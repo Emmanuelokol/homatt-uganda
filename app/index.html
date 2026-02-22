@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Sign Up</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+      <!-- Header -->
+      <div class="signup-header">
+        <div class="logo-section">
+          <div class="app-logo">
+            <span class="material-icons-outlined logo-icon">favorite</span>
+          </div>
+          <h1 class="app-title">Homatt Health</h1>
+          <p class="app-tagline">Your health companion for a better life</p>
+        </div>
+      </div>
+
+      <!-- Sign Up Form -->
+      <div class="form-container">
+        <h2 class="form-title">Create Account</h2>
+        <p class="form-subtitle">Tell us about yourself so we can personalize your health journey</p>
+
+        <!-- Step Indicator -->
+        <div class="step-indicator">
+          <div class="step active" id="step1-dot">
+            <div class="step-number">1</div>
+            <span class="step-label">Personal</span>
+          </div>
+          <div class="step-line active" id="line1"></div>
+          <div class="step" id="step2-dot">
+            <div class="step-number">2</div>
+            <span class="step-label">Location</span>
+          </div>
+          <div class="step-line" id="line2"></div>
+          <div class="step" id="step3-dot">
+            <div class="step-number">3</div>
+            <span class="step-label">Health</span>
+          </div>
+        </div>
+
+        <form id="signupForm" novalidate>
+          <!-- Step 1: Personal Info -->
+          <div class="form-step active" id="step1">
+            <div class="input-group">
+              <label class="input-label" for="firstName">First Name</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">person</span>
+                <input type="text" id="firstName" class="input-field" placeholder="Enter your first name" required>
+              </div>
+              <span class="input-error" id="firstNameError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="lastName">Last Name</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">person_outline</span>
+                <input type="text" id="lastName" class="input-field" placeholder="Enter your last name" required>
+              </div>
+              <span class="input-error" id="lastNameError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="phone">Phone Number</label>
+              <div class="input-wrapper phone-input">
+                <span class="country-code">
+                  <span class="flag">🇺🇬</span>
+                  <span>+256</span>
+                </span>
+                <input type="tel" id="phone" class="input-field phone-field" placeholder="7XX XXX XXX" required>
+              </div>
+              <span class="input-error" id="phoneError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Sex</label>
+              <div class="sex-selector">
+                <button type="button" class="sex-option" data-value="male" id="sexMale">
+                  <span class="material-icons-outlined">male</span>
+                  <span>Male</span>
+                </button>
+                <button type="button" class="sex-option" data-value="female" id="sexFemale">
+                  <span class="material-icons-outlined">female</span>
+                  <span>Female</span>
+                </button>
+              </div>
+              <input type="hidden" id="sex" required>
+              <span class="input-error" id="sexError"></span>
+            </div>
+          </div>
+
+          <!-- Step 2: Location & Family -->
+          <div class="form-step" id="step2">
+            <div class="input-group">
+              <label class="input-label" for="location">District / Region</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">location_on</span>
+                <select id="location" class="input-field select-field" required>
+                  <option value="" disabled selected>Select your district</option>
+                  <option value="kampala">Kampala</option>
+                  <option value="wakiso">Wakiso</option>
+                  <option value="mukono">Mukono</option>
+                  <option value="jinja">Jinja</option>
+                  <option value="mbarara">Mbarara</option>
+                  <option value="gulu">Gulu</option>
+                  <option value="lira">Lira</option>
+                  <option value="mbale">Mbale</option>
+                  <option value="masaka">Masaka</option>
+                  <option value="fort_portal">Fort Portal</option>
+                  <option value="soroti">Soroti</option>
+                  <option value="arua">Arua</option>
+                  <option value="kabale">Kabale</option>
+                  <option value="hoima">Hoima</option>
+                  <option value="entebbe">Entebbe</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <span class="input-error" id="locationError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="city">City / Town</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">location_city</span>
+                <input type="text" id="city" class="input-field" placeholder="Enter your city or town" required>
+              </div>
+              <span class="input-error" id="cityError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label">Do you have a family?</label>
+              <div class="toggle-group">
+                <button type="button" class="toggle-option" data-value="yes" id="familyYes">
+                  <span class="material-icons-outlined">family_restroom</span>
+                  <span>Yes</span>
+                </button>
+                <button type="button" class="toggle-option" data-value="no" id="familyNo">
+                  <span class="material-icons-outlined">person</span>
+                  <span>No</span>
+                </button>
+              </div>
+              <input type="hidden" id="hasFamily" required>
+              <span class="input-error" id="familyError"></span>
+            </div>
+
+            <div class="input-group family-size-group" id="familySizeGroup" style="display:none">
+              <label class="input-label" for="familySize">How many family members?</label>
+              <div class="counter-control">
+                <button type="button" class="counter-btn" id="familyMinus">
+                  <span class="material-icons-outlined">remove</span>
+                </button>
+                <span class="counter-value" id="familySizeDisplay">2</span>
+                <button type="button" class="counter-btn" id="familyPlus">
+                  <span class="material-icons-outlined">add</span>
+                </button>
+              </div>
+              <input type="hidden" id="familySize" value="2">
+              <p class="input-hint">Including yourself</p>
+            </div>
+          </div>
+
+          <!-- Step 3: Health Goals -->
+          <div class="form-step" id="step3">
+            <div class="input-group">
+              <label class="input-label">What are your health goals?</label>
+              <p class="input-hint goals-hint">Select all that apply. This helps us send you personalized preventive tips and schedules.</p>
+              <div class="health-goals-grid">
+                <button type="button" class="goal-card" data-goal="weight">
+                  <span class="material-icons-outlined goal-icon">monitor_weight</span>
+                  <span class="goal-label">Weight Management</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="nutrition">
+                  <span class="material-icons-outlined goal-icon">restaurant</span>
+                  <span class="goal-label">Better Nutrition</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="fitness">
+                  <span class="material-icons-outlined goal-icon">fitness_center</span>
+                  <span class="goal-label">Stay Fit & Active</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="mental">
+                  <span class="material-icons-outlined goal-icon">psychology</span>
+                  <span class="goal-label">Mental Wellness</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="chronic">
+                  <span class="material-icons-outlined goal-icon">medical_services</span>
+                  <span class="goal-label">Manage Chronic Illness</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="maternal">
+                  <span class="material-icons-outlined goal-icon">pregnant_woman</span>
+                  <span class="goal-label">Maternal Health</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="preventive">
+                  <span class="material-icons-outlined goal-icon">health_and_safety</span>
+                  <span class="goal-label">Preventive Care</span>
+                </button>
+                <button type="button" class="goal-card" data-goal="family_health">
+                  <span class="material-icons-outlined goal-icon">diversity_3</span>
+                  <span class="goal-label">Family Health</span>
+                </button>
+              </div>
+              <input type="hidden" id="healthGoals">
+              <span class="input-error" id="goalsError"></span>
+            </div>
+          </div>
+
+          <!-- Navigation Buttons -->
+          <div class="form-navigation">
+            <button type="button" class="btn btn-back" id="btnBack" style="display:none">
+              <span class="material-icons-outlined">arrow_back</span>
+              Back
+            </button>
+            <button type="button" class="btn btn-next" id="btnNext">
+              Continue
+              <span class="material-icons-outlined">arrow_forward</span>
+            </button>
+            <button type="submit" class="btn btn-submit" id="btnSubmit" style="display:none">
+              <span class="material-icons-outlined">check_circle</span>
+              Create Account
+            </button>
+          </div>
+        </form>
+
+        <!-- Terms -->
+        <p class="terms-text">
+          By signing up, you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>
+        </p>
+
+        <p class="login-link">
+          Already have an account? <a href="#">Sign In</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar (preview) -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">calendar_today</span>
+        <span class="nav-label">Schedule</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">favorite</span>
+        <span class="nav-label">Health</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="modal-overlay" id="successModal">
+    <div class="modal-content">
+      <div class="success-animation">
+        <div class="checkmark-circle">
+          <span class="material-icons-outlined checkmark-icon">check_circle</span>
+        </div>
+      </div>
+      <h3 class="modal-title">Welcome to Homatt Health!</h3>
+      <p class="modal-text">Your account has been created successfully. We'll personalize your health journey based on your goals.</p>
+      <button class="btn btn-next modal-btn" id="modalClose">
+        Get Started
+        <span class="material-icons-outlined">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
