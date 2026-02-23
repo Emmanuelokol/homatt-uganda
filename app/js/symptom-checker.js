@@ -1113,6 +1113,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   // ====== AI API Call: OpenAI (primary) → Gemini (fallback) ======
   async function callAI(prompt) {
     console.log('[Homatt AI] Starting AI call chain...');
+    const errors = [];
 
     // 1) Try OpenAI first
     if (OPENAI_API_KEY) {
@@ -1123,11 +1124,13 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           console.log('[Homatt AI] OpenAI SUCCESS');
           return text;
         }
+        errors.push('OpenAI: empty response');
       } catch (err) {
         console.warn('[Homatt AI] OpenAI failed:', err.message);
+        errors.push('OpenAI: ' + err.message);
       }
     } else {
-      console.warn('[Homatt AI] No OpenAI key configured, skipping');
+      errors.push('OpenAI: no key configured');
     }
 
     // 2) Try Gemini models as fallback
@@ -1140,16 +1143,19 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             console.log(`[Homatt AI] Gemini ${model} SUCCESS`);
             return text;
           }
+          errors.push(`${model}: empty response`);
         } catch (err) {
           console.warn(`[Homatt AI] Gemini ${model} failed:`, err.message);
+          errors.push(`${model}: ${err.message}`);
         }
       }
     } else {
-      console.warn('[Homatt AI] No Gemini key configured, skipping');
+      errors.push('Gemini: no key configured');
     }
 
-    console.error('[Homatt AI] All providers failed, falling back to offline engine');
-    throw new Error('All AI providers failed');
+    const errorDetails = errors.join(' | ');
+    console.error('[Homatt AI] All providers failed:', errorDetails);
+    throw new Error(errorDetails);
   }
 
   // ---- Fetch with timeout ----
