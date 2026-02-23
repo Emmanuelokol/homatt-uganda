@@ -1,7 +1,7 @@
 /**
- * Homatt Health - Symptom Checker with Gemini AI
+ * Homatt Health - Symptom Checker with OpenAI + Gemini AI
  * Multi-screen flow: Patient → Symptoms → Follow-up → Results → Monitoring
- * Includes offline fallback engine when API is unavailable
+ * API priority: OpenAI → Gemini → Offline engine
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -11,15 +11,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // ====== Constants ======
-  const GEMINI_API_KEY = 'AIzaSyC9d0bhlF8OqaiiYP0O25Pgjtthzr9FnRk';
+  // ====== API Config (loaded from config.js) ======
+  const cfg = window.HOMATT_CONFIG || {};
+  const OPENAI_API_KEY = cfg.OPENAI_API_KEY || '';
+  const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+  const OPENAI_MODEL = cfg.OPENAI_MODEL || 'gpt-4o-mini';
 
-  // Try multiple models in order until one works
+  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || '';
   const GEMINI_MODELS = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro-latest',
     'gemini-pro',
   ];
 
@@ -231,7 +232,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
 }`;
 
     try {
-      const data = await callGemini(prompt);
+      const data = await callAI(prompt);
       const parsed = parseJSON(data);
 
       if (parsed && parsed.questions) {
@@ -396,7 +397,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown. Use this exact structure:
 Provide 2-3 possible conditions ordered by likelihood. Be specific but compassionate. Use plain language a non-medical person can understand.`;
 
       try {
-        const data = await callGemini(prompt);
+        const data = await callAI(prompt);
         const parsed = parseJSON(data);
 
         if (parsed && parsed.conditions) {
@@ -1089,47 +1090,92 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     localStorage.setItem('homatt_symptom_history', JSON.stringify(history));
   }
 
-  // ====== Gemini API Call (with multi-model fallback) ======
-  async function callGemini(prompt) {
-    let lastError = null;
+  // ====== AI API Call: OpenAI (primary) → Gemini (fallback) ======
+  async function callAI(prompt) {
+    // 1) Try OpenAI first
+    try {
+      const text = await callOpenAI(prompt);
+      if (text) {
+        console.log('OpenAI API success');
+        return text;
+      }
+    } catch (err) {
+      console.warn('OpenAI failed:', err.message);
+    }
 
+    // 2) Try Gemini models as fallback
     for (const model of GEMINI_MODELS) {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: {
-              temperature: 0.3,
-              topP: 0.8,
-              maxOutputTokens: 2048,
-            },
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (text) {
-            console.log('Gemini API success with model:', model);
-            return text;
-          }
+        const text = await callGeminiModel(model, prompt);
+        if (text) {
+          console.log('Gemini API success with model:', model);
+          return text;
         }
-
-        // Log the error but try next model
-        const errText = await response.text().catch(() => '');
-        console.warn(`Model ${model} failed (${response.status}):`, errText.substring(0, 200));
-        lastError = new Error(`${model}: HTTP ${response.status}`);
       } catch (err) {
-        console.warn(`Model ${model} network error:`, err.message);
-        lastError = err;
+        console.warn(`Gemini ${model} failed:`, err.message);
       }
     }
 
-    throw lastError || new Error('All Gemini models failed');
+    throw new Error('All AI providers failed');
+  }
+
+  // ---- OpenAI Call ----
+  async function callOpenAI(prompt) {
+    const response = await fetch(OPENAI_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: OPENAI_MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a medical health assistant for a mobile health app in Uganda called Homatt Health. Always respond with valid JSON only, no markdown or explanation.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 2048,
+      }),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text().catch(() => '');
+      console.warn(`OpenAI error (${response.status}):`, errBody.substring(0, 300));
+      throw new Error(`OpenAI HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.choices?.[0]?.message?.content || '';
+  }
+
+  // ---- Gemini Call (single model) ----
+  async function callGeminiModel(model, prompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          temperature: 0.3,
+          topP: 0.8,
+          maxOutputTokens: 2048,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      console.warn(`Gemini ${model} error (${response.status}):`, errText.substring(0, 200));
+      throw new Error(`Gemini ${model}: HTTP ${response.status}`);
+    }
+
+    const result = await response.json();
+    return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
   // ====== JSON Parser ======

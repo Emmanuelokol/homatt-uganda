@@ -1,2 +1,5 @@
 # Claude MCP config (contains secrets)
 .claude/mcp.json
+
+# API keys config (contains secrets)
+app/js/config.js
