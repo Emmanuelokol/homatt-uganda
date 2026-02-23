@@ -1,6 +1,7 @@
 /**
  * Homatt Health - Symptom Checker with Gemini AI
  * Multi-screen flow: Patient → Symptoms → Follow-up → Results → Monitoring
+ * Includes offline fallback engine when API is unavailable
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -12,17 +13,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ====== Constants ======
   const GEMINI_API_KEY = 'AIzaSyC9d0bhlF8OqaiiYP0O25Pgjtthzr9FnRk';
-  const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+  // Try multiple models in order until one works
+  const GEMINI_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
+    'gemini-pro',
+  ];
 
   // ====== State ======
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
   const family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
-  let selectedPatient = null; // { name, age, sex, relation }
+  let selectedPatient = null;
   let enteredSymptoms = '';
   let selectedChips = new Set();
   let followupAnswers = {};
-  let diagnosisData = null; // store the full AI diagnosis
+  let diagnosisData = null;
   let monitoringSession = null;
+  let aiAvailable = null; // null = untested, true/false after first call
 
   // ====== Elements ======
   const screens = document.querySelectorAll('.sc-screen');
@@ -45,16 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(screenId).classList.add('active');
     currentScreen = screenId;
     document.querySelector('.app-screen').scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Update back button behavior
-    backBtn.style.display = screenId === 'screenPatient' ? 'flex' : 'flex';
   }
 
   backBtn.addEventListener('click', () => {
     if (currentScreen === 'screenPatient') {
       window.location.href = 'dashboard.html';
     } else if (currentScreen === 'screenSymptoms') {
-      // If no family, go back to dashboard
       if (!user.hasFamily || family.length === 0) {
         window.location.href = 'dashboard.html';
       } else {
@@ -79,7 +85,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const list = document.getElementById('patientList');
     list.innerHTML = '';
 
-    // Calculate user age
     let userAge = '';
     if (user.dob) {
       const birth = new Date(user.dob);
@@ -87,7 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
       userAge = Math.floor((today - birth) / (365.25 * 24 * 60 * 60 * 1000));
     }
 
-    // If no family, skip straight to symptoms
     if (!user.hasFamily || family.length === 0) {
       selectedPatient = {
         name: user.firstName || 'User',
@@ -100,7 +104,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Primary user card
     const selfCard = createPatientCard({
       name: `${user.firstName} (You)`,
       icon: 'person',
@@ -117,8 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     list.appendChild(selfCard);
 
-    // Family members
-    family.forEach((member, index) => {
+    family.forEach((member) => {
       const card = createPatientCard({
         name: member.name,
         icon: member.relation === 'child' ? 'child_care' : 'person',
@@ -164,7 +166,6 @@ document.addEventListener('DOMContentLoaded', () => {
     charCount.textContent = symptomInput.value.length;
   });
 
-  // Quick symptom chips
   document.querySelectorAll('.sc-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const symptom = chip.dataset.symptom;
@@ -178,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Analyze button
   document.getElementById('btnAnalyze').addEventListener('click', () => {
     const typed = symptomInput.value.trim();
     const chips = Array.from(selectedChips);
@@ -190,7 +190,6 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Combine symptoms
     const parts = [];
     if (typed) parts.push(typed);
     if (chips.length > 0) parts.push(chips.join(', '));
@@ -200,12 +199,20 @@ document.addEventListener('DOMContentLoaded', () => {
     getFollowupQuestions();
   });
 
-  // ====== SCREEN 3: Follow-up Questions (Gemini AI) ======
+  // ====== SCREEN 3: Follow-up Questions ======
   async function getFollowupQuestions() {
     const loading = document.getElementById('followupLoading');
     const content = document.getElementById('followupContent');
     loading.style.display = 'flex';
     content.style.display = 'none';
+
+    // If we already know AI is unavailable, skip to fallback
+    if (aiAvailable === false) {
+      renderFollowupQuestions(getSmartFallbackQuestions(enteredSymptoms));
+      loading.style.display = 'none';
+      content.style.display = 'block';
+      return;
+    }
 
     const prompt = `You are a health assistant for a mobile health app in Uganda. A patient has described these symptoms: "${enteredSymptoms}".
 
@@ -228,40 +235,73 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       const parsed = parseJSON(data);
 
       if (parsed && parsed.questions) {
+        aiAvailable = true;
         renderFollowupQuestions(parsed.questions);
-        loading.style.display = 'none';
-        content.style.display = 'block';
       } else {
         throw new Error('Invalid response format');
       }
     } catch (err) {
-      console.error('Follow-up error:', err);
-      // Fallback questions
-      renderFollowupQuestions(getFallbackQuestions());
-      loading.style.display = 'none';
-      content.style.display = 'block';
+      console.warn('AI follow-up failed, using smart fallback:', err.message);
+      aiAvailable = false;
+      renderFollowupQuestions(getSmartFallbackQuestions(enteredSymptoms));
     }
+
+    loading.style.display = 'none';
+    content.style.display = 'block';
   }
 
-  function getFallbackQuestions() {
-    return [
+  function getSmartFallbackQuestions(symptoms) {
+    const s = symptoms.toLowerCase();
+    const questions = [
       {
         question: 'How long have you been experiencing these symptoms?',
         options: ['Less than 24 hours', '1-3 days', '4-7 days', 'More than a week'],
       },
       {
-        question: 'How severe is the discomfort?',
-        options: ['Mild - I can go about my day', 'Moderate - It\'s bothering me', 'Severe - It\'s hard to function'],
-      },
-      {
-        question: 'Have you taken any medication for this?',
-        options: ['No, nothing yet', 'Over-the-counter medicine', 'Prescribed medication', 'Traditional remedies'],
-      },
-      {
-        question: 'Do you have any of these additional symptoms?',
-        options: ['Fever or chills', 'Loss of appetite', 'Difficulty sleeping', 'None of these'],
+        question: 'How severe is the discomfort right now?',
+        options: ['Mild - I can go about my day', 'Moderate - It bothers me a lot', 'Severe - I can barely function'],
       },
     ];
+
+    // Add symptom-specific questions
+    if (s.includes('fever') || s.includes('hot') || s.includes('temperature') || s.includes('chills')) {
+      questions.push({
+        question: 'What is your temperature like?',
+        options: ['Slightly warm', 'High fever (above 38°C)', 'Very high fever with chills', 'Comes and goes'],
+      });
+    } else if (s.includes('headache') || s.includes('head')) {
+      questions.push({
+        question: 'Where exactly is the headache?',
+        options: ['Front of head / forehead', 'Both sides', 'Back of head / neck', 'All over'],
+      });
+    } else if (s.includes('stomach') || s.includes('abdominal') || s.includes('belly')) {
+      questions.push({
+        question: 'Where is the stomach pain?',
+        options: ['Upper stomach', 'Lower stomach', 'Around the navel', 'All over the abdomen'],
+      });
+    } else if (s.includes('cough') || s.includes('chest') || s.includes('breathing')) {
+      questions.push({
+        question: 'What type of cough do you have?',
+        options: ['Dry cough', 'Cough with mucus/phlegm', 'Cough with blood', 'Wheezing / difficulty breathing'],
+      });
+    } else if (s.includes('diarrhea') || s.includes('vomit') || s.includes('nausea')) {
+      questions.push({
+        question: 'How often are you experiencing this?',
+        options: ['1-2 times today', '3-5 times today', 'More than 5 times', 'Constant nausea'],
+      });
+    } else {
+      questions.push({
+        question: 'Have you had these symptoms before?',
+        options: ['No, this is the first time', 'Yes, it happened once before', 'Yes, it keeps coming back', 'It runs in my family'],
+      });
+    }
+
+    questions.push({
+      question: 'Do you have any of these additional symptoms?',
+      options: ['Fever or chills', 'Loss of appetite', 'Body weakness / fatigue', 'None of these'],
+    });
+
+    return questions;
   }
 
   function renderFollowupQuestions(questions) {
@@ -275,7 +315,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       questionEl.innerHTML = `
         <p class="sc-question-text">${qIndex + 1}. ${q.question}</p>
         <div class="sc-options-wrap" data-qindex="${qIndex}">
-          ${q.options.map((opt, oIndex) => `
+          ${q.options.map((opt) => `
             <button class="sc-option-btn" data-qindex="${qIndex}" data-value="${opt}">
               ${opt}
             </button>
@@ -285,11 +325,9 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       list.appendChild(questionEl);
     });
 
-    // Option click handlers
     list.querySelectorAll('.sc-option-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const qi = btn.dataset.qindex;
-        // Deselect siblings
         btn.closest('.sc-options-wrap').querySelectorAll('.sc-option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         followupAnswers[qi] = btn.dataset.value;
@@ -299,7 +337,6 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
 
   // Get diagnosis button
   document.getElementById('btnGetDiagnosis').addEventListener('click', () => {
-    // Check at least 2 questions answered
     if (Object.keys(followupAnswers).length < 2) {
       const firstUnanswered = document.querySelector('.sc-options-wrap:not(:has(.selected))');
       if (firstUnanswered) {
@@ -313,7 +350,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
     getDiagnosis();
   });
 
-  // ====== SCREEN 4: Diagnosis Results (Gemini AI) ======
+  // ====== SCREEN 4: Diagnosis Results ======
   async function getDiagnosis() {
     const loading = document.getElementById('resultsLoading');
     const content = document.getElementById('resultsContent');
@@ -324,7 +361,9 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       .map(([k, v]) => v)
       .join('; ');
 
-    const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
+    // Try AI first, fall back to local engine
+    if (aiAvailable !== false) {
+      const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
 
 A patient described these symptoms: "${enteredSymptoms}"
 Follow-up answers: "${answersText}"
@@ -356,37 +395,401 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown. Use this exact structure:
 
 Provide 2-3 possible conditions ordered by likelihood. Be specific but compassionate. Use plain language a non-medical person can understand.`;
 
-    try {
-      const data = await callGemini(prompt);
-      const parsed = parseJSON(data);
+      try {
+        const data = await callGemini(prompt);
+        const parsed = parseJSON(data);
 
-      if (parsed && parsed.conditions) {
-        diagnosisData = parsed;
-        renderDiagnosis(parsed);
-        loading.style.display = 'none';
-        content.style.display = 'block';
-
-        // Save to history
-        saveToHistory(parsed);
-      } else {
-        throw new Error('Invalid diagnosis format');
+        if (parsed && parsed.conditions) {
+          aiAvailable = true;
+          diagnosisData = parsed;
+          renderDiagnosis(parsed);
+          loading.style.display = 'none';
+          content.style.display = 'block';
+          saveToHistory(parsed);
+          return;
+        }
+        throw new Error('Invalid AI response');
+      } catch (err) {
+        console.warn('AI diagnosis failed, using local engine:', err.message);
+        aiAvailable = false;
       }
-    } catch (err) {
-      console.error('Diagnosis error:', err);
-      loading.style.display = 'none';
-      content.style.display = 'block';
-      renderDiagnosisError();
     }
+
+    // Fallback: local symptom analysis engine
+    const localDiagnosis = analyzeSymptoms(enteredSymptoms, answersText);
+    diagnosisData = localDiagnosis;
+    renderDiagnosis(localDiagnosis);
+    loading.style.display = 'none';
+    content.style.display = 'block';
+    saveToHistory(localDiagnosis);
   }
 
+  // ====================================================================
+  // OFFLINE SYMPTOM ANALYSIS ENGINE
+  // A rule-based system mapping symptoms to common East African conditions
+  // ====================================================================
+  function analyzeSymptoms(symptoms, answers) {
+    const s = (symptoms + ' ' + answers).toLowerCase();
+
+    // Symptom detection helpers
+    const has = (terms) => terms.some(t => s.includes(t));
+
+    // Identify symptoms present
+    const identified = [];
+    if (has(['headache', 'head pain', 'head ache'])) identified.push('Headache');
+    if (has(['fever', 'high temperature', 'hot body', 'chills'])) identified.push('Fever');
+    if (has(['cough', 'coughing'])) identified.push('Cough');
+    if (has(['stomach pain', 'abdominal', 'belly pain', 'tummy'])) identified.push('Stomach pain');
+    if (has(['diarrhea', 'diarrhoea', 'loose stool', 'watery stool'])) identified.push('Diarrhea');
+    if (has(['vomit', 'throwing up', 'nausea', 'feel sick'])) identified.push('Nausea/Vomiting');
+    if (has(['fatigue', 'tired', 'weakness', 'weak', 'no energy'])) identified.push('Fatigue');
+    if (has(['body ache', 'body pain', 'joint pain', 'muscle'])) identified.push('Body aches');
+    if (has(['sore throat', 'throat pain', 'swallow'])) identified.push('Sore throat');
+    if (has(['dizziness', 'dizzy', 'lightheaded'])) identified.push('Dizziness');
+    if (has(['chest pain', 'chest tight', 'breathing', 'breathless'])) identified.push('Chest discomfort');
+    if (has(['back pain', 'lower back', 'backache'])) identified.push('Back pain');
+    if (has(['rash', 'skin', 'itching', 'itchy'])) identified.push('Skin irritation');
+    if (has(['runny nose', 'sneezing', 'blocked nose', 'congestion'])) identified.push('Nasal congestion');
+    if (has(['urination', 'urine', 'peeing', 'burning pee'])) identified.push('Urinary symptoms');
+    if (has(['eye', 'red eye', 'watery eye'])) identified.push('Eye irritation');
+    if (has(['loss of appetite', 'no appetite', 'not hungry'])) identified.push('Loss of appetite');
+
+    if (identified.length === 0) {
+      identified.push(symptoms.split(/[,.;]+/)[0].trim());
+    }
+
+    // Score conditions based on symptom matches
+    const conditions = [];
+    let overallRisk = 'low';
+    let shouldVisitClinic = false;
+    let clinicUrgency = 'none';
+
+    // ---------- MALARIA ----------
+    if (has(['fever', 'chills', 'hot']) || has(['headache']) || has(['body ache', 'joint pain'])) {
+      let score = 0;
+      if (has(['fever', 'chills', 'hot body', 'high temperature'])) score += 35;
+      if (has(['headache', 'head pain'])) score += 15;
+      if (has(['body ache', 'joint pain', 'muscle'])) score += 15;
+      if (has(['fatigue', 'tired', 'weakness'])) score += 10;
+      if (has(['nausea', 'vomit', 'loss of appetite'])) score += 10;
+      if (has(['sweating', 'sweat'])) score += 10;
+      score = Math.min(score, 85);
+      if (score >= 40) {
+        conditions.push({
+          name: 'Malaria',
+          likelihood_percent: score,
+          severity: score >= 65 ? 'high' : 'medium',
+          description: 'A mosquito-borne illness very common in Uganda. Causes fever, chills, headache, and body aches. Treatable with antimalarial medication when caught early.',
+        });
+      }
+    }
+
+    // ---------- TYPHOID ----------
+    if (has(['fever']) || has(['stomach', 'abdominal']) || has(['headache'])) {
+      let score = 0;
+      if (has(['fever', 'high temperature'])) score += 25;
+      if (has(['stomach pain', 'abdominal', 'belly'])) score += 20;
+      if (has(['headache'])) score += 10;
+      if (has(['diarrhea', 'loose stool']) || has(['constipat'])) score += 15;
+      if (has(['loss of appetite', 'no appetite'])) score += 10;
+      if (has(['fatigue', 'weakness'])) score += 10;
+      if (has(['more than a week', '4-7 days'])) score += 10;
+      score = Math.min(score, 80);
+      if (score >= 35) {
+        conditions.push({
+          name: 'Typhoid Fever',
+          likelihood_percent: score,
+          severity: score >= 60 ? 'high' : 'medium',
+          description: 'A bacterial infection spread through contaminated food or water. Causes prolonged fever, stomach pain, and fatigue. Requires antibiotic treatment.',
+        });
+      }
+    }
+
+    // ---------- COMMON COLD / FLU ----------
+    if (has(['cough', 'sore throat', 'runny nose', 'sneezing', 'congestion'])) {
+      let score = 0;
+      if (has(['cough'])) score += 20;
+      if (has(['sore throat', 'throat pain'])) score += 20;
+      if (has(['runny nose', 'sneezing', 'blocked nose', 'congestion'])) score += 20;
+      if (has(['fever', 'mild fever'])) score += 10;
+      if (has(['headache'])) score += 10;
+      if (has(['body ache'])) score += 10;
+      if (has(['less than 24', '1-3 days'])) score += 5;
+      score = Math.min(score, 80);
+      if (score >= 30) {
+        conditions.push({
+          name: 'Common Cold / Upper Respiratory Infection',
+          likelihood_percent: score,
+          severity: 'low',
+          description: 'A viral infection affecting the nose and throat. Usually clears up on its own within 5-7 days with rest and fluids.',
+        });
+      }
+    }
+
+    // ---------- GASTROENTERITIS ----------
+    if (has(['diarrhea', 'vomit', 'nausea', 'stomach'])) {
+      let score = 0;
+      if (has(['diarrhea', 'loose stool', 'watery stool'])) score += 30;
+      if (has(['vomit', 'throwing up'])) score += 25;
+      if (has(['stomach pain', 'abdominal', 'cramp'])) score += 15;
+      if (has(['nausea', 'feel sick'])) score += 10;
+      if (has(['fever'])) score += 5;
+      if (has(['more than 5', 'constant'])) score += 10;
+      score = Math.min(score, 80);
+      if (score >= 35) {
+        conditions.push({
+          name: 'Gastroenteritis (Stomach Flu)',
+          likelihood_percent: score,
+          severity: has(['more than 5', 'severe', 'barely function']) ? 'medium' : 'low',
+          description: 'An infection of the stomach and intestines causing diarrhea, vomiting, and stomach cramps. Stay hydrated with ORS (oral rehydration salts).',
+        });
+      }
+    }
+
+    // ---------- UTI ----------
+    if (has(['urination', 'urine', 'peeing', 'burning', 'frequent'])) {
+      let score = 0;
+      if (has(['burning', 'pain when peeing', 'burning pee'])) score += 30;
+      if (has(['frequent', 'often', 'urination'])) score += 20;
+      if (has(['lower back', 'back pain'])) score += 15;
+      if (has(['fever'])) score += 10;
+      if (has(['stomach pain', 'lower stomach', 'abdominal'])) score += 10;
+      score = Math.min(score, 75);
+      if (score >= 30) {
+        conditions.push({
+          name: 'Urinary Tract Infection (UTI)',
+          likelihood_percent: score,
+          severity: 'medium',
+          description: 'A bacterial infection in the urinary system. Common symptoms include burning during urination and frequent urge to urinate. Treatable with antibiotics.',
+        });
+      }
+    }
+
+    // ---------- TENSION HEADACHE / MIGRAINE ----------
+    if (has(['headache', 'head pain']) && !has(['fever'])) {
+      let score = 0;
+      if (has(['headache', 'head pain'])) score += 35;
+      if (has(['both sides', 'all over', 'forehead'])) score += 15;
+      if (has(['stress', 'screen', 'sleep'])) score += 10;
+      if (has(['dizziness', 'dizzy'])) score += 10;
+      if (has(['nausea'])) score += 10;
+      if (has(['mild'])) score += 5;
+      score = Math.min(score, 70);
+      if (score >= 30) {
+        conditions.push({
+          name: 'Tension Headache',
+          likelihood_percent: score,
+          severity: 'low',
+          description: 'A common headache often caused by stress, dehydration, lack of sleep, or eye strain. Usually resolves with rest, water, and pain relief.',
+        });
+      }
+    }
+
+    // ---------- RESPIRATORY INFECTION ----------
+    if (has(['cough', 'chest', 'breathing', 'phlegm', 'wheezing'])) {
+      let score = 0;
+      if (has(['chest pain', 'chest tight'])) score += 25;
+      if (has(['cough with mucus', 'phlegm'])) score += 20;
+      if (has(['breathing', 'breathless', 'wheezing'])) score += 20;
+      if (has(['fever'])) score += 10;
+      if (has(['more than a week'])) score += 10;
+      score = Math.min(score, 80);
+      if (score >= 35) {
+        conditions.push({
+          name: 'Lower Respiratory Infection',
+          likelihood_percent: score,
+          severity: has(['breathless', 'blood', 'severe']) ? 'high' : 'medium',
+          description: 'An infection affecting the lungs or lower airways. Can include bronchitis or pneumonia. May require medical attention especially if breathing is difficult.',
+        });
+      }
+    }
+
+    // ---------- GENERAL BODY PAIN ----------
+    if (has(['back pain', 'muscle', 'body ache']) && conditions.length < 2) {
+      conditions.push({
+        name: 'Musculoskeletal Pain',
+        likelihood_percent: 45,
+        severity: 'low',
+        description: 'Pain in muscles, joints, or back often caused by physical strain, poor posture, or carrying heavy loads. Rest and gentle stretching usually help.',
+      });
+    }
+
+    // Sort by likelihood
+    conditions.sort((a, b) => b.likelihood_percent - a.likelihood_percent);
+
+    // Keep top 3
+    const topConditions = conditions.slice(0, 3);
+
+    // If no conditions matched, provide general guidance
+    if (topConditions.length === 0) {
+      topConditions.push({
+        name: 'Unspecified Symptoms',
+        likelihood_percent: 50,
+        severity: 'medium',
+        description: 'Your symptoms need further evaluation. We recommend visiting a healthcare provider for a proper examination and possible lab tests.',
+      });
+    }
+
+    // Determine overall risk
+    const highRisk = topConditions.some(c => c.severity === 'high');
+    const medRisk = topConditions.some(c => c.severity === 'medium');
+    const hasSevereAnswers = has(['severe', 'barely function', 'very high', 'blood', 'more than 5']);
+
+    if (highRisk || hasSevereAnswers) {
+      overallRisk = 'high';
+      shouldVisitClinic = true;
+      clinicUrgency = 'urgent';
+    } else if (medRisk || has(['moderate', 'more than a week', '4-7 days'])) {
+      overallRisk = 'medium';
+      clinicUrgency = 'soon';
+    }
+
+    // Build causes based on top condition
+    const topName = topConditions[0].name.toLowerCase();
+    let causes, preventionTips, immediateActions, followupMsg;
+
+    if (topName.includes('malaria')) {
+      causes = [
+        'Bite from an infected Anopheles mosquito',
+        'Being in an area with stagnant water where mosquitoes breed',
+        'Not sleeping under a treated mosquito net',
+      ];
+      preventionTips = [
+        'Sleep under an insecticide-treated mosquito net every night',
+        'Use mosquito repellent, especially in the evening',
+        'Remove stagnant water around your home',
+        'Wear long sleeves and pants in the evening',
+      ];
+      immediateActions = [
+        'Get a malaria rapid test (RDT) at the nearest clinic or pharmacy',
+        'Take plenty of fluids and rest while waiting for results',
+      ];
+      followupMsg = 'Malaria is very treatable when caught early. If your fever persists or gets worse, please visit a health facility immediately for testing and treatment.';
+    } else if (topName.includes('typhoid')) {
+      causes = [
+        'Drinking contaminated water',
+        'Eating food prepared in unhygienic conditions',
+        'Contact with an infected person who handles food',
+      ];
+      preventionTips = [
+        'Always drink boiled or treated water',
+        'Wash hands thoroughly before eating and after using the toilet',
+        'Eat freshly cooked food and avoid street food if possible',
+        'Get a typhoid vaccination if available',
+      ];
+      immediateActions = [
+        'Visit a health facility for a Widal test or blood culture',
+        'Stay hydrated and rest',
+      ];
+      followupMsg = 'Typhoid fever requires antibiotic treatment from a doctor. Do not self-medicate. Visit a health facility for proper diagnosis and treatment.';
+    } else if (topName.includes('cold') || topName.includes('respiratory')) {
+      causes = [
+        'Viral infection spread through air droplets',
+        'Close contact with someone who has a cold',
+        'Weakened immune system due to stress or poor nutrition',
+      ];
+      preventionTips = [
+        'Rest and get plenty of sleep',
+        'Drink warm fluids like tea with honey and lemon',
+        'Gargle with warm salt water for sore throat',
+        'Wash hands frequently to prevent spreading',
+      ];
+      immediateActions = [
+        'Take paracetamol for fever and pain if needed',
+        'Stay hydrated with warm fluids',
+      ];
+      followupMsg = 'Most colds clear up in 5-7 days. If your cough lasts more than 2 weeks or you have difficulty breathing, please visit a health facility.';
+    } else if (topName.includes('gastro') || topName.includes('stomach')) {
+      causes = [
+        'Eating contaminated or undercooked food',
+        'Drinking unsafe water',
+        'Viral or bacterial infection',
+      ];
+      preventionTips = [
+        'Drink ORS (Oral Rehydration Salts) to prevent dehydration',
+        'Eat bland foods like rice, bananas, and toast when able',
+        'Avoid dairy, spicy, and fatty foods until recovered',
+        'Wash hands thoroughly and ensure food is well-cooked',
+      ];
+      immediateActions = [
+        'Start ORS immediately to replace lost fluids',
+        'If diarrhea persists beyond 3 days, visit a health facility',
+      ];
+      followupMsg = 'The most important thing is to stay hydrated. If you see blood in stool, can\'t keep fluids down, or symptoms last more than 3 days, seek medical care.';
+    } else if (topName.includes('uti')) {
+      causes = [
+        'Bacteria entering the urinary tract',
+        'Not drinking enough water',
+        'Poor hygiene practices',
+      ];
+      preventionTips = [
+        'Drink plenty of water (at least 8 glasses daily)',
+        'Maintain good personal hygiene',
+        'Don\'t hold urine for too long',
+        'Wear loose, breathable cotton underwear',
+      ];
+      immediateActions = [
+        'Drink lots of water to help flush out bacteria',
+        'Visit a health facility for a urine test and antibiotics',
+      ];
+      followupMsg = 'UTIs are easily treatable with antibiotics. Don\'t ignore the symptoms - visit a clinic for a urine test and proper treatment.';
+    } else if (topName.includes('headache') || topName.includes('tension')) {
+      causes = [
+        'Stress and tension',
+        'Dehydration - not drinking enough water',
+        'Eye strain from screens or poor lighting',
+        'Lack of sleep or irregular sleep patterns',
+      ];
+      preventionTips = [
+        'Drink at least 8 glasses of water daily',
+        'Take regular breaks from screens (20-20-20 rule)',
+        'Get 7-8 hours of sleep each night',
+        'Practice relaxation techniques like deep breathing',
+      ];
+      immediateActions = [
+        'Drink 2 glasses of water and rest in a quiet, dark room',
+        'Take paracetamol if the pain is bothering you',
+      ];
+      followupMsg = 'Tension headaches are usually not serious. If headaches become frequent or very severe, or come with vision changes, please see a doctor.';
+    } else {
+      causes = [
+        'Could have multiple possible causes',
+        'May be related to lifestyle, diet, or environment',
+        'Further examination needed to determine exact cause',
+      ];
+      preventionTips = [
+        'Stay hydrated and eat nutritious meals',
+        'Get adequate rest and sleep',
+        'Visit a health facility if symptoms persist beyond 3 days',
+        'Keep track of your symptoms and any changes',
+      ];
+      immediateActions = [
+        'Rest and monitor your symptoms closely',
+        'Visit a health facility for proper evaluation',
+      ];
+      followupMsg = 'We recommend monitoring your symptoms. If they persist, worsen, or new symptoms appear, please visit a health facility for proper examination.';
+    }
+
+    return {
+      symptoms_identified: identified,
+      conditions: topConditions,
+      causes,
+      prevention_tips: preventionTips,
+      immediate_actions: immediateActions,
+      overall_risk: overallRisk,
+      followup_message: followupMsg,
+      should_visit_clinic: shouldVisitClinic,
+      clinic_urgency: clinicUrgency,
+    };
+  }
+
+  // ====== Render Diagnosis ======
   function renderDiagnosis(data) {
-    // Symptom tags
     const tagsEl = document.getElementById('symptomTags');
     tagsEl.innerHTML = data.symptoms_identified
       .map(s => `<span class="sc-tag">${s}</span>`)
       .join('');
 
-    // Conditions
     const condList = document.getElementById('conditionsList');
     condList.innerHTML = '';
     data.conditions.forEach((cond, i) => {
@@ -415,11 +818,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       condList.appendChild(condEl);
     });
 
-    // Causes
     document.getElementById('causesBody').innerHTML =
       `<ul class="sc-info-list">${data.causes.map(c => `<li>${c}</li>`).join('')}</ul>`;
 
-    // Prevention
     document.getElementById('preventionBody').innerHTML =
       `<ul class="sc-info-list">${data.prevention_tips.map(t => `<li>${t}</li>`).join('')}</ul>`;
 
@@ -478,13 +879,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const bookClinicBtn = document.getElementById('btnBookClinic');
     if (bookClinicBtn) {
       bookClinicBtn.addEventListener('click', () => {
-        // Store the condition for clinic booking
         localStorage.setItem('homatt_clinic_reason', JSON.stringify({
           condition: data.conditions[0]?.name || 'Health Check',
           urgency: data.clinic_urgency || data.overall_risk,
           symptoms: data.symptoms_identified,
         }));
-        // For now, show a message. Later will navigate to clinic finder
         alert('Clinic finder coming soon! In the meantime, please visit your nearest health facility.');
       });
     }
@@ -504,23 +903,6 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
   }
 
-  function renderDiagnosisError() {
-    document.getElementById('resultsContent').innerHTML = `
-      <div class="sc-disclaimer">
-        <span class="material-icons-outlined" style="font-size:18px">error</span>
-        <p>We couldn't complete the assessment right now. Please check your internet connection and try again.</p>
-      </div>
-      <button class="btn btn-next" onclick="location.reload()">
-        <span class="material-icons-outlined">refresh</span>
-        Try Again
-      </button>
-      <button class="btn sc-home-btn" style="margin-top:10px" onclick="location.href='dashboard.html'">
-        <span class="material-icons-outlined">home</span>
-        Back to Dashboard
-      </button>
-    `;
-  }
-
   function getLikelihoodColor(percent) {
     if (percent >= 70) return '#D32F2F';
     if (percent >= 40) return '#F57C00';
@@ -537,10 +919,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       symptomsSame: 0,
     };
 
-    // Save monitoring session
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
-    // Show monitor condition
     document.getElementById('monitorCondition').innerHTML = `
       <div class="sc-monitor-cond-card">
         <span class="material-icons-outlined">medical_information</span>
@@ -551,7 +931,6 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       </div>
     `;
 
-    // Reset feeling options
     document.getElementById('monitorResponse').style.display = 'none';
     document.getElementById('monitorTimer').style.display = 'none';
     document.querySelectorAll('.sc-feeling-btn').forEach(b => {
@@ -565,21 +944,18 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
   function wireMonitoringButtons() {
     document.querySelectorAll('.sc-feeling-btn').forEach(btn => {
-      // Remove old listeners by cloning
       const newBtn = btn.cloneNode(true);
       btn.parentNode.replaceChild(newBtn, btn);
 
       newBtn.addEventListener('click', () => {
         const feeling = newBtn.dataset.feeling;
 
-        // Highlight selection
         document.querySelectorAll('.sc-feeling-btn').forEach(b => {
           b.classList.remove('selected');
           b.disabled = true;
         });
         newBtn.classList.add('selected');
 
-        // Record check-in
         monitoringSession.checkIns.push({
           feeling,
           time: new Date().toISOString(),
@@ -592,14 +968,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         }
 
         localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
-
-        // Handle response
         handleMonitoringResponse(feeling);
       });
     });
   }
 
-  async function handleMonitoringResponse(feeling) {
+  function handleMonitoringResponse(feeling) {
     const responseEl = document.getElementById('monitorResponse');
     const timerEl = document.getElementById('monitorTimer');
 
@@ -615,10 +989,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       `;
       responseEl.style.display = 'block';
       timerEl.style.display = 'flex';
-      scheduleNextCheckIn(2); // 2 hours for improving
+      scheduleNextCheckIn(2);
     } else if (feeling === 'same') {
       if (monitoringSession.symptomsSame >= 2) {
-        // Symptoms persisted through multiple check-ins
         responseEl.innerHTML = `
           <div class="sc-monitor-msg escalate">
             <span class="material-icons-outlined">warning</span>
@@ -653,7 +1026,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         `;
         responseEl.style.display = 'block';
         timerEl.style.display = 'flex';
-        scheduleNextCheckIn(1); // 1 hour
+        scheduleNextCheckIn(1);
       }
     } else if (feeling === 'worse') {
       responseEl.innerHTML = `
@@ -696,7 +1069,6 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     document.getElementById('nextCheckTime').textContent =
       hours === 1 ? '1 hour' : `${hours} hours`;
 
-    // Store next check-in time
     const nextTime = new Date();
     nextTime.setHours(nextTime.getHours() + hours);
     monitoringSession.nextCheckIn = nextTime.toISOString();
@@ -713,40 +1085,55 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       conditions: data.conditions,
       risk: data.overall_risk,
     });
-    // Keep last 20 entries
     if (history.length > 20) history.pop();
     localStorage.setItem('homatt_symptom_history', JSON.stringify(history));
   }
 
-  // ====== Gemini API Call ======
+  // ====== Gemini API Call (with multi-model fallback) ======
   async function callGemini(prompt) {
-    const response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{ text: prompt }],
-        }],
-        generationConfig: {
-          temperature: 0.3,
-          topP: 0.8,
-          maxOutputTokens: 2048,
-        },
-      }),
-    });
+    let lastError = null;
 
-    if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+    for (const model of GEMINI_MODELS) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              temperature: 0.3,
+              topP: 0.8,
+              maxOutputTokens: 2048,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
+          if (text) {
+            console.log('Gemini API success with model:', model);
+            return text;
+          }
+        }
+
+        // Log the error but try next model
+        const errText = await response.text().catch(() => '');
+        console.warn(`Model ${model} failed (${response.status}):`, errText.substring(0, 200));
+        lastError = new Error(`${model}: HTTP ${response.status}`);
+      } catch (err) {
+        console.warn(`Model ${model} network error:`, err.message);
+        lastError = err;
+      }
     }
 
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return text;
+    throw lastError || new Error('All Gemini models failed');
   }
 
-  // ====== JSON Parser (handles markdown code blocks) ======
+  // ====== JSON Parser ======
   function parseJSON(text) {
-    // Strip markdown code fences if present
     let cleaned = text.trim();
     if (cleaned.startsWith('```json')) {
       cleaned = cleaned.slice(7);
@@ -774,7 +1161,6 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       const nextTime = new Date(session.nextCheckIn);
       const now = new Date();
       if (now >= nextTime) {
-        // Time for a check-in
         monitoringSession = session;
         diagnosisData = { conditions: [{ name: session.condition }], overall_risk: session.risk };
         document.getElementById('monitorCondition').innerHTML = `
