@@ -110,10 +110,9 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   document.querySelector('.alert-detail').textContent = riskMessages[userRisk];
 
-  // ====== Feature Cards (placeholder navigation) ======
-  // These will navigate to their respective feature pages in future phases
+  // ====== Feature Cards Navigation ======
   document.getElementById('symptomChecker').addEventListener('click', () => {
-    // Phase 1: will navigate to symptom checker
+    window.location.href = 'symptom-checker.html';
   });
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
