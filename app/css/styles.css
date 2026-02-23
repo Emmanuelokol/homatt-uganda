@@ -422,6 +422,24 @@ body {
   padding-left: 0;
 }
 
+/* Password Toggle */
+.password-toggle {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  color: var(--text-hint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+  color: var(--text-secondary);
+}
+
 /* Sex Selector */
 .sex-selector {
   display: grid;
@@ -678,6 +696,84 @@ body {
   color: var(--primary);
   text-decoration: none;
   font-weight: 600;
+}
+
+/* Sign In Page */
+.signin-header {
+  padding-bottom: 48px;
+}
+
+.signin-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  margin-top: 4px;
+}
+
+.remember-me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.remember-me input[type="checkbox"] {
+  display: none;
+}
+
+.checkmark-box {
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid var(--border);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.remember-me input[type="checkbox"]:checked + .checkmark-box {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.remember-me input[type="checkbox"]:checked + .checkmark-box::after {
+  content: '✓';
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.forgot-link {
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.signin-btn {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.signin-error {
+  font-size: 13px;
+  color: var(--error);
+  background: var(--error-bg);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 16px;
+  text-align: center;
+  display: none;
+}
+
+.signin-error.visible {
+  display: block;
 }
 
 /* Bottom Navigation */

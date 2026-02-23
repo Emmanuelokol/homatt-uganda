@@ -94,6 +94,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // ====== Password Toggle ======
+
+  const togglePassword = document.getElementById('togglePassword');
+  const passwordInput = document.getElementById('password');
+  if (togglePassword && passwordInput) {
+    togglePassword.addEventListener('click', () => {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      togglePassword.querySelector('.material-icons-outlined').textContent =
+        type === 'password' ? 'visibility_off' : 'visibility';
+    });
+  }
+
   // ====== Family Toggle ======
 
   document.querySelectorAll('.toggle-option').forEach(btn => {
@@ -183,6 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
       const lastName = document.getElementById('lastName').value.trim();
       const phone = document.getElementById('phone').value.trim();
       const sex = document.getElementById('sex').value;
+      const dob = document.getElementById('dob').value;
+      const password = document.getElementById('password').value;
 
       if (!firstName) {
         showError('firstNameError', 'Please enter your first name');
@@ -208,11 +223,28 @@ document.addEventListener('DOMContentLoaded', () => {
         clearError('phoneError');
       }
 
+      if (!dob) {
+        showError('dobError', 'Please enter your date of birth');
+        valid = false;
+      } else {
+        clearError('dobError');
+      }
+
       if (!sex) {
         showError('sexError', 'Please select your sex');
         valid = false;
       } else {
         clearError('sexError');
+      }
+
+      if (!password) {
+        showError('passwordError', 'Please create a password');
+        valid = false;
+      } else if (password.length < 6) {
+        showError('passwordError', 'Password must be at least 6 characters');
+        valid = false;
+      } else {
+        clearError('passwordError');
       }
     }
 
@@ -298,7 +330,9 @@ document.addEventListener('DOMContentLoaded', () => {
       firstName: document.getElementById('firstName').value.trim(),
       lastName: document.getElementById('lastName').value.trim(),
       phone: '+256' + document.getElementById('phone').value.replace(/\s/g, ''),
+      dob: document.getElementById('dob').value,
       sex: document.getElementById('sex').value,
+      password: document.getElementById('password').value,
       location: document.getElementById('location').value,
       city: document.getElementById('city').value.trim(),
       hasFamily: document.getElementById('hasFamily').value === 'yes',
@@ -306,9 +340,17 @@ document.addEventListener('DOMContentLoaded', () => {
         ? parseInt(document.getElementById('familySize').value)
         : 0,
       healthGoals: Array.from(selectedGoals),
+      createdAt: new Date().toISOString(),
     };
 
-    console.log('Sign Up Data:', formData);
+    // Save user to localStorage
+    localStorage.setItem('homatt_user', JSON.stringify(formData));
+    localStorage.setItem('homatt_logged_in', 'true');
+
+    // Initialize empty family members if has family
+    if (formData.hasFamily) {
+      localStorage.setItem('homatt_family', JSON.stringify([]));
+    }
 
     // Show success modal
     successModal.classList.add('visible');
@@ -316,5 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   modalClose.addEventListener('click', () => {
     successModal.classList.remove('visible');
+    // Navigate to dashboard
+    window.location.href = 'dashboard.html';
   });
 });

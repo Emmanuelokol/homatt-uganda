@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+      <!-- Header -->
+      <div class="signup-header signin-header">
+        <div class="logo-section">
+          <div class="app-logo">
+            <span class="material-icons-outlined logo-icon">favorite</span>
+          </div>
+          <h1 class="app-title">Homatt Health</h1>
+          <p class="app-tagline">Welcome back to your health journey</p>
+        </div>
+      </div>
+
+      <!-- Sign In Form -->
+      <div class="form-container">
+        <h2 class="form-title">Sign In</h2>
+        <p class="form-subtitle">Enter your phone number and password to continue</p>
+
+        <form id="signinForm" novalidate>
+          <div class="input-group">
+            <label class="input-label" for="phone">Phone Number</label>
+            <div class="input-wrapper phone-input">
+              <span class="country-code">
+                <span class="flag">🇺🇬</span>
+                <span>+256</span>
+              </span>
+              <input type="tel" id="phone" class="input-field phone-field" placeholder="7XX XXX XXX" required>
+            </div>
+            <span class="input-error" id="phoneError"></span>
+          </div>
+
+          <div class="input-group">
+            <label class="input-label" for="password">Password</label>
+            <div class="input-wrapper">
+              <span class="material-icons-outlined input-icon">lock</span>
+              <input type="password" id="password" class="input-field" placeholder="Enter your password" required>
+              <button type="button" class="password-toggle" id="togglePassword">
+                <span class="material-icons-outlined">visibility_off</span>
+              </button>
+            </div>
+            <span class="input-error" id="passwordError"></span>
+          </div>
+
+          <div class="signin-options">
+            <label class="remember-me">
+              <input type="checkbox" id="rememberMe" checked>
+              <span class="checkmark-box"></span>
+              <span>Remember me</span>
+            </label>
+            <a href="#" class="forgot-link">Forgot password?</a>
+          </div>
+
+          <!-- General error message -->
+          <div class="signin-error" id="signinError"></div>
+
+          <button type="submit" class="btn btn-next signin-btn">
+            <span class="material-icons-outlined">login</span>
+            Sign In
+          </button>
+        </form>
+
+        <p class="login-link">
+          Don't have an account? <a href="index.html">Sign Up</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">calendar_today</span>
+        <span class="nav-label">Schedule</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">favorite</span>
+        <span class="nav-label">Health</span>
+      </div>
+      <div class="nav-item">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/signin.js"></script>
+</body>
+</html>

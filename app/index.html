@@ -93,6 +93,15 @@
             </div>
 
             <div class="input-group">
+              <label class="input-label" for="dob">Date of Birth</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">cake</span>
+                <input type="date" id="dob" class="input-field" required>
+              </div>
+              <span class="input-error" id="dobError"></span>
+            </div>
+
+            <div class="input-group">
               <label class="input-label">Sex</label>
               <div class="sex-selector">
                 <button type="button" class="sex-option" data-value="male" id="sexMale">
@@ -106,6 +115,18 @@
               </div>
               <input type="hidden" id="sex" required>
               <span class="input-error" id="sexError"></span>
+            </div>
+
+            <div class="input-group">
+              <label class="input-label" for="password">Create Password</label>
+              <div class="input-wrapper">
+                <span class="material-icons-outlined input-icon">lock</span>
+                <input type="password" id="password" class="input-field" placeholder="Min. 6 characters" required>
+                <button type="button" class="password-toggle" id="togglePassword">
+                  <span class="material-icons-outlined">visibility_off</span>
+                </button>
+              </div>
+              <span class="input-error" id="passwordError"></span>
             </div>
           </div>
 
@@ -246,7 +267,7 @@
         </p>
 
         <p class="login-link">
-          Already have an account? <a href="#">Sign In</a>
+          Already have an account? <a href="signin.html">Sign In</a>
         </p>
       </div>
     </div>
