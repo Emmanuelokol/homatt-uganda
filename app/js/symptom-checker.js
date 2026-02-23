@@ -244,7 +244,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       }
     } catch (err) {
       console.warn('AI follow-up failed, using smart fallback:', err.message);
-      aiAvailable = false;
+      // Don't permanently disable AI - still try again for diagnosis
       renderFollowupQuestions(getSmartFallbackQuestions(enteredSymptoms));
     }
 
@@ -363,8 +363,8 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       .map(([k, v]) => v)
       .join('; ');
 
-    // Try AI first, fall back to local engine
-    if (aiAvailable !== false) {
+    // Always try AI for diagnosis (even if follow-up questions used fallback)
+    {
       const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
 
 A patient described these symptoms: "${enteredSymptoms}"
@@ -410,10 +410,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           saveToHistory(parsed);
           return;
         }
-        throw new Error('Invalid AI response');
+        throw new Error('Invalid AI response format');
       } catch (err) {
         console.warn('AI diagnosis failed, using local engine:', err.message);
         aiAvailable = false;
+        // Show visible error so user knows why AI isn't working
+        showAIError(err.message);
       }
     }
 
@@ -1091,6 +1093,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     localStorage.setItem('homatt_symptom_history', JSON.stringify(history));
   }
 
+  // ====== Show AI error banner on results screen ======
+  function showAIError(errorMsg) {
+    const content = document.getElementById('resultsContent');
+    // Remove any existing error banner
+    const existing = document.getElementById('aiErrorBanner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'aiErrorBanner';
+    banner.style.cssText = 'background:#FFF3E0;border:1px solid #FF9800;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:13px;color:#E65100;';
+    banner.innerHTML = `
+      <strong>AI Unavailable</strong> — Using offline analysis instead.<br>
+      <span style="font-size:11px;color:#999;">Error: ${errorMsg}</span>
+    `;
+    content.insertBefore(banner, content.firstChild);
+  }
+
   // ====== AI API Call: OpenAI (primary) → Gemini (fallback) ======
   async function callAI(prompt) {
     console.log('[Homatt AI] Starting AI call chain...');
@@ -1133,9 +1152,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     throw new Error('All AI providers failed');
   }
 
+  // ---- Fetch with timeout ----
+  async function fetchWithTimeout(url, options, timeoutMs = 15000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+      return response;
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out after ' + (timeoutMs / 1000) + 's');
+      throw err;
+    }
+  }
+
   // ---- OpenAI Call ----
   async function callOpenAI(prompt) {
-    const response = await fetch(OPENAI_URL, {
+    const response = await fetchWithTimeout(OPENAI_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1153,12 +1187,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         temperature: 0.3,
         max_tokens: 2048,
       }),
-    });
+    }, 20000);
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      console.warn(`OpenAI error (${response.status}):`, errBody.substring(0, 300));
-      throw new Error(`OpenAI HTTP ${response.status}`);
+      console.warn(`[Homatt AI] OpenAI error (${response.status}):`, errBody.substring(0, 300));
+      throw new Error(`OpenAI HTTP ${response.status}: ${errBody.substring(0, 100)}`);
     }
 
     const result = await response.json();
@@ -1169,7 +1203,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   async function callGeminiModel(model, prompt) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
 
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1180,11 +1214,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           maxOutputTokens: 2048,
         },
       }),
-    });
+    }, 15000);
 
     if (!response.ok) {
       const errText = await response.text().catch(() => '');
-      console.warn(`Gemini ${model} error (${response.status}):`, errText.substring(0, 200));
+      console.warn(`[Homatt AI] Gemini ${model} error (${response.status}):`, errText.substring(0, 200));
       throw new Error(`Gemini ${model}: HTTP ${response.status}`);
     }
 
