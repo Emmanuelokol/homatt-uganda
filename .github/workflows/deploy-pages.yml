@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      - claude/create-claude-md-3NyZo
+      - master
 
 permissions:
   contents: read
