@@ -1,7 +1,7 @@
 /**
- * Homatt Health - Symptom Checker with Grok + DeepSeek + OpenAI + Gemini AI
+ * Homatt Health - Symptom Checker with Groq + DeepSeek + OpenAI + Gemini AI
  * Multi-screen flow: Patient → Symptoms → Follow-up → Results → Monitoring
- * API priority: Grok → DeepSeek → OpenAI → Gemini → Offline engine
+ * API priority: Groq → DeepSeek → OpenAI → Gemini → Offline engine
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,15 +15,15 @@ document.addEventListener('DOMContentLoaded', () => {
   // Keys are base64-encoded to comply with repository push protection
   const _dk = (s) => atob(s);
 
-  // Grok / xAI (primary) - OpenAI-compatible API
+  // Groq (primary) - Fast inference, OpenAI-compatible API
   // Key split into parts to satisfy repository push protection
   const GROK_API_KEY = [
     'Z3NrX0hiT0tIS1hsN1NmVUUzRmg=',
     'cnU4ZFdHZHliM0ZZd05UZ3hyejQ=',
     'UVZLUXBEZ2ZjM1lDOXJwNQ==',
   ].map(_dk).join('');
-  const GROK_URL = 'https://api.x.ai/v1/chat/completions';
-  const GROK_MODEL = 'grok-2-latest';
+  const GROK_URL = 'https://api.groq.com/openai/v1/chat/completions';
+  const GROK_MODEL = 'llama-3.3-70b-versatile';
 
   // DeepSeek (secondary) - OpenAI-compatible API, less restrictive for health queries
   const DEEPSEEK_API_KEY = _dk('c2stMTcyMzBmOTJmOWZiNGIyMThlOTU1MGQwZGQ4YzNmMTc=');
@@ -1128,15 +1128,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     content.insertBefore(banner, content.firstChild);
   }
 
-  // ====== AI API Call: Grok (primary) → DeepSeek (secondary) → OpenAI (tertiary) → Gemini (quaternary) ======
+  // ====== AI API Call: Groq (primary) → DeepSeek (secondary) → OpenAI (tertiary) → Gemini (quaternary) ======
   async function callAI(prompt) {
     console.log('[Homatt AI] Starting AI call chain...');
     const errors = [];
 
-    // 1) Try Grok first (xAI)
+    // 1) Try Groq first (fast inference)
     if (GROK_API_KEY) {
       try {
-        console.log('[Homatt AI] Trying Grok (grok-2-latest)...');
+        console.log('[Homatt AI] Trying Groq (llama-3.3-70b-versatile)...');
         const text = await callGrok(prompt);
         if (text) {
           console.log('[Homatt AI] Grok SUCCESS');
@@ -1227,7 +1227,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
   }
 
-  // ---- Grok Call (xAI - OpenAI-compatible API) ----
+  // ---- Groq Call (OpenAI-compatible API) ----
   async function callGrok(prompt) {
     const response = await fetchWithTimeout(GROK_URL, {
       method: 'POST',
@@ -1251,8 +1251,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => '');
-      console.warn(`[Homatt AI] Grok error (${response.status}):`, errBody.substring(0, 300));
-      throw new Error(`Grok HTTP ${response.status}: ${errBody.substring(0, 100)}`);
+      console.warn(`[Homatt AI] Groq error (${response.status}):`, errBody.substring(0, 300));
+      throw new Error(`Groq HTTP ${response.status}: ${errBody.substring(0, 100)}`);
     }
 
     const result = await response.json();
