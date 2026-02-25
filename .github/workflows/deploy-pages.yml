@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - master
+      - 'claude/**'
 
 permissions:
   contents: read
