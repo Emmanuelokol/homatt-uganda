@@ -25,14 +25,3 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git HEAD:refs/heads/main --force
 
-      - name: Trigger deploy-pages workflow
-        run: |
-          sleep 5
-          HTTP=$(curl -s -o /tmp/dispatch_resp.json -w "%{http_code}" -X POST \
-            -H "Accept: application/vnd.github.v3+json" \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy-pages.yml/dispatches \
-            -d '{"ref":"main"}')
-          echo "Dispatch HTTP status: $HTTP"
-          cat /tmp/dispatch_resp.json || true
-          [ "$HTTP" = "204" ] || [ "$HTTP" = "200" ] || exit 1
