@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const OPENAI_MODEL = 'gpt-4o-mini';
 
   // Gemini (primary — key provided directly)
-  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || 'AIzaSyDZaYPynsFAT8ebnDvBV8MrchFVTxHlPbA';
+  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || '';
   const GEMINI_MODELS = [
     'gemini-2.0-flash',
     'gemini-1.5-flash-latest',
