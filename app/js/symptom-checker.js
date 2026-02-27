@@ -31,12 +31,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
   const OPENAI_MODEL = 'gpt-4o-mini';
 
-  // Gemini (quaternary fallback)
-  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || '';
+  // Gemini (primary — key provided directly)
+  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || 'AIzaSyDZaYPynsFAT8ebnDvBV8MrchFVTxHlPbA';
   const GEMINI_MODELS = [
-    'gemini-2.0-flash',
     'gemini-1.5-flash',
-    'gemini-pro',
+    'gemini-1.5-pro',
   ];
 
   // ====== State ======
@@ -1129,61 +1128,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     console.log('[Homatt AI] Starting AI call chain...');
     const errors = [];
 
-    // 1) Try Groq first (fast inference)
-    if (GROK_API_KEY) {
-      try {
-        console.log('[Homatt AI] Trying Groq (llama-3.3-70b-versatile)...');
-        const text = await callGrok(prompt);
-        if (text) {
-          console.log('[Homatt AI] Grok SUCCESS');
-          return text;
-        }
-        errors.push('Grok: empty response');
-      } catch (err) {
-        console.warn('[Homatt AI] Grok failed:', err.message);
-        errors.push('Grok: ' + err.message);
-      }
-    } else {
-      errors.push('Grok: no key configured');
-    }
-
-    // 2) Try DeepSeek as secondary fallback
-    if (DEEPSEEK_API_KEY) {
-      try {
-        console.log('[Homatt AI] Trying DeepSeek (deepseek-chat)...');
-        const text = await callDeepSeek(prompt);
-        if (text) {
-          console.log('[Homatt AI] DeepSeek SUCCESS');
-          return text;
-        }
-        errors.push('DeepSeek: empty response');
-      } catch (err) {
-        console.warn('[Homatt AI] DeepSeek failed:', err.message);
-        errors.push('DeepSeek: ' + err.message);
-      }
-    } else {
-      errors.push('DeepSeek: no key configured');
-    }
-
-    // 3) Try OpenAI as tertiary fallback
-    if (OPENAI_API_KEY) {
-      try {
-        console.log('[Homatt AI] Trying OpenAI (gpt-4o-mini)...');
-        const text = await callOpenAI(prompt);
-        if (text) {
-          console.log('[Homatt AI] OpenAI SUCCESS');
-          return text;
-        }
-        errors.push('OpenAI: empty response');
-      } catch (err) {
-        console.warn('[Homatt AI] OpenAI failed:', err.message);
-        errors.push('OpenAI: ' + err.message);
-      }
-    } else {
-      errors.push('OpenAI: no key configured');
-    }
-
-    // 4) Try Gemini models as quaternary fallback
+    // 1) Try Gemini first (live key available)
     if (GEMINI_API_KEY) {
       for (const model of GEMINI_MODELS) {
         try {
@@ -1201,6 +1146,60 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       }
     } else {
       errors.push('Gemini: no key configured');
+    }
+
+    // 2) Try Groq
+    if (GROK_API_KEY) {
+      try {
+        console.log('[Homatt AI] Trying Groq (llama-3.3-70b-versatile)...');
+        const text = await callGrok(prompt);
+        if (text) {
+          console.log('[Homatt AI] Grok SUCCESS');
+          return text;
+        }
+        errors.push('Grok: empty response');
+      } catch (err) {
+        console.warn('[Homatt AI] Grok failed:', err.message);
+        errors.push('Grok: ' + err.message);
+      }
+    } else {
+      errors.push('Grok: no key configured');
+    }
+
+    // 3) Try DeepSeek
+    if (DEEPSEEK_API_KEY) {
+      try {
+        console.log('[Homatt AI] Trying DeepSeek (deepseek-chat)...');
+        const text = await callDeepSeek(prompt);
+        if (text) {
+          console.log('[Homatt AI] DeepSeek SUCCESS');
+          return text;
+        }
+        errors.push('DeepSeek: empty response');
+      } catch (err) {
+        console.warn('[Homatt AI] DeepSeek failed:', err.message);
+        errors.push('DeepSeek: ' + err.message);
+      }
+    } else {
+      errors.push('DeepSeek: no key configured');
+    }
+
+    // 4) Try OpenAI
+    if (OPENAI_API_KEY) {
+      try {
+        console.log('[Homatt AI] Trying OpenAI (gpt-4o-mini)...');
+        const text = await callOpenAI(prompt);
+        if (text) {
+          console.log('[Homatt AI] OpenAI SUCCESS');
+          return text;
+        }
+        errors.push('OpenAI: empty response');
+      } catch (err) {
+        console.warn('[Homatt AI] OpenAI failed:', err.message);
+        errors.push('OpenAI: ' + err.message);
+      }
+    } else {
+      errors.push('OpenAI: no key configured');
     }
 
     const errorDetails = errors.join(' | ');
@@ -1330,8 +1329,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {
           temperature: 0.3,
-          topP: 0.8,
-          maxOutputTokens: 2048,
+          maxOutputTokens: 1024,
         },
       }),
     }, 15000);
