@@ -34,8 +34,9 @@ document.addEventListener('DOMContentLoaded', () => {
   // Gemini (primary — key provided directly)
   const GEMINI_API_KEY = cfg.GEMINI_API_KEY || 'AIzaSyDZaYPynsFAT8ebnDvBV8MrchFVTxHlPbA';
   const GEMINI_MODELS = [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
   ];
 
   // ====== State ======
