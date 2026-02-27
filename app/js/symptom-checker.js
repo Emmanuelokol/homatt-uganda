@@ -12,31 +12,27 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ====== API Config ======
-  // Keys are base64-encoded to comply with repository push protection
-  const _dk = (s) => atob(s);
+  // Keys are loaded from window.HOMATT_CONFIG (injected via config.js, never committed).
+  // config.js is generated at CI build time from GitHub Secrets.
+  // See config.example.js for setup instructions.
+  const cfg = window.HOMATT_CONFIG || {};
 
-  // Groq (primary) - Fast inference, OpenAI-compatible API
-  // Key split into parts to satisfy repository push protection
-  const GROK_API_KEY = [
-    'Z3NrX0hiT0tIS1hsN1NmVUUzRmg=',
-    'cnU4ZFdHZHliM0ZZd05UZ3hyejQ=',
-    'UVZLUXBEZ2ZjM1lDOXJwNQ==',
-  ].map(_dk).join('');
+  const GROK_API_KEY = cfg.GROQ_API_KEY || '';
   const GROK_URL = 'https://api.groq.com/openai/v1/chat/completions';
   const GROK_MODEL = 'llama-3.3-70b-versatile';
 
-  // DeepSeek (secondary) - OpenAI-compatible API, less restrictive for health queries
-  const DEEPSEEK_API_KEY = _dk('c2stMTcyMzBmOTJmOWZiNGIyMThlOTU1MGQwZGQ4YzNmMTc=');
+  // DeepSeek (secondary) - OpenAI-compatible API
+  const DEEPSEEK_API_KEY = cfg.DEEPSEEK_API_KEY || '';
   const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
   const DEEPSEEK_MODEL = 'deepseek-chat';
 
   // OpenAI (tertiary fallback)
-  const OPENAI_API_KEY = _dk('c2stcHJvai1ZQldoVkJFdEhMTTJVeWpQREVaR3h2U1Y4R0QwWkREWUtlMGE1NGFqZjV1U1A2bUIzQUFTelZ6UjgwekpnMkh6dW1PRDM0V1VWZ1QzQmxia0ZKbG1YZ1J0SXptWUZpS0tSQU1NWHp1N3ZHaVZpX0xQM29iQUZhU1U2V1BWUGRQOF85Zi05bjhJbm5QcG42VUduQl8xRXBRb0tRWUE=');
+  const OPENAI_API_KEY = cfg.OPENAI_API_KEY || '';
   const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
   const OPENAI_MODEL = 'gpt-4o-mini';
 
   // Gemini (quaternary fallback)
-  const GEMINI_API_KEY = _dk('QUl6YVN5QzlkMGJobEY4T3FhaWlZUDBPMjVQZ2p0dGh6cjlGblJr');
+  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || '';
   const GEMINI_MODELS = [
     'gemini-2.0-flash',
     'gemini-1.5-flash',
