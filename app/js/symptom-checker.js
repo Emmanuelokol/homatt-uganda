@@ -1,7 +1,7 @@
 /**
- * Homatt Health - Symptom Checker with Groq + DeepSeek + OpenAI + Gemini AI
+ * Homatt Health - Symptom Checker with Groq + OpenAI + Gemini AI
  * Multi-screen flow: Patient → Symptoms → Follow-up → Results → Monitoring
- * API priority: Groq → DeepSeek → OpenAI → Gemini → Offline engine
+ * API priority: Groq → OpenAI → Gemini → Offline engine
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -21,12 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const GROK_URL = 'https://api.groq.com/openai/v1/chat/completions';
   const GROK_MODEL = 'llama-3.3-70b-versatile';
 
-  // DeepSeek (secondary) - OpenAI-compatible API
-  const DEEPSEEK_API_KEY = cfg.DEEPSEEK_API_KEY || '';
-  const DEEPSEEK_URL = 'https://api.deepseek.com/v1/chat/completions';
-  const DEEPSEEK_MODEL = 'deepseek-chat';
-
-  // OpenAI (tertiary fallback)
+  // OpenAI (secondary fallback)
   const OPENAI_API_KEY = cfg.OPENAI_API_KEY || '';
   const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
   const OPENAI_MODEL = 'gpt-4o-mini';
@@ -1124,7 +1119,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     content.insertBefore(banner, content.firstChild);
   }
 
-  // ====== AI API Call: Groq (primary) → DeepSeek (secondary) → OpenAI (tertiary) → Gemini (quaternary) ======
+  // ====== AI API Call: Groq (primary) → OpenAI (secondary) → Gemini (tertiary) ======
   async function callAI(prompt) {
     console.log('[Homatt AI] Starting AI call chain...');
     const errors = [];
@@ -1167,25 +1162,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       errors.push('Grok: no key configured');
     }
 
-    // 3) Try DeepSeek
-    if (DEEPSEEK_API_KEY) {
-      try {
-        console.log('[Homatt AI] Trying DeepSeek (deepseek-chat)...');
-        const text = await callDeepSeek(prompt);
-        if (text) {
-          console.log('[Homatt AI] DeepSeek SUCCESS');
-          return text;
-        }
-        errors.push('DeepSeek: empty response');
-      } catch (err) {
-        console.warn('[Homatt AI] DeepSeek failed:', err.message);
-        errors.push('DeepSeek: ' + err.message);
-      }
-    } else {
-      errors.push('DeepSeek: no key configured');
-    }
-
-    // 4) Try OpenAI
+    // 3) Try OpenAI
     if (OPENAI_API_KEY) {
       try {
         console.log('[Homatt AI] Trying OpenAI (gpt-4o-mini)...');
@@ -1255,37 +1232,6 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     return result.choices?.[0]?.message?.content || '';
   }
 
-  // ---- DeepSeek Call (OpenAI-compatible API) ----
-  async function callDeepSeek(prompt) {
-    const response = await fetchWithTimeout(DEEPSEEK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: DEEPSEEK_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a medical health assistant for a mobile health app in Uganda called Homatt Health. Always respond with valid JSON only, no markdown or explanation.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    }, 25000);
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '');
-      console.warn(`[Homatt AI] DeepSeek error (${response.status}):`, errBody.substring(0, 300));
-      throw new Error(`DeepSeek HTTP ${response.status}: ${errBody.substring(0, 100)}`);
-    }
-
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || '';
-  }
 
   // ---- OpenAI Call ----
   async function callOpenAI(prompt) {
