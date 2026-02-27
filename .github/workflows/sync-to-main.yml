@@ -39,7 +39,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/js/config.js
+          git add -f app/js/config.js
           git commit -m "ci: inject API keys from secrets" || echo "Nothing to commit"
           git push origin HEAD:refs/heads/main --force
         env:
