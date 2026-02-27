@@ -52,12 +52,12 @@ jobs:
 
       - name: Set Pages source to gh-pages branch
         run: |
+          echo '{"build_type":"legacy","source":{"branch":"gh-pages","path":"/"}}' | \
           gh api "repos/${{ github.repository }}/pages" \
             --method PUT \
-            --field "source[branch]=gh-pages" \
-            --field "source[path]=/" \
+            --input - \
             && echo "Pages source set to gh-pages branch" \
-            || echo "Note: Pages source update failed - go to Settings -> Pages and set source to gh-pages branch manually"
+            || echo "Note: Pages source update failed - manually go to Settings -> Pages, change Source to 'Deploy from a branch', select gh-pages / /"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
