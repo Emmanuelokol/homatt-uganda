@@ -12,9 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ====== API Config ======
-  // All AI calls go through the Cloudflare Worker proxy.
-  // NO API keys are stored in this app — the Worker holds them.
-  // Set API_PROXY_URL in config.js to your deployed Worker URL.
+  // All AI calls go through the Supabase Edge Function proxy.
+  // NO API keys are stored in this app — the proxy holds them server-side.
+  // Set API_PROXY_URL in config.js to your deployed Supabase function URL.
   const cfg = window.HOMATT_CONFIG || {};
   const PROXY_URL = cfg.API_PROXY_URL || '';
 
@@ -1106,7 +1106,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   // ====== AI API Call: Groq (primary) → OpenAI (secondary) → Gemini (tertiary) ======
   async function callAI(prompt) {
     if (!PROXY_URL) {
-      throw new Error('API_PROXY_URL is not set in config.js. Deploy the Cloudflare Worker first.');
+      throw new Error('API_PROXY_URL is not set in config.js. Deploy the Supabase Edge Function first.');
     }
 
     console.log('[Homatt AI] Starting AI call chain via proxy...');
