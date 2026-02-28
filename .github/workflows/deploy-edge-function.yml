@@ -25,14 +25,14 @@ jobs:
             GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
             OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
-            --project-ref favfzonoconewfjxevev
+            --project-ref kgkdiykzmqjougwzzewi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Deploy Edge Function
         run: |
           supabase functions deploy ai-proxy \
-            --project-ref favfzonoconewfjxevev \
+            --project-ref kgkdiykzmqjougwzzewi \
             --no-verify-jwt
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
