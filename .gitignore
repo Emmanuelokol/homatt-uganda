@@ -1,5 +1,9 @@
 # Claude MCP config (contains secrets)
 .claude/mcp.json
 
-# API keys config (contains secrets)
+# API keys config (contains secrets — generated at build time)
 app/js/config.js
+
+# Local environment variables (NEVER commit this)
+.env.local
+.env
