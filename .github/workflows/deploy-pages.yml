@@ -1,0 +1,32 @@
+name: Deploy App to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Write config.js with Supabase proxy URL
+        run: |
+          cat > app/js/config.js <<'EOF'
+          window.HOMATT_CONFIG = {
+            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+          };
+          EOF
+
+      - name: Deploy app/ to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./app
+          publish_branch: gh-pages
+          force_orphan: false
