@@ -122,7 +122,16 @@ async function callGemini(prompt: string): Promise<string> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not set in Supabase secrets.');
 
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest'];
+  // Stable model names in priority order (as of 2026)
+  const models = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash-001',
+    'gemini-1.5-pro-001',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+  ];
+
+  const modelErrors: string[] = [];
 
   for (const model of models) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
@@ -130,8 +139,17 @@ async function callGemini(prompt: string): Promise<string> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: 0.3, maxOutputTokens: 1024 },
+        systemInstruction: {
+          parts: [{ text: 'You are a medical health assistant for a mobile health app in Uganda called Homatt Health. Always respond with valid JSON only, no markdown or explanation.' }],
+        },
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
+        safetySettings: [
+          { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+          { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+          { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+          { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+        ],
       }),
     });
 
@@ -139,10 +157,16 @@ async function callGemini(prompt: string): Promise<string> {
       const data = await res.json();
       const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
       if (text) return text;
+      modelErrors.push(`${model}: empty response`);
+    } else {
+      const errBody = await res.text().catch(() => '');
+      const summary = errBody.slice(0, 150);
+      console.error(`Gemini ${model} HTTP ${res.status}: ${summary}`);
+      modelErrors.push(`${model}: HTTP ${res.status}`);
     }
   }
 
-  throw new Error('All Gemini models failed.');
+  throw new Error(`Gemini failed (${modelErrors.join(' | ')})`);
 }
 
 // ---- Helper ----
