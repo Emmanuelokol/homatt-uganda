@@ -1,0 +1,38 @@
+name: Deploy AI Proxy to Supabase
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/**'   # Only runs when the Edge Function changes
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Set API keys as Supabase secrets
+        run: |
+          supabase secrets set \
+            GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            --project-ref kgkdiykzmqjougwzzewi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy Edge Function
+        run: |
+          supabase functions deploy ai-proxy \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

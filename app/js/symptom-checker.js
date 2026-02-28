@@ -12,27 +12,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ====== API Config ======
-  // Keys are loaded from window.HOMATT_CONFIG (injected via config.js, never committed).
-  // config.js is generated at CI build time from GitHub Secrets.
-  // See config.example.js for setup instructions.
+  // All AI calls go through the Supabase Edge Function proxy.
+  // NO API keys are stored in this app — the proxy holds them server-side.
+  // Set API_PROXY_URL in config.js to your deployed Supabase function URL.
   const cfg = window.HOMATT_CONFIG || {};
-
-  const GROK_API_KEY = cfg.GROQ_API_KEY || '';
-  const GROK_URL = 'https://api.groq.com/openai/v1/chat/completions';
-  const GROK_MODEL = 'llama-3.3-70b-versatile';
-
-  // OpenAI (secondary fallback)
-  const OPENAI_API_KEY = cfg.OPENAI_API_KEY || '';
-  const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-  const OPENAI_MODEL = 'gpt-4o-mini';
-
-  // Gemini (primary — key provided directly)
-  const GEMINI_API_KEY = cfg.GEMINI_API_KEY || '';
-  const GEMINI_MODELS = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro-latest',
-  ];
+  const PROXY_URL = cfg.API_PROXY_URL || '';
 
   // ====== State ======
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
@@ -1121,63 +1105,27 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
   // ====== AI API Call: Groq (primary) → OpenAI (secondary) → Gemini (tertiary) ======
   async function callAI(prompt) {
-    console.log('[Homatt AI] Starting AI call chain...');
+    if (!PROXY_URL) {
+      throw new Error('API_PROXY_URL is not set in config.js. Deploy the Supabase Edge Function first.');
+    }
+
+    console.log('[Homatt AI] Starting AI call chain via proxy...');
+    const providers = ['gemini', 'groq', 'openai'];
     const errors = [];
 
-    // 1) Try Gemini first (live key available)
-    if (GEMINI_API_KEY) {
-      for (const model of GEMINI_MODELS) {
-        try {
-          console.log(`[Homatt AI] Trying Gemini ${model}...`);
-          const text = await callGeminiModel(model, prompt);
-          if (text) {
-            console.log(`[Homatt AI] Gemini ${model} SUCCESS`);
-            return text;
-          }
-          errors.push(`${model}: empty response`);
-        } catch (err) {
-          console.warn(`[Homatt AI] Gemini ${model} failed:`, err.message);
-          errors.push(`${model}: ${err.message}`);
-        }
-      }
-    } else {
-      errors.push('Gemini: no key configured');
-    }
-
-    // 2) Try Groq
-    if (GROK_API_KEY) {
+    for (const provider of providers) {
       try {
-        console.log('[Homatt AI] Trying Groq (llama-3.3-70b-versatile)...');
-        const text = await callGrok(prompt);
+        console.log(`[Homatt AI] Trying ${provider}...`);
+        const text = await callProxy(provider, prompt);
         if (text) {
-          console.log('[Homatt AI] Grok SUCCESS');
+          console.log(`[Homatt AI] ${provider} SUCCESS`);
           return text;
         }
-        errors.push('Grok: empty response');
+        errors.push(`${provider}: empty response`);
       } catch (err) {
-        console.warn('[Homatt AI] Grok failed:', err.message);
-        errors.push('Grok: ' + err.message);
+        console.warn(`[Homatt AI] ${provider} failed:`, err.message);
+        errors.push(`${provider}: ${err.message}`);
       }
-    } else {
-      errors.push('Grok: no key configured');
-    }
-
-    // 3) Try OpenAI
-    if (OPENAI_API_KEY) {
-      try {
-        console.log('[Homatt AI] Trying OpenAI (gpt-4o-mini)...');
-        const text = await callOpenAI(prompt);
-        if (text) {
-          console.log('[Homatt AI] OpenAI SUCCESS');
-          return text;
-        }
-        errors.push('OpenAI: empty response');
-      } catch (err) {
-        console.warn('[Homatt AI] OpenAI failed:', err.message);
-        errors.push('OpenAI: ' + err.message);
-      }
-    } else {
-      errors.push('OpenAI: no key configured');
     }
 
     const errorDetails = errors.join(' | ');
@@ -1185,110 +1133,33 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     throw new Error(errorDetails);
   }
 
-  // ---- Fetch with timeout ----
-  async function fetchWithTimeout(url, options, timeoutMs = 15000) {
+  // ---- Proxy Call ----
+  async function callProxy(provider, prompt) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = setTimeout(() => controller.abort(), 25000);
+
     try {
-      const response = await fetch(url, { ...options, signal: controller.signal });
+      const response = await fetch(PROXY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, prompt }),
+        signal: controller.signal,
+      });
       clearTimeout(timer);
-      return response;
+
+      if (!response.ok) {
+        const errBody = await response.text().catch(() => '');
+        throw new Error(`HTTP ${response.status}: ${errBody.slice(0, 100)}`);
+      }
+
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data.text || '';
     } catch (err) {
       clearTimeout(timer);
-      if (err.name === 'AbortError') throw new Error('Request timed out after ' + (timeoutMs / 1000) + 's');
+      if (err.name === 'AbortError') throw new Error('Request timed out after 25s');
       throw err;
     }
-  }
-
-  // ---- Groq Call (OpenAI-compatible API) ----
-  async function callGrok(prompt) {
-    const response = await fetchWithTimeout(GROK_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${GROK_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: GROK_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a medical health assistant for a mobile health app in Uganda called Homatt Health. Always respond with valid JSON only, no markdown or explanation.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    }, 25000);
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '');
-      console.warn(`[Homatt AI] Groq error (${response.status}):`, errBody.substring(0, 300));
-      throw new Error(`Groq HTTP ${response.status}: ${errBody.substring(0, 100)}`);
-    }
-
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || '';
-  }
-
-
-  // ---- OpenAI Call ----
-  async function callOpenAI(prompt) {
-    const response = await fetchWithTimeout(OPENAI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a medical health assistant for a mobile health app in Uganda called Homatt Health. Always respond with valid JSON only, no markdown or explanation.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 2048,
-      }),
-    }, 20000);
-
-    if (!response.ok) {
-      const errBody = await response.text().catch(() => '');
-      console.warn(`[Homatt AI] OpenAI error (${response.status}):`, errBody.substring(0, 300));
-      throw new Error(`OpenAI HTTP ${response.status}: ${errBody.substring(0, 100)}`);
-    }
-
-    const result = await response.json();
-    return result.choices?.[0]?.message?.content || '';
-  }
-
-  // ---- Gemini Call (single model) ----
-  async function callGeminiModel(model, prompt) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
-
-    const response = await fetchWithTimeout(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 1024,
-        },
-      }),
-    }, 15000);
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => '');
-      console.warn(`[Homatt AI] Gemini ${model} error (${response.status}):`, errText.substring(0, 200));
-      throw new Error(`Gemini ${model}: HTTP ${response.status}`);
-    }
-
-    const result = await response.json();
-    return result.candidates?.[0]?.content?.parts?.[0]?.text || '';
   }
 
   // ====== JSON Parser ======
