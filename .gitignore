@@ -7,3 +7,9 @@ app/js/config.js
 # Local environment variables (NEVER commit this)
 .env.local
 .env
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+!.env.example
