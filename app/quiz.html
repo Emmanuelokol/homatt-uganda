@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Daily Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/quiz.css">
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- Screen: Loading -->
+    <div class="qz-screen" id="screenLoading">
+      <div class="qz-loading-inner">
+        <div class="qz-loading-ring"></div>
+        <p class="qz-loading-text">Building your quiz&hellip;</p>
+        <p class="qz-loading-sub">Powered by AI</p>
+      </div>
+    </div>
+
+    <!-- Screen: Accountability (was yesterday's Micro-Mission done?) -->
+    <div class="qz-screen hidden" id="screenAccountability">
+      <div class="qz-page-header">
+        <button class="qz-back-btn" id="accountabilityBack">
+          <span class="material-icons-outlined">arrow_back_ios</span>
+        </button>
+        <div class="qz-topic-badge" id="accountabilityTopic"></div>
+      </div>
+      <div class="qz-accountability-body">
+        <div class="qz-accountability-icon">🎯</div>
+        <h3 class="qz-accountability-title">Yesterday&rsquo;s Micro-Mission</h3>
+        <div class="qz-prev-mission-card">
+          <p class="qz-prev-mission-text" id="prevMissionText"></p>
+        </div>
+        <p class="qz-accountability-q">Did you complete it?</p>
+        <div class="qz-accountability-btns">
+          <button class="qz-acc-btn qz-acc-yes" id="missionYes">
+            <span class="material-icons-outlined">check_circle</span>
+            Yes, I did it!
+          </button>
+          <button class="qz-acc-btn qz-acc-no" id="missionNo">
+            <span class="material-icons-outlined">schedule</span>
+            Not yet
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Screen: Question -->
+    <div class="qz-screen hidden" id="screenQuestion">
+      <div class="qz-page-header">
+        <button class="qz-back-btn" id="questionBack">
+          <span class="material-icons-outlined">arrow_back_ios</span>
+        </button>
+        <div class="qz-header-right">
+          <div class="qz-progress-dots" id="progressDots"></div>
+          <div class="qz-topic-badge" id="questionTopic"></div>
+        </div>
+      </div>
+      <div class="qz-question-body">
+        <span class="qz-question-label" id="questionLabel">The Why</span>
+        <h3 class="qz-question-text" id="questionText"></h3>
+        <!-- scale label injected dynamically -->
+        <div class="qz-options" id="questionOptions"></div>
+        <div class="qz-explanation hidden" id="questionExplanation"></div>
+      </div>
+      <div class="qz-question-footer">
+        <button class="qz-next-btn hidden" id="questionNext">Next</button>
+      </div>
+    </div>
+
+    <!-- Screen: Results -->
+    <div class="qz-screen hidden" id="screenResults">
+      <div class="qz-results-scroll">
+        <div class="qz-results-header">
+          <div class="qz-topic-badge" id="resultsTopic"></div>
+          <div class="qz-results-complete-icon">&#x2705;</div>
+          <h3 class="qz-results-title">Quiz Complete!</h3>
+          <div class="qz-results-score" id="resultsScore"></div>
+        </div>
+        <div class="qz-insight-card">
+          <div class="qz-insight-header">
+            <span class="qz-insight-icon">&#x1F4A1;</span>
+            <h4 class="qz-insight-title">Insight</h4>
+          </div>
+          <p class="qz-insight-text" id="insightText"></p>
+        </div>
+        <div class="qz-mission-card">
+          <div class="qz-mission-header">
+            <span class="qz-mission-icon">&#x26A1;</span>
+            <h4 class="qz-mission-title">Micro-Mission</h4>
+            <span class="qz-mission-badge">&lt; 2 min</span>
+          </div>
+          <p class="qz-mission-text" id="missionText"></p>
+          <p class="qz-mission-note">Complete this right now &mdash; it trains your health habit loop.</p>
+        </div>
+        <button class="qz-done-btn" id="resultsDone">
+          Back to Dashboard
+          <span class="material-icons-outlined">home</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Screen: Already Done Today -->
+    <div class="qz-screen hidden" id="screenAlreadyDone">
+      <div class="qz-already-body">
+        <div class="qz-already-icon">&#x1F3C6;</div>
+        <h3>You&rsquo;ve done today&rsquo;s quiz!</h3>
+        <p class="qz-already-sub">Come back tomorrow for your next Micro-Health Quiz.</p>
+        <div class="qz-streak-display">
+          <span class="material-icons-outlined" style="color:var(--accent)">local_fire_department</span>
+          <span id="streakDisplay">0</span>&nbsp;day streak
+        </div>
+        <button class="qz-done-btn" id="alreadyDoneBack">Back to Dashboard</button>
+      </div>
+    </div>
+
+    <!-- Screen: Error -->
+    <div class="qz-screen hidden" id="screenError">
+      <div class="qz-error-body">
+        <div class="qz-error-icon">&#x26A0;&#xFE0F;</div>
+        <h3>Could not load quiz</h3>
+        <p class="qz-error-msg" id="errorMsg">Check your connection and try again.</p>
+        <button class="qz-done-btn" id="retryBtn">Try Again</button>
+        <button class="qz-back-text-btn" id="errorBack">Back to Dashboard</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/quiz.js"></script>
+</body>
+</html>

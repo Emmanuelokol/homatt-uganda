@@ -307,9 +307,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('familyBalance').textContent = wallets.family.toLocaleString();
   document.getElementById('careBalance').textContent = wallets.care.toLocaleString();
 
-  // ====== Quiz Streak ======
+  // ====== Quiz Streak & Button Label ======
   const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
   document.getElementById('streakCount').textContent = streak;
+
+  const quizDoneToday = localStorage.getItem('homatt_quiz_last_date') === new Date().toISOString().slice(0, 10);
+  const quizStartBtn = document.getElementById('dailyQuiz').querySelector('.quiz-start-btn');
+  if (quizDoneToday) {
+    quizStartBtn.innerHTML = 'Review Today\'s Quiz <span class="material-icons-outlined">replay</span>';
+  }
 
   // ====== Malaria Alert Region ======
   const riskLevels = {
@@ -338,6 +344,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
-    // Phase 10: will navigate to quiz
+    window.location.href = 'quiz.html';
   });
 });

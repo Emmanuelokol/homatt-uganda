@@ -15,6 +15,27 @@
  * Response: { "text": "..." }
  */
 
+// ── Behavioral health coach / quiz system prompt ──────────────────────────────
+const QUIZ_SYSTEM_PROMPT = `You are a Behavioral Health Coach for Homatt Health, a mobile health app serving Uganda and East Africa.
+YOUR ROLE: Generate a daily Micro-Health Quiz in valid JSON format. Be friendly, supportive, and peer-like — never clinical or preachy.
+
+QUIZ STRUCTURE — exactly 3 questions:
+1. One "theory" question (The Why): A multiple-choice question about health science
+2. Two "behavior" questions (The Do): Questions about the user's own recent habits
+
+RULES:
+- All question text combined must be under 150 words total
+- Supportive and encouraging tone — celebrate effort, not perfection
+- Content must be relevant to the given topic and Uganda/East Africa context
+- Theory question: exactly 4 options labeled A), B), C), D) — one clearly correct
+- Behavior question 1: options are exactly ["Yes", "No", "Sometimes"]
+- Behavior question 2: scale options exactly ["1", "2", "3", "4", "5"] with a scale_label
+- Insight: one scientific sentence, under 25 words
+- Mission: a physical action completable in under 2 minutes, starts with an action verb, under 20 words
+
+RESPONSE FORMAT: Return ONLY valid JSON matching this exact schema. No markdown. No text outside the JSON.
+{"topic":string,"questions":[{"type":"theory","label":"The Why","text":string,"options":["A) ...","B) ...","C) ...","D) ..."],"correct":"A"|"B"|"C"|"D","explanation":string},{"type":"behavior","label":"The Do","text":string,"options":["Yes","No","Sometimes"]},{"type":"behavior","label":"The Do","text":string,"options":["1","2","3","4","5"],"scale_label":string}],"insight":string,"mission":string}`;
+
 // ── Clinical triage system prompt (shared across all providers) ──────────────
 const SYSTEM_PROMPT = `You are a clinical triage assistant for Homatt Health, a mobile health app serving Uganda and East Africa.
 
@@ -82,26 +103,28 @@ Deno.serve(async (req) => {
     return json({ error: 'Only POST requests are supported.' }, 405);
   }
 
-  let body: { provider?: string; prompt?: string };
+  let body: { provider?: string; prompt?: string; mode?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid JSON body.' }, 400);
   }
 
-  const { provider, prompt } = body;
+  const { provider, prompt, mode } = body;
 
   if (!prompt) return json({ error: 'Missing prompt.' }, 400);
+
+  const sysPrompt = mode === 'quiz' ? QUIZ_SYSTEM_PROMPT : SYSTEM_PROMPT;
 
   try {
     let text: string;
 
     if (provider === 'groq') {
-      text = await callGroq(prompt);
+      text = await callGroq(prompt, sysPrompt);
     } else if (provider === 'openai') {
-      text = await callOpenAI(prompt);
+      text = await callOpenAI(prompt, sysPrompt);
     } else if (provider === 'gemini') {
-      text = await callGemini(prompt);
+      text = await callGemini(prompt, sysPrompt);
     } else {
       return json({ error: 'Unknown provider. Use groq, openai, or gemini.' }, 400);
     }
@@ -113,7 +136,7 @@ Deno.serve(async (req) => {
 });
 
 // ---- Groq ----
-async function callGroq(prompt: string): Promise<string> {
+async function callGroq(prompt: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
   const apiKey = Deno.env.get('GROQ_API_KEY');
   if (!apiKey) throw new Error('GROQ_API_KEY not set in Supabase secrets.');
 
@@ -123,7 +146,7 @@ async function callGroq(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'llama-3.3-70b-versatile',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
@@ -141,7 +164,7 @@ async function callGroq(prompt: string): Promise<string> {
 }
 
 // ---- OpenAI ----
-async function callOpenAI(prompt: string): Promise<string> {
+async function callOpenAI(prompt: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   if (!apiKey) throw new Error('OPENAI_API_KEY not set in Supabase secrets.');
 
@@ -151,7 +174,7 @@ async function callOpenAI(prompt: string): Promise<string> {
     body: JSON.stringify({
       model: 'gpt-4o-mini',
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: prompt },
       ],
       temperature: 0.3,
@@ -169,7 +192,7 @@ async function callOpenAI(prompt: string): Promise<string> {
 }
 
 // ---- Gemini ----
-async function callGemini(prompt: string): Promise<string> {
+async function callGemini(prompt: string, systemPrompt: string = SYSTEM_PROMPT): Promise<string> {
   const apiKey = Deno.env.get('GEMINI_API_KEY');
   if (!apiKey) throw new Error('GEMINI_API_KEY not set in Supabase secrets.');
 
@@ -191,7 +214,7 @@ async function callGemini(prompt: string): Promise<string> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         systemInstruction: {
-          parts: [{ text: SYSTEM_PROMPT }],
+          parts: [{ text: systemPrompt }],
         },
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: { temperature: 0.3, maxOutputTokens: 2048 },
