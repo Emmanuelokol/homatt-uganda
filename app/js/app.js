@@ -320,6 +320,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ====== Supabase client ======
   const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    btnSubmit.addEventListener('click', (e) => {
+      e.preventDefault();
+      showError('goalsError', 'App configuration error — please reload the page.');
+    });
+    console.error('HOMATT_CONFIG missing SUPABASE_URL or SUPABASE_ANON_KEY', cfg);
+    return;
+  }
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   // ====== Form Submit ======
@@ -369,22 +377,25 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // 2. Sign in immediately to establish session (required when email confirmation is disabled)
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    // 2. Get session — signUp returns a session immediately when email confirmation is disabled.
+    //    If session is null, email confirmation is still on; attempt sign-in as a fallback.
+    let userId = authData.user?.id;
+    if (!authData.session) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    if (signInError) {
-      btnSubmit.disabled = false;
-      btnSubmit.innerHTML = '<span>Create Account</span><span class="material-icons-outlined">arrow_forward</span>';
-      showError('goalsError', signInError.message.includes('not confirmed')
-        ? 'Account created but email confirmation is required. Ask your admin to disable email confirmation in Supabase Auth settings.'
-        : 'Account created but sign-in failed: ' + signInError.message);
-      return;
+      if (signInError) {
+        btnSubmit.disabled = false;
+        btnSubmit.innerHTML = '<span>Create Account</span><span class="material-icons-outlined">arrow_forward</span>';
+        showError('goalsError', signInError.message.toLowerCase().includes('not confirmed')
+          ? 'Account created — please disable "Email Confirmations" in Supabase Auth → Providers → Email settings, then try again.'
+          : 'Account created but sign-in failed: ' + signInError.message);
+        return;
+      }
+      userId = signInData.user.id;
     }
-
-    const userId = signInData.user.id;
 
     // 3. Insert profile record (session is now active so RLS will allow it)
     const { error: profileError } = await supabase.from('profiles').insert({
