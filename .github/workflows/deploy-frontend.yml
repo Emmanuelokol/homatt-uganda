@@ -19,17 +19,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate config.js (proxy URL only — no API keys in browser)
+      - name: Generate config.js
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://kgkdiykzmqjougwzzewi.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8' }}
         run: |
-          cat > app/js/config.js <<'EOF'
+          cat > app/js/config.js << EOF
           // Homatt Health — runtime config
-          // All AI calls go through the Supabase Edge Function proxy.
-          // NO API keys are stored here — the proxy holds them server-side as secrets.
           window.HOMATT_CONFIG = {
-            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+            SUPABASE_URL: '${SUPABASE_URL}',
+            SUPABASE_ANON_KEY: '${SUPABASE_ANON_KEY}',
+            API_PROXY_URL: '${SUPABASE_URL}/functions/v1/ai-proxy',
           };
           EOF
-          # Strip leading whitespace added by YAML indentation
           sed -i 's/^          //' app/js/config.js
 
       - name: Deploy app/ to GitHub Pages (gh-pages branch)
