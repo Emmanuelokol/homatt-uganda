@@ -1,0 +1,41 @@
+name: Deploy Frontend to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - 'claude/**'               # Also deploy from active fix branches
+    paths:
+      - 'app/**'                  # Run when app files change
+      - '.github/workflows/deploy-frontend.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write             # Required to push to gh-pages
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate config.js (proxy URL only — no API keys in browser)
+        run: |
+          cat > app/js/config.js <<'EOF'
+          // Homatt Health — runtime config
+          // All AI calls go through the Supabase Edge Function proxy.
+          // NO API keys are stored here — the proxy holds them server-side as secrets.
+          window.HOMATT_CONFIG = {
+            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+          };
+          EOF
+          # Strip leading whitespace added by YAML indentation
+          sed -i 's/^          //' app/js/config.js
+
+      - name: Deploy app/ to GitHub Pages (gh-pages branch)
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./app
+          publish_branch: gh-pages
+          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }}'
