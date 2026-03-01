@@ -141,6 +141,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'symptom-checker.html';
   });
 
+  document.getElementById('featureCycle').addEventListener('click', () => {
+    window.location.href = 'cycle-tracker.html';
+  });
+
+  document.getElementById('featureMoodSleep').addEventListener('click', () => {
+    window.location.href = 'mood-sleep-tracker.html';
+  });
+
+  document.getElementById('featurePain').addEventListener('click', () => {
+    window.location.href = 'pain-tracker.html';
+  });
+
+  document.getElementById('featureDigestive').addEventListener('click', () => {
+    window.location.href = 'digestive-tracker.html';
+  });
+
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
     // Phase 10: will navigate to quiz
   });

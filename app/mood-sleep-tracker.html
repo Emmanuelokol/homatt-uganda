@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#4527A0">
+  <title>Homatt Health - Mood & Sleep Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/trackers.css">
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar" style="background:#4527A0">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Tracker Header -->
+      <div class="tracker-bg-mood">
+        <div class="tracker-topbar">
+          <button class="tracker-back-btn" id="backBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <span class="tracker-topbar-title">Mood & Sleep</span>
+          <div style="width:36px"></div>
+        </div>
+        <div class="tracker-header">
+          <div class="tracker-hero">
+            <div class="tracker-hero-icon">
+              <span class="material-icons-outlined">bedtime</span>
+            </div>
+            <div class="tracker-hero-text">
+              <h2>Mood & Sleep</h2>
+              <p>Track sleep quality, mood & mental wellbeing patterns</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tracker-tabs">
+        <button class="tracker-tab active" data-tab="log">
+          <span class="material-icons-outlined">edit_note</span>
+          Log Today
+        </button>
+        <button class="tracker-tab" data-tab="patterns">
+          <span class="material-icons-outlined">insights</span>
+          Patterns
+        </button>
+        <button class="tracker-tab" data-tab="history">
+          <span class="material-icons-outlined">history</span>
+          History
+        </button>
+      </div>
+
+      <!-- ===== LOG TAB ===== -->
+      <div class="tracker-tab-pane active" id="paneLog">
+
+        <!-- Sleep -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">bedtime</span>
+            Sleep
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Bedtime (when you went to sleep)</label>
+            <input type="time" id="sleepStart" class="tracker-date-input">
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Wake Time</label>
+            <input type="time" id="wakeTime" class="tracker-date-input">
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Night Awakenings</label>
+            <div class="counter-row">
+              <button class="counter-dec" id="awakeDec">−</button>
+              <div>
+                <div class="counter-display" id="awakeDisplay">0</div>
+                <div class="counter-label">times woken up</div>
+              </div>
+              <button class="counter-inc" id="awakeInc">+</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Sleep Quality</label>
+            <div class="slider-row">
+              <input type="range" id="sleepQuality" class="slider-range" min="1" max="10" value="5">
+              <div class="slider-value-badge" id="sleepQualityVal">5</div>
+            </div>
+            <div class="slider-min-max"><span>Very poor (1)</span><span>Excellent (10)</span></div>
+          </div>
+        </div>
+
+        <!-- Mood & Energy -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">mood</span>
+            Mood & Energy
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Mood</label>
+            <div class="slider-row">
+              <input type="range" id="moodScore" class="slider-range" min="1" max="10" value="5">
+              <div class="slider-value-badge" id="moodScoreVal">5</div>
+            </div>
+            <div class="slider-min-max"><span>Very low (1)</span><span>Excellent (10)</span></div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Energy Level</label>
+            <div class="slider-row">
+              <input type="range" id="energyLevel" class="slider-range" min="1" max="10" value="5">
+              <div class="slider-value-badge" id="energyLevelVal">5</div>
+            </div>
+            <div class="slider-min-max"><span>Exhausted (1)</span><span>Full energy (10)</span></div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Anxiety Level</label>
+            <div class="slider-row">
+              <input type="range" id="anxietyLevel" class="slider-range" min="1" max="10" value="1">
+              <div class="slider-value-badge" id="anxietyLevelVal">1</div>
+            </div>
+            <div class="slider-min-max"><span>None (1)</span><span>Severe (10)</span></div>
+          </div>
+        </div>
+
+        <!-- Stress Triggers -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">psychology</span>
+            Stress & Triggers
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Stress Triggers Today</label>
+            <div class="chips-wrap" id="stressTriggerChips">
+              <button class="chip-toggle" data-chip="stress" data-val="work">Work</button>
+              <button class="chip-toggle" data-chip="stress" data-val="family">Family</button>
+              <button class="chip-toggle" data-chip="stress" data-val="health">Health concern</button>
+              <button class="chip-toggle" data-chip="stress" data-val="financial">Financial</button>
+              <button class="chip-toggle" data-chip="stress" data-val="relationship">Relationship</button>
+              <button class="chip-toggle" data-chip="stress" data-val="sleep_dep">Sleep deprivation</button>
+              <button class="chip-toggle" data-chip="stress" data-val="school">School/Study</button>
+              <button class="chip-toggle" data-chip="stress" data-val="loneliness">Loneliness</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Caffeine Intake Today</label>
+            <div class="yes-no-group">
+              <button class="choice-btn" data-group="caffeine" data-val="yes">Yes</button>
+              <button class="choice-btn" data-group="caffeine" data-val="no">No</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Alcohol Intake Today</label>
+            <div class="yes-no-group">
+              <button class="choice-btn" data-group="alcohol" data-val="yes">Yes</button>
+              <button class="choice-btn" data-group="alcohol" data-val="no">No</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">notes</span>
+            Notes
+          </div>
+          <textarea id="moodNotes" class="tracker-notes-input" placeholder="How are you feeling today? Any observations..."></textarea>
+        </div>
+
+        <button class="btn btn-next log-submit-btn" id="saveMoodLog" style="background:#7B1FA2;box-shadow:0 4px 12px rgba(123,31,162,0.25)">
+          <span class="material-icons-outlined">save</span>
+          Save Today's Log
+        </button>
+      </div>
+
+      <!-- ===== PATTERNS TAB ===== -->
+      <div class="tracker-tab-pane" id="panePatterns">
+
+        <div class="pattern-cta" id="patternCta">
+          <div class="pattern-cta-icon" style="background:#F3E5F5">
+            <span class="material-icons-outlined" style="color:#7B1FA2">insights</span>
+          </div>
+          <h3>Mood & Sleep Analysis</h3>
+          <p>Our AI identifies sleep patterns, mood trends, burnout risks, and potential emotional health signals from your daily logs.</p>
+          <button class="analyze-btn" id="analyzeBtn" style="background:#7B1FA2;box-shadow:0 4px 12px rgba(123,31,162,0.25)">
+            <span class="material-icons-outlined">psychology</span>
+            Analyze My Patterns
+          </button>
+        </div>
+
+        <div class="ai-loading" id="aiLoading">
+          <div class="ai-pulse-rings">
+            <div class="ai-pulse-ring" style="border-color:#7B1FA2"></div>
+            <div class="ai-pulse-ring" style="border-color:#7B1FA2"></div>
+            <div class="ai-pulse-ring" style="border-color:#7B1FA2"></div>
+            <div class="ai-pulse-center" style="background:#7B1FA2">
+              <span class="material-icons-outlined">psychology</span>
+            </div>
+          </div>
+          <p class="ai-loading-text">Analyzing your mood & sleep patterns...</p>
+        </div>
+
+        <div class="pattern-results" id="patternResults">
+          <div class="stability-row">
+            <div class="stability-badge" id="stabilityBadge">
+              <span class="material-icons-outlined">circle</span>
+              <span id="stabilityLabel">Stable</span>
+            </div>
+            <span class="confidence-text" id="confidenceText">85% confidence</span>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#7B1FA2">summarize</span>
+              <h4>Pattern Summary</h4>
+            </div>
+            <p id="patternSummary"></p>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#7B1FA2">trending_up</span>
+              <h4>Trend Interpretation</h4>
+            </div>
+            <p id="trendInterpretation"></p>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#7B1FA2">arrow_circle_right</span>
+              <h4>Recommended Next Step</h4>
+            </div>
+            <p id="nextStep"></p>
+          </div>
+
+          <div class="red-flag-card" id="redFlagCard">
+            <div class="red-flag-header">
+              <span class="material-icons-outlined">warning</span>
+              <h4>Red Flags to Watch</h4>
+            </div>
+            <ul id="redFlagsList"></ul>
+          </div>
+
+          <div class="clarify-card" id="clarifyCard">
+            <p id="clarifyText"></p>
+          </div>
+
+          <p class="pattern-disclaimer">This analysis is for informational purposes only and does not constitute a medical diagnosis. If you experience thoughts of self-harm, please seek immediate support from a mental health professional.</p>
+
+          <button class="re-analyze-btn" id="reAnalyzeBtn">
+            <span class="material-icons-outlined">refresh</span>
+            Re-analyze
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== HISTORY TAB ===== -->
+      <div class="tracker-tab-pane" id="paneHistory">
+        <div class="history-loading" id="historyLoading">
+          <span class="material-icons-outlined" style="font-size:28px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
+          Loading your logs...
+        </div>
+        <div class="history-empty hidden" id="historyEmpty">
+          <span class="material-icons-outlined">bedtime</span>
+          <p>No mood & sleep logs yet.<br>Start logging to build your history.</p>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" id="navHome">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" id="navFamily">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" id="navWallet">
+        <span class="material-icons-outlined">account_balance_wallet</span>
+        <span class="nav-label">Wallet</span>
+      </div>
+      <div class="nav-item" id="navProfile">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/mood-sleep-tracker.js"></script>
+</body>
+</html>
