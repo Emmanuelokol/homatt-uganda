@@ -369,9 +369,24 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    const userId = authData.user.id;
+    // 2. Sign in immediately to establish session (required when email confirmation is disabled)
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-    // 2. Insert profile record
+    if (signInError) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<span>Create Account</span><span class="material-icons-outlined">arrow_forward</span>';
+      showError('goalsError', signInError.message.includes('not confirmed')
+        ? 'Account created but email confirmation is required. Ask your admin to disable email confirmation in Supabase Auth settings.'
+        : 'Account created but sign-in failed: ' + signInError.message);
+      return;
+    }
+
+    const userId = signInData.user.id;
+
+    // 3. Insert profile record (session is now active so RLS will allow it)
     const { error: profileError } = await supabase.from('profiles').insert({
       id: userId,
       phone_number: phone,
@@ -388,11 +403,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     if (profileError) {
-      // Profile insert failed — still proceed if auth succeeded (profile may already exist)
       console.warn('Profile insert error:', profileError.message);
     }
 
-    // 3. Cache user in localStorage for fast reads
+    // 4. Cache user in localStorage for fast reads
     const userCache = { firstName, lastName, phone, dob, sex, district, city, hasFamily, familySize, healthGoals };
     localStorage.setItem('homatt_user', JSON.stringify(userCache));
 
