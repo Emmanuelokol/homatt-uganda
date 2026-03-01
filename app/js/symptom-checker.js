@@ -4,18 +4,18 @@
  * API priority: Groq → OpenAI → Gemini → Offline engine
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Auth check
-  if (localStorage.getItem('homatt_logged_in') !== 'true') {
+document.addEventListener('DOMContentLoaded', async () => {
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  // Auth check via Supabase session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
     window.location.href = 'signin.html';
     return;
   }
 
   // ====== API Config ======
-  // All AI calls go through the Supabase Edge Function proxy.
-  // NO API keys are stored in this app — the proxy holds them server-side.
-  // Set API_PROXY_URL in config.js to your deployed Supabase function URL.
-  const cfg = window.HOMATT_CONFIG || {};
   const PROXY_URL = cfg.API_PROXY_URL || '';
 
   // ====== State ======

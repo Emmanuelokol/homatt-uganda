@@ -2,15 +2,41 @@
  * Homatt Health - Dashboard Logic
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Auth check
-  if (localStorage.getItem('homatt_logged_in') !== 'true') {
+document.addEventListener('DOMContentLoaded', async () => {
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  // Auth check via Supabase session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
     window.location.href = 'signin.html';
     return;
   }
 
-  // Load user data
-  const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  // Load user data — prefer Supabase, fall back to localStorage cache
+  let user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', session.user.id)
+    .single();
+
+  if (profile) {
+    user = {
+      firstName: profile.first_name,
+      lastName: profile.last_name,
+      phone: profile.phone_number,
+      dob: profile.dob,
+      sex: profile.sex,
+      district: profile.district,
+      location: profile.district,
+      city: profile.city,
+      hasFamily: profile.has_family,
+      familySize: profile.family_size,
+      healthGoals: profile.health_goals,
+    };
+    localStorage.setItem('homatt_user', JSON.stringify(user));
+  }
 
   // Update status bar time
   function updateTime() {
@@ -98,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     kabale: 'low', hoima: 'high', entebbe: 'medium',
   };
 
-  const userRisk = riskLevels[user.location] || 'medium';
+  const userRisk = riskLevels[user.district || user.location] || 'medium';
   const alertLevel = document.querySelector('.alert-level');
   alertLevel.textContent = userRisk.charAt(0).toUpperCase() + userRisk.slice(1) + ' Risk';
   alertLevel.className = 'alert-level ' + userRisk;
