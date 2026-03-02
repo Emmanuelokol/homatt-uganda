@@ -59,11 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelector('.dash-welcome').textContent = getGreeting();
   document.getElementById('userName').textContent = user.firstName || 'User';
 
-  // User avatar initial
+  // User avatar initial — click navigates to profile
   const avatarEl = document.getElementById('userAvatar');
   if (user.firstName) {
     avatarEl.innerHTML = `<span>${user.firstName.charAt(0).toUpperCase()}</span>`;
   }
+  avatarEl.addEventListener('click', () => { window.location.href = 'profile.html'; });
 
   // ====== Daily Health Tips ======
   const tips = [
@@ -159,5 +160,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
     // Phase 10: will navigate to quiz
+  });
+
+  // ====== Bottom Nav + Wallet section ======
+  document.getElementById('navFamily').addEventListener('click', () => { window.location.href = 'family.html'; });
+  document.getElementById('navWallet').addEventListener('click', () => { window.location.href = 'wallet.html'; });
+  document.getElementById('navProfile').addEventListener('click', () => { window.location.href = 'profile.html'; });
+
+  // Wallet "Manage" link and deposit buttons
+  const walletManageBtn = document.querySelector('.dash-section .section-link');
+  if (walletManageBtn) walletManageBtn.addEventListener('click', () => { window.location.href = 'wallet.html'; });
+
+  document.querySelectorAll('.wallet-btn').forEach(btn => {
+    btn.addEventListener('click', () => { window.location.href = 'wallet.html'; });
+  });
+
+  // Notification bell
+  document.getElementById('notifBtn').addEventListener('click', () => {
+    // Phase: notifications panel — coming soon
   });
 });

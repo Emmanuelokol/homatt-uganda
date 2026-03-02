@@ -911,6 +911,12 @@ body {
   animation: shake 0.3s ease;
 }
 
+/* Spin animation for loading states */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Ripple effect */
 .ripple {
   position: relative;
