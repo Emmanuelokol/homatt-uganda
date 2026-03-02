@@ -107,11 +107,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ====== Wallet Balances ======
-  const wallets = JSON.parse(localStorage.getItem('homatt_wallets') || '{"family":0,"care":0}');
-  document.getElementById('familyBalance').textContent = wallets.family.toLocaleString();
-  document.getElementById('careBalance').textContent = wallets.care.toLocaleString();
-
   // ====== Quiz Streak ======
   const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
   document.getElementById('streakCount').textContent = streak;
@@ -159,21 +154,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
-    // Phase 10: will navigate to quiz
+    // Phase 10: quiz — show coming soon toast
+    const toast = document.createElement('div');
+    toast.className = 'tracker-toast';
+    toast.textContent = 'Daily health quiz launching soon!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('visible'), 10);
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 400); }, 2800);
   });
 
-  // ====== Bottom Nav + Wallet section ======
+  // ====== Bottom Nav ======
   document.getElementById('navFamily').addEventListener('click', () => { window.location.href = 'family.html'; });
-  document.getElementById('navWallet').addEventListener('click', () => { window.location.href = 'wallet.html'; });
+  document.getElementById('navShop').addEventListener('click', () => { window.location.href = 'family.html#shop'; });
   document.getElementById('navProfile').addEventListener('click', () => { window.location.href = 'profile.html'; });
-
-  // Wallet "Manage" link and deposit buttons
-  const walletManageBtn = document.querySelector('.dash-section .section-link');
-  if (walletManageBtn) walletManageBtn.addEventListener('click', () => { window.location.href = 'wallet.html'; });
-
-  document.querySelectorAll('.wallet-btn').forEach(btn => {
-    btn.addEventListener('click', () => { window.location.href = 'wallet.html'; });
-  });
 
   // Notification bell
   document.getElementById('notifBtn').addEventListener('click', () => {

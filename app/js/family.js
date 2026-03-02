@@ -60,24 +60,41 @@ document.addEventListener('DOMContentLoaded', async () => {
   const tabs = document.querySelectorAll('.tracker-tab');
   const panes = document.querySelectorAll('.family-pane');
 
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const target = tab.dataset.tab;
-      tabs.forEach(t => t.classList.remove('active'));
-      panes.forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
-      document.getElementById('pane-' + target).classList.add('active');
+  function activateTab(target) {
+    tabs.forEach(t => t.classList.remove('active'));
+    panes.forEach(p => p.classList.remove('active'));
+    const tab = document.querySelector(`.tracker-tab[data-tab="${target}"]`);
+    if (tab) tab.classList.add('active');
+    const pane = document.getElementById('pane-' + target);
+    if (pane) pane.classList.add('active');
 
-      // Cart FAB only on shop tab
-      const cartFab = document.getElementById('cartFab');
-      if (target === 'shop') {
-        cartFab.classList.add('visible');
-        if (categories.length === 0) loadShop();
-      } else {
-        cartFab.classList.remove('visible');
-      }
-    });
+    // Cart FAB only on shop tab
+    const cartFab = document.getElementById('cartFab');
+    if (target === 'shop') {
+      cartFab.classList.add('visible');
+      if (categories.length === 0) loadShop();
+      // Bottom nav: Shop active
+      document.getElementById('bottomNavFamily').classList.remove('active');
+      document.getElementById('bottomNavShop').classList.add('active');
+    } else {
+      cartFab.classList.remove('visible');
+      // Bottom nav: Family active
+      document.getElementById('bottomNavFamily').classList.add('active');
+      document.getElementById('bottomNavShop').classList.remove('active');
+    }
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => activateTab(tab.dataset.tab));
   });
+
+  // Bottom nav clicks
+  document.getElementById('bottomNavFamily').addEventListener('click', () => activateTab('members'));
+  document.getElementById('bottomNavShop').addEventListener('click', () => activateTab('shop'));
+
+  // Auto-activate shop tab if #shop hash in URL
+  const startTab = window.location.hash === '#shop' ? 'shop' : 'members';
+  activateTab(startTab);
 
   // ====== Load family members ======
   async function loadMembers() {

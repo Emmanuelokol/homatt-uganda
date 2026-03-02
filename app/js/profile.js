@@ -46,6 +46,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   renderProfile(user);
 
+  // Wallet balance preview in Finance section
+  const wallets = JSON.parse(localStorage.getItem('homatt_wallets') || '{"family":0,"care":0}');
+  const totalBal = (wallets.family || 0) + (wallets.care || 0);
+  const walletPreview = document.getElementById('walletPreviewBalance');
+  if (walletPreview) walletPreview.textContent = `UGX ${totalBal.toLocaleString()}`;
+
   function renderProfile(u) {
     const fullName = `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'User';
     const phoneFormatted = u.phone ? `+256 ${u.phone}` : '';
