@@ -19,18 +19,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Generate config.js (proxy URL only — no API keys in browser)
+      - name: Generate config.js (Supabase URL + anon key are public; proxy URL for AI)
         run: |
-          cat > app/js/config.js <<'EOF'
-          // Homatt Health — runtime config
-          // All AI calls go through the Supabase Edge Function proxy.
-          // NO API keys are stored here — the proxy holds them server-side as secrets.
-          window.HOMATT_CONFIG = {
-            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
-          };
-          EOF
-          # Strip leading whitespace added by YAML indentation
-          sed -i 's/^          //' app/js/config.js
+          cat > app/js/config.js <<'CONFIGEOF'
+// Homatt Health — runtime config
+// SUPABASE_URL and SUPABASE_ANON_KEY are intentionally public (anon key is safe for browsers).
+// All AI calls go through the Supabase Edge Function proxy — no AI API keys here.
+window.HOMATT_CONFIG = {
+  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',
+  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+};
+CONFIGEOF
 
       - name: Deploy app/ to GitHub Pages (gh-pages branch)
         uses: peaceiris/actions-gh-pages@v4
