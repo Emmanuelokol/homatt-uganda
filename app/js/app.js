@@ -4,6 +4,10 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // ====== Supabase client (initialise early so submit handler always registers) ======
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
   // State
   let currentStep = 1;
   const totalSteps = 3;
@@ -317,10 +321,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     e.target.value = val;
   });
-
-  // ====== Supabase client ======
-  const cfg = window.HOMATT_CONFIG || {};
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   // ====== Form Submit ======
 

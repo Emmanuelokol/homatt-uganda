@@ -53,6 +53,32 @@
         </div>
       </div>
 
+      <!-- SCREEN: Emergency Alert (shown when emergency symptoms detected) -->
+      <div class="sc-screen" id="screenEmergency">
+        <div class="sc-screen-inner sc-emergency-screen-inner">
+          <div class="sc-emergency-hero">
+            <div class="sc-emergency-icon-ring">
+              <span class="material-icons-outlined" id="emergencyIcon">emergency</span>
+            </div>
+          </div>
+          <h3 class="sc-emergency-title">🔴 Seek Emergency Care Now</h3>
+          <div class="sc-emergency-body" id="emergencyMessage">
+            Based on your symptoms, you may need urgent medical attention. Please do not wait.
+          </div>
+          <button class="sc-emergency-call-btn" id="btnCallEmergency">
+            <span class="material-icons-outlined">call</span>
+            Call Emergency: 112
+          </button>
+          <button class="sc-emergency-back-btn" id="btnEmergencyBack">
+            <span class="material-icons-outlined">arrow_back</span>
+            Go Back &amp; Edit Symptoms
+          </button>
+          <p class="sc-emergency-disclaimer-text">
+            This app is not a substitute for emergency medical care. If you believe you are in immediate danger, call 112 or go to your nearest emergency department without delay.
+          </p>
+        </div>
+      </div>
+
       <!-- SCREEN 2: Describe symptoms -->
       <div class="sc-screen" id="screenSymptoms">
         <div class="sc-screen-inner">
@@ -138,6 +164,15 @@
               <p>This is <strong>not a final diagnosis</strong>. Always consult a qualified healthcare professional for medical advice.</p>
             </div>
 
+            <!-- Triage Level Card (populated by JS) -->
+            <div class="sc-triage-card" id="triageCard" style="display:none"></div>
+
+            <!-- Confidence Indicator (populated by JS) -->
+            <div class="sc-confidence-bar" id="confidenceBar" style="display:none"></div>
+
+            <!-- Uncertainty Note (shown when AI confidence is low) -->
+            <div class="sc-uncertainty-note" id="uncertaintyNote" style="display:none"></div>
+
             <!-- Symptoms summary -->
             <div class="sc-summary-card" id="symptomsSummary">
               <div class="sc-summary-header">
@@ -176,6 +211,29 @@
               </div>
               <div class="sc-info-body" id="preventionBody">
                 <!-- populated by AI -->
+              </div>
+            </div>
+
+            <!-- OTC Guidance Card (populated by JS, hidden for orange/red cases) -->
+            <div class="sc-info-card sc-otc-card" id="otcCard" style="display:none">
+              <div class="sc-info-header">
+                <span class="material-icons-outlined">medication</span>
+                <h4>Safe Over-the-Counter Options</h4>
+              </div>
+              <div class="sc-info-body" id="otcBody">
+                <!-- populated by JS -->
+              </div>
+              <p class="sc-otc-disclaimer">Always consult a pharmacist before taking any medication. This information is for guidance only and is not a prescription.</p>
+            </div>
+
+            <!-- Red Flags Card (populated by JS) -->
+            <div class="sc-info-card sc-redflags-card" id="redFlagsCard" style="display:none">
+              <div class="sc-info-header">
+                <span class="material-icons-outlined">warning</span>
+                <h4>Watch Out For — Seek Care If:</h4>
+              </div>
+              <div class="sc-info-body" id="redFlagsBody">
+                <!-- populated by JS -->
               </div>
             </div>
 
@@ -251,7 +309,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/vendor/supabase.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/symptom-checker.js"></script>
 </body>

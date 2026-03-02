@@ -29,6 +29,61 @@ document.addEventListener('DOMContentLoaded', async () => {
   let monitoringSession = null;
   let aiAvailable = null; // null = untested, true/false after first call
 
+  // ====== Emergency Triggers ======
+  // Keywords that warrant immediate escalation without follow-up questions
+  const EMERGENCY_TRIGGERS = [
+    {
+      keywords: ['chest pain', 'chest tightness', 'tight chest', 'chest pressure'],
+      message: 'Chest pain can be a sign of a serious heart condition. Do not wait — seek emergency care immediately.',
+      icon: 'favorite',
+    },
+    {
+      keywords: ['difficulty breathing', 'cannot breathe', "can't breathe", 'shortness of breath', 'trouble breathing', 'hard to breathe'],
+      message: 'Difficulty breathing is a medical emergency. Call 112 or go to the nearest emergency department immediately.',
+      icon: 'air',
+    },
+    {
+      keywords: ['stroke', 'face drooping', 'arm weakness', 'slurred speech', 'sudden numbness', 'sudden confusion', 'sudden vision loss'],
+      message: 'These symptoms may indicate a stroke — a medical emergency. Every minute matters. Call 112 immediately.',
+      icon: 'emergency',
+    },
+    {
+      keywords: ['uncontrolled bleeding', 'heavy bleeding', 'wont stop bleeding', "won't stop bleeding", 'blood everywhere'],
+      message: 'Uncontrolled bleeding is a life-threatening emergency. Apply pressure to the wound and call 112 immediately.',
+      icon: 'bloodtype',
+    },
+    {
+      keywords: ['severe allergic', 'anaphylaxis', 'throat swelling', 'lips swelling', 'tongue swelling', 'cant swallow', "can't swallow"],
+      message: 'Severe allergic reactions can be life-threatening. If you have an EpiPen, use it immediately. Call 112 now.',
+      icon: 'warning',
+    },
+    {
+      keywords: ['suicidal', 'want to die', 'kill myself', 'self harm', 'hurt myself'],
+      message: 'You are not alone. Please reach out to someone you trust or call a crisis helpline. Your life matters deeply.',
+      icon: 'support',
+    },
+    {
+      keywords: ['pregnancy bleeding', 'bleeding while pregnant', 'pregnancy pain', 'no baby movement', 'baby not moving', 'preeclampsia'],
+      message: 'Pregnancy complications require immediate medical attention. Go to a maternity facility or call 112 right away.',
+      icon: 'pregnant_woman',
+    },
+    {
+      keywords: ['infant fever', 'baby fever', 'newborn fever', 'baby not breathing', 'baby unconscious'],
+      message: 'High fever or breathing problems in a young baby require emergency care. Go to the nearest health facility immediately.',
+      icon: 'child_care',
+    },
+  ];
+
+  function detectEmergency(symptomText) {
+    const lower = symptomText.toLowerCase();
+    for (const trigger of EMERGENCY_TRIGGERS) {
+      if (trigger.keywords.some(kw => lower.includes(kw))) {
+        return trigger;
+      }
+    }
+    return null;
+  }
+
   // ====== Elements ======
   const screens = document.querySelectorAll('.sc-screen');
   const backBtn = document.getElementById('backBtn');
@@ -55,6 +110,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   backBtn.addEventListener('click', () => {
     if (currentScreen === 'screenPatient') {
       window.location.href = 'dashboard.html';
+    } else if (currentScreen === 'screenEmergency') {
+      showScreen('screenSymptoms');
     } else if (currentScreen === 'screenSymptoms') {
       if (!user.hasFamily || family.length === 0) {
         window.location.href = 'dashboard.html';
@@ -190,9 +247,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (chips.length > 0) parts.push(chips.join(', '));
     enteredSymptoms = parts.join('. Also experiencing: ');
 
+    // Check for emergency symptoms before proceeding to follow-up questions
+    const emergency = detectEmergency(enteredSymptoms);
+    if (emergency) {
+      showEmergencyScreen(emergency);
+      return;
+    }
+
     showScreen('screenFollowup');
     getFollowupQuestions();
   });
+
+  // ====== Emergency Screen ======
+  function showEmergencyScreen(emergency) {
+    const msgEl = document.getElementById('emergencyMessage');
+    const iconEl = document.getElementById('emergencyIcon');
+    if (iconEl) iconEl.textContent = emergency.icon || 'emergency';
+    if (msgEl) msgEl.textContent = emergency.message;
+    showScreen('screenEmergency');
+
+    // Wire emergency action buttons
+    const callBtn = document.getElementById('btnCallEmergency');
+    const backBtn2 = document.getElementById('btnEmergencyBack');
+    if (callBtn) {
+      callBtn.onclick = () => { window.location.href = 'tel:112'; };
+    }
+    if (backBtn2) {
+      backBtn2.onclick = () => { showScreen('screenSymptoms'); };
+    }
+  }
 
   // ====== SCREEN 3: Follow-up Questions ======
   async function getFollowupQuestions() {
@@ -209,18 +292,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    const prompt = `You are a health assistant for a mobile health app in Uganda. A patient has described these symptoms: "${enteredSymptoms}".
+    const prompt = `A patient in Uganda has described these symptoms: "${enteredSymptoms}".
 
-Patient info: ${selectedPatient.name}, ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}, ${selectedPatient.sex}.
+Patient info: ${selectedPatient.name}, ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}, ${selectedPatient.sex}, location: ${user.location || user.district || 'Uganda'}.
 
-Generate exactly 4 follow-up questions to better understand their condition. For each question, provide 3-4 clickable answer options.
+Generate exactly 4 structured follow-up questions to better understand the clinical picture. Questions should cover:
+1. Symptom onset and duration
+2. Severity (mild / moderate / severe)
+3. Any current medications or known allergies (important for safe guidance)
+4. Any associated symptoms or relevant medical history
 
-IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this exact format:
+Keep all options short and easy to understand for a non-medical person.
+
+Respond ONLY with valid JSON, no markdown, no explanation. Use this exact format:
 {
   "questions": [
     {
       "question": "How long have you had this symptom?",
-      "options": ["Less than 24 hours", "1-3 days", "More than a week", "On and off for weeks"]
+      "options": ["Less than 24 hours", "1-3 days", "4-7 days", "More than a week"]
     }
   ]
 }`;
@@ -292,6 +381,11 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
     }
 
     questions.push({
+      question: 'Are you currently taking any medication or have known allergies?',
+      options: ['No medications or allergies', 'Taking painkillers (paracetamol/ibuprofen)', 'Taking prescription medicine', 'I have a known drug allergy'],
+    });
+
+    questions.push({
       question: 'Do you have any of these additional symptoms?',
       options: ['Fever or chills', 'Loss of appetite', 'Body weakness / fatigue', 'None of these'],
     });
@@ -358,37 +452,84 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
 
     // Always try AI for diagnosis (even if follow-up questions used fallback)
     {
-      const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
+      const hasKnownAllergy = answersText.toLowerCase().includes('drug allergy');
+      const takingPrescription = answersText.toLowerCase().includes('prescription medicine');
+      const healthGoalsText = user.healthGoals ? user.healthGoals.join(', ') : 'none specified';
 
-A patient described these symptoms: "${enteredSymptoms}"
-Follow-up answers: "${answersText}"
-Patient: ${selectedPatient.name}, ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}, ${selectedPatient.sex}, located in ${user.location || 'Uganda'}.
+      const prompt = `CLINICAL TRIAGE REQUEST — Homatt Health, Uganda
 
-Based on this information, provide a health assessment. Consider common diseases in Uganda/East Africa (malaria, typhoid, UTIs, respiratory infections, etc.).
+PATIENT:
+- Name: ${selectedPatient.name}
+- Age: ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}
+- Sex: ${selectedPatient.sex}
+- Location: ${user.location || user.district || 'Uganda'}
+- Health goals: ${healthGoalsText}
+${hasKnownAllergy ? '- ALERT: Patient has a known drug allergy — do not suggest OTC without flagging this\n' : ''}${takingPrescription ? '- NOTE: Patient is taking prescription medication — check for interactions before suggesting OTC\n' : ''}
+REPORTED SYMPTOMS: "${enteredSymptoms}"
 
-IMPORTANT: This is NOT a final diagnosis - it is guidance only.
-IMPORTANT: Respond ONLY with valid JSON, no markdown. Use this exact structure:
+FOLLOW-UP ANSWERS: "${answersText}"
 
+REQUIRED CLINICAL REASONING:
+1. Identify the most likely condition with clear reasoning (why this diagnosis fits the symptom pattern)
+2. List 1–2 alternative possibilities, explaining why possible and why less likely than the primary
+3. Assign triage level: green (self-care), yellow (monitor), orange (see doctor soon), red (emergency)
+4. If triage is green or yellow: suggest safe OTC options WITH mechanism of action and contraindications
+5. If triage is orange or red: do NOT suggest OTC — recommend clinic/emergency instead
+6. List 3–5 specific red flags the patient must watch for
+7. If overall confidence is below 50%: state uncertainty clearly and do NOT provide a specific diagnosis
+
+Consider common East African/Ugandan conditions: malaria, typhoid, UTIs, respiratory infections, gastroenteritis, etc.
+
+Respond ONLY with valid JSON, no markdown. Use this exact structure:
 {
-  "symptoms_identified": ["symptom1", "symptom2", "symptom3"],
+  "symptoms_identified": ["symptom1", "symptom2"],
+  "confidence_level": "high|moderate|low",
+  "confidence_percent": 80,
+  "uncertainty_note": "",
+  "triage_level": "green|yellow|orange|red",
+  "triage_label": "Self-care appropriate|Monitor closely|See doctor soon|Emergency",
+  "triage_reason": "Brief reason for this triage level in plain language",
   "conditions": [
     {
-      "name": "Condition Name",
-      "likelihood_percent": 75,
+      "name": "Most Likely Condition",
+      "likelihood_percent": 70,
       "severity": "low|medium|high",
-      "description": "Brief 1-2 sentence description"
+      "description": "1-2 sentence plain-language description",
+      "reasoning": "Why this diagnosis fits the symptom pattern"
+    },
+    {
+      "name": "Alternative Condition",
+      "likelihood_percent": 20,
+      "severity": "low|medium|high",
+      "description": "1-2 sentence plain-language description",
+      "reasoning": "Why possible but less likely"
     }
   ],
-  "causes": ["Possible cause 1", "Possible cause 2", "Possible cause 3"],
-  "prevention_tips": ["Tip 1", "Tip 2", "Tip 3", "Tip 4"],
+  "otc_guidance": [
+    {
+      "name": "Safe OTC option (brand name / generic name)",
+      "indication": "What symptom it treats",
+      "mechanism": "How it works — brief pharmacological explanation",
+      "dose_note": "Follow label instructions. Consult a pharmacist for the correct dose for your age and weight.",
+      "contraindications": ["Condition 1", "Condition 2"]
+    }
+  ],
+  "red_flags": [
+    "Seek care immediately if fever rises above 39°C",
+    "Seek care immediately if you develop difficulty breathing"
+  ],
+  "escalation_required": false,
+  "escalation_message": "",
+  "causes": ["Possible cause 1", "Possible cause 2"],
+  "prevention_tips": ["Tip 1", "Tip 2", "Tip 3"],
   "immediate_actions": ["Action 1", "Action 2"],
   "overall_risk": "low|medium|high",
-  "followup_message": "A caring message about monitoring their health and what to watch for",
+  "followup_message": "A caring reassuring message about next steps",
   "should_visit_clinic": false,
   "clinic_urgency": "none|soon|urgent"
 }
 
-Provide 2-3 possible conditions ordered by likelihood. Be specific but compassionate. Use plain language a non-medical person can understand.`;
+Provide 2–3 conditions ordered by likelihood. Use compassionate, plain language.`;
 
       try {
         const data = await callAI(prompt);
@@ -641,8 +782,33 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       clinicUrgency = 'soon';
     }
 
-    // Build causes based on top condition
+    // Build OTC guidance and red flags based on top condition
     const topName = topConditions[0].name.toLowerCase();
+
+    // Determine triage level from risk and conditions
+    let triageLevel = 'green';
+    let triageLabel = 'Self-care appropriate';
+    let triageReason = 'Your symptoms appear manageable at home with rest and self-care.';
+
+    if (overallRisk === 'high' || clinicUrgency === 'urgent') {
+      triageLevel = 'red';
+      triageLabel = 'Emergency — Seek care now';
+      triageReason = 'Your symptoms suggest a potentially serious condition that requires urgent medical attention.';
+    } else if (topName.includes('malaria') || topName.includes('typhoid') || topName.includes('uti') || topName.includes('lower respiratory')) {
+      triageLevel = 'orange';
+      triageLabel = 'See doctor soon';
+      triageReason = 'This condition requires professional evaluation and likely prescription treatment. Do not delay.';
+    } else if (overallRisk === 'medium' || clinicUrgency === 'soon') {
+      triageLevel = 'yellow';
+      triageLabel = 'Monitor closely';
+      triageReason = 'Your symptoms should be watched carefully. Visit a clinic if they do not improve within 24–48 hours.';
+    }
+
+    // OTC guidance (only for green/yellow triage — not for orange/red)
+    let otcGuidance = [];
+    let redFlags = [];
+
+    // Build causes based on top condition
     let causes, preventionTips, immediateActions, followupMsg;
 
     if (topName.includes('malaria')) {
@@ -662,6 +828,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Take plenty of fluids and rest while waiting for results',
       ];
       followupMsg = 'Malaria is very treatable when caught early. If your fever persists or gets worse, please visit a health facility immediately for testing and treatment.';
+      // OTC for malaria: only paracetamol for fever relief (antimalarials are prescription)
+      if (triageLevel !== 'red') {
+        otcGuidance = [{
+          name: 'Paracetamol (Panadol)',
+          indication: 'Temporary fever and pain relief while awaiting malaria test',
+          mechanism: 'Paracetamol reduces fever by inhibiting prostaglandin synthesis in the brain, lowering the body\'s temperature set-point. It does not treat malaria itself.',
+          dose_note: 'Follow label instructions carefully. Consult a pharmacist for the correct dose for your age and weight. Do NOT take more than the stated dose.',
+          contraindications: ['Liver disease', 'Heavy alcohol use', 'Already taking other paracetamol-containing products'],
+        }];
+      }
+      redFlags = [
+        'Fever above 39°C or that does not respond to paracetamol',
+        'Convulsions or fits',
+        'Unusual drowsiness, confusion, or difficulty waking up',
+        'Difficulty breathing',
+        'Dark or brown-colored urine',
+        'Vomiting that prevents you from keeping any fluids down',
+      ];
     } else if (topName.includes('typhoid')) {
       causes = [
         'Drinking contaminated water',
@@ -679,6 +863,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Stay hydrated and rest',
       ];
       followupMsg = 'Typhoid fever requires antibiotic treatment from a doctor. Do not self-medicate. Visit a health facility for proper diagnosis and treatment.';
+      // No OTC for typhoid — requires prescription antibiotics
+      redFlags = [
+        'Severe or worsening abdominal pain',
+        'Fever above 40°C',
+        'Blood in stool',
+        'Extreme weakness or inability to stand',
+        'Confusion or unusual drowsiness',
+      ];
     } else if (topName.includes('cold') || topName.includes('respiratory')) {
       causes = [
         'Viral infection spread through air droplets',
@@ -696,6 +888,31 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Stay hydrated with warm fluids',
       ];
       followupMsg = 'Most colds clear up in 5-7 days. If your cough lasts more than 2 weeks or you have difficulty breathing, please visit a health facility.';
+      if (triageLevel === 'green' || triageLevel === 'yellow') {
+        otcGuidance = [
+          {
+            name: 'Paracetamol (Panadol)',
+            indication: 'Fever and throat/head pain relief',
+            mechanism: 'Paracetamol works by blocking prostaglandin production in the brain, which reduces the fever response and decreases the perception of pain.',
+            dose_note: 'Follow label instructions. Consult a pharmacist for the correct dose.',
+            contraindications: ['Liver disease', 'Heavy alcohol use'],
+          },
+          {
+            name: 'Saline nasal rinse (salt water)',
+            indication: 'Nasal congestion relief',
+            mechanism: 'Saline rinse physically flushes mucus, irritants, and pathogens from the nasal passages, reducing congestion and inflammation with no drug effects.',
+            dose_note: 'Use a clean cup of boiled, cooled water with a pinch of salt. Sniff gently or use a rinse bottle.',
+            contraindications: [],
+          },
+        ];
+      }
+      redFlags = [
+        'Difficulty breathing or rapid breathing',
+        'Fever above 39°C lasting more than 3 days',
+        'Cough lasting more than 2 weeks',
+        'Coughing up blood or yellow-green mucus with chest pain',
+        'Symptoms worsening after initial improvement',
+      ];
     } else if (topName.includes('gastro') || topName.includes('stomach')) {
       causes = [
         'Eating contaminated or undercooked food',
@@ -713,6 +930,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'If diarrhea persists beyond 3 days, visit a health facility',
       ];
       followupMsg = 'The most important thing is to stay hydrated. If you see blood in stool, can\'t keep fluids down, or symptoms last more than 3 days, seek medical care.';
+      if (triageLevel === 'green' || triageLevel === 'yellow') {
+        otcGuidance = [{
+          name: 'Oral Rehydration Salts (ORS)',
+          indication: 'Preventing and treating dehydration from diarrhea and vomiting',
+          mechanism: 'ORS uses the sodium-glucose cotransport mechanism in the small intestine to actively pull water back into the bloodstream even during active diarrhea, restoring fluid and electrolyte balance.',
+          dose_note: 'Dissolve one ORS sachet in 1 litre of clean (boiled and cooled) water. Sip frequently. Consult a pharmacist for child dosing.',
+          contraindications: ['If the patient is unconscious or unable to swallow — use IV fluids in hospital instead'],
+        }];
+      }
+      redFlags = [
+        'Blood in stool or vomit',
+        'Unable to keep any fluids down for more than 4 hours',
+        'Signs of dehydration: dry mouth, sunken eyes, no urination for 6+ hours, dizziness',
+        'Diarrhea or vomiting lasting more than 3 days',
+        'Severe cramping abdominal pain',
+        'In young children: fewer wet nappies, no tears when crying, unusually sleepy',
+      ];
     } else if (topName.includes('uti')) {
       causes = [
         'Bacteria entering the urinary tract',
@@ -730,6 +964,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Visit a health facility for a urine test and antibiotics',
       ];
       followupMsg = 'UTIs are easily treatable with antibiotics. Don\'t ignore the symptoms - visit a clinic for a urine test and proper treatment.';
+      // UTI requires prescription antibiotics — no OTC for the infection itself
+      // But hydration support is appropriate
+      redFlags = [
+        'Fever above 38°C with back or flank pain (may indicate kidney infection)',
+        'Blood in urine',
+        'Severe pain in the lower back or side',
+        'Symptoms not improving after 2 days of increased fluids',
+        'In children: new bedwetting, crying during urination',
+      ];
     } else if (topName.includes('headache') || topName.includes('tension')) {
       causes = [
         'Stress and tension',
@@ -748,6 +991,31 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Take paracetamol if the pain is bothering you',
       ];
       followupMsg = 'Tension headaches are usually not serious. If headaches become frequent or very severe, or come with vision changes, please see a doctor.';
+      if (triageLevel === 'green' || triageLevel === 'yellow') {
+        otcGuidance = [
+          {
+            name: 'Paracetamol (Panadol)',
+            indication: 'Mild to moderate headache and pain relief',
+            mechanism: 'Paracetamol works by inhibiting prostaglandin synthesis in the brain and spinal cord, reducing the transmission of pain signals without causing stomach irritation.',
+            dose_note: 'Follow label instructions. Do not exceed the stated dose. Consult a pharmacist for advice.',
+            contraindications: ['Liver disease', 'Heavy alcohol use', 'Already taking other paracetamol products'],
+          },
+          {
+            name: 'Ibuprofen (Brufen)',
+            indication: 'Headache with tension or inflammation',
+            mechanism: 'Ibuprofen is an NSAID that works by inhibiting COX-1 and COX-2 enzymes, reducing the production of prostaglandins that cause pain and inflammation.',
+            dose_note: 'Take with food to protect the stomach. Follow label instructions. Consult a pharmacist.',
+            contraindications: ['Stomach ulcers or acid reflux', 'Kidney disease', 'Pregnancy (especially 3rd trimester)', 'Hypertension', 'Blood thinners'],
+          },
+        ];
+      }
+      redFlags = [
+        'Sudden, severe "thunderclap" headache — the worst headache of your life',
+        'Headache with fever AND stiff neck (cannot bend chin to chest)',
+        'Headache with vision changes, confusion, or weakness on one side',
+        'Headache after a head injury',
+        'Headaches becoming more frequent or severe over days/weeks',
+      ];
     } else {
       causes = [
         'Could have multiple possible causes',
@@ -765,11 +1033,35 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         'Visit a health facility for proper evaluation',
       ];
       followupMsg = 'We recommend monitoring your symptoms. If they persist, worsen, or new symptoms appear, please visit a health facility for proper examination.';
+      redFlags = [
+        'Symptoms worsening instead of improving',
+        'New symptoms developing',
+        'Fever above 38.5°C',
+        'Inability to eat or drink',
+        'Unusual drowsiness or confusion',
+      ];
     }
+
+    // For unspecified or uncertain cases, confidence is moderate/low
+    const confidencePercent = topConditions[0].name === 'Unspecified Symptoms' ? 45 : Math.min(topConditions[0].likelihood_percent, 85);
+    const confidenceLevel = confidencePercent >= 80 ? 'high' : confidencePercent >= 50 ? 'moderate' : 'low';
+    const uncertaintyNote = confidenceLevel === 'low'
+      ? "I'm not fully confident about the specific diagnosis based on the information provided. Let's approach this safely — a healthcare professional can provide a proper examination and tests."
+      : '';
 
     return {
       symptoms_identified: identified,
+      confidence_level: confidenceLevel,
+      confidence_percent: confidencePercent,
+      uncertainty_note: uncertaintyNote,
+      triage_level: triageLevel,
+      triage_label: triageLabel,
+      triage_reason: triageReason,
       conditions: topConditions,
+      otc_guidance: otcGuidance,
+      red_flags: redFlags,
+      escalation_required: triageLevel === 'red',
+      escalation_message: triageLevel === 'red' ? 'Please seek emergency medical care immediately. Do not wait.' : '',
       causes,
       prevention_tips: preventionTips,
       immediate_actions: immediateActions,
@@ -780,8 +1072,86 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     };
   }
 
+  // ====== Render Triage Card ======
+  function renderTriageCard(data) {
+    const card = document.getElementById('triageCard');
+    if (!card) return;
+    const level = data.triage_level || 'yellow';
+    const label = data.triage_label || 'Monitor closely';
+    const reason = data.triage_reason || '';
+    const emojiMap = { green: '🟢', yellow: '🟡', orange: '🟠', red: '🔴' };
+
+    card.className = `sc-triage-card ${level}`;
+    card.innerHTML = `
+      <div class="sc-triage-header">
+        <span class="sc-triage-emoji">${emojiMap[level] || '🟡'}</span>
+        <span class="sc-triage-label">${label}</span>
+      </div>
+      ${reason ? `<p class="sc-triage-description">${reason}</p>` : ''}
+    `;
+    card.style.display = 'block';
+
+    // Show confidence / uncertainty note
+    const confBar = document.getElementById('confidenceBar');
+    if (confBar && data.confidence_level) {
+      const confLabel = data.confidence_level === 'high' ? 'High confidence assessment' :
+        data.confidence_level === 'moderate' ? 'Moderate confidence — review possibilities below' :
+        'Limited confidence — please consult a healthcare professional';
+      confBar.innerHTML = `<p class="sc-confidence-text">Assessment confidence: <strong>${confLabel}</strong></p>`;
+      confBar.style.display = 'block';
+    }
+
+    const uncNote = document.getElementById('uncertaintyNote');
+    if (uncNote && data.uncertainty_note) {
+      uncNote.textContent = data.uncertainty_note;
+      uncNote.style.display = 'block';
+    }
+  }
+
+  // ====== Render OTC Guidance Card ======
+  function renderOTCCard(data) {
+    const card = document.getElementById('otcCard');
+    const body = document.getElementById('otcBody');
+    if (!card || !body) return;
+
+    const guidance = data.otc_guidance || [];
+    if (guidance.length === 0 || (data.triage_level === 'orange' || data.triage_level === 'red')) {
+      card.style.display = 'none';
+      return;
+    }
+
+    body.innerHTML = guidance.map(otc => `
+      <div class="sc-otc-item">
+        <p class="sc-otc-name">${otc.name}</p>
+        <p class="sc-otc-indication">${otc.indication || ''}</p>
+        <p class="sc-otc-mechanism"><strong>How it works:</strong> ${otc.mechanism}</p>
+        <p class="sc-otc-dose">⚠ ${otc.dose_note}</p>
+        ${otc.contraindications && otc.contraindications.length > 0
+          ? `<p class="sc-otc-contraindications">Not suitable for: ${otc.contraindications.join(', ')}</p>`
+          : ''}
+      </div>
+    `).join('');
+    card.style.display = 'block';
+  }
+
+  // ====== Render Red Flags Card ======
+  function renderRedFlagsCard(data) {
+    const card = document.getElementById('redFlagsCard');
+    const body = document.getElementById('redFlagsBody');
+    if (!card || !body) return;
+
+    const flags = data.red_flags || [];
+    if (flags.length === 0) { card.style.display = 'none'; return; }
+
+    body.innerHTML = `<ul class="sc-redflags-list">${flags.map(f => `<li>${f}</li>`).join('')}</ul>`;
+    card.style.display = 'block';
+  }
+
   // ====== Render Diagnosis ======
   function renderDiagnosis(data) {
+    // Render new clinical sections first
+    renderTriageCard(data);
+
     const tagsEl = document.getElementById('symptomTags');
     tagsEl.innerHTML = data.symptoms_identified
       .map(s => `<span class="sc-tag">${s}</span>`)
@@ -821,11 +1191,34 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     document.getElementById('preventionBody').innerHTML =
       `<ul class="sc-info-list">${data.prevention_tips.map(t => `<li>${t}</li>`).join('')}</ul>`;
 
-    // Action area based on risk
+    // Render OTC guidance and red flags
+    renderOTCCard(data);
+    renderRedFlagsCard(data);
+
+    // Action area based on triage level (falling back to overall_risk for offline engine compatibility)
     const actionArea = document.getElementById('actionArea');
     actionArea.innerHTML = '';
 
-    if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
+    const isEmergency = data.triage_level === 'red' || data.escalation_required;
+    const isUrgent = data.triage_level === 'orange' || data.overall_risk === 'high' || data.clinic_urgency === 'urgent';
+    const isMonitor = data.triage_level === 'yellow' || data.overall_risk === 'medium' || data.clinic_urgency === 'soon';
+
+    if (isEmergency) {
+      actionArea.innerHTML = `
+        <div class="sc-urgent-banner">
+          <span class="material-icons-outlined">emergency</span>
+          <p>${data.escalation_message || 'Based on your symptoms, please seek emergency medical care immediately. Do not wait.'}</p>
+        </div>
+        <button class="btn sc-emergency-btn" id="btnEmergency112" style="margin-bottom:8px">
+          <span class="material-icons-outlined">call</span>
+          Call Emergency: 112
+        </button>
+        <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
+          <span class="material-icons-outlined">local_hospital</span>
+          Find Nearest Emergency Facility
+        </button>
+      `;
+    } else if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
       actionArea.innerHTML = `
         <div class="sc-urgent-banner">
           <span class="material-icons-outlined">emergency</span>
@@ -873,6 +1266,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
 
     // Wire action buttons
+    const emergencyBtn112 = document.getElementById('btnEmergency112');
+    if (emergencyBtn112) {
+      emergencyBtn112.addEventListener('click', () => { window.location.href = 'tel:112'; });
+    }
+
     const bookClinicBtn = document.getElementById('btnBookClinic');
     if (bookClinicBtn) {
       bookClinicBtn.addEventListener('click', () => {
