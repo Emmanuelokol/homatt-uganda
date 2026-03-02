@@ -40,21 +40,28 @@ document.addEventListener('DOMContentLoaded', async () => {
   let selectedReminderTimes = [];
   let selectedEventType = '';
 
-  // ====== Load user profile ======
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
-  if (profile) {
-    user = { ...user, firstName: profile.first_name, lastName: profile.last_name,
-      district: profile.district, city: profile.city };
-    localStorage.setItem('homatt_user', JSON.stringify(user));
+  // ====== Render from cache immediately (no waiting) ======
+  function renderPrimaryCard(u) {
+    const initial = (u.firstName || 'U').charAt(0).toUpperCase();
+    const avatarEl = document.getElementById('primaryMemberAvatar');
+    if (u.avatarUrl) {
+      avatarEl.innerHTML = `<img src="${u.avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      avatarEl.textContent = initial;
+    }
+    document.getElementById('primaryMemberName').textContent =
+      `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'You';
+    const loc = [u.district, u.city].filter(Boolean).join(', ') || 'Uganda';
+    document.getElementById('primaryLocText').textContent = loc;
   }
+  renderPrimaryCard(user);
 
-  // Primary member card
-  const initial = (user.firstName || 'U').charAt(0).toUpperCase();
-  document.getElementById('primaryMemberAvatar').textContent = initial;
-  document.getElementById('primaryMemberName').textContent =
-    `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'You';
-  const loc = [user.district, user.city].filter(Boolean).join(', ') || 'Uganda';
-  document.getElementById('primaryLocText').textContent = loc;
+  // Show skeleton while data loads
+  document.getElementById('familyMembersList').innerHTML =
+    '<div class="skeleton skeleton-card"></div><div class="skeleton skeleton-card"></div>';
+  document.getElementById('prescriptionsList').innerHTML =
+    '<div class="skeleton skeleton-card"></div>';
+  document.getElementById('familyHeaderSub').textContent = 'Loading...';
 
   // ====== Tab Navigation ======
   const tabs = document.querySelectorAll('.tracker-tab');
@@ -143,6 +150,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         e.stopPropagation();
         openActionSheet(m);
       });
+
+      // Avatar photo upload on tap
+      const avatarEl = document.getElementById(`fmc-avatar-${m.id}`);
+      if (avatarEl) {
+        avatarEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          uploadMemberAvatar(m);
+        });
+      }
     });
   }
 
@@ -151,7 +167,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const isChild = dobAge !== null && dobAge < 15;
     const relClass = { spouse:'rel-spouse', child:'rel-child', parent:'rel-parent', sibling:'rel-sibling', other:'rel-other' }[m.relationship] || 'rel-other';
     const relLabel = m.relationship ? m.relationship.charAt(0).toUpperCase() + m.relationship.slice(1) : 'Member';
-    const initial = m.name.charAt(0).toUpperCase();
+    const initial = m.name ? m.name.charAt(0).toUpperCase() : '?';
+    const avatarContent = m.avatar_url
+      ? `<img src="${m.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : initial;
     const ageText = dobAge !== null ? `${dobAge} yrs` : '';
 
     // Medication adherence (placeholder — real data from prescription_doses)
@@ -160,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     return `
       <div class="family-member-card" id="mc-${m.id}">
         <div class="fmc-top">
-          <div class="fmc-avatar">${initial}</div>
+          <div class="fmc-avatar" style="overflow:hidden;cursor:pointer" id="fmc-avatar-${m.id}">${avatarContent}</div>
           <div style="flex:1">
             <div class="fmc-name">${escHtml(m.name)}${ageText ? ` <span style="font-size:12px;font-weight:400;color:var(--text-hint)">${ageText}</span>` : ''}</div>
             <span class="fmc-rel-chip ${relClass}">${relLabel}</span>
@@ -199,6 +218,39 @@ document.addEventListener('DOMContentLoaded', async () => {
       </div>`;
   }
 
+  // ====== Member Photo Upload ======
+  async function uploadMemberAvatar(member) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      if (file.size > 5 * 1024 * 1024) { showToast('Image must be under 5MB'); return; }
+
+      showToast('Uploading photo...');
+      const ext = file.name.split('.').pop();
+      const path = `${userId}/${member.id}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('member-avatars')
+        .upload(path, file, { upsert: true });
+
+      if (uploadError) { showToast('Upload failed: ' + uploadError.message); return; }
+
+      const { data: { publicUrl } } = supabase.storage.from('member-avatars').getPublicUrl(path);
+
+      await supabase.from('family_members').update({ avatar_url: publicUrl }).eq('id', member.id);
+
+      // Update local data and re-render
+      const idx = familyMembers.findIndex(m => m.id === member.id);
+      if (idx !== -1) familyMembers[idx].avatar_url = publicUrl;
+      renderMembers();
+      showToast('Photo updated!');
+    };
+    input.click();
+  }
+
   function calcAge(dob) {
     const today = new Date();
     const birth = new Date(dob);
@@ -213,9 +265,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     return cache[memberId] !== undefined ? cache[memberId] : 0;
   }
 
-  await loadMembers();
+  // ====== Load profile + members + prescriptions in PARALLEL ======
+  const [profileResult] = await Promise.all([
+    supabase.from('profiles').select('first_name,last_name,district,city,avatar_url').eq('id', userId).single(),
+    loadMembers(),
+    loadPrescriptions(),
+  ]);
+  if (profileResult.data) {
+    const p = profileResult.data;
+    user = { ...user, firstName: p.first_name, lastName: p.last_name,
+      district: p.district, city: p.city, avatarUrl: p.avatar_url };
+    localStorage.setItem('homatt_user', JSON.stringify(user));
+    renderPrimaryCard(user);
+  }
 
-  // ====== Load Prescriptions ======
+  // ====== Prescriptions ======
   async function loadPrescriptions() {
     const { data } = await supabase
       .from('prescriptions')
@@ -363,8 +427,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadPrescriptions();
     showToast('Dose marked as taken!');
   }
-
-  await loadPrescriptions();
 
   // ====== Shop / Marketplace ======
   async function loadShop() {

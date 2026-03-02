@@ -944,3 +944,166 @@ body {
   opacity: 1;
   transition: 0s;
 }
+
+/* ============================================
+   DARK MODE
+   ============================================ */
+:root[data-theme="dark"] {
+  --primary: #66BB6A;
+  --primary-light: #81C784;
+  --primary-dark: #4CAF50;
+  --primary-surface: #1a3a1c;
+  --primary-surface-hover: #2a5a2c;
+  --accent: #FFA726;
+  --accent-light: #FFB74D;
+  --text-primary: #E8EAED;
+  --text-secondary: #9AA0A6;
+  --text-hint: #6E7478;
+  --surface: #1E1E1E;
+  --background: #121212;
+  --border: #333333;
+  --border-focus: #66BB6A;
+  --error-bg: #3B1A1A;
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+[data-theme="dark"] body {
+  background: #0A0A0A;
+}
+
+[data-theme="dark"] .phone-frame {
+  box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
+}
+
+[data-theme="dark"] .bottom-nav {
+  background: #1E1E1E;
+  border-top: 1px solid #333;
+}
+
+[data-theme="dark"] .status-bar {
+  background: #111;
+}
+
+[data-theme="dark"] .page-body {
+  background: var(--surface);
+}
+
+[data-theme="dark"] .bottom-sheet {
+  background: #1E1E1E;
+}
+
+[data-theme="dark"] .sheet-input,
+[data-theme="dark"] .sheet-textarea,
+[data-theme="dark"] .sheet-select {
+  background: #2C2C2C;
+  color: var(--text-primary);
+  border-color: #444;
+}
+
+[data-theme="dark"] .sheet-chip {
+  background: #2C2C2C;
+  color: var(--text-primary);
+  border-color: #444;
+}
+
+[data-theme="dark"] .rx-card,
+[data-theme="dark"] .family-member-card,
+[data-theme="dark"] .item-card,
+[data-theme="dark"] .dash-hero-card,
+[data-theme="dark"] .dash-tip-card,
+[data-theme="dark"] .dash-quiz-card,
+[data-theme="dark"] .feature-card,
+[data-theme="dark"] .reminder-item,
+[data-theme="dark"] .wallet-card-full,
+[data-theme="dark"] .action-sheet-item {
+  background: #2C2C2C;
+}
+
+[data-theme="dark"] .primary-member-card {
+  background: linear-gradient(135deg, #1a3a1c, #2a5a2c);
+}
+
+[data-theme="dark"] .profile-section {
+  border-bottom-color: #2C2C2C;
+}
+
+[data-theme="dark"] .settings-item {
+  border-bottom-color: #2C2C2C;
+}
+
+[data-theme="dark"] .tip-text {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .dash-content {
+  background: var(--background);
+}
+
+[data-theme="dark"] .dash-header {
+  background: linear-gradient(135deg, #1a3a1c 0%, #2a5a2c 100%);
+}
+
+[data-theme="dark"] .health-score-card {
+  background: rgba(255,255,255,0.08);
+}
+
+[data-theme="dark"] .section-title {
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .tracker-tab {
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .tracker-tab.active {
+  color: var(--primary);
+}
+
+[data-theme="dark"] .family-header {
+  background: linear-gradient(135deg, #0d2f55 0%, #1565C0 100%);
+}
+
+[data-theme="dark"] .shop-search-wrap {
+  background: #2C2C2C;
+  border-color: #444;
+}
+
+[data-theme="dark"] .shop-search-input {
+  background: transparent;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .cat-chip {
+  background: #2C2C2C;
+  border-color: #444;
+  color: var(--text-primary);
+}
+
+[data-theme="dark"] .timeline-event {
+  background: #2C2C2C;
+}
+
+[data-theme="dark"] .member-detail-panel {
+  background: var(--background);
+}
+
+/* Skeleton shimmer for loading states */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--border) 25%, var(--background) 50%, var(--border) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-card {
+  height: 96px;
+  margin: 12px 16px;
+  border-radius: var(--radius-md);
+}

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Prescriptions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">Homatt Health</div>
+      <div class="sidebar-logo-sub">Admin Portal — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
+      <div class="sidebar-section-label">User Management</div>
+      <a href="support.html" class="sidebar-link"><span class="material-icons-outlined">contact_support</span> Support Tickets</a>
+      <a href="prescriptions.html" class="sidebar-link active"><span class="material-icons-outlined">medication</span> Prescriptions</a>
+      <div class="sidebar-section-label">Content</div>
+      <a href="terms.html" class="sidebar-link"><span class="material-icons-outlined">description</span> Terms &amp; Content</a>
+      <a href="emergency.html" class="sidebar-link"><span class="material-icons-outlined">emergency</span> Emergency Info</a>
+      <div class="sidebar-section-label">Marketplace</div>
+      <a href="marketplace.html" class="sidebar-link"><span class="material-icons-outlined">storefront</span> Products</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">verified_user</span> Admin</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:10px" id="adminUserName"></div>
+      <button class="logout-sidebar-btn" id="adminLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Prescription Verification</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Pending Prescription Reviews</div>
+          <div class="table-filter">
+            <select id="filterVerified">
+              <option value="false">Pending Review</option>
+              <option value="true">Verified</option>
+              <option value="">All</option>
+            </select>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Drug</th>
+              <th>Dosage / Form</th>
+              <th>Frequency</th>
+              <th>Duration</th>
+              <th>Doctor</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="rxTableBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let allRx = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+  await loadRx();
+  document.getElementById('filterVerified').addEventListener('change', renderRx);
+});
+
+async function loadRx() {
+  const { data } = await supabase
+    .from('prescriptions')
+    .select('*, profiles!prescriptions_user_id_fkey(first_name,last_name)')
+    .order('created_at', { ascending: false });
+  allRx = data || [];
+  renderRx();
+}
+
+function renderRx() {
+  const filter = document.getElementById('filterVerified').value;
+  const filtered = filter === '' ? allRx : allRx.filter(r => String(r.admin_verified) === filter);
+  const tbody = document.getElementById('rxTableBody');
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No prescriptions found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(rx => {
+    const p = rx.profiles;
+    const userName = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'User';
+    const start = rx.start_date ? new Date(rx.start_date).toLocaleDateString('en-UG', {month:'short',day:'numeric'}) : '—';
+    const end = rx.end_date ? new Date(rx.end_date).toLocaleDateString('en-UG', {month:'short',day:'numeric'}) : '—';
+    const freqMap = { once_daily:'Once daily', twice_daily:'Twice daily', three_times:'3× daily', four_times:'4× daily', as_needed:'As needed', weekly:'Weekly' };
+
+    return `<tr>
+      <td>
+        <div style="font-weight:600">${rx.drug_name}</div>
+        <div style="font-size:11px;color:#9AA0A6">Patient: ${userName}</div>
+        ${rx.manufacturer ? `<div style="font-size:11px;color:#9AA0A6">${rx.manufacturer}</div>` : ''}
+      </td>
+      <td>${rx.dosage || '—'} / ${rx.drug_form || '—'}</td>
+      <td>${freqMap[rx.frequency] || rx.frequency || '—'}</td>
+      <td style="font-size:12px">${start} → ${end}</td>
+      <td>${rx.prescribing_doctor ? `Dr. ${rx.prescribing_doctor}` : '—'}</td>
+      <td>
+        <span class="status-badge ${rx.admin_verified ? 'resolved' : 'open'}">
+          ${rx.admin_verified ? '✓ Verified' : '⏳ Pending'}
+        </span>
+      </td>
+      <td style="display:flex;gap:6px">
+        ${!rx.admin_verified
+          ? `<button class="btn-admin primary" onclick="verifyRx('${rx.id}', true)" style="font-size:12px;padding:6px 12px">
+               <span class="material-icons-outlined" style="font-size:14px">verified</span> Verify
+             </button>`
+          : `<button class="btn-admin secondary" onclick="verifyRx('${rx.id}', false)" style="font-size:12px;padding:6px 12px">
+               Unverify
+             </button>`
+        }
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+async function verifyRx(rxId, verified) {
+  const { error } = await supabase.from('prescriptions').update({ admin_verified: verified }).eq('id', rxId);
+  if (error) { showAdminToast('Failed to update', 'error'); return; }
+  await loadRx();
+  showAdminToast(verified ? 'Prescription verified!' : 'Verification removed', verified ? 'success' : 'default');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">Homatt Health</div>
+      <div class="sidebar-logo-sub">Admin Portal — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </a>
+      <div class="sidebar-section-label">User Management</div>
+      <a href="support.html" class="sidebar-link">
+        <span class="material-icons-outlined">contact_support</span> Support Tickets
+      </a>
+      <a href="prescriptions.html" class="sidebar-link">
+        <span class="material-icons-outlined">medication</span> Prescriptions
+      </a>
+      <div class="sidebar-section-label">Content</div>
+      <a href="terms.html" class="sidebar-link">
+        <span class="material-icons-outlined">description</span> Terms &amp; Content
+      </a>
+      <a href="emergency.html" class="sidebar-link">
+        <span class="material-icons-outlined">emergency</span> Emergency Info
+      </a>
+      <div class="sidebar-section-label">Marketplace</div>
+      <a href="marketplace.html" class="sidebar-link">
+        <span class="material-icons-outlined">storefront</span> Products
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">verified_user</span> Admin</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:10px" id="adminUserName">Loading...</div>
+      <button class="logout-sidebar-btn" id="adminLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Dashboard Overview</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <!-- Stats -->
+      <div class="stats-grid" id="statsGrid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">people</span></div>
+          <div><div class="stat-number" id="statUsers">—</div><div class="stat-label">Registered Users</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">contact_support</span></div>
+          <div><div class="stat-number" id="statTickets">—</div><div class="stat-label">Open Tickets</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">medication</span></div>
+          <div><div class="stat-number" id="statRx">—</div><div class="stat-label">Pending Rx Verifications</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">family_restroom</span></div>
+          <div><div class="stat-number" id="statMembers">—</div><div class="stat-label">Family Members</div></div>
+        </div>
+      </div>
+
+      <!-- Recent support tickets -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Recent Support Tickets</div>
+          <a href="support.html" class="btn-admin secondary" style="text-decoration:none">View All</a>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Subject</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody id="recentTicketsBody">
+            <tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading tickets...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+  document.getElementById('adminUserNameTop').textContent = document.getElementById('adminUserName').textContent;
+
+  // Load stats
+  const [usersRes, ticketsRes, rxRes, membersRes] = await Promise.all([
+    supabase.from('profiles').select('id', { count: 'exact', head: true }),
+    supabase.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+    supabase.from('prescriptions').select('id', { count: 'exact', head: true }).eq('admin_verified', false).eq('status', 'active'),
+    supabase.from('family_members').select('id', { count: 'exact', head: true }),
+  ]);
+
+  document.getElementById('statUsers').textContent = usersRes.count ?? '—';
+  document.getElementById('statTickets').textContent = ticketsRes.count ?? '—';
+  document.getElementById('statRx').textContent = rxRes.count ?? '—';
+  document.getElementById('statMembers').textContent = membersRes.count ?? '—';
+
+  // Recent tickets
+  const { data: tickets } = await supabase
+    .from('support_tickets')
+    .select('user_name, subject, category, priority, status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(8);
+
+  const tbody = document.getElementById('recentTicketsBody');
+  if (!tickets || tickets.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No support tickets yet</td></tr>';
+  } else {
+    tbody.innerHTML = tickets.map(t => `
+      <tr>
+        <td><strong>${t.user_name || 'Anonymous'}</strong></td>
+        <td>${t.subject}</td>
+        <td style="text-transform:capitalize">${t.category}</td>
+        <td><span class="status-badge ${t.priority}">${t.priority}</span></td>
+        <td><span class="status-badge ${t.status}">${t.status.replace('_',' ')}</span></td>
+        <td style="color:#9AA0A6;font-size:12px">${formatDate(t.created_at)}</td>
+      </tr>`).join('');
+  }
+});
+</script>
+</body>
+</html>
