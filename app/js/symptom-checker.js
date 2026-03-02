@@ -780,6 +780,102 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     };
   }
 
+  // ====== Escalation Helpers ======
+
+  function generateBookingCode() {
+    const now = new Date();
+    const date = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    const rand = Math.floor(Math.random() * 9000) + 1000;
+    return `AFH-${date}-${rand}`;
+  }
+
+  function isEmergencyLevel(diagData) {
+    const sympText = (diagData.symptoms_identified || []).join(' ').toLowerCase();
+    const rawText  = enteredSymptoms.toLowerCase();
+    const combined = sympText + ' ' + rawText;
+    const redFlags = [
+      'chest pain', 'difficulty breathing', 'loss of consciousness', 'cant breathe',
+      'severe bleeding', 'stroke', 'heart attack', 'convulsion', 'not breathing',
+      'unconscious', 'paralysis', 'severe chest',
+    ];
+    return redFlags.some(rf => combined.includes(rf)) ||
+           diagData.clinic_urgency === 'emergency' ||
+           (diagData.overall_risk === 'high' && sympText.includes('chest'));
+  }
+
+  async function logEscalation(bookingCode, diagData, action) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const urgencyLevel = isEmergencyLevel(diagData) ? 'emergency' : 'urgent';
+      await Promise.all([
+        supabase.from('escalations').insert({
+          patient_id:        session.user.id,
+          patient_name:      selectedPatient?.name || user.firstName || 'Patient',
+          urgency_level:     urgencyLevel,
+          symptoms:          diagData.symptoms_identified || [],
+          ai_diagnosis:      diagData.conditions[0]?.name || 'Unknown',
+          confidence_percent: diagData.conditions[0]?.likelihood_percent || 0,
+          location_district: user.district || null,
+          location_city:     user.city || null,
+          action_taken:      action,
+        }),
+        supabase.from('bookings').insert({
+          booking_code:    bookingCode,
+          patient_id:      session.user.id,
+          patient_name:    selectedPatient?.name || user.firstName || 'Patient',
+          patient_age:     selectedPatient?.age   || null,
+          patient_sex:     selectedPatient?.sex   || user.sex || null,
+          symptoms:        diagData.symptoms_identified || [],
+          ai_diagnosis:    diagData.conditions[0]?.name || 'Unknown',
+          ai_confidence:   diagData.conditions[0]?.likelihood_percent || 0,
+          urgency_level:   urgencyLevel,
+          location_district: user.district || null,
+          location_city:   user.city || null,
+          status:          'pending',
+          priority_flag:   urgencyLevel === 'emergency',
+        }),
+      ]);
+    } catch (err) {
+      console.warn('Escalation log:', err.message);
+    }
+  }
+
+  function showBookingConfirmation(code, diagData) {
+    const overlay = document.createElement('div');
+    overlay.id = 'bookingOverlay';
+    overlay.style.cssText = `
+      position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9999;
+      display:flex;align-items:center;justify-content:center;padding:20px;
+    `;
+    const isEmerg = isEmergencyLevel(diagData);
+    overlay.innerHTML = `
+      <div style="background:white;border-radius:20px;padding:28px;max-width:360px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);text-align:center">
+        <div style="width:56px;height:56px;background:#E8F5E9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <span class="material-icons-outlined" style="font-size:28px;color:#1B5E20">check_circle</span>
+        </div>
+        <h3 style="font-size:18px;font-weight:800;color:#1A1A2E;margin-bottom:8px">Booking Confirmed</h3>
+        <p style="font-size:13px;color:#888;margin-bottom:20px">Your booking code has been generated. Show this code at the clinic.</p>
+        <div style="background:#1B2A1E;color:#69F0AE;font-family:'Courier New',monospace;font-size:22px;font-weight:800;padding:16px;border-radius:12px;letter-spacing:3px;margin-bottom:8px">
+          ${code}
+        </div>
+        <p style="font-size:11px;color:#888;margin-bottom:20px">Save this code. An SMS will be sent to your registered number.</p>
+        ${isEmerg ? `
+        <div style="background:#FFEBEE;border:1px solid #FFCDD2;border-radius:10px;padding:12px;margin-bottom:16px;text-align:left">
+          <div style="font-size:13px;font-weight:700;color:#C62828;margin-bottom:4px">⚠️ Emergency Notice</div>
+          <div style="font-size:12px;color:#B71C1C">If you cannot reach a clinic, call emergency services: <strong>116</strong></div>
+        </div>` : ''}
+        <button onclick="document.getElementById('bookingOverlay').remove()" style="
+          width:100%;padding:13px;background:#1B5E20;color:white;border:none;border-radius:12px;
+          font-size:15px;font-weight:700;cursor:pointer;font-family:inherit
+        ">Got It</button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
   // ====== Render Diagnosis ======
   function renderDiagnosis(data) {
     const tagsEl = document.getElementById('symptomTags');
@@ -826,14 +922,21 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     actionArea.innerHTML = '';
 
     if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
+      const _isEmerg = isEmergencyLevel(data);
       actionArea.innerHTML = `
-        <div class="sc-urgent-banner">
-          <span class="material-icons-outlined">emergency</span>
-          <p>Based on your symptoms, we strongly recommend visiting a health facility as soon as possible.</p>
+        <div class="sc-urgent-banner${_isEmerg ? ' emergency' : ''}" style="${_isEmerg ? 'background:#FFEBEE;border-color:#EF9A9A;' : ''}">
+          <span class="material-icons-outlined" style="${_isEmerg ? 'color:#C62828' : ''}">emergency</span>
+          <p style="${_isEmerg ? 'color:#B71C1C' : ''}"><strong>${_isEmerg ? '🔴 Immediate Medical Attention Recommended' : 'Urgent Medical Care Needed'}</strong></p>
+          <p style="font-size:12px;margin-top:4px;${_isEmerg ? 'color:#C62828' : ''}">Based on your symptoms, please seek medical attention immediately.</p>
         </div>
+        ${_isEmerg ? `
+        <button class="btn sc-clinic-btn urgent" id="btnCallEmergency" style="background:#C62828;color:white;border:none;margin-bottom:8px">
+          <span class="material-icons-outlined">local_phone</span>
+          🚑 Call Emergency (116)
+        </button>` : ''}
         <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
           <span class="material-icons-outlined">local_hospital</span>
-          Find Nearest Clinic
+          🏥 Book Nearest Verified Clinic
         </button>
         <button class="btn sc-monitor-btn" id="btnStartMonitor">
           <span class="material-icons-outlined">schedule</span>
@@ -873,15 +976,25 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
 
     // Wire action buttons
+    const callEmergencyBtn = document.getElementById('btnCallEmergency');
+    if (callEmergencyBtn) {
+      callEmergencyBtn.addEventListener('click', () => {
+        window.location.href = 'tel:116';
+      });
+    }
+
     const bookClinicBtn = document.getElementById('btnBookClinic');
     if (bookClinicBtn) {
-      bookClinicBtn.addEventListener('click', () => {
+      bookClinicBtn.addEventListener('click', async () => {
+        const code = generateBookingCode();
         localStorage.setItem('homatt_clinic_reason', JSON.stringify({
-          condition: data.conditions[0]?.name || 'Health Check',
-          urgency: data.clinic_urgency || data.overall_risk,
-          symptoms: data.symptoms_identified,
+          booking_code: code,
+          condition:    data.conditions[0]?.name || 'Health Check',
+          urgency:      data.clinic_urgency || data.overall_risk,
+          symptoms:     data.symptoms_identified,
         }));
-        alert('Clinic finder coming soon! In the meantime, please visit your nearest health facility.');
+        await logEscalation(code, data, 'book_clinic');
+        showBookingConfirmation(code, data);
       });
     }
 
