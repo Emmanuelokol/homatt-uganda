@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt — Clinic Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="../portals.css">
+  <style>
+    .patient-card {
+      background: white; border-radius: 12px; border: 1px solid var(--border);
+      padding: 16px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .patient-card:hover { border-color: var(--accent-blue); box-shadow: var(--shadow-md); }
+    .patient-card.selected { border-color: var(--accent-blue); background: #E3F2FD; }
+    .patient-card.priority { border-left: 4px solid var(--accent-red); }
+    .patient-avatar {
+      width: 44px; height: 44px; border-radius: 50%; background: #E3F2FD;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: var(--accent-blue); flex-shrink: 0;
+    }
+    .patient-info { flex: 1; }
+    .patient-name { font-size: 14px; font-weight: 700; }
+    .patient-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .patient-time { font-size: 11px; color: var(--text-light); }
+    .ai-diag-card {
+      background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+      border-radius: 12px; padding: 20px; margin-bottom: 16px;
+    }
+    .ai-diag-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-blue); margin-bottom: 8px; }
+    .ai-diag-name { font-size: 22px; font-weight: 800; color: var(--text-dark); }
+    .ai-confidence { font-size: 13px; color: var(--accent-blue); margin-top: 4px; font-weight: 600; }
+    .drug-builder-row {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 40px;
+      gap: 8px; align-items: center; margin-bottom: 8px;
+    }
+    .remove-drug-btn {
+      width: 32px; height: 32px; border-radius: 50%; background: #FFEBEE;
+      border: none; color: var(--accent-red); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rx-preview {
+      background: #F9F9F9; border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px; font-size: 13px; white-space: pre-wrap;
+      font-family: 'Courier New', monospace; max-height: 300px; overflow-y: auto;
+    }
+    .scan-success {
+      background: var(--brand-pale); border: 2px solid var(--brand-primary);
+      border-radius: 12px; padding: 24px; text-align: center;
+      display: none;
+    }
+    .scan-success .material-icons-outlined { font-size: 48px; color: var(--brand-primary); }
+    .urgent-flag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #FFEBEE; color: var(--accent-red);
+      padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon" style="background:#1565C0">
+        <span class="material-icons-outlined">local_hospital</span>
+      </div>
+      <div class="login-logo-name">Clinic Portal</div>
+    </div>
+    <div class="login-subtitle">Homatt Health — Doctor Dashboard</div>
+    <div class="login-field">
+      <label>Doctor Email / Clinic ID</label>
+      <input type="email" id="loginEmail" placeholder="doctor@clinic.ug">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••">
+    </div>
+    <div class="login-error" id="loginError">Invalid credentials.</div>
+    <button class="login-btn" onclick="doLogin()" style="background:#1565C0">Sign In</button>
+    <div class="login-divider">or</div>
+    <button class="demo-btn" onclick="enterDemo()" style="color:#1565C0;border-color:#1565C0">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">science</span>
+      Demo Mode — No Login Required
+    </button>
+    <div class="login-back"><a href="../">← Back to Portal Hub</a></div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="appLayout" class="portal-layout" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge">
+        <div class="logo-icon" style="background:#1565C0">
+          <span class="material-icons-outlined">local_hospital</span>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">Homatt</span>
+          <span class="logo-tag">Clinic Portal</span>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="s-user-name" id="sDocName">Dr. Sarah Nakamya</div>
+      <div class="s-user-role">General Medicine · <span id="sClinicName">Kampala Medical Center</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('queue',this)">
+        <span class="material-icons-outlined">queue</span> Patient Queue
+        <span class="nav-badge" id="badgeQueue">3</span>
+      </div>
+      <div class="nav-item" onclick="showPage('scan',this)">
+        <span class="material-icons-outlined">qr_code_scanner</span> QR Scanner
+      </div>
+      <div class="nav-item" onclick="showPage('prescriptions',this)">
+        <span class="material-icons-outlined">medication</span> My Prescriptions
+      </div>
+      <div class="nav-item" onclick="showPage('profile',this)">
+        <span class="material-icons-outlined">badge</span> My Profile
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <span class="material-icons-outlined">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="pageTitle">Patient Queue</div>
+        <div class="topbar-subtitle" id="pageDate">Today — Loading...</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-icon-btn"><span class="material-icons-outlined">notifications_outlined</span><span class="notif-dot"></span></button>
+        <button class="avatar-btn" style="background:#1565C0" id="avatarBtn">D</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ─── QUEUE ─── -->
+      <div class="page active" id="page-queue">
+        <div class="demo-banner">
+          <span class="material-icons-outlined">science</span>
+          Demo Mode — Click any patient to review their AI diagnosis and issue a prescription.
+        </div>
+
+        <div class="grid-2 mt-16" style="margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-icon blue"><span class="material-icons-outlined">pending_actions</span></div>
+            <div class="stat-info"><div class="stat-value" id="qPending">3</div><div class="stat-label">Awaiting QR Scan</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+            <div class="stat-info"><div class="stat-value" id="qCompleted">5</div><div class="stat-label">Completed Today</div></div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Pending Patients</div>
+        </div>
+
+        <div id="patientQueue"></div>
+
+        <!-- Patient Detail Panel (slides in) -->
+        <div id="patientPanel" style="display:none">
+          <div class="section-header mt-24">
+            <div class="section-title">Patient Review</div>
+            <button class="btn btn-ghost btn-sm" onclick="closePatient()">← Back to Queue</button>
+          </div>
+
+          <div class="grid-2">
+            <div>
+              <!-- Patient Info -->
+              <div class="card" style="margin-bottom:16px">
+                <div class="card-header">
+                  <div class="card-title"><span class="material-icons-outlined">person</span> Patient Info</div>
+                  <span id="panelUrgencyBadge"></span>
+                </div>
+                <div class="card-body">
+                  <div class="form-row">
+                    <div><div class="form-label">Name</div><div class="fw-600" id="panelName">—</div></div>
+                    <div><div class="form-label">Age / Sex</div><div class="fw-600" id="panelAgeSex">—</div></div>
+                  </div>
+                  <div class="form-row mt-16">
+                    <div><div class="form-label">Booking Code</div><div id="panelCode" class="code-badge">—</div></div>
+                    <div><div class="form-label">Booked At</div><div class="text-sm text-muted" id="panelTime">—</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- AI Diagnosis -->
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title"><span class="material-icons-outlined">psychology</span> AI Assessment</div>
+                  <span class="badge badge-info" style="background:#E3F2FD;color:#1565C0">AI Generated</span>
+                </div>
+                <div class="card-body">
+                  <div class="ai-diag-card">
+                    <div class="ai-diag-title">Primary Diagnosis</div>
+                    <div class="ai-diag-name" id="panelDiag">—</div>
+                    <div class="ai-confidence" id="panelConf">—</div>
+                  </div>
+                  <div class="form-label">Reported Symptoms</div>
+                  <div id="panelSymptoms"></div>
+                  <div class="form-label mt-16">Risk Level</div>
+                  <div id="panelRisk"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Confirmation + Prescription Form -->
+            <div>
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title"><span class="material-icons-outlined">fact_check</span> Diagnosis Confirmation</div>
+                </div>
+                <div class="card-body">
+                  <div class="form-group">
+                    <label class="form-label">Doctor's Final Diagnosis</label>
+                    <input type="text" class="form-input" id="finalDiag" placeholder="Confirm or modify AI diagnosis">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">AI Diagnosis Confirmed?</label>
+                    <select class="form-select" id="aiConfirmed">
+                      <option value="yes">Yes — AI diagnosis confirmed</option>
+                      <option value="no">No — Modified (see reason below)</option>
+                    </select>
+                  </div>
+                  <div class="form-group" id="modReasonGroup" style="display:none">
+                    <label class="form-label">Reason for Modification</label>
+                    <textarea class="form-textarea" id="modReason" placeholder="Clinical finding that led to modified diagnosis..."></textarea>
+                  </div>
+
+                  <div class="divider"></div>
+                  <div class="section-title" style="margin-bottom:12px">E-Prescription</div>
+
+                  <div id="drugsBuilder">
+                    <!-- Drug rows added here -->
+                  </div>
+                  <button class="btn btn-ghost btn-sm" onclick="addDrugRow()">
+                    <span class="material-icons-outlined">add</span> Add Drug
+                  </button>
+
+                  <div class="divider"></div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label class="form-label">Doctor Full Name</label>
+                      <input type="text" class="form-input" id="docName" value="Dr. Sarah Nakamya">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">License Number</label>
+                      <input type="text" class="form-input" id="docLicense" value="UMC-2024-00123">
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Special Instructions</label>
+                    <textarea class="form-textarea" id="specialInstr" placeholder="e.g. Take after meals, avoid sunlight..."></textarea>
+                  </div>
+
+                  <div class="modal-footer" style="padding:0;border:none;margin-top:16px">
+                    <button class="btn btn-ghost" onclick="closePatient()">Cancel</button>
+                    <button class="btn btn-primary" onclick="issuePrescription()" style="background:#1565C0">
+                      <span class="material-icons-outlined">create</span> Issue Prescription
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── QR SCANNER ─── -->
+      <div class="page" id="page-scan">
+        <div class="section-header">
+          <div class="section-title">QR Code Scanner</div>
+          <div class="section-sub">Scan patient's booking QR code on arrival</div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="qr-scan-box" onclick="simulateScan()">
+              <span class="material-icons-outlined">qr_code_scanner</span>
+              <p style="font-size:14px;font-weight:600;margin-bottom:4px">Tap to Simulate QR Scan</p>
+              <p>Point camera at patient's booking QR code</p>
+            </div>
+            <div style="margin-top:16px">
+              <div class="form-label">Or enter booking code manually</div>
+              <div style="display:flex;gap:8px;margin-top:6px">
+                <input type="text" class="form-input" id="manualCode" placeholder="AFH-20260302-XXXX" style="flex:1">
+                <button class="btn btn-primary" onclick="manualLookup()" style="background:#1565C0">Look Up</button>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="scan-success" id="scanSuccess">
+              <span class="material-icons-outlined">check_circle</span>
+              <h3 style="margin:12px 0 4px;font-size:18px;color:var(--brand-primary)">Patient Found!</h3>
+              <p id="scanPatientName" style="font-size:15px;font-weight:700;margin-bottom:8px">—</p>
+              <p id="scanDiagnosis" style="font-size:13px;color:var(--text-light);margin-bottom:16px">—</p>
+              <button class="btn btn-primary" onclick="openPatientFromScan()" style="background:#1565C0">
+                <span class="material-icons-outlined">person</span> Open Patient File
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PRESCRIPTIONS ─── -->
+      <div class="page" id="page-prescriptions">
+        <div class="section-header">
+          <div class="section-title">My Issued Prescriptions</div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Rx ID</th><th>Patient</th><th>Diagnosis</th><th>AI Confirmed</th><th>Drugs</th><th>Status</th><th>Issued</th></tr></thead>
+              <tbody id="myRxTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PROFILE ─── -->
+      <div class="page" id="page-profile">
+        <div class="section-header"><div class="section-title">Doctor Profile</div></div>
+        <div style="max-width:500px">
+          <div class="card">
+            <div class="card-body">
+              <div style="text-align:center;padding:20px 0">
+                <div style="width:72px;height:72px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;margin:0 auto 12px">D</div>
+                <div style="font-size:20px;font-weight:800">Dr. Sarah Nakamya</div>
+                <div style="font-size:13px;color:var(--text-light);margin-top:4px">General Medicine</div>
+                <span class="badge badge-verified" style="margin-top:8px">✓ License Verified</span>
+              </div>
+              <div class="divider"></div>
+              <table><tbody>
+                <tr><td class="text-muted text-sm" style="padding:8px">License Number</td><td class="fw-600">UMC-2024-00123</td></tr>
+                <tr><td class="text-muted text-sm" style="padding:8px">Clinic</td><td class="fw-600">Kampala Medical Center</td></tr>
+                <tr><td class="text-muted text-sm" style="padding:8px">Phone</td><td class="fw-600">+256 700 123 456</td></tr>
+                <tr><td class="text-muted text-sm" style="padding:8px">Prescriptions Issued</td><td class="fw-600">23 this week</td></tr>
+              </tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Prescription Success Modal -->
+<div class="modal-overlay hidden" id="rxModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Prescription Issued Successfully</div>
+      <button class="modal-close" onclick="closeRxModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="modal-body">
+      <div class="alert alert-success">
+        <span class="material-icons-outlined">check_circle</span>
+        <div>Prescription digitally signed and sent to pharmacy. Patient notified via SMS.</div>
+      </div>
+      <div class="rx-preview" id="rxPreviewText"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeRxModal()">Close</button>
+      <button class="btn btn-primary" onclick="closeRxModal()" style="background:#1565C0">
+        <span class="material-icons-outlined">print</span> Print Prescription
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="clinic.js"></script>
+</body>
+</html>
