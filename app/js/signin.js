@@ -4,6 +4,13 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const cfg = window.HOMATT_CONFIG || {};
+
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    document.getElementById('signinError').textContent = 'App configuration error. Please reload the page.';
+    document.getElementById('signinError').classList.add('visible');
+    return;
+  }
+
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
   const form = document.getElementById('signinForm');
