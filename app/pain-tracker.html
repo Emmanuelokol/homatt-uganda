@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#BF360C">
+  <title>Homatt Health - Pain Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/trackers.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar" style="background:#BF360C">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Tracker Header -->
+      <div class="tracker-bg-pain">
+        <div class="tracker-topbar">
+          <button class="tracker-back-btn" id="backBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <span class="tracker-topbar-title">Pain Tracker</span>
+          <div style="width:36px"></div>
+        </div>
+        <div class="tracker-header">
+          <div class="tracker-hero">
+            <div class="tracker-hero-icon">
+              <span class="material-icons-outlined">healing</span>
+            </div>
+            <div class="tracker-hero-text">
+              <h2>Pain Tracker</h2>
+              <p>Track pain patterns, detect chronic risks & get insights</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="tracker-tabs">
+        <button class="tracker-tab active" data-tab="log">
+          <span class="material-icons-outlined">edit_note</span>
+          Log Today
+        </button>
+        <button class="tracker-tab" data-tab="patterns">
+          <span class="material-icons-outlined">insights</span>
+          Patterns
+        </button>
+        <button class="tracker-tab" data-tab="history">
+          <span class="material-icons-outlined">history</span>
+          History
+        </button>
+      </div>
+
+      <!-- ===== LOG TAB ===== -->
+      <div class="tracker-tab-pane active" id="paneLog">
+
+        <!-- Pain Location -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">location_on</span>
+            Pain Location
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Where is the pain? <span class="tracker-label-hint">(select all that apply)</span></label>
+            <div class="chips-wrap" id="locationChips">
+              <button class="chip-toggle" data-chip="location" data-val="head">Head / Migraine</button>
+              <button class="chip-toggle" data-chip="location" data-val="neck">Neck</button>
+              <button class="chip-toggle" data-chip="location" data-val="chest">Chest</button>
+              <button class="chip-toggle" data-chip="location" data-val="upper_back">Upper Back</button>
+              <button class="chip-toggle" data-chip="location" data-val="lower_back">Lower Back</button>
+              <button class="chip-toggle" data-chip="location" data-val="abdomen">Abdomen</button>
+              <button class="chip-toggle" data-chip="location" data-val="pelvis">Pelvis</button>
+              <button class="chip-toggle" data-chip="location" data-val="joints">Joints</button>
+              <button class="chip-toggle" data-chip="location" data-val="legs">Legs</button>
+              <button class="chip-toggle" data-chip="location" data-val="arms">Arms</button>
+              <button class="chip-toggle" data-chip="location" data-val="full_body">Full Body</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pain Characteristics -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">tune</span>
+            Pain Characteristics
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Intensity</label>
+            <div class="slider-row">
+              <input type="range" id="painIntensity" class="slider-range" min="1" max="10" value="1">
+              <div class="slider-value-badge" id="painIntensityVal" style="background:#FFEBEE;color:#D32F2F;border-color:#FFCDD2">1</div>
+            </div>
+            <div class="slider-min-max"><span>Mild (1)</span><span>Unbearable (10)</span></div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Pain Type</label>
+            <div class="choice-btn-group">
+              <button class="choice-btn" data-group="painType" data-val="sharp">Sharp</button>
+              <button class="choice-btn" data-group="painType" data-val="dull">Dull</button>
+              <button class="choice-btn" data-group="painType" data-val="throbbing">Throbbing</button>
+              <button class="choice-btn" data-group="painType" data-val="burning">Burning</button>
+              <button class="choice-btn" data-group="painType" data-val="pressure">Pressure</button>
+              <button class="choice-btn" data-group="painType" data-val="aching">Aching</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Duration (hours)</label>
+            <input type="number" id="painDuration" class="tracker-date-input" placeholder="e.g. 2.5" min="0" max="72" step="0.5">
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Time of Day</label>
+            <div class="choice-btn-group">
+              <button class="choice-btn" data-group="timeOfDay" data-val="morning">Morning</button>
+              <button class="choice-btn" data-group="timeOfDay" data-val="afternoon">Afternoon</button>
+              <button class="choice-btn" data-group="timeOfDay" data-val="evening">Evening</button>
+              <button class="choice-btn" data-group="timeOfDay" data-val="night">Night</button>
+              <button class="choice-btn" data-group="timeOfDay" data-val="all_day">All Day</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Context & Relief -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">help_outline</span>
+            Context & Relief
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">What triggered it? <span class="tracker-label-hint">(optional)</span></label>
+            <input type="text" id="painTrigger" class="tracker-date-input" placeholder="e.g. stress, physical activity, food...">
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Relief Methods Tried</label>
+            <div class="chips-wrap" id="reliefChips">
+              <button class="chip-toggle" data-chip="relief" data-val="rest">Rest</button>
+              <button class="chip-toggle" data-chip="relief" data-val="medication">Medication</button>
+              <button class="chip-toggle" data-chip="relief" data-val="heat">Heat / Warm compress</button>
+              <button class="chip-toggle" data-chip="relief" data-val="cold">Cold compress</button>
+              <button class="chip-toggle" data-chip="relief" data-val="exercise">Light exercise</button>
+              <button class="chip-toggle" data-chip="relief" data-val="massage">Massage</button>
+              <button class="chip-toggle" data-chip="relief" data-val="water">Drinking water</button>
+              <button class="chip-toggle" data-chip="relief" data-val="sleep">Sleep</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Associated Symptoms</label>
+            <div class="chips-wrap" id="associatedChips">
+              <button class="chip-toggle" data-chip="associated" data-val="nausea">Nausea</button>
+              <button class="chip-toggle" data-chip="associated" data-val="vomiting">Vomiting</button>
+              <button class="chip-toggle" data-chip="associated" data-val="dizziness">Dizziness</button>
+              <button class="chip-toggle" data-chip="associated" data-val="vision_changes">Vision changes</button>
+              <button class="chip-toggle" data-chip="associated" data-val="light_sensitivity">Light sensitivity</button>
+              <button class="chip-toggle" data-chip="associated" data-val="sound_sensitivity">Sound sensitivity</button>
+              <button class="chip-toggle" data-chip="associated" data-val="fever">Fever</button>
+              <button class="chip-toggle" data-chip="associated" data-val="numbness">Numbness / Tingling</button>
+              <button class="chip-toggle" data-chip="associated" data-val="weakness">Weakness</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notes -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">notes</span>
+            Notes
+          </div>
+          <textarea id="painNotes" class="tracker-notes-input" placeholder="Describe the pain in your own words..."></textarea>
+        </div>
+
+        <button class="btn btn-next log-submit-btn" id="savePainLog" style="background:#D32F2F;box-shadow:0 4px 12px rgba(211,47,47,0.25)">
+          <span class="material-icons-outlined">save</span>
+          Save Pain Log
+        </button>
+      </div>
+
+      <!-- ===== PATTERNS TAB ===== -->
+      <div class="tracker-tab-pane" id="panePatterns">
+
+        <div class="pattern-cta" id="patternCta">
+          <div class="pattern-cta-icon" style="background:#FFEBEE">
+            <span class="material-icons-outlined" style="color:#D32F2F">insights</span>
+          </div>
+          <h3>Pain Pattern Analysis</h3>
+          <p>Our AI reviews your pain logs to detect chronic patterns, identify migraine or neuropathic signals, and flag urgent red flags — without diagnosing.</p>
+          <button class="analyze-btn" id="analyzeBtn" style="background:#D32F2F;box-shadow:0 4px 12px rgba(211,47,47,0.25)">
+            <span class="material-icons-outlined">psychology</span>
+            Analyze My Patterns
+          </button>
+        </div>
+
+        <div class="ai-loading" id="aiLoading">
+          <div class="ai-pulse-rings">
+            <div class="ai-pulse-ring" style="border-color:#D32F2F"></div>
+            <div class="ai-pulse-ring" style="border-color:#D32F2F"></div>
+            <div class="ai-pulse-ring" style="border-color:#D32F2F"></div>
+            <div class="ai-pulse-center" style="background:#D32F2F">
+              <span class="material-icons-outlined">psychology</span>
+            </div>
+          </div>
+          <p class="ai-loading-text">Analyzing your pain patterns...</p>
+        </div>
+
+        <div class="pattern-results" id="patternResults">
+          <div class="stability-row">
+            <div class="stability-badge" id="stabilityBadge">
+              <span class="material-icons-outlined">circle</span>
+              <span id="stabilityLabel">Stable</span>
+            </div>
+            <span class="confidence-text" id="confidenceText">85% confidence</span>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#D32F2F">summarize</span>
+              <h4>Pattern Summary</h4>
+            </div>
+            <p id="patternSummary"></p>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#D32F2F">trending_up</span>
+              <h4>Trend Interpretation</h4>
+            </div>
+            <p id="trendInterpretation"></p>
+          </div>
+
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined" style="color:#D32F2F">arrow_circle_right</span>
+              <h4>Recommended Next Step</h4>
+            </div>
+            <p id="nextStep"></p>
+          </div>
+
+          <div class="red-flag-card" id="redFlagCard">
+            <div class="red-flag-header">
+              <span class="material-icons-outlined">warning</span>
+              <h4>Red Flags to Watch</h4>
+            </div>
+            <ul id="redFlagsList"></ul>
+          </div>
+
+          <div class="clarify-card" id="clarifyCard">
+            <p id="clarifyText"></p>
+          </div>
+
+          <p class="pattern-disclaimer">This analysis is for informational purposes only. Seek immediate care for sudden severe headache, chest pain, neurological deficits, or trauma-related pain.</p>
+
+          <button class="re-analyze-btn" id="reAnalyzeBtn">
+            <span class="material-icons-outlined">refresh</span>
+            Re-analyze
+          </button>
+        </div>
+      </div>
+
+      <!-- ===== HISTORY TAB ===== -->
+      <div class="tracker-tab-pane" id="paneHistory">
+        <div class="history-loading" id="historyLoading">
+          <span class="material-icons-outlined" style="font-size:28px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
+          Loading your logs...
+        </div>
+        <div class="history-empty hidden" id="historyEmpty">
+          <span class="material-icons-outlined">healing</span>
+          <p>No pain logs yet.<br>Start logging to build your history.</p>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" id="navHome">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" id="navFamily">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" id="navWallet">
+        <span class="material-icons-outlined">account_balance_wallet</span>
+        <span class="nav-label">Wallet</span>
+      </div>
+      <div class="nav-item" id="navProfile">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/pain-tracker.js"></script>
+</body>
+</html>

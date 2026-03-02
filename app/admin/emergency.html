@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Emergency Info</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">Homatt Health</div>
+      <div class="sidebar-logo-sub">Admin Portal — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
+      <div class="sidebar-section-label">User Management</div>
+      <a href="support.html" class="sidebar-link"><span class="material-icons-outlined">contact_support</span> Support Tickets</a>
+      <a href="prescriptions.html" class="sidebar-link"><span class="material-icons-outlined">medication</span> Prescriptions</a>
+      <div class="sidebar-section-label">Content</div>
+      <a href="terms.html" class="sidebar-link"><span class="material-icons-outlined">description</span> Terms &amp; Content</a>
+      <a href="emergency.html" class="sidebar-link active"><span class="material-icons-outlined">emergency</span> Emergency Info</a>
+      <div class="sidebar-section-label">Marketplace</div>
+      <a href="marketplace.html" class="sidebar-link"><span class="material-icons-outlined">storefront</span> Products</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">verified_user</span> Admin</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:10px" id="adminUserName"></div>
+      <button class="logout-sidebar-btn" id="adminLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Emergency Contacts &amp; Info</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <div style="background:#FFEBEE;border-left:4px solid #D32F2F;padding:14px 18px;border-radius:8px;margin-bottom:24px">
+        <div style="font-weight:700;color:#D32F2F;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined">warning</span> Critical Information
+        </div>
+        <p style="font-size:13px;color:#C62828">
+          The emergency contacts and information edited here appear directly in the Homatt Health mobile app.
+          Make sure all numbers are current and verified before saving.
+        </p>
+      </div>
+
+      <div class="content-card">
+        <div class="content-card-header">
+          <div class="content-card-icon" style="background:#FFEBEE;color:#D32F2F">
+            <span class="material-icons-outlined">local_hospital</span>
+          </div>
+          <div>
+            <div style="font-weight:700">Emergency Contacts &amp; Information</div>
+            <div class="content-last-updated" id="emergencyUpdated">Loading...</div>
+          </div>
+        </div>
+        <div class="content-card-body">
+          <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+            Enter emergency contact information that will be displayed to users in the app.
+            Include phone numbers, hospital names, and any relevant emergency guidance for Uganda.
+          </p>
+          <div class="admin-form-group">
+            <label>Emergency Information (plain text)</label>
+            <textarea id="emergencyContent" style="min-height:280px" placeholder="Uganda Emergency Services: 999 (Police), 911 (Ambulance)..."></textarea>
+          </div>
+          <div style="background:#FFF8E1;border-radius:8px;padding:12px 16px;margin-bottom:16px;font-size:12px;color:#E65100">
+            <strong>Tip:</strong> Format with line breaks for readability. Include service name, phone number, and hours where available.
+            Example format:<br>
+            Uganda Emergency (Police): 999<br>
+            Mulago National Referral Hospital: +256 414 541 188
+          </div>
+          <button class="btn-admin primary" id="saveEmergencyBtn" style="background:#D32F2F">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> Save Emergency Info
+          </button>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div class="content-card" style="margin-top:20px">
+        <div class="content-card-header">
+          <div class="content-card-icon" style="background:#E8F5E9;color:#2E7D32">
+            <span class="material-icons-outlined">preview</span>
+          </div>
+          <div>
+            <div style="font-weight:700">Preview (as shown in app)</div>
+          </div>
+        </div>
+        <div class="content-card-body">
+          <div style="background:#FFEBEE;border-radius:10px;padding:14px;border-left:4px solid #D32F2F">
+            <div style="font-size:12px;font-weight:700;color:#D32F2F;margin-bottom:8px">
+              Emergency Information
+            </div>
+            <p style="font-size:13px;color:#333;line-height:1.7;white-space:pre-line" id="emergencyPreview">—</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+
+  const { data } = await supabase.from('site_content').select('*').eq('key', 'emergency').single();
+  if (data) {
+    document.getElementById('emergencyContent').value = data.content || '';
+    document.getElementById('emergencyPreview').textContent = data.content || '—';
+    document.getElementById('emergencyUpdated').textContent = 'Last updated: ' + formatDate(data.updated_at);
+  }
+
+  // Live preview
+  document.getElementById('emergencyContent').addEventListener('input', (e) => {
+    document.getElementById('emergencyPreview').textContent = e.target.value || '—';
+  });
+
+  document.getElementById('saveEmergencyBtn').addEventListener('click', async () => {
+    const content = document.getElementById('emergencyContent').value.trim();
+    if (!content) { showAdminToast('Content cannot be empty', 'error'); return; }
+
+    const btn = document.getElementById('saveEmergencyBtn');
+    btn.disabled = true;
+
+    const adminName = document.getElementById('adminUserName').textContent;
+    const { error } = await supabase.from('site_content').upsert({
+      key: 'emergency', title: 'Emergency Contacts', content,
+      updated_at: new Date().toISOString(), updated_by: adminName
+    });
+
+    btn.disabled = false;
+    if (error) { showAdminToast('Failed to save', 'error'); return; }
+    document.getElementById('emergencyUpdated').textContent = 'Last updated: just now';
+    showAdminToast('Emergency info saved successfully!', 'success');
+  });
+});
+</script>
+</body>
+</html>

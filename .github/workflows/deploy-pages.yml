@@ -15,13 +15,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Write config.js with Supabase proxy URL
+      - name: Write config.js with Supabase credentials and proxy URL
         run: |
-          cat > app/js/config.js <<'EOF'
-          window.HOMATT_CONFIG = {
-            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
-          };
-          EOF
+          {
+            echo "window.HOMATT_CONFIG = {"
+            echo "  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',"
+            echo "  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',"
+            echo "  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',"
+            echo "};"
+          } > app/js/config.js
 
       - name: Deploy app/ to gh-pages
         uses: peaceiris/actions-gh-pages@v4

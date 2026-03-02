@@ -59,11 +59,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.querySelector('.dash-welcome').textContent = getGreeting();
   document.getElementById('userName').textContent = user.firstName || 'User';
 
-  // User avatar initial
+  // User avatar initial — click navigates to profile
   const avatarEl = document.getElementById('userAvatar');
   if (user.firstName) {
     avatarEl.innerHTML = `<span>${user.firstName.charAt(0).toUpperCase()}</span>`;
   }
+  avatarEl.addEventListener('click', () => { window.location.href = 'profile.html'; });
 
   // ====== Daily Health Tips ======
   const tips = [
@@ -106,11 +107,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
-  // ====== Wallet Balances ======
-  const wallets = JSON.parse(localStorage.getItem('homatt_wallets') || '{"family":0,"care":0}');
-  document.getElementById('familyBalance').textContent = wallets.family.toLocaleString();
-  document.getElementById('careBalance').textContent = wallets.care.toLocaleString();
-
   // ====== Quiz Streak ======
   const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
   document.getElementById('streakCount').textContent = streak;
@@ -141,7 +137,133 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'symptom-checker.html';
   });
 
+  document.getElementById('featureCycle').addEventListener('click', () => {
+    window.location.href = 'cycle-tracker.html';
+  });
+
+  document.getElementById('featureMoodSleep').addEventListener('click', () => {
+    window.location.href = 'mood-sleep-tracker.html';
+  });
+
+  document.getElementById('featurePain').addEventListener('click', () => {
+    window.location.href = 'pain-tracker.html';
+  });
+
+  document.getElementById('featureDigestive').addEventListener('click', () => {
+    window.location.href = 'digestive-tracker.html';
+  });
+
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
-    // Phase 10: will navigate to quiz
+    // Phase 10: quiz — show coming soon toast
+    const toast = document.createElement('div');
+    toast.className = 'tracker-toast';
+    toast.textContent = 'Daily health quiz launching soon!';
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('visible'), 10);
+    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 400); }, 2800);
+  });
+
+  // ====== Health Score Calculation ======
+  async function calculateHealthScore() {
+    const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const uid = session.user.id;
+
+    // Fetch tracker data in parallel
+    const [moodRes, painRes, rxRes, dosesRes] = await Promise.all([
+      supabase.from('mood_sleep_logs').select('sleep_hours,sleep_quality,mood,energy_level,anxiety_level')
+        .eq('user_id', uid).gte('created_at', since),
+      supabase.from('pain_logs').select('intensity')
+        .eq('user_id', uid).gte('created_at', since),
+      supabase.from('prescriptions').select('id,frequency,start_date,end_date')
+        .eq('user_id', uid).eq('status', 'active'),
+      supabase.from('prescription_doses').select('taken,taken_at')
+        .eq('user_id', uid).gte('taken_at', since),
+    ]);
+
+    const moodLogs = moodRes.data || [];
+    const painLogs = painRes.data || [];
+    const prescriptions = rxRes.data || [];
+    const doses = dosesRes.data || [];
+
+    // 1. Sleep score (0–25): optimal ~7-8 hrs, quality 1-10
+    let sleepScore = 12; // default
+    if (moodLogs.length > 0) {
+      const avgHours = moodLogs.reduce((s, l) => s + (parseFloat(l.sleep_hours) || 0), 0) / moodLogs.length;
+      const avgQuality = moodLogs.reduce((s, l) => s + (l.sleep_quality || 5), 0) / moodLogs.length;
+      const hoursScore = Math.max(0, 1 - Math.abs(avgHours - 7.5) / 7.5);
+      sleepScore = Math.round((hoursScore * 0.6 + (avgQuality / 10) * 0.4) * 25);
+    }
+
+    // 2. Mood score (0–20): avg mood 1-10
+    let moodScore = 10; // default
+    if (moodLogs.length > 0) {
+      const avgMood = moodLogs.reduce((s, l) => s + (l.mood || 5), 0) / moodLogs.length;
+      const avgEnergy = moodLogs.reduce((s, l) => s + (l.energy_level || 5), 0) / moodLogs.length;
+      const avgAnxiety = moodLogs.reduce((s, l) => s + (l.anxiety_level || 5), 0) / moodLogs.length;
+      moodScore = Math.round(((avgMood / 10) * 0.5 + (avgEnergy / 10) * 0.3 + ((10 - avgAnxiety) / 10) * 0.2) * 20);
+    }
+
+    // 3. Pain score (0–20): lower pain = higher score
+    let painScore = 14; // default (assume mild)
+    if (painLogs.length > 0) {
+      const avgPain = painLogs.reduce((s, l) => s + (l.intensity || 3), 0) / painLogs.length;
+      painScore = Math.round((1 - avgPain / 10) * 20);
+    }
+
+    // 4. Medication adherence (0–20): doses taken / expected
+    let adherenceScore = 10; // default
+    if (prescriptions.length > 0 && doses.length > 0) {
+      const freqMap = { once_daily: 1, twice_daily: 2, three_times: 3, four_times: 4, weekly: 0.14, as_needed: 0 };
+      const expectedDoses = prescriptions.reduce((s, rx) => {
+        const freq = freqMap[rx.frequency] || 1;
+        return s + Math.min(30, freq * 30);
+      }, 0);
+      if (expectedDoses > 0) {
+        const takenDoses = doses.filter(d => d.taken).length;
+        adherenceScore = Math.min(20, Math.round((takenDoses / expectedDoses) * 20));
+      }
+    }
+
+    // 5. Engagement score (0–15): number of logs in 30 days
+    const totalLogs = moodLogs.length + painLogs.length;
+    const engagementScore = Math.min(15, Math.round(totalLogs * 1.5));
+
+    const total = sleepScore + moodScore + painScore + adherenceScore + engagementScore;
+    const score = Math.max(0, Math.min(100, total));
+
+    // Update UI
+    const scoreEl = document.getElementById('healthScore');
+    const ringEl = document.querySelector('.score-svg circle:last-child');
+    const statusEl = document.querySelector('.health-score-status');
+    const ringLabel = document.querySelector('.score-ring-label');
+
+    if (scoreEl) scoreEl.textContent = score;
+    if (ringLabel) ringLabel.textContent = score + '%';
+
+    // Animate ring: circumference = 2*pi*34 ≈ 213.6
+    if (ringEl) {
+      const offset = 213.6 - (score / 100) * 213.6;
+      ringEl.setAttribute('stroke-dashoffset', offset.toFixed(1));
+    }
+
+    let statusText = 'Keep tracking to improve!';
+    if (score >= 85) statusText = 'Excellent — Outstanding health!';
+    else if (score >= 70) statusText = 'Good — Keep it up!';
+    else if (score >= 55) statusText = 'Fair — Room to improve';
+    else if (score >= 40) statusText = 'Low — Focus on your health';
+    if (statusEl) statusEl.innerHTML = `<span class="material-icons-outlined" style="font-size:14px">${score >= 55 ? 'trending_up' : 'trending_down'}</span> ${statusText}`;
+  }
+
+  // Run health score in background (non-blocking)
+  calculateHealthScore().catch(() => {});
+
+  // ====== Bottom Nav ======
+  document.getElementById('navFamily').addEventListener('click', () => { window.location.href = 'family.html'; });
+  document.getElementById('navShop').addEventListener('click', () => { window.location.href = 'family.html#shop'; });
+  document.getElementById('navProfile').addEventListener('click', () => { window.location.href = 'profile.html'; });
+
+  // Notification bell
+  document.getElementById('notifBtn').addEventListener('click', () => {
+    // Phase: notifications panel — coming soon
   });
 });
