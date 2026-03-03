@@ -3,33 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Homatt Health — Clinic Portal</title>
+  <title>Homatt Health — Pharmacy Portal</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-  <link rel="stylesheet" href="css/clinic.css">
+  <link rel="stylesheet" href="css/pharmacy.css">
 </head>
 <body>
 <div class="admin-login-page">
   <div class="admin-login-card">
     <div class="admin-login-logo">
       <div class="admin-login-logo-mark">
-        <span class="material-icons-outlined" style="font-size:28px">local_hospital</span>
+        <span class="material-icons-outlined" style="font-size:28px">local_pharmacy</span>
       </div>
-      <div class="admin-login-title">Clinic Portal</div>
+      <div class="admin-login-title">Pharmacy Portal</div>
       <div class="admin-login-sub">Homatt Health — Uganda</div>
     </div>
 
     <form id="loginForm">
       <div class="login-field">
         <label for="email">Staff Email</label>
-        <input type="email" id="email" placeholder="doctor@yourclinic.ug" required>
+        <input type="email" id="email" placeholder="staff@yourpharmacy.ug" required>
       </div>
       <div class="login-field">
         <label for="password">Password</label>
         <input type="password" id="password" placeholder="Enter your password" required>
       </div>
       <button type="submit" class="login-btn" id="loginBtn">
-        Sign In to Clinic Portal
+        Sign In to Pharmacy Portal
       </button>
     </form>
 
@@ -47,7 +47,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script>
-  if (localStorage.getItem('clinic_session')) window.location.href = 'dashboard.html';
+  if (localStorage.getItem('pharmacy_session')) window.location.href = 'dashboard.html';
 
   const cfg = window.HOMATT_CONFIG || {};
   const _supa = (cfg.SUPABASE_URL && window.supabase)
@@ -62,7 +62,7 @@
     err.style.display = 'none';
 
     if (!_supa) {
-      localStorage.setItem('clinic_session', JSON.stringify({ email, staffName: email.split('@')[0], clinicName: 'Clinic Portal' }));
+      localStorage.setItem('pharmacy_session', JSON.stringify({ email, staffName: email.split('@')[0], pharmacyName: 'Your Pharmacy' }));
       window.location.href = 'dashboard.html';
       return;
     }
@@ -75,42 +75,42 @@
       err.textContent = authError.message;
       err.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = 'Sign In to Clinic Portal';
+      btn.textContent = 'Sign In to Pharmacy Portal';
       return;
     }
 
     const { data: pu } = await _supa
       .from('portal_users')
-      .select('*, clinics(name)')
+      .select('*, pharmacies(name)')
       .eq('auth_user_id', authData.user.id)
-      .eq('role', 'clinic_staff')
+      .eq('role', 'pharmacy_staff')
       .eq('is_active', true)
       .single();
 
     if (!pu) {
       await _supa.auth.signOut();
-      err.textContent = 'No clinic staff account found for this email.';
+      err.textContent = 'No pharmacy staff account found for this email.';
       err.style.display = 'block';
       btn.disabled = false;
-      btn.textContent = 'Sign In to Clinic Portal';
+      btn.textContent = 'Sign In to Pharmacy Portal';
       return;
     }
 
-    localStorage.setItem('clinic_session', JSON.stringify({
+    localStorage.setItem('pharmacy_session', JSON.stringify({
       userId: authData.user.id,
       staffName: pu.full_name || email,
-      clinicId: pu.clinic_id,
-      clinicName: pu.clinics?.name || 'Clinic',
+      pharmacyId: pu.pharmacy_id,
+      pharmacyName: pu.pharmacies?.name || 'Pharmacy',
       email
     }));
     window.location.href = 'dashboard.html';
   });
 
   document.getElementById('demoBtn').addEventListener('click', () => {
-    localStorage.setItem('clinic_session', JSON.stringify({
-      staffName: 'Dr. Demo',
-      clinicName: 'Kampala Medical Centre',
-      clinicId: null,
+    localStorage.setItem('pharmacy_session', JSON.stringify({
+      staffName: 'Demo Pharmacist',
+      pharmacyName: 'Ntinda Health Pharmacy',
+      pharmacyId: null,
       demo: true
     }));
     window.location.href = 'dashboard.html';

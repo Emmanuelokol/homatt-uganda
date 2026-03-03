@@ -70,29 +70,29 @@
 
     <div class="admin-content">
 
-      <!-- Emergency alert -->
-      <div class="alert-banner">
+      <!-- Emergency alert (urgent queue items) -->
+      <div class="alert-banner" id="urgentAlert" style="display:none">
         <span class="material-icons-outlined">warning</span>
-        <strong>1 urgent patient in queue</strong> — Ssempa Robert (P-001): High blood pressure &amp; dizziness. Prioritise immediately.
+        <span id="urgentAlertMsg">Urgent patients in queue</span>
       </div>
 
       <!-- Stats -->
       <div class="stats-grid">
         <div class="stat-card">
           <div class="stat-icon blue"><span class="material-icons-outlined">groups</span></div>
-          <div><div class="stat-number">12</div><div class="stat-label">Patients Today</div></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Patients Today</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon orange"><span class="material-icons-outlined">pending_actions</span></div>
-          <div><div class="stat-number" id="statWaiting">7</div><div class="stat-label">In Queue</div></div>
+          <div><div class="stat-number" id="statWaiting">—</div><div class="stat-label">In Queue</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
-          <div><div class="stat-number">5</div><div class="stat-label">Completed</div></div>
+          <div><div class="stat-number" id="statCompleted">—</div><div class="stat-label">Completed</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon red"><span class="material-icons-outlined">emergency</span></div>
-          <div><div class="stat-number">2</div><div class="stat-label">Urgent Cases</div></div>
+          <div><div class="stat-number" id="statUrgent">—</div><div class="stat-label">Urgent Cases</div></div>
         </div>
       </div>
 
@@ -106,36 +106,33 @@
               <div class="table-filter">
                 <select id="queueFilter">
                   <option value="all">All</option>
-                  <option value="urgent">Urgent</option>
-                  <option value="waiting">Waiting</option>
-                  <option value="in-progress">In Progress</option>
+                  <option value="pending">Pending</option>
+                  <option value="high">Urgent</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="attended">Attended</option>
                 </select>
               </div>
             </div>
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th>#</th>
-                  <th>Patient</th>
-                  <th>Complaint</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                  <th>Arrived</th>
-                  <th>Action</th>
+                  <th>#</th><th>Patient</th><th>Complaint</th><th>AI Risk</th><th>Urgency</th><th>Status</th><th>Time</th><th>Action</th>
                 </tr>
               </thead>
-              <tbody id="queueBody"></tbody>
+              <tbody id="queueBody">
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+              </tbody>
             </table>
           </div>
         </div>
 
-        <!-- Appointments sidebar -->
+        <!-- Appointments sidebar (recent bookings) -->
         <div id="appointments">
           <div class="admin-table-wrap appt-card">
             <div class="table-header">
-              <div class="table-title">Today's Appointments</div>
+              <div class="table-title">Recent Bookings</div>
             </div>
-            <div id="apptList"></div>
+            <div id="apptList" style="padding:0 0 8px"></div>
           </div>
         </div>
       </div>
@@ -146,90 +143,162 @@
 
 <div id="clinicToast" class="admin-toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
 <script src="js/clinic.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', () => {
-  requireClinic();
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = requireClinic();
+  if (!session) return;
   setupClinicLogout();
 
-  // Date display
   const now = new Date();
   document.getElementById('clinicUserDate').textContent =
     now.toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
 
-  // Live clock
   function updateClock() {
     document.getElementById('liveClock').textContent =
       new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
   }
-  updateClock();
-  setInterval(updateClock, 1000);
+  updateClock(); setInterval(updateClock, 1000);
 
-  // Render queue
-  const priorityOrder = { urgent:0, high:1, scheduled:2, normal:3 };
-  function renderQueue(filter = 'all') {
-    const rows = MOCK_PATIENTS
-      .filter(p => filter === 'all' || p.priority === filter || p.status === filter)
-      .sort((a,b) => (priorityOrder[a.priority]??9) - (priorityOrder[b.priority]??9));
+  // Update clinic name from session
+  const clinicNameEl = document.getElementById('clinicUserName');
+  if (clinicNameEl && session.clinicName) clinicNameEl.textContent = session.clinicName;
 
-    document.getElementById('queueBody').innerHTML = rows.map(p => `
-      <tr>
-        <td><div class="queue-number">${p.q}</div></td>
-        <td>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="patient-avatar">${p.name[0]}</div>
-            <div>
-              <div style="font-weight:600;font-size:13px">${p.name}</div>
-              <div style="font-size:11px;color:#9AA0A6">${p.id} · ${p.age}y · ${p.sex === 'M' ? 'Male' : 'Female'}</div>
-            </div>
-          </div>
-        </td>
-        <td style="max-width:200px;font-size:13px">${p.complaint}</td>
-        <td><span class="status-badge ${p.priority}">${p.priority}</span></td>
-        <td><span class="status-badge ${p.status}">${p.status.replace('-',' ')}</span></td>
-        <td style="color:#9AA0A6;font-size:12px">${p.arrive}</td>
-        <td>
-          ${p.status === 'waiting'
-            ? `<button class="btn-admin primary sm" onclick="callPatient(${p.q})">
-                <span class="material-icons-outlined" style="font-size:14px">person_add</span> Call
-              </button>`
-            : p.status === 'in-progress'
-            ? `<button class="btn-admin success sm" onclick="completePatient(${p.q})">
-                <span class="material-icons-outlined" style="font-size:14px">check</span> Done
-              </button>`
-            : '<span style="color:#9AA0A6;font-size:12px">Completed</span>'
-          }
-        </td>
-      </tr>`).join('');
+  const cfg = window.HOMATT_CONFIG || {};
+  const supa = (cfg.SUPABASE_URL && window.supabase && session.clinicId)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+  let bookings = [];
+
+  if (supa && session.clinicId) {
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const { data } = await supa.from('bookings')
+      .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,urgency_level,risk_score,status,created_at')
+      .eq('clinic_id', session.clinicId)
+      .gte('created_at', todayStart.toISOString())
+      .order('created_at', { ascending: false });
+    bookings = data || [];
+  } else {
+    // Mock fallback
+    bookings = MOCK_PATIENTS.map((p, i) => ({
+      id: p.q, booking_code: p.id,
+      patient_name: p.name, patient_age: p.age, patient_sex: p.sex,
+      symptoms: p.complaint, ai_diagnosis: null,
+      urgency_level: p.priority === 'urgent' ? 'high' : 'normal',
+      risk_score: p.priority === 'urgent' ? 85 : p.priority === 'high' ? 65 : 30,
+      status: p.status === 'done' ? 'attended' : p.status === 'in-progress' ? 'in_progress' : 'pending',
+      created_at: new Date(Date.now() - i * 900000).toISOString()
+    }));
+  }
+
+  // Stats
+  const todayBookings = bookings;
+  const waiting = bookings.filter(b => b.status === 'pending');
+  const completed = bookings.filter(b => b.status === 'attended' || b.status === 'completed');
+  const urgent = bookings.filter(b => b.urgency_level === 'high' && b.status === 'pending');
+
+  document.getElementById('statTotal').textContent = todayBookings.length;
+  document.getElementById('statWaiting').textContent = waiting.length;
+  document.getElementById('statCompleted').textContent = completed.length;
+  document.getElementById('statUrgent').textContent = urgent.length;
+
+  if (urgent.length > 0) {
+    document.getElementById('urgentAlert').style.display = 'flex';
+    document.getElementById('urgentAlertMsg').textContent =
+      `${urgent.length} urgent patient(s) in queue — prioritise immediately: ` +
+      urgent.slice(0,2).map(b => b.patient_name).join(', ');
+  }
+
+  // Queue render
+  let activeFilter = 'all';
+  function renderQueue() {
+    const filtered = activeFilter === 'all'
+      ? bookings
+      : bookings.filter(b => b.status === activeFilter || b.urgency_level === activeFilter);
+
+    const sorted = [...filtered].sort((a,b) => {
+      const urgencyOrder = { high:0, medium:1, normal:2, low:3 };
+      return (urgencyOrder[a.urgency_level]??9) - (urgencyOrder[b.urgency_level]??9);
+    });
+
+    document.getElementById('queueBody').innerHTML = sorted.length
+      ? sorted.map((b, idx) => {
+          const riskColor = b.risk_score >= 70 ? '#D32F2F' : b.risk_score >= 40 ? '#E65100' : '#2E7D32';
+          const urgencyClass = b.urgency_level === 'high' ? 'urgent' : 'normal';
+          const statusClass = b.status === 'attended' || b.status === 'completed' ? 'delivered' : b.status === 'in_progress' ? 'confirmed' : 'incoming';
+          return `<tr>
+            <td><div class="queue-number">${idx + 1}</div></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="patient-avatar">${(b.patient_name||'?')[0]}</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">${b.patient_name||'Unknown'}</div>
+                  <div style="font-size:11px;color:#9AA0A6">${b.booking_code||''} · ${b.patient_age||'?'}y · ${b.patient_sex||'?'}</div>
+                </div>
+              </div>
+            </td>
+            <td style="max-width:180px;font-size:12px">${b.symptoms||b.ai_diagnosis||'—'}</td>
+            <td style="font-weight:700;color:${riskColor}">${b.risk_score ? b.risk_score + '%' : '—'}</td>
+            <td><span class="status-badge ${urgencyClass}">${b.urgency_level||'normal'}</span></td>
+            <td><span class="status-badge ${statusClass}">${(b.status||'pending').replace('_',' ')}</span></td>
+            <td style="color:#9AA0A6;font-size:12px">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</td>
+            <td>
+              ${b.status === 'pending'
+                ? `<button class="btn-admin primary sm" onclick="callPatient('${b.id}')">
+                    <span class="material-icons-outlined" style="font-size:14px">person_add</span> Call
+                  </button>`
+                : b.status === 'in_progress'
+                ? `<button class="btn-admin success sm" onclick="completePatient('${b.id}')">
+                    <span class="material-icons-outlined" style="font-size:14px">check</span> Done
+                  </button>`
+                : '<span style="color:#9AA0A6;font-size:12px">Attended</span>'
+              }
+            </td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No patients in this category</td></tr>';
   }
 
   renderQueue();
-  document.getElementById('queueFilter').addEventListener('change', e => renderQueue(e.target.value));
+  document.getElementById('queueFilter').addEventListener('change', e => {
+    activeFilter = e.target.value;
+    renderQueue();
+  });
 
-  window.callPatient = q => {
-    const p = MOCK_PATIENTS.find(x => x.q === q);
-    if (p) { p.status = 'in-progress'; renderQueue(document.getElementById('queueFilter').value); showToast(`${p.name} called in to consultation`); }
+  const supa2 = supa;
+  window.callPatient = async id => {
+    if (supa2) {
+      await supa2.from('bookings').update({ status:'in_progress', updated_at: new Date().toISOString() }).eq('id', id);
+    }
+    const b = bookings.find(x => x.id === id);
+    if (b) { b.status = 'in_progress'; renderQueue(); showToast(`${b.patient_name} called in to consultation`); }
   };
-  window.completePatient = q => {
-    const p = MOCK_PATIENTS.find(x => x.q === q);
-    if (p) {
-      p.status = 'done';
-      document.getElementById('statWaiting').textContent =
-        MOCK_PATIENTS.filter(x => x.status === 'waiting' || x.status === 'in-progress').length;
-      renderQueue(document.getElementById('queueFilter').value);
-      showToast(`Consultation complete for ${p.name}`, 'success');
+
+  window.completePatient = async id => {
+    if (supa2) {
+      await supa2.from('bookings').update({ status:'attended', attended_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id);
+    }
+    const b = bookings.find(x => x.id === id);
+    if (b) {
+      b.status = 'attended';
+      document.getElementById('statWaiting').textContent = bookings.filter(x => x.status === 'pending').length;
+      document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
+      renderQueue();
+      showToast(`Consultation complete for ${b.patient_name}`, 'success');
     }
   };
 
-  // Render appointments
-  document.getElementById('apptList').innerHTML = MOCK_APPOINTMENTS.map(a => `
+  // Recent bookings list (sidebar)
+  document.getElementById('apptList').innerHTML = bookings.slice(0, 8).map(b => `
     <div class="appt-item">
-      <div class="appt-time">${a.time}</div>
+      <div class="appt-time">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</div>
       <div class="appt-info">
-        <div class="appt-name">${a.name}</div>
-        <div class="appt-type">${a.type}</div>
+        <div class="appt-name">${b.patient_name||'Unknown'}</div>
+        <div class="appt-type">${b.symptoms ? b.symptoms.slice(0,40) + (b.symptoms.length>40?'…':'') : b.ai_diagnosis||'—'}</div>
       </div>
-    </div>`).join('');
+    </div>`).join('') || '<div style="padding:16px;color:#9AA0A6;font-size:13px">No bookings today</div>';
 });
 </script>
 </body>

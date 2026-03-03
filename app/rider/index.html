@@ -21,12 +21,8 @@
 
     <form id="loginForm">
       <div class="login-field">
-        <label for="riderName">Your Name</label>
-        <input type="text" id="riderName" placeholder="e.g. Ssali Moses" required>
-      </div>
-      <div class="login-field">
-        <label for="phone">Phone Number</label>
-        <input type="tel" id="phone" placeholder="+256 7XX XXX XXX" required>
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="yourname@riders.homatt.ug" required>
       </div>
       <div class="login-field">
         <label for="password">Password</label>
@@ -37,23 +33,101 @@
       </button>
     </form>
 
+    <div style="text-align:center;margin:12px 0;font-size:13px;color:#5F6368">
+      New rider? <a href="register.html" style="color:#FF7043;font-weight:600;text-decoration:none">Apply to join →</a>
+    </div>
+
     <div class="login-divider">or</div>
 
     <button class="demo-btn" id="demoBtn">
       <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px">play_circle</span>
       Open Demo Dashboard
     </button>
+
+    <div class="login-error" id="loginError"></div>
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
 <script>
   if (localStorage.getItem('rider_session')) window.location.href = 'dashboard.html';
 
-  document.getElementById('loginForm').addEventListener('submit', e => {
+  const cfg = window.HOMATT_CONFIG || {};
+  const _supa = (cfg.SUPABASE_URL && window.supabase)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
-    const name = document.getElementById('riderName').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-    localStorage.setItem('rider_session', JSON.stringify({ name: name || phone, phone }));
+    const email = document.getElementById('email').value.trim();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('loginError');
+    err.style.display = 'none';
+
+    if (!_supa) {
+      localStorage.setItem('rider_session', JSON.stringify({ email, name: email.split('@')[0] }));
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    const { data: authData, error: authError } = await _supa.auth.signInWithPassword({ email, password });
+    if (authError) {
+      err.textContent = authError.message;
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Rider Portal';
+      return;
+    }
+
+    const { data: pu } = await _supa
+      .from('portal_users')
+      .select('*, riders(full_name, phone, status, total_deliveries, rating, total_earnings)')
+      .eq('auth_user_id', authData.user.id)
+      .eq('role', 'rider')
+      .eq('is_active', true)
+      .single();
+
+    if (!pu) {
+      await _supa.auth.signOut();
+      err.textContent = 'No rider account found. If you applied, please wait for admin approval.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Rider Portal';
+      return;
+    }
+
+    if (pu.riders?.status === 'pending') {
+      await _supa.auth.signOut();
+      err.textContent = 'Your account is pending admin approval. You will be notified when approved.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Rider Portal';
+      return;
+    }
+
+    if (pu.riders?.status === 'suspended') {
+      await _supa.auth.signOut();
+      err.textContent = 'Your account has been suspended. Contact support at help@homatt.ug';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Rider Portal';
+      return;
+    }
+
+    localStorage.setItem('rider_session', JSON.stringify({
+      userId: authData.user.id,
+      name: pu.riders?.full_name || pu.full_name || email,
+      phone: pu.riders?.phone || pu.phone || '',
+      riderId: pu.rider_id,
+      rating: pu.riders?.rating || 5,
+      totalDeliveries: pu.riders?.total_deliveries || 0,
+      totalEarnings: pu.riders?.total_earnings || 0,
+      email
+    }));
     window.location.href = 'dashboard.html';
   });
 
@@ -61,6 +135,9 @@
     localStorage.setItem('rider_session', JSON.stringify({
       name: 'Ssali Moses',
       phone: '+256 771 234 567',
+      riderId: null,
+      rating: 4.9,
+      totalDeliveries: 142,
       demo: true
     }));
     window.location.href = 'dashboard.html';
