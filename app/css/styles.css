@@ -161,6 +161,13 @@ body {
   font-size: 30px;
 }
 
+.logo-img {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  border-radius: 10px;
+}
+
 .app-title {
   color: white;
   font-size: 24px;
