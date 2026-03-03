@@ -4,6 +4,7 @@
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
+    "url": "https://emmanuelokol.github.io/homatt-uganda",
     "androidScheme": "https",
     "allowNavigation": [
       "*.supabase.co",

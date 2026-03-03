@@ -4,10 +4,8 @@ on:
   push:
     branches:
       - main
-      - 'claude/**'               # Also deploy from active fix branches
-    paths:
-      - 'app/**'                  # Run when app files change
-      - '.github/workflows/deploy-frontend.yml'
+      - 'claude/**'
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
 
 jobs:
   deploy:
