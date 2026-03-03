@@ -10,31 +10,7 @@
 </head>
 <body>
 <div class="admin-layout">
-  <aside class="admin-sidebar">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo-text">Homatt Health</div>
-      <div class="sidebar-logo-sub">Admin Portal — Uganda</div>
-    </div>
-    <nav class="sidebar-nav">
-      <div class="sidebar-section-label">Overview</div>
-      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
-      <div class="sidebar-section-label">User Management</div>
-      <a href="support.html" class="sidebar-link"><span class="material-icons-outlined">contact_support</span> Support Tickets</a>
-      <a href="prescriptions.html" class="sidebar-link"><span class="material-icons-outlined">medication</span> Prescriptions</a>
-      <div class="sidebar-section-label">Content</div>
-      <a href="terms.html" class="sidebar-link"><span class="material-icons-outlined">description</span> Terms &amp; Content</a>
-      <a href="emergency.html" class="sidebar-link active"><span class="material-icons-outlined">emergency</span> Emergency Info</a>
-      <div class="sidebar-section-label">Marketplace</div>
-      <a href="marketplace.html" class="sidebar-link"><span class="material-icons-outlined">storefront</span> Products</a>
-    </nav>
-    <div class="sidebar-footer">
-      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">verified_user</span> Admin</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.5);margin-bottom:10px" id="adminUserName"></div>
-      <button class="logout-sidebar-btn" id="adminLogoutBtn">
-        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
-      </button>
-    </div>
-  </aside>
+  <aside class="admin-sidebar"></aside>
 
   <main class="admin-main">
     <div class="admin-topbar">
@@ -119,6 +95,7 @@
 <script src="js/admin.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('emergency');
   const session = await requireAdmin();
   if (!session) return;
   setupAdminLogout();
