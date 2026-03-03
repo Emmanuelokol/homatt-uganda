@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Clinic Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </a>
+      <div class="sidebar-section-label">Patients</div>
+      <a href="#queue" class="sidebar-link">
+        <span class="material-icons-outlined">queue</span> Today's Queue
+      </a>
+      <a href="#appointments" class="sidebar-link">
+        <span class="material-icons-outlined">calendar_today</span> Appointments
+      </a>
+      <div class="sidebar-section-label">Clinical</div>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">medication</span> Prescriptions
+      </a>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">science</span> Lab Requests
+      </a>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">emergency</span> Emergency Referrals
+      </a>
+      <div class="sidebar-section-label">Reports</div>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">bar_chart</span> Daily Report
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Dashboard</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Emergency alert -->
+      <div class="alert-banner">
+        <span class="material-icons-outlined">warning</span>
+        <strong>1 urgent patient in queue</strong> — Ssempa Robert (P-001): High blood pressure &amp; dizziness. Prioritise immediately.
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">groups</span></div>
+          <div><div class="stat-number">12</div><div class="stat-label">Patients Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">pending_actions</span></div>
+          <div><div class="stat-number" id="statWaiting">7</div><div class="stat-label">In Queue</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number">5</div><div class="stat-label">Completed</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">emergency</span></div>
+          <div><div class="stat-number">2</div><div class="stat-label">Urgent Cases</div></div>
+        </div>
+      </div>
+
+      <!-- Queue + Appointments -->
+      <div class="content-row">
+        <!-- Patient Queue -->
+        <div>
+          <div class="admin-table-wrap" id="queue">
+            <div class="table-header">
+              <div class="table-title">Today's Patient Queue</div>
+              <div class="table-filter">
+                <select id="queueFilter">
+                  <option value="all">All</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="waiting">Waiting</option>
+                  <option value="in-progress">In Progress</option>
+                </select>
+              </div>
+            </div>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Patient</th>
+                  <th>Complaint</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Arrived</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="queueBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Appointments sidebar -->
+        <div id="appointments">
+          <div class="admin-table-wrap appt-card">
+            <div class="table-header">
+              <div class="table-title">Today's Appointments</div>
+            </div>
+            <div id="apptList"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="js/clinic.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  requireClinic();
+  setupClinicLogout();
+
+  // Date display
+  const now = new Date();
+  document.getElementById('clinicUserDate').textContent =
+    now.toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+
+  // Live clock
+  function updateClock() {
+    document.getElementById('liveClock').textContent =
+      new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  // Render queue
+  const priorityOrder = { urgent:0, high:1, scheduled:2, normal:3 };
+  function renderQueue(filter = 'all') {
+    const rows = MOCK_PATIENTS
+      .filter(p => filter === 'all' || p.priority === filter || p.status === filter)
+      .sort((a,b) => (priorityOrder[a.priority]??9) - (priorityOrder[b.priority]??9));
+
+    document.getElementById('queueBody').innerHTML = rows.map(p => `
+      <tr>
+        <td><div class="queue-number">${p.q}</div></td>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="patient-avatar">${p.name[0]}</div>
+            <div>
+              <div style="font-weight:600;font-size:13px">${p.name}</div>
+              <div style="font-size:11px;color:#9AA0A6">${p.id} · ${p.age}y · ${p.sex === 'M' ? 'Male' : 'Female'}</div>
+            </div>
+          </div>
+        </td>
+        <td style="max-width:200px;font-size:13px">${p.complaint}</td>
+        <td><span class="status-badge ${p.priority}">${p.priority}</span></td>
+        <td><span class="status-badge ${p.status}">${p.status.replace('-',' ')}</span></td>
+        <td style="color:#9AA0A6;font-size:12px">${p.arrive}</td>
+        <td>
+          ${p.status === 'waiting'
+            ? `<button class="btn-admin primary sm" onclick="callPatient(${p.q})">
+                <span class="material-icons-outlined" style="font-size:14px">person_add</span> Call
+              </button>`
+            : p.status === 'in-progress'
+            ? `<button class="btn-admin success sm" onclick="completePatient(${p.q})">
+                <span class="material-icons-outlined" style="font-size:14px">check</span> Done
+              </button>`
+            : '<span style="color:#9AA0A6;font-size:12px">Completed</span>'
+          }
+        </td>
+      </tr>`).join('');
+  }
+
+  renderQueue();
+  document.getElementById('queueFilter').addEventListener('change', e => renderQueue(e.target.value));
+
+  window.callPatient = q => {
+    const p = MOCK_PATIENTS.find(x => x.q === q);
+    if (p) { p.status = 'in-progress'; renderQueue(document.getElementById('queueFilter').value); showToast(`${p.name} called in to consultation`); }
+  };
+  window.completePatient = q => {
+    const p = MOCK_PATIENTS.find(x => x.q === q);
+    if (p) {
+      p.status = 'done';
+      document.getElementById('statWaiting').textContent =
+        MOCK_PATIENTS.filter(x => x.status === 'waiting' || x.status === 'in-progress').length;
+      renderQueue(document.getElementById('queueFilter').value);
+      showToast(`Consultation complete for ${p.name}`, 'success');
+    }
+  };
+
+  // Render appointments
+  document.getElementById('apptList').innerHTML = MOCK_APPOINTMENTS.map(a => `
+    <div class="appt-item">
+      <div class="appt-time">${a.time}</div>
+      <div class="appt-info">
+        <div class="appt-name">${a.name}</div>
+        <div class="appt-type">${a.type}</div>
+      </div>
+    </div>`).join('');
+});
+</script>
+</body>
+</html>

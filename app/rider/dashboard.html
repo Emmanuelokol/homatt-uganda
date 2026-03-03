@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Rider Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/rider.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="riderUserName">Rider Portal</div>
+      <div class="sidebar-logo-sub">Homatt Deliveries — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </a>
+      <div class="sidebar-section-label">Deliveries</div>
+      <a href="#requests" class="sidebar-link">
+        <span class="material-icons-outlined">notifications_active</span> New Requests
+        <span id="requestBadge" style="margin-left:auto;background:#D32F2F;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px">3</span>
+      </a>
+      <a href="#active" class="sidebar-link">
+        <span class="material-icons-outlined">local_shipping</span> Active Deliveries
+      </a>
+      <a href="#history" class="sidebar-link">
+        <span class="material-icons-outlined">history</span> History
+      </a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">payments</span> Earnings
+      </a>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">person</span> My Profile
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <span class="material-icons-outlined" style="font-size:14px">electric_moped</span> Rider
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="riderStatus">● Online</div>
+      <button class="logout-sidebar-btn" id="riderLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Rider Dashboard</div>
+      <div class="admin-topbar-right">
+        <!-- Online / Offline toggle -->
+        <div class="online-toggle" id="onlineToggle" style="cursor:pointer" title="Click to go offline">
+          <div class="toggle-dot online" id="onlineDot"></div>
+          <span class="toggle-label" id="onlineLabel">Online</span>
+        </div>
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="riderUserAvatar">R</div>
+          <span id="riderUserNameTop">Rider</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Earnings summary chip -->
+      <div class="earnings-chip">
+        <span class="material-icons-outlined" style="font-size:36px">account_balance_wallet</span>
+        <div>
+          <div class="earnings-amount">UGX 62,500</div>
+          <div class="earnings-label">Earned today · 6 deliveries completed</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div class="rating-stars">★★★★★</div>
+          <div style="font-size:12px;opacity:.85;margin-top:4px">4.9 rating</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">notifications_active</span></div>
+          <div><div class="stat-number" id="statRequests">3</div><div class="stat-label">New Requests</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">local_shipping</span></div>
+          <div><div class="stat-number" id="statActive">1</div><div class="stat-label">Active Deliveries</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number">6</div><div class="stat-label">Completed Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">route</span></div>
+          <div><div class="stat-number">19.6</div><div class="stat-label">km Covered Today</div></div>
+        </div>
+      </div>
+
+      <!-- New delivery requests -->
+      <div class="admin-table-wrap" id="requests" style="border-radius:12px;overflow:visible;background:transparent;box-shadow:none;padding:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-size:16px;font-weight:700">New Delivery Requests</div>
+          <span style="font-size:12px;color:#5F6368">Accept within 2 minutes</span>
+        </div>
+        <div class="delivery-requests" id="requestsList"></div>
+      </div>
+
+      <!-- Active deliveries -->
+      <div class="admin-table-wrap" id="active">
+        <div class="table-header">
+          <div class="table-title">Active Deliveries</div>
+        </div>
+        <div id="activeList"></div>
+      </div>
+
+      <!-- Completed today -->
+      <div class="admin-table-wrap" id="history">
+        <div class="table-header">
+          <div class="table-title">Completed Today</div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>ID</th><th>Item</th><th>Delivered To</th><th>Earnings</th><th>Time</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="historyBody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="riderToast" class="admin-toast"></div>
+
+<script src="js/rider.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  requireRider();
+  setupRiderLogout();
+
+  // Live clock
+  function updateClock() {
+    document.getElementById('liveClock').textContent =
+      new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // Online toggle
+  let isOnline = true;
+  document.getElementById('onlineToggle').addEventListener('click', () => {
+    isOnline = !isOnline;
+    document.getElementById('onlineDot').classList.toggle('online', isOnline);
+    document.getElementById('onlineLabel').textContent = isOnline ? 'Online' : 'Offline';
+    document.getElementById('riderStatus').textContent = isOnline ? '● Online' : '○ Offline';
+    document.getElementById('riderStatus').style.color = isOnline ? 'rgba(76,175,80,0.9)' : 'rgba(255,255,255,0.45)';
+    showToast(isOnline ? 'You are now online — ready for deliveries!' : 'You are offline — no new requests will come in', isOnline ? 'success' : 'warning');
+  });
+
+  // ── Render delivery requests ──
+  function renderRequests() {
+    document.getElementById('statRequests').textContent = DELIVERY_REQUESTS.length;
+    document.getElementById('requestBadge').textContent = DELIVERY_REQUESTS.length;
+
+    if (DELIVERY_REQUESTS.length === 0) {
+      document.getElementById('requestsList').innerHTML =
+        '<div style="background:#fff;border-radius:12px;padding:32px;text-align:center;color:#9AA0A6;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">inbox</span>No new requests right now. Stay online to receive deliveries.</div>';
+      return;
+    }
+
+    document.getElementById('requestsList').innerHTML = DELIVERY_REQUESTS.map(r => `
+      <div class="delivery-card ${r.urgent ? 'urgent' : ''}" id="req-${r.id}">
+        <div class="delivery-icon">
+          <span class="material-icons-outlined">${r.type === 'Lab Result' ? 'science' : 'medication'}</span>
+        </div>
+        <div class="delivery-info">
+          <div class="delivery-id">${r.id} ${r.urgent ? '🔴 URGENT' : ''}</div>
+          <div class="delivery-title">${r.item}</div>
+          <div class="delivery-meta">
+            <span><span class="material-icons-outlined" style="font-size:14px">store</span> ${r.from}</span>
+            <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${r.to}</span>
+            <span><span class="material-icons-outlined" style="font-size:14px">straighten</span> ${r.dist}</span>
+            <span style="color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:14px">payments</span> ${r.pay}</span>
+          </div>
+        </div>
+        <div class="delivery-actions">
+          <button class="btn-admin success sm" onclick="acceptRequest('${r.id}')">
+            <span class="material-icons-outlined" style="font-size:14px">check</span> Accept
+          </button>
+          <button class="btn-admin secondary sm" onclick="declineRequest('${r.id}')">
+            <span class="material-icons-outlined" style="font-size:14px">close</span> Decline
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Render active deliveries ──
+  function renderActive() {
+    document.getElementById('statActive').textContent = ACTIVE_DELIVERIES.length;
+    if (ACTIVE_DELIVERIES.length === 0) {
+      document.getElementById('activeList').innerHTML =
+        '<div style="padding:32px;text-align:center;color:#9AA0A6">No active deliveries. Accept a request above to get started.</div>';
+      return;
+    }
+    document.getElementById('activeList').innerHTML = ACTIVE_DELIVERIES.map(d => `
+      <div style="display:flex;align-items:flex-start;gap:16px;padding:18px 20px;border-bottom:1px solid #F0F0F0">
+        <div class="delivery-icon">
+          <span class="material-icons-outlined">local_shipping</span>
+        </div>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px">${d.id}</div>
+          <div style="font-size:14px;font-weight:600;margin:4px 0">${d.item}</div>
+          <div style="font-size:12px;color:#5F6368;margin-bottom:8px">
+            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">store</span> ${d.from}
+            <span style="margin:0 8px">→</span>
+            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${d.to}
+          </div>
+          <div style="display:flex;gap:14px;font-size:12px;color:#5F6368">
+            <span><b>${d.dist}</b> distance</span>
+            <span style="color:#E65100;font-weight:600">${d.elapsed} in transit</span>
+            <span style="color:#2E7D32;font-weight:600">${d.pay}</span>
+          </div>
+        </div>
+        <div>
+          <span class="status-badge in-transit">${d.status.replace('-',' ')}</span>
+          <div style="margin-top:10px">
+            <button class="btn-admin success sm" onclick="completeDelivery('${d.id}')">
+              <span class="material-icons-outlined" style="font-size:14px">check_circle</span> Mark Delivered
+            </button>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── Render history ──
+  function renderHistory() {
+    document.getElementById('historyBody').innerHTML = COMPLETED_TODAY.map(d => `
+      <tr>
+        <td style="font-weight:600;color:#5F6368">${d.id}</td>
+        <td>${d.item}</td>
+        <td>${d.to}</td>
+        <td style="color:#2E7D32;font-weight:600">${d.pay}</td>
+        <td style="color:#9AA0A6;font-size:12px">${d.time}</td>
+        <td><span class="status-badge delivered">Delivered</span></td>
+      </tr>`).join('');
+  }
+
+  // ── Actions ──
+  window.acceptRequest = id => {
+    const req = DELIVERY_REQUESTS.find(r => r.id === id);
+    if (!req) return;
+    DELIVERY_REQUESTS = DELIVERY_REQUESTS.filter(r => r.id !== id);
+    ACTIVE_DELIVERIES.push({ id: id.replace('REQ','DEL'), item: req.item, from: req.from, to: req.to, dist: req.dist, status:'in-transit', pay: req.pay, elapsed:'0 min' });
+    renderRequests(); renderActive();
+    showToast(`Accepted! Head to ${req.from} to pick up ${req.item}`);
+  };
+
+  window.declineRequest = id => {
+    DELIVERY_REQUESTS = DELIVERY_REQUESTS.filter(r => r.id !== id);
+    renderRequests();
+    showToast('Request declined', 'warning');
+  };
+
+  window.completeDelivery = id => {
+    const d = ACTIVE_DELIVERIES.find(x => x.id === id);
+    if (!d) return;
+    ACTIVE_DELIVERIES = ACTIVE_DELIVERIES.filter(x => x.id !== id);
+    COMPLETED_TODAY.unshift({ id, item: d.item, to: d.to, pay: d.pay, time: new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) });
+    renderActive(); renderHistory();
+    showToast(`Delivery complete! ${d.pay} added to your earnings`);
+  };
+
+  renderRequests(); renderActive(); renderHistory();
+});
+</script>
+</body>
+</html>
