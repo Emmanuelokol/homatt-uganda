@@ -33,4 +33,5 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./app
           publish_branch: gh-pages
+          force_orphan: true
           commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }}'
