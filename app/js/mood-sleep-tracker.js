@@ -255,7 +255,12 @@ Respond ONLY with valid JSON:
   "recommended_next_step": "Specific actionable advice",
   "red_flags": ["flag1", "flag2"],
   "clarifying_data_needed": "What additional data would help, or null",
-  "confidence": 75
+  "confidence": 75,
+  "cause": "In 1-2 plain sentences, what is most likely causing this sleep/mood pattern (e.g. stress, lifestyle, sleep habits)",
+  "how_to_increase": "In 1-2 sentences, the single most impactful thing this person can do to improve their mood and sleep scores",
+  "benefits": ["Specific benefit 1 of improving (e.g. more energy)", "Benefit 2", "Benefit 3"],
+  "techniques": ["Simple technique 1 with brief how-to", "Technique 2", "Technique 3"],
+  "steps": ["Step 1: Specific action to take today", "Step 2: Action for this week", "Step 3: Action to build over the next month"]
 }`;
   }
 
@@ -290,6 +295,47 @@ Respond ONLY with valid JSON:
     } else {
       clarifyCard.classList.add('hidden');
     }
+
+    // — New pattern sections —
+    const causeCard = document.getElementById('causeCard');
+    if (result.cause) {
+      document.getElementById('causeText').textContent = result.cause;
+      causeCard.classList.remove('hidden');
+    } else { causeCard.classList.add('hidden'); }
+
+    const howCard = document.getElementById('howToIncreaseCard');
+    if (result.how_to_increase) {
+      document.getElementById('howToIncreaseText').textContent = result.how_to_increase;
+      howCard.classList.remove('hidden');
+    } else { howCard.classList.add('hidden'); }
+
+    const benefitsCard = document.getElementById('benefitsCard');
+    if (result.benefits && result.benefits.length > 0) {
+      document.getElementById('benefitsList').innerHTML =
+        result.benefits.map(b => `<li>${b}</li>`).join('');
+      benefitsCard.classList.remove('hidden');
+    } else { benefitsCard.classList.add('hidden'); }
+
+    const techCard = document.getElementById('techniquesCard');
+    if (result.techniques && result.techniques.length > 0) {
+      document.getElementById('techniquesList').innerHTML =
+        result.techniques.map(t => `<li>${t}</li>`).join('');
+      techCard.classList.remove('hidden');
+    } else { techCard.classList.add('hidden'); }
+
+    const stepsCard = document.getElementById('stepsCard');
+    if (result.steps && result.steps.length > 0) {
+      document.getElementById('stepsList').innerHTML =
+        result.steps.map((s, i) => `
+          <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+            <div style="width:24px;height:24px;border-radius:50%;background:var(--primary);color:white;
+              font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+              ${i + 1}
+            </div>
+            <span>${s.replace(/^Step \d+:\s*/i, '')}</span>
+          </div>`).join('');
+      stepsCard.classList.remove('hidden');
+    } else { stepsCard.classList.add('hidden'); }
   }
 
   // ---- Load History ----

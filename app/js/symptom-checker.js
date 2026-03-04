@@ -988,14 +988,49 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       timerEl.style.display = 'flex';
       scheduleNextCheckIn(2);
     } else if (feeling === 'same') {
+      const condition = (monitoringSession.condition || '').toLowerCase();
+      const otcMap = {
+        malaria: { icon: 'warning', label: 'Get Tested First', color: '#E65100', items: ['Visit a clinic or pharmacy for a malaria Rapid Diagnostic Test (RDT)', 'Do not self-medicate with antimalarials without a positive test', 'Take paracetamol to reduce fever while waiting'] },
+        cold: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['Paracetamol 500mg for fever and headache (2 tablets every 6 hrs after food)', 'Antihistamine (e.g. cetirizine) for runny nose', 'Warm water with honey and lemon for sore throat', 'Saline nasal drops for blocked nose'] },
+        headache: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['Paracetamol 500mg or Ibuprofen 400mg with food', 'Drink 2 glasses of water — dehydration is a common cause', 'Rest in a quiet, dim room for 20 minutes'] },
+        gastro: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['ORS (Oral Rehydration Salts) — buy from any pharmacy, mix with clean water', 'Zinc tablets (for children with diarrhea)', 'Avoid spicy, fatty, or dairy foods until better', 'If diarrhea lasts >3 days or there is blood, go to a clinic'] },
+        stomach: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['ORS (Oral Rehydration Salts) to prevent dehydration', 'Oral metronidazole if prescribed before for similar issue', 'Visit clinic if no improvement in 48 hours'] },
+        uti: { icon: 'local_hospital', label: 'Clinic Recommended', color: '#C62828', items: ['UTIs require a prescription antibiotic — OTC drugs are not enough', 'Drink lots of water to help flush bacteria', 'Visit a clinic for a urine test and proper treatment today'] },
+        typhoid: { icon: 'local_hospital', label: 'Clinic Recommended', color: '#C62828', items: ['Typhoid requires prescription antibiotics from a doctor', 'Do not self-medicate', 'Visit a health facility for a Widal test or blood culture'] },
+        default: { icon: 'medication', label: 'General Tips', color: '#2E7D32', items: ['Rest and stay well hydrated', 'Take paracetamol for pain or fever if needed', 'Eat light, nutritious meals', 'If no improvement in 48 hours, visit a clinic'] },
+      };
+
+      const getOTC = () => {
+        for (const key of Object.keys(otcMap)) {
+          if (key !== 'default' && condition.includes(key)) return otcMap[key];
+        }
+        // Check by partial keywords
+        if (condition.includes('respiratory') || condition.includes('cold') || condition.includes('flu')) return otcMap.cold;
+        if (condition.includes('gastro') || condition.includes('diarrhea')) return otcMap.gastro;
+        return otcMap.default;
+      };
+
+      const otc = getOTC();
+
       if (monitoringSession.symptomsSame >= 2) {
+        // 2nd or more "same" — offer OTC first, then clinic
+        const needsClinic = ['malaria', 'typhoid', 'uti'].some(k => condition.includes(k));
         responseEl.innerHTML = `
           <div class="sc-monitor-msg escalate">
             <span class="material-icons-outlined">warning</span>
             <div>
-              <p class="sc-monitor-msg-title">Your symptoms are persisting</p>
-              <p>Since your condition hasn't improved after multiple check-ins, we recommend visiting a health facility for proper examination.</p>
+              <p class="sc-monitor-msg-title">Symptoms still not improving</p>
+              <p>${needsClinic ? 'Your condition needs medical attention. Please visit a clinic.' : 'Try the options below. If there\'s no improvement in 24 hours, please see a doctor.'}</p>
             </div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span class="material-icons-outlined" style="color:${otc.color};font-size:20px">${otc.icon}</span>
+              <strong style="font-size:13px;color:var(--text-primary)">${otc.label}</strong>
+            </div>
+            <ul style="padding-left:16px;margin:0;font-size:13px;color:var(--text-secondary);line-height:1.7">
+              ${otc.items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
           </div>
           <button class="btn sc-clinic-btn urgent" id="btnMonitorClinic" style="margin-top:12px">
             <span class="material-icons-outlined">local_hospital</span>
@@ -1004,25 +1039,60 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         `;
         responseEl.style.display = 'block';
         timerEl.style.display = 'none';
-
-        const clinicBtn = document.getElementById('btnMonitorClinic');
-        if (clinicBtn) {
-          clinicBtn.addEventListener('click', () => {
-            alert('Clinic finder coming soon! Please visit your nearest health facility.');
-          });
-        }
+        document.getElementById('btnMonitorClinic')?.addEventListener('click', () => {
+          localStorage.setItem('homatt_clinic_reason', JSON.stringify({ condition: monitoringSession.condition, urgency: 'soon' }));
+          window.location.href = 'clinic-booking.html';
+        });
       } else {
+        // 1st "same" — ask what they did + show OTC
         responseEl.innerHTML = `
           <div class="sc-monitor-msg same">
             <span class="material-icons-outlined">info</span>
             <div>
-              <p class="sc-monitor-msg-title">Noted</p>
-              <p>Keep resting and follow the tips. We'll check in again soon. If symptoms worsen at any time, please seek medical help.</p>
+              <p class="sc-monitor-msg-title">Noted — no change yet</p>
+              <p>Tell us what you tried, and we'll suggest what to do next.</p>
             </div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px">
+              What did you do to manage your symptoms? (optional)
+            </label>
+            <textarea id="monitorWhatDid" rows="3"
+              style="width:100%;border:2px solid #C8C8C8;border-radius:8px;padding:10px 12px;
+                font-size:15px;font-family:inherit;background:#fff;color:#111;resize:none;outline:none;
+                -webkit-text-fill-color:#111;box-sizing:border-box"
+              placeholder="e.g. I rested, drank water, took paracetamol..."></textarea>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span class="material-icons-outlined" style="color:${otc.color};font-size:20px">${otc.icon}</span>
+              <strong style="font-size:13px;color:var(--text-primary)">${otc.label}</strong>
+            </div>
+            <ul style="padding-left:16px;margin:0;font-size:13px;color:var(--text-secondary);line-height:1.7">
+              ${otc.items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
           </div>
         `;
         responseEl.style.display = 'block';
         timerEl.style.display = 'flex';
+
+        // Save "what did they do" on next check-in
+        const didInput = document.getElementById('monitorWhatDid');
+        if (didInput) {
+          didInput.addEventListener('change', () => {
+            monitoringSession.lastAction = didInput.value.trim();
+            localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+          });
+          // Dark mode border
+          const theme = document.documentElement.getAttribute('data-theme');
+          if (theme === 'dark') {
+            didInput.style.background = '#2C2C2C';
+            didInput.style.borderColor = '#555';
+            didInput.style.color = '#F0F0F0';
+            didInput.style.webkitTextFillColor = '#F0F0F0';
+          }
+        }
+
         scheduleNextCheckIn(1);
       }
     } else if (feeling === 'worse') {
