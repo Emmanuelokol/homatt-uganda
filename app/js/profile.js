@@ -155,12 +155,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   darkToggle.addEventListener('click', () => {
     darkOn = !darkOn;
     darkToggle.classList.toggle('on', darkOn);
-    if (darkOn) {
-      document.documentElement.setAttribute('data-theme', 'dark');
-      localStorage.setItem('homatt_theme', 'dark');
+
+    // Smooth fade transition — briefly hide frame, switch theme, restore
+    const frame = document.querySelector('.phone-frame');
+    if (frame) {
+      frame.classList.add('theme-transitioning');
+      setTimeout(() => {
+        if (darkOn) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+          localStorage.setItem('homatt_theme', 'dark');
+        } else {
+          document.documentElement.removeAttribute('data-theme');
+          localStorage.setItem('homatt_theme', 'light');
+        }
+        setTimeout(() => frame.classList.remove('theme-transitioning'), 30);
+      }, 120);
     } else {
-      document.documentElement.removeAttribute('data-theme');
-      localStorage.setItem('homatt_theme', 'light');
+      if (darkOn) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('homatt_theme', 'dark');
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('homatt_theme', 'light');
+      }
     }
     showToast(darkOn ? 'Dark mode on' : 'Dark mode off');
   });

@@ -154,13 +154,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
-    // Phase 10: quiz — show coming soon toast
-    const toast = document.createElement('div');
-    toast.className = 'tracker-toast';
-    toast.textContent = 'Daily health quiz launching soon!';
-    document.body.appendChild(toast);
-    setTimeout(() => toast.classList.add('visible'), 10);
-    setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 400); }, 2800);
+    window.location.href = 'quiz.html';
   });
 
   // ====== Health Score Calculation ======
@@ -262,8 +256,72 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('navShop').addEventListener('click', () => { window.location.href = 'family.html#shop'; });
   document.getElementById('navProfile').addEventListener('click', () => { window.location.href = 'profile.html'; });
 
-  // Notification bell
-  document.getElementById('notifBtn').addEventListener('click', () => {
-    // Phase: notifications panel — coming soon
-  });
+  // Notification bell — slide-up panel
+  document.getElementById('notifBtn').addEventListener('click', showNotificationPanel);
+
+  function showNotificationPanel() {
+    if (document.getElementById('notifPanel')) return;
+
+    const notifications = JSON.parse(localStorage.getItem('homatt_notifications') || '[]');
+    const defaults = [
+      { icon: 'water_drop', color: '#1565C0', title: 'Drink Water', body: 'You have not logged water today. Stay hydrated!', time: '2 min ago' },
+      { icon: 'bedtime', color: '#4527A0', title: 'Sleep Reminder', body: 'Log your sleep quality from last night.', time: '1 hr ago' },
+      { icon: 'medication', color: '#E65100', title: 'Medication Due', body: 'Check your medication schedule for today.', time: '3 hr ago' },
+      { icon: 'tips_and_updates', color: '#2E7D32', title: 'Health Tip', body: 'Walk for 30 minutes today to boost your mood and energy.', time: 'Today' },
+    ];
+    const items = notifications.length > 0 ? notifications : defaults;
+
+    const panel = document.createElement('div');
+    panel.id = 'notifPanel';
+    panel.style.cssText = `
+      position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(100%);
+      width:100%;max-width:430px;background:var(--surface);
+      border-radius:20px 20px 0 0;box-shadow:0 -4px 24px rgba(0,0,0,0.18);
+      z-index:9999;transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);
+      max-height:80dvh;max-height:80vh;display:flex;flex-direction:column;
+    `;
+
+    panel.innerHTML = `
+      <div style="padding:16px 20px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <div style="font-size:16px;font-weight:700;color:var(--text-primary)">Notifications</div>
+        <button id="closeNotifPanel" style="background:none;border:none;cursor:pointer;color:var(--text-hint);display:flex">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div style="overflow-y:auto;-webkit-overflow-scrolling:touch;flex:1;padding:8px 0 20px">
+        ${items.map(n => `
+          <div style="display:flex;align-items:flex-start;gap:12px;padding:12px 20px;border-bottom:1px solid var(--border)">
+            <div style="width:38px;height:38px;border-radius:50%;background:${n.color}22;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="font-size:20px;color:${n.color}">${n.icon}</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${n.title}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:2px;line-height:1.4">${n.body}</div>
+              <div style="font-size:11px;color:var(--text-hint);margin-top:4px">${n.time}</div>
+            </div>
+          </div>`).join('')}
+        <div style="text-align:center;padding:16px;font-size:12px;color:var(--text-hint)">You're all caught up!</div>
+      </div>
+    `;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'notifOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:9998;';
+    overlay.addEventListener('click', closeNotifPanel);
+
+    document.querySelector('.phone-frame').appendChild(overlay);
+    document.querySelector('.phone-frame').appendChild(panel);
+    setTimeout(() => { panel.style.transform = 'translateX(-50%) translateY(0)'; }, 10);
+
+    document.getElementById('closeNotifPanel').addEventListener('click', closeNotifPanel);
+  }
+
+  function closeNotifPanel() {
+    const panel = document.getElementById('notifPanel');
+    const overlay = document.getElementById('notifOverlay');
+    if (panel) {
+      panel.style.transform = 'translateX(-50%) translateY(100%)';
+      setTimeout(() => { panel.remove(); if (overlay) overlay.remove(); }, 320);
+    }
+  }
 });
