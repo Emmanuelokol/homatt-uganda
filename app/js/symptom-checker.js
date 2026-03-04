@@ -356,6 +356,14 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       .map(([k, v]) => v)
       .join('; ');
 
+    // Fetch historical corrections for learning context
+    const corrections = await getHistoricalCorrections(enteredSymptoms);
+    const correctionContext = corrections.length
+      ? `\nHISTORICAL LEARNING DATA (cases where AI was corrected by a clinician in this region):\n` +
+        corrections.map(c => `- AI said "${c.top_diagnosis}" but clinician confirmed "${c.clinician_confirmed_diagnosis}" for symptoms: "${(c.symptoms_text||'').slice(0,80)}"`).join('\n') +
+        `\nUse this data to improve accuracy — if similar symptoms appear, adjust probability accordingly.\n`
+      : '';
+
     // Always try AI for diagnosis (even if follow-up questions used fallback)
     {
       const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
@@ -363,7 +371,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
 A patient described these symptoms: "${enteredSymptoms}"
 Follow-up answers: "${answersText}"
 Patient: ${selectedPatient.name}, ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}, ${selectedPatient.sex}, located in ${user.location || 'Uganda'}.
-
+${correctionContext}
 Based on this information, provide a health assessment. Consider common diseases in Uganda/East Africa (malaria, typhoid, UTIs, respiratory infections, etc.).
 
 IMPORTANT: This is NOT a final diagnosis - it is guidance only.
@@ -1142,18 +1150,74 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
   }
 
-  // ====== Save to history ======
-  function saveToHistory(data) {
+  // ====== Save to history (localStorage + Supabase ai_triage_sessions) ======
+  async function saveToHistory(data) {
+    // Local symptom history
     const history = JSON.parse(localStorage.getItem('homatt_symptom_history') || '[]');
     history.unshift({
-      date: new Date().toISOString(),
-      patient: selectedPatient.name,
-      symptoms: enteredSymptoms,
+      date:       new Date().toISOString(),
+      patient:    selectedPatient.name,
+      symptoms:   enteredSymptoms,
       conditions: data.conditions,
-      risk: data.overall_risk,
+      risk:       data.overall_risk,
     });
     if (history.length > 20) history.pop();
     localStorage.setItem('homatt_symptom_history', JSON.stringify(history));
+
+    // Save triage context for booking page
+    const topCondition = (data.conditions || [])[0] || {};
+    const triageCtx = {
+      primary_condition: topCondition.name || '',
+      confidence:        topCondition.likelihood_percent || 0,
+      ai_confidence:     topCondition.likelihood_percent || 0,
+      overall_risk:      data.overall_risk || 'low',
+      should_visit_clinic: data.should_visit_clinic || false,
+      clinic_urgency:    data.clinic_urgency || 'none',
+      symptoms:          enteredSymptoms,
+      timestamp:         new Date().toISOString(),
+    };
+    localStorage.setItem('homatt_last_triage', JSON.stringify(triageCtx));
+
+    // Save to Supabase ai_triage_sessions for learning engine
+    if (supabase && session?.user?.id) {
+      try {
+        await supabase.from('ai_triage_sessions').insert({
+          user_id:            session.user.id,
+          patient_name:       selectedPatient.name,
+          patient_age:        selectedPatient.age || null,
+          patient_sex:        selectedPatient.sex || null,
+          symptoms_text:      enteredSymptoms,
+          followup_answers:   followupAnswers,
+          ai_conditions:      data.conditions,
+          ai_confidence:      topCondition.likelihood_percent || null,
+          top_diagnosis:      topCondition.name || null,
+          overall_risk:       data.overall_risk || null,
+          should_visit_clinic: data.should_visit_clinic || false,
+          clinic_urgency:     data.clinic_urgency || 'none',
+        });
+      } catch (e) {
+        // Non-fatal: triage session save failed
+        console.warn('[Homatt] Failed to save triage session:', e.message);
+      }
+    }
+  }
+
+  // ====== Fetch historical AI corrections for learning context ======
+  async function getHistoricalCorrections(symptomsText) {
+    if (!supabase || !session?.user?.id) return [];
+    try {
+      const { data } = await supabase
+        .from('ai_triage_sessions')
+        .select('symptoms_text, top_diagnosis, clinician_confirmed_diagnosis, ai_was_correct')
+        .not('clinician_confirmed_diagnosis', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (!data?.length) return [];
+      // Filter to cases where AI was wrong
+      return data.filter(d => d.ai_was_correct === false).slice(0, 4);
+    } catch (e) {
+      return [];
+    }
   }
 
   // ====== Show AI error banner on results screen ======

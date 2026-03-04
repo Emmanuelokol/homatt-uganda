@@ -141,6 +141,141 @@
   </main>
 </div>
 
+<!-- ===== CLINICIAN CONFIRMATION MODAL ===== -->
+<div id="attendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;overflow-y:auto;padding:20px 0">
+  <div style="background:#fff;border-radius:16px;max-width:660px;margin:0 auto;padding:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+
+    <!-- Modal header -->
+    <div style="background:linear-gradient(135deg,#1B5E20,#4CAF50);padding:20px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#fff" id="attendModalTitle">Patient Consultation</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8)" id="attendModalSub">Fill in diagnosis and treatment plan</div>
+      </div>
+      <button onclick="closeAttendModal()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Step indicator -->
+    <div style="display:flex;border-bottom:1px solid #E0E0E0;background:#F8F9FA">
+      <div id="attendStep1Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#1B5E20;border-bottom:2px solid #1B5E20">
+        1. Patient Info
+      </div>
+      <div id="attendStep2Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#9AA0A6">
+        2. Diagnosis
+      </div>
+      <div id="attendStep3Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#9AA0A6">
+        3. Prescription
+      </div>
+    </div>
+
+    <!-- STEP 1: Patient Info -->
+    <div id="attendPane1" style="padding:20px 24px">
+      <div id="patientInfoCard" style="background:#F8F9FA;border-radius:12px;padding:16px;margin-bottom:16px"></div>
+      <!-- AI Diagnosis card -->
+      <div id="aiDiagCard" style="display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:12px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
+          <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">smart_toy</span> AI Pre-Diagnosis
+        </div>
+        <div id="aiDiagText" style="font-size:13px;color:#1565C0;font-weight:600"></div>
+        <div id="aiDiagConf" style="font-size:12px;color:#1976D2;margin-top:4px"></div>
+        <div id="aiDiagSymptoms" style="font-size:12px;color:#1976D2;margin-top:4px;opacity:.8"></div>
+      </div>
+      <!-- Token validity -->
+      <div id="tokenCard" style="display:none;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <span class="material-icons-outlined" style="font-size:20px" id="tokenIcon">verified</span>
+        <div>
+          <div style="font-size:13px;font-weight:600" id="tokenLabel">Token Valid</div>
+          <div style="font-size:11px;color:#555" id="tokenExpiry"></div>
+        </div>
+      </div>
+      <button onclick="goAttendStep(2)" style="background:#1B5E20;color:#fff;border:none;width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+        Proceed to Diagnosis →
+      </button>
+    </div>
+
+    <!-- STEP 2: Diagnosis Form -->
+    <div id="attendPane2" style="display:none;padding:20px 24px">
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Did AI diagnosis match?</label>
+        <div style="display:flex;gap:8px">
+          <button id="aiMatchYes" onclick="setAIMatch('yes')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ✓ Yes, Matches
+          </button>
+          <button id="aiMatchPartial" onclick="setAIMatch('partial')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ~ Partial
+          </button>
+          <button id="aiMatchNo" onclick="setAIMatch('no')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ✗ Different
+          </button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Confirmed Diagnosis *</label>
+        <input id="diagnosisInput" type="text" placeholder="e.g. Malaria (Plasmodium Falciparum)" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">ICD-10 Code</label>
+        <input id="icd10Input" type="text" placeholder="e.g. B54 (Unspecified malaria)" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Severity</label>
+        <select id="severitySelect" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+          <option value="">Select severity</option>
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+          <option value="critical">Critical — refer</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Lab Tests Ordered</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="labTestChips">
+          ${['Malaria RDT','Full Blood Count','Blood Glucose','Urine Analysis','Liver Function','Chest X-Ray','HIV Test','Pregnancy Test','Sputum Culture'].map(t =>
+            `<button type="button" onclick="toggleLabTest('${t}')" data-test="${t}" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">${t}</button>`
+          ).join('')}
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Treatment Plan</label>
+        <textarea id="treatmentInput" placeholder="Describe the treatment plan…" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;min-height:80px;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Follow-up in (days)</label>
+        <input id="followUpDays" type="number" value="7" min="1" max="90" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="goAttendStep(1)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
+        <button onclick="goAttendStep(3)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Issue Prescription →</button>
+        <button onclick="submitDiagnosis(false)" style="flex:2;background:#0D47A1;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Save (No Rx)</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: E-Prescription Writer -->
+    <div id="attendPane3" style="display:none;padding:20px 24px">
+      <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Add medications to the prescription. Each drug line will be sent to the pharmacy.</div>
+      <div id="rxLines"></div>
+      <button onclick="addRxLine()" style="width:100%;padding:10px;border:2px dashed #4CAF50;border-radius:8px;font-size:13px;color:#1B5E20;font-weight:600;cursor:pointer;background:#F1F8E9;margin-bottom:16px">
+        + Add Drug
+      </button>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Route to Pharmacy</label>
+        <select id="rxPharmacySelect" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+          <option value="">Patient collects from any pharmacy</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="goAttendStep(2)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
+        <button onclick="submitDiagnosis(true)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">send</span> Save & Send Rx
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- ===== END MODAL ===== -->
+
 <div id="clinicToast" class="admin-toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -268,26 +403,295 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   const supa2 = supa;
+  let activeBooking = null;
+  let selectedLabTests = [];
+  let aiMatchValue = null;
+  let rxLineCount = 0;
+
   window.callPatient = async id => {
     if (supa2) {
       await supa2.from('bookings').update({ status:'in_progress', updated_at: new Date().toISOString() }).eq('id', id);
     }
     const b = bookings.find(x => x.id === id);
-    if (b) { b.status = 'in_progress'; renderQueue(); showToast(`${b.patient_name} called in to consultation`); }
+    if (b) { b.status = 'in_progress'; renderQueue(); }
+    openAttendModal(id);
   };
 
-  window.completePatient = async id => {
-    if (supa2) {
-      await supa2.from('bookings').update({ status:'attended', attended_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq('id', id);
-    }
+  window.completePatient = id => openAttendModal(id);
+
+  function openAttendModal(id) {
     const b = bookings.find(x => x.id === id);
-    if (b) {
-      b.status = 'attended';
-      document.getElementById('statWaiting').textContent = bookings.filter(x => x.status === 'pending').length;
-      document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
-      renderQueue();
-      showToast(`Consultation complete for ${b.patient_name}`, 'success');
+    if (!b) return;
+    activeBooking = b;
+    selectedLabTests = [];
+    aiMatchValue = null;
+    rxLineCount = 0;
+
+    // Populate patient info card
+    const aiData = b.ai_full_data || {};
+    document.getElementById('patientInfoCard').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${[
+          ['Patient',  b.patient_name || '—'],
+          ['Age/Sex',  (b.patient_age||'?') + 'y · ' + (b.patient_sex||'?')],
+          ['Booking',  b.booking_code || '—'],
+          ['Urgency',  '<span style="font-weight:600;color:'+(b.urgency_level==='high'?'#D32F2F':'#1565C0')+'">'+(b.urgency_level||'normal')+'</span>'],
+          ['Symptoms', b.symptoms || '—'],
+          ['Arrived',  new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})],
+        ].map(([k,v]) => `
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">${k}</div>
+            <div style="font-size:13px;color:#202124;margin-top:2px">${v}</div>
+          </div>`).join('')}
+      </div>`;
+
+    // AI diagnosis card
+    const aiDiag = b.ai_diagnosis || aiData.primary_condition || aiData.topCondition;
+    if (aiDiag) {
+      document.getElementById('aiDiagCard').style.display = 'block';
+      document.getElementById('aiDiagText').textContent = aiDiag;
+      const conf = b.ai_confidence || aiData.confidence;
+      document.getElementById('aiDiagConf').textContent = conf ? `Confidence: ${conf}%` : '';
+      document.getElementById('aiDiagSymptoms').textContent = b.symptoms ? `Reported: ${b.symptoms.slice(0,80)}` : '';
+    } else {
+      document.getElementById('aiDiagCard').style.display = 'none';
     }
+
+    // Token validity
+    const tokenCard = document.getElementById('tokenCard');
+    if (b.pin_token) {
+      tokenCard.style.display = 'flex';
+      const expired = b.pin_expires_at && new Date(b.pin_expires_at) < new Date();
+      tokenCard.style.background = expired ? '#FFEBEE' : '#E8F5E9';
+      document.getElementById('tokenIcon').textContent  = expired ? 'error' : 'verified';
+      document.getElementById('tokenIcon').style.color  = expired ? '#C62828' : '#2E7D32';
+      document.getElementById('tokenLabel').textContent = (expired ? 'Token Expired — ' : 'Token Valid — ') + b.pin_token;
+      document.getElementById('tokenLabel').style.color = expired ? '#C62828' : '#2E7D32';
+      document.getElementById('tokenExpiry').textContent = b.pin_expires_at
+        ? 'Expires ' + new Date(b.pin_expires_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) : '';
+    } else { tokenCard.style.display = 'none'; }
+
+    // Reset form fields
+    document.getElementById('diagnosisInput').value = aiDiag || '';
+    document.getElementById('icd10Input').value = '';
+    document.getElementById('severitySelect').value = '';
+    document.getElementById('treatmentInput').value = '';
+    document.getElementById('followUpDays').value = '7';
+    document.querySelectorAll('#labTestChips button').forEach(b => {
+      b.style.background = '#fff'; b.style.borderColor = '#E0E0E0'; b.style.color = '#202124';
+    });
+    document.getElementById('rxLines').innerHTML = '';
+    rxLineCount = 0;
+    addRxLine();
+
+    // Load pharmacies for routing
+    if (supa2) {
+      supa2.from('pharmacies').select('id,name,district').eq('active', true).then(({ data }) => {
+        const sel = document.getElementById('rxPharmacySelect');
+        sel.innerHTML = '<option value="">Patient collects from any pharmacy</option>';
+        (data||[]).forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id; opt.textContent = `${p.name} (${p.district||'—'})`;
+          sel.appendChild(opt);
+        });
+      });
+    }
+
+    document.getElementById('attendModalTitle').textContent = `${b.patient_name} — Consultation`;
+    document.getElementById('attendModalSub').textContent = `Booking ${b.booking_code||b.id.slice(-6).toUpperCase()}`;
+    goAttendStep(1);
+    document.getElementById('attendModal').style.display = 'block';
+  }
+
+  window.closeAttendModal = () => {
+    document.getElementById('attendModal').style.display = 'none';
+    activeBooking = null;
+  };
+
+  window.goAttendStep = n => {
+    [1,2,3].forEach(i => {
+      document.getElementById('attendPane' + i).style.display = i === n ? 'block' : 'none';
+      const tab = document.getElementById('attendStep' + i + 'Tab');
+      tab.style.color = i === n ? '#1B5E20' : '#9AA0A6';
+      tab.style.borderBottom = i === n ? '2px solid #1B5E20' : '2px solid transparent';
+    });
+  };
+
+  window.setAIMatch = val => {
+    aiMatchValue = val;
+    ['yes','partial','no'].forEach(v => {
+      const btn = document.getElementById('aiMatch' + v.charAt(0).toUpperCase() + v.slice(1));
+      const active = v === val;
+      btn.style.borderColor = active ? '#1B5E20' : '#E0E0E0';
+      btn.style.background  = active ? '#E8F5E9' : '#fff';
+      btn.style.color       = active ? '#1B5E20' : '#202124';
+    });
+  };
+
+  window.toggleLabTest = name => {
+    const idx = selectedLabTests.indexOf(name);
+    if (idx === -1) selectedLabTests.push(name); else selectedLabTests.splice(idx, 1);
+    document.querySelectorAll('#labTestChips button').forEach(btn => {
+      const active = selectedLabTests.includes(btn.dataset.test);
+      btn.style.background  = active ? '#E8F5E9' : '#fff';
+      btn.style.borderColor = active ? '#4CAF50' : '#E0E0E0';
+      btn.style.color       = active ? '#1B5E20' : '#202124';
+    });
+  };
+
+  window.addRxLine = () => {
+    rxLineCount++;
+    const n = rxLineCount;
+    const div = document.createElement('div');
+    div.id = 'rxLine' + n;
+    div.style.cssText = 'background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px;position:relative';
+    div.innerHTML = `
+      <button onclick="document.getElementById('rxLine${n}').remove()" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:#9AA0A6;font-size:18px">×</button>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Drug Name *</label>
+          <input type="text" id="rxDrug${n}" placeholder="e.g. Artemether-Lumefantrine" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Strength</label>
+          <input type="text" id="rxStrength${n}" placeholder="e.g. 80/480mg" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Route</label>
+          <select id="rxRoute${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
+            <option value="oral">Oral</option><option value="iv">IV</option><option value="im">IM</option><option value="topical">Topical</option><option value="inhaled">Inhaled</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Frequency</label>
+          <select id="rxFreq${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
+            <option value="once_daily">Once daily</option><option value="twice_daily">Twice daily</option><option value="three_daily">3× daily</option><option value="four_daily">4× daily</option><option value="as_needed">As needed</option><option value="stat">Stat (once)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Days</label>
+          <input type="number" id="rxDays${n}" value="5" min="1" max="365" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Qty</label>
+          <input type="number" id="rxQty${n}" value="1" min="1" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+        </div>
+      </div>`;
+    document.getElementById('rxLines').appendChild(div);
+  };
+
+  window.submitDiagnosis = async withPrescription => {
+    const diagnosis = document.getElementById('diagnosisInput').value.trim();
+    if (!diagnosis) { alert('Please enter the confirmed diagnosis'); return; }
+    if (!activeBooking) return;
+
+    const b           = activeBooking;
+    const icd10       = document.getElementById('icd10Input').value.trim();
+    const severity    = document.getElementById('severitySelect').value;
+    const treatment   = document.getElementById('treatmentInput').value.trim();
+    const followUp    = parseInt(document.getElementById('followUpDays').value) || 7;
+
+    // Build prescription items
+    let rxItems = [];
+    if (withPrescription) {
+      for (let i = 1; i <= rxLineCount; i++) {
+        const drug = document.getElementById('rxDrug' + i);
+        if (!drug) continue;
+        const name = drug.value.trim();
+        if (!name) continue;
+        rxItems.push({
+          drug_name:  name,
+          strength:   document.getElementById('rxStrength' + i)?.value || '',
+          route:      document.getElementById('rxRoute'    + i)?.value || 'oral',
+          frequency:  document.getElementById('rxFreq'     + i)?.value || 'once_daily',
+          duration:   parseInt(document.getElementById('rxDays' + i)?.value) || 5,
+          qty:        parseInt(document.getElementById('rxQty'  + i)?.value) || 1,
+        });
+      }
+    }
+
+    const pharmacyId = document.getElementById('rxPharmacySelect').value || null;
+
+    if (supa2) {
+      // Save clinic_diagnoses record
+      const { data: diagRecord, error: diagErr } = await supa2.from('clinic_diagnoses').insert({
+        booking_id:           b.id,
+        clinic_id:            session.clinicId || null,
+        clinician_id:         session.userId   || null,
+        ai_suggested_diagnosis: b.ai_diagnosis || null,
+        ai_confidence:        b.ai_confidence  || null,
+        ai_match:             aiMatchValue === 'yes' ? true : aiMatchValue === 'no' ? false : null,
+        confirmed_diagnosis:  diagnosis,
+        icd10_code:           icd10   || null,
+        lab_tests_ordered:    selectedLabTests.length ? selectedLabTests : [],
+        severity:             severity || null,
+        treatment_plan:       treatment || null,
+        follow_up_days:       followUp,
+        prescription_items:   rxItems,
+        routed_pharmacy_id:   pharmacyId,
+      }).select('id').single();
+
+      if (diagErr) { alert('Save failed: ' + diagErr.message); return; }
+
+      // If prescription, save to e_prescriptions + create pharmacy_order
+      if (withPrescription && rxItems.length && diagRecord) {
+        const startDate = new Date().toISOString().split('T')[0];
+        const maxDays   = Math.max(...rxItems.map(x => x.duration));
+        const endDate   = new Date(Date.now() + maxDays * 86400000).toISOString().split('T')[0];
+
+        const { data: rxRecord } = await supa2.from('e_prescriptions').insert({
+          diagnosis_id:   diagRecord.id,
+          booking_id:     b.id,
+          patient_id:     b.patient_id || null,
+          clinic_id:      session.clinicId || null,
+          issued_by:      session.userId || null,
+          items:          rxItems,
+          status:         'active',
+          start_date:     startDate,
+          end_date:       endDate,
+          routed_to_pharmacy_id: pharmacyId || null,
+          notes:          treatment || null,
+        }).select('id').single();
+
+        // Create pharmacy_order linked to prescription
+        if (rxRecord && pharmacyId) {
+          await supa2.from('pharmacy_orders').insert({
+            pharmacy_id:      pharmacyId,
+            patient_name:     b.patient_name,
+            patient_phone:    null,
+            items:            rxItems.map(x => ({ name: x.drug_name + (x.strength?' '+x.strength:''), qty: x.qty })),
+            status:           'incoming',
+            urgency:          b.urgency_level === 'high' ? 'urgent' : 'standard',
+            e_prescription_id: rxRecord.id,
+            order_type:       'prescription',
+            delivery_address: 'Clinic Pickup',
+            total_cost:       0,
+            notes:            `E-Prescription from ${diagnosis}`,
+          });
+        }
+      }
+
+      // Update booking status
+      await supa2.from('bookings').update({
+        status:              'attended',
+        attended_at:         new Date().toISOString(),
+        updated_at:          new Date().toISOString(),
+        clinic_diagnosis_id: diagRecord?.id || null,
+      }).eq('id', b.id);
+
+      // Update local state
+      b.status = 'attended';
+      document.getElementById('statWaiting').textContent   = bookings.filter(x => x.status === 'pending').length;
+      document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
+    } else {
+      activeBooking.status = 'attended';
+    }
+
+    renderQueue();
+    closeAttendModal();
+    showToast(withPrescription ? `Diagnosis saved & prescription sent for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
   };
 
   // Recent bookings list (sidebar)

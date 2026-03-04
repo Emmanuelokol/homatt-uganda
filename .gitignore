@@ -1,8 +1,8 @@
 # Claude MCP config (contains secrets)
 .claude/mcp.json
 
-# API keys config (contains secrets — generated at build time)
-app/js/config.js
+# API keys config — Supabase anon key is public/publishable (safe to commit)
+# app/js/config.js
 
 # Local environment variables (NEVER commit this)
 .env.local
