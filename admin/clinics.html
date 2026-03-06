@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Clinics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Management</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin primary" id="addClinicBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Clinic
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Clinics</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input type="text" id="searchClinics" placeholder="Search by name..." style="width:180px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>License</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="clinicsBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Clinic Modal -->
+<div class="admin-modal-overlay" id="clinicModal" style="display:none">
+  <div class="admin-modal" style="max-width:580px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="clinicModalTitle">Add New Clinic</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="clinicId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Clinic Name *</label>
+          <input type="text" id="clinicName" placeholder="e.g. Kampala Medical Centre">
+        </div>
+        <div class="admin-form-group">
+          <label>District</label>
+          <input type="text" id="clinicDistrict" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group">
+          <label>City / Subcounty</label>
+          <input type="text" id="clinicCity" placeholder="e.g. Nakawa">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Address</label>
+          <input type="text" id="clinicAddress" placeholder="Full address">
+        </div>
+        <div class="admin-form-group">
+          <label>Phone</label>
+          <input type="text" id="clinicPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Email</label>
+          <input type="email" id="clinicEmail" placeholder="clinic@example.com">
+        </div>
+        <div class="admin-form-group">
+          <label>Contact Person</label>
+          <input type="text" id="clinicContact" placeholder="Dr. Name / Manager Name">
+        </div>
+        <div class="admin-form-group">
+          <label>License Number</label>
+          <input type="text" id="clinicLicense" placeholder="MOH-2024-XXXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Commission Rate (%)</label>
+          <input type="number" id="clinicCommission" value="15" min="0" max="50">
+        </div>
+        <div class="admin-form-group">
+          <label>Status</label>
+          <select id="clinicStatus">
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Notes (internal)</label>
+          <textarea id="clinicNotes" style="min-height:70px" placeholder="Internal notes..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveClinicBtn">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save Clinic
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Staff Modal -->
+<div class="admin-modal-overlay" id="staffModal" style="display:none">
+  <div class="admin-modal" style="max-width:480px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Assign Clinic Staff Login</div>
+      <button class="admin-modal-close" onclick="closeStaffModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="staffClinicId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Create a portal login for clinic staff. They will receive a password setup email.</p>
+      <div class="admin-form-group">
+        <label>Full Name *</label>
+        <input type="text" id="staffName" placeholder="Dr. Firstname Lastname">
+      </div>
+      <div class="admin-form-group">
+        <label>Email Address *</label>
+        <input type="email" id="staffEmail" placeholder="staff@clinic.ug">
+      </div>
+      <div class="admin-form-group">
+        <label>Temporary Password *</label>
+        <input type="password" id="staffPassword" placeholder="Min 8 characters">
+      </div>
+      <div class="admin-form-group">
+        <label>Role</label>
+        <select id="staffRole">
+          <option value="doctor">Doctor</option>
+          <option value="nurse">Nurse</option>
+          <option value="receptionist">Receptionist</option>
+          <option value="manager">Clinic Manager</option>
+        </select>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeStaffModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveStaffBtn">
+        <span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let allClinics = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('clinics');
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+  await loadClinics();
+
+  document.getElementById('addClinicBtn').addEventListener('click', () => openModal());
+  document.getElementById('filterStatus').addEventListener('change', renderClinics);
+  document.getElementById('searchClinics').addEventListener('input', renderClinics);
+
+  document.getElementById('saveClinicBtn').addEventListener('click', saveClinic);
+  document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+});
+
+async function loadClinics() {
+  const { data } = await supabase.from('clinics').select('*').order('created_at', {ascending:false});
+  allClinics = data || [];
+  renderClinics();
+}
+
+function renderClinics() {
+  const statusF = document.getElementById('filterStatus').value;
+  const searchF = document.getElementById('searchClinics').value.toLowerCase();
+  const filtered = allClinics.filter(c =>
+    (!statusF || c.status === statusF) &&
+    (!searchF || c.name.toLowerCase().includes(searchF))
+  );
+  const tbody = document.getElementById('clinicsBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(c => `
+    <tr>
+      <td><div style="font-weight:600">${c.name}</div>${c.contact_person ? `<div style="font-size:11px;color:#9AA0A6">${c.contact_person}</div>` : ''}</td>
+      <td>${[c.district, c.city].filter(Boolean).join(', ') || '—'}</td>
+      <td style="font-size:12px">${c.phone || '—'}</td>
+      <td style="font-size:12px">${c.license_number || '—'}</td>
+      <td>${c.verified ? '<span class="status-badge resolved">Verified</span>' : '<span class="status-badge open">Unverified</span>'}</td>
+      <td><span class="status-badge ${c.status || 'approved'}">${c.status || 'approved'}</span></td>
+      <td style="font-size:12px;color:#9AA0A6">${formatShortDate(c.created_at)}</td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-admin secondary sm" onclick="openModal('${c.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">edit</span>
+        </button>
+        <button class="btn-admin info sm" onclick="openStaffModal('${c.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">person_add</span> Staff
+        </button>
+        ${!c.verified ? `<button class="btn-admin primary sm" onclick="toggleVerify('${c.id}', true)">Verify</button>` : ''}
+      </td>
+    </tr>`).join('');
+}
+
+function openModal(id) {
+  const c = id ? allClinics.find(x => x.id === id) : null;
+  document.getElementById('clinicModalTitle').textContent = c ? 'Edit Clinic' : 'Add New Clinic';
+  document.getElementById('clinicId').value     = c?.id || '';
+  document.getElementById('clinicName').value   = c?.name || '';
+  document.getElementById('clinicDistrict').value = c?.district || '';
+  document.getElementById('clinicCity').value   = c?.city || '';
+  document.getElementById('clinicAddress').value = c?.address || '';
+  document.getElementById('clinicPhone').value  = c?.phone || '';
+  document.getElementById('clinicEmail').value  = c?.email || '';
+  document.getElementById('clinicContact').value = c?.contact_person || '';
+  document.getElementById('clinicLicense').value = c?.license_number || '';
+  document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
+  document.getElementById('clinicStatus').value = c?.status || 'approved';
+  document.getElementById('clinicNotes').value  = c?.notes || '';
+  document.getElementById('clinicModal').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('clinicModal').style.display = 'none'; }
+
+async function saveClinic() {
+  const id = document.getElementById('clinicId').value;
+  const name = document.getElementById('clinicName').value.trim();
+  if (!name) { showAdminToast('Clinic name is required', 'error'); return; }
+
+  const payload = {
+    name,
+    district: document.getElementById('clinicDistrict').value.trim() || null,
+    city: document.getElementById('clinicCity').value.trim() || null,
+    address: document.getElementById('clinicAddress').value.trim() || null,
+    phone: document.getElementById('clinicPhone').value.trim() || null,
+    email: document.getElementById('clinicEmail').value.trim() || null,
+    contact_person: document.getElementById('clinicContact').value.trim() || null,
+    license_number: document.getElementById('clinicLicense').value.trim() || null,
+    commission_rate: Number(document.getElementById('clinicCommission').value) || 15,
+    status: document.getElementById('clinicStatus').value,
+    notes: document.getElementById('clinicNotes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById('saveClinicBtn');
+  btn.disabled = true;
+
+  let error;
+  if (id) {
+    ({ error } = await supabase.from('clinics').update(payload).eq('id', id));
+  } else {
+    ({ error } = await supabase.from('clinics').insert(payload));
+  }
+
+  btn.disabled = false;
+  if (error) { showAdminToast('Save failed: ' + error.message, 'error'); return; }
+  closeModal();
+  await loadClinics();
+  showAdminToast(id ? 'Clinic updated!' : 'Clinic added!', 'success');
+}
+
+async function toggleVerify(id, verified) {
+  const { error } = await supabase.from('clinics').update({ verified }).eq('id', id);
+  if (error) { showAdminToast('Failed', 'error'); return; }
+  await loadClinics();
+  showAdminToast('Clinic verified!', 'success');
+}
+
+function openStaffModal(clinicId) {
+  document.getElementById('staffClinicId').value = clinicId;
+  document.getElementById('staffName').value = '';
+  document.getElementById('staffEmail').value = '';
+  document.getElementById('staffPassword').value = '';
+  document.getElementById('staffModal').style.display = 'flex';
+}
+
+function closeStaffModal() { document.getElementById('staffModal').style.display = 'none'; }
+
+async function saveStaff() {
+  const clinicId = document.getElementById('staffClinicId').value;
+  const name     = document.getElementById('staffName').value.trim();
+  const email    = document.getElementById('staffEmail').value.trim();
+  const password = document.getElementById('staffPassword').value;
+
+  if (!name || !email || !password) { showAdminToast('All fields required', 'error'); return; }
+  if (password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  const btn = document.getElementById('saveStaffBtn');
+  btn.disabled = true;
+
+  // Create Supabase auth user
+  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+  if (signUpErr) { btn.disabled = false; showAdminToast('Auth error: ' + signUpErr.message, 'error'); return; }
+
+  const authUserId = signUpData.user?.id;
+  if (!authUserId) { btn.disabled = false; showAdminToast('Could not create auth user', 'error'); return; }
+
+  // Create portal_users record
+  const { error: puErr } = await supabase.from('portal_users').insert({
+    auth_user_id: authUserId,
+    full_name: name,
+    email,
+    role: 'clinic_staff',
+    clinic_id: clinicId
+  });
+
+  btn.disabled = false;
+  if (puErr) { showAdminToast('Portal user error: ' + puErr.message, 'error'); return; }
+
+  closeStaffModal();
+  showAdminToast(`Staff login created for ${name}`, 'success');
+}
+</script>
+</body>
+</html>

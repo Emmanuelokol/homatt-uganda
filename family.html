@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0D47A1">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health - Family</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/trackers.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar" style="background:#0D47A1">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Family Header -->
+      <div class="family-header">
+        <div class="family-header-top">
+          <div>
+            <div class="family-header-title">Family Health Hub</div>
+            <div class="family-header-sub" id="familyHeaderSub">Loading family...</div>
+          </div>
+          <button class="family-add-btn" id="addMemberHeaderBtn" title="Add family member">
+            <span class="material-icons-outlined">person_add</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tracker-tabs" style="border-bottom-color:rgba(13,71,161,0.2)">
+        <button class="tracker-tab active" data-tab="members" id="tabMembers">
+          <span class="material-icons-outlined">people</span>
+          Members
+        </button>
+        <button class="tracker-tab" data-tab="prescriptions" id="tabRx">
+          <span class="material-icons-outlined">medication</span>
+          Prescriptions
+        </button>
+        <button class="tracker-tab" data-tab="shop" id="tabShop">
+          <span class="material-icons-outlined">storefront</span>
+          Shop
+        </button>
+      </div>
+
+      <!-- =========================================
+           TAB 1: MEMBERS
+           ========================================= -->
+      <div class="family-pane active" id="pane-members">
+
+        <!-- Primary member card -->
+        <div class="primary-member-card" id="primaryMemberCard">
+          <div class="primary-member-inner">
+            <div class="primary-member-avatar" id="primaryMemberAvatar">?</div>
+            <div class="primary-member-info">
+              <div class="primary-member-name" id="primaryMemberName">Loading...</div>
+              <span class="primary-badge">Primary Member</span>
+            </div>
+          </div>
+          <div class="primary-member-loc" id="primaryMemberLoc">
+            <span class="material-icons-outlined">location_on</span>
+            <span id="primaryLocText">—</span>
+          </div>
+        </div>
+
+        <!-- Family members list -->
+        <div id="familyMembersList">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Add family member button -->
+        <button class="add-member-inline-btn" id="addMemberBtn">
+          <span class="material-icons-outlined">person_add</span>
+          Add Family Member
+        </button>
+
+      </div>
+
+      <!-- =========================================
+           TAB 2: PRESCRIPTIONS
+           ========================================= -->
+      <div class="family-pane" id="pane-prescriptions">
+
+        <button class="add-rx-inline-btn" id="addRxBtn">
+          <span class="material-icons-outlined">add_circle</span>
+          Add Prescription
+        </button>
+
+        <div class="rx-list" id="prescriptionsList">
+          <!-- Populated by JS -->
+        </div>
+
+      </div>
+
+      <!-- =========================================
+           TAB 3: PREVENTION MARKETPLACE
+           ========================================= -->
+      <div class="family-pane" id="pane-shop">
+
+        <!-- Search -->
+        <div class="shop-search-wrap">
+          <span class="material-icons-outlined">search</span>
+          <input type="text" class="shop-search-input" id="shopSearch" placeholder="Search health products...">
+        </div>
+
+        <!-- Categories scroll -->
+        <div class="category-scroll" id="categoryScroll">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Items section title -->
+        <div class="items-section-title" id="itemsSectionTitle">All Products</div>
+
+        <!-- Items grid -->
+        <div class="items-grid" id="itemsGrid">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Loading state -->
+        <div id="shopLoading" style="text-align:center;padding:32px 20px;color:var(--text-hint);font-size:13px;display:none">
+          <span class="material-icons-outlined" style="font-size:32px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
+          Loading products...
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="window.location.href='dashboard.html'">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" id="bottomNavFamily">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" id="bottomNavShop">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='profile.html'">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+
+    <!-- =========================================
+         MEMBER DETAIL PANEL (Health Log)
+         ========================================= -->
+    <div class="member-detail-panel" id="memberDetailPanel">
+      <div class="member-detail-header">
+        <button class="member-detail-back" id="memberDetailBack">
+          <span class="material-icons-outlined">arrow_back</span>
+        </button>
+        <div>
+          <div class="member-detail-title" id="memberDetailName">Member</div>
+          <div style="font-size:11px;color:rgba(255,255,255,0.7)" id="memberDetailRel">—</div>
+        </div>
+      </div>
+      <div class="member-detail-body">
+
+        <button class="log-event-btn" id="logEventForMemberBtn">
+          <span class="material-icons-outlined">add_circle</span>
+          Log Health Event
+        </button>
+
+        <div style="font-size:12px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Health Log</div>
+
+        <div class="timeline-wrap" id="memberTimeline">
+          <div class="timeline-empty">
+            <span class="material-icons-outlined">history</span>
+            No health events yet.<br>Log a symptom check, vaccination, or treatment to start the timeline.
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- =========================================
+         OVERLAYS & SHEETS
+         ========================================= -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+
+    <!-- Add Family Member Sheet -->
+    <div class="bottom-sheet" id="addMemberSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Add Family Member</span>
+        <button class="sheet-close-btn" id="closeAddMemberSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Full Name *</label>
+          <input type="text" class="sheet-input" id="memberName" placeholder="e.g. Sarah Okello">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Relationship *</label>
+          <div class="sheet-chip-group" id="relChipGroup">
+            <button class="sheet-chip" data-val="spouse">Spouse</button>
+            <button class="sheet-chip" data-val="child">Child</button>
+            <button class="sheet-chip" data-val="parent">Parent</button>
+            <button class="sheet-chip" data-val="sibling">Sibling</button>
+            <button class="sheet-chip" data-val="other">Other</button>
+          </div>
+          <input type="hidden" id="memberRelationship">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Date of Birth</label>
+          <div style="display:grid;grid-template-columns:2fr 2fr 3fr;gap:8px">
+            <input type="number" class="sheet-input" id="memberDobDay" placeholder="DD" min="1" max="31" inputmode="numeric" style="text-align:center">
+            <input type="number" class="sheet-input" id="memberDobMonth" placeholder="MM" min="1" max="12" inputmode="numeric" style="text-align:center">
+            <input type="number" class="sheet-input" id="memberDobYear" placeholder="YYYY" min="1900" max="2025" inputmode="numeric" style="text-align:center">
+          </div>
+          <div style="font-size:11px;color:var(--text-hint);margin-top:4px">Day / Month / Year</div>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Sex</label>
+          <div class="sheet-sex-selector">
+            <button type="button" class="sheet-sex-btn" data-val="male" id="memberSexMale">
+              <span class="material-icons-outlined">male</span> Male
+            </button>
+            <button type="button" class="sheet-sex-btn" data-val="female" id="memberSexFemale">
+              <span class="material-icons-outlined">female</span> Female
+            </button>
+          </div>
+          <input type="hidden" id="memberSex">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Location (District)</label>
+          <select class="sheet-input sheet-select" id="memberLocation">
+            <option value="">Select district</option>
+            <option value="Kampala">Kampala</option>
+            <option value="Wakiso">Wakiso</option>
+            <option value="Mukono">Mukono</option>
+            <option value="Jinja">Jinja</option>
+            <option value="Mbarara">Mbarara</option>
+            <option value="Gulu">Gulu</option>
+            <option value="Lira">Lira</option>
+            <option value="Mbale">Mbale</option>
+            <option value="Masaka">Masaka</option>
+            <option value="Fort Portal">Fort Portal</option>
+            <option value="Soroti">Soroti</option>
+            <option value="Arua">Arua</option>
+            <option value="Kabale">Kabale</option>
+            <option value="Hoima">Hoima</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Chronic Conditions</label>
+          <div class="sheet-chip-group" id="chronicGroup">
+            <button class="sheet-chip" data-val="diabetes">Diabetes</button>
+            <button class="sheet-chip" data-val="hypertension">Hypertension</button>
+            <button class="sheet-chip" data-val="asthma">Asthma</button>
+            <button class="sheet-chip" data-val="hiv">HIV/AIDS</button>
+            <button class="sheet-chip" data-val="sickle_cell">Sickle Cell</button>
+            <button class="sheet-chip" data-val="epilepsy">Epilepsy</button>
+            <button class="sheet-chip" data-val="tb">Tuberculosis</button>
+            <button class="sheet-chip" data-val="none">None</button>
+          </div>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Current Medications</label>
+          <input type="text" class="sheet-input" id="memberMedications" placeholder="e.g. Metformin, Lisinopril (comma-separated)">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Allergies</label>
+          <input type="text" class="sheet-input" id="memberAllergies" placeholder="e.g. Penicillin, Peanuts (comma-separated)">
+        </div>
+
+        <div class="sheet-input-group">
+          <div class="sheet-toggle-row">
+            <div>
+              <div class="sheet-toggle-label">No Smartphone</div>
+              <div class="sheet-toggle-sub">Primary member manages their health on their behalf</div>
+            </div>
+            <button class="toggle-switch" id="noSmartphoneToggle" aria-label="No smartphone"></button>
+          </div>
+        </div>
+
+        <button class="sheet-submit-btn sheet-submit-blue" id="saveMemberBtn">
+          <span class="material-icons-outlined">person_add</span>
+          Add Member
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Member Action Sheet -->
+    <div class="bottom-sheet" id="memberActionSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title" id="actionSheetMemberName">Member Actions</span>
+        <button class="sheet-close-btn" id="closeActionSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" style="padding:0 0 20px">
+
+        <!-- Book appointment notice will be inserted here when member has location -->
+        <div id="bookingLocationCard"></div>
+
+        <div class="action-sheet-item" id="actionViewLog">
+          <div class="action-sheet-icon" style="background:linear-gradient(135deg,#0D47A1,#1976D2)">
+            <span class="material-icons-outlined">history</span>
+          </div>
+          <div>
+            <div class="action-sheet-label">View Health Log</div>
+            <div class="action-sheet-sub">Full chronological health history</div>
+          </div>
+        </div>
+        <div class="action-sheet-item" id="actionLogEvent">
+          <div class="action-sheet-icon" style="background:linear-gradient(135deg,#00695C,#00897B)">
+            <span class="material-icons-outlined">add_circle</span>
+          </div>
+          <div>
+            <div class="action-sheet-label">Log Health Event</div>
+            <div class="action-sheet-sub">Record symptom, vaccination, treatment, outcome</div>
+          </div>
+        </div>
+        <div class="action-sheet-item" id="actionAddRxForMember">
+          <div class="action-sheet-icon" style="background:linear-gradient(135deg,#4527A0,#7B1FA2)">
+            <span class="material-icons-outlined">medication</span>
+          </div>
+          <div>
+            <div class="action-sheet-label">Add Prescription</div>
+            <div class="action-sheet-sub">Track a drug prescribed for this member</div>
+          </div>
+        </div>
+        <div class="action-sheet-item" id="actionBookAppt">
+          <div class="action-sheet-icon" style="background:linear-gradient(135deg,#E65100,#FF6F00)">
+            <span class="material-icons-outlined">event</span>
+          </div>
+          <div>
+            <div class="action-sheet-label">Book Appointment</div>
+            <div class="action-sheet-sub">Find nearest clinic based on their location</div>
+          </div>
+        </div>
+        <div class="action-sheet-item action-danger" id="actionRemoveMember">
+          <div class="action-sheet-icon">
+            <span class="material-icons-outlined">person_remove</span>
+          </div>
+          <div>
+            <div class="action-sheet-label">Remove Member</div>
+            <div class="action-sheet-sub">Remove from your family group</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Add Prescription Sheet -->
+    <div class="bottom-sheet" id="addRxSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Add Prescription</span>
+        <button class="sheet-close-btn" id="closeAddRxSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+
+        <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:10px 14px;margin-bottom:14px;">
+          <p style="font-size:12px;color:var(--primary);line-height:1.5">
+            <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px">verified</span>
+            Prescriptions are reviewed by a Homatt Health admin for your safety. You'll see a verified badge once approved.
+          </p>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Drug Type *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+            <button type="button" class="sheet-chip selected" id="rxTypeOtc" onclick="setRxType('otc')" style="padding:10px;font-size:12px">💊 OTC (no prescription)</button>
+            <button type="button" class="sheet-chip" id="rxTypeRx" onclick="setRxType('rx')" style="padding:10px;font-size:12px">📋 Prescription (Rx)</button>
+          </div>
+          <input type="hidden" id="rxType" value="otc">
+          <div id="rxVerifyNotice" style="display:none;background:#F3E5F5;border:1px solid #CE93D8;border-radius:var(--radius-md);padding:8px 12px;font-size:12px;color:#6A1B9A;margin-top:6px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">verified_user</span>
+            Prescription drugs require a verified doctor's recommendation. A Homatt admin will review this before it is dispensed.
+          </div>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Drug Name *</label>
+          <input type="text" class="sheet-input" id="rxDrugName" placeholder="e.g. Paracetamol, Metformin">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Manufacturer / Brand</label>
+          <input type="text" class="sheet-input" id="rxManufacturer" placeholder="e.g. Cipla, GSK, Strides">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Dosage</label>
+          <input type="text" class="sheet-input" id="rxDosage" placeholder="e.g. 500mg, 10ml">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Drug Form</label>
+          <div class="sheet-chip-group" id="drugFormGroup">
+            <button class="sheet-chip" data-val="tablet">Tablet</button>
+            <button class="sheet-chip" data-val="capsule">Capsule</button>
+            <button class="sheet-chip" data-val="syrup">Syrup</button>
+            <button class="sheet-chip" data-val="injection">Injection</button>
+            <button class="sheet-chip" data-val="cream">Cream</button>
+            <button class="sheet-chip" data-val="drops">Drops</button>
+          </div>
+          <input type="hidden" id="rxDrugForm">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Frequency *</label>
+          <select class="sheet-input sheet-select" id="rxFrequency">
+            <option value="">Select frequency</option>
+            <option value="once_daily">Once daily</option>
+            <option value="twice_daily">Twice daily (every 12hrs)</option>
+            <option value="three_times">Three times daily (every 8hrs)</option>
+            <option value="four_times">Four times daily (every 6hrs)</option>
+            <option value="as_needed">As needed (PRN)</option>
+            <option value="weekly">Once weekly</option>
+          </select>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="sheet-input-group">
+            <label class="sheet-label">Start Date *</label>
+            <input type="date" class="sheet-input" id="rxStartDate">
+          </div>
+          <div class="sheet-input-group">
+            <label class="sheet-label">End Date *</label>
+            <input type="date" class="sheet-input" id="rxEndDate">
+          </div>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Total Quantity</label>
+          <input type="number" class="sheet-input" id="rxQuantity" placeholder="e.g. 30 tablets" min="1">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Reminder Times</label>
+          <div class="sheet-chip-group" id="reminderTimesGroup">
+            <button class="sheet-chip" data-val="morning">Morning (7AM)</button>
+            <button class="sheet-chip" data-val="midday">Midday (12PM)</button>
+            <button class="sheet-chip" data-val="afternoon">Afternoon (3PM)</button>
+            <button class="sheet-chip" data-val="evening">Evening (7PM)</button>
+            <button class="sheet-chip" data-val="bedtime">Bedtime (10PM)</button>
+          </div>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Prescribing Doctor</label>
+          <input type="text" class="sheet-input" id="rxDoctor" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">For (member)</label>
+          <select class="sheet-input sheet-select" id="rxForMember">
+            <option value="">Self</option>
+            <!-- Populated by JS with family members -->
+          </select>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Special Instructions / Notes</label>
+          <textarea class="sheet-input sheet-textarea" id="rxNotes" placeholder="e.g. Take after meals, avoid alcohol..."></textarea>
+        </div>
+
+        <button class="sheet-submit-btn" id="saveRxBtn">
+          <span class="material-icons-outlined">save</span>
+          Submit Prescription
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Log Health Event Sheet -->
+    <div class="bottom-sheet" id="logEventSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Log Health Event</span>
+        <button class="sheet-close-btn" id="closeLogEventSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Event Type *</label>
+          <div class="event-type-grid" id="eventTypeGrid">
+            <button class="event-type-btn" data-val="symptom_check">
+              <span class="material-icons-outlined">sick</span>
+              <span>Symptom Check</span>
+            </button>
+            <button class="event-type-btn" data-val="diagnosis">
+              <span class="material-icons-outlined">biotech</span>
+              <span>Diagnosis</span>
+            </button>
+            <button class="event-type-btn" data-val="treatment">
+              <span class="material-icons-outlined">medical_services</span>
+              <span>Treatment</span>
+            </button>
+            <button class="event-type-btn" data-val="vaccination">
+              <span class="material-icons-outlined">vaccines</span>
+              <span>Vaccination</span>
+            </button>
+            <button class="event-type-btn" data-val="medication">
+              <span class="material-icons-outlined">medication</span>
+              <span>Medication</span>
+            </button>
+            <button class="event-type-btn" data-val="outcome">
+              <span class="material-icons-outlined">thumb_up</span>
+              <span>Outcome</span>
+            </button>
+          </div>
+          <input type="hidden" id="eventType">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Title / Summary *</label>
+          <input type="text" class="sheet-input" id="eventTitle" placeholder="e.g. Fever and headache, Malaria diagnosed">
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Details</label>
+          <textarea class="sheet-input sheet-textarea" id="eventDescription" placeholder="Describe the symptoms, findings, or treatment given..."></textarea>
+        </div>
+
+        <button class="sheet-submit-btn sheet-submit-blue" id="saveEventBtn">
+          <span class="material-icons-outlined">save</span>
+          Save Event
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Cart Sheet -->
+    <div class="bottom-sheet" id="cartSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Your Cart</span>
+        <button class="sheet-close-btn" id="closeCartSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div id="cartItemsList"></div>
+        <div id="cartTotalRow" class="cart-total-row" style="display:none">
+          <span>Total</span>
+          <span class="cart-total-amount">UGX <span id="cartTotal">0</span></span>
+        </div>
+        <div id="cartCheckoutArea" style="display:none">
+          <div style="background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;">
+            <p style="font-size:11px;color:#1565C0;line-height:1.4">
+              <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:3px">local_shipping</span>
+              Checkout and payment integration coming soon. Products will be delivered from verified pharmacies near you.
+            </p>
+          </div>
+          <button class="cart-checkout-btn">
+            <span class="material-icons-outlined">shopping_bag</span>
+            Proceed to Checkout (Coming Soon)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Cart FAB -->
+    <button class="cart-fab" id="cartFab">
+      <span class="material-icons-outlined">shopping_cart</span>
+      <span class="cart-badge-dot" id="cartBadgeDot">0</span>
+    </button>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="familyToast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/family.js"></script>
+  <script src="js/native-bridge.js"></script>
+  <script>
+    function setRxType(type) {
+      document.getElementById('rxType').value = type;
+      const otcBtn = document.getElementById('rxTypeOtc');
+      const rxBtn  = document.getElementById('rxTypeRx');
+      const notice = document.getElementById('rxVerifyNotice');
+      if (type === 'otc') {
+        otcBtn.classList.add('selected');
+        rxBtn.classList.remove('selected');
+        notice.style.display = 'none';
+      } else {
+        rxBtn.classList.add('selected');
+        otcBtn.classList.remove('selected');
+        notice.style.display = 'block';
+      }
+    }
+  </script>
+</body>
+</html>

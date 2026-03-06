@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Platform Overview</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:12px;color:#5F6368" id="lastRefreshed"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <!-- Live KPIs -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr))">
+        <div class="stat-card"><div class="stat-icon blue"><span class="material-icons-outlined">people</span></div><div><div class="stat-number" id="statUsers">—</div><div class="stat-label">Registered Users</div></div></div>
+        <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">event_available</span></div><div><div class="stat-number" id="statBookings">—</div><div class="stat-label">Total Bookings</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><span class="material-icons-outlined">local_pharmacy</span></div><div><div class="stat-number" id="statOrders">—</div><div class="stat-label">Medicine Orders</div></div></div>
+        <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">local_hospital</span></div><div><div class="stat-number" id="statClinics">—</div><div class="stat-label">Active Clinics</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue"><span class="material-icons-outlined">store</span></div><div><div class="stat-number" id="statPharmacies">—</div><div class="stat-label">Active Pharmacies</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><span class="material-icons-outlined">electric_moped</span></div><div><div class="stat-number" id="statRiders">—</div><div class="stat-label">Active Riders</div></div></div>
+        <div class="stat-card"><div class="stat-icon red"><span class="material-icons-outlined">contact_support</span></div><div><div class="stat-number" id="statTickets">—</div><div class="stat-label">Open Tickets</div></div></div>
+        <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">medication</span></div><div><div class="stat-number" id="statRx">—</div><div class="stat-label">Pending Rx Reviews</div></div></div>
+      </div>
+
+      <!-- Pending approvals -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin-bottom:24px">
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Pending Clinics</div><a href="clinics.html" class="btn-admin secondary" style="text-decoration:none;font-size:12px">View All</a></div>
+          <div id="pendingClinics" style="padding:16px 20px;font-size:13px;color:#9AA0A6">Loading...</div>
+        </div>
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Pending Pharmacies</div><a href="pharmacies.html" class="btn-admin secondary" style="text-decoration:none;font-size:12px">View All</a></div>
+          <div id="pendingPharmacies" style="padding:16px 20px;font-size:13px;color:#9AA0A6">Loading...</div>
+        </div>
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Pending Riders</div><a href="riders.html" class="btn-admin secondary" style="text-decoration:none;font-size:12px">View All</a></div>
+          <div id="pendingRiders" style="padding:16px 20px;font-size:13px;color:#9AA0A6">Loading...</div>
+        </div>
+      </div>
+
+      <!-- Recent bookings + orders -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Recent Bookings</div></div>
+          <table class="admin-table">
+            <thead><tr><th>Patient</th><th>Urgency</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody id="recentBookingsBody"><tr><td colspan="4" style="text-align:center;padding:24px;color:#9AA0A6">Loading...</td></tr></tbody>
+          </table>
+        </div>
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Recent Medicine Orders</div></div>
+          <table class="admin-table">
+            <thead><tr><th>Patient</th><th>Urgency</th><th>Status</th><th>Date</th></tr></thead>
+            <tbody id="recentOrdersBody"><tr><td colspan="4" style="text-align:center;padding:24px;color:#9AA0A6">Loading...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Recent tickets -->
+      <div class="admin-table-wrap">
+        <div class="table-header"><div class="table-title">Recent Support Tickets</div><a href="support.html" class="btn-admin secondary" style="text-decoration:none">View All</a></div>
+        <table class="admin-table">
+          <thead><tr><th>User</th><th>Subject</th><th>Category</th><th>Priority</th><th>Status</th><th>Date</th></tr></thead>
+          <tbody id="recentTicketsBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9AA0A6">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('dashboard');
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+  document.getElementById('lastRefreshed').textContent = 'Refreshed ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+  const [uR, bR, oR, cR, pR, rR, tR, xR] = await Promise.all([
+    supabase.from('profiles').select('id',{count:'exact',head:true}),
+    supabase.from('bookings').select('id',{count:'exact',head:true}),
+    supabase.from('pharmacy_orders').select('id',{count:'exact',head:true}),
+    supabase.from('clinics').select('id',{count:'exact',head:true}).eq('active',true),
+    supabase.from('pharmacies').select('id',{count:'exact',head:true}).eq('active',true),
+    supabase.from('riders').select('id',{count:'exact',head:true}).eq('active',true),
+    supabase.from('support_tickets').select('id',{count:'exact',head:true}).eq('status','open'),
+    supabase.from('prescriptions').select('id',{count:'exact',head:true}).eq('admin_verified',false).eq('status','active'),
+  ]);
+  document.getElementById('statUsers').textContent = uR.count??'—';
+  document.getElementById('statBookings').textContent = bR.count??'—';
+  document.getElementById('statOrders').textContent = oR.count??'—';
+  document.getElementById('statClinics').textContent = cR.count??'—';
+  document.getElementById('statPharmacies').textContent = pR.count??'—';
+  document.getElementById('statRiders').textContent = rR.count??'—';
+  document.getElementById('statTickets').textContent = tR.count??'—';
+  document.getElementById('statRx').textContent = xR.count??'—';
+
+  const [pC, pP, pRi] = await Promise.all([
+    supabase.from('clinics').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
+    supabase.from('pharmacies').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
+    supabase.from('riders').select('full_name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
+  ]);
+  const rp = (data, k, el) => {
+    const d = document.getElementById(el);
+    if (!data?.length) { d.innerHTML='<span style="color:#9AA0A6">None pending</span>'; return; }
+    d.innerHTML = data.map(x=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid #F0F0F0"><span style="font-weight:500">${x[k]}</span><span style="font-size:11px;color:#9AA0A6">${formatShortDate(x.created_at)}</span></div>`).join('');
+  };
+  rp(pC.data,'name','pendingClinics'); rp(pP.data,'name','pendingPharmacies'); rp(pRi.data,'full_name','pendingRiders');
+
+  const {data:bk} = await supabase.from('bookings').select('patient_name,urgency_level,status,created_at').order('created_at',{ascending:false}).limit(6);
+  document.getElementById('recentBookingsBody').innerHTML = !bk?.length ? '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No bookings yet</td></tr>' : bk.map(b=>`<tr><td><strong>${b.patient_name||'—'}</strong></td><td><span class="status-badge ${b.urgency_level==='high'?'urgent':'normal'}">${b.urgency_level||'—'}</span></td><td><span class="status-badge ${b.status}">${(b.status||'').replace('_',' ')}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(b.created_at)}</td></tr>`).join('');
+
+  const {data:ord} = await supabase.from('pharmacy_orders').select('patient_name,urgency,status,created_at').order('created_at',{ascending:false}).limit(6);
+  document.getElementById('recentOrdersBody').innerHTML = !ord?.length ? '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No orders yet</td></tr>' : ord.map(o=>`<tr><td><strong>${o.patient_name||'—'}</strong></td><td><span class="status-badge ${o.urgency==='urgent'?'urgent':'normal'}">${o.urgency||'standard'}</span></td><td><span class="status-badge ${o.status}">${(o.status||'').replace('_',' ')}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(o.created_at)}</td></tr>`).join('');
+
+  const {data:tk} = await supabase.from('support_tickets').select('user_name,subject,category,priority,status,created_at').order('created_at',{ascending:false}).limit(6);
+  document.getElementById('recentTicketsBody').innerHTML = !tk?.length ? '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9AA0A6">No tickets</td></tr>' : tk.map(t=>`<tr><td><strong>${t.user_name||'Anonymous'}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</td><td style="text-transform:capitalize">${t.category}</td><td><span class="status-badge ${t.priority}">${t.priority}</span></td><td><span class="status-badge ${t.status}">${(t.status||'').replace('_',' ')}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(t.created_at)}</td></tr>`).join('');
+});
+</script>
+</body>
+</html>

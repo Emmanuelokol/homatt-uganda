@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Pharmacy — Inventory</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/pharmacy.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Stock Management</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin primary sm" onclick="openAddModal()">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add / Update Stock
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="pharmacyUserAvatar">P</div>
+          <span id="pharmacyUserNameTop">Pharmacist</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">inventory_2</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Total Medicines</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statInStock">—</div><div class="stat-label">Well Stocked</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">warning</span></div>
+          <div><div class="stat-number" id="statLow">—</div><div class="stat-label">Low Stock</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">remove_circle</span></div>
+          <div><div class="stat-number" id="statOut">—</div><div class="stat-label">Out of Stock</div></div>
+        </div>
+      </div>
+
+      <!-- Low stock banner -->
+      <div id="lowBanner" style="display:none;background:#FFEBEE;border-left:4px solid #D32F2F;border-radius:8px;padding:12px 18px;margin-bottom:20px;font-size:13px;color:#B71C1C">
+        <strong><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">error</span>
+        Critical stock alert:</strong> <span id="lowBannerMsg"></span>
+      </div>
+
+      <!-- Stock table -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Medicine Inventory</div>
+          <div class="table-filter">
+            <select id="filterStockStatus">
+              <option value="">All Stock Levels</option>
+              <option value="ok">Well Stocked</option>
+              <option value="low">Low Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+            <input type="text" id="searchStock" placeholder="Search medicine…" style="width:200px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Medicine</th>
+              <th>Stock Level</th>
+              <th>Qty</th>
+              <th>Reorder At</th>
+              <th>Retail Price</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Add / Update Stock Modal -->
+<div class="admin-modal-overlay" id="stockModal" style="display:none">
+  <div class="admin-modal" style="max-width:460px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="stockModalTitle">Add / Update Stock</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div class="admin-form-group">
+        <label>Medicine Name</label>
+        <input type="text" id="stockMedicine" placeholder="e.g. Amoxicillin 500mg">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group">
+          <label>Quantity in Stock</label>
+          <input type="number" id="stockQty" min="0" placeholder="0">
+        </div>
+        <div class="admin-form-group">
+          <label>Reorder Threshold</label>
+          <input type="number" id="stockThreshold" min="0" placeholder="20">
+        </div>
+        <div class="admin-form-group">
+          <label>Wholesale Price (UGX)</label>
+          <input type="number" id="stockWholesale" min="0" placeholder="0">
+        </div>
+        <div class="admin-form-group">
+          <label>Retail Price (UGX)</label>
+          <input type="number" id="stockRetail" min="0" placeholder="0">
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveStockBtn" onclick="saveStock()">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/pharmacy.js"></script>
+<script>
+let allInventory = [];
+let editingId = null;
+let _session = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildPharmacySidebar('inventory');
+  _session = requirePharmacy();
+  if (!_session) return;
+  setupPharmacyLogout();
+
+  const supa = initPharmacySupabase();
+  window._pharmSupa = supa;
+
+  if (supa && _session.pharmacyId) {
+    await loadLive(supa, _session.pharmacyId);
+  } else {
+    allInventory = MOCK_INVENTORY.map(i => ({...i}));
+    renderInventory();
+  }
+
+  document.getElementById('filterStockStatus').addEventListener('change', renderInventory);
+  document.getElementById('searchStock').addEventListener('input', renderInventory);
+});
+
+async function loadLive(supa, pharmacyId) {
+  const { data } = await supa.from('pharmacy_inventory').select('*')
+    .eq('pharmacy_id', pharmacyId).order('medicine_name');
+  allInventory = data || [];
+  renderInventory();
+}
+
+function stockStatus(qty, threshold) {
+  if (qty === 0) return 'out';
+  if (qty <= threshold) return 'low';
+  return 'ok';
+}
+
+function renderInventory() {
+  const filterVal = document.getElementById('filterStockStatus').value;
+  const q = document.getElementById('searchStock').value.toLowerCase();
+
+  const filtered = allInventory.filter(i => {
+    const st = stockStatus(i.quantity, i.reorder_threshold || 20);
+    const matchFilter = !filterVal || st === filterVal;
+    const matchSearch = !q || (i.medicine_name||'').toLowerCase().includes(q);
+    return matchFilter && matchSearch;
+  });
+
+  const total = allInventory.length;
+  const lowItems = allInventory.filter(i => {
+    const st = stockStatus(i.quantity, i.reorder_threshold || 20);
+    return st === 'low';
+  });
+  const outItems = allInventory.filter(i => i.quantity === 0);
+  const okItems = allInventory.filter(i => stockStatus(i.quantity, i.reorder_threshold || 20) === 'ok');
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statInStock').textContent = okItems.length;
+  document.getElementById('statLow').textContent = lowItems.length;
+  document.getElementById('statOut').textContent = outItems.length;
+
+  if (outItems.length > 0) {
+    document.getElementById('lowBanner').style.display = 'block';
+    document.getElementById('lowBannerMsg').textContent =
+      outItems.map(i => i.medicine_name).join(', ') + ' — completely out of stock';
+  } else {
+    document.getElementById('lowBanner').style.display = 'none';
+  }
+
+  const tbody = document.getElementById('inventoryBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No items found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(i => {
+    const threshold = i.reorder_threshold || 20;
+    const st = stockStatus(i.quantity, threshold);
+    const maxDisplay = threshold * 3;
+    const pct = Math.min(100, Math.round(i.quantity / maxDisplay * 100));
+    const barClass = st === 'out' ? 'low' : st === 'low' ? 'medium' : 'high';
+    const badgeClass = st === 'out' ? 'rejected' : st === 'low' ? 'incoming' : 'completed';
+    const badgeText = st === 'out' ? 'Out of stock' : st === 'low' ? 'Low stock' : 'In stock';
+    return `
+    <tr>
+      <td><div style="font-weight:600;font-size:13px">${i.medicine_name}</div></td>
+      <td style="min-width:130px">
+        <div class="stock-bar-wrap">
+          <div class="stock-bar"><div class="stock-fill ${barClass}" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td><span class="stock-qty" style="font-size:14px;font-weight:700;color:${st==='out'?'#D32F2F':st==='low'?'#E65100':'#2E7D32'}">${i.quantity}</span></td>
+      <td style="font-size:12px;color:#9AA0A6">${threshold}</td>
+      <td style="font-size:12px">${i.retail_price ? formatUGX(i.retail_price) : '—'}</td>
+      <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+      <td>
+        <button class="btn-admin secondary sm" onclick="openEditModal('${i.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">edit</span>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+window.openAddModal = () => {
+  editingId = null;
+  document.getElementById('stockModalTitle').textContent = 'Add New Medicine';
+  document.getElementById('stockMedicine').value = '';
+  document.getElementById('stockQty').value = '';
+  document.getElementById('stockThreshold').value = '20';
+  document.getElementById('stockWholesale').value = '';
+  document.getElementById('stockRetail').value = '';
+  document.getElementById('stockModal').style.display = 'flex';
+};
+
+window.openEditModal = id => {
+  const item = allInventory.find(i => i.id === id || i.id === id);
+  if (!item) return;
+  editingId = item.id;
+  document.getElementById('stockModalTitle').textContent = 'Update Stock';
+  document.getElementById('stockMedicine').value = item.medicine_name || '';
+  document.getElementById('stockQty').value = item.quantity || 0;
+  document.getElementById('stockThreshold').value = item.reorder_threshold || 20;
+  document.getElementById('stockWholesale').value = item.wholesale_price || '';
+  document.getElementById('stockRetail').value = item.retail_price || '';
+  document.getElementById('stockModal').style.display = 'flex';
+};
+
+window.saveStock = async () => {
+  const medicine_name = document.getElementById('stockMedicine').value.trim();
+  const quantity = parseInt(document.getElementById('stockQty').value) || 0;
+  const reorder_threshold = parseInt(document.getElementById('stockThreshold').value) || 20;
+  const wholesale_price = parseFloat(document.getElementById('stockWholesale').value) || null;
+  const retail_price = parseFloat(document.getElementById('stockRetail').value) || null;
+
+  if (!medicine_name) { showToast('Medicine name is required', 'error'); return; }
+
+  const btn = document.getElementById('saveStockBtn');
+  btn.disabled = true;
+
+  if (window._pharmSupa && _session?.pharmacyId) {
+    const payload = { medicine_name, quantity, reorder_threshold, wholesale_price, retail_price, pharmacy_id: _session.pharmacyId };
+    let error;
+    if (editingId) {
+      ({ error } = await window._pharmSupa.from('pharmacy_inventory').update(payload).eq('id', editingId));
+    } else {
+      ({ error } = await window._pharmSupa.from('pharmacy_inventory').insert(payload));
+    }
+    if (error) { showToast('Failed: ' + error.message, 'error'); btn.disabled = false; return; }
+    await loadLive(window._pharmSupa, _session.pharmacyId);
+  } else {
+    if (editingId) {
+      const idx = allInventory.findIndex(i => i.id === editingId);
+      if (idx >= 0) allInventory[idx] = { ...allInventory[idx], medicine_name, quantity, reorder_threshold, wholesale_price, retail_price };
+    } else {
+      allInventory.push({ id: 'inv-' + Date.now(), medicine_name, quantity, reorder_threshold, wholesale_price, retail_price });
+    }
+    renderInventory();
+  }
+
+  btn.disabled = false;
+  closeModal();
+  showToast(editingId ? 'Stock updated!' : 'Medicine added!', 'success');
+};
+
+window.closeModal = () => { document.getElementById('stockModal').style.display = 'none'; editingId = null; };
+</script>
+</body>
+</html>

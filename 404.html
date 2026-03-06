@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health</title>
+  <!-- GitHub Pages SPA redirect: send every unknown URL back to index.html -->
+  <script>
+    // Preserve the path so deep links still work after redirect
+    var path = window.location.pathname.replace('/homatt-uganda', '');
+    var search = window.location.search;
+    var hash = window.location.hash;
+    var redirectUrl = '/homatt-uganda/' + (path.replace(/^\//, '') || 'index.html') + search + hash;
+    window.location.replace(redirectUrl);
+  </script>
+</head>
+<body>
+  <p style="font-family:sans-serif;text-align:center;margin-top:40px;color:#1B5E20">
+    Loading Homatt Health…
+  </p>
+</body>
+</html>

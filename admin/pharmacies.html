@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Pharmacies</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Pharmacy Management</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin primary" id="addPharmacyBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Pharmacy
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Pharmacies</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input type="text" id="searchPharmacies" placeholder="Search..." style="width:160px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>Location</th><th>Phone</th><th>Routing Score</th><th>Confirm Rate</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="pharmaciesBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="admin-modal-overlay" id="pharmacyModal" style="display:none">
+  <div class="admin-modal" style="max-width:580px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="pharmacyModalTitle">Add New Pharmacy</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="pharmacyId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Pharmacy Name *</label>
+          <input type="text" id="pharmacyName" placeholder="e.g. Nakawa Pharmacy">
+        </div>
+        <div class="admin-form-group">
+          <label>District</label>
+          <input type="text" id="pharmacyDistrict" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group">
+          <label>City / Zone</label>
+          <input type="text" id="pharmacyCity" placeholder="e.g. Nakawa">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Address</label>
+          <input type="text" id="pharmacyAddress" placeholder="Full address">
+        </div>
+        <div class="admin-form-group">
+          <label>Phone</label>
+          <input type="text" id="pharmacyPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Email</label>
+          <input type="email" id="pharmacyEmail" placeholder="pharmacy@example.com">
+        </div>
+        <div class="admin-form-group">
+          <label>Contact Person (Owner/Manager)</label>
+          <input type="text" id="pharmacyContact" placeholder="Owner/Manager name">
+        </div>
+        <div class="admin-form-group">
+          <label>License Number</label>
+          <input type="text" id="pharmacyLicense" placeholder="NDA-2024-XXXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Status</label>
+          <select id="pharmacyStatus">
+            <option value="approved">Approved</option>
+            <option value="pending">Pending</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+        <div class="admin-form-group">
+          <label>Routing Score (0–100)</label>
+          <input type="number" id="pharmacyRoutingScore" value="100" min="0" max="100">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Notes</label>
+          <textarea id="pharmacyNotes" style="min-height:70px" placeholder="Internal notes..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="savePharmacyBtn">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save Pharmacy
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Staff Modal -->
+<div class="admin-modal-overlay" id="staffModal" style="display:none">
+  <div class="admin-modal" style="max-width:460px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Assign Pharmacy Staff Login</div>
+      <button class="admin-modal-close" onclick="closeStaffModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="staffPharmacyId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Create a portal login for pharmacy staff. They can then manage orders and inventory.</p>
+      <div class="admin-form-group">
+        <label>Full Name *</label>
+        <input type="text" id="staffName" placeholder="Pharmacist name">
+      </div>
+      <div class="admin-form-group">
+        <label>Email Address *</label>
+        <input type="email" id="staffEmail" placeholder="pharmacist@pharmacy.ug">
+      </div>
+      <div class="admin-form-group">
+        <label>Temporary Password *</label>
+        <input type="password" id="staffPassword" placeholder="Min 8 characters">
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeStaffModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveStaffBtn">
+        <span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let allPharmacies = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('pharmacies');
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+  await loadPharmacies();
+
+  document.getElementById('addPharmacyBtn').addEventListener('click', () => openModal());
+  document.getElementById('filterStatus').addEventListener('change', renderPharmacies);
+  document.getElementById('searchPharmacies').addEventListener('input', renderPharmacies);
+  document.getElementById('savePharmacyBtn').addEventListener('click', savePharmacy);
+  document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+});
+
+async function loadPharmacies() {
+  const { data } = await supabase.from('pharmacies').select('*').order('created_at',{ascending:false});
+  allPharmacies = data || [];
+  renderPharmacies();
+}
+
+function renderPharmacies() {
+  const sf = document.getElementById('filterStatus').value;
+  const q  = document.getElementById('searchPharmacies').value.toLowerCase();
+  const filtered = allPharmacies.filter(p =>
+    (!sf || p.status === sf) && (!q || p.name.toLowerCase().includes(q))
+  );
+  const tbody = document.getElementById('pharmaciesBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No pharmacies found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(p => {
+    const score = p.routing_score ?? 100;
+    const scoreColor = score >= 90 ? '#2E7D32' : score >= 70 ? '#E65100' : '#D32F2F';
+    return `<tr>
+      <td><div style="font-weight:600">${p.name}</div>${p.contact_person ? `<div style="font-size:11px;color:#9AA0A6">${p.contact_person}</div>` : ''}</td>
+      <td>${[p.district, p.city].filter(Boolean).join(', ') || '—'}</td>
+      <td style="font-size:12px">${p.phone || '—'}</td>
+      <td><span style="font-weight:700;color:${scoreColor}">${score}</span>/100</td>
+      <td>${(p.confirmation_rate ?? 100).toFixed(0)}%</td>
+      <td><span class="status-badge ${p.status || 'approved'}">${p.status || 'approved'}</span></td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-admin secondary sm" onclick="openModal('${p.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">edit</span>
+        </button>
+        <button class="btn-admin info sm" onclick="openStaffModal('${p.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">person_add</span>
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openModal(id) {
+  const p = id ? allPharmacies.find(x => x.id === id) : null;
+  document.getElementById('pharmacyModalTitle').textContent = p ? 'Edit Pharmacy' : 'Add New Pharmacy';
+  document.getElementById('pharmacyId').value     = p?.id || '';
+  document.getElementById('pharmacyName').value   = p?.name || '';
+  document.getElementById('pharmacyDistrict').value = p?.district || '';
+  document.getElementById('pharmacyCity').value   = p?.city || '';
+  document.getElementById('pharmacyAddress').value = p?.address || '';
+  document.getElementById('pharmacyPhone').value  = p?.phone || '';
+  document.getElementById('pharmacyEmail').value  = p?.email || '';
+  document.getElementById('pharmacyContact').value = p?.contact_person || '';
+  document.getElementById('pharmacyLicense').value = p?.license_number || '';
+  document.getElementById('pharmacyStatus').value = p?.status || 'approved';
+  document.getElementById('pharmacyRoutingScore').value = p?.routing_score ?? 100;
+  document.getElementById('pharmacyNotes').value  = p?.notes || '';
+  document.getElementById('pharmacyModal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('pharmacyModal').style.display = 'none'; }
+
+async function savePharmacy() {
+  const id   = document.getElementById('pharmacyId').value;
+  const name = document.getElementById('pharmacyName').value.trim();
+  if (!name) { showAdminToast('Name required', 'error'); return; }
+
+  const payload = {
+    name,
+    district: document.getElementById('pharmacyDistrict').value.trim() || null,
+    city: document.getElementById('pharmacyCity').value.trim() || null,
+    address: document.getElementById('pharmacyAddress').value.trim() || null,
+    phone: document.getElementById('pharmacyPhone').value.trim() || null,
+    email: document.getElementById('pharmacyEmail').value.trim() || null,
+    contact_person: document.getElementById('pharmacyContact').value.trim() || null,
+    license_number: document.getElementById('pharmacyLicense').value.trim() || null,
+    status: document.getElementById('pharmacyStatus').value,
+    routing_score: Number(document.getElementById('pharmacyRoutingScore').value) || 100,
+    notes: document.getElementById('pharmacyNotes').value.trim() || null,
+    updated_at: new Date().toISOString()
+  };
+
+  const btn = document.getElementById('savePharmacyBtn');
+  btn.disabled = true;
+  const { error } = id
+    ? await supabase.from('pharmacies').update(payload).eq('id', id)
+    : await supabase.from('pharmacies').insert(payload);
+  btn.disabled = false;
+  if (error) { showAdminToast('Save failed: ' + error.message, 'error'); return; }
+  closeModal();
+  await loadPharmacies();
+  showAdminToast(id ? 'Pharmacy updated!' : 'Pharmacy added!', 'success');
+}
+
+function openStaffModal(pharmacyId) {
+  document.getElementById('staffPharmacyId').value = pharmacyId;
+  document.getElementById('staffName').value = '';
+  document.getElementById('staffEmail').value = '';
+  document.getElementById('staffPassword').value = '';
+  document.getElementById('staffModal').style.display = 'flex';
+}
+function closeStaffModal() { document.getElementById('staffModal').style.display = 'none'; }
+
+async function saveStaff() {
+  const pharmacyId = document.getElementById('staffPharmacyId').value;
+  const name       = document.getElementById('staffName').value.trim();
+  const email      = document.getElementById('staffEmail').value.trim();
+  const password   = document.getElementById('staffPassword').value;
+  if (!name || !email || password.length < 8) { showAdminToast('All fields required. Password min 8 chars.', 'error'); return; }
+
+  const btn = document.getElementById('saveStaffBtn');
+  btn.disabled = true;
+
+  const { data: su, error: suErr } = await supabase.auth.signUp({ email, password });
+  if (suErr || !su?.user) { btn.disabled = false; showAdminToast('Auth error: ' + (suErr?.message || 'unknown'), 'error'); return; }
+
+  const { error: puErr } = await supabase.from('portal_users').insert({
+    auth_user_id: su.user.id, full_name: name, email, role: 'pharmacy_staff', pharmacy_id: pharmacyId
+  });
+  btn.disabled = false;
+  if (puErr) { showAdminToast('Portal user error: ' + puErr.message, 'error'); return; }
+  closeStaffModal();
+  showAdminToast(`Portal login created for ${name}`, 'success');
+}
+</script>
+</body>
+</html>

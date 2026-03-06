@@ -1,0 +1,26 @@
+{
+  "name": "Homatt Health Uganda",
+  "short_name": "Homatt",
+  "description": "Your personal health companion — track, manage, and improve your family's health in Uganda",
+  "start_url": "dashboard.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1B5E20",
+  "theme_color": "#1B5E20",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["health", "medical", "lifestyle"],
+  "lang": "en-UG"
+}
