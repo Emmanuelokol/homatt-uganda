@@ -20,7 +20,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ====== State ======
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
-  const family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
+  // Load family from cache first, then try to refresh from Supabase in background
+  let family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
+  // Background sync of family members so next open has fresh data
+  if (session && session.user) {
+    supabase.from('family_members')
+      .select('id,name,relationship,dob,sex')
+      .eq('primary_user_id', session.user.id)
+      .then(({ data }) => {
+        if (data && data.length) {
+          const mapped = data.map(m => {
+            let age = '';
+            if (m.dob) {
+              const b = new Date(m.dob);
+              age = Math.floor((Date.now() - b) / (365.25 * 24 * 60 * 60 * 1000));
+            }
+            return { name: m.name, relation: m.relationship || 'family', sex: m.sex || 'unknown', age };
+          });
+          localStorage.setItem('homatt_family', JSON.stringify(mapped));
+          // If the patient list is still on screen, rebuild it with fresh data
+          if (document.getElementById('screenPatient').classList.contains('active')) {
+            family.splice(0, family.length, ...mapped);
+            buildPatientList();
+          }
+        }
+      }).catch(() => {}); // offline — stay with cached
+  }
   let selectedPatient = null;
   let enteredSymptoms = '';
   let selectedChips = new Set();
@@ -52,23 +77,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelector('.app-screen').scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  backBtn.addEventListener('click', () => {
+  function handleBack() {
     if (currentScreen === 'screenPatient') {
       window.location.href = 'dashboard.html';
     } else if (currentScreen === 'screenSymptoms') {
-      if (!user.hasFamily || family.length === 0) {
-        window.location.href = 'dashboard.html';
-      } else {
-        showScreen('screenPatient');
-      }
+      showScreen('screenPatient');
     } else if (currentScreen === 'screenFollowup') {
       showScreen('screenSymptoms');
     } else if (currentScreen === 'screenResults') {
       showScreen('screenFollowup');
     } else if (currentScreen === 'screenMonitor') {
       showScreen('screenResults');
+    } else {
+      window.location.href = 'dashboard.html';
     }
-  });
+  }
+
+  backBtn.addEventListener('click', handleBack);
+
+  // Register with native-bridge so the Android hardware back button does the same
+  window.HomattBackHandler = function () {
+    handleBack();
+    return true; // tell native-bridge we handled it
+  };
 
   // Bottom nav
   document.getElementById('navHome').addEventListener('click', () => {
@@ -83,11 +114,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     let userAge = '';
     if (user.dob) {
       const birth = new Date(user.dob);
-      const today = new Date();
-      userAge = Math.floor((today - birth) / (365.25 * 24 * 60 * 60 * 1000));
+      userAge = Math.floor((Date.now() - birth) / (365.25 * 24 * 60 * 60 * 1000));
     }
 
-    if (!user.hasFamily || family.length === 0) {
+    // Always show "Me" card first — even if the user has no family members
+    const selfCard = createPatientCard({
+      name: `${user.firstName || 'Me'} (You)`,
+      icon: 'person',
+      subtitle: `${user.sex === 'male' ? 'Male' : user.sex === 'female' ? 'Female' : 'User'}${userAge ? ', ' + userAge + ' yrs' : ''}`,
+      badge: 'You',
+    }, () => {
       selectedPatient = {
         name: user.firstName || 'User',
         age: userAge,
@@ -96,35 +132,25 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
       document.getElementById('patientName').textContent = 'Checking for: You';
       showScreen('screenSymptoms');
-      return;
-    }
-
-    const selfCard = createPatientCard({
-      name: `${user.firstName} (You)`,
-      icon: 'person',
-      subtitle: `${user.sex === 'male' ? 'Male' : 'Female'}${userAge ? ', ' + userAge + ' yrs' : ''}`,
-    }, () => {
-      selectedPatient = {
-        name: user.firstName,
-        age: userAge,
-        sex: user.sex,
-        relation: 'self',
-      };
-      document.getElementById('patientName').textContent = 'Checking for: You';
-      showScreen('screenSymptoms');
     });
     list.appendChild(selfCard);
 
+    // Add family / dependents from cache
     family.forEach((member) => {
+      const icon = member.relation === 'child' ? 'child_care'
+                 : member.relation === 'parent' ? 'elderly'
+                 : member.relation === 'spouse' ? 'favorite'
+                 : 'person';
       const card = createPatientCard({
         name: member.name,
-        icon: member.relation === 'child' ? 'child_care' : 'person',
-        subtitle: `${member.sex === 'male' ? 'Male' : 'Female'}, ${member.age} yrs - ${member.relation}`,
+        icon,
+        subtitle: `${member.sex === 'male' ? 'Male' : member.sex === 'female' ? 'Female' : ''}${member.age ? ', ' + member.age + ' yrs' : ''} · ${member.relation}`,
+        badge: member.relation,
       }, () => {
         selectedPatient = {
           name: member.name,
           age: member.age,
-          sex: member.sex,
+          sex: member.sex || 'unknown',
           relation: member.relation,
         };
         document.getElementById('patientName').textContent = `Checking for: ${member.name}`;
@@ -132,11 +158,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
       list.appendChild(card);
     });
+
+    // If no family yet, show a hint
+    if (family.length === 0) {
+      const hint = document.createElement('p');
+      hint.style.cssText = 'text-align:center;font-size:12px;color:var(--text-secondary);margin-top:12px;padding:0 20px;line-height:1.5';
+      hint.textContent = 'Add family members in the Family Hub to check symptoms for them too.';
+      list.appendChild(hint);
+    }
   }
 
-  function createPatientCard({ name, icon, subtitle }, onClick) {
+  function createPatientCard({ name, icon, subtitle, badge }, onClick) {
     const card = document.createElement('button');
     card.className = 'sc-patient-card';
+    const badgeHtml = badge
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(27,94,32,0.12);color:var(--primary);text-transform:capitalize;margin-top:3px;display:inline-block">${badge}</span>`
+      : '';
     card.innerHTML = `
       <div class="sc-patient-avatar">
         <span class="material-icons-outlined">${icon}</span>
@@ -144,6 +181,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div class="sc-patient-info">
         <p class="sc-patient-name">${name}</p>
         <p class="sc-patient-detail">${subtitle}</p>
+        ${badgeHtml}
       </div>
       <span class="material-icons-outlined sc-patient-arrow">chevron_right</span>
     `;

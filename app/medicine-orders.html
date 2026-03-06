@@ -621,12 +621,19 @@ async function submitOrder() {
 
 // Init
 document.addEventListener('DOMContentLoaded', async () => {
+  // Load from cache first so list shows immediately offline
+  const cached = window.HomattCache ? window.HomattCache.load('medicines', []) : [];
+  if (cached.length) { allMeds = cached; filterMeds(); }
+
   if (supa) {
     const { data } = await supa.from('medicine_catalog').select('name,retail_price').order('name');
-    allMeds = (data || []).map(m => ({ name: m.name, price: m.retail_price || 500 }));
+    if (data && data.length) {
+      allMeds = data.map(m => ({ name: m.name, price: m.retail_price || 500 }));
+      if (window.HomattCache) window.HomattCache.save('medicines', allMeds);
+      filterMeds();
+    }
   }
-  if (!allMeds.length) allMeds = MOCK_MEDS;
-  filterMeds();
+  if (!allMeds.length) { allMeds = MOCK_MEDS; filterMeds(); }
 
   // Pre-fill delivery address from session
   const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');

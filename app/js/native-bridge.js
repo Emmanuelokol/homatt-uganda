@@ -29,24 +29,37 @@
   }
 
   // ─── BACK BUTTON ────────────────────────────────────────────────────────────
+  /**
+   * Pages with internal multi-screen flows (e.g. symptom-checker) can set
+   *   window.HomattBackHandler = function() { return true; }
+   * returning true means "I handled it, don't do the default navigation".
+   */
   function initBackButton() {
+    // Also wire the browser popstate so in-page back works on Android gesture navigation
+    window.addEventListener('popstate', () => {
+      if (window.HomattBackHandler && window.HomattBackHandler()) return;
+    });
+
     if (!isNative()) return;
     const { App } = window.Capacitor.Plugins;
     if (!App) return;
 
     App.addListener('backButton', ({ canGoBack }) => {
+      // 1. Let the current page handle it if it registered a custom handler
+      if (window.HomattBackHandler && window.HomattBackHandler()) return;
+
+      // 2. Close any open sheet / modal
       const openSheet = document.querySelector('.bottom-sheet.open, .modal.open, .overlay.active');
       if (openSheet) {
-        // Close the open sheet/modal instead of going back
         openSheet.classList.remove('open', 'active');
-        const overlays = document.querySelectorAll('.overlay');
-        overlays.forEach(o => o.classList.remove('active'));
+        document.querySelectorAll('.sheet-overlay').forEach(o => o.classList.remove('visible'));
         return;
       }
-      const dashboardPages = ['dashboard.html', 'index.html'];
+
+      // 3. Default page navigation
+      const mainPages = ['dashboard.html', 'signin.html', 'index.html'];
       const currentPage = location.pathname.split('/').pop() || 'index.html';
-      if (dashboardPages.includes(currentPage) || !canGoBack) {
-        // On main page — show exit confirmation
+      if (mainPages.includes(currentPage) || !canGoBack) {
         showExitDialog();
       } else {
         window.history.back();
@@ -277,6 +290,52 @@
     } else {
       window.addEventListener('load', hideSplash);
     }
+  }
+
+  // ─── OFFLINE DATA CACHE HELPERS ─────────────────────────────────────────────
+  /**
+   * HomattCache — save/load Supabase query results in localStorage
+   * so the app can show last-known data when offline.
+   *
+   * Usage:
+   *   HomattCache.save('medicines', data);
+   *   const data = HomattCache.load('medicines', []);
+   */
+  window.HomattCache = {
+    save(key, value) {
+      try {
+        localStorage.setItem('_hc_' + key, JSON.stringify({ ts: Date.now(), v: value }));
+      } catch (e) {}
+    },
+    load(key, fallback) {
+      try {
+        const raw = localStorage.getItem('_hc_' + key);
+        if (!raw) return fallback;
+        return JSON.parse(raw).v;
+      } catch (e) {
+        return fallback;
+      }
+    },
+    age(key) {
+      try {
+        const raw = localStorage.getItem('_hc_' + key);
+        return raw ? Date.now() - JSON.parse(raw).ts : Infinity;
+      } catch (e) { return Infinity; }
+    },
+  };
+
+  // ─── SERVICE WORKER REGISTRATION ────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      // Determine the SW path relative to where we are in the URL tree
+      const swPath = location.pathname.includes('/admin/') ||
+                     location.pathname.includes('/pharmacy/') ||
+                     location.pathname.includes('/rider/') ||
+                     location.pathname.includes('/clinic/')
+        ? '../sw.js' : './sw.js';
+      navigator.serviceWorker.register(swPath, { scope: swPath.replace('sw.js', '') })
+        .catch(() => {}); // silently fail on non-HTTPS or unsupported env
+    });
   }
 
   // Wait for Capacitor bridge to be ready
