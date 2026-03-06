@@ -1,0 +1,56 @@
+{
+  "appId": "ug.homatt.health",
+  "appName": "Homatt Health",
+  "webDir": "app",
+  "bundledWebRuntime": false,
+  "server": {
+    "url": "https://emmanuelokol.github.io/homatt-uganda",
+    "androidScheme": "https",
+    "allowNavigation": [
+      "*.supabase.co",
+      "fonts.googleapis.com",
+      "fonts.gstatic.com",
+      "cdn.jsdelivr.net",
+      "emmanuelokol.github.io"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": false,
+    "backgroundColor": "#1B5E20",
+    "minWebViewVersion": 60
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2500,
+      "launchAutoHide": true,
+      "backgroundColor": "#1B5E20",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#1B5E20",
+      "overlaysWebView": false
+    },
+    "Keyboard": {
+      "resize": "body",
+      "resizeOnFullScreen": true
+    },
+    "Camera": {
+      "permissions": ["camera", "photos"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_launcher",
+      "iconColor": "#4CAF50",
+      "sound": "default"
+    },
+    "App": {
+      "launchUrl": "signin.html"
+    }
+  }
+}

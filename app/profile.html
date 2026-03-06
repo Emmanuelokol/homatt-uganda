@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health - Profile</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+</head>
+<body>
+  <!-- Apply dark mode before render to prevent flash -->
+  <script>(function(){var t=localStorage.getItem('homatt_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})()</script>
+
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Profile Header -->
+      <div class="page-header">
+        <div class="page-header-top">
+          <span class="page-header-title">Profile</span>
+          <button class="page-header-action" id="editProfileBtn" title="Edit profile">
+            <span class="material-icons-outlined">edit</span>
+          </button>
+        </div>
+        <!-- Avatar + Name Hero -->
+        <div class="profile-hero">
+          <div class="profile-avatar-lg" id="profileAvatarLg">
+            <span class="material-icons-outlined" style="font-size:36px">person</span>
+            <button class="profile-avatar-edit-btn" id="avatarEditBtn" title="Change photo">
+              <span class="material-icons-outlined">photo_camera</span>
+            </button>
+          </div>
+          <!-- Hidden file input for avatar upload -->
+          <input type="file" id="avatarInput" accept="image/*" style="display:none">
+          <h2 class="profile-hero-name" id="profileFullName">Loading...</h2>
+          <p class="profile-hero-phone" id="profilePhone"></p>
+          <p class="profile-hero-location" id="profileLocation">
+            <span class="material-icons-outlined">location_on</span>
+            <span id="locationText">Uganda</span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Profile Body -->
+      <div class="page-body">
+
+        <!-- Personal Information -->
+        <div class="profile-section">
+          <div class="profile-section-title">Personal Information</div>
+          <div class="profile-info-row">
+            <span class="material-icons-outlined">person</span>
+            <div>
+              <p class="info-label">Full Name</p>
+              <p class="info-value" id="infoName">—</p>
+            </div>
+          </div>
+          <div class="profile-info-row">
+            <span class="material-icons-outlined">cake</span>
+            <div>
+              <p class="info-label">Date of Birth</p>
+              <p class="info-value" id="infoDob">—</p>
+            </div>
+          </div>
+          <div class="profile-info-row">
+            <span class="material-icons-outlined">wc</span>
+            <div>
+              <p class="info-label">Sex</p>
+              <p class="info-value" id="infoSex">—</p>
+            </div>
+          </div>
+          <div class="profile-info-row">
+            <span class="material-icons-outlined">location_on</span>
+            <div>
+              <p class="info-label">District / City</p>
+              <p class="info-value" id="infoLocation">—</p>
+            </div>
+          </div>
+          <div class="profile-info-row">
+            <span class="material-icons-outlined">phone</span>
+            <div>
+              <p class="info-label">Phone Number</p>
+              <p class="info-value" id="infoPhone">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health Goals -->
+        <div class="profile-section">
+          <div class="profile-section-title">Health Goals</div>
+          <div class="goals-chips" id="goalsChips">
+            <span style="font-size:12px;color:var(--text-hint);padding:4px 0">Loading...</span>
+          </div>
+        </div>
+
+        <!-- Wallet access -->
+        <div class="profile-section">
+          <div class="profile-section-title">Finance</div>
+          <div class="settings-item" onclick="window.location.href='wallet.html'" style="cursor:pointer">
+            <span class="material-icons-outlined">account_balance_wallet</span>
+            <span class="settings-item-label">My Wallets</span>
+            <span class="settings-value" id="walletPreviewBalance">UGX 0</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+        </div>
+
+        <!-- Settings -->
+        <div class="profile-section">
+          <div class="profile-section-title">Settings</div>
+          <div class="settings-item">
+            <span class="material-icons-outlined">notifications</span>
+            <span class="settings-item-label">Health Reminders</span>
+            <button class="toggle-switch on" id="notifToggle" aria-label="Toggle notifications"></button>
+          </div>
+          <div class="settings-item">
+            <span class="material-icons-outlined">language</span>
+            <span class="settings-item-label">Language</span>
+            <span class="settings-value">English</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+          <div class="settings-item">
+            <span class="material-icons-outlined">dark_mode</span>
+            <span class="settings-item-label">Dark Mode</span>
+            <button class="toggle-switch" id="darkModeToggle" aria-label="Toggle dark mode"></button>
+          </div>
+        </div>
+
+        <!-- Help & Support -->
+        <div class="profile-section">
+          <div class="profile-section-title">Help & Support</div>
+          <div class="settings-item" id="faqBtn">
+            <span class="material-icons-outlined">help_outline</span>
+            <span class="settings-item-label">FAQ</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+          <div class="settings-item" id="supportBtn" style="cursor:pointer">
+            <span class="material-icons-outlined">contact_support</span>
+            <span class="settings-item-label">Contact Support</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+          <div class="settings-item" id="emergencyBtn" style="cursor:pointer">
+            <span class="material-icons-outlined" style="color:#D32F2F">local_hospital</span>
+            <span class="settings-item-label">Emergency Contacts</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+        </div>
+
+        <!-- About -->
+        <div class="profile-section">
+          <div class="profile-section-title">About</div>
+          <div class="settings-item">
+            <span class="material-icons-outlined">info</span>
+            <span class="settings-item-label">App Version</span>
+            <span class="settings-value">1.0.0</span>
+          </div>
+          <div class="settings-item" id="termsBtn" style="cursor:pointer">
+            <span class="material-icons-outlined">description</span>
+            <span class="settings-item-label">Terms of Service</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+          <div class="settings-item">
+            <span class="material-icons-outlined">privacy_tip</span>
+            <span class="settings-item-label">Privacy Policy</span>
+            <span class="material-icons-outlined settings-chevron">chevron_right</span>
+          </div>
+        </div>
+
+        <!-- Sign Out -->
+        <button class="logout-btn" id="logoutBtn">
+          <span class="material-icons-outlined">logout</span>
+          Sign Out
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="window.location.href='dashboard.html'">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='family.html'">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='family.html#shop'">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
+      <div class="nav-item active">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+
+    <!-- Sheet Overlay -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+
+    <!-- Contact Support Sheet -->
+    <div class="bottom-sheet" id="contactSupportSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Contact Support</span>
+        <button class="sheet-close-btn" id="closeSupportSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-input-group">
+          <label class="sheet-label">Category</label>
+          <select class="sheet-input sheet-select" id="supportCategory">
+            <option value="general">General Inquiry</option>
+            <option value="technical">Technical Issue</option>
+            <option value="billing">Billing / Wallet</option>
+            <option value="feedback">Feedback</option>
+            <option value="emergency">Emergency Help</option>
+          </select>
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">Subject *</label>
+          <input type="text" class="sheet-input" id="supportSubject" placeholder="Brief description of your issue">
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">Message *</label>
+          <textarea class="sheet-input sheet-textarea" id="supportMessage" placeholder="Describe your issue in detail..."></textarea>
+        </div>
+        <button class="sheet-submit-btn sheet-submit-blue" id="submitSupportBtn">
+          <span class="material-icons-outlined">send</span>
+          Submit Request
+        </button>
+      </div>
+    </div>
+
+    <!-- Emergency Info Sheet -->
+    <div class="bottom-sheet" id="emergencySheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title" style="color:#D32F2F">Emergency Contacts</span>
+        <button class="sheet-close-btn" id="closeEmergencySheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" id="emergencySheetBody">
+        <div style="text-align:center;padding:20px;color:var(--text-hint)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Terms Sheet -->
+    <div class="bottom-sheet" id="termsSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Terms of Service</span>
+        <button class="sheet-close-btn" id="closeTermsSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" id="termsSheetBody">
+        <div style="text-align:center;padding:20px;color:var(--text-hint)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Edit Profile Sheet -->
+    <div class="bottom-sheet" id="editProfileSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Edit Profile</span>
+        <button class="sheet-close-btn" id="closeEditSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <p class="profile-edit-hint">Update your personal information. Changes sync to your Homatt Health account.</p>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">First Name</label>
+          <input type="text" class="sheet-input" id="editFirstName" placeholder="First name">
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">Last Name</label>
+          <input type="text" class="sheet-input" id="editLastName" placeholder="Last name">
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">District</label>
+          <select class="sheet-input sheet-select" id="editDistrict">
+            <option value="">Select district</option>
+            <option value="kampala">Kampala</option>
+            <option value="wakiso">Wakiso</option>
+            <option value="mukono">Mukono</option>
+            <option value="jinja">Jinja</option>
+            <option value="mbarara">Mbarara</option>
+            <option value="gulu">Gulu</option>
+            <option value="lira">Lira</option>
+            <option value="mbale">Mbale</option>
+            <option value="masaka">Masaka</option>
+            <option value="fort_portal">Fort Portal</option>
+            <option value="soroti">Soroti</option>
+            <option value="arua">Arua</option>
+            <option value="kabale">Kabale</option>
+            <option value="hoima">Hoima</option>
+            <option value="entebbe">Entebbe</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">City / Town</label>
+          <input type="text" class="sheet-input" id="editCity" placeholder="City or town">
+        </div>
+
+        <button class="sheet-submit-btn" id="saveProfileBtn">
+          <span class="material-icons-outlined">save</span>
+          Save Changes
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="profileToast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/profile.js"></script>
+  <script src="js/native-bridge.js"></script>
+</body>
+</html>

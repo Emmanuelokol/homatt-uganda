@@ -3,11 +3,15 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
   const form = document.getElementById('signinForm');
   const phoneInput = document.getElementById('phone');
   const passwordInput = document.getElementById('password');
   const togglePassword = document.getElementById('togglePassword');
   const signinError = document.getElementById('signinError');
+  const submitBtn = form.querySelector('button[type="submit"]');
 
   // Update status bar time
   function updateTime() {
@@ -19,11 +23,10 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTime();
   setInterval(updateTime, 30000);
 
-  // If already logged in, go to dashboard
-  if (localStorage.getItem('homatt_logged_in') === 'true') {
-    window.location.href = 'dashboard.html';
-    return;
-  }
+  // If already logged in via Supabase session, go to dashboard
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) window.location.href = 'dashboard.html';
+  });
 
   // Password toggle
   togglePassword.addEventListener('click', () => {
@@ -37,13 +40,8 @@ document.addEventListener('DOMContentLoaded', () => {
   phoneInput.addEventListener('input', (e) => {
     let val = e.target.value.replace(/\D/g, '');
     if (val.length > 9) val = val.slice(0, 9);
-
-    if (val.length > 6) {
-      val = val.slice(0, 3) + ' ' + val.slice(3, 6) + ' ' + val.slice(6);
-    } else if (val.length > 3) {
-      val = val.slice(0, 3) + ' ' + val.slice(3);
-    }
-
+    if (val.length > 6) val = val.slice(0, 3) + ' ' + val.slice(3, 6) + ' ' + val.slice(6);
+    else if (val.length > 3) val = val.slice(0, 3) + ' ' + val.slice(3);
     e.target.value = val;
   });
 
@@ -53,10 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const group = input.closest('.input-group');
       if (group) {
         const error = group.querySelector('.input-error');
-        if (error) {
-          error.textContent = '';
-          error.classList.remove('visible');
-        }
+        if (error) { error.textContent = ''; error.classList.remove('visible'); }
       }
       signinError.textContent = '';
       signinError.classList.remove('visible');
@@ -75,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Form submit
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     const phone = phoneInput.value.trim();
@@ -97,31 +92,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (!valid) return;
 
-    // Check against stored user
-    const storedUser = localStorage.getItem('homatt_user');
-    if (!storedUser) {
-      signinError.textContent = 'No account found. Please sign up first.';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Signing in\u2026';
+
+    const phoneDigits = phone.replace(/\s/g, '');
+    const email = '256' + phoneDigits + '@homatt.ug';
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Sign In';
+      signinError.textContent = error.message.includes('Invalid login')
+        ? 'Incorrect phone number or password.'
+        : error.message;
       signinError.classList.add('visible');
       return;
     }
 
-    const user = JSON.parse(storedUser);
-    const inputPhone = '+256' + phone.replace(/\s/g, '');
+    // Load profile and cache locally for fast reads
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', data.user.id)
+      .single();
 
-    if (user.phone !== inputPhone) {
-      signinError.textContent = 'Phone number not found. Check and try again.';
-      signinError.classList.add('visible');
-      return;
+    if (profile) {
+      localStorage.setItem('homatt_user', JSON.stringify({
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        phone: profile.phone_number,
+        dob: profile.dob,
+        sex: profile.sex,
+        district: profile.district,
+        city: profile.city,
+        hasFamily: profile.has_family,
+        familySize: profile.family_size,
+        healthGoals: profile.health_goals,
+      }));
     }
 
-    if (user.password !== password) {
-      signinError.textContent = 'Incorrect password. Please try again.';
-      signinError.classList.add('visible');
-      return;
-    }
-
-    // Login success
-    localStorage.setItem('homatt_logged_in', 'true');
     window.location.href = 'dashboard.html';
   });
 });

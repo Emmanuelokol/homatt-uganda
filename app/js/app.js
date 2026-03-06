@@ -318,39 +318,86 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = val;
   });
 
+  // ====== Supabase client ======
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
   // ====== Form Submit ======
 
-  form.addEventListener('submit', (e) => {
+  form.addEventListener('submit', async (e) => {
     e.preventDefault();
 
     if (!validateStep(3)) return;
 
-    // Collect all data
-    const formData = {
-      firstName: document.getElementById('firstName').value.trim(),
-      lastName: document.getElementById('lastName').value.trim(),
-      phone: '+256' + document.getElementById('phone').value.replace(/\s/g, ''),
-      dob: document.getElementById('dob').value,
-      sex: document.getElementById('sex').value,
-      password: document.getElementById('password').value,
-      location: document.getElementById('location').value,
-      city: document.getElementById('city').value.trim(),
-      hasFamily: document.getElementById('hasFamily').value === 'yes',
-      familySize: document.getElementById('hasFamily').value === 'yes'
-        ? parseInt(document.getElementById('familySize').value)
-        : 0,
-      healthGoals: Array.from(selectedGoals),
-      createdAt: new Date().toISOString(),
-    };
+    const firstName  = document.getElementById('firstName').value.trim();
+    const lastName   = document.getElementById('lastName').value.trim();
+    const phoneRaw   = document.getElementById('phone').value.replace(/\s/g, '');
+    const dob        = document.getElementById('dob').value;
+    const sex        = document.getElementById('sex').value;
+    const password   = document.getElementById('password').value;
+    const district   = document.getElementById('location').value;
+    const city       = document.getElementById('city').value.trim();
+    const hasFamily  = document.getElementById('hasFamily').value === 'yes';
+    const familySize = hasFamily ? parseInt(document.getElementById('familySize').value) : 0;
+    const healthGoals = Array.from(selectedGoals);
 
-    // Save user to localStorage
-    localStorage.setItem('homatt_user', JSON.stringify(formData));
-    localStorage.setItem('homatt_logged_in', 'true');
+    const phone = '+256' + phoneRaw;
+    // Use phone as the auth email (no real email required)
+    const email = '256' + phoneRaw + '@homatt.ug';
 
-    // Initialize empty family members if has family
-    if (formData.hasFamily) {
-      localStorage.setItem('homatt_family', JSON.stringify([]));
+    // Calculate age from dob
+    const dobDate = new Date(dob);
+    const age = Math.floor((Date.now() - dobDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+
+    // Disable button while submitting
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = 'Creating account…';
+
+    // 1. Create auth user
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { first_name: firstName, last_name: lastName } },
+    });
+
+    if (authError) {
+      btnSubmit.disabled = false;
+      btnSubmit.innerHTML = '<span>Create Account</span><span class="material-icons-outlined">arrow_forward</span>';
+      showError('goalsError', authError.message.includes('already registered')
+        ? 'This phone number is already registered. Please sign in.'
+        : 'Sign-up failed: ' + authError.message);
+      return;
     }
+
+    const userId = authData.user.id;
+
+    // 2. Insert profile record
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: userId,
+      phone_number: phone,
+      first_name: firstName,
+      last_name: lastName,
+      sex,
+      dob,
+      age,
+      city,
+      district,
+      has_family: hasFamily,
+      family_size: familySize,
+      health_goals: healthGoals,
+    });
+
+    if (profileError) {
+      // Profile insert failed — still proceed if auth succeeded (profile may already exist)
+      console.warn('Profile insert error:', profileError.message);
+    }
+
+    // 3. Cache user in localStorage for fast reads
+    const userCache = { firstName, lastName, phone, dob, sex, district, city, hasFamily, familySize, healthGoals };
+    localStorage.setItem('homatt_user', JSON.stringify(userCache));
+
+    btnSubmit.disabled = false;
+    btnSubmit.innerHTML = '<span>Create Account</span><span class="material-icons-outlined">arrow_forward</span>';
 
     // Show success modal
     successModal.classList.add('visible');
@@ -358,7 +405,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   modalClose.addEventListener('click', () => {
     successModal.classList.remove('visible');
-    // Navigate to dashboard
     window.location.href = 'dashboard.html';
   });
 });

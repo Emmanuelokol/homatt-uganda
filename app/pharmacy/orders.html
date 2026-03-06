@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Pharmacy — Order Queue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/pharmacy.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Order Queue</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="pharmacyUserAvatar">P</div>
+          <span id="pharmacyUserNameTop">Pharmacist</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Realtime indicator -->
+      <div id="realtimeBadge" style="display:none;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:6px 14px;font-size:12px;color:#2E7D32;margin-bottom:12px;align-items:center;gap:6px">
+        <span class="material-icons-outlined" style="font-size:14px">wifi</span>
+        Live updates active — new orders appear automatically
+      </div>
+
+      <!-- Status filter tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+        <button class="btn-admin primary" id="tab-all" onclick="setTab('all')">All Orders</button>
+        <button class="btn-admin secondary" id="tab-incoming" onclick="setTab('incoming')">
+          Incoming <span id="badge-incoming" style="background:#D32F2F;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span>
+        </button>
+        <button class="btn-admin secondary" id="tab-prescription" onclick="setTab('prescription')">
+          Prescriptions <span id="badge-rx" style="background:#0D47A1;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:4px">0</span>
+        </button>
+        <button class="btn-admin secondary" id="tab-confirmed" onclick="setTab('confirmed')">Confirmed</button>
+        <button class="btn-admin secondary" id="tab-preparing" onclick="setTab('preparing')">Preparing</button>
+        <button class="btn-admin secondary" id="tab-ready" onclick="setTab('ready')">Ready</button>
+        <button class="btn-admin secondary" id="tab-in_transit" onclick="setTab('in_transit')">In Transit</button>
+        <button class="btn-admin secondary" id="tab-delivered" onclick="setTab('delivered')">Delivered</button>
+        <button class="btn-admin secondary" id="tab-rejected" onclick="setTab('rejected')">Rejected</button>
+      </div>
+
+      <!-- Order cards -->
+      <div id="ordersList"></div>
+      <div id="ordersEmpty" style="display:none;text-align:center;padding:60px;color:#9AA0A6">
+        <span class="material-icons-outlined" style="font-size:48px;display:block;margin-bottom:12px">inbox</span>
+        No orders in this category
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="admin-modal-overlay" id="orderModal" style="display:none">
+  <div class="admin-modal" style="max-width:540px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="orderModalTitle">Order Details</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body" id="orderModalBody"></div>
+    <div class="admin-modal-footer" id="orderModalFooter">
+      <button class="btn-admin secondary" onclick="closeModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/pharmacy.js"></script>
+<script>
+let allOrders = [];
+let allPrescriptions = [];
+let currentTab = 'all';
+let activeOrderId = null;
+let otcSafetyRules = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildPharmacySidebar('orders');
+  const session = requirePharmacy();
+  if (!session) return;
+  setupPharmacyLogout();
+
+  const supa = initPharmacySupabase();
+  window._pharmSupa = supa;
+
+  if (supa && session.pharmacyId) {
+    // Load OTC safety rules once
+    const { data: rules } = await supa.from('otc_safety_rules').select('*').eq('active', true);
+    otcSafetyRules = rules || [];
+
+    await loadLive(supa, session.pharmacyId);
+    setupRealtime(supa, session.pharmacyId);
+  } else {
+    allOrders = [...MOCK_ORDERS];
+    render();
+  }
+});
+
+function setupRealtime(supa, pharmacyId) {
+  const badge = document.getElementById('realtimeBadge');
+  if (badge) badge.style.display = 'flex';
+
+  supa.channel('pharmacy-orders-' + pharmacyId)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'pharmacy_orders',
+      filter: `pharmacy_id=eq.${pharmacyId}`
+    }, payload => {
+      allOrders.unshift(payload.new);
+      render();
+      showToast('New order received!', 'success');
+      // Flash the incoming badge
+      const b = document.getElementById('badge-incoming');
+      if (b) { b.style.animation = 'none'; b.offsetHeight; b.style.animation = 'pulse 0.6s ease 3'; }
+    })
+    .on('postgres_changes', {
+      event: 'UPDATE',
+      schema: 'public',
+      table: 'pharmacy_orders',
+      filter: `pharmacy_id=eq.${pharmacyId}`
+    }, payload => {
+      const idx = allOrders.findIndex(o => o.id === payload.new.id);
+      if (idx !== -1) allOrders[idx] = payload.new;
+      render();
+    })
+    .subscribe();
+}
+
+async function loadLive(supa, pharmacyId) {
+  const { data } = await supa.from('pharmacy_orders').select('*')
+    .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
+  allOrders = data || [];
+
+  // Load e-prescriptions routed to this pharmacy
+  const { data: rxData } = await supa.from('e_prescriptions')
+    .select('*,clinic_diagnoses(confirmed_diagnosis,icd10_code,ai_match)')
+    .eq('routed_to_pharmacy_id', pharmacyId)
+    .eq('status', 'active')
+    .order('created_at', { ascending: false });
+  allPrescriptions = rxData || [];
+
+  render();
+}
+
+function setTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('[id^="tab-"]').forEach(b => {
+    b.className = b.id === 'tab-' + tab ? 'btn-admin primary' : 'btn-admin secondary';
+  });
+  render();
+}
+
+// Check OTC safety flags for an order
+function checkOTCSafety(order) {
+  const flags = [];
+  const items = order.items || [];
+  items.forEach(item => {
+    const itemName = (item.name || '').toLowerCase();
+    otcSafetyRules.forEach(rule => {
+      if (itemName.includes(rule.drug_name.toLowerCase())) {
+        flags.push({
+          drug: rule.drug_name,
+          warning: rule.warning_message,
+          block: rule.block_dispensing,
+        });
+      }
+    });
+  });
+  return flags;
+}
+
+function renderPrescriptions() {
+  if (!allPrescriptions.length) {
+    document.getElementById('ordersList').innerHTML = '';
+    document.getElementById('ordersEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('ordersEmpty').style.display = 'none';
+  document.getElementById('ordersList').innerHTML = allPrescriptions.map(rx => {
+    const diag = rx.clinic_diagnoses;
+    const drugs = (rx.items || []).map(i => `${i.drug_name}${i.strength?' '+i.strength:''} ×${i.duration}d`).join(', ');
+    return `
+    <div class="order-card" style="cursor:pointer;border-left:4px solid #0D47A1" onclick="openRxModal('${rx.id}')">
+      <div class="order-card-header">
+        <span class="order-ref" style="color:#0D47A1">
+          <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span>
+          E-Prescription
+        </span>
+        <span class="status-badge confirmed">${rx.status||'active'}</span>
+        ${diag?.icd10_code ? `<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${diag.icd10_code}</span>` : ''}
+      </div>
+      <div class="order-meds">${drugs || '—'}</div>
+      <div class="order-meta">
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">local_hospital</span> ${diag?.confirmed_diagnosis || '—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(rx.created_at)}</span>
+        ${diag?.ai_match === true ? '<span style="color:#2E7D32;font-size:12px">✓ AI confirmed</span>' : ''}
+      </div>
+      <div class="order-actions" onclick="event.stopPropagation()">
+        <button class="btn-admin primary sm" onclick="openRxModal('${rx.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View & Dispense
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function render() {
+  if (currentTab === 'prescription') { renderPrescriptions(); return; }
+
+  const filtered = currentTab === 'all' ? allOrders : allOrders.filter(o => o.status === currentTab);
+  const incoming = allOrders.filter(o => o.status === 'incoming');
+  const rxOrders = allOrders.filter(o => o.order_type === 'prescription');
+  document.getElementById('badge-incoming').textContent = incoming.length;
+  document.getElementById('badge-incoming').style.display = incoming.length ? 'inline' : 'none';
+  const rxBadge = document.getElementById('badge-rx');
+  if (rxBadge) { rxBadge.textContent = allPrescriptions.length; rxBadge.style.display = allPrescriptions.length ? 'inline' : 'none'; }
+
+  if (!filtered.length) {
+    document.getElementById('ordersList').innerHTML = '';
+    document.getElementById('ordersEmpty').style.display = 'block';
+    return;
+  }
+  document.getElementById('ordersEmpty').style.display = 'none';
+
+  document.getElementById('ordersList').innerHTML = filtered.map(o => {
+    const elapsed = Math.floor((Date.now() - new Date(o.created_at)) / 60000);
+    const remaining = Math.max(0, 5 - elapsed);
+    const actions = getActions(o);
+    const safetyFlags = o.status === 'incoming' ? checkOTCSafety(o) : [];
+    const hasBlock = safetyFlags.some(f => f.block);
+    const isRx = o.order_type === 'prescription';
+    return `
+    <div class="order-card ${o.urgency === 'urgent' ? 'urgent' : ''}" style="cursor:pointer" onclick="openModal('${o.id}')">
+      <div class="order-card-header">
+        <span class="order-ref">#${(o.id||'').toUpperCase().slice(-6)}</span>
+        ${isRx ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">Rx</span>' : ''}
+        <span class="status-badge ${o.status}">${(o.status||'').replace('_',' ')}</span>
+        ${o.urgency ? `<span class="order-urgency ${o.urgency}">${o.urgency}</span>` : ''}
+        ${o.status === 'incoming' ? `<span class="timer-badge">
+          <span class="material-icons-outlined" style="font-size:13px">timer</span>
+          ${remaining > 0 ? remaining + 'm left' : 'Overdue'}
+        </span>` : ''}
+        ${hasBlock ? '<span style="background:#FFEBEE;color:#C62828;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">⚠ Safety Flag</span>' : ''}
+        ${o.discount_applied ? '<span style="background:#FFF8E1;color:#E65100;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px">−15%</span>' : ''}
+      </div>
+      <div class="order-meds">${o.items ? o.items.map(i => `${i.name} ×${i.qty}`).join(', ') : '—'}</div>
+      ${safetyFlags.length ? `<div style="background:#FFF3E0;border-radius:6px;padding:6px 10px;margin:4px 0;font-size:11px;color:#E65100">
+        ⚠ ${safetyFlags.map(f => f.warning).join(' | ')}
+      </div>` : ''}
+      <div class="order-meta">
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ${o.patient_name||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(o.created_at)}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">payments</span> ${formatUGX(o.total_cost)}</span>
+      </div>
+      <div class="order-actions" onclick="event.stopPropagation()">${actions}</div>
+    </div>`;
+  }).join('');
+}
+
+function getActions(o) {
+  if (o.status === 'incoming') {
+    const safetyFlags = checkOTCSafety(o);
+    const hasBlock = safetyFlags.some(f => f.block);
+    const confirmBtn = hasBlock
+      ? `<button class="btn-admin secondary sm" disabled title="${safetyFlags.find(f=>f.block)?.warning}" style="opacity:.5;cursor:not-allowed">
+          <span class="material-icons-outlined" style="font-size:14px">block</span> Safety Block
+        </button>`
+      : `<button class="btn-admin success sm" onclick="confirmWithSafetyCheck('${o.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">check_circle</span> Confirm${safetyFlags.length ? ' ⚠' : ''}
+        </button>`;
+    return confirmBtn + `
+    <button class="btn-admin danger sm" onclick="rejectPrompt('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">cancel</span> Reject
+    </button>`;
+  }
+  if (o.status === 'confirmed') return `
+    <button class="btn-admin primary sm" onclick="updateStatus('${o.id}','preparing')">
+      <span class="material-icons-outlined" style="font-size:14px">medication</span> Start Preparing
+    </button>`;
+  if (o.status === 'preparing') return `
+    <button class="btn-admin success sm" onclick="updateStatus('${o.id}','ready')">
+      <span class="material-icons-outlined" style="font-size:14px">done_all</span> Mark Ready
+    </button>`;
+  if (o.status === 'ready') return `
+    <button class="btn-admin warning sm" onclick="updateStatus('${o.id}','in_transit')">
+      <span class="material-icons-outlined" style="font-size:14px">local_shipping</span> Dispatched
+    </button>`;
+  return '';
+}
+
+window.confirmWithSafetyCheck = async id => {
+  const o = allOrders.find(x => x.id === id);
+  if (!o) return;
+  const flags = checkOTCSafety(o);
+  if (flags.length) {
+    const warnings = flags.map(f => `• ${f.warning}`).join('\n');
+    const proceed = confirm(`Safety warnings for this order:\n\n${warnings}\n\nProceed with dispensing?`);
+    if (!proceed) return;
+  }
+  if (window._pharmSupa) {
+    await window._pharmSupa.from('pharmacy_orders').update({
+      status: 'confirmed',
+      otc_safety_checked: true,
+      otc_safety_flags: flags,
+      updated_at: new Date().toISOString()
+    }).eq('id', id);
+  }
+  if (o) o.status = 'confirmed';
+  render();
+  showToast('Order confirmed', 'success');
+};
+
+window.openRxModal = id => {
+  const rx = allPrescriptions.find(x => x.id === id);
+  if (!rx) return;
+  const diag = rx.clinic_diagnoses || {};
+  const items = rx.items || [];
+  document.getElementById('orderModalTitle').textContent = 'E-Prescription — Dispense';
+  document.getElementById('orderModalBody').innerHTML = `
+    <div style="background:#E3F2FD;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span> E-Prescription
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
+        <div><span style="color:#5F6368">Diagnosis:</span> <strong>${diag.confirmed_diagnosis||'—'}</strong></div>
+        <div><span style="color:#5F6368">ICD-10:</span> ${diag.icd10_code||'—'}</div>
+        <div><span style="color:#5F6368">AI Match:</span> ${diag.ai_match===true?'<span style="color:#2E7D32">✓ Confirmed</span>':diag.ai_match===false?'<span style="color:#C62828">✗ Different</span>':'Partial'}</div>
+        <div><span style="color:#5F6368">Issued:</span> ${fmtDateTime(rx.created_at)}</div>
+      </div>
+    </div>
+    <div style="background:#F8F9FA;border-radius:10px;padding:14px;margin-bottom:16px">
+      <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Prescribed Drugs</div>
+      ${items.map(i => {
+        const safetyFlag = otcSafetyRules.find(r => (i.drug_name||'').toLowerCase().includes(r.drug_name.toLowerCase()));
+        return `<div style="padding:8px 0;border-bottom:1px solid #E0E0E0">
+          <div style="font-weight:600;font-size:13px">${i.drug_name} ${i.strength||''}</div>
+          <div style="font-size:12px;color:#5F6368">${(i.route||'oral').toUpperCase()} · ${(i.frequency||'').replace(/_/g,' ')} · ${i.duration||5} days · Qty: ${i.qty||1}</div>
+          ${safetyFlag ? `<div style="font-size:11px;color:#E65100;margin-top:3px">⚠ ${safetyFlag.warning_message}</div>` : ''}
+        </div>`;
+      }).join('')}
+    </div>
+    <div style="font-size:12px;color:#5F6368">Dispensing this prescription will mark it as dispensed and update the e-prescription record.</div>`;
+
+  const footer = document.getElementById('orderModalFooter');
+  footer.innerHTML = `
+    <button class="btn-admin secondary" onclick="closeModal()">Close</button>
+    <button class="btn-admin success" onclick="dispenseRx('${id}')">
+      <span class="material-icons-outlined" style="font-size:14px">medication</span> Mark Dispensed
+    </button>`;
+  document.getElementById('orderModal').style.display = 'flex';
+};
+
+window.dispenseRx = async id => {
+  if (window._pharmSupa) {
+    await window._pharmSupa.from('e_prescriptions').update({
+      status: 'dispensed',
+      dispensed_at: new Date().toISOString(),
+    }).eq('id', id);
+  }
+  const idx = allPrescriptions.findIndex(x => x.id === id);
+  if (idx !== -1) allPrescriptions.splice(idx, 1);
+  closeModal();
+  render();
+  showToast('Prescription dispensed', 'success');
+};
+
+window.openModal = id => {
+  const o = allOrders.find(x => x.id === id);
+  if (!o) return;
+  activeOrderId = id;
+  document.getElementById('orderModalTitle').textContent = `Order #${(o.id||'').toUpperCase().slice(-6)}`;
+  document.getElementById('orderModalBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      ${[
+        ['Patient', o.patient_name||'—'], ['Phone', o.patient_phone||'—'],
+        ['Delivery Address', o.delivery_address||'—'], ['Status', `<span class="status-badge ${o.status}">${(o.status||'').replace('_',' ')}</span>`],
+        ['Urgency', o.urgency||'standard'], ['Payment', o.payment_method||'—'],
+        ['Medication Cost', formatUGX(o.medication_cost)], ['Delivery Cost', formatUGX(o.delivery_cost)],
+        ['Total', formatUGX(o.total_cost)], ['Ordered', fmtDateTime(o.created_at)],
+      ].map(([k,v]) => `
+        <div>
+          <div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${k}</div>
+          <div style="font-size:13px;font-weight:500;margin-top:3px">${v}</div>
+        </div>`).join('')}
+    </div>
+    ${o.items ? `
+      <div style="background:#F8F9FA;border-radius:8px;padding:14px">
+        <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Medications</div>
+        ${o.items.map(i => `
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E0E0E0;font-size:13px">
+            <span>${i.name}</span>
+            <span style="font-weight:600">×${i.qty}</span>
+          </div>`).join('')}
+      </div>` : ''}
+    ${o.rejection_reason ? `<div style="margin-top:12px;background:#FFEBEE;border-radius:8px;padding:10px 14px;font-size:13px;color:#C62828"><strong>Rejection reason:</strong> ${o.rejection_reason}</div>` : ''}`;
+
+  const footer = document.getElementById('orderModalFooter');
+  footer.innerHTML = `<button class="btn-admin secondary" onclick="closeModal()">Close</button>
+    ${getActions(o).replace(/onclick="([^"]+)"/g, 'onclick="$1;closeModal()"')}`;
+  document.getElementById('orderModal').style.display = 'flex';
+};
+
+window.closeModal = () => { document.getElementById('orderModal').style.display = 'none'; activeOrderId = null; };
+
+window.updateStatus = async (id, status) => {
+  if (window._pharmSupa) {
+    const { error } = await window._pharmSupa.from('pharmacy_orders')
+      .update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+  }
+  const o = allOrders.find(x => x.id === id);
+  if (o) o.status = status;
+  render();
+  showToast(`Order marked as ${status.replace('_',' ')}`, 'success');
+};
+
+window.rejectPrompt = async id => {
+  const reason = prompt('Rejection reason (optional):') || '';
+  if (window._pharmSupa) {
+    const { error } = await window._pharmSupa.from('pharmacy_orders')
+      .update({ status:'rejected', rejection_reason: reason, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+  }
+  const o = allOrders.find(x => x.id === id);
+  if (o) { o.status = 'rejected'; o.rejection_reason = reason; }
+  render();
+  showToast('Order rejected', 'warning');
+};
+</script>
+</body>
+</html>

@@ -9,8 +9,10 @@
   <title>Homatt Health - Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
 </head>
 <body>
   <div class="phone-frame">
@@ -119,33 +121,54 @@
           </button>
         </div>
 
+        <!-- Health Services -->
+        <div class="dash-section">
+          <h3 class="section-title">Health Services</h3>
+          <div class="feature-grid" style="grid-template-columns:1fr 1fr">
+            <div class="feature-card" onclick="window.location.href='clinic-booking.html'" style="cursor:pointer;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
+              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
+                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_hospital</span>
+              </div>
+              <span style="font-size:13px;font-weight:700;color:#fff">Book Clinic</span>
+              <span style="font-size:11px;opacity:.8;color:#fff">Visit a nearby clinic</span>
+            </div>
+            <div class="feature-card" onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
+              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
+                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_pharmacy</span>
+              </div>
+              <span style="font-size:13px;font-weight:700;color:#fff">Order Medicines</span>
+              <span style="font-size:11px;opacity:.8;color:#fff">Home delivery</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Feature Grid Section -->
         <div class="dash-section">
           <h3 class="section-title">Health Trackers</h3>
           <div class="feature-grid">
-            <div class="feature-card" id="featureMenstrual">
-              <div class="feature-icon-wrap menstrual">
+            <div class="feature-card" id="featureCycle">
+              <div class="feature-icon-wrap cycle-tracker">
                 <span class="material-icons-outlined">calendar_month</span>
               </div>
               <span class="feature-label">Cycle Tracker</span>
             </div>
-            <div class="feature-card" id="featurePregnancy">
-              <div class="feature-icon-wrap pregnancy">
-                <span class="material-icons-outlined">pregnant_woman</span>
+            <div class="feature-card" id="featureMoodSleep">
+              <div class="feature-icon-wrap mood-tracker">
+                <span class="material-icons-outlined">bedtime</span>
               </div>
-              <span class="feature-label">Pregnancy</span>
+              <span class="feature-label">Mood & Sleep</span>
             </div>
-            <div class="feature-card" id="featureChildGrowth">
-              <div class="feature-icon-wrap child">
-                <span class="material-icons-outlined">child_care</span>
+            <div class="feature-card" id="featurePain">
+              <div class="feature-icon-wrap pain-tracker">
+                <span class="material-icons-outlined">healing</span>
               </div>
-              <span class="feature-label">Child Growth</span>
+              <span class="feature-label">Pain Tracker</span>
             </div>
-            <div class="feature-card" id="featureBP">
-              <div class="feature-icon-wrap bp">
-                <span class="material-icons-outlined">monitor_heart</span>
+            <div class="feature-card" id="featureDigestive">
+              <div class="feature-icon-wrap digestive-tracker">
+                <span class="material-icons-outlined">restaurant</span>
               </div>
-              <span class="feature-label">Blood Pressure</span>
+              <span class="feature-label">Digestive</span>
             </div>
           </div>
         </div>
@@ -211,42 +234,6 @@
           </div>
         </div>
 
-        <!-- Wallet Preview -->
-        <div class="dash-section">
-          <div class="section-header">
-            <h3 class="section-title">My Wallets</h3>
-            <button class="section-link">Manage</button>
-          </div>
-          <div class="wallet-cards">
-            <div class="wallet-card family-wallet">
-              <div class="wallet-header">
-                <span class="material-icons-outlined">account_balance_wallet</span>
-                <span class="wallet-name">Family Wallet</span>
-              </div>
-              <p class="wallet-balance">UGX <span id="familyBalance">0</span></p>
-              <div class="wallet-actions">
-                <button class="wallet-btn">
-                  <span class="material-icons-outlined" style="font-size:16px">add</span>
-                  Deposit
-                </button>
-              </div>
-            </div>
-            <div class="wallet-card care-wallet">
-              <div class="wallet-header">
-                <span class="material-icons-outlined">health_and_safety</span>
-                <span class="wallet-name">Care Wallet</span>
-              </div>
-              <p class="wallet-balance">UGX <span id="careBalance">0</span></p>
-              <div class="wallet-actions">
-                <button class="wallet-btn">
-                  <span class="material-icons-outlined" style="font-size:16px">add</span>
-                  Deposit
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Bottom spacer for scroll -->
         <div style="height: 16px;"></div>
       </div>
@@ -258,21 +245,24 @@
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
       </div>
-      <div class="nav-item" id="navFamily">
+      <div class="nav-item" id="navFamily" onclick="window.location.href='family.html'" style="cursor:pointer">
         <span class="material-icons-outlined">family_restroom</span>
         <span class="nav-label">Family</span>
       </div>
-      <div class="nav-item" id="navWallet">
-        <span class="material-icons-outlined">account_balance_wallet</span>
-        <span class="nav-label">Wallet</span>
+      <div class="nav-item" id="navShop" onclick="window.location.href='family.html#shop'" style="cursor:pointer">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
       </div>
-      <div class="nav-item" id="navProfile">
+      <div class="nav-item" id="navProfile" onclick="window.location.href='profile.html'" style="cursor:pointer">
         <span class="material-icons-outlined">person</span>
         <span class="nav-label">Profile</span>
       </div>
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
   <script src="js/dashboard.js"></script>
+  <script src="js/native-bridge.js"></script>
 </body>
 </html>

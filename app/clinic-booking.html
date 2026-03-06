@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Book Clinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    .cb-step { display:none; }
+    .cb-step.active { display:flex; flex-direction:column; height:100%; }
+    .cb-hero { text-align:center; padding:28px 24px 16px; }
+    .cb-hero-icon { width:72px; height:72px; border-radius:24px; background:linear-gradient(135deg,#1B5E20,#4CAF50); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+    .cb-hero-icon .material-icons-outlined { font-size:36px; color:#fff; }
+    .cb-heading { font-size:22px; font-weight:700; color:var(--text-primary); margin-bottom:6px; }
+    .cb-subheading { font-size:14px; color:var(--text-secondary); line-height:1.5; }
+    .cb-section { padding:16px 20px; }
+    .cb-label { font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px; }
+    .cb-field { margin-bottom:14px; }
+    .cb-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:6px; }
+    .cb-field input, .cb-field select, .cb-field textarea {
+      width:100%; padding:12px 16px; border:1.5px solid var(--border); border-radius:var(--radius-md);
+      font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s;
+    }
+    .cb-field input:focus, .cb-field select:focus, .cb-field textarea:focus { border-color:var(--primary); }
+    .cb-field textarea { resize:vertical; min-height:80px; }
+    .clinic-card {
+      background:#fff; border-radius:var(--radius-md); padding:14px 16px;
+      margin-bottom:10px; border:2px solid var(--border); cursor:pointer; transition:all .2s;
+      display:flex; align-items:center; gap:14px;
+    }
+    .clinic-card:active, .clinic-card.selected { border-color:var(--primary); background:var(--primary-surface); }
+    .clinic-card-icon { width:44px; height:44px; border-radius:12px; background:var(--primary-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .clinic-card-name { font-size:14px; font-weight:600; color:var(--text-primary); }
+    .clinic-card-meta { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .urgency-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .urgency-option { padding:14px 12px; border:2px solid var(--border); border-radius:var(--radius-md); text-align:center; cursor:pointer; transition:all .2s; }
+    .urgency-option.selected { border-color:var(--primary); background:var(--primary-surface); }
+    .urgency-option .material-icons-outlined { font-size:28px; display:block; margin-bottom:6px; }
+    .urgency-option .urg-label { font-size:13px; font-weight:600; }
+    .urgency-option .urg-desc { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+    .cb-btn {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      width:100%; padding:14px; border-radius:var(--radius-md); font-size:15px;
+      font-weight:600; border:none; cursor:pointer; transition:all .2s;
+    }
+    .cb-btn.primary { background:var(--primary); color:#fff; }
+    .cb-btn.primary:active { background:var(--primary-dark); }
+    .cb-btn.secondary { background:#F3F4F6; color:var(--text-primary); }
+    .cb-bottom { padding:16px 20px 28px; position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); }
+    .cb-prog { display:flex; gap:6px; padding:0 20px 12px; }
+    .cb-prog-dot { flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .3s; }
+    .cb-prog-dot.active { background:var(--primary); }
+    .booking-confirm-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #F0F0F0; font-size:13px; }
+    .booking-confirm-row:last-child { border-bottom:none; }
+    .booking-confirm-label { color:var(--text-secondary); font-weight:500; }
+    .booking-confirm-value { font-weight:600; color:var(--text-primary); text-align:right; max-width:55%; }
+    .success-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; text-align:center; height:100%; }
+    .success-icon-wrap { width:90px; height:90px; border-radius:50%; background:#E8F5E9; display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+    .booking-code-box { background:var(--primary-surface); border:1.5px dashed var(--primary); border-radius:var(--radius-md); padding:16px 24px; margin:20px 0; width:100%; }
+    .booking-code-text { font-size:28px; font-weight:800; color:var(--primary); letter-spacing:4px; }
+  </style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+      <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+      <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+    </div>
+  </div>
+
+  <div class="app-screen">
+    <!-- Top bar -->
+    <div class="sc-topbar" style="background:var(--primary);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+      <button onclick="history.back()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <span class="material-icons-outlined">arrow_back</span>
+      </button>
+      <div>
+        <div style="font-size:16px;font-weight:700">Book Clinic Visit</div>
+        <div style="font-size:11px;opacity:.8" id="stepLabel">Step 1 of 4 — Select Urgency</div>
+      </div>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="cb-prog">
+      <div class="cb-prog-dot active" id="prog1"></div>
+      <div class="cb-prog-dot" id="prog2"></div>
+      <div class="cb-prog-dot" id="prog3"></div>
+      <div class="cb-prog-dot" id="prog4"></div>
+    </div>
+
+    <!-- STEP 1: Urgency -->
+    <div class="cb-step active" id="step1">
+      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">local_hospital</span></div>
+          <div class="cb-heading">How urgent is this?</div>
+          <div class="cb-subheading">This helps us prioritise your visit and match you to the right clinic.</div>
+        </div>
+        <div class="cb-section">
+          <div class="urgency-row">
+            <div class="urgency-option" id="urg-emergency" onclick="selectUrgency('emergency')">
+              <span class="material-icons-outlined" style="color:#D32F2F">emergency</span>
+              <div class="urg-label">Emergency</div>
+              <div class="urg-desc">Severe / life-threatening</div>
+            </div>
+            <div class="urgency-option" id="urg-high" onclick="selectUrgency('high')">
+              <span class="material-icons-outlined" style="color:#E65100">priority_high</span>
+              <div class="urg-label">Urgent</div>
+              <div class="urg-desc">Needs attention today</div>
+            </div>
+            <div class="urgency-option" id="urg-normal" onclick="selectUrgency('normal')">
+              <span class="material-icons-outlined" style="color:#1565C0">schedule</span>
+              <div class="urg-label">Standard</div>
+              <div class="urg-desc">Can wait a few hours</div>
+            </div>
+            <div class="urgency-option" id="urg-low" onclick="selectUrgency('low')">
+              <span class="material-icons-outlined" style="color:#2E7D32">event_note</span>
+              <div class="urg-label">Routine</div>
+              <div class="urg-desc">Scheduled check-up</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom">
+        <button class="cb-btn primary" id="step1Btn" disabled onclick="goStep(2)">
+          Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Symptoms -->
+    <div class="cb-step" id="step2">
+      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">stethoscope</span></div>
+          <div class="cb-heading">Describe your symptoms</div>
+          <div class="cb-subheading">Be as detailed as possible — this helps the doctor prepare.</div>
+        </div>
+        <div class="cb-section">
+          <div class="cb-field">
+            <label>Who is the patient? <span style="color:#D32F2F">*</span></label>
+            <select id="patientSelect">
+              <option value="">Loading…</option>
+            </select>
+          </div>
+          <div class="cb-field">
+            <label>Describe symptoms <span style="color:#D32F2F">*</span></label>
+            <textarea id="symptomsText" placeholder="e.g. Headache and fever for 2 days, cough, slight difficulty breathing…"></textarea>
+          </div>
+          <div class="cb-field">
+            <label>How long have you had these symptoms?</label>
+            <select id="symptomDuration">
+              <option value="">Select duration</option>
+              <option value="today">Started today</option>
+              <option value="1-2days">1–2 days</option>
+              <option value="3-7days">3–7 days</option>
+              <option value="1-2weeks">1–2 weeks</option>
+              <option value="chronic">Longer / ongoing</option>
+            </select>
+          </div>
+          <div class="cb-field">
+            <label>Any additional notes for the doctor</label>
+            <textarea id="notesText" placeholder="e.g. Allergic to penicillin, currently on Metformin…" style="min-height:60px"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(1)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" onclick="goStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Select Clinic -->
+    <div class="cb-step" id="step3">
+      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+        <div class="cb-section" style="padding-top:20px">
+          <div class="cb-label">Nearby Clinics</div>
+          <div id="clinicsList">
+            <div style="text-align:center;padding:40px 0;color:var(--text-secondary)">
+              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">location_searching</span>
+              Loading clinics…
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(2)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" id="step3Btn" disabled onclick="goStep(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Confirm -->
+    <div class="cb-step" id="step4">
+      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">receipt_long</span></div>
+          <div class="cb-heading">Confirm Booking</div>
+          <div class="cb-subheading">Review your details before submitting</div>
+        </div>
+        <div class="cb-section">
+          <div id="confirmDetails"></div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(3)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" id="submitBtn" onclick="submitBooking()">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Confirm Booking
+        </button>
+      </div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="cb-step" id="stepSuccess">
+      <div class="success-container">
+        <div class="success-icon-wrap">
+          <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32">check_circle</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:8px">Booking Confirmed!</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-bottom:4px">Booking reference:</div>
+        <div class="booking-code-box">
+          <div class="booking-code-text" id="bookingCodeDisplay">HM-XXXX</div>
+        </div>
+
+        <!-- PIN Token -->
+        <div id="pinBox" style="width:100%;background:#E3F2FD;border:2px dashed #1565C0;border-radius:var(--radius-md);padding:16px 20px;margin:12px 0;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#0D47A1;margin-bottom:6px">Check-In PIN Token</div>
+          <div id="pinDisplay" style="font-size:26px;font-weight:800;letter-spacing:4px;color:#1565C0">AFH-CHK-000000</div>
+          <div style="font-size:11px;color:#1565C0;margin-top:4px;opacity:.8">Valid 2 hours · Show at clinic reception</div>
+        </div>
+
+        <!-- Discount badge -->
+        <div id="discountBadge" style="display:none;width:100%;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px 16px;margin-bottom:12px;align-items:center;gap:10px">
+          <span class="material-icons-outlined" style="color:#2E7D32;font-size:18px">discount</span>
+          <div style="text-align:left">
+            <div style="font-size:13px;font-weight:600;color:#1B5E20">15% Probable Condition Discount Applied</div>
+            <div style="font-size:11px;color:#2E7D32">Discount applies if clinician confirms AI diagnosis</div>
+          </div>
+        </div>
+
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px">
+          The clinic has been notified. Show your PIN or booking code at reception.
+        </div>
+        <button class="cb-btn primary" style="width:100%;margin-bottom:10px" onclick="window.location.href='dashboard.html'">
+          <span class="material-icons-outlined" style="font-size:18px">home</span> Back to Dashboard
+        </button>
+        <button class="cb-btn secondary" style="width:100%" onclick="window.location.href='clinic-booking.html'">
+          Book Another Visit
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .clinic-score-bar { height:6px; border-radius:3px; background:#E0E0E0; margin-top:6px; overflow:hidden; }
+  .clinic-score-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#4CAF50,#1B5E20); transition:width .6s ease; }
+  .clinic-best-badge { background:#1B5E20; color:#fff; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; letter-spacing:.5px; }
+  .clinic-fee-chip { font-size:11px; color:#1B5E20; background:#E8F5E9; border-radius:6px; padding:2px 8px; font-weight:600; }
+  .discount-preview { background:#FFF8E1; border:1px solid #FFD54F; border-radius:8px; padding:10px 14px; font-size:12px; color:#E65100; display:flex; align-items:center; gap:8px; margin-top:10px; }
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+</style>
+<script>
+const cfg = window.HOMATT_CONFIG || {};
+const supa = (cfg.SUPABASE_URL && window.supabase)
+  ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+let booking = {
+  urgency: null, patient: null, patientName: null,
+  symptoms: null, duration: null, notes: null,
+  clinicId: null, clinicName: null, clinicScore: 0, clinicFee: null
+};
+let currentStep = 1;
+const STEPS = ['Select Urgency', 'Describe Symptoms', 'Choose Clinic', 'Confirm Booking'];
+
+// Status time
+document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+// Generate AFH-CHK-XXXXXX pin token
+function generatePIN() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pin = '';
+  for (let i = 0; i < 6; i++) pin += chars[Math.floor(Math.random() * chars.length)];
+  return 'AFH-CHK-' + pin;
+}
+
+// Weighted clinic scoring: Quality 40% + Distance 20% + Price 20% + Availability 10% + Condition 10%
+function scoreClinic(c, userDistrict, aiCondition) {
+  const qualPct  = (c.quality_score || c.avg_rating * 20 || 75) / 100;
+  const distPct  = (c.district||'').toLowerCase() === (userDistrict||'').toLowerCase() ? 1.0 : 0.65;
+  const fee      = c.consultation_fee || 25000;
+  const feePct   = Math.max(0.2, 1 - Math.max(0, fee - 10000) / 60000);
+  const availPct = c.avg_wait_minutes ? Math.max(0.2, 1 - c.avg_wait_minutes / 120) : 0.85;
+  let condPct    = (c.cure_rate || 78) / 100;
+  if (aiCondition && c.condition_performance) {
+    const key = aiCondition.toLowerCase().replace(/\s+/g,'_');
+    if (c.condition_performance[key]) condPct = c.condition_performance[key] / 100;
+  }
+  return Math.min(99, Math.round(qualPct*40 + distPct*20 + feePct*20 + availPct*10 + condPct*10));
+}
+
+function fmtUGX(n) {
+  if (!n) return '—';
+  return 'UGX ' + parseInt(n).toLocaleString();
+}
+
+function goStep(n) {
+  if (n === 2 && !booking.urgency) { alert('Please select urgency level'); return; }
+  if (n === 3) {
+    booking.symptoms = document.getElementById('symptomsText').value.trim();
+    booking.duration = document.getElementById('symptomDuration').value;
+    booking.notes = document.getElementById('notesText').value.trim();
+    if (!booking.symptoms) { alert('Please describe your symptoms'); return; }
+    const ps = document.getElementById('patientSelect');
+    booking.patient = ps.value;
+    booking.patientName = ps.options[ps.selectedIndex]?.text || 'Me';
+    loadClinics();
+  }
+  if (n === 4) {
+    if (!booking.clinicId) { alert('Please select a clinic'); return; }
+    renderConfirm();
+  }
+  document.querySelectorAll('.cb-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 4; i++) {
+    const d = document.getElementById('prog' + i);
+    if (d) d.classList.toggle('active', i <= n);
+  }
+  document.getElementById('stepLabel').textContent = `Step ${n} of 4 — ${STEPS[n-1]}`;
+  currentStep = n;
+}
+
+function selectUrgency(level) {
+  booking.urgency = level;
+  document.querySelectorAll('.urgency-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('urg-' + level)?.classList.add('selected');
+  document.getElementById('step1Btn').disabled = false;
+}
+
+// Load patients (self + family)
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const select = document.getElementById('patientSelect');
+  select.innerHTML = `<option value="self">Me (${session.first_name || session.name || 'You'})</option>`;
+  if (supa && session.userId) {
+    const { data: family } = await supa.from('family_members').select('id,name').eq('user_id', session.userId);
+    if (family?.length) {
+      family.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name + ' (family)';
+        select.appendChild(opt);
+      });
+    }
+  }
+});
+
+async function loadClinics() {
+  const list = document.getElementById('clinicsList');
+  list.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text-secondary)"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">manage_search</span>Finding best clinics for you…</div>';
+
+  const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  const userDist  = session.district || '';
+  const aiCond    = triage.primary_condition || triage.topCondition || '';
+  const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
+
+  let clinics = [];
+  if (supa) {
+    const { data } = await supa.from('clinics')
+      .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified')
+      .eq('active', true).order('quality_score', { ascending: false });
+    clinics = data || [];
+  }
+
+  if (!clinics.length) {
+    clinics = [
+      { id:'c1', name:'Kampala Medical Centre',  address:'Plot 12, Kampala Road',       district:'Kampala', phone:'+256 41 234 567', quality_score:82, cure_rate:80, consultation_fee:20000 },
+      { id:'c2', name:'Ntinda Health Clinic',    address:'Ntinda Estate, Block B',       district:'Kampala', phone:'+256 41 345 678', quality_score:74, cure_rate:76, consultation_fee:15000 },
+      { id:'c3', name:'Mulago Community Clinic', address:'Mulago Hill, Kampala',         district:'Kampala', phone:'+256 41 456 789', quality_score:88, cure_rate:84, consultation_fee:10000 },
+      { id:'c4', name:'Nakawa Health Centre',    address:'Nakawa Industrial Area',       district:'Kampala', phone:'+256 41 567 890', quality_score:65, cure_rate:70, consultation_fee:12000 },
+    ];
+  }
+
+  // Score and rank; show top 4
+  const scored = clinics
+    .map(c => ({ ...c, score: scoreClinic(c, userDist, aiCond) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4);
+
+  list.innerHTML = scored.map((c, idx) => `
+    <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0})">
+      <div class="clinic-card-icon">
+        <span class="material-icons-outlined" style="color:var(--primary);font-size:24px">local_hospital</span>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="clinic-card-name">${c.name}</div>
+          ${idx===0 ? '<span class="clinic-best-badge">BEST MATCH</span>' : ''}
+        </div>
+        <div class="clinic-card-meta">
+          <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">location_on</span>
+          ${c.address ? c.address+', ' : ''}${c.district||'Kampala'}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+          ${c.consultation_fee ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>` : ''}
+          <span style="font-size:11px;color:var(--text-secondary)">Match: <strong>${c.score}%</strong></span>
+          ${c.avg_wait_minutes ? `<span style="font-size:11px;color:var(--text-secondary)">~${c.avg_wait_minutes}m wait</span>` : ''}
+        </div>
+        <div class="clinic-score-bar">
+          <div class="clinic-score-fill" style="width:${c.score}%"></div>
+        </div>
+      </div>
+      <span class="material-icons-outlined" style="color:var(--border);flex-shrink:0">chevron_right</span>
+    </div>`).join('');
+
+  // Show AI context hint if from triage
+  if (aiCond) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 10px;display:flex;gap:6px;align-items:center">
+      <span class="material-icons-outlined" style="font-size:14px;color:#1565C0">smart_toy</span>
+      Ranked for <strong>${aiCond}</strong>${aiConf ? ' ('+Math.round(aiConf*100||aiConf)+'% AI confidence)' : ''}
+    </div>` + list.innerHTML;
+  }
+}
+
+function selectClinic(id, name, score, fee) {
+  booking.clinicId   = id;
+  booking.clinicName = name;
+  booking.clinicScore = score || 0;
+  booking.clinicFee  = fee || null;
+  document.querySelectorAll('.clinic-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('clinic-' + id)?.classList.add('selected');
+  document.getElementById('step3Btn').disabled = false;
+}
+
+function renderConfirm() {
+  const triage   = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  const aiConf   = parseFloat(triage.confidence || triage.ai_confidence || '0');
+  const confPct  = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
+  const discount = confPct >= 75;
+
+  document.getElementById('confirmDetails').innerHTML = `
+    <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:16px;margin-bottom:12px">
+      ${[
+        ['Patient',  booking.patientName || 'Me'],
+        ['Urgency',  booking.urgency],
+        ['Symptoms', booking.symptoms],
+        ['Duration', booking.duration ? booking.duration.replace(/-/g,' ') : '—'],
+        ['Clinic',   booking.clinicName],
+        ['Match',    booking.clinicScore + '% match score'],
+        ['Est. Fee', booking.clinicFee ? fmtUGX(booking.clinicFee) + (discount ? ' <span style="color:#E65100;font-weight:700">−15%</span>' : '') : '—'],
+        ['Notes',    booking.notes || 'None'],
+      ].map(([k,v]) => `
+        <div class="booking-confirm-row">
+          <span class="booking-confirm-label">${k}</span>
+          <span class="booking-confirm-value">${v||'—'}</span>
+        </div>`).join('')}
+    </div>
+    ${discount ? `
+    <div class="discount-preview">
+      <span class="material-icons-outlined" style="font-size:18px;color:#E65100">discount</span>
+      <div><strong>15% Probable Condition Discount</strong><br>AI confidence ≥75% — discount applied if clinician confirms diagnosis</div>
+    </div>` : ''}
+    <div style="background:#E8F5E9;border-radius:var(--radius-md);padding:12px 16px;font-size:12px;color:#2E7D32;display:flex;align-items:center;gap:8px;margin-top:10px">
+      <span class="material-icons-outlined" style="font-size:16px">info</span>
+      The clinic will be notified. Show your PIN at reception.
+    </div>`;
+}
+
+async function submitBooking() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Booking…';
+
+  const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
+  const confPct   = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
+  const discount  = confPct >= 75;
+
+  const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
+  const pinToken      = generatePIN();
+  const pinExpiry     = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // +2 hours
+
+  if (supa) {
+    const isMockClinic = ['c1','c2','c3','c4'].includes(booking.clinicId);
+    const payload = {
+      patient_id:       session.userId || null,
+      patient_name:     session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : (session.name || 'Patient'),
+      patient_age:      session.age  || null,
+      patient_sex:      session.sex  || null,
+      clinic_id:        isMockClinic ? null : booking.clinicId,
+      symptoms:         booking.symptoms,
+      urgency_level:    booking.urgency,
+      status:           'pending',
+      booking_code:     bookingCode,
+      location_district: session.district || null,
+      location_city:    session.city || null,
+      notes:            booking.notes || null,
+      family_member_id: booking.patient !== 'self' ? booking.patient : null,
+      pin_token:        pinToken,
+      pin_expires_at:   pinExpiry,
+      discount_applied: discount,
+      discount_pct:     discount ? 15 : 0,
+      ai_confidence:    confPct || null,
+      ai_full_data:     Object.keys(triage).length ? triage : null,
+    };
+
+    const { data: inserted, error } = await supa.from('bookings').insert(payload).select('id').single();
+    if (error) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Confirm Booking';
+      alert('Booking failed: ' + error.message);
+      return;
+    }
+
+    // Save PIN to clinic_check_in_pins
+    if (inserted?.id) {
+      await supa.from('clinic_check_in_pins').insert({
+        pin_token:   pinToken,
+        booking_id:  inserted.id,
+        expires_at:  pinExpiry,
+        is_used:     false,
+      }).maybeSingle();
+    }
+  }
+
+  // Show success screen
+  document.getElementById('bookingCodeDisplay').textContent = bookingCode;
+  document.getElementById('pinDisplay').textContent = pinToken;
+  if (discount) {
+    const badge = document.getElementById('discountBadge');
+    badge.style.display = 'flex';
+  }
+  document.querySelectorAll('.cb-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('stepSuccess').classList.add('active');
+  document.querySelector('.cb-prog').style.display = 'none';
+}
+</script>
+</body>
+</html>

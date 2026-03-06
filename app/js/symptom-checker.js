@@ -4,23 +4,48 @@
  * API priority: Groq → OpenAI → Gemini → Offline engine
  */
 
-document.addEventListener('DOMContentLoaded', () => {
-  // Auth check
-  if (localStorage.getItem('homatt_logged_in') !== 'true') {
+document.addEventListener('DOMContentLoaded', async () => {
+  const cfg = window.HOMATT_CONFIG || {};
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  // Auth check via Supabase session
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
     window.location.href = 'signin.html';
     return;
   }
 
   // ====== API Config ======
-  // All AI calls go through the Supabase Edge Function proxy.
-  // NO API keys are stored in this app — the proxy holds them server-side.
-  // Set API_PROXY_URL in config.js to your deployed Supabase function URL.
-  const cfg = window.HOMATT_CONFIG || {};
   const PROXY_URL = cfg.API_PROXY_URL || '';
 
   // ====== State ======
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
-  const family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
+  // Load family from cache first, then try to refresh from Supabase in background
+  let family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
+  // Background sync of family members so next open has fresh data
+  if (session && session.user) {
+    supabase.from('family_members')
+      .select('id,name,relationship,dob,sex')
+      .eq('primary_user_id', session.user.id)
+      .then(({ data }) => {
+        if (data && data.length) {
+          const mapped = data.map(m => {
+            let age = '';
+            if (m.dob) {
+              const b = new Date(m.dob);
+              age = Math.floor((Date.now() - b) / (365.25 * 24 * 60 * 60 * 1000));
+            }
+            return { name: m.name, relation: m.relationship || 'family', sex: m.sex || 'unknown', age };
+          });
+          localStorage.setItem('homatt_family', JSON.stringify(mapped));
+          // If the patient list is still on screen, rebuild it with fresh data
+          if (document.getElementById('screenPatient').classList.contains('active')) {
+            family.splice(0, family.length, ...mapped);
+            buildPatientList();
+          }
+        }
+      }).catch(() => {}); // offline — stay with cached
+  }
   let selectedPatient = null;
   let enteredSymptoms = '';
   let selectedChips = new Set();
@@ -52,23 +77,29 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.app-screen').scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  backBtn.addEventListener('click', () => {
+  function handleBack() {
     if (currentScreen === 'screenPatient') {
       window.location.href = 'dashboard.html';
     } else if (currentScreen === 'screenSymptoms') {
-      if (!user.hasFamily || family.length === 0) {
-        window.location.href = 'dashboard.html';
-      } else {
-        showScreen('screenPatient');
-      }
+      showScreen('screenPatient');
     } else if (currentScreen === 'screenFollowup') {
       showScreen('screenSymptoms');
     } else if (currentScreen === 'screenResults') {
       showScreen('screenFollowup');
     } else if (currentScreen === 'screenMonitor') {
       showScreen('screenResults');
+    } else {
+      window.location.href = 'dashboard.html';
     }
-  });
+  }
+
+  backBtn.addEventListener('click', handleBack);
+
+  // Register with native-bridge so the Android hardware back button does the same
+  window.HomattBackHandler = function () {
+    handleBack();
+    return true; // tell native-bridge we handled it
+  };
 
   // Bottom nav
   document.getElementById('navHome').addEventListener('click', () => {
@@ -83,11 +114,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let userAge = '';
     if (user.dob) {
       const birth = new Date(user.dob);
-      const today = new Date();
-      userAge = Math.floor((today - birth) / (365.25 * 24 * 60 * 60 * 1000));
+      userAge = Math.floor((Date.now() - birth) / (365.25 * 24 * 60 * 60 * 1000));
     }
 
-    if (!user.hasFamily || family.length === 0) {
+    // Always show "Me" card first — even if the user has no family members
+    const selfCard = createPatientCard({
+      name: `${user.firstName || 'Me'} (You)`,
+      icon: 'person',
+      subtitle: `${user.sex === 'male' ? 'Male' : user.sex === 'female' ? 'Female' : 'User'}${userAge ? ', ' + userAge + ' yrs' : ''}`,
+      badge: 'You',
+    }, () => {
       selectedPatient = {
         name: user.firstName || 'User',
         age: userAge,
@@ -96,35 +132,25 @@ document.addEventListener('DOMContentLoaded', () => {
       };
       document.getElementById('patientName').textContent = 'Checking for: You';
       showScreen('screenSymptoms');
-      return;
-    }
-
-    const selfCard = createPatientCard({
-      name: `${user.firstName} (You)`,
-      icon: 'person',
-      subtitle: `${user.sex === 'male' ? 'Male' : 'Female'}${userAge ? ', ' + userAge + ' yrs' : ''}`,
-    }, () => {
-      selectedPatient = {
-        name: user.firstName,
-        age: userAge,
-        sex: user.sex,
-        relation: 'self',
-      };
-      document.getElementById('patientName').textContent = 'Checking for: You';
-      showScreen('screenSymptoms');
     });
     list.appendChild(selfCard);
 
+    // Add family / dependents from cache
     family.forEach((member) => {
+      const icon = member.relation === 'child' ? 'child_care'
+                 : member.relation === 'parent' ? 'elderly'
+                 : member.relation === 'spouse' ? 'favorite'
+                 : 'person';
       const card = createPatientCard({
         name: member.name,
-        icon: member.relation === 'child' ? 'child_care' : 'person',
-        subtitle: `${member.sex === 'male' ? 'Male' : 'Female'}, ${member.age} yrs - ${member.relation}`,
+        icon,
+        subtitle: `${member.sex === 'male' ? 'Male' : member.sex === 'female' ? 'Female' : ''}${member.age ? ', ' + member.age + ' yrs' : ''} · ${member.relation}`,
+        badge: member.relation,
       }, () => {
         selectedPatient = {
           name: member.name,
           age: member.age,
-          sex: member.sex,
+          sex: member.sex || 'unknown',
           relation: member.relation,
         };
         document.getElementById('patientName').textContent = `Checking for: ${member.name}`;
@@ -132,11 +158,22 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       list.appendChild(card);
     });
+
+    // If no family yet, show a hint
+    if (family.length === 0) {
+      const hint = document.createElement('p');
+      hint.style.cssText = 'text-align:center;font-size:12px;color:var(--text-secondary);margin-top:12px;padding:0 20px;line-height:1.5';
+      hint.textContent = 'Add family members in the Family Hub to check symptoms for them too.';
+      list.appendChild(hint);
+    }
   }
 
-  function createPatientCard({ name, icon, subtitle }, onClick) {
+  function createPatientCard({ name, icon, subtitle, badge }, onClick) {
     const card = document.createElement('button');
     card.className = 'sc-patient-card';
+    const badgeHtml = badge
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;background:rgba(27,94,32,0.12);color:var(--primary);text-transform:capitalize;margin-top:3px;display:inline-block">${badge}</span>`
+      : '';
     card.innerHTML = `
       <div class="sc-patient-avatar">
         <span class="material-icons-outlined">${icon}</span>
@@ -144,6 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="sc-patient-info">
         <p class="sc-patient-name">${name}</p>
         <p class="sc-patient-detail">${subtitle}</p>
+        ${badgeHtml}
       </div>
       <span class="material-icons-outlined sc-patient-arrow">chevron_right</span>
     `;
@@ -356,6 +394,14 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
       .map(([k, v]) => v)
       .join('; ');
 
+    // Fetch historical corrections for learning context
+    const corrections = await getHistoricalCorrections(enteredSymptoms);
+    const correctionContext = corrections.length
+      ? `\nHISTORICAL LEARNING DATA (cases where AI was corrected by a clinician in this region):\n` +
+        corrections.map(c => `- AI said "${c.top_diagnosis}" but clinician confirmed "${c.clinician_confirmed_diagnosis}" for symptoms: "${(c.symptoms_text||'').slice(0,80)}"`).join('\n') +
+        `\nUse this data to improve accuracy — if similar symptoms appear, adjust probability accordingly.\n`
+      : '';
+
     // Always try AI for diagnosis (even if follow-up questions used fallback)
     {
       const prompt = `You are a medical health assistant AI for a mobile health app in Uganda called "Homatt Health".
@@ -363,7 +409,7 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
 A patient described these symptoms: "${enteredSymptoms}"
 Follow-up answers: "${answersText}"
 Patient: ${selectedPatient.name}, ${selectedPatient.age ? selectedPatient.age + ' years old' : 'age unknown'}, ${selectedPatient.sex}, located in ${user.location || 'Uganda'}.
-
+${correctionContext}
 Based on this information, provide a health assessment. Consider common diseases in Uganda/East Africa (malaria, typhoid, UTIs, respiratory infections, etc.).
 
 IMPORTANT: This is NOT a final diagnosis - it is guidance only.
@@ -988,14 +1034,49 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       timerEl.style.display = 'flex';
       scheduleNextCheckIn(2);
     } else if (feeling === 'same') {
+      const condition = (monitoringSession.condition || '').toLowerCase();
+      const otcMap = {
+        malaria: { icon: 'warning', label: 'Get Tested First', color: '#E65100', items: ['Visit a clinic or pharmacy for a malaria Rapid Diagnostic Test (RDT)', 'Do not self-medicate with antimalarials without a positive test', 'Take paracetamol to reduce fever while waiting'] },
+        cold: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['Paracetamol 500mg for fever and headache (2 tablets every 6 hrs after food)', 'Antihistamine (e.g. cetirizine) for runny nose', 'Warm water with honey and lemon for sore throat', 'Saline nasal drops for blocked nose'] },
+        headache: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['Paracetamol 500mg or Ibuprofen 400mg with food', 'Drink 2 glasses of water — dehydration is a common cause', 'Rest in a quiet, dim room for 20 minutes'] },
+        gastro: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['ORS (Oral Rehydration Salts) — buy from any pharmacy, mix with clean water', 'Zinc tablets (for children with diarrhea)', 'Avoid spicy, fatty, or dairy foods until better', 'If diarrhea lasts >3 days or there is blood, go to a clinic'] },
+        stomach: { icon: 'medication', label: 'OTC Options', color: '#1565C0', items: ['ORS (Oral Rehydration Salts) to prevent dehydration', 'Oral metronidazole if prescribed before for similar issue', 'Visit clinic if no improvement in 48 hours'] },
+        uti: { icon: 'local_hospital', label: 'Clinic Recommended', color: '#C62828', items: ['UTIs require a prescription antibiotic — OTC drugs are not enough', 'Drink lots of water to help flush bacteria', 'Visit a clinic for a urine test and proper treatment today'] },
+        typhoid: { icon: 'local_hospital', label: 'Clinic Recommended', color: '#C62828', items: ['Typhoid requires prescription antibiotics from a doctor', 'Do not self-medicate', 'Visit a health facility for a Widal test or blood culture'] },
+        default: { icon: 'medication', label: 'General Tips', color: '#2E7D32', items: ['Rest and stay well hydrated', 'Take paracetamol for pain or fever if needed', 'Eat light, nutritious meals', 'If no improvement in 48 hours, visit a clinic'] },
+      };
+
+      const getOTC = () => {
+        for (const key of Object.keys(otcMap)) {
+          if (key !== 'default' && condition.includes(key)) return otcMap[key];
+        }
+        // Check by partial keywords
+        if (condition.includes('respiratory') || condition.includes('cold') || condition.includes('flu')) return otcMap.cold;
+        if (condition.includes('gastro') || condition.includes('diarrhea')) return otcMap.gastro;
+        return otcMap.default;
+      };
+
+      const otc = getOTC();
+
       if (monitoringSession.symptomsSame >= 2) {
+        // 2nd or more "same" — offer OTC first, then clinic
+        const needsClinic = ['malaria', 'typhoid', 'uti'].some(k => condition.includes(k));
         responseEl.innerHTML = `
           <div class="sc-monitor-msg escalate">
             <span class="material-icons-outlined">warning</span>
             <div>
-              <p class="sc-monitor-msg-title">Your symptoms are persisting</p>
-              <p>Since your condition hasn't improved after multiple check-ins, we recommend visiting a health facility for proper examination.</p>
+              <p class="sc-monitor-msg-title">Symptoms still not improving</p>
+              <p>${needsClinic ? 'Your condition needs medical attention. Please visit a clinic.' : 'Try the options below. If there\'s no improvement in 24 hours, please see a doctor.'}</p>
             </div>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span class="material-icons-outlined" style="color:${otc.color};font-size:20px">${otc.icon}</span>
+              <strong style="font-size:13px;color:var(--text-primary)">${otc.label}</strong>
+            </div>
+            <ul style="padding-left:16px;margin:0;font-size:13px;color:var(--text-secondary);line-height:1.7">
+              ${otc.items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
           </div>
           <button class="btn sc-clinic-btn urgent" id="btnMonitorClinic" style="margin-top:12px">
             <span class="material-icons-outlined">local_hospital</span>
@@ -1004,25 +1085,60 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         `;
         responseEl.style.display = 'block';
         timerEl.style.display = 'none';
-
-        const clinicBtn = document.getElementById('btnMonitorClinic');
-        if (clinicBtn) {
-          clinicBtn.addEventListener('click', () => {
-            alert('Clinic finder coming soon! Please visit your nearest health facility.');
-          });
-        }
+        document.getElementById('btnMonitorClinic')?.addEventListener('click', () => {
+          localStorage.setItem('homatt_clinic_reason', JSON.stringify({ condition: monitoringSession.condition, urgency: 'soon' }));
+          window.location.href = 'clinic-booking.html';
+        });
       } else {
+        // 1st "same" — ask what they did + show OTC
         responseEl.innerHTML = `
           <div class="sc-monitor-msg same">
             <span class="material-icons-outlined">info</span>
             <div>
-              <p class="sc-monitor-msg-title">Noted</p>
-              <p>Keep resting and follow the tips. We'll check in again soon. If symptoms worsen at any time, please seek medical help.</p>
+              <p class="sc-monitor-msg-title">Noted — no change yet</p>
+              <p>Tell us what you tried, and we'll suggest what to do next.</p>
             </div>
+          </div>
+          <div style="margin-top:14px">
+            <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px">
+              What did you do to manage your symptoms? (optional)
+            </label>
+            <textarea id="monitorWhatDid" rows="3"
+              style="width:100%;border:2px solid #C8C8C8;border-radius:8px;padding:10px 12px;
+                font-size:15px;font-family:inherit;background:#fff;color:#111;resize:none;outline:none;
+                -webkit-text-fill-color:#111;box-sizing:border-box"
+              placeholder="e.g. I rested, drank water, took paracetamol..."></textarea>
+          </div>
+          <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+              <span class="material-icons-outlined" style="color:${otc.color};font-size:20px">${otc.icon}</span>
+              <strong style="font-size:13px;color:var(--text-primary)">${otc.label}</strong>
+            </div>
+            <ul style="padding-left:16px;margin:0;font-size:13px;color:var(--text-secondary);line-height:1.7">
+              ${otc.items.map(item => `<li>${item}</li>`).join('')}
+            </ul>
           </div>
         `;
         responseEl.style.display = 'block';
         timerEl.style.display = 'flex';
+
+        // Save "what did they do" on next check-in
+        const didInput = document.getElementById('monitorWhatDid');
+        if (didInput) {
+          didInput.addEventListener('change', () => {
+            monitoringSession.lastAction = didInput.value.trim();
+            localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+          });
+          // Dark mode border
+          const theme = document.documentElement.getAttribute('data-theme');
+          if (theme === 'dark') {
+            didInput.style.background = '#2C2C2C';
+            didInput.style.borderColor = '#555';
+            didInput.style.color = '#F0F0F0';
+            didInput.style.webkitTextFillColor = '#F0F0F0';
+          }
+        }
+
         scheduleNextCheckIn(1);
       }
     } else if (feeling === 'worse') {
@@ -1072,18 +1188,74 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
   }
 
-  // ====== Save to history ======
-  function saveToHistory(data) {
+  // ====== Save to history (localStorage + Supabase ai_triage_sessions) ======
+  async function saveToHistory(data) {
+    // Local symptom history
     const history = JSON.parse(localStorage.getItem('homatt_symptom_history') || '[]');
     history.unshift({
-      date: new Date().toISOString(),
-      patient: selectedPatient.name,
-      symptoms: enteredSymptoms,
+      date:       new Date().toISOString(),
+      patient:    selectedPatient.name,
+      symptoms:   enteredSymptoms,
       conditions: data.conditions,
-      risk: data.overall_risk,
+      risk:       data.overall_risk,
     });
     if (history.length > 20) history.pop();
     localStorage.setItem('homatt_symptom_history', JSON.stringify(history));
+
+    // Save triage context for booking page
+    const topCondition = (data.conditions || [])[0] || {};
+    const triageCtx = {
+      primary_condition: topCondition.name || '',
+      confidence:        topCondition.likelihood_percent || 0,
+      ai_confidence:     topCondition.likelihood_percent || 0,
+      overall_risk:      data.overall_risk || 'low',
+      should_visit_clinic: data.should_visit_clinic || false,
+      clinic_urgency:    data.clinic_urgency || 'none',
+      symptoms:          enteredSymptoms,
+      timestamp:         new Date().toISOString(),
+    };
+    localStorage.setItem('homatt_last_triage', JSON.stringify(triageCtx));
+
+    // Save to Supabase ai_triage_sessions for learning engine
+    if (supabase && session?.user?.id) {
+      try {
+        await supabase.from('ai_triage_sessions').insert({
+          user_id:            session.user.id,
+          patient_name:       selectedPatient.name,
+          patient_age:        selectedPatient.age || null,
+          patient_sex:        selectedPatient.sex || null,
+          symptoms_text:      enteredSymptoms,
+          followup_answers:   followupAnswers,
+          ai_conditions:      data.conditions,
+          ai_confidence:      topCondition.likelihood_percent || null,
+          top_diagnosis:      topCondition.name || null,
+          overall_risk:       data.overall_risk || null,
+          should_visit_clinic: data.should_visit_clinic || false,
+          clinic_urgency:     data.clinic_urgency || 'none',
+        });
+      } catch (e) {
+        // Non-fatal: triage session save failed
+        console.warn('[Homatt] Failed to save triage session:', e.message);
+      }
+    }
+  }
+
+  // ====== Fetch historical AI corrections for learning context ======
+  async function getHistoricalCorrections(symptomsText) {
+    if (!supabase || !session?.user?.id) return [];
+    try {
+      const { data } = await supabase
+        .from('ai_triage_sessions')
+        .select('symptoms_text, top_diagnosis, clinician_confirmed_diagnosis, ai_was_correct')
+        .not('clinician_confirmed_diagnosis', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (!data?.length) return [];
+      // Filter to cases where AI was wrong
+      return data.filter(d => d.ai_was_correct === false).slice(0, 4);
+    } catch (e) {
+      return [];
+    }
   }
 
   // ====== Show AI error banner on results screen ======
