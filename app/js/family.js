@@ -641,7 +641,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function resetAddMemberForm() {
     document.getElementById('memberName').value = '';
     document.getElementById('memberRelationship').value = '';
-    document.getElementById('memberDob').value = '';
+    document.getElementById('memberDobDay').value = '';
+    document.getElementById('memberDobMonth').value = '';
+    document.getElementById('memberDobYear').value = '';
     document.getElementById('memberSex').value = '';
     document.getElementById('memberLocation').value = '';
     document.getElementById('memberMedications').value = '';
@@ -717,7 +719,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!name) { showToast('Member name is required'); return; }
     if (!selectedRelationship) { showToast('Select a relationship'); return; }
 
-    const dob = document.getElementById('memberDob').value || null;
+    const dobDay = document.getElementById('memberDobDay').value.trim().padStart(2,'0');
+    const dobMonth = document.getElementById('memberDobMonth').value.trim().padStart(2,'0');
+    const dobYear = document.getElementById('memberDobYear').value.trim();
+    const dob = (dobDay && dobMonth && dobYear) ? `${dobYear}-${dobMonth}-${dobDay}` : null;
     const location = document.getElementById('memberLocation').value || null;
     const medicationsRaw = document.getElementById('memberMedications').value.trim();
     const allergiesRaw = document.getElementById('memberAllergies').value.trim();

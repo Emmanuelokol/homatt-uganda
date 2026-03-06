@@ -228,7 +228,12 @@
 
         <div class="sheet-input-group">
           <label class="sheet-label">Date of Birth</label>
-          <input type="date" class="sheet-input" id="memberDob">
+          <div style="display:grid;grid-template-columns:2fr 2fr 3fr;gap:8px">
+            <input type="number" class="sheet-input" id="memberDobDay" placeholder="DD" min="1" max="31" inputmode="numeric" style="text-align:center">
+            <input type="number" class="sheet-input" id="memberDobMonth" placeholder="MM" min="1" max="12" inputmode="numeric" style="text-align:center">
+            <input type="number" class="sheet-input" id="memberDobYear" placeholder="YYYY" min="1900" max="2025" inputmode="numeric" style="text-align:center">
+          </div>
+          <div style="font-size:11px;color:var(--text-hint);margin-top:4px">Day / Month / Year</div>
         </div>
 
         <div class="sheet-input-group">
@@ -386,6 +391,19 @@
             <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:3px">verified</span>
             Prescriptions are reviewed by a Homatt Health admin for your safety. You'll see a verified badge once approved.
           </p>
+        </div>
+
+        <div class="sheet-input-group">
+          <label class="sheet-label">Drug Type *</label>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+            <button type="button" class="sheet-chip selected" id="rxTypeOtc" onclick="setRxType('otc')" style="padding:10px;font-size:12px">💊 OTC (no prescription)</button>
+            <button type="button" class="sheet-chip" id="rxTypeRx" onclick="setRxType('rx')" style="padding:10px;font-size:12px">📋 Prescription (Rx)</button>
+          </div>
+          <input type="hidden" id="rxType" value="otc">
+          <div id="rxVerifyNotice" style="display:none;background:#F3E5F5;border:1px solid #CE93D8;border-radius:var(--radius-md);padding:8px 12px;font-size:12px;color:#6A1B9A;margin-top:6px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">verified_user</span>
+            Prescription drugs require a verified doctor's recommendation. A Homatt admin will review this before it is dispensed.
+          </div>
         </div>
 
         <div class="sheet-input-group">
@@ -587,5 +605,22 @@
   <script src="js/config.js"></script>
   <script src="js/family.js"></script>
   <script src="js/native-bridge.js"></script>
+  <script>
+    function setRxType(type) {
+      document.getElementById('rxType').value = type;
+      const otcBtn = document.getElementById('rxTypeOtc');
+      const rxBtn  = document.getElementById('rxTypeRx');
+      const notice = document.getElementById('rxVerifyNotice');
+      if (type === 'otc') {
+        otcBtn.classList.add('selected');
+        rxBtn.classList.remove('selected');
+        notice.style.display = 'none';
+      } else {
+        rxBtn.classList.add('selected');
+        otcBtn.classList.remove('selected');
+        notice.style.display = 'block';
+      }
+    }
+  </script>
 </body>
 </html>

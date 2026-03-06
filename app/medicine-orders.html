@@ -63,6 +63,25 @@
     .urgency-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
     .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; }
     .urgency-chip.selected { background:#00695C; color:#fff; border-color:#00695C; }
+    /* Condition/symptom selector */
+    .condition-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
+    .cond-btn { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px;
+      border:1.5px solid var(--border); border-radius:var(--radius-md); background:#fff;
+      font-size:11px; font-weight:600; color:var(--text-secondary); cursor:pointer; text-align:center;
+      transition:all .2s; font-family:inherit; }
+    .cond-btn .material-icons-outlined { font-size:22px; }
+    .cond-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
+    /* Drug type selector */
+    .drug-type-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
+    .drug-type-btn { padding:10px 8px; border:1.5px solid var(--border); border-radius:var(--radius-md);
+      background:#fff; font-size:13px; font-weight:600; color:var(--text-secondary);
+      cursor:pointer; font-family:inherit; transition:all .2s; text-align:center; }
+    .drug-type-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
+    .drug-type-btn.rx-selected { border-color:#7B1FA2; background:#F3E5F5; color:#6A1B9A; }
+    .rx-notice { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md);
+      padding:10px 14px; font-size:12px; color:#6A1B9A; display:flex; gap:8px; align-items:flex-start;
+      margin-bottom:12px; display:none; }
+    .rx-notice.visible { display:flex; }
   </style>
 </head>
 <body>
@@ -103,16 +122,75 @@
     <!-- STEP 1: Select medicines -->
     <div class="mo-step active" id="mostep1">
       <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="mo-hero">
+        <div class="mo-hero" style="padding-bottom:4px">
           <div class="mo-hero-icon"><span class="material-icons-outlined">medication</span></div>
-          <div class="mo-heading">Select Medicines</div>
-          <div class="mo-subheading">Search or browse available medicines from nearby pharmacies.</div>
+          <div class="mo-heading">Order Medicines</div>
+          <div class="mo-subheading">Select your condition then choose medicines, or search by name.</div>
         </div>
+
+        <!-- Condition / Symptom selector -->
+        <div class="mo-section" style="padding-bottom:4px">
+          <div class="mo-label">What is the issue? (select one)</div>
+          <div class="condition-grid" id="conditionGrid">
+            <button class="cond-btn" data-cond="pain" onclick="selectCondition('pain')">
+              <span class="material-icons-outlined" style="color:#E53935">sentiment_very_dissatisfied</span>Pain / Ache
+            </button>
+            <button class="cond-btn" data-cond="fever" onclick="selectCondition('fever')">
+              <span class="material-icons-outlined" style="color:#FF7043">thermostat</span>Fever
+            </button>
+            <button class="cond-btn" data-cond="malaria" onclick="selectCondition('malaria')">
+              <span class="material-icons-outlined" style="color:#388E3C">bug_report</span>Malaria
+            </button>
+            <button class="cond-btn" data-cond="infection" onclick="selectCondition('infection')">
+              <span class="material-icons-outlined" style="color:#0288D1">coronavirus</span>Infection
+            </button>
+            <button class="cond-btn" data-cond="digestive" onclick="selectCondition('digestive')">
+              <span class="material-icons-outlined" style="color:#8D6E63">sick</span>Stomach / Gut
+            </button>
+            <button class="cond-btn" data-cond="chronic" onclick="selectCondition('chronic')">
+              <span class="material-icons-outlined" style="color:#7B1FA2">monitor_heart</span>Chronic Disease
+            </button>
+            <button class="cond-btn" data-cond="maternal" onclick="selectCondition('maternal')">
+              <span class="material-icons-outlined" style="color:#E91E63">pregnant_woman</span>Maternal
+            </button>
+            <button class="cond-btn" data-cond="skin" onclick="selectCondition('skin')">
+              <span class="material-icons-outlined" style="color:#FF8F00">face</span>Skin
+            </button>
+            <button class="cond-btn" data-cond="other" onclick="selectCondition('other')">
+              <span class="material-icons-outlined" style="color:#607D8B">more_horiz</span>Other
+            </button>
+          </div>
+        </div>
+
+        <!-- Drug type: OTC or Prescription -->
+        <div class="mo-section" style="padding-top:4px;padding-bottom:4px">
+          <div class="mo-label">Drug type</div>
+          <div class="drug-type-row">
+            <button class="drug-type-btn selected" id="dtcOtc" onclick="selectDrugType('otc')">
+              💊 Over-the-Counter (OTC)<br><span style="font-size:11px;font-weight:400">No doctor needed</span>
+            </button>
+            <button class="drug-type-btn" id="dtcRx" onclick="selectDrugType('rx')">
+              📋 Prescription (Rx)<br><span style="font-size:11px;font-weight:400">Doctor required</span>
+            </button>
+          </div>
+          <div class="rx-notice" id="rxNotice">
+            <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">verified_user</span>
+            <span>Prescription drugs require a doctor's recommendation. Please add your doctor's name and upload or paste your prescription details below. Homatt will verify before dispensing.</span>
+          </div>
+          <!-- Prescription doctor input (shown only for Rx) -->
+          <div id="rxDoctorWrap" style="display:none">
+            <div class="mo-field">
+              <label>Prescribing Doctor *</label>
+              <input type="text" id="rxDoctorName" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
+            </div>
+          </div>
+        </div>
+
         <div class="mo-section">
           <div class="mo-field">
             <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="filterMeds()">
           </div>
-          <div class="mo-label">Available Medicines</div>
+          <div class="mo-label" id="medsListLabel">Suggested Medicines</div>
           <div id="medsList"></div>
         </div>
         <div class="mo-section">
@@ -246,8 +324,48 @@ const supa = (cfg.SUPABASE_URL && window.supabase)
 document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
 
 let cart = {};     // { medicine_name: { name, qty, price } }
-let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null };
+let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '' };
 let allMeds = [];
+let selectedCondition = '';
+let selectedDrugType = 'otc';
+
+// Medicines grouped by condition
+const CONDITION_MEDS = {
+  pain:      ['Paracetamol 500mg', 'Ibuprofen 400mg', 'Diclofenac 50mg'],
+  fever:     ['Paracetamol 500mg', 'Ibuprofen 400mg', 'ORS Sachet'],
+  malaria:   ['Coartem 20/120mg (Malaria)', 'ORS Sachet', 'Paracetamol 500mg'],
+  infection: ['Amoxicillin 500mg', 'Ciprofloxacin 500mg', 'Metronidazole 400mg'],
+  digestive: ['ORS Sachet', 'Metronidazole 400mg', 'Omeprazole 20mg', 'Ibuprofen 400mg'],
+  chronic:   ['Metformin 500mg', 'Amlodipine 5mg', 'Prednisolone 5mg', 'Omeprazole 20mg'],
+  maternal:  ['Folic Acid 5mg', 'Ferrous Sulphate 200mg', 'ORS Sachet'],
+  skin:      ['Prednisolone 5mg', 'Ciprofloxacin 500mg', 'Amoxicillin 500mg'],
+  other:     [],
+};
+
+function selectCondition(cond) {
+  selectedCondition = cond;
+  document.querySelectorAll('.cond-btn').forEach(b => b.classList.toggle('selected', b.dataset.cond === cond));
+  const label = document.getElementById('medsListLabel');
+  if (label) label.textContent = cond === 'other' ? 'All Medicines' : 'Suggested for your condition';
+  filterMeds();
+}
+
+function selectDrugType(type) {
+  selectedDrugType = type;
+  order.drugType = type;
+  document.getElementById('dtcOtc').classList.toggle('selected', type === 'otc');
+  document.getElementById('dtcRx').classList.toggle('selected', false);
+  document.getElementById('dtcRx').classList.toggle('rx-selected', type === 'rx');
+  const notice = document.getElementById('rxNotice');
+  const wrap = document.getElementById('rxDoctorWrap');
+  if (type === 'rx') {
+    notice.classList.add('visible');
+    wrap.style.display = 'block';
+  } else {
+    notice.classList.remove('visible');
+    wrap.style.display = 'none';
+  }
+}
 
 const MOCK_MEDS = [
   { name:'Coartem 20/120mg (Malaria)', price:3200 },
@@ -273,6 +391,15 @@ function goMoStep(n) {
   if (n === 2) {
     const pText = document.getElementById('prescriptionText').value.trim();
     if (!Object.keys(cart).length && !pText) { alert('Please add at least one medicine or paste a prescription'); return; }
+    // Collect drug type and doctor details
+    order.condition = selectedCondition;
+    order.drugType = selectedDrugType;
+    order.rxDoctor = (document.getElementById('rxDoctorName') || {}).value || '';
+    if (selectedDrugType === 'rx' && !order.rxDoctor.trim()) {
+      alert("For prescription drugs please enter the prescribing doctor's name.");
+      document.getElementById('rxDoctorName').focus();
+      return;
+    }
     const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
     if (session.city || session.district) {
       const addr = document.getElementById('deliveryAddress');
@@ -336,7 +463,17 @@ function removeFromCart(name) {
 
 function filterMeds() {
   const q = document.getElementById('medSearch').value.toLowerCase();
-  const displayed = q ? allMeds.filter(m => m.name.toLowerCase().includes(q)) : allMeds;
+  let displayed = allMeds;
+  if (q) {
+    displayed = allMeds.filter(m => m.name.toLowerCase().includes(q));
+  } else if (selectedCondition && selectedCondition !== 'other') {
+    const suggested = CONDITION_MEDS[selectedCondition] || [];
+    // Put suggested first, then rest
+    const suggSet = new Set(suggested);
+    const top = allMeds.filter(m => suggSet.has(m.name));
+    const rest = allMeds.filter(m => !suggSet.has(m.name));
+    displayed = [...top, ...rest];
+  }
   document.getElementById('medsList').innerHTML = displayed.map(m => {
     const c = cart[m.name];
     return `<div class="med-item ${c ? 'selected' : ''}">

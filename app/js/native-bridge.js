@@ -78,34 +78,87 @@
     }, 2500);
   }
 
+  // ─── KEYBOARD ────────────────────────────────────────────────────────────────
+  function initKeyboard() {
+    // Scroll focused input above keyboard whenever any input gains focus inside a sheet
+    document.addEventListener('focusin', (e) => {
+      const el = e.target;
+      if (!el || !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
+      // Delay to let keyboard animate in first
+      setTimeout(() => {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }, 300);
+    }, { passive: true });
+
+    // Tap outside any input/textarea/select → blur immediately to dismiss keyboard fast
+    document.addEventListener('touchstart', (e) => {
+      const tag = e.target && e.target.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+        const active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+          active.blur();
+        }
+      }
+    }, { passive: true });
+
+    // Capacitor Keyboard plugin listeners (native only)
+    if (!isNative()) return;
+    const { Keyboard } = window.Capacitor.Plugins;
+    if (!Keyboard) return;
+
+    Keyboard.addListener('keyboardWillShow', () => {
+      document.body.classList.add('keyboard-open');
+      // Re-scroll focused element into view after keyboard appears
+      setTimeout(() => {
+        const el = document.activeElement;
+        if (el && el !== document.body) {
+          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+      }, 350);
+    });
+
+    Keyboard.addListener('keyboardWillHide', () => {
+      document.body.classList.remove('keyboard-open');
+    });
+  }
+
   // ─── NETWORK STATUS ─────────────────────────────────────────────────────────
   function initNetwork() {
     if (!isNative()) return;
     const { Network } = window.Capacitor.Plugins;
     if (!Network) return;
 
+    // Check current status on startup
+    Network.getStatus().then((status) => {
+      if (!status.connected) showNetworkBanner('No internet connection', '#F44336');
+    }).catch(() => {});
+
     Network.addListener('networkStatusChange', (status) => {
       if (!status.connected) {
-        showNetworkBanner('No internet connection');
+        showNetworkBanner('No internet connection', '#F44336');
       } else {
-        hideNetworkBanner();
+        // Show brief "back online" notice then hide
+        showNetworkBanner('Back online \u2714', '#388E3C');
+        setTimeout(hideNetworkBanner, 2000);
       }
     });
   }
 
-  function showNetworkBanner(msg) {
+  function showNetworkBanner(msg, color) {
     let banner = document.getElementById('_networkBanner');
     if (!banner) {
       banner = document.createElement('div');
       banner.id = '_networkBanner';
       banner.style.cssText = `
         position:fixed; top:0; left:0; right:0; z-index:10000;
-        background:#F44336; color:#fff; text-align:center;
+        color:#fff; text-align:center;
         padding:8px; font-size:13px; font-weight:500;
+        transition: background 0.3s;
       `;
       document.body.appendChild(banner);
     }
     banner.textContent = msg;
+    banner.style.background = color || '#F44336';
     banner.style.display = 'block';
   }
 
@@ -217,6 +270,7 @@
     initStatusBar();
     initBackButton();
     initNetwork();
+    initKeyboard();
     // Hide splash after a short delay to ensure content is visible
     if (document.readyState === 'complete') {
       hideSplash();

@@ -960,6 +960,21 @@ body {
 }
 
 /* ============================================
+   KEYBOARD-OPEN STATE
+   When keyboard is visible, give bottom-sheets extra breathing room
+   and speed up keyboard-dismiss transitions.
+   ============================================ */
+body.keyboard-open .bottom-sheet.open {
+  /* Ensure the sheet doesn't fight with the keyboard */
+  transition: none;
+}
+
+body.keyboard-open .sheet-body {
+  /* Smooth scrolling when navigating between inputs */
+  scroll-behavior: smooth;
+}
+
+/* ============================================
    DARK MODE TRANSITION — smooth fade-out/in
    Applied by JS when toggling via .theme-transitioning class
    ============================================ */
@@ -1080,8 +1095,37 @@ body {
 [data-theme="dark"] .sheet-textarea,
 [data-theme="dark"] .sheet-select {
   background: #2C2C2C;
-  color: var(--text-primary);
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
   border-color: #555;
+}
+
+/* Prevent focus state from reverting to white bg+light text in dark mode */
+[data-theme="dark"] .sheet-input:focus,
+[data-theme="dark"] .sheet-textarea:focus,
+[data-theme="dark"] .sheet-select:focus {
+  background: #3a3a3a;
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
+  border-color: var(--primary);
+}
+
+/* Dark mode: medicine order inputs */
+[data-theme="dark"] .mo-field input,
+[data-theme="dark"] .mo-field select,
+[data-theme="dark"] .mo-field textarea {
+  background: #2C2C2C;
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
+  border-color: #555;
+}
+
+[data-theme="dark"] .mo-field input:focus,
+[data-theme="dark"] .mo-field select:focus,
+[data-theme="dark"] .mo-field textarea:focus {
+  background: #3a3a3a;
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
 }
 
 [data-theme="dark"] .sheet-chip {
