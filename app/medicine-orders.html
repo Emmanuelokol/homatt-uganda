@@ -128,7 +128,7 @@
         <div style="font-size:16px;font-weight:700">Order Medicines</div>
         <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4</div>
       </div>
-      <button onclick="goMoStep(3)" style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;touch-action:manipulation">
+      <button onclick="goMoStep(2)" style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;touch-action:manipulation">
         <span class="material-icons-outlined" style="font-size:16px">shopping_cart</span>
         Cart <span class="cart-badge" id="cartBadge">0</span>
       </button>
@@ -832,6 +832,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   if (session.district) document.getElementById('deliveryAddress').value = session.district + ', Uganda';
   if (session.phone_number || session.phone) document.getElementById('deliveryPhone').value = session.phone_number || session.phone;
+
+  // Pre-select condition from symptom checker (passed via URL param ?condition=malaria)
+  const urlCond = new URLSearchParams(window.location.search).get('condition');
+  if (urlCond && CONDITION_MEDS[urlCond] !== undefined) {
+    selectCondition(urlCond);
+  }
 });
 </script>
 </body>

@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Marketplace Products</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Marketplace Products</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin primary" id="addProductBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Product
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">storefront</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Total Products</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statActive">—</div><div class="stat-label">Active</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">inventory_2</span></div>
+          <div><div class="stat-number" id="statLow">—</div><div class="stat-label">Low Stock</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">local_pharmacy</span></div>
+          <div><div class="stat-number" id="statCategories">—</div><div class="stat-label">Categories</div></div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Products</div>
+          <div class="table-filter" style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="searchProducts" placeholder="Search product name…" style="width:200px">
+            <select id="filterCategory" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+              <option value="">All Categories</option>
+              <option value="otc">OTC Medicines</option>
+              <option value="rx">Prescription Drugs</option>
+              <option value="equipment">Medical Equipment</option>
+              <option value="supplement">Supplements</option>
+            </select>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Product Name</th>
+              <th>Category</th>
+              <th>Unit Price (UGX)</th>
+              <th>Stock</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsBody">
+            <tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Product Modal -->
+<div class="admin-modal-overlay" id="productModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="productModalTitle">Add Product</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:4px">Product Name *</label>
+          <input type="text" id="mpName" placeholder="e.g. Paracetamol 500mg (strip of 10)" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:4px">Category *</label>
+          <select id="mpCategory" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            <option value="otc">OTC Medicine</option>
+            <option value="rx">Prescription Drug</option>
+            <option value="equipment">Medical Equipment</option>
+            <option value="supplement">Supplement</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:4px">Unit Price (UGX) *</label>
+            <input type="number" id="mpPrice" placeholder="e.g. 1500" min="0" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:4px">Stock Qty</label>
+            <input type="number" id="mpStock" placeholder="e.g. 500" min="0" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:4px">Description</label>
+          <textarea id="mpDesc" placeholder="Short product description…" rows="2" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+          <input type="checkbox" id="mpActive" checked style="width:16px;height:16px"> List as active / available
+        </label>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveProductBtn" onclick="saveProduct()">Save Product</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+// Mock products (used in demo mode and when DB is empty)
+const MOCK_PRODUCTS = [
+  { id:'p1', name:'Paracetamol 500mg (strip of 10)',  category:'otc',       price:1500,  stock:800, active:true },
+  { id:'p2', name:'Amoxicillin 500mg (capsule x 21)', category:'rx',        price:18000, stock:120, active:true },
+  { id:'p3', name:'ORS Sachets (box of 10)',          category:'otc',       price:3500,  stock:350, active:true },
+  { id:'p4', name:'Coartem 20/120mg (malaria, 24tab)',category:'rx',        price:22000, stock:60,  active:true },
+  { id:'p5', name:'Digital Thermometer',              category:'equipment', price:28000, stock:45,  active:true },
+  { id:'p6', name:'Folic Acid 5mg (30 tabs)',         category:'supplement',price:2500,  stock:200, active:true },
+  { id:'p7', name:'Blood Pressure Monitor',           category:'equipment', price:185000,stock:12,  active:true },
+  { id:'p8', name:'Ibuprofen 400mg (strip of 10)',    category:'otc',       price:1800,  stock:15,  active:true },
+];
+
+let allProducts = [];
+let editingId = null;
+
+function closeModal() {
+  document.getElementById('productModal').style.display = 'none';
+  editingId = null;
+}
+
+function renderProducts(list) {
+  const cats = [...new Set(list.map(p => p.category).filter(Boolean))];
+  document.getElementById('statTotal').textContent = list.length;
+  document.getElementById('statActive').textContent = list.filter(p => p.active !== false).length;
+  document.getElementById('statLow').textContent = list.filter(p => (p.stock || 0) < 20).length;
+  document.getElementById('statCategories').textContent = cats.length;
+
+  document.getElementById('productsBody').innerHTML = list.length ? list.map(p => `
+    <tr>
+      <td>
+        <div style="font-weight:600;font-size:13px">${p.name}</div>
+        ${p.description ? `<div style="font-size:11px;color:#9AA0A6;margin-top:2px">${p.description.slice(0,60)}${p.description.length>60?'…':''}</div>` : ''}
+      </td>
+      <td><span style="background:#E8F5E9;color:#1B5E20;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;text-transform:capitalize">${p.category||'—'}</span></td>
+      <td style="font-weight:600">UGX ${Number(p.price||0).toLocaleString()}</td>
+      <td>
+        <span style="font-weight:600;color:${(p.stock||0)<20?'#D32F2F':'#1B5E20'}">${p.stock??'—'}</span>
+        ${(p.stock||0)<20?'<span style="font-size:10px;color:#D32F2F;margin-left:4px">LOW</span>':''}
+      </td>
+      <td><span class="status-badge ${p.active!==false?'delivered':'rejected'}">${p.active!==false?'Active':'Inactive'}</span></td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn-admin secondary sm" onclick="editProduct('${p.id}')">Edit</button>
+          <button class="btn-admin danger sm" onclick="toggleActive('${p.id}', ${p.active!==false})">${p.active!==false?'Deactivate':'Activate'}</button>
+        </div>
+      </td>
+    </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No products found</td></tr>';
+}
+
+function applyFilter() {
+  const q = document.getElementById('searchProducts').value.toLowerCase();
+  const cat = document.getElementById('filterCategory').value;
+  const filtered = allProducts.filter(p =>
+    (!q || (p.name||'').toLowerCase().includes(q)) &&
+    (!cat || p.category === cat)
+  );
+  renderProducts(filtered);
+}
+
+function editProduct(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('productModalTitle').textContent = 'Edit Product';
+  document.getElementById('mpName').value = p.name || '';
+  document.getElementById('mpCategory').value = p.category || 'otc';
+  document.getElementById('mpPrice').value = p.price || '';
+  document.getElementById('mpStock').value = p.stock ?? '';
+  document.getElementById('mpDesc').value = p.description || '';
+  document.getElementById('mpActive').checked = p.active !== false;
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+async function saveProduct() {
+  const btn = document.getElementById('saveProductBtn');
+  const name = document.getElementById('mpName').value.trim();
+  if (!name) { document.getElementById('mpName').focus(); return; }
+  btn.disabled = true;
+
+  const payload = {
+    name,
+    category:    document.getElementById('mpCategory').value,
+    price:       Number(document.getElementById('mpPrice').value) || 0,
+    stock:       Number(document.getElementById('mpStock').value) || 0,
+    description: document.getElementById('mpDesc').value.trim(),
+    active:      document.getElementById('mpActive').checked,
+  };
+
+  if (editingId) {
+    const idx = allProducts.findIndex(p => p.id === editingId);
+    if (idx > -1) allProducts[idx] = { ...allProducts[idx], ...payload };
+    if (supabase) {
+      try { await supabase.from('medicine_catalog').update(payload).eq('id', editingId); } catch(e) {}
+    }
+  } else {
+    const newId = 'new-' + Date.now();
+    allProducts.unshift({ id: newId, ...payload });
+    if (supabase) {
+      try { await supabase.from('medicine_catalog').insert(payload); } catch(e) {}
+    }
+  }
+
+  applyFilter();
+  closeModal();
+  btn.disabled = false;
+  showAdminToast(editingId ? 'Product updated' : 'Product added', 'success');
+}
+
+async function toggleActive(id, currentlyActive) {
+  const idx = allProducts.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  allProducts[idx].active = !currentlyActive;
+  if (supabase) {
+    try { await supabase.from('medicine_catalog').update({ active: !currentlyActive }).eq('id', id); } catch(e) {}
+  }
+  applyFilter();
+  showAdminToast('Product ' + (!currentlyActive ? 'activated' : 'deactivated'), 'success');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('marketplace');
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+
+  document.getElementById('addProductBtn').addEventListener('click', () => {
+    editingId = null;
+    document.getElementById('productModalTitle').textContent = 'Add Product';
+    document.getElementById('mpName').value = '';
+    document.getElementById('mpCategory').value = 'otc';
+    document.getElementById('mpPrice').value = '';
+    document.getElementById('mpStock').value = '';
+    document.getElementById('mpDesc').value = '';
+    document.getElementById('mpActive').checked = true;
+    document.getElementById('productModal').style.display = 'flex';
+  });
+
+  document.getElementById('searchProducts').addEventListener('input', applyFilter);
+  document.getElementById('filterCategory').addEventListener('change', applyFilter);
+
+  // Load products from Supabase or fallback to mock
+  if (supabase) {
+    try {
+      const { data } = await supabase.from('medicine_catalog').select('*').order('name');
+      allProducts = (data && data.length) ? data : MOCK_PRODUCTS;
+    } catch(e) { allProducts = MOCK_PRODUCTS; }
+  } else {
+    allProducts = MOCK_PRODUCTS;
+  }
+
+  renderProducts(allProducts);
+});
+</script>
+</body>
+</html>

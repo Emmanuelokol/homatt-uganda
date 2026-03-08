@@ -86,12 +86,48 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+const DEMO_BOOKINGS = [
+  { patient_name:'Ssempa Robert',  urgency_level:'high',   status:'pending',     created_at: new Date(Date.now()-3600000).toISOString() },
+  { patient_name:'Nakato Brenda',  urgency_level:'normal', status:'in_progress', created_at: new Date(Date.now()-7200000).toISOString() },
+  { patient_name:'Mubiru John',    urgency_level:'high',   status:'attended',    created_at: new Date(Date.now()-86400000).toISOString() },
+];
+const DEMO_ORDERS = [
+  { patient_name:'Namutebi Agnes', urgency:'standard', status:'incoming',  created_at: new Date(Date.now()-1800000).toISOString() },
+  { patient_name:'Kibuuka Paul',   urgency:'urgent',   status:'confirmed', created_at: new Date(Date.now()-3600000).toISOString() },
+  { patient_name:'Namukasa Grace', urgency:'standard', status:'delivered', created_at: new Date(Date.now()-86400000).toISOString() },
+];
+const DEMO_TICKETS = [
+  { user_name:'Ssali Emmanuel', subject:'Medicine delivery delayed', category:'delivery',    priority:'high',   status:'open',   created_at: new Date(Date.now()-7200000).toISOString() },
+  { user_name:'Rose K.',         subject:'App login issue',         category:'technical',   priority:'normal', status:'open',   created_at: new Date(Date.now()-86400000).toISOString() },
+];
+
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('dashboard');
   const session = await requireAdmin();
   if (!session) return;
   setupAdminLogout();
   document.getElementById('lastRefreshed').textContent = 'Refreshed ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+  const isDemo = session.demo === true;
+
+  if (isDemo) {
+    // Show realistic demo stats
+    document.getElementById('statUsers').textContent = '248';
+    document.getElementById('statBookings').textContent = '1,043';
+    document.getElementById('statOrders').textContent = '892';
+    document.getElementById('statClinics').textContent = '12';
+    document.getElementById('statPharmacies').textContent = '8';
+    document.getElementById('statRiders').textContent = '24';
+    document.getElementById('statTickets').textContent = '3';
+    document.getElementById('statRx').textContent = '7';
+    document.getElementById('pendingClinics').innerHTML = '<span style="color:#9AA0A6">Ntinda Health Clinic (pending)</span>';
+    document.getElementById('pendingPharmacies').innerHTML = '<span style="color:#9AA0A6">None pending</span>';
+    document.getElementById('pendingRiders').innerHTML = '<span style="color:#9AA0A6">2 riders awaiting approval</span>';
+    document.getElementById('recentBookingsBody').innerHTML = DEMO_BOOKINGS.map(b=>`<tr><td><strong>${b.patient_name}</strong></td><td><span class="status-badge ${b.urgency_level==='high'?'urgent':'normal'}">${b.urgency_level}</span></td><td><span class="status-badge ${b.status}">${b.status.replace('_',' ')}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(b.created_at)}</td></tr>`).join('');
+    document.getElementById('recentOrdersBody').innerHTML = DEMO_ORDERS.map(o=>`<tr><td><strong>${o.patient_name}</strong></td><td><span class="status-badge ${o.urgency==='urgent'?'urgent':'normal'}">${o.urgency}</span></td><td><span class="status-badge ${o.status}">${o.status}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(o.created_at)}</td></tr>`).join('');
+    document.getElementById('recentTicketsBody').innerHTML = DEMO_TICKETS.map(t=>`<tr><td><strong>${t.user_name}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</td><td style="text-transform:capitalize">${t.category}</td><td><span class="status-badge ${t.priority}">${t.priority}</span></td><td><span class="status-badge ${t.status}">${t.status}</span></td><td style="font-size:12px;color:#9AA0A6">${formatShortDate(t.created_at)}</td></tr>`).join('');
+    return;
+  }
 
   const [uR, bR, oR, cR, pR, rR, tR, xR] = await Promise.all([
     supabase.from('profiles').select('id',{count:'exact',head:true}),

@@ -6,11 +6,23 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  // Auth check via Supabase session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // Create Supabase client safely — works even if config.js is stale or CDN is slow
+  let supabase = null;
+  let session = null;
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    try {
+      supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      const { data } = await supabase.auth.getSession();
+      session = data?.session || null;
+    } catch(e) { console.warn('[SC] Supabase init failed:', e.message); }
+  }
+
+  // Accept localStorage session as fallback (APK users, offline mode, expired Supabase session)
+  const _localSess = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+  const _localUser = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
+
+  if (!session && !_localSess && !_localUser) {
     window.location.href = 'signin.html';
     return;
   }
@@ -23,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load family from cache first, then try to refresh from Supabase in background
   let family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
   // Background sync of family members so next open has fresh data
-  if (session && session.user) {
+  if (supabase && session && session.user) {
     supabase.from('family_members')
       .select('id,name,relationship,dob,sex')
       .eq('primary_user_id', session.user.id)
@@ -903,11 +915,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const actionArea = document.getElementById('actionArea');
     actionArea.innerHTML = '';
 
+    // Consultation fee estimate based on condition
+    const topCond = (data.conditions[0]?.name || '').toLowerCase();
+    const feeRange = topCond.includes('malaria') || topCond.includes('typhoid') ? 'UGX 20,000 – 35,000' :
+                     topCond.includes('uti') || topCond.includes('gastro') ? 'UGX 15,000 – 25,000' :
+                     topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory') ? 'UGX 10,000 – 20,000' :
+                     topCond.includes('headache') || topCond.includes('pain') ? 'UGX 10,000 – 20,000' :
+                     topCond.includes('diabetes') || topCond.includes('chronic') ? 'UGX 25,000 – 50,000' :
+                     'UGX 10,000 – 30,000';
+
     if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
       actionArea.innerHTML = `
         <div class="sc-urgent-banner">
           <span class="material-icons-outlined">emergency</span>
           <p>Based on your symptoms, we strongly recommend visiting a health facility as soon as possible.</p>
+        </div>
+        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
+          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
         </div>
         <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
           <span class="material-icons-outlined">local_hospital</span>
@@ -923,6 +948,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         <div class="sc-medium-banner">
           <span class="material-icons-outlined">info</span>
           <p>${data.followup_message || 'Monitor your symptoms closely. If they persist or worsen, please visit a health facility.'}</p>
+        </div>
+        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
+          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
         </div>
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
@@ -943,6 +972,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">monitor_heart</span>
           Monitor My Symptoms
         </button>
+        <button class="btn sc-clinic-btn secondary" id="btnBookClinic">
+          <span class="material-icons-outlined">local_hospital</span>
+          Find Nearby Clinics
+        </button>
         <button class="btn sc-home-btn" id="btnGoHome">
           <span class="material-icons-outlined">home</span>
           Back to Dashboard
@@ -950,63 +983,68 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       `;
     }
 
-    // OTC medication recommendations (only for non-high risk)
-    if (data.overall_risk !== 'high') {
-      const otcMap = {
-        malaria:      [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
-        fever:        [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
-        cold:         [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
-        respiratory:  [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
-        gastro:       [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
-        stomach:      [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
-        headache:     [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
-        tension:      [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
-        uti:          [{ name: 'Drink plenty of water', note: 'Flush bacteria' }, { name: 'Ciprofloxacin 500mg', note: 'Needs Rx — see pharmacist' }],
-      };
+    // OTC medication recommendations — shown for ALL risk levels
+    const otcMap = {
+      malaria:      [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
+      fever:        [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
+      cold:         [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
+      respiratory:  [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
+      gastro:       [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
+      stomach:      [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
+      headache:     [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
+      tension:      [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
+      uti:          [{ name: 'Drink plenty of water', note: 'Flush bacteria' }, { name: 'Ciprofloxacin 500mg', note: 'Needs Rx — see pharmacist' }],
+      typhoid:      [{ name: 'Paracetamol 500mg', note: 'Fever control' }, { name: 'ORS Sachets', note: 'Hydration' }],
+    };
 
-      const topCondName = (data.conditions[0]?.name || '').toLowerCase();
-      let otcItems = [];
-      for (const [key, items] of Object.entries(otcMap)) {
-        if (topCondName.includes(key)) {
-          otcItems = items;
-          break;
-        }
-      }
-      if (!otcItems.length) {
-        otcItems = [{ name: 'Paracetamol 500mg', note: 'For pain or fever' }, { name: 'ORS Sachets', note: 'Stay hydrated' }];
-      }
+    const topCondName = (data.conditions[0]?.name || '').toLowerCase();
+    let otcItems = [];
+    for (const [key, items] of Object.entries(otcMap)) {
+      if (topCondName.includes(key)) { otcItems = items; break; }
+    }
+    if (!otcItems.length) {
+      otcItems = [{ name: 'Paracetamol 500mg', note: 'For pain or fever' }, { name: 'ORS Sachets', note: 'Stay hydrated' }];
+    }
 
-      const otcSection = document.createElement('div');
-      otcSection.className = 'sc-otc-section';
-      otcSection.innerHTML = `
-        <div class="sc-otc-title">
-          <span class="material-icons-outlined">medication</span>
-          Available Over-the-Counter
-        </div>
-        <div class="sc-otc-disclaimer">
-          ⚠️ This is not a prescription. Always confirm with a licensed pharmacist or doctor before taking any medication.
-        </div>
-        <div class="sc-otc-list" id="otcList">
-          ${otcItems.map(item => `
-            <div class="sc-otc-item">
-              <span>${item.name}</span>
-              <span style="font-size:11px;color:var(--text-secondary)">${item.note}</span>
-            </div>
-          `).join('')}
-        </div>
-        <button class="btn sc-order-btn" id="btnOrderMeds">
-          <span class="material-icons-outlined">local_pharmacy</span>
-          Order Medicines
-        </button>
-      `;
-      actionArea.appendChild(otcSection);
+    const otcSection = document.createElement('div');
+    otcSection.className = 'sc-otc-section';
+    otcSection.innerHTML = `
+      <div class="sc-otc-title">
+        <span class="material-icons-outlined">medication</span>
+        Available Over-the-Counter
+      </div>
+      <div class="sc-otc-disclaimer">
+        ⚠️ This is not a prescription. Always confirm with a licensed pharmacist or doctor before taking any medication.
+      </div>
+      <div class="sc-otc-list" id="otcList">
+        ${otcItems.map(item => `
+          <div class="sc-otc-item">
+            <span>${item.name}</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${item.note}</span>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn sc-order-btn" id="btnOrderMeds">
+        <span class="material-icons-outlined">local_pharmacy</span>
+        Order Medicines
+      </button>
+    `;
+    actionArea.appendChild(otcSection);
 
-      const orderBtn = document.getElementById('btnOrderMeds');
-      if (orderBtn) {
-        orderBtn.addEventListener('click', () => {
-          alert('Medicine ordering coming soon! Visit your nearest pharmacy for these items.');
-        });
-      }
+    const orderBtn = document.getElementById('btnOrderMeds');
+    if (orderBtn) {
+      orderBtn.addEventListener('click', () => {
+        // Map top condition name to a medicine-orders condition key
+        const cn = topCondName;
+        const condKey = cn.includes('malaria') ? 'malaria' :
+                        cn.includes('fever') || cn.includes('typhoid') ? 'fever' :
+                        cn.includes('pain') || cn.includes('headache') ? 'pain' :
+                        cn.includes('gastro') || cn.includes('diarrhea') || cn.includes('stomach') ? 'digestive' :
+                        cn.includes('respiratory') || cn.includes('cold') || cn.includes('flu') ? 'infection' :
+                        cn.includes('uti') || cn.includes('urinary') ? 'infection' :
+                        'other';
+        window.location.href = 'medicine-orders.html?condition=' + condKey;
+      });
     }
 
     // Wire action buttons
@@ -1535,10 +1573,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       { id: 'mock-5', name: 'Nakasero Hospital' },
     ];
 
-    supabase.from('clinics')
-      .select('id, name')
-      .eq('active', true)
-      .limit(20)
+    const clinicLoad = supabase
+      ? supabase.from('clinics').select('id, name').eq('active', true).limit(20)
+      : Promise.resolve({ data: null });
+    clinicLoad
       .then(({ data: clinicsData }) => {
         const list = (clinicsData && clinicsData.length) ? clinicsData : mockClinics;
         clinicSelect.innerHTML = list.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
@@ -1584,8 +1622,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking...';
 
-      // Save to Supabase
-      try {
+      // Save to Supabase (if available)
+      if (supabase) try {
         await supabase.from('bookings').insert(bookingRecord);
       } catch (e) {
         console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
