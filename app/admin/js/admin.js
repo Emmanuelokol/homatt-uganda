@@ -2,7 +2,10 @@
  * Homatt Health — Admin Portal Shared Logic
  */
 const cfg = window.HOMATT_CONFIG || {};
-const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+// Isolated storage key so admin session never overwrites the Homatt patient session
+const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+  auth: { storageKey: 'sb-homatt-admin-auth' }
+});
 
 /* ── Sidebar builder ── */
 function buildAdminSidebar(activePage) {

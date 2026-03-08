@@ -6,36 +6,52 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  // Auth check via Supabase session
+  // Auth check via Supabase session.
+  // Use a redirect-guard flag to break any loop: if we already tried to redirect
+  // to signin this page-load, don't loop again.
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
-    window.location.href = 'signin.html';
-    return;
+    // Only redirect if we have no cached user either (fully signed out)
+    if (!localStorage.getItem('homatt_user') ||
+        localStorage.getItem('homatt_user') === '{}') {
+      window.location.href = 'signin.html';
+      return;
+    }
+    // Offline or token expired but we have cached data — continue with cache
   }
 
   // Load user data — prefer Supabase, fall back to localStorage cache
   let user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', session.user.id)
-    .single();
 
-  if (profile) {
-    user = {
-      firstName: profile.first_name,
-      lastName: profile.last_name,
-      phone: profile.phone_number,
-      dob: profile.dob,
-      sex: profile.sex,
-      district: profile.district,
-      location: profile.district,
-      city: profile.city,
-      hasFamily: profile.has_family,
-      familySize: profile.family_size,
-      healthGoals: profile.health_goals,
-    };
-    localStorage.setItem('homatt_user', JSON.stringify(user));
+  if (session) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', session.user.id)
+      .single();
+
+    if (profile) {
+      user = {
+        firstName: profile.first_name,
+        lastName: profile.last_name,
+        phone: profile.phone_number,
+        dob: profile.dob,
+        sex: profile.sex,
+        district: profile.district,
+        location: profile.district,
+        city: profile.city,
+        hasFamily: profile.has_family,
+        familySize: profile.family_size,
+        healthGoals: profile.health_goals,
+      };
+      localStorage.setItem('homatt_user', JSON.stringify(user));
+    } else if (!user.firstName) {
+      // Supabase session exists but no patient profile AND no cached data.
+      // This is a portal staff account that slipped through — sign out and go to signin.
+      await supabase.auth.signOut();
+      window.location.href = 'signin.html';
+      return;
+    }
   }
 
   // Update status bar time

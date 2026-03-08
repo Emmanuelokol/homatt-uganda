@@ -47,11 +47,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script>
-  if (localStorage.getItem('pharmacy_session')) window.location.href = 'dashboard.html';
+  // Validate session is a real non-null object before redirecting
+  // (a raw truthy check like !!localStorage.getItem() would loop on "null" or bad JSON)
+  (function() {
+    try {
+      const s = JSON.parse(localStorage.getItem('pharmacy_session') || 'null');
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+    } catch(e) {}
+    // Corrupted data — clear it to break any existing loop
+    localStorage.removeItem('pharmacy_session');
+  })();
 
   const cfg = window.HOMATT_CONFIG || {};
+  // Use persistSession:false so pharmacy Supabase auth does NOT overwrite the
+  // shared Homatt patient session stored in localStorage
   const _supa = (cfg.SUPABASE_URL && window.supabase)
-    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { persistSession: false }
+      }) : null;
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();

@@ -44,7 +44,7 @@
   <script src="../js/config.js"></script>
   <script>
     const cfg = window.HOMATT_CONFIG || {};
-    const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-admin-auth' } });
 
     // Check if already logged in as admin
     (async () => {
