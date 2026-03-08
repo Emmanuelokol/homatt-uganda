@@ -681,11 +681,65 @@ document.addEventListener('DOMContentLoaded', async () => {
         clinic_diagnosis_id: diagRecord?.id || null,
       }).eq('id', b.id);
 
+      // ── Symptom cache: save confirmed diagnosis for future AI checks ──
+      if (b.symptoms && diagnosis) {
+        try {
+          const sympKey = (b.symptoms || '').toLowerCase().trim().split(/\s+/).sort().slice(0,8).join(' ');
+          const cachePayload = {
+            symptoms_key: sympKey,
+            symptoms_text: b.symptoms,
+            confirmed_diagnosis: diagnosis,
+            conditions_json: JSON.stringify([{
+              name: diagnosis,
+              likelihood_percent: 85,
+              severity: severity || 'medium',
+              description: treatment || diagnosis + ' — clinician confirmed.',
+              icd10: icd10 || null,
+            }]),
+            ai_match: aiMatchValue,
+            source: 'clinician',
+            updated_at: new Date().toISOString(),
+          };
+          await supa2.from('symptom_cache')
+            .upsert(cachePayload, { onConflict: 'symptoms_key', ignoreDuplicates: false });
+        } catch(e) {}
+      }
+
+      // ── Preventive recommendations after confirmed diagnosis ──
+      const diagLower = diagnosis.toLowerCase();
+      const PREVENTIVE = {
+        malaria:     { msg: 'Recommend to patient: Insecticide-treated mosquito net, mosquito repellent, and clearing stagnant water near home.', product: 'Mosquito Net' },
+        typhoid:     { msg: 'Recommend to patient: Boil drinking water, typhoid vaccine, and improved sanitation practices.', product: 'Water purification tablets' },
+        tuberculosis:{ msg: 'Recommend to patient: TB screening for household contacts, proper ventilation, and complete TB treatment course.', product: null },
+        hiv:         { msg: 'Recommend to patient: HIV counselling, partner testing, and consistent condom use.', product: null },
+        diabetes:    { msg: 'Recommend to patient: Blood glucose monitor, low-sugar diet, regular exercise, and foot care.', product: 'Blood glucose monitor' },
+        hypertension:{ msg: 'Recommend to patient: Home BP monitor, low-salt diet, regular exercise, and medication compliance.', product: 'Blood pressure monitor' },
+        cholera:     { msg: 'Recommend to patient: Oral rehydration salts, boiled water, cholera vaccine if available.', product: 'ORS sachets' },
+      };
+      const matchedPrev = Object.entries(PREVENTIVE).find(([k]) => diagLower.includes(k));
+      if (matchedPrev) {
+        const [, info] = matchedPrev;
+        setTimeout(() => showToast('🛡️ Prevention: ' + info.msg, 'warning'), 2000);
+        if (supa2 && info.product && b.id) {
+          try {
+            await supa2.from('preventive_recommendations').insert({
+              booking_id: b.id,
+              diagnosis: diagnosis,
+              recommended_product: info.product,
+              recommendation_text: info.msg,
+              sent_to_patient: false,
+              created_at: new Date().toISOString(),
+            });
+          } catch(e) {}
+        }
+      }
+
       // Update local state
       b.status = 'attended';
       document.getElementById('statWaiting').textContent   = bookings.filter(x => x.status === 'pending').length;
       document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
     } else {
+      // Demo mode — simulate the flow
       activeBooking.status = 'attended';
     }
 

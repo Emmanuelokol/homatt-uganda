@@ -15,6 +15,9 @@
     <div class="admin-topbar">
       <div class="admin-topbar-title">Clinic Management</div>
       <div class="admin-topbar-right">
+        <button class="btn-admin info" id="createClinicAccountBtn">
+          <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Clinic Account
+        </button>
         <button class="btn-admin primary" id="addClinicBtn">
           <span class="material-icons-outlined" style="font-size:16px">add</span> Add Clinic
         </button>
@@ -162,6 +165,63 @@
   </div>
 </div>
 
+<!-- Create Clinic Account Modal -->
+<div class="admin-modal-overlay" id="createClinicAccountModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Create Clinic Account</div>
+      <button class="admin-modal-close" onclick="closeCreateClinicAccountModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="clinicAccountDemoNote" style="display:none;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#795548">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px;margin-right:4px">info</span>
+        In demo mode, account creation requires real Supabase credentials.
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+        Creates a Supabase auth account for this clinic and registers it in the clinics table. Share the credentials with the clinic staff to log into their portal.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Clinic Name *</label>
+          <input type="text" id="caClinicName" placeholder="e.g. Kampala Medical Centre">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Location / District *</label>
+          <input type="text" id="caClinicLocation" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Staff Email *</label>
+          <input type="email" id="caClinicEmail" placeholder="clinic@example.com">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">This will be the login email for the clinic portal.</div>
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Password *</label>
+          <input type="text" id="caClinicPassword" placeholder="Min 8 characters" autocomplete="new-password">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Minimum 8 characters. Share this with the clinic.</div>
+        </div>
+      </div>
+
+      <!-- Success box shown after creation -->
+      <div id="caClinicSuccessBox" style="display:none;margin-top:16px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:16px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Account Created!
+        </div>
+        <div style="font-size:13px;color:#2E7D32;margin-bottom:10px">Share these credentials with the clinic staff:</div>
+        <div style="background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:12px;font-family:monospace;font-size:13px;line-height:1.8" id="caClinicCredentials"></div>
+        <button class="btn-admin secondary" style="margin-top:10px;font-size:12px" onclick="copyClinicCredentials()">
+          <span class="material-icons-outlined" style="font-size:14px">content_copy</span> Copy Credentials
+        </button>
+      </div>
+    </div>
+    <div class="admin-modal-footer" id="caClinicFooter">
+      <button class="btn-admin secondary" onclick="closeCreateClinicAccountModal()">Cancel</button>
+      <button class="btn-admin primary" id="createClinicAccountSubmitBtn">
+        <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-toast" id="adminToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -169,20 +229,24 @@
 <script src="js/admin.js"></script>
 <script>
 let allClinics = [];
+let _adminSession = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('clinics');
   const session = await requireAdmin();
   if (!session) return;
+  _adminSession = session;
   setupAdminLogout();
   await loadClinics();
 
   document.getElementById('addClinicBtn').addEventListener('click', () => openModal());
+  document.getElementById('createClinicAccountBtn').addEventListener('click', () => openCreateClinicAccountModal());
   document.getElementById('filterStatus').addEventListener('change', renderClinics);
   document.getElementById('searchClinics').addEventListener('input', renderClinics);
 
   document.getElementById('saveClinicBtn').addEventListener('click', saveClinic);
   document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+  document.getElementById('createClinicAccountSubmitBtn').addEventListener('click', submitCreateClinicAccount);
 });
 
 async function loadClinics() {
@@ -331,6 +395,98 @@ async function saveStaff() {
 
   closeStaffModal();
   showAdminToast(`Staff login created for ${name}`, 'success');
+}
+
+/* ── Create Clinic Account Modal ── */
+function openCreateClinicAccountModal() {
+  // Reset form
+  document.getElementById('caClinicName').value = '';
+  document.getElementById('caClinicLocation').value = '';
+  document.getElementById('caClinicEmail').value = '';
+  document.getElementById('caClinicPassword').value = '';
+  document.getElementById('caClinicSuccessBox').style.display = 'none';
+  document.getElementById('caClinicFooter').style.display = 'flex';
+  document.getElementById('createClinicAccountSubmitBtn').disabled = false;
+
+  // Show demo note if in demo mode
+  const isDemo = _adminSession && _adminSession.demo === true;
+  document.getElementById('clinicAccountDemoNote').style.display = isDemo ? 'block' : 'none';
+
+  document.getElementById('createClinicAccountModal').style.display = 'flex';
+}
+
+function closeCreateClinicAccountModal() {
+  document.getElementById('createClinicAccountModal').style.display = 'none';
+}
+
+let _lastClinicCredentials = '';
+
+async function submitCreateClinicAccount() {
+  const name     = document.getElementById('caClinicName').value.trim();
+  const location = document.getElementById('caClinicLocation').value.trim();
+  const email    = document.getElementById('caClinicEmail').value.trim();
+  const password = document.getElementById('caClinicPassword').value;
+
+  if (!name)     { showAdminToast('Clinic name is required', 'error'); return; }
+  if (!location) { showAdminToast('Location / district is required', 'error'); return; }
+  if (!email)    { showAdminToast('Staff email is required', 'error'); return; }
+  if (!password || password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  const btn = document.getElementById('createClinicAccountSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">hourglass_top</span> Creating...';
+
+  // Step 1: Create auth account
+  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+
+  if (signUpErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Account creation failed: ' + signUpErr.message, 'error');
+    return;
+  }
+
+  const authUserId = signUpData.user?.id;
+  if (!authUserId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Could not create auth user — the email may already be registered.', 'error');
+    return;
+  }
+
+  // Step 2: Insert into clinics table
+  const { data: clinicRow, error: insertErr } = await supabase.from('clinics').insert({
+    name,
+    district: location,
+    status: 'active',
+    email,
+    auth_user_id: authUserId
+  }).select().single();
+
+  if (insertErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Clinic record error: ' + insertErr.message, 'error');
+    return;
+  }
+
+  // Success
+  _lastClinicCredentials = `Clinic: ${name}\nLocation: ${location}\nEmail: ${email}\nPassword: ${password}\nPortal: ${window.location.origin}`;
+
+  document.getElementById('caClinicCredentials').textContent = _lastClinicCredentials;
+  document.getElementById('caClinicSuccessBox').style.display = 'block';
+  document.getElementById('caClinicFooter').style.display = 'none';
+
+  await loadClinics();
+  showAdminToast('Clinic account created successfully!', 'success');
+}
+
+function copyClinicCredentials() {
+  navigator.clipboard.writeText(_lastClinicCredentials).then(() => {
+    showAdminToast('Credentials copied to clipboard', 'success');
+  }).catch(() => {
+    showAdminToast('Copy failed — please select and copy manually', 'error');
+  });
 }
 </script>
 </body>

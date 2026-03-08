@@ -1,10 +1,14 @@
 /* Homatt Health — Clinic Portal shared JS */
 
 function requireClinic() {
-  const raw = localStorage.getItem('clinic_session');
-  if (!raw) { window.location.href = 'index.html'; return null; }
-  const s = JSON.parse(raw);
-  const name = s.name || 'Clinic Staff';
+  let s;
+  try { s = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
+  if (!s || typeof s !== 'object' || Array.isArray(s)) {
+    localStorage.removeItem('clinic_session');
+    window.location.href = 'index.html';
+    return null;
+  }
+  const name = s.staffName || s.name || 'Clinic Staff';
   const el1 = document.getElementById('clinicUserName');
   const el2 = document.getElementById('clinicUserNameTop');
   const av  = document.getElementById('clinicUserAvatar');

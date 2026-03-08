@@ -49,13 +49,19 @@ function buildPharmacySidebar(activePage) {
 
 /* ── Session management ── */
 function getPharmacySession() {
-  const raw = localStorage.getItem('pharmacy_session');
-  return raw ? JSON.parse(raw) : null;
+  try {
+    const s = JSON.parse(localStorage.getItem('pharmacy_session') || 'null');
+    return (s && typeof s === 'object' && !Array.isArray(s)) ? s : null;
+  } catch(e) { return null; }
 }
 
 function requirePharmacy() {
   const s = getPharmacySession();
-  if (!s) { window.location.href = 'index.html'; return null; }
+  if (!s) {
+    localStorage.removeItem('pharmacy_session');
+    window.location.href = 'index.html';
+    return null;
+  }
   const el = document.getElementById('pharmacyUserName');
   const nm = document.getElementById('pharmacyName');
   const av = document.getElementById('pharmacyUserAvatar');
@@ -104,7 +110,7 @@ function formatUGX(n) {
 function initPharmacySupabase() {
   const cfg = window.HOMATT_CONFIG || {};
   if (!cfg.SUPABASE_URL || !window.supabase) return null;
-  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
 }
 
 /* ── Mock data (demo mode fallback) ── */
