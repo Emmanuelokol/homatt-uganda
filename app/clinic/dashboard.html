@@ -231,9 +231,15 @@
       <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Lab Tests Ordered</label>
         <div style="display:flex;flex-wrap:wrap;gap:8px" id="labTestChips">
-          ${['Malaria RDT','Full Blood Count','Blood Glucose','Urine Analysis','Liver Function','Chest X-Ray','HIV Test','Pregnancy Test','Sputum Culture'].map(t =>
-            `<button type="button" onclick="toggleLabTest('${t}')" data-test="${t}" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">${t}</button>`
-          ).join('')}
+          <button type="button" onclick="toggleLabTest('Malaria RDT')" data-test="Malaria RDT" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Malaria RDT</button>
+          <button type="button" onclick="toggleLabTest('Full Blood Count')" data-test="Full Blood Count" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Full Blood Count</button>
+          <button type="button" onclick="toggleLabTest('Blood Glucose')" data-test="Blood Glucose" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Blood Glucose</button>
+          <button type="button" onclick="toggleLabTest('Urine Analysis')" data-test="Urine Analysis" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Urine Analysis</button>
+          <button type="button" onclick="toggleLabTest('Liver Function')" data-test="Liver Function" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Liver Function</button>
+          <button type="button" onclick="toggleLabTest('Chest X-Ray')" data-test="Chest X-Ray" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Chest X-Ray</button>
+          <button type="button" onclick="toggleLabTest('HIV Test')" data-test="HIV Test" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">HIV Test</button>
+          <button type="button" onclick="toggleLabTest('Pregnancy Test')" data-test="Pregnancy Test" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Pregnancy Test</button>
+          <button type="button" onclick="toggleLabTest('Sputum Culture')" data-test="Sputum Culture" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Sputum Culture</button>
         </div>
       </div>
       <div style="margin-bottom:14px">

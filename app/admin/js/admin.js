@@ -3,9 +3,14 @@
  */
 const cfg = window.HOMATT_CONFIG || {};
 // Isolated storage key so admin session never overwrites the Homatt patient session
-const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-  auth: { storageKey: 'sb-homatt-admin-auth' }
-});
+let supabase = null;
+try {
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'sb-homatt-admin-auth' }
+    });
+  }
+} catch(e) { console.warn('[Admin] Supabase init failed:', e.message); }
 
 /* ── Sidebar builder ── */
 function buildAdminSidebar(activePage) {
@@ -78,6 +83,7 @@ async function requireAdmin() {
     return { demo: true };
   }
 
+  if (!supabase) { window.location.href = 'index.html'; return null; }
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) { window.location.href = 'index.html'; return null; }
 
@@ -120,7 +126,7 @@ async function requirePortalUser(expectedRole, onSuccess) {
 function setupAdminLogout() {
   document.getElementById('adminLogoutBtn')?.addEventListener('click', async () => {
     localStorage.removeItem('admin_session');
-    await supabase.auth.signOut();
+    if (supabase) { try { await supabase.auth.signOut(); } catch(e) {} }
     window.location.href = 'index.html';
   });
 }
