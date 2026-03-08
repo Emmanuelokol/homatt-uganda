@@ -49,17 +49,25 @@
   <script src="../js/config.js"></script>
   <script>
     const cfg = window.HOMATT_CONFIG || {};
-    const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-admin-auth' } });
+    let supabase = null;
+    try {
+      if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+        supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-admin-auth' } });
+      }
+    } catch(e) { console.warn('[Admin] Supabase init failed:', e.message); }
 
     // Check if already logged in as admin
     (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).single();
-        if (profile && profile.is_admin) {
-          window.location.href = 'dashboard.html';
+      if (!supabase) return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).single();
+          if (profile && profile.is_admin) {
+            window.location.href = 'dashboard.html';
+          }
         }
-      }
+      } catch(e) { console.warn('[Admin] session check failed:', e.message); }
     })();
 
     document.getElementById('loginBtn').addEventListener('click', async () => {
@@ -70,6 +78,7 @@
 
       errEl.style.display = 'none';
       if (!email || !password) { errEl.textContent = 'Please enter email and password'; errEl.style.display = 'block'; return; }
+      if (!supabase) { errEl.textContent = 'Service unavailable. Please try the Demo Dashboard.'; errEl.style.display = 'block'; return; }
 
       btn.disabled = true;
       document.getElementById('loginBtnText').textContent = 'Signing in...';
