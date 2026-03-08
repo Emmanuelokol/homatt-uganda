@@ -28,6 +28,7 @@
     .mo-field input, .mo-field select, .mo-field textarea {
       width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius-md);
       font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s;
+      box-sizing:border-box;
     }
     .mo-field input:focus, .mo-field select:focus, .mo-field textarea:focus { border-color:#00695C; }
     .mo-field textarea { resize:vertical; min-height:70px; }
@@ -41,13 +42,13 @@
     .med-name { font-size:13px; font-weight:600; flex:1; }
     .med-price { font-size:12px; color:#00695C; font-weight:600; }
     .qty-control { display:flex; align-items:center; gap:8px; }
-    .qty-btn { width:28px; height:28px; border-radius:8px; border:none; background:#E0F2F1; color:#00695C; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+    .qty-btn { width:28px; height:28px; border-radius:8px; border:none; background:#E0F2F1; color:#00695C; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; touch-action:manipulation; }
     .qty-num { font-size:14px; font-weight:700; min-width:20px; text-align:center; }
     .cart-badge { background:#D32F2F; color:#fff; border-radius:10px; font-size:10px; font-weight:700; padding:2px 6px; margin-left:4px; }
     .cart-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F0F0F0; }
     .cart-row:last-child { border-bottom:none; }
     .total-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0 4px; border-top:2px solid var(--border); font-weight:700; font-size:15px; margin-top:4px; }
-    .mo-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:var(--radius-md); font-size:15px; font-weight:600; border:none; cursor:pointer; transition:all .2s; }
+    .mo-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:var(--radius-md); font-size:15px; font-weight:600; border:none; cursor:pointer; transition:all .2s; touch-action:manipulation; }
     .mo-btn.primary { background:#00695C; color:#fff; }
     .mo-btn.secondary { background:#F3F4F6; color:var(--text-primary); }
     .mo-btn:active { opacity:.85; }
@@ -61,27 +62,49 @@
     .order-code-box { background:#E0F2F1; border:1.5px dashed #00695C; border-radius:var(--radius-md); padding:14px 20px; margin:16px 0; width:100%; }
     .order-code-text { font-size:24px; font-weight:800; color:#00695C; letter-spacing:3px; }
     .urgency-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-    .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; }
+    .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; touch-action:manipulation; }
     .urgency-chip.selected { background:#00695C; color:#fff; border-color:#00695C; }
-    /* Condition/symptom selector */
+    /* Condition / symptom selector */
     .condition-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
     .cond-btn { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px;
       border:1.5px solid var(--border); border-radius:var(--radius-md); background:#fff;
       font-size:11px; font-weight:600; color:var(--text-secondary); cursor:pointer; text-align:center;
-      transition:all .2s; font-family:inherit; }
+      transition:all .2s; font-family:inherit; touch-action:manipulation; }
     .cond-btn .material-icons-outlined { font-size:22px; }
     .cond-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
     /* Drug type selector */
     .drug-type-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
     .drug-type-btn { padding:10px 8px; border:1.5px solid var(--border); border-radius:var(--radius-md);
       background:#fff; font-size:13px; font-weight:600; color:var(--text-secondary);
-      cursor:pointer; font-family:inherit; transition:all .2s; text-align:center; }
+      cursor:pointer; font-family:inherit; transition:all .2s; text-align:center;
+      touch-action:manipulation; }
     .drug-type-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
     .drug-type-btn.rx-selected { border-color:#7B1FA2; background:#F3E5F5; color:#6A1B9A; }
     .rx-notice { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md);
       padding:10px 14px; font-size:12px; color:#6A1B9A; display:flex; gap:8px; align-items:flex-start;
       margin-bottom:12px; display:none; }
     .rx-notice.visible { display:flex; }
+    /* Auth info banner */
+    .auth-banner { background:#FFF8E1; border:1px solid #FFD54F; border-radius:var(--radius-md);
+      padding:10px 14px; font-size:12px; color:#795548; display:flex; gap:8px; align-items:center;
+      margin:0 20px 4px; }
+    /* Pharmacy availability results */
+    .avail-section { padding:8px 20px 4px; }
+    .avail-title { font-size:11px; font-weight:700; color:#00695C; text-transform:uppercase;
+      letter-spacing:.6px; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+    .avail-item { background:#E0F2F1; border:1px solid #B2DFDB; border-radius:var(--radius-md);
+      padding:10px 14px; margin-bottom:6px; font-size:12px; color:#004D40; }
+    .avail-item strong { font-weight:700; color:#00695C; }
+    .avail-none { background:#FFF8E1; border:1px solid #FFD54F; border-radius:var(--radius-md);
+      padding:10px 14px; font-size:12px; color:#795548; }
+    /* Rx approval block */
+    .rx-approval-block { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md);
+      padding:12px 14px; margin-bottom:12px; }
+    .rx-approval-block .rx-warn { font-size:12px; color:#6A1B9A; font-weight:600; margin-bottom:8px;
+      display:flex; gap:6px; align-items:flex-start; }
+    .rx-code-input { width:100%; padding:9px 12px; border:1.5px solid #CE93D8; border-radius:8px;
+      font-size:13px; font-family:inherit; outline:none; background:#fff; box-sizing:border-box; }
+    .rx-code-input:focus { border-color:#7B1FA2; }
   </style>
 </head>
 <body>
@@ -98,17 +121,23 @@
   <div class="app-screen">
     <!-- Top bar -->
     <div style="background:#00695C;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
-      <button onclick="history.back()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <button onclick="history.back()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
         <span class="material-icons-outlined">arrow_back</span>
       </button>
       <div>
         <div style="font-size:16px;font-weight:700">Order Medicines</div>
         <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4</div>
       </div>
-      <button onclick="goMoStep(3)" style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">
+      <button onclick="goMoStep(3)" style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px;touch-action:manipulation">
         <span class="material-icons-outlined" style="font-size:16px">shopping_cart</span>
         Cart <span class="cart-badge" id="cartBadge">0</span>
       </button>
+    </div>
+
+    <!-- Guest auth info banner (shown if no session) -->
+    <div class="auth-banner" id="authBanner" style="display:none">
+      <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">info</span>
+      <span>You are browsing as a guest. <a href="login.html" style="color:#00695C;font-weight:600">Sign in</a> to save your order and track delivery.</span>
     </div>
 
     <!-- Progress dots -->
@@ -188,11 +217,25 @@
 
         <div class="mo-section">
           <div class="mo-field">
-            <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="filterMeds()">
+            <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="onMedSearchInput()">
           </div>
           <div class="mo-label" id="medsListLabel">Suggested Medicines</div>
           <div id="medsList"></div>
         </div>
+
+        <!-- Pharmacy availability panel (shown after condition + medicine selected) -->
+        <div id="availSection" style="display:none">
+          <div class="avail-section">
+            <div class="avail-title">
+              <span class="material-icons-outlined" style="font-size:15px">local_pharmacy</span>
+              Pharmacy Availability
+            </div>
+            <div id="availResults">
+              <div style="font-size:12px;color:var(--text-secondary)">Checking nearby pharmacies…</div>
+            </div>
+          </div>
+        </div>
+
         <div class="mo-section">
           <div class="mo-label">Or paste your prescription</div>
           <div class="mo-field">
@@ -233,6 +276,22 @@
               <option value="wallet">Homatt Wallet</option>
             </select>
           </div>
+
+          <!-- Rx prescription code block (shown only when drug_type = 'rx') -->
+          <div id="rxApprovalBlock" style="display:none">
+            <div class="rx-approval-block">
+              <div class="rx-warn">
+                <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">medical_services</span>
+                <span>Prescription medicines require doctor approval. Book a clinic visit first or enter your prescription code below.</span>
+              </div>
+              <label style="font-size:12px;font-weight:600;color:#6A1B9A;display:block;margin-bottom:6px">Prescription / Booking Code (optional)</label>
+              <input type="text" id="rxBookingCode" class="rx-code-input" placeholder="e.g. HO-4892" style="text-transform:uppercase">
+              <div style="font-size:11px;color:#9C4DCC;margin-top:6px">
+                Don't have a code? <a href="clinic-booking.html" style="color:#7B1FA2;font-weight:600">Book a clinic visit →</a>
+              </div>
+            </div>
+          </div>
+
           <div class="mo-field">
             <label>Special instructions (optional)</label>
             <textarea id="deliveryNotes" placeholder="e.g. Call on arrival, gate code is 1234…" style="min-height:60px"></textarea>
@@ -317,17 +376,30 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script>
-const cfg = window.HOMATT_CONFIG || {};
+// ── Auth check: read localStorage, show guest banner but do NOT redirect ──
+const _hoUser   = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
+const _hoSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+const _isGuest  = !_hoUser && !_hoSession;
+
+// Supabase client (may be null if config missing)
+const cfg  = window.HOMATT_CONFIG || {};
 const supa = (cfg.SUPABASE_URL && window.supabase)
   ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
 
 document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
 
+// Show guest banner if no session (no redirect)
+if (_isGuest) {
+  const banner = document.getElementById('authBanner');
+  if (banner) banner.style.display = 'flex';
+}
+
 let cart = {};     // { medicine_name: { name, qty, price } }
-let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '' };
+let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '', rxBookingCode: '' };
 let allMeds = [];
-let selectedCondition = '';
-let selectedDrugType = 'otc';
+let selectedCondition  = '';
+let selectedDrugType   = 'otc';
+let availCheckTimeout  = null;
 
 // Medicines grouped by condition
 const CONDITION_MEDS = {
@@ -348,16 +420,17 @@ function selectCondition(cond) {
   const label = document.getElementById('medsListLabel');
   if (label) label.textContent = cond === 'other' ? 'All Medicines' : 'Suggested for your condition';
   filterMeds();
+  maybeCheckAvailability();
 }
 
 function selectDrugType(type) {
   selectedDrugType = type;
-  order.drugType = type;
+  order.drugType   = type;
   document.getElementById('dtcOtc').classList.toggle('selected', type === 'otc');
   document.getElementById('dtcRx').classList.toggle('selected', false);
   document.getElementById('dtcRx').classList.toggle('rx-selected', type === 'rx');
   const notice = document.getElementById('rxNotice');
-  const wrap = document.getElementById('rxDoctorWrap');
+  const wrap   = document.getElementById('rxDoctorWrap');
   if (type === 'rx') {
     notice.classList.add('visible');
     wrap.style.display = 'block';
@@ -365,6 +438,7 @@ function selectDrugType(type) {
     notice.classList.remove('visible');
     wrap.style.display = 'none';
   }
+  maybeCheckAvailability();
 }
 
 const MOCK_MEDS = [
@@ -393,13 +467,17 @@ function goMoStep(n) {
     if (!Object.keys(cart).length && !pText) { alert('Please add at least one medicine or paste a prescription'); return; }
     // Collect drug type and doctor details
     order.condition = selectedCondition;
-    order.drugType = selectedDrugType;
-    order.rxDoctor = (document.getElementById('rxDoctorName') || {}).value || '';
+    order.drugType  = selectedDrugType;
+    order.rxDoctor  = (document.getElementById('rxDoctorName') || {}).value || '';
     if (selectedDrugType === 'rx' && !order.rxDoctor.trim()) {
       alert("For prescription drugs please enter the prescribing doctor's name.");
       document.getElementById('rxDoctorName').focus();
       return;
     }
+    // Show Rx approval block on step 2 if Rx type selected
+    const rxBlock = document.getElementById('rxApprovalBlock');
+    if (rxBlock) rxBlock.style.display = selectedDrugType === 'rx' ? 'block' : 'none';
+
     const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
     if (session.city || session.district) {
       const addr = document.getElementById('deliveryAddress');
@@ -409,11 +487,12 @@ function goMoStep(n) {
     if (!ph.value && (session.phone_number || session.phone)) ph.value = session.phone_number || session.phone;
   }
   if (n === 3) {
-    order.urgency = document.querySelector('.urgency-chip.selected')?.id.replace('murg-','') || 'standard';
-    order.address = document.getElementById('deliveryAddress').value.trim();
-    order.phone = document.getElementById('deliveryPhone').value.trim();
-    order.payment = document.getElementById('paymentMethod').value;
-    order.notes = document.getElementById('deliveryNotes').value.trim();
+    order.urgency  = document.querySelector('.urgency-chip.selected')?.id.replace('murg-','') || 'standard';
+    order.address  = document.getElementById('deliveryAddress').value.trim();
+    order.phone    = document.getElementById('deliveryPhone').value.trim();
+    order.payment  = document.getElementById('paymentMethod').value;
+    order.notes    = document.getElementById('deliveryNotes').value.trim();
+    order.rxBookingCode = (document.getElementById('rxBookingCode') || {}).value || '';
     if (!order.address) { alert('Please enter a delivery address'); return; }
     document.getElementById('etaText').textContent = order.urgency === 'urgent' ? '30–60 min' : '2–4 hours';
     renderCartSummary();
@@ -451,6 +530,7 @@ function addToCart(name, price) {
   cart[name].qty++;
   updateCartBadge();
   renderMeds();
+  maybeCheckAvailability();
 }
 
 function removeFromCart(name) {
@@ -468,11 +548,10 @@ function filterMeds() {
     displayed = allMeds.filter(m => m.name.toLowerCase().includes(q));
   } else if (selectedCondition && selectedCondition !== 'other') {
     const suggested = CONDITION_MEDS[selectedCondition] || [];
-    // Put suggested first, then rest
     const suggSet = new Set(suggested);
-    const top = allMeds.filter(m => suggSet.has(m.name));
+    const top  = allMeds.filter(m => suggSet.has(m.name));
     const rest = allMeds.filter(m => !suggSet.has(m.name));
-    displayed = [...top, ...rest];
+    displayed  = [...top, ...rest];
   }
   document.getElementById('medsList').innerHTML = displayed.map(m => {
     const c = cart[m.name];
@@ -491,11 +570,112 @@ function filterMeds() {
   }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No medicines found</div>';
 }
 
+// Called when the search input changes
+function onMedSearchInput() {
+  filterMeds();
+  maybeCheckAvailability();
+}
+
+/* ── Pharmacy Availability Check ── */
+function maybeCheckAvailability() {
+  // Show section only when condition selected OR medicine in cart OR search term entered
+  const searchTerm = document.getElementById('medSearch').value.trim();
+  const hasCart    = Object.keys(cart).length > 0;
+  const hasCond    = !!selectedCondition;
+
+  if (!hasCond && !hasCart && !searchTerm) {
+    document.getElementById('availSection').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('availSection').style.display = 'block';
+
+  // Debounce the actual lookup
+  clearTimeout(availCheckTimeout);
+  availCheckTimeout = setTimeout(checkPharmacyAvailability, 600);
+}
+
+async function checkPharmacyAvailability() {
+  const resultsEl = document.getElementById('availResults');
+  resultsEl.innerHTML = '<div style="font-size:12px;color:var(--text-secondary)">Checking nearby pharmacies…</div>';
+
+  // Build search terms: cart items + search field
+  const searchTerm = document.getElementById('medSearch').value.trim();
+  const cartNames  = Object.keys(cart);
+  const terms = searchTerm ? [searchTerm, ...cartNames] : cartNames.length ? cartNames : (CONDITION_MEDS[selectedCondition] || []).slice(0,3);
+
+  if (!terms.length) {
+    resultsEl.innerHTML = '<div style="font-size:12px;color:var(--text-secondary)">Select a medicine to check availability.</div>';
+    return;
+  }
+
+  // Try Supabase lookup
+  if (supa) {
+    try {
+      let results = [];
+      for (const term of terms.slice(0,3)) {  // limit to 3 lookups
+        let query = supa
+          .from('pharmacy_inventory')
+          .select('id, medicine_name, retail_price, drug_type, quantity, pharmacy_id')
+          .ilike('medicine_name', `%${term}%`)
+          .eq('is_available', true);
+
+        if (selectedDrugType) query = query.eq('drug_type', selectedDrugType);
+
+        const { data: invData } = await query.limit(5);
+        if (invData && invData.length) {
+          // Fetch pharmacy names
+          const pharmIds = [...new Set(invData.map(r => r.pharmacy_id).filter(Boolean))];
+          let pharmMap = {};
+          if (pharmIds.length) {
+            const { data: pharmData } = await supa.from('pharmacies').select('id,name,district').in('id', pharmIds);
+            if (pharmData) pharmData.forEach(p => { pharmMap[p.id] = p; });
+          }
+          results.push(...invData.map(r => ({
+            medicine: r.medicine_name,
+            price: r.retail_price,
+            pharmacy: pharmMap[r.pharmacy_id]?.name || 'Nearby Pharmacy',
+            district: pharmMap[r.pharmacy_id]?.district || 'Kampala',
+          })));
+        }
+      }
+
+      if (results.length) {
+        resultsEl.innerHTML = results.slice(0,6).map(r =>
+          `<div class="avail-item">
+            <strong>${r.medicine}</strong> — available at ${r.pharmacy} (${r.district})
+            ${r.price ? ` — UGX ${Number(r.price).toLocaleString()} each` : ''}
+          </div>`
+        ).join('');
+      } else {
+        resultsEl.innerHTML = `<div class="avail-none">Not found in nearby pharmacies. We'll source it for you.</div>`;
+      }
+      return;
+    } catch(e) {
+      // Fall through to mock
+    }
+  }
+
+  // Mock fallback results
+  const mockResults = [
+    { medicine: terms[0], pharmacy:'Ntinda Health Pharmacy', district:'Kampala', price: 500 },
+    { medicine: terms[0], pharmacy:'City Chemist Nakasero', district:'Kampala', price: 480 },
+  ];
+  resultsEl.innerHTML = mockResults.map(r =>
+    `<div class="avail-item">
+      <strong>${r.medicine}</strong> — available at ${r.pharmacy} (${r.district})
+      ${r.price ? ` — UGX ${Number(r.price).toLocaleString()} each` : ''}
+    </div>`
+  ).join('');
+}
+
+function renderMeds() { filterMeds(); }
+
 function renderCartSummary() {
-  const items = Object.values(cart);
-  const pText = document.getElementById('prescriptionText').value.trim();
+  const items    = Object.values(cart);
+  const pText    = document.getElementById('prescriptionText').value.trim();
   const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
+  const total    = subtotal + 5000;
   document.getElementById('cartSummary').innerHTML = `
     <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px">
       ${items.map(m => `
@@ -540,30 +720,40 @@ async function loadPharmacies() {
 }
 
 function selectPharmacy(id, name) {
-  order.pharmacyId = id;
+  order.pharmacyId   = id;
   order.pharmacyName = name;
   document.querySelectorAll('.pharmacy-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('ph-' + id)?.classList.add('selected');
 }
 
 function renderFinalSummary() {
-  const items = Object.values(cart);
+  const items    = Object.values(cart);
   const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
+  const total    = subtotal + 5000;
+  const rows = [
+    ['Pharmacy', order.pharmacyName || 'Nearest available'],
+    ['Delivery to', order.address],
+    ['Urgency', order.urgency === 'urgent' ? 'Urgent (30–60 min)' : 'Standard (2–4h)'],
+    ['Payment', order.payment.replace(/_/g,' ')],
+    ['Drug type', order.drugType === 'rx' ? 'Prescription (Rx)' : 'OTC'],
+  ];
+  if (order.drugType === 'rx' && order.rxBookingCode) {
+    rows.push(['Prescription code', order.rxBookingCode]);
+  }
+  rows.push(['Total', 'UGX ' + total.toLocaleString()]);
   document.getElementById('finalSummary').innerHTML = `
     <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px;margin-bottom:12px">
-      ${[
-        ['Pharmacy', order.pharmacyName || 'Nearest available'],
-        ['Delivery to', order.address],
-        ['Urgency', order.urgency === 'urgent' ? 'Urgent (30–60 min)' : 'Standard (2–4h)'],
-        ['Payment', order.payment.replace(/_/g,' ')],
-        ['Total', 'UGX ' + total.toLocaleString()],
-      ].map(([k,v]) => `
+      ${rows.map(([k,v]) => `
         <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:13px">
           <span style="color:var(--text-secondary)">${k}</span>
           <span style="font-weight:600;text-align:right;max-width:55%;text-transform:capitalize">${v}</span>
         </div>`).join('')}
     </div>
+    ${order.drugType === 'rx' && !order.rxBookingCode ? `
+    <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#795548;display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <span class="material-icons-outlined" style="font-size:16px">warning</span>
+      No prescription code provided. Homatt will contact you to verify the prescription before dispensing.
+    </div>` : ''}
     <div style="background:#E0F2F1;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#00695C;display:flex;gap:8px;align-items:center">
       <span class="material-icons-outlined" style="font-size:16px">info</span>
       Medicines will be delivered by a verified Homatt rider. You'll receive SMS updates.
@@ -575,11 +765,11 @@ async function submitOrder() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Placing order…';
 
-  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
-  const items = Object.values(cart);
+  const session  = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const items    = Object.values(cart);
   const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
-  const pText = document.getElementById('prescriptionText').value.trim();
+  const total    = subtotal + 5000;
+  const pText    = document.getElementById('prescriptionText').value.trim();
 
   const orderItems = items.map(m => ({ name: m.name, qty: m.qty, price: m.price }));
   if (!orderItems.length && pText) orderItems.push({ name: pText, qty: 1, price: 0 });
@@ -587,20 +777,23 @@ async function submitOrder() {
   if (supa && session.userId) {
     const pharmacyId = (order.pharmacyId && !['p1','p2','p3'].includes(order.pharmacyId)) ? order.pharmacyId : null;
     const payload = {
-      patient_id: session.userId,
-      patient_name: session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : session.name || 'Patient',
-      patient_phone: order.phone || session.phone_number || '',
+      patient_id:       session.userId,
+      patient_name:     session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : session.name || 'Patient',
+      patient_phone:    order.phone || session.phone_number || '',
       delivery_address: order.address,
-      delivery_district: session.district || null,
-      pharmacy_id: pharmacyId,
-      items: orderItems,
-      urgency: order.urgency,
-      medication_cost: subtotal,
-      delivery_cost: 5000,
-      total_cost: total,
-      payment_method: order.payment,
-      payment_status: 'pending',
-      status: 'incoming',
+      delivery_district:session.district || null,
+      pharmacy_id:      pharmacyId,
+      items:            orderItems,
+      urgency:          order.urgency,
+      drug_type:        order.drugType,
+      rx_doctor:        order.rxDoctor || null,
+      rx_booking_code:  order.rxBookingCode || null,
+      medication_cost:  subtotal,
+      delivery_cost:    5000,
+      total_cost:       total,
+      payment_method:   order.payment,
+      payment_status:   'pending',
+      status:           'incoming',
     };
     const { error } = await supa.from('pharmacy_orders').insert(payload);
     if (error) {
@@ -613,7 +806,7 @@ async function submitOrder() {
 
   const orderCode = 'ORD-' + Math.random().toString(36).toUpperCase().slice(2,6);
   document.getElementById('orderCodeDisplay').textContent = orderCode;
-  document.getElementById('confirmAddress').textContent = order.address || 'your address';
+  document.getElementById('confirmAddress').textContent   = order.address || 'your address';
   document.querySelectorAll('.mo-step').forEach(s => s.classList.remove('active'));
   document.getElementById('mostepSuccess').classList.add('active');
   document.querySelector('.mo-prog').style.display = 'none';

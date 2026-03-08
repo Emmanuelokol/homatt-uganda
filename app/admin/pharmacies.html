@@ -15,6 +15,9 @@
     <div class="admin-topbar">
       <div class="admin-topbar-title">Pharmacy Management</div>
       <div class="admin-topbar-right">
+        <button class="btn-admin info" id="createPharmacyAccountBtn">
+          <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Pharmacy Account
+        </button>
         <button class="btn-admin primary" id="addPharmacyBtn">
           <span class="material-icons-outlined" style="font-size:16px">add</span> Add Pharmacy
         </button>
@@ -153,6 +156,67 @@
   </div>
 </div>
 
+<!-- Create Pharmacy Account Modal -->
+<div class="admin-modal-overlay" id="createPharmacyAccountModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Create Pharmacy Account</div>
+      <button class="admin-modal-close" onclick="closeCreatePharmacyAccountModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="pharmacyAccountDemoNote" style="display:none;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#795548">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px;margin-right:4px">info</span>
+        In demo mode, account creation requires real Supabase credentials.
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+        Creates a Supabase auth account for this pharmacy and registers it in the pharmacies table. Share the credentials with pharmacy staff to log into their portal.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Pharmacy Name *</label>
+          <input type="text" id="paPharmacyName" placeholder="e.g. Nakawa Pharmacy">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Location / District *</label>
+          <input type="text" id="paPharmacyLocation" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Phone Number</label>
+          <input type="text" id="paPharmacyPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Staff Email *</label>
+          <input type="email" id="paPharmacyEmail" placeholder="pharmacy@example.com">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">This will be the login email for the pharmacy portal.</div>
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Password *</label>
+          <input type="text" id="paPharmacyPassword" placeholder="Min 8 characters" autocomplete="new-password">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Minimum 8 characters. Share this with the pharmacy.</div>
+        </div>
+      </div>
+
+      <!-- Success box shown after creation -->
+      <div id="paPharmacySuccessBox" style="display:none;margin-top:16px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:16px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Account Created!
+        </div>
+        <div style="font-size:13px;color:#2E7D32;margin-bottom:10px">Share these credentials with the pharmacy staff:</div>
+        <div style="background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:12px;font-family:monospace;font-size:13px;line-height:1.8" id="paPharmacyCredentials"></div>
+        <button class="btn-admin secondary" style="margin-top:10px;font-size:12px" onclick="copyPharmacyCredentials()">
+          <span class="material-icons-outlined" style="font-size:14px">content_copy</span> Copy Credentials
+        </button>
+      </div>
+    </div>
+    <div class="admin-modal-footer" id="paPharmacyFooter">
+      <button class="btn-admin secondary" onclick="closeCreatePharmacyAccountModal()">Cancel</button>
+      <button class="btn-admin primary" id="createPharmacyAccountSubmitBtn">
+        <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="admin-toast" id="adminToast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -160,19 +224,23 @@
 <script src="js/admin.js"></script>
 <script>
 let allPharmacies = [];
+let _adminSession = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('pharmacies');
   const session = await requireAdmin();
   if (!session) return;
+  _adminSession = session;
   setupAdminLogout();
   await loadPharmacies();
 
   document.getElementById('addPharmacyBtn').addEventListener('click', () => openModal());
+  document.getElementById('createPharmacyAccountBtn').addEventListener('click', () => openCreatePharmacyAccountModal());
   document.getElementById('filterStatus').addEventListener('change', renderPharmacies);
   document.getElementById('searchPharmacies').addEventListener('input', renderPharmacies);
   document.getElementById('savePharmacyBtn').addEventListener('click', savePharmacy);
   document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+  document.getElementById('createPharmacyAccountSubmitBtn').addEventListener('click', submitCreatePharmacyAccount);
 });
 
 async function loadPharmacies() {
@@ -294,6 +362,110 @@ async function saveStaff() {
   if (puErr) { showAdminToast('Portal user error: ' + puErr.message, 'error'); return; }
   closeStaffModal();
   showAdminToast(`Portal login created for ${name}`, 'success');
+}
+
+/* ── Create Pharmacy Account Modal ── */
+function openCreatePharmacyAccountModal() {
+  // Reset form
+  document.getElementById('paPharmacyName').value = '';
+  document.getElementById('paPharmacyLocation').value = '';
+  document.getElementById('paPharmacyPhone').value = '';
+  document.getElementById('paPharmacyEmail').value = '';
+  document.getElementById('paPharmacyPassword').value = '';
+  document.getElementById('paPharmacySuccessBox').style.display = 'none';
+  document.getElementById('paPharmacyFooter').style.display = 'flex';
+  document.getElementById('createPharmacyAccountSubmitBtn').disabled = false;
+  document.getElementById('createPharmacyAccountSubmitBtn').innerHTML =
+    '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+
+  // Show demo note if in demo mode
+  const isDemo = _adminSession && _adminSession.demo === true;
+  document.getElementById('pharmacyAccountDemoNote').style.display = isDemo ? 'block' : 'none';
+
+  document.getElementById('createPharmacyAccountModal').style.display = 'flex';
+}
+
+function closeCreatePharmacyAccountModal() {
+  document.getElementById('createPharmacyAccountModal').style.display = 'none';
+}
+
+let _lastPharmacyCredentials = '';
+
+async function submitCreatePharmacyAccount() {
+  const name     = document.getElementById('paPharmacyName').value.trim();
+  const location = document.getElementById('paPharmacyLocation').value.trim();
+  const phone    = document.getElementById('paPharmacyPhone').value.trim();
+  const email    = document.getElementById('paPharmacyEmail').value.trim();
+  const password = document.getElementById('paPharmacyPassword').value;
+
+  if (!name)     { showAdminToast('Pharmacy name is required', 'error'); return; }
+  if (!location) { showAdminToast('Location / district is required', 'error'); return; }
+  if (!email)    { showAdminToast('Staff email is required', 'error'); return; }
+  if (!password || password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  const btn = document.getElementById('createPharmacyAccountSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">hourglass_top</span> Creating...';
+
+  // Step 1: Create auth account
+  const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({ email, password });
+
+  if (signUpErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Account creation failed: ' + signUpErr.message, 'error');
+    return;
+  }
+
+  const authUserId = signUpData.user?.id;
+  if (!authUserId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Could not create auth user — the email may already be registered.', 'error');
+    return;
+  }
+
+  // Step 2: Insert into pharmacies table
+  const insertPayload = {
+    name,
+    district: location,
+    status: 'active',
+    email,
+    auth_user_id: authUserId
+  };
+  if (phone) insertPayload.phone = phone;
+
+  const { data: pharmacyRow, error: insertErr } = await supabase
+    .from('pharmacies')
+    .insert(insertPayload)
+    .select()
+    .single();
+
+  if (insertErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Pharmacy record error: ' + insertErr.message, 'error');
+    return;
+  }
+
+  // Success
+  const phoneLine = phone ? `\nPhone: ${phone}` : '';
+  _lastPharmacyCredentials = `Pharmacy: ${name}\nLocation: ${location}${phoneLine}\nEmail: ${email}\nPassword: ${password}\nPortal: ${window.location.origin}`;
+
+  document.getElementById('paPharmacyCredentials').textContent = _lastPharmacyCredentials;
+  document.getElementById('paPharmacySuccessBox').style.display = 'block';
+  document.getElementById('paPharmacyFooter').style.display = 'none';
+
+  await loadPharmacies();
+  showAdminToast('Pharmacy account created successfully!', 'success');
+}
+
+function copyPharmacyCredentials() {
+  navigator.clipboard.writeText(_lastPharmacyCredentials).then(() => {
+    showAdminToast('Credentials copied to clipboard', 'success');
+  }).catch(() => {
+    showAdminToast('Copy failed — please select and copy manually', 'error');
+  });
 }
 </script>
 </body>
