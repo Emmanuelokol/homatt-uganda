@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="css/pages.css">
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
   <style>
+    /* Critical: prevent outer app-screen from scrolling — let each step's inner div scroll instead */
+    .app-screen { overflow: hidden !important; display:flex; flex-direction:column; }
     .mo-step { display:none; }
     .mo-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
     .mo-hero { text-align:center; padding:24px 20px 12px; }
