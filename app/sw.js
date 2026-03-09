@@ -7,7 +7,7 @@
  *   • Everything else: Network-first, fall back to cache
  */
 
-const CACHE_NAME = 'homatt-shell-v7';
+const CACHE_NAME = 'homatt-shell-v8';
 
 const APP_SHELL = [
   './',
@@ -95,6 +95,25 @@ self.addEventListener('fetch', (event) => {
           return response;
         }).catch(() => cached || new Response('', { status: 503 }));
       })
+    );
+    return;
+  }
+
+  // Admin / clinic / pharmacy / rider portals: always network-first (auth-sensitive)
+  if (
+    url.pathname.includes('/admin/') ||
+    url.pathname.includes('/clinic/') ||
+    url.pathname.includes('/pharmacy/') ||
+    url.pathname.includes('/rider/')
+  ) {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
     );
     return;
   }
