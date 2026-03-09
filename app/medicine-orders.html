@@ -66,14 +66,13 @@
     .urgency-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
     .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; touch-action:manipulation; }
     .urgency-chip.selected { background:#00695C; color:#fff; border-color:#00695C; }
-    /* Condition / symptom selector */
-    .condition-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
-    .cond-btn { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px;
-      border:1.5px solid var(--border); border-radius:var(--radius-md); background:#fff;
-      font-size:11px; font-weight:600; color:var(--text-secondary); cursor:pointer; text-align:center;
-      transition:all .2s; font-family:inherit; touch-action:manipulation; }
-    .cond-btn .material-icons-outlined { font-size:22px; }
-    .cond-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
+    /* Condition chips — horizontal scroll row */
+    .cond-btn { display:inline-flex; align-items:center; gap:5px; padding:7px 12px;
+      border:1.5px solid var(--border); border-radius:20px; background:#fff;
+      font-size:12px; font-weight:500; color:var(--text-secondary); cursor:pointer;
+      white-space:nowrap; flex-shrink:0; font-family:inherit; transition:all .2s; touch-action:manipulation; }
+    .cond-btn .material-icons-outlined { font-size:16px; }
+    .cond-btn.selected { border-color:#00695C; background:#00695C; color:#fff; }
     /* Drug type selector */
     .drug-type-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
     .drug-type-btn { padding:10px 8px; border:1.5px solid var(--border); border-radius:var(--radius-md);
@@ -152,80 +151,51 @@
 
     <!-- STEP 1: Select medicines -->
     <div class="mo-step active" id="mostep1">
-      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
-        <div class="mo-hero" style="padding-bottom:4px">
-          <div class="mo-hero-icon"><span class="material-icons-outlined">medication</span></div>
-          <div class="mo-heading">Order Medicines</div>
-          <div class="mo-subheading">Select your condition then choose medicines, or search by name.</div>
-        </div>
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:20px">
 
-        <!-- Condition / Symptom selector -->
-        <div class="mo-section" style="padding-bottom:4px">
-          <div class="mo-label">What is the issue? (select one)</div>
-          <div class="condition-grid" id="conditionGrid">
-            <button class="cond-btn" data-cond="pain" onclick="selectCondition('pain')">
-              <span class="material-icons-outlined" style="color:#E53935">sentiment_very_dissatisfied</span>Pain / Ache
-            </button>
-            <button class="cond-btn" data-cond="fever" onclick="selectCondition('fever')">
-              <span class="material-icons-outlined" style="color:#FF7043">thermostat</span>Fever
-            </button>
-            <button class="cond-btn" data-cond="malaria" onclick="selectCondition('malaria')">
-              <span class="material-icons-outlined" style="color:#388E3C">bug_report</span>Malaria
-            </button>
-            <button class="cond-btn" data-cond="infection" onclick="selectCondition('infection')">
-              <span class="material-icons-outlined" style="color:#0288D1">coronavirus</span>Infection
-            </button>
-            <button class="cond-btn" data-cond="digestive" onclick="selectCondition('digestive')">
-              <span class="material-icons-outlined" style="color:#8D6E63">sick</span>Stomach / Gut
-            </button>
-            <button class="cond-btn" data-cond="chronic" onclick="selectCondition('chronic')">
-              <span class="material-icons-outlined" style="color:#7B1FA2">monitor_heart</span>Chronic Disease
-            </button>
-            <button class="cond-btn" data-cond="maternal" onclick="selectCondition('maternal')">
-              <span class="material-icons-outlined" style="color:#E91E63">pregnant_woman</span>Maternal
-            </button>
-            <button class="cond-btn" data-cond="skin" onclick="selectCondition('skin')">
-              <span class="material-icons-outlined" style="color:#FF8F00">face</span>Skin
-            </button>
-            <button class="cond-btn" data-cond="other" onclick="selectCondition('other')">
-              <span class="material-icons-outlined" style="color:#607D8B">more_horiz</span>Other
-            </button>
-          </div>
-        </div>
-
-        <!-- Drug type: OTC or Prescription -->
-        <div class="mo-section" style="padding-top:4px;padding-bottom:4px">
-          <div class="mo-label">Drug type</div>
-          <div class="drug-type-row">
-            <button class="drug-type-btn selected" id="dtcOtc" onclick="selectDrugType('otc')">
-              💊 Over-the-Counter (OTC)<br><span style="font-size:11px;font-weight:400">No doctor needed</span>
-            </button>
-            <button class="drug-type-btn" id="dtcRx" onclick="selectDrugType('rx')">
-              📋 Prescription (Rx)<br><span style="font-size:11px;font-weight:400">Doctor required</span>
-            </button>
-          </div>
-          <div class="rx-notice" id="rxNotice">
-            <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">verified_user</span>
-            <span>Prescription drugs require a doctor's recommendation. Please add your doctor's name and upload or paste your prescription details below. Homatt will verify before dispensing.</span>
-          </div>
-          <!-- Prescription doctor input (shown only for Rx) -->
-          <div id="rxDoctorWrap" style="display:none">
-            <div class="mo-field">
-              <label>Prescribing Doctor *</label>
-              <input type="text" id="rxDoctorName" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
-            </div>
-          </div>
-        </div>
-
-        <div class="mo-section">
-          <div class="mo-field">
+        <!-- Search bar — shown first so medicines are immediately visible -->
+        <div class="mo-section" style="padding-top:14px;padding-bottom:8px">
+          <div class="mo-field" style="margin-bottom:0">
             <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="onMedSearchInput()">
           </div>
-          <div class="mo-label" id="medsListLabel">Suggested Medicines</div>
+        </div>
+
+        <!-- Condition chips — horizontal scroll, compact -->
+        <div style="padding:0 20px 8px;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none" id="conditionGrid">
+          <button class="cond-btn" data-cond="pain" onclick="selectCondition('pain')"><span class="material-icons-outlined" style="color:#E53935">sentiment_very_dissatisfied</span>Pain</button>
+          <button class="cond-btn" data-cond="fever" onclick="selectCondition('fever')"><span class="material-icons-outlined" style="color:#FF7043">thermostat</span>Fever</button>
+          <button class="cond-btn" data-cond="malaria" onclick="selectCondition('malaria')"><span class="material-icons-outlined" style="color:#388E3C">bug_report</span>Malaria</button>
+          <button class="cond-btn" data-cond="infection" onclick="selectCondition('infection')"><span class="material-icons-outlined" style="color:#0288D1">coronavirus</span>Infection</button>
+          <button class="cond-btn" data-cond="digestive" onclick="selectCondition('digestive')"><span class="material-icons-outlined" style="color:#8D6E63">sick</span>Stomach</button>
+          <button class="cond-btn" data-cond="chronic" onclick="selectCondition('chronic')"><span class="material-icons-outlined" style="color:#7B1FA2">monitor_heart</span>Chronic</button>
+          <button class="cond-btn" data-cond="maternal" onclick="selectCondition('maternal')"><span class="material-icons-outlined" style="color:#E91E63">pregnant_woman</span>Maternal</button>
+          <button class="cond-btn" data-cond="skin" onclick="selectCondition('skin')"><span class="material-icons-outlined" style="color:#FF8F00">face</span>Skin</button>
+          <button class="cond-btn" data-cond="other" onclick="selectCondition('other')"><span class="material-icons-outlined" style="color:#607D8B">more_horiz</span>Other</button>
+        </div>
+
+        <!-- Drug type: compact inline -->
+        <div style="padding:0 20px 10px;display:flex;gap:8px">
+          <button class="drug-type-btn selected" id="dtcOtc" onclick="selectDrugType('otc')" style="flex:1;padding:8px 10px;font-size:12px">💊 OTC (No Rx)</button>
+          <button class="drug-type-btn" id="dtcRx" onclick="selectDrugType('rx')" style="flex:1;padding:8px 10px;font-size:12px">📋 Prescription</button>
+        </div>
+        <div class="rx-notice" id="rxNotice" style="margin:0 20px 8px">
+          <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">verified_user</span>
+          <span>Prescription drugs require a doctor's recommendation. Homatt will verify before dispensing.</span>
+        </div>
+        <div id="rxDoctorWrap" style="display:none;padding:0 20px 8px">
+          <div class="mo-field">
+            <label>Prescribing Doctor *</label>
+            <input type="text" id="rxDoctorName" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
+          </div>
+        </div>
+
+        <!-- Medicine list — immediately visible below search -->
+        <div class="mo-section" style="padding-top:4px">
+          <div class="mo-label" id="medsListLabel">All Medicines</div>
           <div id="medsList"></div>
         </div>
 
-        <!-- Pharmacy availability panel (shown after condition + medicine selected) -->
+        <!-- Pharmacy availability panel -->
         <div id="availSection" style="display:none">
           <div class="avail-section">
             <div class="avail-title">
@@ -420,7 +390,7 @@ function selectCondition(cond) {
   selectedCondition = cond;
   document.querySelectorAll('.cond-btn').forEach(b => b.classList.toggle('selected', b.dataset.cond === cond));
   const label = document.getElementById('medsListLabel');
-  if (label) label.textContent = cond === 'other' ? 'All Medicines' : 'Suggested for your condition';
+  if (label) label.textContent = (!cond || cond === 'other') ? 'All Medicines' : 'Suggested for your condition';
   filterMeds();
   maybeCheckAvailability();
 }
