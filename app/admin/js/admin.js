@@ -69,18 +69,28 @@ function buildAdminSidebar(activePage) {
 
 /* ── Admin auth guard ── */
 async function requireAdmin() {
-  // Demo mode — skip Supabase auth entirely
-  let demo;
-  try { demo = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
-  if (demo && typeof demo === 'object' && demo.demo) {
-    const adminName = demo.name || 'Admin (Demo)';
+  // Check stored session (demo or real login) — works without Supabase CDN
+  let stored;
+  try { stored = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
+  if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
+    const adminName = stored.name || 'Admin';
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
     const nameTop  = document.getElementById('adminUserNameTop');
     if (avatarEl) avatarEl.textContent = adminName.charAt(0).toUpperCase();
     if (nameEl)   nameEl.textContent   = adminName;
     if (nameTop)  nameTop.textContent  = adminName;
-    return { demo: true };
+    // For real sessions, also verify with Supabase in the background (non-blocking)
+    if (!stored.demo && supabase) {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (!session) {
+          // Session expired — clear and redirect
+          localStorage.removeItem('admin_session');
+          window.location.href = 'index.html';
+        }
+      }).catch(() => {});
+    }
+    return stored;
   }
 
   if (!supabase) { window.location.href = 'index.html'; return null; }

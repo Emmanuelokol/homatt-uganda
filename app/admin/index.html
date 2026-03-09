@@ -58,12 +58,27 @@
 
     // Check if already logged in as admin
     (async () => {
+      // Check stored session first (works offline / without Supabase CDN)
+      let stored;
+      try { stored = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
+      if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+      // Fallback: check Supabase session
       if (!supabase) return;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
-          const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).single();
+          const { data: profile } = await supabase.from('profiles').select('first_name, last_name, is_admin').eq('id', session.user.id).single();
           if (profile && profile.is_admin) {
+            // Restore stored session marker
+            localStorage.setItem('admin_session', JSON.stringify({
+              email: session.user.email,
+              name: (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+              isAdmin: true,
+              userId: session.user.id
+            }));
             window.location.href = 'dashboard.html';
           }
         }
@@ -95,13 +110,21 @@
       }
 
       // Check admin flag
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', data.user.id).single();
+      const { data: profile } = await supabase.from('profiles').select('first_name, last_name, is_admin').eq('id', data.user.id).single();
       if (!profile || !profile.is_admin) {
         await supabase.auth.signOut();
         errEl.textContent = 'Access denied. Your account is not an admin account.';
         errEl.style.display = 'block';
         return;
       }
+
+      // Store session marker so requireAdmin() works even if Supabase CDN is slow/unavailable
+      localStorage.setItem('admin_session', JSON.stringify({
+        email: data.user.email,
+        name: (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+        isAdmin: true,
+        userId: data.user.id
+      }));
 
       window.location.href = 'dashboard.html';
     });
