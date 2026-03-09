@@ -7,6 +7,14 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
+  <script>
+    // Portals must never be served from SW cache — unregister any active SW then reload once
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        Promise.all(regs.map(r => r.unregister())).then(() => location.reload());
+      });
+    }
+  </script>
 </head>
 <body>
   <div class="admin-login-page">

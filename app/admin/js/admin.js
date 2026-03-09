@@ -80,16 +80,6 @@ async function requireAdmin() {
     if (avatarEl) avatarEl.textContent = adminName.charAt(0).toUpperCase();
     if (nameEl)   nameEl.textContent   = adminName;
     if (nameTop)  nameTop.textContent  = adminName;
-    // For real sessions, also verify with Supabase in the background (non-blocking)
-    if (!stored.demo && supabase) {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) {
-          // Session expired — clear and redirect
-          localStorage.removeItem('admin_session');
-          window.location.href = 'index.html';
-        }
-      }).catch(() => {});
-    }
     return stored;
   }
 
