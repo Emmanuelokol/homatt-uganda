@@ -135,6 +135,82 @@
           </div>
         </div>
 
+        <!-- Diet -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">restaurant</span>
+            Diet Today
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">How well did you eat today?</label>
+            <div class="slider-row">
+              <input type="range" id="dietQuality" class="slider-range" min="1" max="10" value="5">
+              <div class="slider-value-badge" id="dietQualityVal">5</div>
+            </div>
+            <div class="slider-min-max"><span>Very poor (1)</span><span>Very healthy (10)</span></div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Meals eaten today</label>
+            <div class="chips-wrap" id="mealChips">
+              <button class="chip-toggle" data-chip="meal" data-val="breakfast">Breakfast</button>
+              <button class="chip-toggle" data-chip="meal" data-val="lunch">Lunch</button>
+              <button class="chip-toggle" data-chip="meal" data-val="dinner">Dinner</button>
+              <button class="chip-toggle" data-chip="meal" data-val="snacks">Snacks</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Water intake today</label>
+            <div class="chips-wrap">
+              <button class="chip-toggle" data-chip="water" data-val="under_4">Under 4 glasses</button>
+              <button class="chip-toggle" data-chip="water" data-val="4_6">4–6 glasses</button>
+              <button class="chip-toggle" data-chip="water" data-val="8_plus">8+ glasses</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Exercise -->
+        <div class="tracker-section">
+          <div class="tracker-section-title">
+            <span class="material-icons-outlined">fitness_center</span>
+            Exercise & Activity
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Did you exercise today?</label>
+            <div class="yes-no-group">
+              <button class="choice-btn" data-group="exercised" data-val="yes">Yes</button>
+              <button class="choice-btn" data-group="exercised" data-val="no">No</button>
+            </div>
+          </div>
+          <div class="tracker-input-group" id="exerciseTypeWrap" style="display:none">
+            <label class="tracker-label">Type of exercise</label>
+            <div class="chips-wrap" id="exerciseTypeChips">
+              <button class="chip-toggle" data-chip="exercise_type" data-val="walking">Walking</button>
+              <button class="chip-toggle" data-chip="exercise_type" data-val="running">Running / Jogging</button>
+              <button class="chip-toggle" data-chip="exercise_type" data-val="gym">Gym / Weights</button>
+              <button class="chip-toggle" data-chip="exercise_type" data-val="sports">Sports</button>
+              <button class="chip-toggle" data-chip="exercise_type" data-val="yoga">Yoga / Stretching</button>
+              <button class="chip-toggle" data-chip="exercise_type" data-val="other">Other</button>
+            </div>
+          </div>
+          <div class="tracker-input-group" id="exerciseDurationWrap" style="display:none">
+            <label class="tracker-label">How long did you exercise?</label>
+            <div class="chips-wrap">
+              <button class="chip-toggle" data-chip="exercise_duration" data-val="15_30">15–30 min</button>
+              <button class="chip-toggle" data-chip="exercise_duration" data-val="30_60">30–60 min</button>
+              <button class="chip-toggle" data-chip="exercise_duration" data-val="60_plus">Over 1 hour</button>
+            </div>
+          </div>
+          <div class="tracker-input-group">
+            <label class="tracker-label">Daily activity level</label>
+            <div class="chips-wrap">
+              <button class="chip-toggle" data-chip="activity" data-val="sedentary">Mostly sitting</button>
+              <button class="chip-toggle" data-chip="activity" data-val="light">Light movement</button>
+              <button class="chip-toggle" data-chip="activity" data-val="moderate">Moderately active</button>
+              <button class="chip-toggle" data-chip="activity" data-val="very_active">Very active</button>
+            </div>
+          </div>
+        </div>
+
         <!-- Stress Triggers -->
         <div class="tracker-section">
           <div class="tracker-section-title">
@@ -142,7 +218,7 @@
             Stress & Triggers
           </div>
           <div class="tracker-input-group">
-            <label class="tracker-label">Stress Triggers Today</label>
+            <label class="tracker-label">Stress triggers today</label>
             <div class="chips-wrap" id="stressTriggerChips">
               <button class="chip-toggle" data-chip="stress" data-val="work">Work</button>
               <button class="chip-toggle" data-chip="stress" data-val="family">Family</button>
@@ -155,14 +231,14 @@
             </div>
           </div>
           <div class="tracker-input-group">
-            <label class="tracker-label">Caffeine Intake Today</label>
+            <label class="tracker-label">Caffeine intake today</label>
             <div class="yes-no-group">
               <button class="choice-btn" data-group="caffeine" data-val="yes">Yes</button>
               <button class="choice-btn" data-group="caffeine" data-val="no">No</button>
             </div>
           </div>
           <div class="tracker-input-group">
-            <label class="tracker-label">Alcohol Intake Today</label>
+            <label class="tracker-label">Alcohol intake today</label>
             <div class="yes-no-group">
               <button class="choice-btn" data-group="alcohol" data-val="yes">Yes</button>
               <button class="choice-btn" data-group="alcohol" data-val="no">No</button>

@@ -5,13 +5,27 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { window.location.href = 'signin.html'; return; }
+  // Safe Supabase init — won't crash if CDN is slow or config missing
+  let supabase = null;
+  let session = null;
+  let userId = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      const { data } = await supabase.auth.getSession();
+      session = data?.session || null;
+      userId = session?.user?.id || null;
+    }
+  } catch(e) { console.warn('[MoodTracker] Supabase init failed:', e.message); }
 
-  const userId = session.user.id;
+  // Accept localStorage session for offline / APK users
+  const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+  if (!session && !localSession) { window.location.href = 'signin.html'; return; }
+  if (!userId && localSession?.userId) userId = localSession.userId;
+
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  const firstName = user.first_name || localSession?.first_name || localSession?.name?.split(' ')[0] || 'there';
   const today = new Date().toISOString().split('T')[0];
 
   function updateTime() {
@@ -67,6 +81,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   initSlider('moodScore', 'moodScoreVal');
   initSlider('energyLevel', 'energyLevelVal');
   initSlider('anxietyLevel', 'anxietyLevelVal');
+  initSlider('dietQuality', 'dietQualityVal');
+
+  // ---- Exercise toggle: show type/duration when "yes" selected ----
+  document.querySelectorAll('.choice-btn[data-group="exercised"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const show = btn.dataset.val === 'yes';
+      const typeWrap = document.getElementById('exerciseTypeWrap');
+      const durWrap = document.getElementById('exerciseDurationWrap');
+      if (typeWrap) typeWrap.style.display = show ? 'block' : 'none';
+      if (durWrap) durWrap.style.display = show ? 'block' : 'none';
+    });
+  });
+
+  // ---- Personalized greeting ----
+  const logSection = document.querySelector('.tracker-section:first-child .tracker-section-title');
+  if (logSection) {
+    const greetEl = document.createElement('p');
+    greetEl.style.cssText = 'font-size:13px;color:var(--text-secondary);margin:4px 20px 0;line-height:1.5';
+    greetEl.textContent = `Hi ${firstName}! Log how you slept and how you're feeling today.`;
+    logSection.closest('.tracker-section').insertAdjacentElement('beforebegin', greetEl);
+  }
 
   // ---- Counter: Night Awakenings ----
   let awakenings = 0;
@@ -106,6 +141,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const sleepStart = document.getElementById('sleepStart').value;
     const wakeTime = document.getElementById('wakeTime').value;
 
+    // Also pull today's diet data from diet tracker for richer analysis
+    const dietLogs = JSON.parse(localStorage.getItem('homatt_diet_logs') || '[]');
+    const todayDiet = dietLogs.find(d => d.date === today) || null;
+
     const logData = {
       user_id: userId,
       log_date: today,
@@ -120,6 +159,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       stress_triggers: getChips('stress'),
       caffeine_intake: getChoice('caffeine') === 'yes',
       alcohol_intake: getChoice('alcohol') === 'yes',
+      // Diet data (from this tracker + synced from diet tracker)
+      diet_quality: parseInt(document.getElementById('dietQuality')?.value || '5'),
+      meals_eaten: getChips('meal'),
+      water_intake: getChips('water')[0] || null,
+      diet_synced: todayDiet ? todayDiet : null,
+      // Exercise data
+      exercised: getChoice('exercised') === 'yes',
+      exercise_types: getChips('exercise_type'),
+      exercise_duration: getChips('exercise_duration')[0] || null,
+      activity_level: getChips('activity')[0] || null,
       notes: document.getElementById('moodNotes').value.trim() || null,
     };
 
@@ -127,18 +176,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Saving...';
 
-    const { error } = await supabase.from('mood_sleep_logs').insert(logData);
+    // Save to localStorage always (offline-first)
+    const localLogs = JSON.parse(localStorage.getItem('homatt_mood_logs') || '[]');
+    localLogs.unshift(logData);
+    if (localLogs.length > 60) localLogs.pop();
+    localStorage.setItem('homatt_mood_logs', JSON.stringify(localLogs));
+
+    if (supabase) {
+      const { error } = await supabase.from('mood_sleep_logs').insert(logData);
+      if (error) console.warn('[MoodTracker] Supabase insert failed (will use local data):', error.message);
+    }
 
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Today\'s Log';
 
-    if (error) {
-      showToast('Error saving log. Please try again.');
-      console.error(error);
-    } else {
-      showToast('Mood & sleep log saved!');
-      resetForm();
-    }
+    showToast(`Great job logging, ${firstName}! Keep it up 🌱`);
+    resetForm();
   });
 
   function resetForm() {
@@ -146,17 +199,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('wakeTime').value = '';
     awakenings = 0;
     updateAwakeDisplay();
-    document.getElementById('sleepQuality').value = 5;
-    document.getElementById('sleepQualityVal').textContent = 5;
-    document.getElementById('moodScore').value = 5;
-    document.getElementById('moodScoreVal').textContent = 5;
-    document.getElementById('energyLevel').value = 5;
-    document.getElementById('energyLevelVal').textContent = 5;
+    ['sleepQuality','moodScore','energyLevel','dietQuality'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.value = 5; }
+      const valEl = document.getElementById(id + 'Val');
+      if (valEl) valEl.textContent = '5';
+    });
     document.getElementById('anxietyLevel').value = 1;
     document.getElementById('anxietyLevelVal').textContent = 1;
     document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
     document.querySelectorAll('.chip-toggle').forEach(c => c.classList.remove('selected'));
     document.getElementById('moodNotes').value = '';
+    // Hide exercise details
+    const tw = document.getElementById('exerciseTypeWrap');
+    const dw = document.getElementById('exerciseDurationWrap');
+    if (tw) tw.style.display = 'none';
+    if (dw) dw.style.display = 'none';
   }
 
   // ---- Pattern Analysis ----
@@ -174,22 +232,32 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoff = thirtyDaysAgo.toISOString().split('T')[0];
 
-    const { data: logs } = await supabase
-      .from('mood_sleep_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .gte('log_date', thirtyDaysAgo.toISOString().split('T')[0])
-      .order('log_date', { ascending: false });
+    // Load from localStorage first (offline-first), then try Supabase
+    let logs = JSON.parse(localStorage.getItem('homatt_mood_logs') || '[]')
+      .filter(l => l.log_date >= cutoff);
+
+    if (supabase && userId) {
+      try {
+        const { data: sbLogs } = await supabase
+          .from('mood_sleep_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .gte('log_date', cutoff)
+          .order('log_date', { ascending: false });
+        if (sbLogs && sbLogs.length > logs.length) logs = sbLogs;
+      } catch(e) {}
+    }
 
     if (!logs || logs.length < 3) {
       aiLoading.classList.remove('visible');
       patternCta.style.display = 'block';
-      showToast('Log at least 3 days to run analysis.');
+      showToast(`Log at least 3 days to run analysis, ${firstName}.`);
       return;
     }
 
-    const prompt = buildMoodPrompt(logs, { age: user.age, city: user.city });
+    const prompt = buildMoodPrompt(logs, { age: user.age || localSession?.age, city: user.city || localSession?.city, name: firstName });
 
     try {
       const text = await callAI(prompt, cfg);
@@ -211,6 +279,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const avgSleep = (logs.reduce((s, l) => s + (l.sleep_hours || 7), 0) / logs.length).toFixed(1);
     const avgAnxiety = (logs.reduce((s, l) => s + (l.anxiety_level || 1), 0) / logs.length).toFixed(1);
 
+    const avgDiet = logs.some(l => l.diet_quality) ? (logs.reduce((s, l) => s + (l.diet_quality || 5), 0) / logs.length).toFixed(1) : null;
+    const avgExerciseDays = logs.filter(l => l.exercised).length;
+
     const logSummary = logs.map(l => ({
       date: l.log_date,
       sleep_hours: l.sleep_hours,
@@ -222,16 +293,22 @@ document.addEventListener('DOMContentLoaded', async () => {
       stress_triggers: l.stress_triggers,
       caffeine: l.caffeine_intake,
       alcohol: l.alcohol_intake,
+      diet_quality: l.diet_quality,
+      meals_eaten: l.meals_eaten,
+      water_intake: l.water_intake,
+      exercised: l.exercised,
+      exercise_types: l.exercise_types,
+      activity_level: l.activity_level,
     }));
 
-    return `You are a preventive health pattern analyzer for Homatt Health, a mobile health app in Uganda.
+    return `You are a caring, personalized health pattern analyzer for Homatt Health, a mobile health app in Uganda.
 
-Analyze this user's mood and sleep log data.
+Analyze ${userContext.name || 'this user'}'s mood, sleep, diet, and exercise log data. Use their name (${userContext.name || 'User'}) in your response.
 
-User: age=${userContext.age || 'unknown'}, location=${userContext.city || 'Uganda'}
-Averages: mood=${avgMood}/10, sleep=${avgSleep}hrs, anxiety=${avgAnxiety}/10
+User context: name=${userContext.name || 'User'}, age=${userContext.age || 'unknown'}, location=${userContext.city || 'Uganda'}
+Averages (last ${logs.length} days): mood=${avgMood}/10, sleep=${avgSleep}hrs, anxiety=${avgAnxiety}/10${avgDiet ? ', diet='+avgDiet+'/10' : ''}, exercise_days=${avgExerciseDays}/${logs.length}
 
-Daily logs (last 30 days, recent first):
+Daily logs (recent first):
 ${JSON.stringify(logSummary, null, 2)}
 
 Analysis rules:

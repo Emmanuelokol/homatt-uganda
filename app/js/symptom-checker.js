@@ -1144,19 +1144,83 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const responseEl = document.getElementById('monitorResponse');
     const timerEl = document.getElementById('monitorTimer');
 
+    const firstName = user.first_name || user.name?.split(' ')[0] || 'there';
     if (feeling === 'better') {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const inBg = isDark ? '#2C2C2C' : '#fff';
+      const inColor = isDark ? '#F0F0F0' : '#111';
       responseEl.innerHTML = `
         <div class="sc-monitor-msg better">
           <span class="material-icons-outlined">celebration</span>
           <div>
-            <p class="sc-monitor-msg-title">Great to hear!</p>
-            <p>Your symptoms are improving. Continue following the prevention tips and stay hydrated. We'll check in again to make sure you're recovering well.</p>
+            <p class="sc-monitor-msg-title">Great news, ${firstName}!</p>
+            <p>We're happy to hear you're feeling better. Help us learn by sharing your recovery experience — it helps us give better advice in future.</p>
           </div>
         </div>
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px">
+            What helped you recover? (optional but helpful)
+          </label>
+          <textarea id="recoveryWhatHelped" rows="3"
+            style="width:100%;border:2px solid var(--border);border-radius:8px;padding:10px 12px;
+              font-size:14px;font-family:inherit;background:${inBg};color:${inColor};resize:none;outline:none;box-sizing:border-box"
+            placeholder="e.g. I rested for 2 days, drank ORS, took paracetamol 500mg..."></textarea>
+          <div style="margin-top:10px">
+            <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:6px">How long did it take to feel better?</label>
+            <select id="recoveryDuration"
+              style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:${inBg};color:${inColor};outline:none">
+              <option value="">Select...</option>
+              <option value="few_hours">A few hours</option>
+              <option value="1_day">About 1 day</option>
+              <option value="2_3_days">2–3 days</option>
+              <option value="1_week">About a week</option>
+              <option value="longer">Longer than a week</option>
+            </select>
+          </div>
+        </div>
+        <button id="btnMarkRecovered"
+          style="width:100%;margin-top:14px;padding:14px;background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+          <span class="material-icons-outlined">check_circle</span>
+          Mark as Fully Recovered
+        </button>
       `;
       responseEl.style.display = 'block';
-      timerEl.style.display = 'flex';
-      scheduleNextCheckIn(2);
+      timerEl.style.display = 'none';
+
+      document.getElementById('btnMarkRecovered')?.addEventListener('click', () => {
+        const whatHelped = document.getElementById('recoveryWhatHelped')?.value.trim() || '';
+        const duration = document.getElementById('recoveryDuration')?.value || '';
+        // Save recovery record
+        const recoveries = JSON.parse(localStorage.getItem('homatt_recovery_log') || '[]');
+        recoveries.unshift({
+          condition: monitoringSession.condition,
+          recoveredAt: new Date().toISOString(),
+          startedAt: monitoringSession.startedAt,
+          whatHelped,
+          duration,
+          checkIns: monitoringSession.checkIns,
+        });
+        if (recoveries.length > 50) recoveries.pop();
+        localStorage.setItem('homatt_recovery_log', JSON.stringify(recoveries));
+        // Clear active monitoring
+        localStorage.removeItem('homatt_monitoring');
+        monitoringSession = null;
+        // Show final message
+        responseEl.innerHTML = `
+          <div class="sc-monitor-msg better" style="flex-direction:column;text-align:center;padding:20px">
+            <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32;margin-bottom:8px">health_and_safety</span>
+            <p class="sc-monitor-msg-title" style="font-size:18px">Recovery recorded, ${firstName}!</p>
+            <p style="color:var(--text-secondary);line-height:1.6;margin-top:6px">
+              We've saved your recovery journey. ${whatHelped ? 'What you shared helps us give you smarter advice next time.' : 'Stay healthy and take care!'}
+            </p>
+            <button onclick="window.location.href='dashboard.html'"
+              style="margin-top:16px;padding:12px 24px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+              Back to Dashboard
+            </button>
+          </div>
+        `;
+        document.getElementById('sc-feeling-options') && (document.getElementById('feelingOptions').style.display = 'none');
+      });
     } else if (feeling === 'same') {
       const condition = (monitoringSession.condition || '').toLowerCase();
       const otcMap = {
@@ -1309,6 +1373,39 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     nextTime.setHours(nextTime.getHours() + hours);
     monitoringSession.nextCheckIn = nextTime.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+    // Request browser notification permission for auto hourly reminders
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    // Schedule in-page reminder using setTimeout (works while page is open)
+    const msUntil = nextTime - Date.now();
+    if (msUntil > 0 && msUntil < 2 * 3600000) { // only if within 2 hours
+      setTimeout(() => {
+        // Show check-in if monitoring still active
+        const m = JSON.parse(localStorage.getItem('homatt_monitoring') || 'null');
+        if (!m) return;
+        // Send browser notification if possible
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Homatt-health Check-in', {
+            body: `Time to check in on your ${m.condition}. How are you feeling?`,
+            icon: '/icons/icon-192.png',
+          });
+        }
+        // Re-enable buttons for new check-in
+        document.querySelectorAll('.sc-feeling-btn').forEach(b => {
+          b.classList.remove('selected');
+          b.disabled = false;
+        });
+        document.getElementById('monitorResponse').style.display = 'none';
+        document.getElementById('monitorTimer').style.display = 'none';
+        if (document.getElementById('screenMonitor').classList.contains('active')) {
+          document.querySelector('.sc-subheading') &&
+            (document.querySelector('#screenMonitor .sc-subheading').textContent = 'Time for your hourly check-in. How are you feeling now?');
+        }
+        wireMonitoringButtons();
+      }, msUntil);
+    }
   }
 
   // ====== Save to history (localStorage + Supabase ai_triage_sessions) ======

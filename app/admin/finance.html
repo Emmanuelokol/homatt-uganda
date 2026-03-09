@@ -154,7 +154,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('savePayoutBtn').addEventListener('click', savePayout);
 });
 
+const DEMO_PAYOUTS = [
+  { id:'p1', recipient_type:'pharmacy', recipient_name:'Ntinda Pharmacy', amount:285000, period_start: new Date(Date.now()-864e5*14).toISOString().split('T')[0], period_end: new Date(Date.now()-864e5*7).toISOString().split('T')[0], payment_method:'mtn_mobile_money', status:'pending', created_at: new Date(Date.now()-864e5*3).toISOString() },
+  { id:'p2', recipient_type:'clinic', recipient_name:'Kisugu Health Centre', amount:150000, period_start: new Date(Date.now()-864e5*14).toISOString().split('T')[0], period_end: new Date(Date.now()-864e5*7).toISOString().split('T')[0], payment_method:'bank_transfer', status:'approved', created_at: new Date(Date.now()-864e5*4).toISOString() },
+  { id:'p3', recipient_type:'rider', recipient_name:'Kato Moses', amount:42000, period_start: new Date(Date.now()-864e5*7).toISOString().split('T')[0], period_end: new Date(Date.now()-864e5*0).toISOString().split('T')[0], payment_method:'airtel_money', status:'paid', created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'p4', recipient_type:'pharmacy', recipient_name:'Wandegeya Pharmacy', amount:195000, period_start: new Date(Date.now()-864e5*7).toISOString().split('T')[0], period_end: new Date(Date.now()-864e5*0).toISOString().split('T')[0], payment_method:'mtn_mobile_money', status:'pending', created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'p5', recipient_type:'rider', recipient_name:'Ssali David', amount:36500, period_start: new Date(Date.now()-864e5*7).toISOString().split('T')[0], period_end: new Date(Date.now()-864e5*0).toISOString().split('T')[0], payment_method:'mtn_mobile_money', status:'pending', created_at: new Date(Date.now()-864e5*1).toISOString() },
+];
+
 async function loadData() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo) {
+    allPayouts = DEMO_PAYOUTS;
+    document.getElementById('statTotalOrders').textContent = '38';
+    const pending = DEMO_PAYOUTS.filter(p=>p.status==='pending');
+    document.getElementById('statPendingClinicPayouts').textContent = pending.filter(p=>p.recipient_type==='clinic').length;
+    document.getElementById('statPendingPharmPayouts').textContent = pending.filter(p=>p.recipient_type==='pharmacy').length;
+    document.getElementById('statPendingRiderPayouts').textContent = pending.filter(p=>p.recipient_type==='rider').length;
+    renderPayouts();
+    return;
+  }
+  if (!supabase) { renderPayouts(); return; }
   const [ordersR, pendingR, payoutsR] = await Promise.all([
     supabase.from('pharmacy_orders').select('id',{count:'exact',head:true}),
     supabase.from('payouts').select('*').eq('status','pending'),

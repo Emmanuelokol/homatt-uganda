@@ -88,7 +88,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('searchRiders').addEventListener('input', renderRiders);
 });
 
+const DEMO_RIDERS = [
+  { id:'r1', full_name:'Kato Moses', phone_number:'0772100011', vehicle_type:'motorcycle', plate_number:'UAA 123B', total_deliveries:47, rating:4.8, status:'approved', created_at: new Date(Date.now()-864e5*2).toISOString() },
+  { id:'r2', full_name:'Ssali David', phone_number:'0752200022', vehicle_type:'motorcycle', plate_number:'UBA 456C', total_deliveries:23, rating:4.5, status:'approved', created_at: new Date(Date.now()-864e5*7).toISOString() },
+  { id:'r3', full_name:'Nakabuye Fiona', phone_number:'0700300033', vehicle_type:'bicycle', plate_number:'N/A', total_deliveries:8, rating:4.2, status:'pending', created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'r4', full_name:'Mukasa Peter', phone_number:'0782400044', vehicle_type:'motorcycle', plate_number:'UCA 789D', total_deliveries:62, rating:4.9, status:'approved', created_at: new Date(Date.now()-864e5*14).toISOString() },
+  { id:'r5', full_name:'Tumwine Rogers', phone_number:'0704500055', vehicle_type:'motorcycle', plate_number:'UDA 321E', total_deliveries:3, rating:3.8, status:'suspended', created_at: new Date(Date.now()-864e5*20).toISOString() },
+];
+
 async function loadRiders() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo) { allRiders = DEMO_RIDERS; renderRiders(); return; }
+  if (!supabase) { allRiders = []; renderRiders(); return; }
   const { data } = await supabase.from('riders').select('*').order('created_at',{ascending:false});
   allRiders = data || [];
   renderRiders();

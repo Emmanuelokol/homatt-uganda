@@ -7,7 +7,7 @@
  *   • Everything else: Network-first, fall back to cache
  */
 
-const CACHE_NAME = 'homatt-shell-v6';
+const CACHE_NAME = 'homatt-shell-v7';
 
 const APP_SHELL = [
   './',

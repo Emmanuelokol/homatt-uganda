@@ -88,7 +88,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 });
 
+const DEMO_USERS = [
+  { id:'d1', hommat_id:'HM-001', first_name:'Ssempa', last_name:'Robert', phone_number:'0772100001', city:'Ntinda', district:'Kampala', age:32, sex:'Male', has_family:true, family_size:4, is_admin:false, created_at: new Date(Date.now()-864e5*5).toISOString() },
+  { id:'d2', hommat_id:'HM-002', first_name:'Nakato', last_name:'Brenda', phone_number:'0752200002', city:'Wandegeya', district:'Kampala', age:28, sex:'Female', has_family:false, family_size:1, is_admin:false, created_at: new Date(Date.now()-864e5*10).toISOString() },
+  { id:'d3', hommat_id:'HM-003', first_name:'Mubiru', last_name:'John', phone_number:'0700300003', city:'Mbarara', district:'Mbarara', age:45, sex:'Male', has_family:true, family_size:6, is_admin:false, created_at: new Date(Date.now()-864e5*15).toISOString() },
+  { id:'d4', hommat_id:'HM-004', first_name:'Namutebi', last_name:'Agnes', phone_number:'0782400004', city:'Entebbe', district:'Wakiso', age:35, sex:'Female', has_family:true, family_size:3, is_admin:false, created_at: new Date(Date.now()-864e5*20).toISOString() },
+  { id:'d5', hommat_id:'HM-005', first_name:'Kibuuka', last_name:'Paul', phone_number:'0704500005', city:'Jinja', district:'Jinja', age:52, sex:'Male', has_family:true, family_size:5, is_admin:false, created_at: new Date(Date.now()-864e5*25).toISOString() },
+  { id:'d6', hommat_id:'HM-006', first_name:'Namukasa', last_name:'Grace', phone_number:'0756600006', city:'Gulu', district:'Gulu', age:24, sex:'Female', has_family:false, family_size:1, is_admin:false, created_at: new Date(Date.now()-864e5*30).toISOString() },
+];
+
 async function loadUsers() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo) { allUsers = DEMO_USERS; renderUsers(); return; }
+  if (!supabase) { renderUsers(); return; }
   const { data } = await supabase.from('profiles')
     .select('id,hommat_id,first_name,last_name,phone_number,city,district,dob,age,sex,has_family,family_size,is_admin,created_at')
     .order('created_at', {ascending:false});

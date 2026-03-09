@@ -15,7 +15,7 @@
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
   <style>
     .mo-step { display:none; }
-    .mo-step.active { display:flex; flex-direction:column; height:100%; }
+    .mo-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
     .mo-hero { text-align:center; padding:24px 20px 12px; }
     .mo-hero-icon { width:66px; height:66px; border-radius:22px; background:linear-gradient(135deg,#00695C,#4DB6AC); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
     .mo-hero-icon .material-icons-outlined { font-size:34px; color:#fff; }
@@ -150,7 +150,7 @@
 
     <!-- STEP 1: Select medicines -->
     <div class="mo-step active" id="mostep1">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="mo-hero" style="padding-bottom:4px">
           <div class="mo-hero-icon"><span class="material-icons-outlined">medication</span></div>
           <div class="mo-heading">Order Medicines</div>
@@ -253,7 +253,7 @@
 
     <!-- STEP 2: Delivery details -->
     <div class="mo-step" id="mostep2">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="mo-section" style="padding-top:20px">
           <div class="mo-label">Urgency</div>
           <div class="urgency-chips">
@@ -306,7 +306,7 @@
 
     <!-- STEP 3: Cart / Review -->
     <div class="mo-step" id="mostep3">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="mo-section" style="padding-top:16px">
           <div class="mo-label">Your Order</div>
           <div id="cartSummary"></div>
@@ -330,7 +330,7 @@
 
     <!-- STEP 4: Confirmation -->
     <div class="mo-step" id="mostep4">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="mo-hero">
           <div class="mo-hero-icon"><span class="material-icons-outlined">receipt_long</span></div>
           <div class="mo-heading">Order Summary</div>

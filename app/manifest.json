@@ -2,7 +2,7 @@
   "name": "Homatt Health Uganda",
   "short_name": "Homatt",
   "description": "Your personal health companion — track, manage, and improve your family's health in Uganda",
-  "start_url": "dashboard.html",
+  "start_url": "welcome.html",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#1B5E20",

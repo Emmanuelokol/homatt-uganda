@@ -4,16 +4,21 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  let supabase = null;
+  let session = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      const { data } = await supabase.auth.getSession();
+      session = data?.session || null;
+    }
+  } catch(e) { console.warn('[Dashboard] Supabase init failed:', e.message); }
 
-  // Auth check via Supabase session.
-  // Use a redirect-guard flag to break any loop: if we already tried to redirect
-  // to signin this page-load, don't loop again.
-  const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     // Only redirect if we have no cached user either (fully signed out)
-    if (!localStorage.getItem('homatt_user') ||
-        localStorage.getItem('homatt_user') === '{}') {
+    const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+    const localUser = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
+    if (!localSession && !localUser) {
       window.location.href = 'signin.html';
       return;
     }
@@ -21,37 +26,46 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Load user data — prefer Supabase, fall back to localStorage cache
-  let user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+  let user = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || '{}'); } catch(e) { return {}; } })();
 
-  if (session) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', session.user.id)
-      .single();
+  // Merge local session data into user object
+  if (localSession) {
+    if (!user.firstName && localSession.first_name) user.firstName = localSession.first_name;
+    if (!user.firstName && localSession.name) user.firstName = localSession.name.split(' ')[0];
+  }
 
-    if (profile) {
-      user = {
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        phone: profile.phone_number,
-        dob: profile.dob,
-        sex: profile.sex,
-        district: profile.district,
-        location: profile.district,
-        city: profile.city,
-        hasFamily: profile.has_family,
-        familySize: profile.family_size,
-        healthGoals: profile.health_goals,
-      };
-      localStorage.setItem('homatt_user', JSON.stringify(user));
-    } else if (!user.firstName) {
-      // Supabase session exists but no patient profile AND no cached data.
-      // This is a portal staff account that slipped through — sign out and go to signin.
-      await supabase.auth.signOut();
-      window.location.href = 'signin.html';
-      return;
-    }
+  if (session && supabase) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      if (profile) {
+        user = {
+          firstName: profile.first_name,
+          lastName: profile.last_name,
+          phone: profile.phone_number,
+          dob: profile.dob,
+          sex: profile.sex,
+          district: profile.district,
+          location: profile.district,
+          city: profile.city,
+          hasFamily: profile.has_family,
+          familySize: profile.family_size,
+          healthGoals: profile.health_goals,
+        };
+        localStorage.setItem('homatt_user', JSON.stringify(user));
+      } else if (!user.firstName && !localSession) {
+        // Supabase session exists but no patient profile AND no cached data.
+        // This is a portal staff account that slipped through — sign out and go to signin.
+        await supabase.auth.signOut();
+        window.location.href = 'signin.html';
+        return;
+      }
+    } catch(e) { console.warn('[Dashboard] Profile fetch failed:', e.message); }
   }
 
   // Update status bar time
@@ -175,6 +189,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ====== Health Score Calculation ======
   async function calculateHealthScore() {
+    if (!supabase || !session?.user?.id) return;
     const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
     const uid = session.user.id;
 
@@ -340,4 +355,163 @@ document.addEventListener('DOMContentLoaded', async () => {
       setTimeout(() => { panel.remove(); if (overlay) overlay.remove(); }, 320);
     }
   }
+
+  // ====== Health Predictions from Tracker Data ======
+  function runHealthPredictions() {
+    const moodLogs   = (() => { try { return JSON.parse(localStorage.getItem('homatt_mood_logs') || '[]'); } catch(e) { return []; } })();
+    const painLogs   = (() => { try { return JSON.parse(localStorage.getItem('homatt_pain_logs') || '[]'); } catch(e) { return []; } })();
+    const dietLogs   = (() => { try { return JSON.parse(localStorage.getItem('homatt_diet_logs') || '[]'); } catch(e) { return []; } })();
+    const cycleLogs  = (() => { try { return JSON.parse(localStorage.getItem('homatt_cycle_logs') || '[]'); } catch(e) { return []; } })();
+    const digestLogs = (() => { try { return JSON.parse(localStorage.getItem('homatt_digestive_logs') || '[]'); } catch(e) { return []; } })();
+    const symLogs    = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+
+    const insights = [];
+
+    // — Sleep pattern analysis
+    if (moodLogs.length >= 3) {
+      const recent = moodLogs.slice(0, 14);
+      const avgSleep = recent.reduce((s, l) => s + (parseFloat(l.sleep_hours) || 0), 0) / recent.length;
+      const avgMood  = recent.reduce((s, l) => s + (l.mood || 5), 0) / recent.length;
+      const avgAnx   = recent.reduce((s, l) => s + (l.anxiety_level || 5), 0) / recent.length;
+
+      if (avgSleep < 6) {
+        insights.push({
+          icon: 'bedtime', color: '#4527A0', urgency: 'warning',
+          title: 'Sleep Deprivation Risk',
+          cause: `You are averaging only ${avgSleep.toFixed(1)} hours of sleep.`,
+          prediction: 'Chronic sleep loss weakens immunity and raises risk of hypertension, depression, and diabetes.',
+          action: 'Aim for 7–9 hours. Set a consistent bedtime and reduce screen time 1 hour before sleep.',
+        });
+      }
+      if (avgAnx >= 7) {
+        insights.push({
+          icon: 'sentiment_very_dissatisfied', color: '#C62828', urgency: 'warning',
+          title: 'High Stress / Anxiety Pattern',
+          cause: 'Your logged anxiety levels have been consistently high.',
+          prediction: 'Prolonged stress can lead to headaches, digestive issues, high blood pressure, and burnout.',
+          action: 'Try 5 minutes of deep breathing daily. Consider talking to someone you trust or a counsellor.',
+        });
+      }
+      if (avgMood < 4 && moodLogs.length >= 5) {
+        insights.push({
+          icon: 'mood_bad', color: '#7B1FA2', urgency: 'info',
+          title: 'Low Mood — Watch Your Mental Health',
+          cause: 'Your recent mood logs show consistently low mood scores.',
+          prediction: 'Prolonged low mood can progress to depression if not addressed.',
+          action: 'Get sunlight daily, exercise, eat well, and connect with friends. Seek help if mood persists.',
+        });
+      }
+    }
+
+    // — Pain pattern analysis
+    if (painLogs.length >= 3) {
+      const recent = painLogs.slice(0, 10);
+      const avgPain = recent.reduce((s, l) => s + (l.intensity || 0), 0) / recent.length;
+      const locations = recent.flatMap(l => l.locations || []);
+      const headCount = locations.filter(loc => (loc || '').toLowerCase().includes('head')).length;
+      const backCount = locations.filter(loc => (loc || '').toLowerCase().includes('back')).length;
+
+      if (avgPain >= 6) {
+        insights.push({
+          icon: 'healing', color: '#BF360C', urgency: 'danger',
+          title: 'Chronic Pain Pattern Detected',
+          cause: `Average pain intensity: ${avgPain.toFixed(1)}/10 over recent logs.`,
+          prediction: 'Unmanaged chronic pain can affect sleep, mood, and daily function.',
+          action: 'Track your pain triggers and consult a health provider. Book a clinic visit on Homatt.',
+        });
+      }
+      if (headCount >= 3) {
+        insights.push({
+          icon: 'psychology', color: '#1565C0', urgency: 'info',
+          title: 'Frequent Headaches — Possible Causes',
+          cause: 'You have logged headaches multiple times recently.',
+          prediction: 'May indicate dehydration, eye strain, hypertension, or stress.',
+          action: 'Drink more water, rest your eyes, and check your blood pressure. See a doctor if headaches are severe.',
+        });
+      }
+      if (backCount >= 3) {
+        insights.push({
+          icon: 'accessibility_new', color: '#00695C', urgency: 'info',
+          title: 'Recurring Back Pain',
+          cause: 'Back pain appears frequently in your recent logs.',
+          prediction: 'Could signal posture issues, muscle strain, or kidney problems.',
+          action: 'Stretch daily, improve sitting posture, and stay hydrated. See a provider if pain is sharp or persistent.',
+        });
+      }
+    }
+
+    // — Diet analysis
+    if (dietLogs.length >= 3) {
+      const recent = dietLogs.slice(0, 7);
+      const avgDiet = recent.reduce((s, l) => s + (l.diet_quality || 5), 0) / recent.length;
+      const avgWater = recent.filter(l => (l.water_intake || '') === '8+').length;
+
+      if (avgDiet < 5) {
+        insights.push({
+          icon: 'restaurant', color: '#E65100', urgency: 'warning',
+          title: 'Poor Diet — Nutritional Risk',
+          cause: 'Your diet quality ratings have been low.',
+          prediction: 'A poor diet increases risk of anaemia, malnutrition, and weakened immunity.',
+          action: 'Include vegetables, fruits, and protein in every meal. Reduce fried and sugary foods.',
+        });
+      }
+      if (avgWater === 0 && recent.length >= 3) {
+        insights.push({
+          icon: 'water_drop', color: '#1565C0', urgency: 'info',
+          title: 'Low Water Intake',
+          cause: 'You rarely log drinking 8+ glasses of water.',
+          prediction: 'Dehydration causes fatigue, headaches, and poor kidney function.',
+          action: 'Set a water reminder. Aim for at least 8 glasses (2 litres) per day.',
+        });
+      }
+    }
+
+    // — Active symptom monitoring
+    if (symLogs && symLogs.condition) {
+      insights.push({
+        icon: 'monitor_heart', color: '#D32F2F', urgency: 'danger',
+        title: `Active Monitoring: ${symLogs.condition}`,
+        cause: `You reported ${symLogs.condition} and are being monitored every hour.`,
+        prediction: 'Unresolved symptoms can worsen if left unmanaged.',
+        action: 'Log a check-in in the Symptom Checker. Take your temperature, drink water, and rest.',
+      });
+    }
+
+    // — Positive reinforcement
+    if (insights.length === 0 && (moodLogs.length + painLogs.length) >= 5) {
+      insights.push({
+        icon: 'verified', color: '#2E7D32', urgency: 'good',
+        title: 'You Are Doing Great!',
+        cause: 'Your tracker data looks healthy and consistent.',
+        prediction: 'Keep up your current habits to maintain good health.',
+        action: 'Continue logging daily and stay on top of your nutrition, sleep, and exercise.',
+      });
+    }
+
+    if (insights.length === 0) return; // not enough data yet
+
+    const section = document.getElementById('healthPredictionSection');
+    const list = document.getElementById('healthPredictionList');
+    if (!section || !list) return;
+
+    const urgencyColors = { danger:'#FFEBEE', warning:'#FFF8E1', info:'#E3F2FD', good:'#E8F5E9' };
+    const urgencyBorder = { danger:'#EF9A9A', warning:'#FFE082', info:'#90CAF9', good:'#A5D6A7' };
+
+    list.innerHTML = insights.map(ins => `
+      <div style="background:${urgencyColors[ins.urgency]||'#F5F5F5'};border:1px solid ${urgencyBorder[ins.urgency]||'#E0E0E0'};border-radius:14px;padding:14px 16px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="width:36px;height:36px;border-radius:10px;background:${ins.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-icons-outlined" style="font-size:20px;color:#fff">${ins.icon}</span>
+          </div>
+          <div style="font-size:14px;font-weight:700;color:#1A1A1A;line-height:1.3">${ins.title}</div>
+        </div>
+        <div style="font-size:12px;color:#555;margin-bottom:6px"><strong>Why:</strong> ${ins.cause}</div>
+        <div style="font-size:12px;color:#555;margin-bottom:6px"><strong>Risk:</strong> ${ins.prediction}</div>
+        <div style="font-size:12px;font-weight:600;color:${ins.color}"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span> ${ins.action}</div>
+      </div>`).join('');
+
+    section.style.display = 'block';
+  }
+
+  runHealthPredictions();
 });
