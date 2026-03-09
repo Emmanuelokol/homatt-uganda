@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Daily Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
+      <div class="sidebar-section-label">Clinical</div>
+      <a href="prescriptions.html" class="sidebar-link"><span class="material-icons-outlined">medication</span> Prescriptions</a>
+      <a href="lab-requests.html" class="sidebar-link"><span class="material-icons-outlined">science</span> Lab Requests</a>
+      <a href="patients.html" class="sidebar-link"><span class="material-icons-outlined">person_search</span> Patient Search</a>
+      <div class="sidebar-section-label">Reports</div>
+      <a href="daily-report.html" class="sidebar-link active"><span class="material-icons-outlined">bar_chart</span> Daily Report</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Daily Clinical Report</div>
+      <div class="admin-topbar-right">
+        <input type="date" id="reportDate" style="padding:7px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;outline:none" onchange="loadReport()">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <div id="reportBanner" style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;font-size:13px;color:#1565C0">
+        <span class="material-icons-outlined">info</span>
+        <span id="reportBannerMsg">Loading today's report…</span>
+      </div>
+
+      <!-- KPI Row -->
+      <div class="stats-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">groups</span></div>
+          <div><div class="stat-number" id="kpiTotal">—</div><div class="stat-label">Total Patients</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="kpiAttended">—</div><div class="stat-label">Attended</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">emergency</span></div>
+          <div><div class="stat-number" id="kpiUrgent">—</div><div class="stat-label">Urgent Cases</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">medication</span></div>
+          <div><div class="stat-number" id="kpiRx">—</div><div class="stat-label">Prescriptions</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">science</span></div>
+          <div><div class="stat-number" id="kpiLabs">—</div><div class="stat-label">Lab Tests</div></div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:24px">
+
+        <!-- Top Diagnoses -->
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Top Diagnoses Today</div></div>
+          <table class="admin-table">
+            <thead><tr><th>Diagnosis</th><th>Count</th><th>Share</th></tr></thead>
+            <tbody id="diagBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Urgency breakdown -->
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header"><div class="table-title">Urgency Breakdown</div></div>
+          <div id="urgencyBars" style="padding:16px 20px"></div>
+        </div>
+
+      </div>
+
+      <!-- Patient list for the day -->
+      <div class="admin-table-wrap">
+        <div class="table-header"><div class="table-title">Patient List</div></div>
+        <table class="admin-table">
+          <thead><tr><th>#</th><th>Patient</th><th>Symptoms / Diagnosis</th><th>Urgency</th><th>Status</th><th>Time</th></tr></thead>
+          <tbody id="dayBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+let supa = null;
+let session = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+
+  document.getElementById('clinicUserDate').textContent =
+    new Date().toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+
+  // Set date picker to today
+  document.getElementById('reportDate').value = new Date().toISOString().split('T')[0];
+
+  const cfg = window.HOMATT_CONFIG || {};
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    }
+  } catch(e) {}
+
+  loadReport();
+});
+
+async function loadReport() {
+  const dateStr = document.getElementById('reportDate').value;
+  const date = new Date(dateStr);
+  const dayStart = new Date(date); dayStart.setHours(0,0,0,0);
+  const dayEnd   = new Date(date); dayEnd.setHours(23,59,59,999);
+
+  const isToday = dateStr === new Date().toISOString().split('T')[0];
+  document.getElementById('reportBannerMsg').textContent =
+    isToday ? `Today's report — ${new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`
+            : `Report for ${date.toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}`;
+
+  let bookings = [];
+
+  if (supa) {
+    try {
+      let q = supa.from('bookings')
+        .select('id,patient_name,symptoms,ai_diagnosis,urgency_level,status,created_at')
+        .gte('created_at', dayStart.toISOString())
+        .lte('created_at', dayEnd.toISOString())
+        .order('created_at', { ascending: false });
+      if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
+      const { data } = await q;
+      bookings = data || [];
+    } catch(e) {}
+  }
+
+  if (!bookings.length && isToday) {
+    // Demo fallback
+    bookings = [
+      { id:'1', patient_name:'Ssempa Robert',  symptoms:'High BP / dizziness',       ai_diagnosis:'Hypertension',          urgency_level:'high',   status:'attended',    created_at: new Date(Date.now()-28800000).toISOString() },
+      { id:'2', patient_name:'Nakato Brenda',   symptoms:'Fever & headache',          ai_diagnosis:'Malaria',               urgency_level:'normal', status:'attended',    created_at: new Date(Date.now()-25200000).toISOString() },
+      { id:'3', patient_name:'Mubiru John',     symptoms:'Malaria symptoms',          ai_diagnosis:'Malaria',               urgency_level:'high',   status:'in_progress', created_at: new Date(Date.now()-21600000).toISOString() },
+      { id:'4', patient_name:'Namutebi Agnes',  symptoms:'Prenatal check (32 weeks)', ai_diagnosis:null,                    urgency_level:'normal', status:'pending',     created_at: new Date(Date.now()-18000000).toISOString() },
+      { id:'5', patient_name:'Kibuuka Paul',    symptoms:'Chest pain',                ai_diagnosis:'Cardiac event (risk)',  urgency_level:'high',   status:'attended',    created_at: new Date(Date.now()-14400000).toISOString() },
+      { id:'6', patient_name:'Namukasa Grace',  symptoms:'Stomach pain',              ai_diagnosis:'Gastritis',             urgency_level:'normal', status:'pending',     created_at: new Date(Date.now()-10800000).toISOString() },
+      { id:'7', patient_name:'Ssali Emmanuel',  symptoms:'Diabetes check',            ai_diagnosis:'Type 2 Diabetes',       urgency_level:'normal', status:'attended',    created_at: new Date(Date.now()-7200000).toISOString() },
+    ];
+  }
+
+  // KPIs
+  document.getElementById('kpiTotal').textContent    = bookings.length;
+  document.getElementById('kpiAttended').textContent = bookings.filter(b => b.status === 'attended' || b.status === 'completed').length;
+  document.getElementById('kpiUrgent').textContent   = bookings.filter(b => b.urgency_level === 'high' || b.urgency_level === 'emergency').length;
+  document.getElementById('kpiRx').textContent       = '—';
+  document.getElementById('kpiLabs').textContent     = '—';
+
+  if (supa && session.clinicId) {
+    // Try to load rx / labs count
+    supa.from('e_prescriptions').select('id',{count:'exact',head:true})
+      .gte('created_at', dayStart.toISOString()).lte('created_at', dayEnd.toISOString())
+      .eq('clinic_id', session.clinicId)
+      .then(({count}) => { if (count != null) document.getElementById('kpiRx').textContent = count; });
+  } else {
+    document.getElementById('kpiRx').textContent  = '3';
+    document.getElementById('kpiLabs').textContent = '6';
+  }
+
+  // Diagnoses breakdown
+  const diagCounts = {};
+  bookings.forEach(b => {
+    const d = b.ai_diagnosis || 'Not diagnosed';
+    diagCounts[d] = (diagCounts[d] || 0) + 1;
+  });
+  const sorted = Object.entries(diagCounts).sort((a,b) => b[1]-a[1]);
+  document.getElementById('diagBody').innerHTML = sorted.slice(0,8).map(([d,n]) =>
+    `<tr>
+      <td style="font-size:13px">${d}</td>
+      <td style="font-weight:700">${n}</td>
+      <td>
+        <div style="background:#E0E0E0;border-radius:4px;height:8px;width:120px;overflow:hidden">
+          <div style="background:#1565C0;height:100%;border-radius:4px;width:${Math.round(n/bookings.length*100)}%"></div>
+        </div>
+      </td>
+    </tr>`
+  ).join('') || '<tr><td colspan="3" style="text-align:center;padding:20px;color:#9AA0A6">No data</td></tr>';
+
+  // Urgency bars
+  const urgencyDef = [
+    { key:'high', label:'Urgent / High', color:'#D32F2F' },
+    { key:'normal', label:'Standard', color:'#1565C0' },
+    { key:'low', label:'Routine', color:'#2E7D32' },
+    { key:'emergency', label:'Emergency', color:'#B71C1C' },
+  ];
+  document.getElementById('urgencyBars').innerHTML = urgencyDef.map(u => {
+    const cnt = bookings.filter(b => b.urgency_level === u.key).length;
+    const pct = bookings.length ? Math.round(cnt/bookings.length*100) : 0;
+    return `<div style="margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:5px;font-size:13px">
+        <span style="font-weight:500">${u.label}</span>
+        <span style="font-weight:700;color:${u.color}">${cnt} (${pct}%)</span>
+      </div>
+      <div style="background:#F0F0F0;border-radius:6px;height:10px;overflow:hidden">
+        <div style="background:${u.color};height:100%;border-radius:6px;width:${pct}%;transition:width .6s"></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Patient list
+  document.getElementById('dayBody').innerHTML = bookings.length
+    ? bookings.map((b, idx) => {
+        const urgClass = b.urgency_level === 'high' || b.urgency_level === 'emergency' ? 'urgent' : 'normal';
+        const statClass = b.status === 'attended' || b.status === 'completed' ? 'completed' : b.status === 'in_progress' ? 'in_progress' : 'waiting';
+        return `<tr>
+          <td><div class="queue-number">${idx+1}</div></td>
+          <td>
+            <div style="display:flex;align-items:center;gap:8px">
+              <div class="patient-avatar">${(b.patient_name||'?')[0]}</div>
+              <strong style="font-size:13px">${b.patient_name||'—'}</strong>
+            </div>
+          </td>
+          <td style="font-size:12px;max-width:200px">${b.ai_diagnosis||b.symptoms||'—'}</td>
+          <td><span class="status-badge ${urgClass}">${b.urgency_level||'normal'}</span></td>
+          <td><span class="status-badge ${statClass}">${(b.status||'pending').replace('_',' ')}</span></td>
+          <td style="font-size:12px;color:#9AA0A6">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No patients recorded for this date</td></tr>';
+}
+</script>
+</body>
+</html>

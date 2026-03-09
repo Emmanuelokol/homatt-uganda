@@ -30,17 +30,17 @@
         <span class="material-icons-outlined">calendar_today</span> Appointments
       </a>
       <div class="sidebar-section-label">Clinical</div>
-      <a href="#" class="sidebar-link">
+      <a href="prescriptions.html" class="sidebar-link">
         <span class="material-icons-outlined">medication</span> Prescriptions
       </a>
-      <a href="#" class="sidebar-link">
+      <a href="lab-requests.html" class="sidebar-link">
         <span class="material-icons-outlined">science</span> Lab Requests
       </a>
-      <a href="#" class="sidebar-link">
-        <span class="material-icons-outlined">emergency</span> Emergency Referrals
+      <a href="patients.html" class="sidebar-link">
+        <span class="material-icons-outlined">person_search</span> Patient Search
       </a>
       <div class="sidebar-section-label">Reports</div>
-      <a href="#" class="sidebar-link">
+      <a href="daily-report.html" class="sidebar-link">
         <span class="material-icons-outlined">bar_chart</span> Daily Report
       </a>
     </nav>
@@ -308,25 +308,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (clinicNameEl && session.clinicName) clinicNameEl.textContent = session.clinicName;
 
   const cfg = window.HOMATT_CONFIG || {};
-  const supa = (cfg.SUPABASE_URL && window.supabase && session.clinicId)
-    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+  // Always initialize supa so demo mode also gets real patient data from Supabase
+  let supa = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    }
+  } catch(e) {}
 
   let bookings = [];
 
-  if (supa && session.clinicId) {
-    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-    const { data } = await supa.from('bookings')
-      .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,urgency_level,risk_score,status,created_at')
-      .eq('clinic_id', session.clinicId)
-      .gte('created_at', todayStart.toISOString())
-      .order('created_at', { ascending: false });
-    bookings = data || [];
-  } else {
-    // Mock fallback
+  if (supa) {
+    try {
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      let q = supa.from('bookings')
+        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,risk_score,status,created_at,ai_full_data,pin_token,pin_expires_at')
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false });
+      // Filter by clinic if logged in as real clinic staff; otherwise show all today's bookings
+      if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
+      const { data } = await q;
+      bookings = data || [];
+    } catch(e) {}
+  }
+
+  if (!bookings.length) {
+    // Fall back to mock patients so the portal always shows something
     bookings = MOCK_PATIENTS.map((p, i) => ({
-      id: p.q, booking_code: p.id,
+      id: String(p.q), booking_code: p.id,
       patient_name: p.name, patient_age: p.age, patient_sex: p.sex,
-      symptoms: p.complaint, ai_diagnosis: null,
+      symptoms: p.complaint, ai_diagnosis: null, ai_confidence: null,
       urgency_level: p.priority === 'urgent' ? 'high' : 'normal',
       risk_score: p.priority === 'urgent' ? 85 : p.priority === 'high' ? 65 : 30,
       status: p.status === 'done' ? 'attended' : p.status === 'in-progress' ? 'in_progress' : 'pending',
@@ -745,8 +756,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('statWaiting').textContent   = bookings.filter(x => x.status === 'pending').length;
       document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
     } else {
-      // Demo mode — simulate the flow
+      // Demo/offline mode — simulate the flow locally
       activeBooking.status = 'attended';
+      b.status = 'attended';
     }
 
     renderQueue();
@@ -754,15 +766,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(withPrescription ? `Diagnosis saved & prescription sent for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
   };
 
-  // Recent bookings list (sidebar)
-  document.getElementById('apptList').innerHTML = bookings.slice(0, 8).map(b => `
+  // Recent bookings + scheduled appointments sidebar
+  const apptItems = bookings.slice(0, 6).map(b => `
     <div class="appt-item">
       <div class="appt-time">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</div>
       <div class="appt-info">
         <div class="appt-name">${b.patient_name||'Unknown'}</div>
-        <div class="appt-type">${b.symptoms ? b.symptoms.slice(0,40) + (b.symptoms.length>40?'…':'') : b.ai_diagnosis||'—'}</div>
+        <div class="appt-type">${b.symptoms ? b.symptoms.slice(0,40)+(b.symptoms.length>40?'…':'') : b.ai_diagnosis||'Visit'}</div>
       </div>
-    </div>`).join('') || '<div style="padding:16px;color:#9AA0A6;font-size:13px">No bookings today</div>';
+      <span class="status-badge ${b.status||'pending'}" style="font-size:10px">${(b.status||'pending').replace('_',' ')}</span>
+    </div>`);
+  // Append scheduled appointments from mock (or future DB source)
+  const schedItems = MOCK_APPOINTMENTS.map(a => `
+    <div class="appt-item" style="opacity:.85">
+      <div class="appt-time" style="color:#7B1FA2">${a.time}</div>
+      <div class="appt-info">
+        <div class="appt-name">${a.name}</div>
+        <div class="appt-type">${a.type}</div>
+      </div>
+      <span class="status-badge scheduled" style="font-size:10px">sched</span>
+    </div>`);
+  document.getElementById('apptList').innerHTML =
+    (apptItems.length ? apptItems.join('') : '') +
+    schedItems.join('') ||
+    '<div style="padding:16px;color:#9AA0A6;font-size:13px">No bookings today</div>';
 });
 </script>
 </body>

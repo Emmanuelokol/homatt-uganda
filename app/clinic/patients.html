@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Patient Search</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
+      <div class="sidebar-section-label">Clinical</div>
+      <a href="prescriptions.html" class="sidebar-link"><span class="material-icons-outlined">medication</span> Prescriptions</a>
+      <a href="lab-requests.html" class="sidebar-link"><span class="material-icons-outlined">science</span> Lab Requests</a>
+      <a href="patients.html" class="sidebar-link active"><span class="material-icons-outlined">person_search</span> Patient Search</a>
+      <div class="sidebar-section-label">Reports</div>
+      <a href="daily-report.html" class="sidebar-link"><span class="material-icons-outlined">bar_chart</span> Daily Report</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Patient Search</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Search bar -->
+      <div class="admin-table-wrap" style="padding:20px 24px;margin-bottom:20px">
+        <div style="display:flex;gap:12px;align-items:center">
+          <span class="material-icons-outlined" style="color:#9AA0A6;font-size:24px">person_search</span>
+          <input id="searchInput" type="text" placeholder="Search by name, booking code, symptoms or date…"
+            style="flex:1;padding:12px 16px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:15px;outline:none;font-family:inherit"
+            oninput="searchPatients()">
+          <select id="statusFilter" onchange="searchPatients()" style="padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;outline:none">
+            <option value="all">All Visits</option>
+            <option value="pending">Pending</option>
+            <option value="in_progress">In Progress</option>
+            <option value="attended">Attended</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Patient Visit History</div>
+          <span id="resultCount" style="font-size:13px;color:#9AA0A6"></span>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Booking Code</th>
+              <th>AI Diagnosis</th>
+              <th>Urgency</th>
+              <th>Status</th>
+              <th>Visit Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="patientsBody">
+            <tr><td colspan="7" style="text-align:center;padding:40px;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px;opacity:.4">person_search</span>
+              Search for a patient above
+            </td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Patient detail modal -->
+<div id="patientModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;overflow-y:auto;padding:20px">
+  <div style="background:#fff;border-radius:16px;max-width:600px;margin:0 auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="background:linear-gradient(135deg,#1565C0,#42A5F5);padding:20px 24px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#fff" id="modalPatientName">Patient</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8)" id="modalPatientSub">Visit details</div>
+      </div>
+      <button onclick="document.getElementById('patientModal').style.display='none'"
+        style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <div style="padding:24px" id="modalBody">—</div>
+  </div>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+let allPatients = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+
+  document.getElementById('clinicUserDate').textContent =
+    new Date().toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+
+  const cfg = window.HOMATT_CONFIG || {};
+  let supa = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    }
+  } catch(e) {}
+
+  if (supa) {
+    try {
+      let q = supa.from('bookings')
+        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,status,created_at,notes,location_district')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
+      const { data } = await q;
+      if (data && data.length) allPatients = data;
+    } catch(e) {}
+  }
+
+  if (!allPatients.length) {
+    // Mock data including mock clinic patients
+    allPatients = [...MOCK_PATIENTS.map((p, i) => ({
+      id: String(p.q),
+      booking_code: p.id,
+      patient_name: p.name,
+      patient_age: p.age,
+      patient_sex: p.sex,
+      symptoms: p.complaint,
+      ai_diagnosis: null,
+      urgency_level: p.priority === 'urgent' ? 'high' : 'normal',
+      status: p.status === 'done' ? 'attended' : p.status === 'in-progress' ? 'in_progress' : 'pending',
+      created_at: new Date(Date.now() - i * 900000).toISOString(),
+      notes: null,
+      location_district: 'Kampala',
+    }))];
+  }
+
+  searchPatients();
+});
+
+function searchPatients() {
+  const q = document.getElementById('searchInput').value.toLowerCase().trim();
+  const s = document.getElementById('statusFilter').value;
+
+  const filtered = allPatients.filter(p =>
+    (s === 'all' || p.status === s) &&
+    (!q || p.patient_name?.toLowerCase().includes(q) ||
+     p.booking_code?.toLowerCase().includes(q) ||
+     p.symptoms?.toLowerCase().includes(q) ||
+     p.ai_diagnosis?.toLowerCase().includes(q) ||
+     fmtDate(p.created_at).toLowerCase().includes(q))
+  );
+
+  document.getElementById('resultCount').textContent = filtered.length + ' record' + (filtered.length !== 1 ? 's' : '');
+  renderTable(filtered);
+}
+
+function renderTable(patients) {
+  const tbody = document.getElementById('patientsBody');
+  if (!patients.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:40px;color:#9AA0A6">No patients found matching your search</td></tr>';
+    return;
+  }
+  tbody.innerHTML = patients.map(p => {
+    const urgClass = p.urgency_level === 'high' || p.urgency_level === 'emergency' ? 'urgent' : 'normal';
+    const statClass = p.status === 'attended' || p.status === 'completed' ? 'completed' : p.status === 'in_progress' ? 'in_progress' : 'waiting';
+    return `<tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="patient-avatar">${(p.patient_name||'?')[0]}</div>
+          <div>
+            <div style="font-weight:600;font-size:13px">${p.patient_name||'—'}</div>
+            <div style="font-size:11px;color:#9AA0A6">${p.patient_age||'?'}y · ${p.patient_sex||'?'} · ${p.location_district||'—'}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-size:12px;font-weight:600;color:#1565C0">${p.booking_code||'—'}</td>
+      <td style="font-size:12px;max-width:160px">${p.ai_diagnosis||p.symptoms?.slice(0,50)||'—'}</td>
+      <td><span class="status-badge ${urgClass}">${p.urgency_level||'normal'}</span></td>
+      <td><span class="status-badge ${statClass}">${(p.status||'pending').replace('_',' ')}</span></td>
+      <td style="font-size:12px;color:#9AA0A6">${fmtDate(p.created_at)}</td>
+      <td>
+        <button class="btn-admin secondary sm" onclick='showPatient(${JSON.stringify(JSON.stringify(p))})'>
+          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View
+        </button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function showPatient(pJson) {
+  const p = JSON.parse(pJson);
+  document.getElementById('modalPatientName').textContent = p.patient_name || '—';
+  document.getElementById('modalPatientSub').textContent =
+    `${p.booking_code||''} · ${p.patient_age||'?'}y · ${p.patient_sex||'?'} · ${fmtDate(p.created_at)}`;
+  document.getElementById('modalBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      ${[
+        ['Booking Code',   p.booking_code||'—'],
+        ['Urgency',        `<span class="status-badge ${p.urgency_level==='high'?'urgent':'normal'}">${p.urgency_level||'normal'}</span>`],
+        ['Status',         `<span class="status-badge ${p.status==='attended'?'completed':p.status==='in_progress'?'in_progress':'waiting'}">${(p.status||'pending').replace('_',' ')}</span>`],
+        ['District',       p.location_district||'—'],
+        ['Age',            p.patient_age ? p.patient_age+'y' : '—'],
+        ['Sex',            p.patient_sex||'—'],
+      ].map(([k,v]) => `<div>
+        <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;margin-bottom:4px">${k}</div>
+        <div style="font-size:13px">${v}</div>
+      </div>`).join('')}
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;margin-bottom:6px">Symptoms</div>
+      <div style="font-size:13px;background:#F8F9FA;padding:12px;border-radius:8px;line-height:1.5">${p.symptoms||'—'}</div>
+    </div>
+    ${p.ai_diagnosis ? `<div style="background:#E3F2FD;border-radius:8px;padding:12px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;margin-bottom:4px">
+        <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">smart_toy</span> AI Diagnosis
+      </div>
+      <div style="font-size:13px;color:#1565C0;font-weight:600">${p.ai_diagnosis}</div>
+      ${p.ai_confidence ? `<div style="font-size:11px;color:#1976D2;margin-top:2px">Confidence: ${p.ai_confidence}%</div>` : ''}
+    </div>` : ''}
+    ${p.notes ? `<div>
+      <div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;margin-bottom:6px">Notes</div>
+      <div style="font-size:13px;background:#F8F9FA;padding:12px;border-radius:8px">${p.notes}</div>
+    </div>` : ''}
+    <div style="margin-top:16px;text-align:right">
+      <button onclick="document.getElementById('patientModal').style.display='none'" class="btn-admin secondary">Close</button>
+    </div>`;
+  document.getElementById('patientModal').style.display = 'block';
+}
+</script>
+</body>
+</html>
