@@ -813,22 +813,14 @@ async function submitOrder() {
 }
 
 // Init
-document.addEventListener('DOMContentLoaded', async () => {
-  // Load from cache first so list shows immediately offline
+document.addEventListener('DOMContentLoaded', () => {
+  // Load MOCK_MEDS FIRST so medicine list is immediately interactive
+  allMeds = MOCK_MEDS;
   const cached = window.HomattCache ? window.HomattCache.load('medicines', []) : [];
-  if (cached.length) { allMeds = cached; filterMeds(); }
+  if (cached.length) { allMeds = cached; }
+  filterMeds();
 
-  if (supa) {
-    const { data } = await supa.from('medicine_catalog').select('name,retail_price').order('name');
-    if (data && data.length) {
-      allMeds = data.map(m => ({ name: m.name, price: m.retail_price || 500 }));
-      if (window.HomattCache) window.HomattCache.save('medicines', allMeds);
-      filterMeds();
-    }
-  }
-  if (!allMeds.length) { allMeds = MOCK_MEDS; filterMeds(); }
-
-  // Pre-fill delivery address from session
+  // Pre-fill delivery address/phone from session right away
   const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   if (session.district) document.getElementById('deliveryAddress').value = session.district + ', Uganda';
   if (session.phone_number || session.phone) document.getElementById('deliveryPhone').value = session.phone_number || session.phone;
@@ -837,6 +829,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlCond = new URLSearchParams(window.location.search).get('condition');
   if (urlCond && CONDITION_MEDS[urlCond] !== undefined) {
     selectCondition(urlCond);
+  }
+
+  // Load from Supabase in background — non-blocking, updates list if available
+  if (supa) {
+    supa.from('medicine_catalog').select('name,retail_price').order('name')
+      .then(({ data }) => {
+        if (data && data.length) {
+          allMeds = data.map(m => ({ name: m.name, price: m.retail_price || 500 }));
+          if (window.HomattCache) window.HomattCache.save('medicines', allMeds);
+          filterMeds();
+        }
+      })
+      .catch(() => {}); // keep mocks on network error
   }
 });
 </script>
