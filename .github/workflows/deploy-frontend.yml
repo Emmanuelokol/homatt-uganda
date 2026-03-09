@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - master
       - 'claude/**'               # Also deploy from active fix branches
     paths:
       - 'app/**'                  # Run when app files change
