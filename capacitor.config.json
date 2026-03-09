@@ -50,7 +50,7 @@
       "sound": "default"
     },
     "App": {
-      "launchUrl": "signin.html"
+      "launchUrl": "welcome.html"
     }
   }
 }
