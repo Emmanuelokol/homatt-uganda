@@ -7,6 +7,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/clinic.css">
+  <!-- Prefetch sibling pages for instant navigation -->
+  <link rel="prefetch" href="prescriptions.html">
+  <link rel="prefetch" href="patients.html">
+  <link rel="prefetch" href="lab-requests.html">
+  <link rel="prefetch" href="daily-report.html">
 </head>
 <body>
 <div class="admin-layout">
@@ -100,6 +105,11 @@
       <div class="content-row">
         <!-- Patient Queue -->
         <div>
+          <!-- Diagnosis tip banner -->
+          <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;color:#1565C0">
+            <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">info</span>
+            <span><strong>To enter diagnosis &amp; prescription:</strong> click the <strong style="background:#1565C0;color:#fff;padding:2px 8px;border-radius:4px">Call</strong> button next to a pending patient in the queue below. This opens the full consultation form.</span>
+          </div>
           <div class="admin-table-wrap" id="queue">
             <div class="table-header">
               <div class="table-title">Today's Patient Queue</div>

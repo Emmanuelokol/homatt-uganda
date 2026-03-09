@@ -243,9 +243,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('createPharmacyAccountSubmitBtn').addEventListener('click', submitCreatePharmacyAccount);
 });
 
+const DEMO_PHARMACIES = [
+  { id:'p1', name:'Ntinda Health Pharmacy', district:'Kampala', city:'Kampala', phone:'+256 77 123 4567', license_number:'PH-2021-001', contact_person:'Pharm. Ssali',   status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*25).toISOString() },
+  { id:'p2', name:'City Chemist Nakasero',  district:'Kampala', city:'Kampala', phone:'+256 77 234 5678', license_number:'PH-2021-002', contact_person:'Pharm. Nakato',  status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*18).toISOString() },
+  { id:'p3', name:'Wandegeya Pharmacy',     district:'Kampala', city:'Kampala', phone:'+256 77 345 6789', license_number:'PH-2022-003', contact_person:'Pharm. Mubiru',  status:'approved', verified:false,active:true, created_at: new Date(Date.now()-86400000*7).toISOString() },
+  { id:'p4', name:'Mukono Central Chemist', district:'Mukono',  city:'Mukono',  phone:'+256 77 456 7890', license_number:'PH-2023-004', contact_person:'Pharm. Nabirye', status:'pending',  verified:false,active:false,created_at: new Date(Date.now()-86400000*1).toISOString() },
+];
+
 async function loadPharmacies() {
+  if (!supabase) { allPharmacies = DEMO_PHARMACIES; renderPharmacies(); return; }
   const { data } = await supabase.from('pharmacies').select('*').order('created_at',{ascending:false});
-  allPharmacies = data || [];
+  allPharmacies = (data && data.length) ? data : DEMO_PHARMACIES;
   renderPharmacies();
 }
 

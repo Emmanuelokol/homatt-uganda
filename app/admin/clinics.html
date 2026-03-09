@@ -249,9 +249,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('createClinicAccountSubmitBtn').addEventListener('click', submitCreateClinicAccount);
 });
 
+const DEMO_CLINICS = [
+  { id:'c1', name:'Kampala Medical Centre', district:'Kampala', city:'Kampala', phone:'+256 41 234 567', license_number:'HC-2021-001', contact_person:'Dr. Namukasa', status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*30).toISOString() },
+  { id:'c2', name:'Ntinda Health Clinic',   district:'Kampala', city:'Kampala', phone:'+256 41 345 678', license_number:'HC-2021-002', contact_person:'Dr. Mubiru',   status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*20).toISOString() },
+  { id:'c3', name:'Mulago Community Clinic',district:'Kampala', city:'Kampala', phone:'+256 41 456 789', license_number:'HC-2022-003', contact_person:'Dr. Ssempa',   status:'approved', verified:false,active:true, created_at: new Date(Date.now()-86400000*10).toISOString() },
+  { id:'c4', name:'Nakawa Health Centre',   district:'Kampala', city:'Kampala', phone:'+256 41 567 890', license_number:'HC-2022-004', contact_person:'Dr. Nabirye',  status:'pending',  verified:false,active:false,created_at: new Date(Date.now()-86400000*2).toISOString() },
+];
+
 async function loadClinics() {
-  const { data } = await supabase.from('clinics').select('*').order('created_at', {ascending:false});
-  allClinics = data || [];
+  if (!supabase) { allClinics = DEMO_CLINICS; renderClinics(); return; }
+  const { data, error } = await supabase.from('clinics').select('*').order('created_at', {ascending:false});
+  allClinics = (data && data.length) ? data : DEMO_CLINICS;
   renderClinics();
 }
 

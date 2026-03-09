@@ -100,11 +100,18 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!session) return;
   setupAdminLogout();
 
-  const { data } = await supabase.from('site_content').select('*').eq('key', 'emergency').single();
-  if (data) {
-    document.getElementById('emergencyContent').value = data.content || '';
-    document.getElementById('emergencyPreview').textContent = data.content || '—';
-    document.getElementById('emergencyUpdated').textContent = 'Last updated: ' + formatDate(data.updated_at);
+  const DEMO_EMERGENCY = `Emergency Contacts — Uganda\n\nNational Ambulance: 0800 999 000 (toll-free)\nPolice: 999 / 112\nFire & Rescue: 0800 199 699\nUganda Red Cross: +256 41 4258700\nMulago National Referral Hospital: +256 41 4532 201\nUganda Cancer Institute: +256 41 4534 516`;
+  if (!supabase) {
+    document.getElementById('emergencyContent').value = DEMO_EMERGENCY;
+    document.getElementById('emergencyPreview').textContent = DEMO_EMERGENCY;
+    document.getElementById('emergencyUpdated').textContent = 'Demo mode';
+  } else {
+    const { data } = await supabase.from('site_content').select('*').eq('key', 'emergency').single();
+    if (data) {
+      document.getElementById('emergencyContent').value = data.content || '';
+      document.getElementById('emergencyPreview').textContent = data.content || '—';
+      document.getElementById('emergencyUpdated').textContent = 'Last updated: ' + formatDate(data.updated_at);
+    }
   }
 
   // Live preview

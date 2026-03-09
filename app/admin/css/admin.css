@@ -28,7 +28,9 @@ body {
   background: var(--admin-bg);
   color: var(--admin-text);
   min-height: 100vh;
+  animation: pg-in .18s ease both;
 }
+@keyframes pg-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
 
 /* ---- Layout ---- */
 .admin-layout {

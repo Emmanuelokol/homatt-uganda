@@ -223,15 +223,26 @@ async function openModal() {
 }
 function closeModal() { document.getElementById('payoutModal').style.display = 'none'; }
 
+const DEMO_RECIPIENTS = {
+  clinic:   [{id:'c1',name:'Kampala Medical Centre'},{id:'c2',name:'Ntinda Health Clinic'}],
+  pharmacy: [{id:'p1',name:'Ntinda Health Pharmacy'},{id:'p2',name:'City Chemist Nakasero'}],
+  rider:    [{id:'r1',full_name:'Kato Moses'},{id:'r2',full_name:'Ssali David'}],
+};
+
 async function loadRecipients() {
   const type = document.getElementById('payoutType').value;
   const sel  = document.getElementById('payoutRecipient');
   sel.innerHTML = '<option>Loading...</option>';
-  let data, error;
-  if (type === 'clinic')    ({ data, error } = await supabase.from('clinics').select('id,name').eq('active',true));
-  if (type === 'pharmacy')  ({ data, error } = await supabase.from('pharmacies').select('id,name').eq('active',true));
-  if (type === 'rider')     ({ data, error } = await supabase.from('riders').select('id,full_name').eq('active',true));
-  data = data || [];
+  let data = [];
+  if (!supabase) {
+    data = DEMO_RECIPIENTS[type] || [];
+  } else {
+    let res;
+    if (type === 'clinic')   res = await supabase.from('clinics').select('id,name').eq('active',true);
+    if (type === 'pharmacy') res = await supabase.from('pharmacies').select('id,name').eq('active',true);
+    if (type === 'rider')    res = await supabase.from('riders').select('id,full_name').eq('active',true);
+    data = (res?.data && res.data.length) ? res.data : (DEMO_RECIPIENTS[type] || []);
+  }
   recipientData = Object.fromEntries(data.map(d => [d.id, d.name || d.full_name]));
   sel.innerHTML = data.map(d => `<option value="${d.id}">${d.name || d.full_name}</option>`).join('');
 }

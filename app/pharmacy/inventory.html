@@ -99,6 +99,15 @@
           <div class="stat-icon red"><span class="material-icons-outlined">remove_circle</span></div>
           <div><div class="stat-number" id="statOut">—</div><div class="stat-label">Out of Stock</div></div>
         </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">event_busy</span></div>
+          <div><div class="stat-number" id="statExpiring">—</div><div class="stat-label">Expiring ≤30 days</div></div>
+        </div>
+      </div>
+      <!-- Expiry warning banner -->
+      <div id="expiryBanner" style="display:none;background:#FFF3E0;border-left:4px solid #E65100;border-radius:8px;padding:12px 18px;margin-bottom:16px;font-size:13px;color:#BF360C">
+        <strong><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">event_busy</span>
+        Expiry alert:</strong> <span id="expiryBannerMsg"></span>
       </div>
 
       <!-- Low / out-of-stock alert banner -->
@@ -147,20 +156,36 @@
             </select>
           </div>
           <div class="inv-form-group">
-            <label>Retail Price (UGX)</label>
-            <input type="number" id="fldPrice" min="0" placeholder="0">
+            <label>Retail / Selling Price (UGX) *</label>
+            <input type="number" id="fldPrice" min="0" placeholder="e.g. 3200">
+          </div>
+          <div class="inv-form-group">
+            <label>Purchase / Cost Price (UGX)</label>
+            <input type="number" id="fldCostPrice" min="0" placeholder="e.g. 2400">
           </div>
           <div class="inv-form-group">
             <label>Quantity in Stock *</label>
             <input type="number" id="fldQty" min="0" placeholder="0">
           </div>
           <div class="inv-form-group">
-            <label>Reorder Threshold</label>
+            <label>Reorder Threshold (alert level)</label>
             <input type="number" id="fldThreshold" min="0" placeholder="20">
           </div>
+          <div class="inv-form-group">
+            <label>Expiry Date</label>
+            <input type="date" id="fldExpiry">
+          </div>
+          <div class="inv-form-group">
+            <label>Batch / Lot Number</label>
+            <input type="text" id="fldBatch" placeholder="e.g. BT-2024-0891">
+          </div>
           <div class="inv-form-group" style="grid-column:span 2">
-            <label>Notes (optional)</label>
-            <textarea id="fldNotes" placeholder="Storage conditions, supplier info, expiry notes…"></textarea>
+            <label>Supplier / Manufacturer</label>
+            <input type="text" id="fldSupplier" placeholder="e.g. Cipla Uganda, UNHCR, NMS">
+          </div>
+          <div class="inv-form-group" style="grid-column:span 2">
+            <label>Storage Notes (optional)</label>
+            <textarea id="fldNotes" placeholder="e.g. Keep refrigerated, store below 25°C, away from direct sunlight…"></textarea>
           </div>
         </div>
         <div class="inv-form-actions">
@@ -200,8 +225,10 @@
               <th>Category</th>
               <th>Stock Level</th>
               <th>Qty</th>
-              <th>Reorder At</th>
-              <th>Price (UGX)</th>
+              <th>Sell Price</th>
+              <th>Cost Price</th>
+              <th>Expiry</th>
+              <th>Supplier</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -304,15 +331,22 @@ function renderInventory() {
   });
 
   // Stats (over full list, ignore filters)
+  const now = new Date();
   const total = allInventory.length;
-  const okCount  = allInventory.filter(i => stockStatus(i) === 'ok').length;
-  const lowCount = allInventory.filter(i => stockStatus(i) === 'low').length;
-  const outItems = allInventory.filter(i => stockStatus(i) === 'out');
+  const okCount      = allInventory.filter(i => stockStatus(i) === 'ok').length;
+  const lowCount     = allInventory.filter(i => stockStatus(i) === 'low').length;
+  const outItems     = allInventory.filter(i => stockStatus(i) === 'out');
+  const expiringItems= allInventory.filter(i => {
+    if (!i.expiry_date) return false;
+    const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+    return d <= 30;
+  });
 
-  document.getElementById('statTotal').textContent   = total;
-  document.getElementById('statInStock').textContent = okCount;
-  document.getElementById('statLow').textContent     = lowCount;
-  document.getElementById('statOut').textContent     = outItems.length;
+  document.getElementById('statTotal').textContent    = total;
+  document.getElementById('statInStock').textContent  = okCount;
+  document.getElementById('statLow').textContent      = lowCount;
+  document.getElementById('statOut').textContent      = outItems.length;
+  document.getElementById('statExpiring').textContent = expiringItems.length;
 
   if (outItems.length) {
     document.getElementById('lowBanner').style.display = 'block';
@@ -322,12 +356,24 @@ function renderInventory() {
     document.getElementById('lowBanner').style.display = 'none';
   }
 
+  if (expiringItems.length) {
+    document.getElementById('expiryBanner').style.display = 'block';
+    document.getElementById('expiryBannerMsg').textContent =
+      expiringItems.map(i => {
+        const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+        return `${i.medicine_name} (${d < 0 ? 'EXPIRED' : d + 'd left'})`;
+      }).join(', ');
+  } else {
+    document.getElementById('expiryBanner').style.display = 'none';
+  }
+
   const tbody = document.getElementById('inventoryBody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No drugs found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#9AA0A6">No drugs found</td></tr>';
     return;
   }
 
+  const today = new Date();
   tbody.innerHTML = filtered.map(i => {
     const threshold = i.reorder_threshold || 20;
     const st = stockStatus(i);
@@ -339,9 +385,22 @@ function renderInventory() {
     const typeCls    = (i.drug_type || 'otc') === 'rx' ? 'rx' : 'otc';
     const catLabel   = i.category ? i.category.charAt(0).toUpperCase() + i.category.slice(1) : '—';
     const isOos      = !i.is_available || i.quantity === 0;
+    // Expiry display with warning colours
+    let expiryHtml = '—';
+    if (i.expiry_date) {
+      const exp = new Date(i.expiry_date);
+      const daysLeft = Math.ceil((exp - today) / 86400000);
+      const expStr = exp.toLocaleDateString('en-UG', {day:'numeric',month:'short',year:'numeric'});
+      if (daysLeft < 0)       expiryHtml = `<span style="color:#D32F2F;font-weight:700;font-size:12px">EXPIRED<br><small>${expStr}</small></span>`;
+      else if (daysLeft <= 30) expiryHtml = `<span style="color:#E65100;font-weight:700;font-size:12px">${daysLeft}d left<br><small>${expStr}</small></span>`;
+      else                     expiryHtml = `<span style="font-size:12px;color:#5F6368">${expStr}</span>`;
+    }
     return `
     <tr>
-      <td style="font-weight:600;font-size:13px">${i.medicine_name || '—'}</td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${i.medicine_name || '—'}</div>
+        ${i.batch_number ? `<div style="font-size:11px;color:#9AA0A6">Batch: ${i.batch_number}</div>` : ''}
+      </td>
       <td><span class="drug-badge ${typeCls}">${typeLabel}</span></td>
       <td style="font-size:12px;color:#5F6368">${catLabel}</td>
       <td style="min-width:110px">
@@ -350,8 +409,10 @@ function renderInventory() {
         </div>
       </td>
       <td><span style="font-size:14px;font-weight:700;color:${st==='out'?'#D32F2F':st==='low'?'#E65100':'#2E7D32'}">${i.quantity}</span></td>
-      <td style="font-size:12px;color:#9AA0A6">${threshold}</td>
       <td style="font-size:12px">${i.retail_price ? formatUGX(i.retail_price) : '—'}</td>
+      <td style="font-size:12px;color:#5F6368">${i.cost_price ? formatUGX(i.cost_price) : '—'}</td>
+      <td>${expiryHtml}</td>
+      <td style="font-size:12px;color:#5F6368;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.supplier || '—'}</td>
       <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
       <td style="white-space:nowrap">
         <button class="btn-admin secondary sm" onclick="openEditPanel('${i.id}')" title="Edit">
@@ -373,8 +434,12 @@ function resetFormFields() {
   document.getElementById('fldDrugType').value  = 'otc';
   document.getElementById('fldCategory').value  = '';
   document.getElementById('fldPrice').value     = '';
+  document.getElementById('fldCostPrice').value = '';
   document.getElementById('fldQty').value       = '';
   document.getElementById('fldThreshold').value = '20';
+  document.getElementById('fldExpiry').value    = '';
+  document.getElementById('fldBatch').value     = '';
+  document.getElementById('fldSupplier').value  = '';
   document.getElementById('fldNotes').value     = '';
 }
 
@@ -396,8 +461,12 @@ window.openEditPanel = function(id) {
   document.getElementById('fldDrugType').value  = item.drug_type || 'otc';
   document.getElementById('fldCategory').value  = item.category || '';
   document.getElementById('fldPrice').value     = item.retail_price || '';
+  document.getElementById('fldCostPrice').value = item.cost_price || '';
   document.getElementById('fldQty').value       = item.quantity || 0;
   document.getElementById('fldThreshold').value = item.reorder_threshold || 20;
+  document.getElementById('fldExpiry').value    = item.expiry_date ? item.expiry_date.split('T')[0] : '';
+  document.getElementById('fldBatch').value     = item.batch_number || '';
+  document.getElementById('fldSupplier').value  = item.supplier || '';
   document.getElementById('fldNotes').value     = item.notes || '';
   document.getElementById('formPanelTitle').textContent = 'Edit Drug: ' + item.medicine_name;
   document.getElementById('saveBtnLabel').textContent   = 'Save Changes';
@@ -412,20 +481,24 @@ window.closeFormPanel = function() {
 
 /* ── Save drug (add or edit) ── */
 window.saveDrug = async function() {
-  const medicine_name    = document.getElementById('fldName').value.trim();
-  const drug_type        = document.getElementById('fldDrugType').value;
-  const category         = document.getElementById('fldCategory').value;
-  const retail_price     = parseFloat(document.getElementById('fldPrice').value) || null;
-  const quantity         = parseInt(document.getElementById('fldQty').value) || 0;
+  const medicine_name     = document.getElementById('fldName').value.trim();
+  const drug_type         = document.getElementById('fldDrugType').value;
+  const category          = document.getElementById('fldCategory').value;
+  const retail_price      = parseFloat(document.getElementById('fldPrice').value) || null;
+  const cost_price        = parseFloat(document.getElementById('fldCostPrice').value) || null;
+  const quantity          = parseInt(document.getElementById('fldQty').value) || 0;
   const reorder_threshold = parseInt(document.getElementById('fldThreshold').value) || 20;
-  const notes            = document.getElementById('fldNotes').value.trim();
+  const expiry_date       = document.getElementById('fldExpiry').value || null;
+  const batch_number      = document.getElementById('fldBatch').value.trim() || null;
+  const supplier          = document.getElementById('fldSupplier').value.trim() || null;
+  const notes             = document.getElementById('fldNotes').value.trim();
 
   if (!medicine_name) { showToast('Medicine name is required', 'error'); document.getElementById('fldName').focus(); return; }
 
   const btn = document.getElementById('saveDrugBtn');
   btn.disabled = true;
 
-  const payload = { medicine_name, drug_type, category, retail_price, quantity, reorder_threshold, notes, is_available: quantity > 0 };
+  const payload = { medicine_name, drug_type, category, retail_price, cost_price, quantity, reorder_threshold, expiry_date, batch_number, supplier, notes, is_available: quantity > 0 };
 
   if (window._pharmSupa && _session?.pharmacyId) {
     payload.pharmacy_id = _session.pharmacyId;
