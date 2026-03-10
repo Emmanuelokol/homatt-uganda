@@ -28,8 +28,9 @@
       </div>
 
       <div class="login-field">
-        <label>Email Address</label>
-        <input type="email" id="adminEmail" placeholder="admin@homatt.ug" autocomplete="email">
+        <label>Email or Phone Number</label>
+        <input type="text" id="adminEmail" placeholder="admin@homatt.ug or 7XX XXX XXX" autocomplete="email" inputmode="email">
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Enter your email address or Uganda phone number (9 digits, no +256)</div>
       </div>
       <div class="login-field">
         <label>Password</label>
@@ -100,13 +101,19 @@
       const btn = document.getElementById('loginBtn');
 
       errEl.style.display = 'none';
-      if (!email || !password) { errEl.textContent = 'Please enter email and password'; errEl.style.display = 'block'; return; }
+      if (!email || !password) { errEl.textContent = 'Please enter email/phone and password'; errEl.style.display = 'block'; return; }
       if (!supabase) { errEl.textContent = 'Service unavailable. Please try the Demo Dashboard.'; errEl.style.display = 'block'; return; }
+
+      // If input looks like a phone number (9 digits, no @), convert to Homatt email format
+      const phoneOnly = email.replace(/\s/g, '');
+      const loginEmail = /^[0-9]{9}$/.test(phoneOnly)
+        ? '256' + phoneOnly + '@homatt.ug'
+        : email;
 
       btn.disabled = true;
       document.getElementById('loginBtnText').textContent = 'Signing in...';
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
 
       btn.disabled = false;
       document.getElementById('loginBtnText').textContent = 'Sign In to Admin Portal';
