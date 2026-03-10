@@ -16,14 +16,14 @@
     }
 
     // ── Global action functions (defined early, before any CDN loads) ──
+    function _saveAdminSession(obj) {
+      const val = JSON.stringify(obj);
+      try { sessionStorage.setItem('admin_session', val); } catch(e) {}
+      try { localStorage.setItem('admin_session', val); } catch(e) {}
+    }
+
     function adminOpenDemo() {
-      try {
-        localStorage.setItem('admin_session', JSON.stringify({
-          name: 'Homatt Admin (Demo)',
-          email: 'demo@homatt.ug',
-          demo: true
-        }));
-      } catch(e) {}
+      _saveAdminSession({ name: 'Homatt Admin (Demo)', email: 'demo@homatt.ug', demo: true });
       window.location.href = 'dashboard.html';
     }
 
@@ -93,14 +93,12 @@
           return;
         }
 
-        try {
-          localStorage.setItem('admin_session', JSON.stringify({
-            email:   data.user.email,
-            name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
-            isAdmin: true,
-            userId:  data.user.id
-          }));
-        } catch(e) {}
+        _saveAdminSession({
+          email:   data.user.email,
+          name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+          isAdmin: true,
+          userId:  data.user.id
+        });
 
         window.location.href = 'dashboard.html';
 
@@ -158,8 +156,10 @@
   <script>
     // Auto-redirect if already logged in (runs after CDN loads)
     window.addEventListener('load', async () => {
-      let stored;
-      try { stored = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
+      let stored = null;
+      for (const store of [sessionStorage, localStorage]) {
+        try { const r = store.getItem('admin_session'); if (r) { stored = JSON.parse(r); break; } } catch(e) {}
+      }
       if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
         window.location.href = 'dashboard.html';
         return;
@@ -178,14 +178,12 @@
             .select('first_name, last_name, is_admin')
             .eq('id', session.user.id).single();
           if (profile && profile.is_admin) {
-            try {
-              localStorage.setItem('admin_session', JSON.stringify({
-                email:   session.user.email,
-                name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
-                isAdmin: true,
-                userId:  session.user.id
-              }));
-            } catch(e) {}
+            _saveAdminSession({
+              email:   session.user.email,
+              name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+              isAdmin: true,
+              userId:  session.user.id
+            });
             window.location.href = 'dashboard.html';
           }
         }

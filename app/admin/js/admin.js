@@ -2,15 +2,50 @@
  * Homatt Health — Admin Portal Shared Logic
  */
 const cfg = window.HOMATT_CONFIG || {};
-// Isolated storage key so admin session never overwrites the Homatt patient session
-let supabase = null;
-try {
-  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
-    supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+
+// Lazy Supabase init — called only when actually needed (after CDN has loaded async)
+function getAdminSupabase() {
+  if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || !window.supabase) return null;
+  try {
+    return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-homatt-admin-auth' }
     });
+  } catch(e) { return null; }
+}
+
+// Keep a module-level reference once created (avoids creating multiple clients)
+let _adminSupa = null;
+function adminSupa() {
+  if (!_adminSupa) _adminSupa = getAdminSupabase();
+  return _adminSupa;
+}
+
+// Helper: read admin session from sessionStorage (primary) or localStorage (fallback)
+function getAdminSession() {
+  for (const store of [sessionStorage, localStorage]) {
+    try {
+      const raw = store.getItem('admin_session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') return parsed;
+      }
+    } catch(e) {}
   }
-} catch(e) { console.warn('[Admin] Supabase init failed:', e.message); }
+  return null;
+}
+
+// Helper: write admin session to both storages so it survives across tabs/storage modes
+function setAdminSession(obj) {
+  const val = JSON.stringify(obj);
+  try { sessionStorage.setItem('admin_session', val); } catch(e) {}
+  try { localStorage.setItem('admin_session', val); } catch(e) {}
+}
+
+// Helper: remove admin session from both storages
+function clearAdminSession() {
+  try { sessionStorage.removeItem('admin_session'); } catch(e) {}
+  try { localStorage.removeItem('admin_session'); } catch(e) {}
+}
 
 /* ── Sidebar builder ── */
 function buildAdminSidebar(activePage) {
@@ -69,10 +104,10 @@ function buildAdminSidebar(activePage) {
 
 /* ── Admin auth guard ── */
 async function requireAdmin() {
-  // Check stored session (demo or real login) — works without Supabase CDN
-  let stored;
-  try { stored = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
-  if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
+  // 1. Check stored session (sessionStorage first, localStorage fallback)
+  //    Works without any CDN or network — covers demo mode and real logins
+  const stored = getAdminSession();
+  if (stored && (stored.demo || stored.isAdmin)) {
     const adminName = stored.name || 'Admin';
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
@@ -83,19 +118,36 @@ async function requireAdmin() {
     return stored;
   }
 
-  if (!supabase) { window.location.href = 'index.html'; return null; }
-  const { data: { session } } = await supabase.auth.getSession();
+  // 2. No stored session — try live Supabase auth
+  const supa = adminSupa();
+  if (!supa) {
+    // CDN hasn't loaded yet — redirect to login rather than silently doing nothing
+    window.location.href = 'index.html';
+    return null;
+  }
+
+  let session;
+  try {
+    const { data } = await supa.auth.getSession();
+    session = data?.session;
+  } catch(e) {}
   if (!session) { window.location.href = 'index.html'; return null; }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('first_name, last_name, is_admin')
-    .eq('id', session.user.id)
-    .single();
+  let profile;
+  try {
+    const { data } = await supa.from('profiles')
+      .select('first_name, last_name, is_admin')
+      .eq('id', session.user.id)
+      .single();
+    profile = data;
+  } catch(e) {}
 
   if (!profile?.is_admin) { window.location.href = 'index.html'; return null; }
 
   const adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
+  // Store so subsequent pages don't need to re-verify
+  setAdminSession({ email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id });
+
   const avatarEl = document.getElementById('adminUserAvatar');
   const nameEl   = document.getElementById('adminUserName');
   const nameTop  = document.getElementById('adminUserNameTop');
@@ -125,8 +177,9 @@ async function requirePortalUser(expectedRole, onSuccess) {
 /* ── Logout ── */
 function setupAdminLogout() {
   document.getElementById('adminLogoutBtn')?.addEventListener('click', async () => {
-    localStorage.removeItem('admin_session');
-    if (supabase) { try { await supabase.auth.signOut(); } catch(e) {} }
+    clearAdminSession();
+    const supa = adminSupa();
+    if (supa) { try { await supa.auth.signOut(); } catch(e) {} }
     window.location.href = 'index.html';
   });
 }
