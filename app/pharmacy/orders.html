@@ -59,6 +59,72 @@
   </main>
 </div>
 
+<!-- Rate Patient Modal -->
+<div class="admin-modal-overlay" id="ratePatientModal" style="display:none">
+  <div class="admin-modal" style="max-width:440px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="ratePatientName">Rate Patient</div>
+      <button class="admin-modal-close" onclick="closeRatePatient()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="ratePatientOrderId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Rate this patient's behaviour during the medicine order. This helps us maintain service quality.</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Punctuality / Availability</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Communication / Responsiveness</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Compliance (prescription / instructions)</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Payment / No disputes</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Additional Notes (optional)</div>
+          <textarea id="patientRatingComment" rows="3" style="width:100%;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;resize:none;outline:none" placeholder="Any issues or comments about this patient?"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeRatePatient()">Cancel</button>
+      <button class="btn-admin success" onclick="submitPatientRating()">
+        <span class="material-icons-outlined" style="font-size:14px">star</span> Submit Rating
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Order Detail Modal -->
 <div class="admin-modal-overlay" id="orderModal" style="display:none">
   <div class="admin-modal" style="max-width:540px">
@@ -302,6 +368,10 @@ function getActions(o) {
     <button class="btn-admin warning sm" onclick="updateStatus('${o.id}','in_transit')">
       <span class="material-icons-outlined" style="font-size:14px">local_shipping</span> Dispatched
     </button>`;
+  if (o.status === 'delivered') return `
+    <button class="btn-admin secondary sm" onclick="event.stopPropagation();openRatePatient('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate Patient
+    </button>`;
   return '';
 }
 
@@ -443,6 +513,55 @@ window.updateStatus = async (id, status) => {
   if (o) o.status = status;
   render();
   showToast(`Order marked as ${status.replace('_',' ')}`, 'success');
+};
+
+/* ── Patient Rating ── */
+window.openRatePatient = id => {
+  const o = allOrders.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('ratePatientOrderId').value = id;
+  document.getElementById('ratePatientName').textContent = 'Rate: ' + (o.patient_name || 'Patient');
+  // Reset stars
+  ['punctuality','communication','compliance','payment'].forEach(k => setPatientStar(k, 0));
+  document.getElementById('patientRatingComment').value = '';
+  document.getElementById('ratePatientModal').style.display = 'flex';
+};
+
+window.closeRatePatient = () => { document.getElementById('ratePatientModal').style.display = 'none'; };
+
+var patientStars = { punctuality:0, communication:0, compliance:0, payment:0 };
+window.setPatientStar = (key, val) => {
+  patientStars[key] = val;
+  document.querySelectorAll('.ps-star[data-key="' + key + '"]').forEach(function(s, i) {
+    s.style.color = i < val ? '#F9A825' : '#E0E0E0';
+  });
+};
+
+window.submitPatientRating = async () => {
+  const id = document.getElementById('ratePatientOrderId').value;
+  const o = allOrders.find(x => x.id === id);
+  const overall = Math.round((patientStars.punctuality + patientStars.communication + patientStars.compliance + patientStars.payment) / 4) || 3;
+  const comment = document.getElementById('patientRatingComment').value.trim();
+  const session = requirePharmacy();
+
+  if (window._pharmSupa) {
+    await window._pharmSupa.from('ratings').insert({
+      pharmacy_id: session?.pharmacyId || null,
+      order_id: id,
+      rating_type: 'patient_review',
+      is_patient_review: true,
+      patient_rating_type: 'patient',
+      score: overall,
+      score_speed: patientStars.punctuality,
+      score_quality: patientStars.compliance,
+      score_comms: patientStars.communication,
+      score_cost: patientStars.payment,
+      comment: comment || null,
+      created_at: new Date().toISOString()
+    });
+  }
+  closeRatePatient();
+  showToast('Patient rated successfully', 'success');
 };
 
 window.rejectPrompt = async id => {

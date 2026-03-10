@@ -111,6 +111,71 @@
   </div>
 </div>
 
+<!-- Rate Patient Modal (Clinic) -->
+<div class="admin-modal-overlay" id="rateClinicPatientModal" style="display:none">
+  <div class="admin-modal" style="max-width:440px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="rateClinicPatientName">Rate Patient</div>
+      <button class="admin-modal-close" onclick="closeRateClinicPatient()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Rate this patient's behaviour during the clinic visit. This helps maintain service quality and assists other healthcare providers.</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Punctuality (on time for appointment)</div>
+          <div style="display:flex;gap:4px">
+            <button class="cps-star" data-key="punctuality" onclick="setClinicPatientStar('punctuality',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="punctuality" onclick="setClinicPatientStar('punctuality',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="punctuality" onclick="setClinicPatientStar('punctuality',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="punctuality" onclick="setClinicPatientStar('punctuality',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="punctuality" onclick="setClinicPatientStar('punctuality',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Compliance (follows medical advice)</div>
+          <div style="display:flex;gap:4px">
+            <button class="cps-star" data-key="compliance" onclick="setClinicPatientStar('compliance',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="compliance" onclick="setClinicPatientStar('compliance',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="compliance" onclick="setClinicPatientStar('compliance',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="compliance" onclick="setClinicPatientStar('compliance',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="compliance" onclick="setClinicPatientStar('compliance',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Communication / Cooperation</div>
+          <div style="display:flex;gap:4px">
+            <button class="cps-star" data-key="communication" onclick="setClinicPatientStar('communication',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="communication" onclick="setClinicPatientStar('communication',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="communication" onclick="setClinicPatientStar('communication',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="communication" onclick="setClinicPatientStar('communication',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="communication" onclick="setClinicPatientStar('communication',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Payment / No billing disputes</div>
+          <div style="display:flex;gap:4px">
+            <button class="cps-star" data-key="payment" onclick="setClinicPatientStar('payment',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="payment" onclick="setClinicPatientStar('payment',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="payment" onclick="setClinicPatientStar('payment',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="payment" onclick="setClinicPatientStar('payment',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="cps-star" data-key="payment" onclick="setClinicPatientStar('payment',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Clinical Notes (optional)</div>
+          <textarea id="clinicPatientRatingComment" rows="3" style="width:100%;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;resize:none;outline:none" placeholder="Any clinical observations or behavioural notes?"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeRateClinicPatient()">Cancel</button>
+      <button class="btn-admin success" onclick="submitClinicPatientRating()">
+        <span class="material-icons-outlined" style="font-size:14px">star</span> Submit Rating
+      </button>
+    </div>
+  </div>
+</div>
+
 <div id="clinicToast" class="admin-toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -209,14 +274,77 @@ function renderTable(patients) {
       <td><span class="status-badge ${urgClass}">${p.urgency_level||'normal'}</span></td>
       <td><span class="status-badge ${statClass}">${(p.status||'pending').replace('_',' ')}</span></td>
       <td style="font-size:12px;color:#9AA0A6">${fmtDate(p.created_at)}</td>
-      <td>
+      <td style="display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn-admin secondary sm" onclick='showPatient(${JSON.stringify(JSON.stringify(p))})'>
           <span class="material-icons-outlined" style="font-size:14px">visibility</span> View
         </button>
+        ${p.status === 'attended' || p.status === 'completed' ? `<button class="btn-admin primary sm" onclick='openRatePatientClinic(${JSON.stringify(JSON.stringify(p))})'>
+          <span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate
+        </button>` : ''}
       </td>
     </tr>`;
   }).join('');
 }
+
+/* ── Patient rating (clinic) ── */
+var clinicPatientStars = { punctuality:0, compliance:0, communication:0, payment:0 };
+var ratingPatientId = null;
+
+window.openRatePatientClinic = function(pJson) {
+  try {
+    var p = typeof pJson === 'string' ? JSON.parse(pJson) : pJson;
+    ratingPatientId = p.id;
+    document.getElementById('rateClinicPatientName').textContent = 'Rate: ' + (p.patient_name || 'Patient');
+    ['punctuality','compliance','communication','payment'].forEach(function(k){ setClinicPatientStar(k,0); });
+    document.getElementById('clinicPatientRatingComment').value = '';
+    document.getElementById('patientModal').style.display = 'none';
+    document.getElementById('rateClinicPatientModal').style.display = 'flex';
+  } catch(e) {}
+};
+
+window.closeRateClinicPatient = function() {
+  document.getElementById('rateClinicPatientModal').style.display = 'none';
+};
+
+window.setClinicPatientStar = function(key, val) {
+  clinicPatientStars[key] = val;
+  document.querySelectorAll('.cps-star[data-key="' + key + '"]').forEach(function(s, i) {
+    s.style.color = i < val ? '#F9A825' : '#E0E0E0';
+  });
+};
+
+window.submitClinicPatientRating = async function() {
+  var comment = document.getElementById('clinicPatientRatingComment').value.trim();
+  var overall = Math.round((clinicPatientStars.punctuality + clinicPatientStars.compliance + clinicPatientStars.communication + clinicPatientStars.payment) / 4) || 3;
+  var session = requireClinic();
+  var cfg = window.HOMATT_CONFIG || {};
+  var supa = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    }
+  } catch(e) {}
+
+  if (supa) {
+    await supa.from('ratings').insert({
+      clinic_id: session?.clinicId || null,
+      booking_id: ratingPatientId,
+      rating_type: 'patient_review',
+      is_patient_review: true,
+      patient_rating_type: 'patient',
+      score: overall,
+      score_speed: clinicPatientStars.punctuality,
+      score_quality: clinicPatientStars.compliance,
+      score_comms: clinicPatientStars.communication,
+      score_cost: clinicPatientStars.payment,
+      comment: comment || null,
+      created_at: new Date().toISOString()
+    });
+  }
+  closeRateClinicPatient();
+  var toast = document.getElementById('clinicToast');
+  if (toast) { toast.textContent = 'Patient rated!'; toast.className = 'admin-toast success show'; setTimeout(function(){toast.className='admin-toast';},2500); }
+};
 
 function showPatient(pJson) {
   const p = JSON.parse(pJson);
@@ -252,7 +380,8 @@ function showPatient(pJson) {
       <div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;margin-bottom:6px">Notes</div>
       <div style="font-size:13px;background:#F8F9FA;padding:12px;border-radius:8px">${p.notes}</div>
     </div>` : ''}
-    <div style="margin-top:16px;text-align:right">
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
+      ${p.status === 'attended' || p.status === 'completed' ? `<button onclick="openRatePatientClinic(JSON.stringify(${JSON.stringify(JSON.stringify(p))}))" class="btn-admin primary"><span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate Patient</button>` : ''}
       <button onclick="document.getElementById('patientModal').style.display='none'" class="btn-admin secondary">Close</button>
     </div>`;
   document.getElementById('patientModal').style.display = 'block';
