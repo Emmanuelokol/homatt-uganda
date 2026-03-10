@@ -82,7 +82,7 @@
     .drug-type-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
     .drug-type-btn.rx-selected { border-color:#7B1FA2; background:#F3E5F5; color:#6A1B9A; }
     .rx-notice { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md);
-      padding:10px 14px; font-size:12px; color:#6A1B9A; display:flex; gap:8px; align-items:flex-start;
+      padding:10px 14px; font-size:12px; color:#6A1B9A; gap:8px; align-items:flex-start;
       margin-bottom:12px; display:none; }
     .rx-notice.visible { display:flex; }
     /* Auth info banner */
@@ -399,8 +399,9 @@ function selectDrugType(type) {
   selectedDrugType = type;
   order.drugType   = type;
   document.getElementById('dtcOtc').classList.toggle('selected', type === 'otc');
-  document.getElementById('dtcRx').classList.toggle('selected', false);
+  document.getElementById('dtcOtc').classList.remove('rx-selected');
   document.getElementById('dtcRx').classList.toggle('rx-selected', type === 'rx');
+  document.getElementById('dtcRx').classList.toggle('selected', type === 'rx');
   const notice = document.getElementById('rxNotice');
   const wrap   = document.getElementById('rxDoctorWrap');
   if (type === 'rx') {
