@@ -54,34 +54,35 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
   <script src="../js/config.js"></script>
   <script>
+    // Attach button listeners immediately — do NOT wait for Supabase CDN
     const cfg = window.HOMATT_CONFIG || {};
-    let supabase = null;
-    try {
-      if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
-        supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-admin-auth' } });
-      }
-    } catch(e) { console.warn('[Admin] Supabase init failed:', e.message); }
 
-    // Check if already logged in as admin
-    (async () => {
-      // Check stored session first (works offline / without Supabase CDN)
+    function getSupabase() {
+      if (!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) return null;
+      if (!window.supabase) return null;
+      try {
+        return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-admin-auth' } });
+      } catch(e) { return null; }
+    }
+
+    // Check if already logged in as admin (runs after page load)
+    window.addEventListener('load', async () => {
       let stored;
       try { stored = JSON.parse(localStorage.getItem('admin_session') || 'null'); } catch(e) {}
       if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
         window.location.href = 'dashboard.html';
         return;
       }
-      // Fallback: check Supabase session
+      const supabase = getSupabase();
       if (!supabase) return;
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session) {
           const { data: profile } = await supabase.from('profiles').select('first_name, last_name, is_admin').eq('id', session.user.id).single();
           if (profile && profile.is_admin) {
-            // Restore stored session marker
             localStorage.setItem('admin_session', JSON.stringify({
               email: session.user.email,
               name: (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
@@ -92,7 +93,7 @@
           }
         }
       } catch(e) { console.warn('[Admin] session check failed:', e.message); }
-    })();
+    });
 
     document.getElementById('loginBtn').addEventListener('click', async () => {
       const email = document.getElementById('adminEmail').value.trim();
@@ -102,13 +103,15 @@
 
       errEl.style.display = 'none';
       if (!email || !password) { errEl.textContent = 'Please enter email/phone and password'; errEl.style.display = 'block'; return; }
-      if (!supabase) { errEl.textContent = 'Service unavailable. Please try the Demo Dashboard.'; errEl.style.display = 'block'; return; }
 
       // If input looks like a phone number (9 digits, no @), convert to Homatt email format
       const phoneOnly = email.replace(/\s/g, '');
       const loginEmail = /^[0-9]{9}$/.test(phoneOnly)
         ? '256' + phoneOnly + '@homatt.ug'
         : email;
+
+      const supabase = getSupabase();
+      if (!supabase) { errEl.textContent = 'Service loading, please wait a moment and try again.'; errEl.style.display = 'block'; return; }
 
       btn.disabled = true;
       document.getElementById('loginBtnText').textContent = 'Signing in...';
@@ -133,7 +136,6 @@
         return;
       }
 
-      // Store session marker so requireAdmin() works even if Supabase CDN is slow/unavailable
       localStorage.setItem('admin_session', JSON.stringify({
         email: data.user.email,
         name: (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
