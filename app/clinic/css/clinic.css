@@ -145,5 +145,8 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .admin-toast{position:fixed;bottom:24px;right:24px;background:#1E1E1E;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,0.3);transform:translateY(60px);opacity:0;transition:all .3s ease;z-index:999}
 .admin-toast.visible{transform:translateY(0);opacity:1}
 
+/* ── Check-In spinner ── */
+@keyframes checkin-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
 /* ── Responsive ── */
 @media(max-width:768px){.admin-sidebar{width:0;overflow:hidden}.admin-main{margin-left:0}.stats-grid{grid-template-columns:1fr 1fr}}

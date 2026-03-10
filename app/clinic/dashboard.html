@@ -34,6 +34,9 @@
       <a href="#appointments" class="sidebar-link">
         <span class="material-icons-outlined">calendar_today</span> Appointments
       </a>
+      <a href="#checkin" class="sidebar-link">
+        <span class="material-icons-outlined">how_to_reg</span> Check-In Station
+      </a>
       <div class="sidebar-section-label">Clinical</div>
       <a href="prescriptions.html" class="sidebar-link">
         <span class="material-icons-outlined">medication</span> Prescriptions
@@ -80,6 +83,49 @@
         <span class="material-icons-outlined">warning</span>
         <span id="urgentAlertMsg">Urgent patients in queue</span>
       </div>
+
+      <!-- ===== RECEPTION CHECK-IN STATION ===== -->
+      <div class="admin-table-wrap" id="checkin" style="margin-bottom:28px">
+        <div class="table-header" style="background:linear-gradient(135deg,#004D40,#00897B);border-radius:12px 12px 0 0;padding:16px 22px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:22px">how_to_reg</span>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#fff">Reception Check-In Station</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px">Enter the patient's PIN token or booking code to verify and check them in</div>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);padding:5px 12px;border-radius:20px;letter-spacing:.5px">
+            RECEPTION
+          </div>
+        </div>
+        <div style="padding:20px 24px">
+          <div style="display:flex;gap:10px;margin-bottom:14px">
+            <div style="position:relative;flex:1">
+              <span class="material-icons-outlined" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:20px;pointer-events:none">pin</span>
+              <input id="pinInput" type="text" placeholder="Enter PIN (e.g. AFH-CHK-7R3NMX) or booking code (e.g. HM-A7KF)"
+                     style="width:100%;padding:13px 16px 13px 44px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s;box-sizing:border-box;text-transform:uppercase;letter-spacing:.5px"
+                     onkeydown="if(event.key==='Enter')verifyPin()"
+                     oninput="clearPinResult()"
+                     onfocus="this.style.borderColor='#00897B'"
+                     onblur="this.style.borderColor='#E0E0E0'">
+            </div>
+            <button onclick="verifyPin()" id="verifyBtn"
+                    style="padding:13px 24px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background .2s;flex-shrink:0"
+                    onmouseover="this.style.background='#00695C'" onmouseout="this.style.background='#00897B'">
+              <span class="material-icons-outlined" id="verifyIcon" style="font-size:18px">search</span>
+              <span id="verifyLabel">Verify Patient</span>
+            </button>
+          </div>
+          <div id="pinResult" style="display:none"></div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9AA0A6;margin-top:6px">
+            <span class="material-icons-outlined" style="font-size:14px">info</span>
+            Patient receives a PIN code when they complete booking on the Homatt app. PIN is valid for 2 hours.
+          </div>
+        </div>
+      </div>
+      <!-- ===== END CHECK-IN STATION ===== -->
 
       <!-- Stats -->
       <div class="stats-grid">
@@ -428,6 +474,180 @@ document.addEventListener('DOMContentLoaded', async () => {
     activeFilter = e.target.value;
     renderQueue();
   });
+
+  // ── Reception Check-In Station ──────────────────────────────────────
+  function updateStats() {
+    document.getElementById('statTotal').textContent     = bookings.length;
+    document.getElementById('statWaiting').textContent   = bookings.filter(b => b.status === 'pending').length;
+    document.getElementById('statCompleted').textContent = bookings.filter(b => b.status === 'attended' || b.status === 'completed').length;
+    document.getElementById('statUrgent').textContent    = bookings.filter(b => b.urgency_level === 'high' && b.status === 'pending').length;
+  }
+
+  window.clearPinResult = () => {
+    const r = document.getElementById('pinResult');
+    r.style.display = 'none';
+    r.innerHTML = '';
+  };
+
+  function renderPinResult(b, expired, alreadyIn) {
+    const urgColor = b.urgency_level === 'high' ? '#D32F2F' : '#1565C0';
+    const urgBg    = b.urgency_level === 'high' ? '#FFEBEE' : '#E3F2FD';
+
+    let headerBg, headerBorder, iconHtml, titleHtml, subHtml, badgeHtml;
+    if (alreadyIn) {
+      headerBg = '#F3E5F5'; headerBorder = '#CE93D8';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#7B1FA2;font-size:24px">info</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#4A148C">Already In Queue</div>';
+      subHtml   = '<div style="font-size:12px;color:#7B1FA2;margin-top:2px">This patient is already checked in and appears in today\'s queue</div>';
+      badgeHtml = '<div style="background:#7B1FA2;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">IN QUEUE</div>';
+    } else if (expired) {
+      headerBg = '#FFF8E1'; headerBorder = '#FFB300';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#E65100;font-size:24px">warning</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#E65100">PIN Expired — Override Available</div>';
+      subHtml   = '<div style="font-size:12px;color:#F57F17;margin-top:2px">PIN has expired but you can manually check this patient in</div>';
+      badgeHtml = '<div style="background:#E65100;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">PIN EXPIRED</div>';
+    } else {
+      headerBg = '#E8F5E9'; headerBorder = '#4CAF50';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#2E7D32;font-size:24px">check_circle</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#1B5E20">Patient Verified</div>';
+      subHtml   = '<div style="font-size:12px;color:#2E7D32;margin-top:2px">PIN is valid · Patient confirmed · Ready to check in</div>';
+      badgeHtml = '<div style="background:#2E7D32;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">PIN VALID</div>';
+    }
+
+    const pinExpiry = b.pin_expires_at
+      ? new Date(b.pin_expires_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' })
+      : '—';
+
+    const details = [
+      ['Patient',      b.patient_name  || '—'],
+      ['Booking Code', b.booking_code  || '—'],
+      ['Age / Sex',    (b.patient_age||'?') + 'y · ' + (b.patient_sex||'?')],
+      ['Urgency',      `<span style="font-weight:700;color:${urgColor};background:${urgBg};padding:2px 8px;border-radius:4px">${b.urgency_level||'normal'}</span>`],
+      ['Symptoms',     ((b.symptoms||b.ai_diagnosis||'—').slice(0,60))],
+      ['PIN Expires',  pinExpiry],
+    ];
+
+    let actionBtn;
+    if (alreadyIn) {
+      actionBtn = `<button onclick="callPatient('${b.id}')"
+                           style="flex:1;background:#7B1FA2;color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+                     <span class="material-icons-outlined" style="font-size:18px">open_in_full</span>Open Consultation
+                   </button>`;
+    } else {
+      const btnBg = expired ? '#E65100' : '#00897B';
+      const btnLabel = expired ? 'Override &amp; Check In' : 'Check Patient In';
+      actionBtn = `<button onclick="confirmCheckIn('${b.id}')"
+                           style="flex:1;background:${btnBg};color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+                     <span class="material-icons-outlined" style="font-size:18px">how_to_reg</span>${btnLabel}
+                   </button>`;
+    }
+
+    document.getElementById('pinResult').style.display = 'block';
+    document.getElementById('pinResult').innerHTML = `
+      <div style="background:${headerBg};border:1.5px solid ${headerBorder};border-radius:12px;padding:16px">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          ${iconHtml}
+          <div style="flex:1">${titleHtml}${subHtml}</div>
+          ${badgeHtml}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#fff;border-radius:8px;padding:14px;margin-bottom:14px">
+          ${details.map(([k,v]) => `
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${k}</div>
+              <div style="font-size:13px;color:#202124;font-weight:500">${v}</div>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:10px">
+          ${actionBtn}
+          <button onclick="clearPinResult();document.getElementById('pinInput').value=''"
+                  style="padding:13px 20px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:#5F6368;flex-shrink:0">
+            Cancel
+          </button>
+        </div>
+      </div>`;
+  }
+
+  window.verifyPin = async () => {
+    const raw = document.getElementById('pinInput').value.trim().toUpperCase().replace(/\s/g,'');
+    if (!raw) { showToast('Enter a PIN token or booking code', 'error'); return; }
+
+    const btn   = document.getElementById('verifyBtn');
+    const icon  = document.getElementById('verifyIcon');
+    const label = document.getElementById('verifyLabel');
+    btn.disabled = true;
+    icon.textContent  = 'refresh';
+    icon.style.animation = 'checkin-spin 0.8s linear infinite';
+    label.textContent = 'Verifying…';
+
+    let found = null;
+
+    if (supa) {
+      try {
+        const { data } = await supa.from('bookings')
+          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,created_at')
+          .or(`pin_token.eq.${raw},booking_code.eq.${raw}`)
+          .maybeSingle();
+        found = data;
+      } catch(e) {}
+    }
+
+    // Fallback: search in already-loaded bookings array (covers demo/mock mode)
+    if (!found) {
+      found = bookings.find(b =>
+        (b.pin_token    && b.pin_token.toUpperCase().replace(/\s/g,'')    === raw) ||
+        (b.booking_code && b.booking_code.toUpperCase().replace(/\s/g,'') === raw)
+      ) || null;
+    }
+
+    btn.disabled = false;
+    icon.textContent = 'search';
+    icon.style.animation = '';
+    label.textContent = 'Verify Patient';
+
+    if (!found) {
+      document.getElementById('pinResult').style.display = 'block';
+      document.getElementById('pinResult').innerHTML = `
+        <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:12px">
+          <span class="material-icons-outlined" style="color:#D32F2F;font-size:24px;flex-shrink:0">error</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:#B71C1C">No Patient Found</div>
+            <div style="font-size:13px;color:#D32F2F;margin-top:4px">No booking matched: <strong>${raw}</strong></div>
+            <div style="font-size:12px;color:#9AA0A6;margin-top:6px">Check the code and try again. The patient's PIN is shown on their Homatt app booking confirmation screen.</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const expired   = found.pin_expires_at ? new Date(found.pin_expires_at) < new Date() : false;
+    const alreadyIn = found.status === 'in_progress' || found.status === 'attended' || found.status === 'completed';
+    renderPinResult(found, expired, alreadyIn);
+  };
+
+  window.confirmCheckIn = async id => {
+    const b = bookings.find(x => x.id === id);
+    if (!b) return;
+
+    if (supa) {
+      try {
+        await supa.from('bookings').update({
+          status:         'pending',
+          checked_in_at:  new Date().toISOString(),
+          updated_at:     new Date().toISOString(),
+        }).eq('id', id);
+      } catch(e) {}
+    }
+
+    b.status = 'pending';
+    renderQueue();
+    updateStats();
+    clearPinResult();
+    document.getElementById('pinInput').value = '';
+    showToast(`${b.patient_name} checked in — added to queue`, 'success');
+    setTimeout(() => {
+      document.getElementById('queue').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+  };
+  // ── End Check-In Station ────────────────────────────────────────────
 
   const supa2 = supa;
   let activeBooking = null;
