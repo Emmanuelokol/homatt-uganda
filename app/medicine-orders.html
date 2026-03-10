@@ -153,8 +153,34 @@
     <div class="mo-step active" id="mostep1">
       <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:20px">
 
-        <!-- Search bar — shown first so medicines are immediately visible -->
-        <div class="mo-section" style="padding-top:14px;padding-bottom:8px">
+        <!-- ── Symptom / illness description — the primary entry point ── -->
+        <div style="margin:12px 20px 4px">
+          <div style="background:linear-gradient(135deg,#00695C,#004D40);border-radius:14px;padding:16px">
+            <div style="color:#fff;font-size:14px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:20px">medical_information</span>
+              How are you feeling?
+            </div>
+            <div style="color:rgba(255,255,255,0.8);font-size:12px;margin-bottom:10px">
+              Describe your illness or symptoms — we'll suggest the right medicines and the pharmacy will review your order
+            </div>
+            <textarea id="symptomInput" rows="2" oninput="onSymptomInput()"
+              placeholder="e.g. I have a fever and headache for 2 days, or 'malaria symptoms', or 'olukunizo'"
+              style="width:100%;background:rgba(255,255,255,0.15);border:1.5px solid rgba(255,255,255,0.3);border-radius:10px;padding:10px 12px;color:#fff;font-size:13px;font-family:inherit;resize:none;box-sizing:border-box;outline:none;min-height:64px;-webkit-tap-highlight-color:transparent"></textarea>
+            <div id="symptomHint" style="color:rgba(255,255,255,0.55);font-size:11px;margin-top:6px">
+              The pharmacy will confirm your order before dispensing any medicines
+            </div>
+            <div id="symptomSuggestions" style="display:none;margin-top:10px">
+              <div style="color:rgba(255,255,255,0.7);font-size:11px;font-weight:700;letter-spacing:.5px;margin-bottom:8px">
+                <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">auto_awesome</span>
+                SUGGESTED FOR YOUR SYMPTOMS — TAP TO ADD:
+              </div>
+              <div id="symptomMedList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search bar — shown below symptom card, for direct drug name search -->
+        <div class="mo-section" style="padding-top:12px;padding-bottom:8px">
           <div class="mo-field" style="margin-bottom:0">
             <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="onMedSearchInput()">
           </div>
@@ -345,7 +371,7 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
 <script src="js/config.js"></script>
 <script>
 // ── Auth check: read localStorage, show guest banner but do NOT redirect ──
@@ -353,25 +379,78 @@ const _hoUser   = (() => { try { return JSON.parse(localStorage.getItem('homatt_
 const _hoSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
 const _isGuest  = !_hoUser && !_hoSession;
 
-// Supabase client (may be null if config missing)
-const cfg  = window.HOMATT_CONFIG || {};
-const supa = (cfg.SUPABASE_URL && window.supabase)
-  ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+// Lazy Supabase init — CDN loads async so we can't init at script-parse time
+let _supa = null;
+function getSupa() {
+  if (_supa) return _supa;
+  const cfg = window.HOMATT_CONFIG || {};
+  if (cfg.SUPABASE_URL && window.supabase) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  }
+  return _supa;
+}
 
 document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
 
-// Show guest banner if no session (no redirect)
-if (_isGuest) {
-  const banner = document.getElementById('authBanner');
-  if (banner) banner.style.display = 'flex';
-}
-
 let cart = {};     // { medicine_name: { name, qty, price } }
-let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '', rxBookingCode: '' };
+let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '', rxBookingCode: '', symptomDescription: '' };
 let allMeds = [];
 let selectedCondition  = '';
 let selectedDrugType   = 'otc';
 let availCheckTimeout  = null;
+
+// Symptom → condition + medicine suggestions (supports English and common Ugandan terms)
+const SYMPTOM_MAP = [
+  { keywords: ['malaria','omunyo','shivering','chills','mosquito','mbu'], condition: 'malaria',   meds: ['Coartem 20/120mg (Malaria)','Paracetamol 500mg','ORS Sachet'] },
+  { keywords: ['fever','omusujja','temperature','hot','flu','sweating'],  condition: 'fever',     meds: ['Paracetamol 500mg','Ibuprofen 400mg','ORS Sachet'] },
+  { keywords: ['pain','headache','ache','back pain','joint','muscle','obulumi'], condition: 'pain', meds: ['Paracetamol 500mg','Ibuprofen 400mg','Diclofenac 50mg'] },
+  { keywords: ['diarrhea','stomach','vomiting','nausea','ulcer','gastro','dehydrated','loose'], condition: 'digestive', meds: ['ORS Sachet','Metronidazole 400mg','Omeprazole 20mg'] },
+  { keywords: ['infection','bacterial','wound','sore throat','throat','tonsil','abscess','swollen'], condition: 'infection', meds: ['Amoxicillin 500mg','Ciprofloxacin 500mg','Metronidazole 400mg'] },
+  { keywords: ['diabetes','sugar','blood pressure','hypertension','pressure','chronic','heart'], condition: 'chronic',  meds: ['Metformin 500mg','Amlodipine 5mg','Omeprazole 20mg'] },
+  { keywords: ['pregnant','pregnancy','antenatal','expecting','maternal','birth'], condition: 'maternal', meds: ['Folic Acid 5mg','Ferrous Sulphate 200mg'] },
+  { keywords: ['rash','itching','skin','eczema','allergy','hives','blisters'], condition: 'skin',   meds: ['Prednisolone 5mg','Ciprofloxacin 500mg'] },
+];
+
+function onSymptomInput() {
+  const raw  = document.getElementById('symptomInput').value || '';
+  const text = raw.toLowerCase().trim();
+  order.symptomDescription = raw;
+
+  const sugg = document.getElementById('symptomSuggestions');
+  const hint = document.getElementById('symptomHint');
+
+  if (text.length < 3) {
+    sugg.style.display = 'none';
+    if (hint) hint.style.display = 'block';
+    return;
+  }
+  if (hint) hint.style.display = 'none';
+
+  // Score each condition entry
+  let bestMatch = null, bestScore = 0;
+  for (const entry of SYMPTOM_MAP) {
+    const score = entry.keywords.filter(k => text.includes(k)).length;
+    if (score > bestScore) { bestScore = score; bestMatch = entry; }
+  }
+
+  if (bestMatch && bestScore > 0) {
+    selectCondition(bestMatch.condition);
+    sugg.style.display = 'block';
+    document.getElementById('symptomMedList').innerHTML = bestMatch.meds.map(name => {
+      const med = allMeds.find(x => x.name === name) || { name, price: 500 };
+      const inCart = !!cart[name];
+      return `<button onclick="addToCart('${name.replace(/'/g,"\\'")}', ${med.price})"
+        style="background:${inCart?'rgba(255,255,255,0.4)':'rgba(255,255,255,0.15)'};border:1.5px solid rgba(255,255,255,0.4);border-radius:20px;color:#fff;padding:7px 14px;font-size:12px;font-family:inherit;cursor:pointer;touch-action:manipulation;transition:background .2s">
+        ${inCart?'✓':'+'}  ${name}
+      </button>`;
+    }).join('');
+  } else {
+    // No keyword match — still show the description, auto-select 'other'
+    sugg.style.display = 'none';
+    selectCondition('other');
+  }
+  filterMeds();
+}
 
 // Medicines grouped by condition
 const CONDITION_MEDS = {
@@ -504,6 +583,9 @@ function addToCart(name, price) {
   updateCartBadge();
   renderMeds();
   maybeCheckAvailability();
+  // Refresh symptom suggestion buttons so ✓ indicator updates
+  const symp = document.getElementById('symptomInput');
+  if (symp && symp.value.trim().length >= 3) onSymptomInput();
 }
 
 function removeFromCart(name) {
@@ -512,6 +594,8 @@ function removeFromCart(name) {
   if (cart[name].qty <= 0) delete cart[name];
   updateCartBadge();
   renderMeds();
+  const symp = document.getElementById('symptomInput');
+  if (symp && symp.value.trim().length >= 3) onSymptomInput();
 }
 
 function filterMeds() {
@@ -583,6 +667,7 @@ async function checkPharmacyAvailability() {
   }
 
   // Try Supabase lookup
+  const supa = getSupa();
   if (supa) {
     try {
       let results = [];
@@ -668,6 +753,7 @@ function renderCartSummary() {
 async function loadPharmacies() {
   const list = document.getElementById('pharmacyList');
   let pharmacies = [];
+  const supa = getSupa();
   if (supa) {
     const { data } = await supa.from('pharmacies').select('id,name,address,district').eq('active', true).eq('verified', true).order('name');
     pharmacies = data || [];
@@ -747,26 +833,29 @@ async function submitOrder() {
   const orderItems = items.map(m => ({ name: m.name, qty: m.qty, price: m.price }));
   if (!orderItems.length && pText) orderItems.push({ name: pText, qty: 1, price: 0 });
 
+  const supa = getSupa();
   if (supa && session.userId) {
     const pharmacyId = (order.pharmacyId && !['p1','p2','p3'].includes(order.pharmacyId)) ? order.pharmacyId : null;
     const payload = {
-      patient_id:       session.userId,
-      patient_name:     session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : session.name || 'Patient',
-      patient_phone:    order.phone || session.phone_number || '',
-      delivery_address: order.address,
-      delivery_district:session.district || null,
-      pharmacy_id:      pharmacyId,
-      items:            orderItems,
-      urgency:          order.urgency,
-      drug_type:        order.drugType,
-      rx_doctor:        order.rxDoctor || null,
-      rx_booking_code:  order.rxBookingCode || null,
-      medication_cost:  subtotal,
-      delivery_cost:    5000,
-      total_cost:       total,
-      payment_method:   order.payment,
-      payment_status:   'pending',
-      status:           'incoming',
+      patient_id:                  session.userId,
+      patient_name:                session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : session.name || 'Patient',
+      patient_phone:               order.phone || session.phone_number || '',
+      delivery_address:            order.address,
+      delivery_district:           session.district || null,
+      pharmacy_id:                 pharmacyId,
+      items:                       orderItems,
+      urgency:                     order.urgency,
+      order_type:                  order.drugType,       // 'otc' or 'rx' — correct column name
+      rx_doctor:                   order.rxDoctor || null,
+      rx_booking_code:             order.rxBookingCode || null,
+      patient_symptom_description: order.symptomDescription || null,   // illness described by patient
+      condition_tags:              order.condition || null,             // selected condition chip
+      medication_cost:             subtotal,
+      delivery_cost:               5000,
+      total_cost:                  total,
+      payment_method:              order.payment,
+      payment_status:              'pending',
+      status:                      'incoming',
     };
     const { error } = await supa.from('pharmacy_orders').insert(payload);
     if (error) {
@@ -785,32 +874,40 @@ async function submitOrder() {
   document.querySelector('.mo-prog').style.display = 'none';
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', () => {
-  // Load MOCK_MEDS FIRST so medicine list is immediately interactive
-  allMeds = MOCK_MEDS;
-  const cached = window.HomattCache ? window.HomattCache.load('medicines', []) : [];
-  if (cached.length) { allMeds = cached; }
-  filterMeds();
+// ── Init — runs immediately (scripts at bottom of body so DOM is already parsed) ──
+// Render MOCK_MEDS right away so medicines are clickable with zero delay
+allMeds = MOCK_MEDS;
+filterMeds();
 
-  // Pre-fill delivery address/phone from session right away
+// Pre-fill delivery fields from session
+(function() {
   const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
-  if (session.district) document.getElementById('deliveryAddress').value = session.district + ', Uganda';
-  if (session.phone_number || session.phone) document.getElementById('deliveryPhone').value = session.phone_number || session.phone;
-
-  // Pre-select condition from symptom checker (passed via URL param ?condition=malaria)
-  const urlCond = new URLSearchParams(window.location.search).get('condition');
-  if (urlCond && CONDITION_MEDS[urlCond] !== undefined) {
-    selectCondition(urlCond);
+  if (session.district) {
+    const a = document.getElementById('deliveryAddress');
+    if (a) a.value = session.district + ', Uganda';
   }
+  const p = document.getElementById('deliveryPhone');
+  if (p && (session.phone_number || session.phone)) p.value = session.phone_number || session.phone || '';
 
-  // Load from Supabase in background — non-blocking, updates list if available
+  // Pre-select condition from URL param (e.g. from symptom checker: ?condition=malaria)
+  const urlCond = new URLSearchParams(window.location.search).get('condition');
+  if (urlCond && CONDITION_MEDS[urlCond] !== undefined) selectCondition(urlCond);
+})();
+
+// Show guest banner if no session
+if (_isGuest) {
+  const banner = document.getElementById('authBanner');
+  if (banner) banner.style.display = 'flex';
+}
+
+// Load real medicines from Supabase in background — non-blocking, updates list when CDN ready
+window.addEventListener('load', () => {
+  const supa = getSupa();
   if (supa) {
-    supa.from('medicine_catalog').select('name,retail_price').order('name')
+    supa.from('medicine_catalog').select('name,retail_price').eq('is_active', true).order('name')
       .then(({ data }) => {
         if (data && data.length) {
           allMeds = data.map(m => ({ name: m.name, price: m.retail_price || 500 }));
-          if (window.HomattCache) window.HomattCache.save('medicines', allMeds);
           filterMeds();
         }
       })

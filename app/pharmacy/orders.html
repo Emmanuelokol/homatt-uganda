@@ -263,6 +263,12 @@ function render() {
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(o.created_at)}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">payments</span> ${formatUGX(o.total_cost)}</span>
       </div>
+      ${o.patient_symptom_description ? `
+      <div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:6px 10px;margin:6px 0;font-size:12px;color:#1B5E20">
+        <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:4px">chat_bubble_outline</span>
+        Patient: <em>"${o.patient_symptom_description.slice(0,80)}${o.patient_symptom_description.length>80?'…':''}"</em>
+        ${o.condition_tags ? `<span style="margin-left:8px;background:#C8E6C9;color:#1B5E20;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px">${o.condition_tags}</span>` : ''}
+      </div>` : ''}
       <div class="order-actions" onclick="event.stopPropagation()">${actions}</div>
     </div>`;
   }).join('');
@@ -394,9 +400,23 @@ window.openModal = id => {
           <div style="font-size:13px;font-weight:500;margin-top:3px">${v}</div>
         </div>`).join('')}
     </div>
+    ${o.patient_symptom_description ? `
+    <div style="background:#E8F5E9;border-left:4px solid #2E7D32;border-radius:0 10px 10px 0;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">medical_information</span>
+        Patient Describes Their Illness
+      </div>
+      <div style="font-size:14px;color:#1B5E20;font-style:italic;line-height:1.5">"${o.patient_symptom_description}"</div>
+      ${o.condition_tags ? `<div style="margin-top:8px;font-size:12px;color:#388E3C;font-weight:600">
+        Condition category: <span style="background:#C8E6C9;padding:2px 8px;border-radius:10px">${o.condition_tags}</span>
+      </div>` : ''}
+      ${o.order_type === 'rx' ? `<div style="margin-top:6px;font-size:12px;color:#7B1FA2;font-weight:600">
+        ⚕ Prescription order${o.rx_doctor ? ` — Dr. ${o.rx_doctor}` : ''}${o.rx_booking_code ? ` (Code: ${o.rx_booking_code})` : ''}
+      </div>` : ''}
+    </div>` : ''}
     ${o.items ? `
       <div style="background:#F8F9FA;border-radius:8px;padding:14px">
-        <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Medications</div>
+        <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Medications Ordered</div>
         ${o.items.map(i => `
           <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E0E0E0;font-size:13px">
             <span>${i.name}</span>
