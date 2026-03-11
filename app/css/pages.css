@@ -1855,7 +1855,7 @@
 
 .sheet-input:focus {
   border-color: var(--primary);
-  background: white;
+  background: var(--surface);
   box-shadow: 0 0 0 3px rgba(27,94,32,0.1);
 }
 

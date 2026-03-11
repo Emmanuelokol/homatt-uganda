@@ -1070,6 +1070,28 @@ body.keyboard-open .sheet-body {
   background: #1E1E1E;
 }
 
+/* Global dark mode: ensure ALL inputs, selects and textareas are readable */
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background: #2C2C2C;
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
+  border-color: #555;
+}
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  background: #3a3a3a;
+  color: #E8EAED;
+  -webkit-text-fill-color: #E8EAED;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #6E7478;
+  opacity: 1;
+}
+
 /* Dark mode input fields — clearly visible white text on dark bg */
 [data-theme="dark"] .input-wrapper {
   background: #2C2C2C;

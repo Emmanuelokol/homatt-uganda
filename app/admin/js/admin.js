@@ -104,10 +104,14 @@ function buildAdminSidebar(activePage) {
 
 /* ── Admin auth guard ── */
 async function requireAdmin() {
+  // Hide content immediately so there's no flash of protected content before redirect
+  document.body.style.visibility = 'hidden';
   // 1. Check stored session (sessionStorage first, localStorage fallback)
   //    Works without any CDN or network — covers demo mode and real logins
   const stored = getAdminSession();
   if (stored && (stored.demo || stored.isAdmin)) {
+    // Auth passed — show the page
+    document.body.style.visibility = 'visible';
     const adminName = stored.name || 'Admin';
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
@@ -148,6 +152,8 @@ async function requireAdmin() {
   // Store so subsequent pages don't need to re-verify
   setAdminSession({ email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id });
 
+  // Auth passed — show the page
+  document.body.style.visibility = 'visible';
   const avatarEl = document.getElementById('adminUserAvatar');
   const nameEl   = document.getElementById('adminUserName');
   const nameTop  = document.getElementById('adminUserNameTop');

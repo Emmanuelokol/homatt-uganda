@@ -537,8 +537,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     localStorage.setItem('homatt_cart', JSON.stringify(cart));
     updateCartBadge();
-    // Re-render items to update button state
-    loadItems(selectedCategoryId);
+    // Re-render from cached items only — no DB fetch on every tap (prevents slowness)
+    const searchTerm = (document.getElementById('shopSearch') || {}).value || '';
+    const term = searchTerm.toLowerCase();
+    const filtered = term ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term)) : items;
+    renderItems(filtered);
     showToast(`${item.name} added to cart`);
   }
 

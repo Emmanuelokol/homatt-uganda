@@ -1,6 +1,8 @@
 /* Homatt Health — Clinic Portal shared JS */
 
 function requireClinic() {
+  // Hide content immediately so there's no flash of protected content before redirect
+  document.body.style.visibility = 'hidden';
   let s;
   try { s = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
   if (!s || typeof s !== 'object' || Array.isArray(s)) {
@@ -8,6 +10,8 @@ function requireClinic() {
     window.location.href = 'index.html';
     return null;
   }
+  // Auth passed — show the page
+  document.body.style.visibility = 'visible';
   const name = s.staffName || s.name || 'Clinic Staff';
   const el1 = document.getElementById('clinicUserName');
   const el2 = document.getElementById('clinicUserNameTop');

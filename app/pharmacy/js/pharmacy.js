@@ -56,12 +56,16 @@ function getPharmacySession() {
 }
 
 function requirePharmacy() {
+  // Hide content immediately so there's no flash of protected content before redirect
+  document.body.style.visibility = 'hidden';
   const s = getPharmacySession();
   if (!s) {
     localStorage.removeItem('pharmacy_session');
     window.location.href = 'index.html';
     return null;
   }
+  // Auth passed — show the page
+  document.body.style.visibility = 'visible';
   const el = document.getElementById('pharmacyUserName');
   const nm = document.getElementById('pharmacyName');
   const av = document.getElementById('pharmacyUserAvatar');
