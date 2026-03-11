@@ -1017,7 +1017,9 @@
   background: var(--background);
   z-index: 90;
   transform: translateX(100%);
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, visibility 0s linear 0.3s;
+  visibility: hidden;       /* truly hidden when closed — belt-and-suspenders */
+  pointer-events: none;     /* no ghost-click events when off-screen */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1025,6 +1027,9 @@
 
 .member-detail-panel.open {
   transform: translateX(0);
+  visibility: visible;
+  pointer-events: auto;
+  transition: transform 0.3s ease, visibility 0s linear 0s;
 }
 
 .member-detail-header {

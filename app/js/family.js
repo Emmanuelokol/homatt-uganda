@@ -799,6 +799,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   function closeAllSheets() {
     overlay.classList.remove('visible');
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    // Always close the health-log panel too — it's not a .bottom-sheet
+    // but can be left open behind sheets, causing it to show after cart closes
+    const panel = document.getElementById('memberDetailPanel');
+    if (panel) panel.classList.remove('open');
   }
 
   overlay.addEventListener('click', closeAllSheets);
