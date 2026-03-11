@@ -151,7 +151,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/config.js"></script>
   <script>
     // Auto-redirect if already logged in (runs after CDN loads)
@@ -160,7 +160,9 @@
       for (const store of [sessionStorage, localStorage]) {
         try { const r = store.getItem('admin_session'); if (r) { stored = JSON.parse(r); break; } } catch(e) {}
       }
-      if (stored && typeof stored === 'object' && (stored.demo || stored.isAdmin)) {
+      // Only auto-redirect for REAL admin sessions — demo mode must NOT auto-redirect
+      // so the admin can log in with real credentials to see live data
+      if (stored && typeof stored === 'object' && stored.isAdmin && !stored.demo) {
         window.location.href = 'dashboard.html';
         return;
       }

@@ -544,7 +544,25 @@ function renderCurrentMeds() {
     var label = document.getElementById('medsLabel');
     if (label) label.textContent = 'Search results for "' + searchQ + '"';
   } else if (activeCat) {
-    meds = CAT_MEDS[activeCat] || [];
+    // Special categories 'otc' and 'rx' filter the full ALL_MEDS list by rx flag
+    if (activeCat === 'otc') {
+      meds = ALL_MEDS.filter(function(m){ return !m.rx; });
+      // Also add all non-rx category meds
+      Object.keys(CAT_MEDS).forEach(function(k) {
+        CAT_MEDS[k].forEach(function(m) {
+          if (!m.rx && !meds.find(function(x){return x.n===m.n;})) meds.push(m);
+        });
+      });
+    } else if (activeCat === 'rx') {
+      meds = ALL_MEDS.filter(function(m){ return m.rx; });
+      Object.keys(CAT_MEDS).forEach(function(k) {
+        CAT_MEDS[k].forEach(function(m) {
+          if (m.rx && !meds.find(function(x){return x.n===m.n;})) meds.push(m);
+        });
+      });
+    } else {
+      meds = CAT_MEDS[activeCat] || [];
+    }
   } else {
     meds = ALL_MEDS;
   }

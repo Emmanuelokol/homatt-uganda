@@ -556,6 +556,18 @@ async function submitBooking() {
   const confPct   = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
   const discount  = confPct >= 75;
 
+  // Get authenticated user ID directly from Supabase — don't rely on localStorage key
+  let authUserId = session.userId || null;
+  if (supa && !authUserId) {
+    try {
+      const { data: authData } = await supa.auth.getSession();
+      authUserId = authData?.session?.user?.id || null;
+    } catch(e) {}
+  }
+
+  // Also pull display info from homatt_user cache
+  const userCache = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+
   const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
   const pinToken      = generatePIN();
   const pinExpiry     = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // +2 hours
@@ -563,10 +575,10 @@ async function submitBooking() {
   if (supa) {
     const isMockClinic = ['c1','c2','c3','c4'].includes(booking.clinicId);
     const payload = {
-      patient_id:       session.userId || null,
-      patient_name:     session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : (session.name || 'Patient'),
-      patient_age:      session.age  || null,
-      patient_sex:      session.sex  || null,
+      patient_id:       authUserId,
+      patient_name:     userCache.firstName ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ') : (session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : 'Patient'),
+      patient_age:      userCache.age  || session.age  || null,
+      patient_sex:      userCache.sex  || session.sex  || null,
       clinic_id:        isMockClinic ? null : booking.clinicId,
       symptoms:         booking.symptoms ? [booking.symptoms] : null,
       urgency_level:    booking.urgency,
