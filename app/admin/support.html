@@ -105,6 +105,7 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+let supabase = null;
 let allTickets = [];
 let activeTicketId = null;
 
@@ -112,6 +113,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('support');
   const session = await requireAdmin();
   if (!session) return;
+  supabase = adminSupa();
   setupAdminLogout();
   await loadTickets();
 

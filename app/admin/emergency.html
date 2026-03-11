@@ -94,10 +94,12 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+let supabase = null;
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('emergency');
   const session = await requireAdmin();
   if (!session) return;
+  supabase = adminSupa();
   setupAdminLogout();
 
   const DEMO_EMERGENCY = `Emergency Contacts — Uganda\n\nNational Ambulance: 0800 999 000 (toll-free)\nPolice: 999 / 112\nFire & Rescue: 0800 199 699\nUganda Red Cross: +256 41 4258700\nMulago National Referral Hospital: +256 41 4532 201\nUganda Cancer Institute: +256 41 4534 516`;

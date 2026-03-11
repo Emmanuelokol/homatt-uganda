@@ -74,12 +74,11 @@
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Customer</th>
-              <th>Items</th>
+              <th>Customer &amp; Date</th>
+              <th>Items Ordered</th>
               <th>Total</th>
               <th>Delivery Address</th>
-              <th>Status</th>
-              <th>Date</th>
+              <th>Status / Payment</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -246,6 +245,7 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+let supabase = null;   // set from adminSupa() after auth
 let allProducts = [];
 let allCategories = [];
 let editingId = null;
@@ -478,18 +478,33 @@ function renderOrders(list) {
   document.getElementById('statOrders').textContent = list.filter(o => o.status === 'pending').length;
   document.getElementById('ordersBody').innerHTML = list.length ? list.map(o => {
     const items = Array.isArray(o.items) ? o.items : [];
-    const summary = items.map(i => `${i.name} ×${i.qty}`).join(', ');
-    const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    // Build a detailed items breakdown
+    const itemsHtml = items.map(i =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F0F0F0;gap:12px">
+        <span style="font-size:12px;font-weight:500">${i.name || i.n || '?'}</span>
+        <span style="font-size:12px;color:#5F6368;white-space:nowrap">×${i.qty} &nbsp;<strong>UGX ${Number((i.price||i.p||0)*i.qty).toLocaleString()}</strong></span>
+      </div>`
+    ).join('');
+    const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
     return `<tr>
       <td>
-        <div style="font-weight:600;font-size:13px">${o.patient_name || '—'}</div>
-        <div style="font-size:11px;color:#9AA0A6">${o.patient_phone || ''}</div>
+        <div style="font-weight:700;font-size:13px">${o.patient_name || 'Customer'}</div>
+        ${o.patient_phone ? `<div style="font-size:11px;color:#9AA0A6">${o.patient_phone}</div>` : ''}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:2px">${date}</div>
       </td>
-      <td style="font-size:12px;max-width:200px">${summary || '—'}</td>
-      <td style="font-weight:600">UGX ${Number(o.total_amount||0).toLocaleString()}</td>
-      <td style="font-size:12px;color:#5F6368">${o.delivery_address || '—'}</td>
-      <td><span class="${ORDER_STATUS_COLORS[o.status]||'status-badge'}">${o.status}</span></td>
-      <td style="font-size:12px;color:#9AA0A6;white-space:nowrap">${date}</td>
+      <td>
+        ${itemsHtml || '<span style="color:#9AA0A6;font-size:12px">—</span>'}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+      </td>
+      <td style="font-weight:700;font-size:14px;color:#1B5E20">UGX ${Number(o.total_amount||0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#5F6368">
+        ${o.delivery_address || '—'}
+        ${o.district ? `<div style="font-size:11px;color:#9AA0A6">${o.district}</div>` : ''}
+      </td>
+      <td>
+        <span class="${ORDER_STATUS_COLORS[o.status]||'status-badge'}" style="text-transform:capitalize">${o.status}</span>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:3px">${o.payment_method ? o.payment_method.replace(/_/g,' ') : ''}</div>
+      </td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           ${o.status === 'pending'   ? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','confirmed')">Confirm</button>` : ''}
@@ -500,7 +515,7 @@ function renderOrders(list) {
       </td>
     </tr>`;
   }).join('')
-  : '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
+  : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
 }
 
 function applyOrderFilter() {
@@ -530,6 +545,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('marketplace');
   const session = await requireAdmin();
   if (!session) return;
+  supabase = adminSupa();
   setupAdminLogout();
 
   document.getElementById('addProductBtn').addEventListener('click', openAdd);
