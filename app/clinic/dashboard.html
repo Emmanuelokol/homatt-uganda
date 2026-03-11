@@ -104,7 +104,20 @@
             RECEPTION
           </div>
         </div>
-        <div style="padding:20px 24px">
+        <!-- Mode tabs -->
+        <div style="display:flex;border-bottom:2px solid #E0E0E0;padding:0 24px;gap:0">
+          <button id="tabCode" onclick="switchCheckinTab('code')"
+                  style="padding:12px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#00897B;border-bottom:2px solid #00897B;margin-bottom:-2px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">pin</span>PIN / Code
+          </button>
+          <button id="tabWalkin" onclick="switchCheckinTab('walkin')"
+                  style="padding:12px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#9AA0A6;border-bottom:2px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">person_add</span>Walk-in Patient
+          </button>
+        </div>
+
+        <!-- PIN tab -->
+        <div id="panelCode" style="padding:20px 24px">
           <div style="display:flex;gap:10px;margin-bottom:14px">
             <div style="position:relative;flex:1">
               <span class="material-icons-outlined" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:20px;pointer-events:none">pin</span>
@@ -116,8 +129,7 @@
                      onblur="this.style.borderColor='#E0E0E0'">
             </div>
             <button onclick="verifyPin()" id="verifyBtn"
-                    style="padding:13px 24px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;transition:background .2s;flex-shrink:0"
-                    onmouseover="this.style.background='#00695C'" onmouseout="this.style.background='#00897B'">
+                    style="padding:13px 24px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0">
               <span class="material-icons-outlined" id="verifyIcon" style="font-size:18px">search</span>
               <span id="verifyLabel">Verify Patient</span>
             </button>
@@ -125,8 +137,57 @@
           <div id="pinResult" style="display:none"></div>
           <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9AA0A6;margin-top:6px">
             <span class="material-icons-outlined" style="font-size:14px">info</span>
-            Patient receives a PIN code when they complete booking on the Homatt app. PIN is valid for 2 hours.
+            Patient receives a PIN when they complete booking on the Homatt app. PIN is valid for 2 hours.
           </div>
+        </div>
+
+        <!-- Walk-in tab -->
+        <div id="panelWalkin" style="display:none;padding:20px 24px">
+          <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Register a walk-in patient who has not used the Homatt app.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div style="grid-column:span 2">
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Patient Full Name *</label>
+              <input id="wiName" type="text" placeholder="e.g. Nakato Brenda"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Age</label>
+              <input id="wiAge" type="number" placeholder="e.g. 35" min="0" max="120"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Sex</label>
+              <select id="wiSex" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+                <option value="">—</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+              </select>
+            </div>
+            <div style="grid-column:span 2">
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Chief Complaint / Symptoms *</label>
+              <textarea id="wiSymptoms" rows="2" placeholder="e.g. Fever and headache for 2 days, cough…"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Urgency</label>
+              <select id="wiUrgency" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+                <option value="normal">Standard</option>
+                <option value="high">Urgent</option>
+                <option value="emergency">Emergency</option>
+                <option value="low">Routine</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Phone (optional)</label>
+              <input id="wiPhone" type="tel" placeholder="e.g. 0700 000 000"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+          </div>
+          <button onclick="registerWalkin()"
+                  style="width:100%;padding:13px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <span class="material-icons-outlined" style="font-size:18px">person_add</span>
+            Register &amp; Add to Queue
+          </button>
         </div>
       </div>
       <!-- ===== END CHECK-IN STATION ===== -->
@@ -379,6 +440,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   } catch(e) {}
 
   let bookings = [];
+  let lastVerifiedBooking = null; // booking found via verifyPin that may not be in local array
 
   if (supa) {
     try {
@@ -524,12 +586,56 @@ document.addEventListener('DOMContentLoaded', async () => {
       ? new Date(b.pin_expires_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' })
       : '—';
 
+    // Build AI Patient Brief from ai_full_data
+    const aiData  = b.ai_full_data || {};
+    const aiCond  = aiData.primary_condition || b.ai_diagnosis || null;
+    const aiConf  = aiData.confidence || aiData.ai_confidence || b.ai_confidence || null;
+    const aiRisk  = aiData.overall_risk || null;
+    const aiSymp  = aiData.symptoms || (Array.isArray(b.symptoms) ? b.symptoms.join(', ') : b.symptoms) || null;
+    const aiUrg   = aiData.clinic_urgency || null;
+    const riskColor = aiRisk === 'high' ? '#D32F2F' : aiRisk === 'medium' ? '#E65100' : '#2E7D32';
+    const riskBg   = aiRisk === 'high' ? '#FFEBEE' : aiRisk === 'medium' ? '#FFF3E0' : '#E8F5E9';
+
+    const aiBriefHtml = aiCond ? `
+      <div style="background:#EDE7F6;border:1.5px solid #9575CD;border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="color:#512DA8;font-size:18px">psychology</span>
+          <span style="font-weight:700;font-size:12px;color:#512DA8;text-transform:uppercase;letter-spacing:.6px">AI Symptom Checker Brief</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:#fff;border-radius:8px;padding:10px">
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Probable Condition</div>
+            <div style="font-size:14px;font-weight:700;color:#311B92">${aiCond}</div>
+            ${aiConf ? `<div style="font-size:12px;color:#512DA8;margin-top:2px">${Math.round(aiConf)}% likelihood</div>` : ''}
+          </div>
+          <div style="background:${riskBg};border-radius:8px;padding:10px">
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Risk Level</div>
+            <div style="font-size:14px;font-weight:700;color:${riskColor};text-transform:capitalize">${aiRisk || 'unknown'}</div>
+            ${aiUrg ? `<div style="font-size:12px;color:${riskColor};margin-top:2px;text-transform:capitalize">Urgency: ${aiUrg}</div>` : ''}
+          </div>
+        </div>
+        ${aiSymp ? `
+        <div style="background:#fff;border-radius:8px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Patient-Reported Symptoms</div>
+          <div style="font-size:13px;color:#202124;line-height:1.5">${aiSymp}</div>
+        </div>` : ''}
+        ${b.notes ? `
+        <div style="background:#FFF8E1;border-radius:8px;padding:10px;margin-top:8px">
+          <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Patient Notes for Doctor</div>
+          <div style="font-size:13px;color:#202124;line-height:1.5">${b.notes}</div>
+        </div>` : ''}
+      </div>` : (aiSymp ? `
+      <div style="background:#F3F4F6;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reported Symptoms</div>
+        <div style="font-size:13px;color:#202124;line-height:1.5">${aiSymp}</div>
+      </div>` : '');
+
     const details = [
       ['Patient',      b.patient_name  || '—'],
       ['Booking Code', b.booking_code  || '—'],
       ['Age / Sex',    (b.patient_age||'?') + 'y · ' + (b.patient_sex||'?')],
-      ['Urgency',      `<span style="font-weight:700;color:${urgColor};background:${urgBg};padding:2px 8px;border-radius:4px">${b.urgency_level||'normal'}</span>`],
-      ['Symptoms',     ((b.symptoms||b.ai_diagnosis||'—').slice(0,60))],
+      ['Urgency',      `<span style="font-weight:700;color:${urgColor};background:${urgBg};padding:2px 8px;border-radius:4px;text-transform:capitalize">${b.urgency_level||'normal'}</span>`],
+      ['Booked',       new Date(b.created_at).toLocaleString('en-UG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})],
       ['PIN Expires',  pinExpiry],
     ];
 
@@ -556,13 +662,14 @@ document.addEventListener('DOMContentLoaded', async () => {
           <div style="flex:1">${titleHtml}${subHtml}</div>
           ${badgeHtml}
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#fff;border-radius:8px;padding:14px;margin-bottom:14px">
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#fff;border-radius:8px;padding:14px;margin-bottom:12px">
           ${details.map(([k,v]) => `
             <div>
               <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${k}</div>
               <div style="font-size:13px;color:#202124;font-weight:500">${v}</div>
             </div>`).join('')}
         </div>
+        ${aiBriefHtml}
         <div style="display:flex;gap:10px">
           ${actionBtn}
           <button onclick="clearPinResult();document.getElementById('pinInput').value=''"
@@ -590,7 +697,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (supa) {
       try {
         const { data } = await supa.from('bookings')
-          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,created_at')
+          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,ai_confidence,ai_full_data,notes,discount_applied,discount_pct,created_at')
           .or(`pin_token.eq.${raw},booking_code.eq.${raw}`)
           .maybeSingle();
         found = data;
@@ -604,6 +711,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         (b.booking_code && b.booking_code.toUpperCase().replace(/\s/g,'') === raw)
       ) || null;
     }
+
+    // Store so confirmCheckIn can find it even if not in local bookings array
+    lastVerifiedBooking = found || null;
 
     btn.disabled = false;
     icon.textContent = 'search';
@@ -630,20 +740,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   window.confirmCheckIn = async id => {
-    const b = bookings.find(x => x.id === id);
+    // Look in local array first, fall back to lastVerifiedBooking (cross-clinic walk-in)
+    let b = bookings.find(x => x.id === id);
+    if (!b && lastVerifiedBooking && lastVerifiedBooking.id === id) {
+      b = lastVerifiedBooking;
+      // Add to local bookings array so queue updates
+      bookings.unshift(b);
+    }
     if (!b) return;
 
     if (supa) {
       try {
         await supa.from('bookings').update({
           status:         'pending',
-          checked_in_at:  new Date().toISOString(),
           updated_at:     new Date().toISOString(),
         }).eq('id', id);
       } catch(e) {}
     }
 
     b.status = 'pending';
+    lastVerifiedBooking = null;
     renderQueue();
     updateStats();
     clearPinResult();
@@ -652,6 +768,78 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => {
       document.getElementById('queue').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 400);
+  };
+  // ── Walk-in registration & tab switching ────────────────────────────
+  window.switchCheckinTab = tab => {
+    const isCode = tab === 'code';
+    document.getElementById('panelCode').style.display   = isCode ? 'block' : 'none';
+    document.getElementById('panelWalkin').style.display = isCode ? 'none'  : 'block';
+    const tCode   = document.getElementById('tabCode');
+    const tWalkin = document.getElementById('tabWalkin');
+    tCode.style.color         = isCode ? '#00897B' : '#9AA0A6';
+    tCode.style.borderBottomColor   = isCode ? '#00897B' : 'transparent';
+    tWalkin.style.color       = isCode ? '#9AA0A6' : '#00897B';
+    tWalkin.style.borderBottomColor = isCode ? 'transparent' : '#00897B';
+    if (isCode) clearPinResult();
+  };
+
+  window.registerWalkin = async () => {
+    const name     = document.getElementById('wiName').value.trim();
+    const symptoms = document.getElementById('wiSymptoms').value.trim();
+    if (!name)     { showToast('Patient name is required', 'error'); return; }
+    if (!symptoms) { showToast('Chief complaint is required', 'error'); return; }
+
+    const age     = parseInt(document.getElementById('wiAge').value) || null;
+    const sex     = document.getElementById('wiSex').value || null;
+    const urgency = document.getElementById('wiUrgency').value || 'normal';
+    const phone   = document.getElementById('wiPhone').value.trim() || null;
+    const code    = 'WI-' + Math.random().toString(36).toUpperCase().slice(2,6);
+    const clinicId = session.clinicId || null;
+
+    const walkin = {
+      id:           'wi-' + Date.now(),
+      booking_code: code,
+      patient_name: name,
+      patient_age:  age,
+      patient_sex:  sex,
+      symptoms:     symptoms,
+      urgency_level: urgency,
+      status:       'pending',
+      created_at:   new Date().toISOString(),
+      pin_token:    null,
+      ai_full_data: null,
+      notes:        phone ? 'Phone: ' + phone : null,
+    };
+
+    if (supa) {
+      try {
+        const { data: ins } = await supa.from('bookings').insert({
+          booking_code:   code,
+          patient_name:   name,
+          patient_age:    age,
+          patient_sex:    sex,
+          symptoms:       [symptoms],
+          urgency_level:  urgency,
+          status:         'pending',
+          clinic_id:      clinicId,
+          notes:          phone ? 'Phone: ' + phone : null,
+        }).select('id').single();
+        if (ins?.id) walkin.id = ins.id;
+      } catch(e) {}
+    }
+
+    bookings.unshift(walkin);
+    renderQueue();
+    updateStats();
+
+    // Reset form
+    ['wiName','wiAge','wiSymptoms','wiPhone'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('wiSex').value = '';
+    document.getElementById('wiUrgency').value = 'normal';
+
+    showToast(`${name} registered (${code}) — added to queue`, 'success');
+    switchCheckinTab('code');
+    setTimeout(() => document.getElementById('queue').scrollIntoView({ behavior:'smooth', block:'start' }), 400);
   };
   // ── End Check-In Station ────────────────────────────────────────────
 
@@ -673,7 +861,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.completePatient = id => openAttendModal(id);
 
   function openAttendModal(id) {
-    const b = bookings.find(x => x.id === id);
+    // Look in local array first, then lastVerifiedBooking
+    let b = bookings.find(x => x.id === id);
+    if (!b && lastVerifiedBooking && lastVerifiedBooking.id === id) b = lastVerifiedBooking;
     if (!b) return;
     activeBooking = b;
     selectedLabTests = [];

@@ -550,22 +550,21 @@ async function submitBooking() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Booking…';
 
-  const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
   const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
   const confPct   = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
   const discount  = confPct >= 75;
 
-  // Get authenticated user ID directly from Supabase — don't rely on localStorage key
-  let authUserId = session.userId || null;
-  if (supa && !authUserId) {
+  // Get Supabase auth session (works for properly logged-in users)
+  let authUserId = null;
+  if (supa) {
     try {
       const { data: authData } = await supa.auth.getSession();
       authUserId = authData?.session?.user?.id || null;
     } catch(e) {}
   }
 
-  // Also pull display info from homatt_user cache
+  // Pull display info from homatt_user cache
   const userCache = JSON.parse(localStorage.getItem('homatt_user') || '{}');
 
   const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
@@ -614,6 +613,13 @@ async function submitBooking() {
       }).maybeSingle();
     }
   }
+
+  // Save booking reference to localStorage so user can always retrieve it
+  try {
+    const saved = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
+    saved.unshift({ bookingCode, pinToken, pinExpiry, clinicName: booking.clinicName, symptoms: booking.symptoms, createdAt: new Date().toISOString() });
+    localStorage.setItem('homatt_bookings', JSON.stringify(saved.slice(0, 10)));
+  } catch(e) {}
 
   // Show success screen
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;
