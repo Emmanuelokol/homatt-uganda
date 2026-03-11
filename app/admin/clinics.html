@@ -528,10 +528,32 @@ document.addEventListener('DOMContentLoaded', async function() {
 });
 
 async function loadClinics() {
+  // Demo mode: only use demo data if explicitly in demo session
+  if (_adminSession && _adminSession.demo) {
+    allClinics = DEMO_CLINICS;
+    renderClinics();
+    return;
+  }
   var supa = adminSupa();
-  if (!supa) { allClinics = DEMO_CLINICS; renderClinics(); return; }
-  var res = await supa.from('clinics').select('*').order('created_at', {ascending:false});
-  allClinics = (res.data && res.data.length) ? res.data : DEMO_CLINICS;
+  if (!supa) {
+    showAdminToast('Cannot connect to database — please sign in again', 'error');
+    allClinics = [];
+    renderClinics();
+    return;
+  }
+  try {
+    var res = await supa.from('clinics').select('*').order('created_at', {ascending:false});
+    if (res.error) {
+      showAdminToast('Error loading clinics: ' + res.error.message, 'error');
+      allClinics = [];
+    } else {
+      // Always use real DB data — never silently fall back to demo when authenticated
+      allClinics = res.data || [];
+    }
+  } catch(e) {
+    showAdminToast('Network error loading clinics', 'error');
+    allClinics = [];
+  }
   renderClinics();
 }
 

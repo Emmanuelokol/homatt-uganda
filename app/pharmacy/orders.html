@@ -207,11 +207,11 @@ async function loadLive(supa, pharmacyId) {
     .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
   allOrders = data || [];
 
-  // Load e-prescriptions routed to this pharmacy
+  // Load e-prescriptions: ones routed specifically to this pharmacy OR unrouted (any pharmacy)
   const { data: rxData } = await supa.from('e_prescriptions')
-    .select('*,clinic_diagnoses(confirmed_diagnosis,icd10_code,ai_match)')
-    .eq('routed_to_pharmacy_id', pharmacyId)
-    .eq('status', 'active')
+    .select('*')
+    .in('status', ['active'])
+    .or(`routed_to_pharmacy_id.eq.${pharmacyId},routed_to_pharmacy_id.is.null`)
     .order('created_at', { ascending: false });
   allPrescriptions = rxData || [];
 
@@ -253,27 +253,28 @@ function renderPrescriptions() {
   }
   document.getElementById('ordersEmpty').style.display = 'none';
   document.getElementById('ordersList').innerHTML = allPrescriptions.map(rx => {
-    const diag = rx.clinic_diagnoses;
-    const drugs = (rx.items || []).map(i => `${i.drug_name}${i.strength?' '+i.strength:''} ×${i.duration}d`).join(', ');
+    const diagnosis = rx.diagnosis || '—';
+    const drugs = (rx.items || []).map(i => `${i.drug_name||i.name||'?'}${i.strength?' '+i.strength:''} ×${i.duration||'?'}d`).join(', ');
+    const routed = rx.routed_to_pharmacy_id ? '' : '<span style="background:#FFF3E0;color:#E65100;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">Any Pharmacy</span>';
     return `
-    <div class="order-card" style="cursor:pointer;border-left:4px solid #0D47A1" onclick="openRxModal('${rx.id}')">
+    <div class="order-card" style="cursor:pointer;border-left:4px solid #0D47A1" onclick="openRxDetail('${rx.id}')">
       <div class="order-card-header">
         <span class="order-ref" style="color:#0D47A1">
           <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span>
           E-Prescription
         </span>
         <span class="status-badge confirmed">${rx.status||'active'}</span>
-        ${diag?.icd10_code ? `<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${diag.icd10_code}</span>` : ''}
+        ${routed}
       </div>
       <div class="order-meds">${drugs || '—'}</div>
       <div class="order-meta">
-        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">local_hospital</span> ${diag?.confirmed_diagnosis || '—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ${rx.patient_name||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">local_hospital</span> ${diagnosis}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(rx.created_at)}</span>
-        ${diag?.ai_match === true ? '<span style="color:#2E7D32;font-size:12px">✓ AI confirmed</span>' : ''}
       </div>
       <div class="order-actions" onclick="event.stopPropagation()">
-        <button class="btn-admin primary sm" onclick="openRxModal('${rx.id}')">
-          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View & Dispense
+        <button class="btn-admin primary sm" onclick="openRxDetail('${rx.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View &amp; Dispense
         </button>
       </div>
     </div>`;
@@ -397,36 +398,42 @@ window.confirmWithSafetyCheck = async id => {
   showToast('Order confirmed', 'success');
 };
 
-window.openRxModal = id => {
+window.openRxDetail = id => {
   const rx = allPrescriptions.find(x => x.id === id);
   if (!rx) return;
-  const diag = rx.clinic_diagnoses || {};
   const items = rx.items || [];
+  const diagnosis = rx.diagnosis || '—';
   document.getElementById('orderModalTitle').textContent = 'E-Prescription — Dispense';
   document.getElementById('orderModalBody').innerHTML = `
     <div style="background:#E3F2FD;border-radius:10px;padding:14px;margin-bottom:16px">
       <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
-        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span> E-Prescription
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span> E-Prescription Details
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
-        <div><span style="color:#5F6368">Diagnosis:</span> <strong>${diag.confirmed_diagnosis||'—'}</strong></div>
-        <div><span style="color:#5F6368">ICD-10:</span> ${diag.icd10_code||'—'}</div>
-        <div><span style="color:#5F6368">AI Match:</span> ${diag.ai_match===true?'<span style="color:#2E7D32">✓ Confirmed</span>':diag.ai_match===false?'<span style="color:#C62828">✗ Different</span>':'Partial'}</div>
+        <div><span style="color:#5F6368">Patient:</span> <strong>${rx.patient_name||'—'}</strong></div>
+        <div><span style="color:#5F6368">Diagnosis:</span> <strong>${diagnosis}</strong></div>
+        <div><span style="color:#5F6368">Valid From:</span> ${rx.start_date||'—'}</div>
+        <div><span style="color:#5F6368">Valid Until:</span> ${rx.end_date||'—'}</div>
         <div><span style="color:#5F6368">Issued:</span> ${fmtDateTime(rx.created_at)}</div>
+        <div><span style="color:#5F6368">Routed to:</span> ${rx.routed_to_pharmacy_id ? 'This pharmacy' : 'Any pharmacy'}</div>
       </div>
+      ${rx.notes ? `<div style="margin-top:10px;font-size:13px;color:#1B5E20;background:#E8F5E9;border-radius:6px;padding:8px 12px"><strong>Instructions:</strong> ${rx.notes}</div>` : ''}
     </div>
     <div style="background:#F8F9FA;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Prescribed Drugs</div>
-      ${items.map(i => {
-        const safetyFlag = otcSafetyRules.find(r => (i.drug_name||'').toLowerCase().includes(r.drug_name.toLowerCase()));
-        return `<div style="padding:8px 0;border-bottom:1px solid #E0E0E0">
-          <div style="font-weight:600;font-size:13px">${i.drug_name} ${i.strength||''}</div>
-          <div style="font-size:12px;color:#5F6368">${(i.route||'oral').toUpperCase()} · ${(i.frequency||'').replace(/_/g,' ')} · ${i.duration||5} days · Qty: ${i.qty||1}</div>
+      <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Prescribed Medications</div>
+      ${items.length ? items.map(i => {
+        const safetyFlag = otcSafetyRules.find(r => (i.drug_name||i.name||'').toLowerCase().includes(r.drug_name.toLowerCase()));
+        return `<div style="padding:8px 0;border-bottom:1px solid #E0E0E0;last-child:border-none">
+          <div style="font-weight:600;font-size:13px">${i.drug_name||i.name||'—'} ${i.strength||''}</div>
+          <div style="font-size:12px;color:#5F6368">${(i.frequency||'').replace(/_/g,' ')} · ${i.duration||'?'} days</div>
           ${safetyFlag ? `<div style="font-size:11px;color:#E65100;margin-top:3px">⚠ ${safetyFlag.warning_message}</div>` : ''}
         </div>`;
-      }).join('')}
+      }).join('') : '<div style="color:#9AA0A6;font-size:13px">No medications listed</div>'}
     </div>
-    <div style="font-size:12px;color:#5F6368">Dispensing this prescription will mark it as dispensed and update the e-prescription record.</div>`;
+    <div style="font-size:12px;color:#5F6368;background:#FFF8E1;border-radius:6px;padding:8px 12px">
+      <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">info</span>
+      Dispensing this prescription will mark it as <strong>dispensed</strong>. This cannot be undone.
+    </div>`;
 
   const footer = document.getElementById('orderModalFooter');
   footer.innerHTML = `

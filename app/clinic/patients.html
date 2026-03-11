@@ -113,6 +113,72 @@
   </div>
 </div>
 
+<!-- ══ Write Prescription Modal ══ -->
+<div class="admin-modal-overlay" id="writePrescriptionModal" style="display:none">
+  <div class="admin-modal" style="max-width:600px">
+    <div class="admin-modal-header" style="background:linear-gradient(135deg,#1B5E20,#4CAF50)">
+      <div class="admin-modal-title" id="rxModalTitle" style="color:#fff">Write Prescription</div>
+      <button class="admin-modal-close" onclick="closeRxModal()" style="color:#fff"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+
+      <!-- Patient info banner -->
+      <div id="rxPatientBanner" style="background:#F1F8E9;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:13px;color:#1B5E20;font-weight:600"></div>
+
+      <!-- Diagnosis -->
+      <div class="admin-form-group">
+        <label>Confirmed Diagnosis *</label>
+        <input type="text" id="rxDiagnosis" placeholder="e.g. Malaria, Hypertension, Respiratory Tract Infection">
+      </div>
+
+      <!-- Drug lines -->
+      <div style="margin-bottom:12px">
+        <div style="font-size:13px;font-weight:700;color:#1B5E20;margin-bottom:8px">
+          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">medication</span>
+          Medications
+        </div>
+        <div id="rxDrugLines" style="display:flex;flex-direction:column;gap:8px"></div>
+        <button onclick="addRxDrug()" style="margin-top:8px;width:100%;padding:9px;border:2px dashed #4CAF50;border-radius:8px;font-size:13px;color:#1B5E20;font-weight:600;cursor:pointer;background:#F1F8E9">
+          <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">add</span> Add Drug
+        </button>
+      </div>
+
+      <!-- Route to pharmacy -->
+      <div class="admin-form-group">
+        <label>Route to Pharmacy <small style="color:#9AA0A6;font-weight:400">(optional — leave blank for "any pharmacy")</small></label>
+        <select id="rxPharmacy">
+          <option value="">Any registered pharmacy</option>
+        </select>
+      </div>
+
+      <!-- Duration / validity -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="admin-form-group">
+          <label>Valid From</label>
+          <input type="date" id="rxStartDate">
+        </div>
+        <div class="admin-form-group">
+          <label>Valid Until</label>
+          <input type="date" id="rxEndDate">
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div class="admin-form-group">
+        <label>Clinical Notes <small style="color:#9AA0A6;font-weight:400">(instructions to pharmacist or patient)</small></label>
+        <textarea id="rxNotes" rows="2" style="width:100%;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;resize:none;outline:none" placeholder="e.g. Take with food. Avoid alcohol. Return if fever persists after 3 days."></textarea>
+      </div>
+
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeRxModal()">Cancel</button>
+      <button class="btn-admin primary" id="submitRxBtn" onclick="submitPrescription()">
+        <span class="material-icons-outlined" style="font-size:15px">send</span> Issue Prescription
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Rate Patient Modal (Clinic) -->
 <div class="admin-modal-overlay" id="rateClinicPatientModal" style="display:none">
   <div class="admin-modal" style="max-width:440px">
@@ -280,7 +346,10 @@ function renderTable(patients) {
         <button class="btn-admin secondary sm" onclick='showPatient(${JSON.stringify(JSON.stringify(p))})'>
           <span class="material-icons-outlined" style="font-size:14px">visibility</span> View
         </button>
-        ${p.status === 'attended' || p.status === 'completed' ? `<button class="btn-admin primary sm" onclick='openRatePatientClinic(${JSON.stringify(JSON.stringify(p))})'>
+        <button class="btn-admin primary sm" title="Write Prescription" onclick='openRxModal(${JSON.stringify(JSON.stringify(p))})' style="background:#1B5E20">
+          <span class="material-icons-outlined" style="font-size:14px">medication</span> Rx
+        </button>
+        ${p.status === 'attended' || p.status === 'completed' ? `<button class="btn-admin secondary sm" onclick='openRatePatientClinic(${JSON.stringify(JSON.stringify(p))})'>
           <span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate
         </button>` : ''}
       </td>
@@ -348,6 +417,197 @@ window.submitClinicPatientRating = async function() {
   if (toast) { toast.textContent = 'Patient rated!'; toast.className = 'admin-toast success show'; setTimeout(function(){toast.className='admin-toast';},2500); }
 };
 
+/* ═══════════════════════════════════════════════
+   WRITE PRESCRIPTION — from Patient Search page
+   ═══════════════════════════════════════════════ */
+
+let _rxPatient = null;
+let _rxDrugCount = 0;
+let _rxSupa = null;
+
+function _getRxSupa() {
+  if (_rxSupa) return _rxSupa;
+  const cfg = window.HOMATT_CONFIG || {};
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    try { _rxSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } }); } catch(e) {}
+  }
+  return _rxSupa;
+}
+
+window.openRxModal = function(pJson) {
+  try {
+    const p = typeof pJson === 'string' ? JSON.parse(pJson) : pJson;
+    _rxPatient    = p;
+    _rxDrugCount  = 0;
+
+    document.getElementById('rxModalTitle').textContent = 'Write Prescription — ' + (p.patient_name || 'Patient');
+    document.getElementById('rxPatientBanner').innerHTML =
+      '<span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">person</span> ' +
+      '<strong>' + (p.patient_name||'—') + '</strong>' +
+      (p.patient_age ? ' · ' + p.patient_age + 'y' : '') +
+      (p.patient_sex ? ' · ' + p.patient_sex : '') +
+      (p.booking_code ? ' · Booking: <code style="font-size:12px">' + p.booking_code + '</code>' : '') +
+      (p.ai_diagnosis ? '<br><span style="font-size:12px;color:#1B5E20">AI Suggestion: ' + p.ai_diagnosis + '</span>' : '');
+
+    document.getElementById('rxDiagnosis').value = p.ai_diagnosis || '';
+    document.getElementById('rxNotes').value = '';
+
+    // Set default dates: today → today + 7 days
+    const today = new Date().toISOString().split('T')[0];
+    const week  = new Date(Date.now() + 7*864e5).toISOString().split('T')[0];
+    document.getElementById('rxStartDate').value = today;
+    document.getElementById('rxEndDate').value   = week;
+
+    // Clear drug lines and add one empty line
+    document.getElementById('rxDrugLines').innerHTML = '';
+    addRxDrug();
+
+    // Load pharmacies
+    loadRxPharmacies();
+
+    // Close patient detail modal if open
+    document.getElementById('patientModal').style.display = 'none';
+    document.getElementById('writePrescriptionModal').style.display = 'flex';
+  } catch(e) { console.error('openRxModal error:', e); }
+};
+
+window.closeRxModal = function() {
+  document.getElementById('writePrescriptionModal').style.display = 'none';
+  _rxPatient = null;
+};
+
+window.addRxDrug = function() {
+  _rxDrugCount++;
+  const n = _rxDrugCount;
+  const wrap = document.createElement('div');
+  wrap.id = 'rxLine_' + n;
+  wrap.style.cssText = 'display:grid;grid-template-columns:2fr 1fr 1fr 1fr 36px;gap:6px;align-items:center;background:#F8F9FA;border-radius:8px;padding:8px';
+  wrap.innerHTML = `
+    <input type="text"   id="rxDrug_${n}"     placeholder="Drug name (e.g. Amoxicillin)"   style="border:1px solid #E0E0E0;border-radius:6px;padding:7px 10px;font-family:inherit;font-size:12px;outline:none">
+    <input type="text"   id="rxStrength_${n}" placeholder="Strength (e.g. 500mg)"          style="border:1px solid #E0E0E0;border-radius:6px;padding:7px 10px;font-family:inherit;font-size:12px;outline:none">
+    <select id="rxFreq_${n}" style="border:1px solid #E0E0E0;border-radius:6px;padding:7px 8px;font-family:inherit;font-size:12px;outline:none">
+      <option value="once_daily">Once daily</option>
+      <option value="twice_daily">Twice daily</option>
+      <option value="three_daily">3× daily</option>
+      <option value="four_daily">4× daily</option>
+      <option value="as_needed">As needed (PRN)</option>
+      <option value="weekly">Once weekly</option>
+    </select>
+    <input type="number" id="rxDays_${n}"     placeholder="Days"  min="1" max="365" value="7" style="border:1px solid #E0E0E0;border-radius:6px;padding:7px 10px;font-family:inherit;font-size:12px;outline:none">
+    <button onclick="document.getElementById('rxLine_${n}').remove()" style="background:#FFEBEE;border:none;color:#D32F2F;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center" title="Remove">
+      <span class="material-icons-outlined" style="font-size:16px">close</span>
+    </button>`;
+  document.getElementById('rxDrugLines').appendChild(wrap);
+};
+
+async function loadRxPharmacies() {
+  const sel = document.getElementById('rxPharmacy');
+  sel.innerHTML = '<option value="">Any registered pharmacy</option>';
+  const supa = _getRxSupa();
+  if (!supa) return;
+  try {
+    const session = requireClinic();
+    let q = supa.from('pharmacies').select('id,name').eq('active', true);
+    const { data } = await q;
+    if (data && data.length) {
+      data.forEach(ph => {
+        const opt = document.createElement('option');
+        opt.value = ph.id;
+        opt.textContent = ph.name;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+}
+
+window.submitPrescription = async function() {
+  if (!_rxPatient) return;
+  const diagnosis = document.getElementById('rxDiagnosis').value.trim();
+  if (!diagnosis) { showToast('Please enter the confirmed diagnosis', 'error'); return; }
+
+  // Collect drug lines
+  const items = [];
+  document.querySelectorAll('#rxDrugLines > div').forEach(row => {
+    const idSuffix = row.id.replace('rxLine_', '');
+    const drug = document.getElementById('rxDrug_' + idSuffix)?.value.trim();
+    if (!drug) return;
+    items.push({
+      drug_name:  drug,
+      strength:   document.getElementById('rxStrength_' + idSuffix)?.value.trim() || '',
+      frequency:  document.getElementById('rxFreq_'     + idSuffix)?.value || 'once_daily',
+      duration:   Number(document.getElementById('rxDays_' + idSuffix)?.value) || 7,
+    });
+  });
+
+  if (!items.length) { showToast('Add at least one medication', 'error'); return; }
+
+  const btn = document.getElementById('submitRxBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Saving…';
+
+  const session     = requireClinic();
+  const pharmId     = document.getElementById('rxPharmacy').value || null;
+  const startDate   = document.getElementById('rxStartDate').value || null;
+  const endDate     = document.getElementById('rxEndDate').value   || null;
+  const notes       = document.getElementById('rxNotes').value.trim() || null;
+
+  const supa = _getRxSupa();
+  if (supa) {
+    try {
+      const rxPayload = {
+        booking_id:               _rxPatient.id,
+        clinic_id:                session?.clinicId || null,
+        patient_name:             _rxPatient.patient_name || '—',
+        diagnosis,
+        items,
+        status:                   'active',
+        start_date:               startDate,
+        end_date:                 endDate,
+        routed_to_pharmacy_id:    pharmId,
+        notes,
+        created_at:               new Date().toISOString(),
+      };
+
+      const { data: rxRecord, error: rxErr } = await supa
+        .from('e_prescriptions')
+        .insert(rxPayload)
+        .select()
+        .single();
+
+      if (rxErr) {
+        showToast('Error saving prescription: ' + rxErr.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">send</span> Issue Prescription';
+        return;
+      }
+
+      // Also create a pharmacy_order so pharmacy sees it immediately
+      if (rxRecord) {
+        await supa.from('pharmacy_orders').insert({
+          e_prescription_id: rxRecord.id,
+          clinic_id:         session?.clinicId || null,
+          pharmacy_id:       pharmId,
+          patient_name:      _rxPatient.patient_name || '—',
+          order_type:        'prescription',
+          items,
+          status:            'pending',
+          created_at:        new Date().toISOString(),
+        });
+      }
+    } catch(e) {
+      showToast('Network error — prescription not saved', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">send</span> Issue Prescription';
+      return;
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">send</span> Issue Prescription';
+  closeRxModal();
+  showToast('Prescription issued successfully! Pharmacy can now see it.', 'success');
+};
+
 function showPatient(pJson) {
   const p = JSON.parse(pJson);
   document.getElementById('modalPatientName').textContent = p.patient_name || '—';
@@ -382,8 +642,11 @@ function showPatient(pJson) {
       <div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;margin-bottom:6px">Notes</div>
       <div style="font-size:13px;background:#F8F9FA;padding:12px;border-radius:8px">${p.notes}</div>
     </div>` : ''}
-    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end">
-      ${p.status === 'attended' || p.status === 'completed' ? `<button onclick="openRatePatientClinic(JSON.stringify(${JSON.stringify(JSON.stringify(p))}))" class="btn-admin primary"><span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate Patient</button>` : ''}
+    <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+      <button onclick='openRxModal(${JSON.stringify(JSON.stringify(p))})' class="btn-admin primary" style="background:#1B5E20">
+        <span class="material-icons-outlined" style="font-size:14px">medication</span> Write Prescription
+      </button>
+      ${p.status === 'attended' || p.status === 'completed' ? `<button onclick="openRatePatientClinic(JSON.stringify(${JSON.stringify(JSON.stringify(p))}))" class="btn-admin secondary"><span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate Patient</button>` : ''}
       <button onclick="document.getElementById('patientModal').style.display='none'" class="btn-admin secondary">Close</button>
     </div>`;
   document.getElementById('patientModal').style.display = 'block';
