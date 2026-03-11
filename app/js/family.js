@@ -608,6 +608,68 @@ document.addEventListener('DOMContentLoaded', async () => {
     openSheet(document.getElementById('cartSheet'));
   }
 
+  // ====== Checkout — Place Order ======
+  window.submitOrder = async function() {
+    const addr = (document.getElementById('cartDeliveryAddress')?.value || '').trim();
+    if (!addr) {
+      showToast('Please enter your delivery address');
+      document.getElementById('cartDeliveryAddress')?.focus();
+      return;
+    }
+    if (cart.length === 0) return;
+
+    const btn = document.getElementById('cartCheckoutBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Placing order…'; }
+
+    const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
+
+    // Get user profile for name/phone
+    let patientName = 'Customer', patientPhone = null;
+    try {
+      const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
+      if (prof) {
+        patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+        patientPhone = prof.phone || null;
+        if (!addr && prof.district) addr = prof.district;
+      }
+    } catch(e) {}
+
+    // Save order to marketplace_orders
+    const orderPayload = {
+      user_id: userId,
+      patient_name: patientName,
+      patient_phone: patientPhone,
+      delivery_address: addr,
+      items: itemsPayload,
+      total_amount: total,
+      status: 'pending',
+      payment_method: 'cash_on_delivery',
+    };
+
+    const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
+
+    if (orderErr) {
+      showToast('Order failed: ' + orderErr.message);
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
+      return;
+    }
+
+    // Deduct stock for each item (best-effort, ignore errors)
+    try {
+      for (const item of cart) {
+        await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
+      }
+    } catch(e) {}
+
+    // Clear cart
+    cart = [];
+    localStorage.removeItem('homatt_cart');
+    updateCartBadge();
+    closeAllSheets();
+    showToast('Order placed! We will call you to confirm delivery.');
+  };
+
   // ====== Sheet / Overlay Management ======
   const overlay = document.getElementById('sheetOverlay');
 

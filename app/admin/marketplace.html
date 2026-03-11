@@ -47,6 +47,46 @@
           <div class="stat-icon red"><span class="material-icons-outlined">inventory_2</span></div>
           <div><div class="stat-number" id="statLowStock">—</div><div class="stat-label">Low / Out of Stock</div></div>
         </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE7F6"><span class="material-icons-outlined" style="color:#6A1B9A">receipt_long</span></div>
+          <div><div class="stat-number" id="statOrders">—</div><div class="stat-label">New Orders</div></div>
+        </div>
+      </div>
+
+      <!-- ===== CUSTOMER ORDERS ===== -->
+      <div class="admin-table-wrap" style="margin-bottom:28px">
+        <div class="table-header">
+          <div class="table-title">Customer Orders</div>
+          <div class="table-filter" style="display:flex;gap:8px;align-items:center">
+            <select id="filterOrderStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="dispatched">Dispatched</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="btn-admin secondary sm" onclick="loadOrders()">
+              <span class="material-icons-outlined" style="font-size:15px">refresh</span> Refresh
+            </button>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Delivery Address</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="admin-table-wrap">
@@ -423,6 +463,69 @@ async function deleteCategory(id, name) {
   showAdminToast('Category deleted', 'success');
 }
 
+// ===== ORDER MANAGEMENT =====
+let allOrders = [];
+
+const ORDER_STATUS_COLORS = {
+  pending: 'status-badge incoming',
+  confirmed: 'status-badge scheduled',
+  dispatched: 'status-badge in_progress',
+  delivered: 'status-badge delivered',
+  cancelled: 'status-badge rejected',
+};
+
+function renderOrders(list) {
+  document.getElementById('statOrders').textContent = list.filter(o => o.status === 'pending').length;
+  document.getElementById('ordersBody').innerHTML = list.length ? list.map(o => {
+    const items = Array.isArray(o.items) ? o.items : [];
+    const summary = items.map(i => `${i.name} ×${i.qty}`).join(', ');
+    const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'});
+    return `<tr>
+      <td>
+        <div style="font-weight:600;font-size:13px">${o.patient_name || '—'}</div>
+        <div style="font-size:11px;color:#9AA0A6">${o.patient_phone || ''}</div>
+      </td>
+      <td style="font-size:12px;max-width:200px">${summary || '—'}</td>
+      <td style="font-weight:600">UGX ${Number(o.total_amount||0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#5F6368">${o.delivery_address || '—'}</td>
+      <td><span class="${ORDER_STATUS_COLORS[o.status]||'status-badge'}">${o.status}</span></td>
+      <td style="font-size:12px;color:#9AA0A6;white-space:nowrap">${date}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${o.status === 'pending'   ? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','confirmed')">Confirm</button>` : ''}
+          ${o.status === 'confirmed' ? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','dispatched')">Dispatch</button>` : ''}
+          ${o.status === 'dispatched'? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','delivered')">Delivered</button>` : ''}
+          ${['pending','confirmed'].includes(o.status) ? `<button class="btn-admin danger sm" onclick="updateOrderStatus('${o.id}','cancelled')">Cancel</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
+}
+
+function applyOrderFilter() {
+  const st = document.getElementById('filterOrderStatus').value;
+  renderOrders(st ? allOrders.filter(o => o.status === st) : allOrders);
+}
+
+async function loadOrders() {
+  if (!supabase) return;
+  const { data } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+  allOrders = data || [];
+  applyOrderFilter();
+}
+
+window.updateOrderStatus = async function(id, status) {
+  const extra = {};
+  if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
+  if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
+  if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
+  const { error } = await supabase.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
+  if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
+  await loadOrders();
+  showAdminToast('Order marked as ' + status, 'success');
+};
+
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('marketplace');
   const session = await requireAdmin();
@@ -436,9 +539,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('searchProducts').addEventListener('input', applyFilter);
   document.getElementById('filterCategory').addEventListener('change', applyFilter);
   document.getElementById('filterStatus').addEventListener('change', applyFilter);
+  document.getElementById('filterOrderStatus').addEventListener('change', applyOrderFilter);
 
   await loadCategories();
-  await loadProducts();
+  await Promise.all([loadProducts(), loadOrders()]);
 });
 </script>
 </body>
