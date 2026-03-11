@@ -134,7 +134,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
   try {
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
-      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
     }
   } catch(e) {}
 

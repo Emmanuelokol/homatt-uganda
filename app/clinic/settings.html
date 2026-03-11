@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Init Supabase
   var cfg = window.HOMATT_CONFIG || {};
   if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
-    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
   }
 
   // Build UI sections

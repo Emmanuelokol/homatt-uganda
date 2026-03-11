@@ -110,7 +110,7 @@ function formatUGX(n) {
 function initPharmacySupabase() {
   const cfg = window.HOMATT_CONFIG || {};
   if (!cfg.SUPABASE_URL || !window.supabase) return null;
-  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-pharmacy-auth' } });
 }
 
 /* ── Mock data (demo mode fallback) ── */

@@ -368,11 +368,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (clinicNameEl && session.clinicName) clinicNameEl.textContent = session.clinicName;
 
   const cfg = window.HOMATT_CONFIG || {};
-  // Always initialize supa so demo mode also gets real patient data from Supabase
+  // Use named storageKey to pick up the session saved at login (clinic portal)
   let supa = null;
   try {
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
-      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
+      });
     }
   } catch(e) {}
 
@@ -392,8 +394,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) {}
   }
 
-  if (!bookings.length) {
-    // Fall back to mock patients so the portal always shows something
+  if (!bookings.length && session.demo) {
+    // Demo mode only: show mock patients so the demo always looks populated
     bookings = MOCK_PATIENTS.map((p, i) => ({
       id: String(p.q), booking_code: p.id,
       patient_name: p.name, patient_age: p.age, patient_sex: p.sex,

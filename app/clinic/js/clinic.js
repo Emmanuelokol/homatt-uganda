@@ -19,7 +19,17 @@ function requireClinic() {
 }
 
 function setupClinicLogout() {
-  document.getElementById('clinicLogoutBtn')?.addEventListener('click', () => {
+  document.getElementById('clinicLogoutBtn')?.addEventListener('click', async () => {
+    // Sign out of Supabase auth so the session token is invalidated
+    const cfg = window.HOMATT_CONFIG || {};
+    if (window.supabase && cfg.SUPABASE_URL) {
+      try {
+        const tmpSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+          auth: { storageKey: 'sb-homatt-clinic-auth' }
+        });
+        await tmpSupa.auth.signOut();
+      } catch(e) {}
+    }
     localStorage.removeItem('clinic_session');
     window.location.href = 'index.html';
   });

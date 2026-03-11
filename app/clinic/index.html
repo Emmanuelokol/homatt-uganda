@@ -68,7 +68,7 @@
   const cfg = window.HOMATT_CONFIG || {};
   const _supa = (cfg.SUPABASE_URL && window.supabase)
     ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-        auth: { persistSession: false }
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
       }) : null;
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
