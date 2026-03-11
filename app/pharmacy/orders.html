@@ -175,6 +175,7 @@ function setupRealtime(supa, pharmacyId) {
   const badge = document.getElementById('realtimeBadge');
   if (badge) badge.style.display = 'flex';
 
+  // Listen for prescription-based pharmacy orders
   supa.channel('pharmacy-orders-' + pharmacyId)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -184,8 +185,7 @@ function setupRealtime(supa, pharmacyId) {
     }, payload => {
       allOrders.unshift(payload.new);
       render();
-      showToast('New order received!', 'success');
-      // Flash the incoming badge
+      showToast('New prescription order received!', 'success');
       const b = document.getElementById('badge-incoming');
       if (b) { b.style.animation = 'none'; b.offsetHeight; b.style.animation = 'pulse 0.6s ease 3'; }
     })
@@ -200,12 +200,58 @@ function setupRealtime(supa, pharmacyId) {
       render();
     })
     .subscribe();
+
+  // Listen for marketplace (OTC shop) orders routed to this pharmacy
+  supa.channel('mkt-orders-' + pharmacyId)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'marketplace_orders',
+      filter: `pharmacy_id=eq.${pharmacyId}`
+    }, payload => {
+      const o = payload.new;
+      const normalised = {
+        ...o,
+        order_type: 'otc_shop',
+        urgency: 'standard',
+        medication_cost: (o.total_amount || 0) - (o.delivery_fee || 2000),
+        delivery_cost: o.delivery_fee || 2000,
+        total_cost: o.total_amount || 0,
+        status: 'incoming',
+        _source: 'marketplace',
+      };
+      allOrders.unshift(normalised);
+      render();
+      showToast('New shop order received!', 'success');
+      const b = document.getElementById('badge-incoming');
+      if (b) { b.style.animation = 'none'; b.offsetHeight; b.style.animation = 'pulse 0.6s ease 3'; }
+    })
+    .subscribe();
 }
 
 async function loadLive(supa, pharmacyId) {
-  const { data } = await supa.from('pharmacy_orders').select('*')
+  // Load prescription-based pharmacy orders
+  const { data: rxOrders } = await supa.from('pharmacy_orders').select('*')
     .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
-  allOrders = data || [];
+
+  // Also load OTC marketplace orders routed to this pharmacy
+  const { data: mktOrders } = await supa.from('marketplace_orders').select('*')
+    .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
+
+  // Normalise marketplace_orders to the same shape as pharmacy_orders
+  const normalisedMkt = (mktOrders || []).map(o => ({
+    ...o,
+    order_type: 'otc_shop',
+    urgency: 'standard',
+    medication_cost: (o.total_amount || 0) - (o.delivery_fee || 2000),
+    delivery_cost: o.delivery_fee || 2000,
+    total_cost: o.total_amount || 0,
+    status: o.status === 'pending' ? 'incoming' : o.status,
+    _source: 'marketplace',
+  }));
+
+  allOrders = [...(rxOrders || []), ...normalisedMkt]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   // Load e-prescriptions: ones routed specifically to this pharmacy OR unrouted (any pharmacy)
   const { data: rxData } = await supa.from('e_prescriptions')

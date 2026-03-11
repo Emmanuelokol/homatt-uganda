@@ -106,13 +106,13 @@ function buildAdminSidebar(activePage) {
 async function requireAdmin() {
   // Hide content immediately so there's no flash of protected content before redirect
   document.body.style.visibility = 'hidden';
-  // 1. Check stored session (sessionStorage first, localStorage fallback)
-  //    Works without any CDN or network — covers demo mode and real logins
+
   const stored = getAdminSession();
-  if (stored && (stored.demo || stored.isAdmin)) {
-    // Auth passed — show the page
+
+  // Demo mode — allowed through but with a clear flag (no real DB access)
+  if (stored?.demo) {
     document.body.style.visibility = 'visible';
-    const adminName = stored.name || 'Admin';
+    const adminName = stored.name || 'Admin (Demo)';
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
     const nameTop  = document.getElementById('adminUserNameTop');
@@ -122,20 +122,19 @@ async function requireAdmin() {
     return stored;
   }
 
-  // 2. No stored session — try live Supabase auth
+  // All non-demo sessions MUST validate against Supabase auth every time.
+  // This prevents localStorage manipulation — a manually crafted localStorage
+  // entry with {isAdmin:true} will fail here because Supabase won't have a
+  // matching live session token.
   const supa = adminSupa();
-  if (!supa) {
-    // CDN hasn't loaded yet — redirect to login rather than silently doing nothing
-    window.location.href = 'index.html';
-    return null;
-  }
+  if (!supa) { window.location.href = 'index.html'; return null; }
 
   let session;
   try {
     const { data } = await supa.auth.getSession();
     session = data?.session;
   } catch(e) {}
-  if (!session) { window.location.href = 'index.html'; return null; }
+  if (!session) { clearAdminSession(); window.location.href = 'index.html'; return null; }
 
   let profile;
   try {
@@ -146,13 +145,11 @@ async function requireAdmin() {
     profile = data;
   } catch(e) {}
 
-  if (!profile?.is_admin) { window.location.href = 'index.html'; return null; }
+  if (!profile?.is_admin) { clearAdminSession(); window.location.href = 'index.html'; return null; }
 
   const adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
-  // Store so subsequent pages don't need to re-verify
   setAdminSession({ email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id });
 
-  // Auth passed — show the page
   document.body.style.visibility = 'visible';
   const avatarEl = document.getElementById('adminUserAvatar');
   const nameEl   = document.getElementById('adminUserName');
@@ -160,7 +157,7 @@ async function requireAdmin() {
   if (avatarEl) avatarEl.textContent = adminName.charAt(0).toUpperCase();
   if (nameEl)   nameEl.textContent   = adminName;
   if (nameTop)  nameTop.textContent  = adminName;
-  return session;
+  return { email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id };
 }
 
 /* ── Portal auth guard (clinic/pharmacy/rider portals) ── */

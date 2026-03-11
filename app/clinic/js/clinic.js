@@ -1,5 +1,13 @@
 /* Homatt Health — Clinic Portal shared JS */
 
+function _getClinicSupabase() {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return null;
+  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-clinic-auth' }
+  });
+}
+
 function requireClinic() {
   // Hide content immediately so there's no flash of protected content before redirect
   document.body.style.visibility = 'hidden';
@@ -19,6 +27,31 @@ function requireClinic() {
   if (el1) el1.textContent = name;
   if (el2) el2.textContent = name;
   if (av)  av.textContent  = name[0].toUpperCase();
+
+  // Non-demo: validate Supabase session in background.
+  // If the stored session is a fake (no real Supabase token), redirect after short delay.
+  // This prevents URL manipulation while still showing the page immediately for real users.
+  if (!s.demo) {
+    setTimeout(async () => {
+      try {
+        const supa = _getClinicSupabase();
+        if (!supa) return;
+        const { data } = await supa.auth.getSession();
+        if (!data?.session) {
+          // No valid Supabase session — the localStorage was faked or expired
+          localStorage.removeItem('clinic_session');
+          window.location.href = 'index.html';
+          return;
+        }
+        // Verify the session belongs to the stored user
+        if (s.userId && data.session.user.id !== s.userId) {
+          localStorage.removeItem('clinic_session');
+          window.location.href = 'index.html';
+        }
+      } catch(e) { /* Network error — allow offline access */ }
+    }, 200);
+  }
+
   return s;
 }
 

@@ -74,6 +74,27 @@ function requirePharmacy() {
   if (nm) nm.textContent = s.pharmacyName || 'Pharmacy Portal';
   if (av) av.textContent = (s.staffName || s.pharmacyName || 'P')[0].toUpperCase();
   if (nt) nt.textContent = s.staffName || 'Pharmacist';
+
+  // Non-demo: validate Supabase session in background to prevent localStorage forgery
+  if (!s.demo) {
+    setTimeout(async () => {
+      try {
+        const supa = initPharmacySupabase();
+        if (!supa) return;
+        const { data } = await supa.auth.getSession();
+        if (!data?.session) {
+          localStorage.removeItem('pharmacy_session');
+          window.location.href = 'index.html';
+          return;
+        }
+        if (s.userId && data.session.user.id !== s.userId) {
+          localStorage.removeItem('pharmacy_session');
+          window.location.href = 'index.html';
+        }
+      } catch(e) { /* Network error — allow offline access */ }
+    }, 200);
+  }
+
   return s;
 }
 
@@ -119,10 +140,10 @@ function initPharmacySupabase() {
 
 /* ── Mock data (demo mode fallback) ── */
 const MOCK_ORDERS = [
-  { id:'ord-001', status:'incoming', urgency:'urgent',   patient_name:'Ssempa Robert',  patient_phone:'+256 771 123 456', delivery_address:'Ntinda Estate, Plot 7',  items:[{name:'Coartem 20/120mg',qty:6},{name:'Paracetamol 500mg',qty:10}], medication_cost:18500, delivery_cost:5000, total_cost:23500, created_at: new Date(Date.now()-180000).toISOString() },
-  { id:'ord-002', status:'incoming', urgency:'standard', patient_name:'Nakato Brenda',  patient_phone:'+256 782 234 567', delivery_address:'Kyanja, Zone 3, H22',     items:[{name:'Amoxicillin 500mg',qty:21}], medication_cost:8500, delivery_cost:5000, total_cost:13500, created_at: new Date(Date.now()-420000).toISOString() },
-  { id:'ord-003', status:'confirmed',urgency:'standard', patient_name:'Mubiru John',    patient_phone:'+256 755 345 678', delivery_address:'Namuwongo, Block B',      items:[{name:'ORS Sachet',qty:5},{name:'Paracetamol 500mg',qty:10}], medication_cost:5000, delivery_cost:5000, total_cost:10000, created_at: new Date(Date.now()-900000).toISOString() },
-  { id:'ord-004', status:'preparing', urgency:'standard', patient_name:'Namutebi Agnes', patient_phone:'+256 700 456 789', delivery_address:'Kira Road, House 14',    items:[{name:'Folic Acid 5mg',qty:30},{name:'Ferrous Sulphate 200mg',qty:30}], medication_cost:9000, delivery_cost:5000, total_cost:14000, created_at: new Date(Date.now()-1800000).toISOString() },
+  { id:'ord-001', status:'incoming', urgency:'urgent',   patient_name:'Ssempa Robert',  patient_phone:'+256 771 123 456', delivery_address:'Ntinda Estate, Plot 7',  items:[{name:'Coartem 20/120mg',qty:6},{name:'Paracetamol 500mg',qty:10}], medication_cost:18500, delivery_cost:2000, total_cost:20500, created_at: new Date(Date.now()-180000).toISOString() },
+  { id:'ord-002', status:'incoming', urgency:'standard', patient_name:'Nakato Brenda',  patient_phone:'+256 782 234 567', delivery_address:'Kyanja, Zone 3, H22',     items:[{name:'Amoxicillin 500mg',qty:21}], medication_cost:8500, delivery_cost:2000, total_cost:10500, created_at: new Date(Date.now()-420000).toISOString() },
+  { id:'ord-003', status:'confirmed',urgency:'standard', patient_name:'Mubiru John',    patient_phone:'+256 755 345 678', delivery_address:'Namuwongo, Block B',      items:[{name:'ORS Sachet',qty:5},{name:'Paracetamol 500mg',qty:10}], medication_cost:5000, delivery_cost:2000, total_cost:7000, created_at: new Date(Date.now()-900000).toISOString() },
+  { id:'ord-004', status:'preparing', urgency:'standard', patient_name:'Namutebi Agnes', patient_phone:'+256 700 456 789', delivery_address:'Kira Road, House 14',    items:[{name:'Folic Acid 5mg',qty:30},{name:'Ferrous Sulphate 200mg',qty:30}], medication_cost:9000, delivery_cost:2000, total_cost:11000, created_at: new Date(Date.now()-1800000).toISOString() },
 ];
 
 const MOCK_INVENTORY = [

@@ -54,6 +54,10 @@
       </div>
 
       <!-- ===== CUSTOMER ORDERS ===== -->
+      <div id="demoOrdersNotice" style="display:none;background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#E65100">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">warning</span>
+        <strong>Demo mode:</strong> Sign in with real admin credentials to see live customer orders.
+      </div>
       <div class="admin-table-wrap" style="margin-bottom:28px">
         <div class="table-header">
           <div class="table-title">Customer Orders</div>
@@ -525,7 +529,16 @@ function applyOrderFilter() {
 
 async function loadOrders() {
   if (!supabase) return;
-  const { data } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+  const { data, error } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+  if (error) {
+    console.error('Orders load error:', error.message);
+    document.getElementById('ordersBody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F">
+        <span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>
+        Could not load orders. Please sign in with real admin credentials.
+      </td></tr>`;
+    return;
+  }
   allOrders = data || [];
   applyOrderFilter();
 }
@@ -547,6 +560,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!session) return;
   supabase = adminSupa();
   setupAdminLogout();
+
+  // Show demo warning if no real Supabase auth session
+  if (session.demo) {
+    const notice = document.getElementById('demoOrdersNotice');
+    if (notice) notice.style.display = 'block';
+  }
 
   document.getElementById('addProductBtn').addEventListener('click', openAdd);
   document.getElementById('manageCategoriesBtn').addEventListener('click', () => {
