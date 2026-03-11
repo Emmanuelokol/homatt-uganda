@@ -1696,22 +1696,40 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
       const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
 
+      // Generate a PIN token so clinic can look up by PIN too
+      const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let pinToken = 'HK-';
+      for (let i = 0; i < 6; i++) pinToken += pinChars[Math.floor(Math.random() * pinChars.length)];
+      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(); // 4 hours
+
+      // Mock IDs are not valid UUIDs — set clinic_id to null for those
+      const isMockClinic = !selectedClinicId || selectedClinicId.startsWith('mock-');
+
       const bookingRecord = {
-        booking_code: bookingCode,
-        patient_name: patientName,
-        patient_age: selectedPatient.age || null,
-        patient_sex: selectedPatient.sex || null,
-        patient_user_id: session?.user?.id || null,
-        symptoms: enteredSymptoms ? [enteredSymptoms] : null,
-        symptoms_identified: JSON.stringify(diagnosisData.symptoms_identified),
-        ai_diagnosis: diagnosisData.conditions[0]?.name || null,
-        conditions_json: JSON.stringify(diagnosisData.conditions),
+        booking_code:  bookingCode,
+        patient_name:  patientName,
+        patient_id:    session?.user?.id || null,
+        patient_age:   selectedPatient.age || null,
+        patient_sex:   selectedPatient.sex || null,
+        symptoms:      enteredSymptoms ? [enteredSymptoms] : null,
+        ai_diagnosis:  diagnosisData.conditions[0]?.name || null,
+        ai_confidence: diagnosisData.conditions[0]?.likelihood_percent || null,
+        ai_full_data: {
+          primary_condition: diagnosisData.conditions[0]?.name || null,
+          confidence:        diagnosisData.conditions[0]?.likelihood_percent || null,
+          overall_risk:      diagnosisData.overall_risk || null,
+          symptoms:          enteredSymptoms || null,
+          clinic_urgency:    diagnosisData.clinic_urgency || null,
+          conditions:        diagnosisData.conditions || [],
+          immediate_actions: diagnosisData.immediate_actions || [],
+        },
         urgency_level: diagnosisData.clinic_urgency === 'urgent' ? 'high' : diagnosisData.clinic_urgency === 'soon' ? 'medium' : 'normal',
-        risk_score: diagnosisData.conditions[0]?.likelihood_percent || 50,
-        clinic_id: selectedClinicId || null,
+        risk_score:    diagnosisData.conditions[0]?.likelihood_percent || 50,
+        clinic_id:     isMockClinic ? null : selectedClinicId,
         preferred_time: selectedTime,
-        status: 'pending',
-        created_at: new Date().toISOString(),
+        status:        'pending',
+        pin_token:     pinToken,
+        pin_expires_at: pinExpiry,
       };
 
       // Disable button and show loading state
@@ -1719,16 +1737,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking...';
 
-      // Save to Supabase (if available)
-      if (supabase) try {
-        await supabase.from('bookings').insert(bookingRecord);
-      } catch (e) {
-        console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
+      // Save to Supabase
+      let savedOk = false;
+      if (supabase) {
+        try {
+          const { error: insertErr } = await supabase.from('bookings').insert(bookingRecord);
+          if (insertErr) {
+            console.error('[Homatt] Booking insert error:', insertErr.message);
+          } else {
+            savedOk = true;
+          }
+        } catch (e) {
+          console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
+        }
       }
 
       // Always save to localStorage as backup
       const localBookings = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
-      localBookings.unshift({ ...bookingRecord, clinic_name: selectedClinicName });
+      localBookings.unshift({ ...bookingRecord, clinic_name: selectedClinicName, savedToDb: savedOk });
       if (localBookings.length > 20) localBookings.pop();
       localStorage.setItem('homatt_bookings', JSON.stringify(localBookings));
 
@@ -1742,9 +1768,13 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <h3 style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Booking Confirmed!</h3>
           <p style="font-size:13px;color:#666;margin-bottom:20px">Your appointment has been submitted.</p>
 
-          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:20px">
+          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:16px">
             <p style="font-size:12px;color:#555;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Your Booking Code</p>
-            <p style="font-size:36px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0">${bookingCode}</p>
+            <p style="font-size:36px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
+            <div style="background:rgba(0,0,0,0.05);border-radius:8px;padding:10px">
+              <p style="font-size:11px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">PIN Token (show to reception)</p>
+              <p style="font-size:18px;font-weight:700;color:#00695C;letter-spacing:2px;margin:0">${pinToken}</p>
+            </div>
           </div>
 
           <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:20px">
@@ -1759,7 +1789,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           </div>
 
           <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:20px">
-            Show this code to the clinic on arrival.<br>The clinic will confirm your appointment.
+            Show the booking code <strong>or</strong> PIN to the reception desk.<br>The clinic will verify and check you in.
           </p>
 
           <button id="btnCloseSuccess"
