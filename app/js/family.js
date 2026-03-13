@@ -74,8 +74,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tab) tab.classList.add('active');
     const pane = document.getElementById('pane-' + target);
     if (pane) pane.classList.add('active');
-    // Close the full-screen health log panel when switching tabs
-    document.getElementById('memberDetailPanel')?.classList.remove('open');
+    // Fully hide the health log panel when switching tabs
+    closeMemberDetail();
 
     // Cart FAB only on shop tab
     const cartFab = document.getElementById('cartFab');
@@ -783,8 +783,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cart = [];
     localStorage.removeItem('homatt_cart');
     updateCartBadge();
-    closeAllSheets();
-    document.getElementById('memberDetailPanel')?.classList.remove('open');
+    closeAllSheets(); // also calls closeMemberDetail() internally
     showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
   };
 
@@ -799,10 +798,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function closeAllSheets() {
     overlay.classList.remove('visible');
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    // Always close the health-log panel too — it's not a .bottom-sheet
-    // but can be left open behind sheets, causing it to show after cart closes
-    const panel = document.getElementById('memberDetailPanel');
-    if (panel) panel.classList.remove('open');
+    // Always close the health-log panel (not a .bottom-sheet, but must be hidden)
+    closeMemberDetail();
   }
 
   overlay.addEventListener('click', closeAllSheets);
@@ -1011,17 +1008,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ====== Member Detail Panel ======
+  function closeMemberDetail() {
+    const panel = document.getElementById('memberDetailPanel');
+    panel.classList.remove('open');
+    // Wait for slide-out transition (300ms), then fully remove from layout
+    setTimeout(() => {
+      if (!panel.classList.contains('open')) panel.style.display = 'none';
+    }, 320);
+    logEventForMemberId = null;
+  }
+
   function openMemberDetail(member) {
+    const panel = document.getElementById('memberDetailPanel');
+    // Reset display so it's visible before animating in
+    panel.style.display = 'flex';
+    panel.offsetHeight; // force reflow so CSS transition fires
     logEventForMemberId = member.id;
     document.getElementById('memberDetailName').textContent = member.name;
     document.getElementById('memberDetailRel').textContent =
       member.relationship ? member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1) : '—';
-    document.getElementById('memberDetailPanel').classList.add('open');
+    panel.classList.add('open');
     loadMemberHealthLog(member.id);
   }
 
   document.getElementById('memberDetailBack').addEventListener('click', () => {
-    document.getElementById('memberDetailPanel').classList.remove('open');
+    closeMemberDetail();
     logEventForMemberId = null;
   });
 
