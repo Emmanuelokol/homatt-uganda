@@ -522,4 +522,65 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   runHealthPredictions();
+
+  // ── Medication Check-in ──────────────────────────────────────
+  window._activeCheckinId = null;
+
+  async function checkPendingCheckins() {
+    if (!supabase || !session?.user?.id) return;
+    const now = new Date().toISOString();
+    const { data: due } = await supabase
+      .from('medication_checkins')
+      .select('*, medication_dispensing(instructions, warnings)')
+      .eq('user_id', session.user.id)
+      .eq('status', 'pending')
+      .lte('scheduled_at', now)
+      .order('scheduled_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!due) return;
+
+    window._activeCheckinId = due.id;
+    const disp = due.medication_dispensing || {};
+    document.getElementById('checkinMedName').textContent = due.item_name;
+    document.getElementById('checkinDosage').textContent = `Dose: ${due.dosage}`;
+
+    const instr = disp.instructions || '';
+    const instrEl = document.getElementById('checkinInstructions');
+    instrEl.textContent = instr;
+    instrEl.style.display = instr ? 'block' : 'none';
+
+    const warn = disp.warnings || '';
+    const warnEl = document.getElementById('checkinWarnings');
+    warnEl.textContent = warn ? `⚠ ${warn}` : '';
+    warnEl.style.display = warn ? 'block' : 'none';
+
+    document.getElementById('medCheckinBanner').style.display = 'block';
+  }
+
+  window.respondCheckin = async function(feeling) {
+    const id = window._activeCheckinId;
+    if (!id || !supabase) return;
+
+    await supabase.from('medication_checkins').update({
+      status:             feeling === 'worse' ? 'escalated' : 'completed',
+      feeling,
+      clinic_recommended: feeling === 'worse',
+      responded_at:       new Date().toISOString(),
+    }).eq('id', id);
+
+    document.getElementById('medCheckinBanner').style.display = 'none';
+    window._activeCheckinId = null;
+
+    if (feeling === 'worse') {
+      document.getElementById('clinicReferralBanner').style.display = 'block';
+      document.querySelector('.app-screen').scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      // Check if another check-in is due right after
+      checkPendingCheckins();
+    }
+  };
+
+  checkPendingCheckins();
 });

@@ -59,6 +59,89 @@
   </main>
 </div>
 
+<!-- Dispense Medication Details Modal -->
+<div class="admin-modal-overlay" id="dispenseModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">
+        <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px">medication</span>
+        Fill Dispensing Details
+      </div>
+      <button class="admin-modal-close" onclick="closeDispenseModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#5D4037">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">info</span>
+        These details are sent to the patient. They will be asked to check in after each dose. If they report getting worse, they will be referred to the nearest clinic immediately.
+      </div>
+      <input type="hidden" id="dispenseOrderId">
+      <input type="hidden" id="dispenseOrderType">
+      <input type="hidden" id="dispenseUserId">
+
+      <div style="display:grid;gap:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Medicine / Item Name *</label>
+          <input id="dispenseItemName" type="text" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none" placeholder="e.g. Amoxicillin 500mg">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Dosage *</label>
+            <input id="dispenseDosage" type="text" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none" placeholder="e.g. 1 tablet, 5ml">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Form</label>
+            <select id="dispenseForm" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+              <option value="tablet">Tablet</option>
+              <option value="capsule">Capsule</option>
+              <option value="syrup">Syrup</option>
+              <option value="injection">Injection</option>
+              <option value="cream">Cream / Ointment</option>
+              <option value="drops">Drops</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Frequency (times per day) *</label>
+            <select id="dispenseFreq" onchange="updateDoseTimes()" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+              <option value="24">Once daily (every 24h)</option>
+              <option value="12">Twice daily (every 12h)</option>
+              <option value="8" selected>Three times daily (every 8h)</option>
+              <option value="6">Four times daily (every 6h)</option>
+              <option value="2">Every 2 hours (intensive)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Duration (days) *</label>
+            <input id="dispenseDuration" type="number" min="1" max="90" value="5" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Dose Times (first dose start time)</label>
+          <input id="dispenseFirstDose" type="time" value="07:00" onchange="updateDoseTimes()" style="padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          <div id="doseTimesPreview" style="margin-top:6px;font-size:12px;color:#388E3C;font-weight:500"></div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Instructions for Patient</label>
+          <textarea id="dispenseInstructions" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:none" placeholder="e.g. Take with food. Complete the full course even if feeling better."></textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Warnings / Side effects to watch for</label>
+          <textarea id="dispenseWarnings" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:none" placeholder="e.g. May cause drowsiness. Do not drink alcohol."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeDispenseModal()">Cancel</button>
+      <button class="btn-admin success" id="saveDispenseBtn" onclick="saveDispenseDetails()">
+        <span class="material-icons-outlined" style="font-size:14px">send</span>
+        Save &amp; Schedule Check-ins
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Rate Patient Modal -->
 <div class="admin-modal-overlay" id="ratePatientModal" style="display:none">
   <div class="admin-modal" style="max-width:440px">
@@ -408,12 +491,15 @@ function getActions(o) {
       <span class="material-icons-outlined" style="font-size:14px">medication</span> Start Preparing
     </button>`;
   if (o.status === 'preparing') return `
-    <button class="btn-admin success sm" onclick="updateStatus('${o.id}','ready')">
-      <span class="material-icons-outlined" style="font-size:14px">done_all</span> Mark Ready
+    <button class="btn-admin success sm" onclick="openDispenseModal('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">done_all</span> Mark Ready + Dispense Details
     </button>`;
   if (o.status === 'ready') return `
     <button class="btn-admin warning sm" onclick="updateStatus('${o.id}','in_transit')">
       <span class="material-icons-outlined" style="font-size:14px">local_shipping</span> Dispatched
+    </button>
+    <button class="btn-admin secondary sm" onclick="openDispenseModal('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">assignment</span> Dispensing Details
     </button>`;
   if (o.status === 'delivered') return `
     <button class="btn-admin secondary sm" onclick="event.stopPropagation();openRatePatient('${o.id}')">
@@ -615,6 +701,153 @@ window.submitPatientRating = async () => {
   }
   closeRatePatient();
   showToast('Patient rated successfully', 'success');
+};
+
+/* ── Dispense Medication Details ── */
+
+function calcDoseTimes(firstTime, intervalHours) {
+  const times = [];
+  const [h, m] = firstTime.split(':').map(Number);
+  const count = Math.floor(24 / intervalHours);
+  for (let i = 0; i < count; i++) {
+    const totalMins = h * 60 + m + i * intervalHours * 60;
+    const hh = String(Math.floor((totalMins % 1440) / 60)).padStart(2, '0');
+    const mm = String(totalMins % 60).padStart(2, '0');
+    times.push(`${hh}:${mm}`);
+  }
+  return times;
+}
+
+window.updateDoseTimes = function() {
+  const freq = parseInt(document.getElementById('dispenseFreq').value);
+  const first = document.getElementById('dispenseFirstDose').value || '07:00';
+  const times = calcDoseTimes(first, freq);
+  document.getElementById('doseTimesPreview').textContent = 'Dose times: ' + times.join(', ');
+};
+
+window.openDispenseModal = function(orderId) {
+  const o = allOrders.find(x => x.id === orderId);
+  if (!o) return;
+  document.getElementById('dispenseOrderId').value = orderId;
+  document.getElementById('dispenseOrderType').value = o._source === 'marketplace' ? 'marketplace' : 'pharmacy';
+  document.getElementById('dispenseUserId').value = o.user_id || o.patient_id || '';
+
+  // Pre-fill medicine name from first item
+  const firstName = o.items && o.items.length ? o.items[0].name : '';
+  document.getElementById('dispenseItemName').value = firstName;
+  document.getElementById('dispenseDosage').value = '';
+  document.getElementById('dispenseForm').value = 'tablet';
+  document.getElementById('dispenseFreq').value = '8';
+  document.getElementById('dispenseDuration').value = '5';
+  document.getElementById('dispenseFirstDose').value = '07:00';
+  document.getElementById('dispenseInstructions').value = '';
+  document.getElementById('dispenseWarnings').value = '';
+  updateDoseTimes();
+
+  document.getElementById('dispenseModal').style.display = 'flex';
+};
+
+window.closeDispenseModal = function() {
+  document.getElementById('dispenseModal').style.display = 'none';
+};
+
+window.saveDispenseDetails = async function() {
+  const orderId     = document.getElementById('dispenseOrderId').value;
+  const orderType   = document.getElementById('dispenseOrderType').value;
+  const userId      = document.getElementById('dispenseUserId').value;
+  const itemName    = document.getElementById('dispenseItemName').value.trim();
+  const dosage      = document.getElementById('dispenseDosage').value.trim();
+  const form        = document.getElementById('dispenseForm').value;
+  const freqHours   = parseInt(document.getElementById('dispenseFreq').value);
+  const duration    = parseInt(document.getElementById('dispenseDuration').value);
+  const firstDose   = document.getElementById('dispenseFirstDose').value || '07:00';
+  const instructions = document.getElementById('dispenseInstructions').value.trim();
+  const warnings    = document.getElementById('dispenseWarnings').value.trim();
+
+  if (!itemName) { showToast('Medicine name is required', 'error'); return; }
+  if (!dosage)   { showToast('Dosage is required', 'error'); return; }
+  if (!duration || duration < 1) { showToast('Duration must be at least 1 day', 'error'); return; }
+
+  const btn = document.getElementById('saveDispenseBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const doseTimes = calcDoseTimes(firstDose, freqHours);
+  const session = requirePharmacy();
+  const supa = window._pharmSupa;
+
+  // 1. Insert dispensing record
+  const dispPayload = {
+    order_id:        orderId,
+    order_type:      orderType,
+    user_id:         userId || null,
+    pharmacy_id:     session?.pharmacyId || null,
+    item_name:       itemName,
+    dosage,
+    form,
+    frequency_hours: freqHours,
+    dose_times:      doseTimes,
+    duration_days:   duration,
+    instructions:    instructions || null,
+    warnings:        warnings || null,
+  };
+
+  let dispensingId = null;
+  if (supa) {
+    const { data: dispData, error: dispErr } = await supa
+      .from('medication_dispensing').insert(dispPayload).select('id').single();
+    if (dispErr) {
+      showToast('Failed to save dispensing: ' + dispErr.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">send</span> Save & Schedule Check-ins';
+      return;
+    }
+    dispensingId = dispData.id;
+  }
+
+  // 2. Generate check-in records (one per dose, for each day)
+  if (supa && userId && dispensingId) {
+    const now = new Date();
+    const checkins = [];
+    for (let day = 0; day < duration; day++) {
+      for (const t of doseTimes) {
+        const [h, m] = t.split(':').map(Number);
+        const scheduledAt = new Date(now);
+        scheduledAt.setDate(now.getDate() + day);
+        scheduledAt.setHours(h, m, 0, 0);
+        // Only schedule future check-ins
+        if (scheduledAt > now || day === 0) {
+          checkins.push({
+            dispensing_id: dispensingId,
+            user_id:       userId,
+            order_id:      orderId,
+            item_name:     itemName,
+            dosage,
+            scheduled_at:  scheduledAt.toISOString(),
+            status:        'pending',
+          });
+        }
+      }
+    }
+    if (checkins.length) {
+      await supa.from('medication_checkins').insert(checkins);
+    }
+  }
+
+  // 3. Advance order to 'ready' if currently 'preparing'
+  const o = allOrders.find(x => x.id === orderId);
+  if (o && o.status === 'preparing' && supa) {
+    const table = o._source === 'marketplace' ? 'marketplace_orders' : 'pharmacy_orders';
+    await supa.from(table).update({ status: 'ready', updated_at: new Date().toISOString() }).eq('id', orderId);
+    o.status = 'ready';
+  }
+
+  closeDispenseModal();
+  render();
+  showToast('Dispensing details saved. Patient check-ins scheduled!', 'success');
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">send</span> Save & Schedule Check-ins';
 };
 
 window.rejectPrompt = async id => {
