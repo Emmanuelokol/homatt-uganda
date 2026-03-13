@@ -416,11 +416,26 @@ async function toggleActive(id, currentlyActive) {
 }
 
 async function loadProducts() {
-  if (!supabase) { showAdminToast('No database connection', 'error'); return; }
-  const { data, error } = await supabase.from('marketplace_items').select('*').order('sort_order').order('name');
-  if (error) { showAdminToast('Load failed: ' + error.message, 'error'); return; }
-  allProducts = data || [];
-  applyFilter();
+  if (!supabase) {
+    document.getElementById('productsBody').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
+    return;
+  }
+  document.getElementById('productsBody').innerHTML =
+    '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>';
+  try {
+    const { data, error } = await supabase.from('marketplace_items').select('*').order('sort_order').order('name');
+    if (error) {
+      document.getElementById('productsBody').innerHTML =
+        `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
+      return;
+    }
+    allProducts = data || [];
+    applyFilter();
+  } catch(e) {
+    document.getElementById('productsBody').innerHTML =
+      `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
+  }
 }
 
 async function loadCategories() {
@@ -528,19 +543,26 @@ function applyOrderFilter() {
 }
 
 async function loadOrders() {
-  if (!supabase) return;
-  const { data, error } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
-  if (error) {
-    console.error('Orders load error:', error.message);
+  if (!supabase) {
     document.getElementById('ordersBody').innerHTML =
-      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F">
-        <span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>
-        Could not load orders. Please sign in with real admin credentials.
-      </td></tr>`;
+      '<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
     return;
   }
-  allOrders = data || [];
-  applyOrderFilter();
+  document.getElementById('ordersBody').innerHTML =
+    '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
+  try {
+    const { data, error } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) {
+      document.getElementById('ordersBody').innerHTML =
+        `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
+      return;
+    }
+    allOrders = data || [];
+    applyOrderFilter();
+  } catch(e) {
+    document.getElementById('ordersBody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
+  }
 }
 
 window.updateOrderStatus = async function(id, status) {
@@ -554,8 +576,33 @@ window.updateOrderStatus = async function(id, status) {
   showAdminToast('Order marked as ' + status, 'success');
 };
 
+// Wait up to 5 seconds for the Supabase SDK CDN script to finish loading
+function waitForSupabaseSDK(maxMs = 5000) {
+  return new Promise(resolve => {
+    if (window.supabase && typeof window.supabase.createClient === 'function') { resolve(true); return; }
+    const interval = 100;
+    let elapsed = 0;
+    const t = setInterval(() => {
+      elapsed += interval;
+      if (window.supabase && typeof window.supabase.createClient === 'function') { clearInterval(t); resolve(true); }
+      else if (elapsed >= maxMs) { clearInterval(t); resolve(false); }
+    }, interval);
+  });
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('marketplace');
+
+  // Ensure CDN has finished before anything auth/db related
+  const sdkReady = await waitForSupabaseSDK();
+  if (!sdkReady) {
+    const errMsg = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>Could not load the database library. Check your internet connection and reload.</td></tr>';
+    document.getElementById('productsBody').innerHTML = errMsg;
+    document.getElementById('ordersBody').innerHTML = errMsg.replace('colspan="8"','colspan="6"');
+    document.body.style.visibility = 'visible';
+    return;
+  }
+
   const session = await requireAdmin();
   if (!session) return;
   supabase = adminSupa();

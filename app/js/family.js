@@ -835,11 +835,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.bottom-sheet').forEach(s => {
       if (s !== sheet) s.classList.remove('open');
     });
-    // Also hide the member detail panel so it never bleeds through
+    // Immediately hide the member-detail panel — no transition delay so it
+    // cannot bleed through the top of the cart/action sheet.
     const detailPanel = document.getElementById('memberDetailPanel');
     if (detailPanel) {
       detailPanel.classList.remove('open');
-      setTimeout(() => { detailPanel.style.display = 'none'; }, 300);
+      detailPanel.style.display = 'none';
     }
     overlay.classList.add('visible');
     sheet.classList.add('open');
