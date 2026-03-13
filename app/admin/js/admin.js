@@ -104,14 +104,22 @@ function buildAdminSidebar(activePage) {
 
 /* ── Admin auth guard ── */
 async function requireAdmin() {
-  // Hide content immediately so there's no flash of protected content before redirect
-  document.body.style.visibility = 'hidden';
+  // Use an opaque overlay instead of body.visibility:hidden so the background
+  // colour is always visible (prevents black flash on Android WebView / dark OS)
+  let authOverlay = document.getElementById('_adminAuthOverlay');
+  if (!authOverlay) {
+    authOverlay = document.createElement('div');
+    authOverlay.id = '_adminAuthOverlay';
+    authOverlay.style.cssText = 'position:fixed;inset:0;background:#F4F6F9;z-index:9999;display:flex;align-items:center;justify-content:center';
+    authOverlay.innerHTML = '<div style="width:32px;height:32px;border:3px solid #1B5E20;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+    document.body.appendChild(authOverlay);
+  }
 
   const stored = getAdminSession();
 
   // Demo mode — allowed through but with a clear flag (no real DB access)
   if (stored?.demo) {
-    document.body.style.visibility = 'visible';
+    authOverlay.remove();
     const adminName = stored.name || 'Admin (Demo)';
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
@@ -150,7 +158,7 @@ async function requireAdmin() {
   const adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
   setAdminSession({ email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id });
 
-  document.body.style.visibility = 'visible';
+  authOverlay.remove();
   const avatarEl = document.getElementById('adminUserAvatar');
   const nameEl   = document.getElementById('adminUserName');
   const nameTop  = document.getElementById('adminUserNameTop');

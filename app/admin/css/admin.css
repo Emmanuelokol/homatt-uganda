@@ -23,6 +23,9 @@
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* Prevent black flash on Android WebView when body.visibility is toggled */
+html { background: #F4F6F9; }
+
 body {
   font-family: 'Inter', -apple-system, sans-serif;
   background: var(--admin-bg);
