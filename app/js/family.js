@@ -835,6 +835,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.querySelectorAll('.bottom-sheet').forEach(s => {
       if (s !== sheet) s.classList.remove('open');
     });
+    // Also hide the member detail panel so it never bleeds through
+    const detailPanel = document.getElementById('memberDetailPanel');
+    if (detailPanel) {
+      detailPanel.classList.remove('open');
+      setTimeout(() => { detailPanel.style.display = 'none'; }, 300);
+    }
     overlay.classList.add('visible');
     sheet.classList.add('open');
   }

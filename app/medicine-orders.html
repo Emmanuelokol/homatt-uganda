@@ -747,7 +747,7 @@ function loadPharmacies() {
   }
 
   if (supa) {
-    supa.from('pharmacies').select('id,name,address,district').eq('active',true).eq('verified',true).order('name')
+    supa.from('pharmacies').select('id,name,address,district').eq('active',true).order('name')
       .then(function(res) {
         if (res.data && res.data.length) { renderPharms(res.data); return; }
         renderPharms(MOCK_PHARMACIES);
