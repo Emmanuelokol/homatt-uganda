@@ -1187,10 +1187,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       responseEl.style.display = 'block';
       timerEl.style.display = 'none';
 
-      document.getElementById('btnMarkRecovered')?.addEventListener('click', () => {
+      document.getElementById('btnMarkRecovered')?.addEventListener('click', async () => {
         const whatHelped = document.getElementById('recoveryWhatHelped')?.value.trim() || '';
         const duration = document.getElementById('recoveryDuration')?.value || '';
-        // Save recovery record
+        // Save recovery record locally
         const recoveries = JSON.parse(localStorage.getItem('homatt_recovery_log') || '[]');
         recoveries.unshift({
           condition: monitoringSession.condition,
@@ -1202,6 +1202,30 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         });
         if (recoveries.length > 50) recoveries.pop();
         localStorage.setItem('homatt_recovery_log', JSON.stringify(recoveries));
+
+        // Save to Supabase symptom_monitoring_logs if authenticated
+        try {
+          if (!window._symptomSupa) {
+            const _cfg = window.HOMATT_CONFIG || {};
+            if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+              window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+            }
+          }
+          if (window._symptomSupa) {
+            const { data: _sd } = await window._symptomSupa.auth.getSession();
+            const _sess = _sd?.session || null;
+            await window._symptomSupa.from('symptom_monitoring_logs').insert({
+              user_id: _sess?.user?.id || null,
+              condition: monitoringSession.condition,
+              started_at: monitoringSession.startedAt,
+              ended_at: new Date().toISOString(),
+              outcome: 'recovered',
+              check_ins: monitoringSession.checkIns,
+              what_helped: whatHelped,
+            });
+          }
+        } catch(_e) { console.warn('[SC] monitoring log save failed:', _e.message); }
+
         // Clear active monitoring
         localStorage.removeItem('homatt_monitoring');
         monitoringSession = null;
@@ -1295,6 +1319,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                 font-size:15px;font-family:inherit;background:#fff;color:#111;resize:none;outline:none;
                 -webkit-text-fill-color:#111;box-sizing:border-box"
               placeholder="e.g. I rested, drank water, took paracetamol..."></textarea>
+            <button id="btnSameSubmit"
+              style="width:100%;margin-top:10px;padding:13px;background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+              <span class="material-icons-outlined">check_circle</span>
+              Submit &amp; Continue
+            </button>
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -1307,9 +1336,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           </div>
         `;
         responseEl.style.display = 'block';
-        timerEl.style.display = 'flex';
+        timerEl.style.display = 'none';
 
-        // Save "what did they do" on next check-in
+        // Save "what did they do" on change (passive autosave)
         const didInput = document.getElementById('monitorWhatDid');
         if (didInput) {
           didInput.addEventListener('change', () => {
@@ -1326,7 +1355,47 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           }
         }
 
-        scheduleNextCheckIn(1);
+        // Submit & Continue button
+        document.getElementById('btnSameSubmit')?.addEventListener('click', async () => {
+          const actionText = document.getElementById('monitorWhatDid')?.value.trim() || '';
+          monitoringSession.lastAction = actionText;
+          localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+          // Try to save check-in to Supabase
+          try {
+            if (!window._symptomSupa) {
+              const _cfg = window.HOMATT_CONFIG || {};
+              if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+                window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+              }
+            }
+            if (window._symptomSupa) {
+              const { data: _sd } = await window._symptomSupa.auth.getSession();
+              const _sess = _sd?.session || null;
+              await window._symptomSupa.from('symptom_monitoring_logs').insert({
+                user_id: _sess?.user?.id || null,
+                condition: monitoringSession.condition,
+                started_at: monitoringSession.startedAt,
+                outcome: 'monitoring',
+                check_ins: monitoringSession.checkIns,
+                last_action: actionText,
+              });
+            }
+          } catch(_e) { console.warn('[SC] check-in save failed:', _e.message); }
+
+          // Show confirmation and schedule next check-in
+          responseEl.innerHTML = `
+            <div class="sc-monitor-msg same" style="flex-direction:column;text-align:center;padding:20px">
+              <span class="material-icons-outlined" style="font-size:40px;color:#1565C0;margin-bottom:8px">schedule</span>
+              <p class="sc-monitor-msg-title">Noted! Check back in 1 hour</p>
+              <p style="color:var(--text-secondary);line-height:1.6;margin-top:6px">
+                We've recorded your check-in. We'll remind you to check back in an hour. Rest and stay hydrated.
+              </p>
+            </div>
+          `;
+          timerEl.style.display = 'flex';
+          scheduleNextCheckIn(1);
+        });
       }
     } else if (feeling === 'worse') {
       responseEl.innerHTML = `
