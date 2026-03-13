@@ -74,7 +74,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tab) tab.classList.add('active');
     const pane = document.getElementById('pane-' + target);
     if (pane) pane.classList.add('active');
-    // Fully hide the health log panel when switching tabs
+    // Close any open sheets and health log panel when switching tabs
+    const overlayEl = document.getElementById('sheetOverlay');
+    if (overlayEl) overlayEl.classList.remove('visible');
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
     closeMemberDetail();
 
     // Cart FAB only on shop tab
