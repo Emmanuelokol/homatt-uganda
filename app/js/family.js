@@ -791,6 +791,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const overlay = document.getElementById('sheetOverlay');
 
   function openSheet(sheet) {
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      if (s !== sheet) s.classList.remove('open');
+    });
     overlay.classList.add('visible');
     sheet.classList.add('open');
   }
