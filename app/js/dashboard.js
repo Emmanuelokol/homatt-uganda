@@ -183,6 +183,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = 'digestive-tracker.html';
   });
 
+  document.getElementById('featureChildGrowth').addEventListener('click', () => {
+    window.location.href = 'child-growth-tracker.html';
+  });
+
+  document.getElementById('featureMalaria').addEventListener('click', () => {
+    window.location.href = 'malaria-tracker.html';
+  });
+
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
     window.location.href = 'quiz.html';
   });
