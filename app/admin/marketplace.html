@@ -440,10 +440,15 @@ async function loadProducts() {
 
 async function loadCategories() {
   if (!supabase) return;
-  const { data } = await supabase.from('marketplace_categories').select('*').order('sort_order');
-  allCategories = data || [];
-  populateCategoryDropdowns();
-  renderCategoriesList();
+  try {
+    const { data, error } = await supabase.from('marketplace_categories').select('*').order('sort_order');
+    if (error) { console.error('loadCategories DB error:', error.message); return; }
+    allCategories = data || [];
+    try { populateCategoryDropdowns(); } catch(e) { console.error('populateCategoryDropdowns failed:', e); }
+    try { renderCategoriesList(); } catch(e) { console.error('renderCategoriesList failed:', e); }
+  } catch(e) {
+    console.error('loadCategories failed:', e);
+  }
 }
 
 function renderCategoriesList() {
@@ -623,7 +628,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('filterStatus').addEventListener('change', applyFilter);
   document.getElementById('filterOrderStatus').addEventListener('change', applyOrderFilter);
 
-  await loadCategories();
+  try { await loadCategories(); } catch(e) { console.error('loadCategories init error:', e); }
   await Promise.all([loadProducts(), loadOrders()]);
 });
 </script>
