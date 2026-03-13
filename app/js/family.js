@@ -711,6 +711,44 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (cart.length === 0) return;
 
+    // ── Self-medication frequency guard ─────────────────────────
+    // Check how many orders this user has placed in the last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentOrders } = await supabase
+      .from('marketplace_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', sevenDaysAgo);
+    const recentCount = (recentOrders || []).length;
+
+    if (recentCount >= 5) {
+      // Hard block — too many orders, must see clinic
+      closeAllSheets();
+      document.getElementById('clinicReferralBanner') &&
+        (document.getElementById('clinicReferralBanner').style.display = 'block');
+      showToast('You have ordered medicine 5+ times this week. Please visit a clinic for a proper check-up.');
+      // Also show a modal-like warning
+      const blocked = confirm(
+        'You have placed ' + recentCount + ' medicine orders in the last 7 days.\n\n' +
+        'Frequent self-medication can be harmful.\n\n' +
+        'We strongly recommend visiting a clinic for a proper diagnosis before ordering more medicine.\n\n' +
+        'Press OK to go to clinic booking, or Cancel to go back.'
+      );
+      if (blocked) window.location.href = 'clinic-booking.html';
+      return;
+    }
+
+    if (recentCount >= 3) {
+      // Soft warning — require confirmation
+      const proceed = confirm(
+        'You have ordered medicine ' + recentCount + ' times in the last 7 days.\n\n' +
+        'Repeated self-medication without a proper diagnosis can be dangerous.\n\n' +
+        'We recommend visiting a clinic for a check-up. Do you still want to place this order?'
+      );
+      if (!proceed) return;
+    }
+    // ────────────────────────────────────────────────────────────
+
     const btn = document.getElementById('cartCheckoutBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Placing order…'; }
 

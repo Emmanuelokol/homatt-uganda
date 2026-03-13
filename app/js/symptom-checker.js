@@ -376,21 +376,34 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
         btn.closest('.sc-options-wrap').querySelectorAll('.sc-option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         followupAnswers[qi] = btn.dataset.value;
+        // Update answered counter
+        const countEl = document.getElementById('answeredCount');
+        if (countEl) countEl.textContent = Object.keys(followupAnswers).length;
+        // Hide validation message when user starts answering
+        const validationMsg = document.getElementById('followupValidationMsg');
+        if (validationMsg) validationMsg.style.display = 'none';
       });
     });
   }
 
   // Get diagnosis button
   document.getElementById('btnGetDiagnosis').addEventListener('click', () => {
-    if (Object.keys(followupAnswers).length < 2) {
-      const firstUnanswered = document.querySelector('.sc-options-wrap:not(:has(.selected))');
+    const answeredCount = Object.keys(followupAnswers).length;
+    const validationMsg = document.getElementById('followupValidationMsg');
+    if (answeredCount < 1) {
+      const firstUnanswered = document.querySelector('.sc-options-wrap');
       if (firstUnanswered) {
         firstUnanswered.classList.add('shake');
         setTimeout(() => firstUnanswered.classList.remove('shake'), 300);
+        firstUnanswered.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (validationMsg) {
+        validationMsg.style.display = 'block';
+        validationMsg.textContent = 'Please answer at least one question above to get your assessment.';
       }
       return;
     }
-
+    if (validationMsg) validationMsg.style.display = 'none';
     showScreen('screenResults');
     getDiagnosis();
   });
@@ -1031,6 +1044,59 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     `;
     actionArea.appendChild(otcSection);
 
+    // ── Diagnosis Feedback Card ──────────────────────────────
+    const feedbackCard = document.createElement('div');
+    feedbackCard.style.cssText = 'margin-top:20px;background:#F8F9FA;border-radius:14px;padding:16px;text-align:center';
+    feedbackCard.innerHTML = `
+      <div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:10px">Was this assessment helpful?</div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:10px">
+        <button id="feedbackYes" style="flex:1;max-width:120px;padding:10px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:13px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit">
+          👍 Yes, helpful
+        </button>
+        <button id="feedbackNo" style="flex:1;max-width:120px;padding:10px;border:2px solid #E0E0E0;background:#fff;border-radius:10px;font-size:13px;font-weight:700;color:#5F6368;cursor:pointer;font-family:inherit">
+          👎 Not really
+        </button>
+      </div>
+      <textarea id="feedbackNote" style="display:none;width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:12px;font-family:inherit;resize:none;outline:none" rows="2" placeholder="Tell us how we can improve..."></textarea>
+      <div id="feedbackThanks" style="display:none;font-size:13px;color:#2E7D32;font-weight:600;padding:8px 0">✓ Thank you for your feedback!</div>
+    `;
+    actionArea.appendChild(feedbackCard);
+
+    // Feedback button handlers
+    const fbYes = feedbackCard.querySelector('#feedbackYes');
+    const fbNo  = feedbackCard.querySelector('#feedbackNo');
+    const fbNote = feedbackCard.querySelector('#feedbackNote');
+    const fbThanks = feedbackCard.querySelector('#feedbackThanks');
+
+    async function saveFeedback(helpful, note) {
+      if (supabase && userId) {
+        await supabase.from('ai_triage_sessions').insert({
+          user_id: userId,
+          symptoms_text: enteredSymptoms,
+          top_diagnosis: data.conditions[0]?.name || '',
+          feedback_helpful: helpful,
+          feedback_note: note || null,
+          created_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+      fbYes.style.display = 'none';
+      fbNo.style.display = 'none';
+      fbNote.style.display = 'none';
+      fbThanks.style.display = 'block';
+    }
+
+    fbYes.addEventListener('click', () => saveFeedback(true, ''));
+    fbNo.addEventListener('click', () => {
+      fbNote.style.display = 'block';
+      fbNote.focus();
+      fbNo.style.borderColor = '#F44336';
+      fbNo.style.background = '#FFEBEE';
+      fbNo.style.color = '#C62828';
+      fbNo.textContent = '👎 Submit feedback';
+      fbNo.onclick = () => saveFeedback(false, fbNote.value.trim());
+    });
+    // ────────────────────────────────────────────────────────────
+
     const orderBtn = document.getElementById('btnOrderMeds');
     if (orderBtn) {
       orderBtn.addEventListener('click', () => {
@@ -1597,7 +1663,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   // ---- Proxy Call ----
   async function callProxy(provider, prompt) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(PROXY_URL, {

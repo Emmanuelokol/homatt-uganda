@@ -819,11 +819,39 @@ function renderFinalSummary() {
    ══════════════════════════════════════ */
 
 function submitOrder() {
-  var btn = document.getElementById('submitBtn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Placing order…'; }
-
   var sess = {};
   try { sess = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
+
+  // ── Self-medication frequency guard ─────────────────────────
+  var supa0 = getSupa();
+  if (supa0 && sess.userId) {
+    var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    supa0.from('pharmacy_orders')
+      .select('id')
+      .eq('patient_id', sess.userId)
+      .gte('created_at', sevenDaysAgo)
+      .then(function(res) {
+        var count = (res.data || []).length;
+        if (count >= 5) {
+          alert('You have placed ' + count + ' prescription orders in the last 7 days.\n\nFrequent self-medication is dangerous. Please visit a clinic for a proper diagnosis.\n\nYou will be redirected to clinic booking.');
+          window.location.href = 'clinic-booking.html';
+          return;
+        }
+        if (count >= 3) {
+          var proceed = confirm('You have ordered medicine ' + count + ' times in the last 7 days.\n\nRepeated self-medication without proper diagnosis can be harmful.\n\nDo you still want to place this order?');
+          if (!proceed) return;
+        }
+        _doSubmitOrder(sess);
+      });
+    return;
+  }
+  _doSubmitOrder(sess);
+}
+// ────────────────────────────────────────────────────────────
+
+function _doSubmitOrder(sess) {
+  var btn = document.getElementById('submitBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Placing order…'; }
 
   var items = Object.values(cart);
   var pText = (document.getElementById('prescriptionText') || {}).value || '';
