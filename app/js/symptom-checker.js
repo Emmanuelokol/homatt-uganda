@@ -1378,7 +1378,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                 started_at: monitoringSession.startedAt,
                 outcome: 'monitoring',
                 check_ins: monitoringSession.checkIns,
-                last_action: actionText,
+                last_action: actionText || null,
               });
             }
           } catch(_e) { console.warn('[SC] check-in save failed:', _e.message); }

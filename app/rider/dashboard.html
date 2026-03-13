@@ -327,8 +327,8 @@ function startGpsTracking(supa, riderId) {
     if (now - _gpsLastUpdate < 30000) return; // throttle to every 30s
     _gpsLastUpdate = now;
     supa.from('rider_deliveries')
-      .update({ rider_lat: pos.coords.latitude, rider_lon: pos.coords.longitude })
-      .eq('rider_id', riderId)
+      .update({ rider_lat: pos.coords.latitude, rider_lon: pos.coords.longitude, rider_updated_at: new Date().toISOString() })
+      .eq('rider_user_id', riderId)   // column is rider_user_id, not rider_id
       .in('status', ['pending', 'in_transit'])
       .then(() => {}).catch(() => {});
   }, null, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
@@ -353,15 +353,16 @@ async function loadLive(supa, riderId) {
 
   const [pendingRes, activeRes, completedRes] = await Promise.all([
     supa.from('rider_deliveries')
-      .select('*, marketplace_orders(buyer_name, delivery_address, total_amount, items, urgency, seller_id)')
-      .eq('rider_id', riderUserId).eq('status', 'pending'),
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items, pharmacy_id)')
+      .eq('rider_user_id', riderUserId).eq('status', 'pending'),
     supa.from('rider_deliveries')
-      .select('*, marketplace_orders(buyer_name, delivery_address, total_amount, items)')
-      .eq('rider_id', riderUserId).eq('status', 'in_transit'),
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items)')
+      .eq('rider_user_id', riderUserId).eq('status', 'in_transit'),
     supa.from('rider_deliveries')
-      .select('*, marketplace_orders(buyer_name, delivery_address, total_amount)')
-      .eq('rider_id', riderUserId).eq('status', 'delivered')
-      .gte('delivered_at', todayStart.toISOString()),
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount)')
+      .eq('rider_user_id', riderUserId).eq('status', 'delivered')
+      .gte('updated_at', todayStart.toISOString()),   // delivered_at also works once set
+
   ]);
 
   // Fallback to old deliveries table if rider_deliveries returned no data
@@ -414,12 +415,14 @@ async function loadLive(supa, riderId) {
   } else {
     document.getElementById('requestsList').innerHTML = pending.map(d => {
       const o = d.marketplace_orders || {};
-      return `<div class="delivery-card ${o.urgency === 'urgent' ? 'urgent' : ''}" id="req-${d.id}">
+      const patientName = o.patient_name || o.buyer_name || 'Customer';
+      return `<div class="delivery-card" id="req-${d.id}">
         <div class="delivery-icon"><span class="material-icons-outlined">medication</span></div>
         <div class="delivery-info">
-          <div class="delivery-id">DEL-${d.id.slice(-6).toUpperCase()}${o.urgency === 'urgent' ? ' 🔴 URGENT' : ''}</div>
+          <div class="delivery-id">DEL-${d.id.slice(-6).toUpperCase()}</div>
           <div class="delivery-title">${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : 'Order'}</div>
           <div class="delivery-meta">
+            <span><span class="material-icons-outlined" style="font-size:14px">person</span> ${patientName}</span>
             <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${o.delivery_address||'—'}</span>
             <span style="color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:14px">payments</span> UGX ${(d.earnings||5000).toLocaleString()}</span>
           </div>
@@ -478,7 +481,7 @@ async function loadLive(supa, riderId) {
           <td>${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : '—'}</td>
           <td>${o.delivery_address||'—'}</td>
           <td style="color:#2E7D32;font-weight:600">UGX ${(d.earnings||0).toLocaleString()}</td>
-          <td style="color:#9AA0A6;font-size:12px">${d.delivered_at ? new Date(d.delivered_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+          <td style="color:#9AA0A6;font-size:12px">${(d.delivered_at||d.updated_at) ? new Date(d.delivered_at||d.updated_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
           <td><span class="status-badge delivered">Delivered</span></td>
         </tr>`;
       }).join('')
@@ -511,6 +514,7 @@ window.completeLive = async id => {
     // Try rider_deliveries first
     const { error } = await supa.from('rider_deliveries').update({
       status: 'delivered',
+      delivered: true,
       delivered_at: now,
       updated_at: now,
     }).eq('id', id);
