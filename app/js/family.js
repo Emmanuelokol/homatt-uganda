@@ -77,7 +77,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Close any open sheets and health log panel when switching tabs
     const overlayEl = document.getElementById('sheetOverlay');
     if (overlayEl) overlayEl.classList.remove('visible');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      s.classList.remove('open');
+      s.style.visibility = 'hidden';
+    });
     closeMemberDetail();
 
     // Cart FAB only on shop tab
@@ -833,7 +836,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openSheet(sheet) {
     document.querySelectorAll('.bottom-sheet').forEach(s => {
-      if (s !== sheet) s.classList.remove('open');
+      if (s !== sheet) {
+        s.classList.remove('open');
+        // Belt-and-suspenders: force visibility off so the sheet can never
+        // bleed through the cart or any other active sheet.
+        s.style.visibility = 'hidden';
+      }
     });
     // Immediately hide the member-detail panel — no transition delay so it
     // cannot bleed through the top of the cart/action sheet.
@@ -843,13 +851,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       detailPanel.style.display = 'none';
     }
     overlay.classList.add('visible');
+    sheet.style.visibility = ''; // let CSS class handle it
     sheet.classList.add('open');
   }
 
   function closeAllSheets() {
     overlay.classList.remove('visible');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    // Always close the health-log panel (not a .bottom-sheet, but must be hidden)
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      s.classList.remove('open');
+      s.style.visibility = 'hidden';
+    });
     closeMemberDetail();
   }
 

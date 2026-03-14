@@ -1877,7 +1877,11 @@
   border-radius: 20px 20px 0 0;
   z-index: 201;
   transform: translateY(100%);
-  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+  /* visibility hidden ensures the sheet is truly invisible when not open,
+     even if overflow:hidden on phone-frame doesn't clip transforms. */
+  visibility: hidden;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+              visibility 0s linear 0.35s; /* hide AFTER slide-out completes */
   max-height: 88%;
   display: flex;
   flex-direction: column;
@@ -1885,6 +1889,9 @@
 
 .bottom-sheet.open {
   transform: translateY(0);
+  visibility: visible;
+  transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1),
+              visibility 0s linear 0s; /* show IMMEDIATELY when opening */
 }
 
 .sheet-handle {
