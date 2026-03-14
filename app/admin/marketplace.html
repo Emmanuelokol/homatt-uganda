@@ -249,7 +249,7 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
-let supabase = null;   // set from adminSupa() after auth
+let adminDb = null;   // Supabase client — use adminDb to avoid conflict with window.supabase (CDN global)
 let allProducts = [];
 let allCategories = [];
 let editingId = null;
@@ -395,9 +395,9 @@ async function saveProduct() {
 
   let error;
   if (editingId) {
-    ({ error } = await supabase.from('marketplace_items').update(payload).eq('id', editingId));
+    ({ error } = await adminDb.from('marketplace_items').update(payload).eq('id', editingId));
   } else {
-    ({ error } = await supabase.from('marketplace_items').insert(payload));
+    ({ error } = await adminDb.from('marketplace_items').insert(payload));
   }
 
   btn.disabled = false;
@@ -409,14 +409,14 @@ async function saveProduct() {
 }
 
 async function toggleActive(id, currentlyActive) {
-  const { error } = await supabase.from('marketplace_items').update({ active: !currentlyActive }).eq('id', id);
+  const { error } = await adminDb.from('marketplace_items').update({ active: !currentlyActive }).eq('id', id);
   if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
   await loadProducts();
   showAdminToast('Product ' + (!currentlyActive ? 'activated' : 'deactivated'), 'success');
 }
 
 async function loadProducts() {
-  if (!supabase) {
+  if (!adminDb) {
     document.getElementById('productsBody').innerHTML =
       '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
     return;
@@ -424,7 +424,7 @@ async function loadProducts() {
   document.getElementById('productsBody').innerHTML =
     '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>';
   try {
-    const { data, error } = await supabase.from('marketplace_items').select('*').order('sort_order').order('name');
+    const { data, error } = await adminDb.from('marketplace_items').select('*').order('sort_order').order('name');
     if (error) {
       document.getElementById('productsBody').innerHTML =
         `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
@@ -439,9 +439,9 @@ async function loadProducts() {
 }
 
 async function loadCategories() {
-  if (!supabase) return;
+  if (!adminDb) return;
   try {
-    const { data, error } = await supabase.from('marketplace_categories').select('*').order('sort_order');
+    const { data, error } = await adminDb.from('marketplace_categories').select('*').order('sort_order');
     if (error) { console.error('loadCategories DB error:', error.message); return; }
     allCategories = data || [];
     try { populateCategoryDropdowns(); } catch(e) { console.error('populateCategoryDropdowns failed:', e); }
@@ -469,7 +469,7 @@ async function addCategory() {
   const icon = document.getElementById('newCatIcon').value.trim() || 'label';
   const sort = Number(document.getElementById('newCatSort').value) || 99;
 
-  const { error } = await supabase.from('marketplace_categories').insert({ name, icon, sort_order: sort });
+  const { error } = await adminDb.from('marketplace_categories').insert({ name, icon, sort_order: sort });
   if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
 
   document.getElementById('newCatName').value = '';
@@ -481,7 +481,7 @@ async function addCategory() {
 
 async function deleteCategory(id, name) {
   if (!confirm(`Delete category "${name}"? Products in this category will have no category.`)) return;
-  const { error } = await supabase.from('marketplace_categories').delete().eq('id', id);
+  const { error } = await adminDb.from('marketplace_categories').delete().eq('id', id);
   if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
   await loadCategories();
   showAdminToast('Category deleted', 'success');
@@ -548,7 +548,7 @@ function applyOrderFilter() {
 }
 
 async function loadOrders() {
-  if (!supabase) {
+  if (!adminDb) {
     document.getElementById('ordersBody').innerHTML =
       '<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
     return;
@@ -556,7 +556,7 @@ async function loadOrders() {
   document.getElementById('ordersBody').innerHTML =
     '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
   try {
-    const { data, error } = await supabase.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+    const { data, error } = await adminDb.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
     if (error) {
       document.getElementById('ordersBody').innerHTML =
         `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
@@ -575,7 +575,7 @@ window.updateOrderStatus = async function(id, status) {
   if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
   if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
   if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
-  const { error } = await supabase.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
+  const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
   await loadOrders();
   showAdminToast('Order marked as ' + status, 'success');
@@ -610,7 +610,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const session = await requireAdmin();
   if (!session) return;
-  supabase = adminSupa();
+  adminDb = adminSupa();
   setupAdminLogout();
 
   // Show demo warning if no real Supabase auth session

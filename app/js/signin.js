@@ -148,6 +148,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
     }
 
+    // Link this user's push token to their Supabase UUID for targeted notifications
+    if (typeof oneSignalLogin === 'function') oneSignalLogin(data.user.id);
+
     window.location.href = 'dashboard.html';
   });
 });

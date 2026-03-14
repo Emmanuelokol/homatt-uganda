@@ -340,6 +340,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Signing out...';
 
+    // Unlink push token from this user before signing out
+    if (typeof oneSignalLogout === 'function') oneSignalLogout();
+
     await supabase.auth.signOut();
     localStorage.removeItem('homatt_user');
     localStorage.removeItem('homatt_wallets');
