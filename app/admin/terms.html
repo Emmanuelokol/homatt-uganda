@@ -84,14 +84,17 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+let supabase = null;
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('terms');
   const session = await requireAdmin();
   if (!session) return;
+  supabase = adminSupa();
   setupAdminLogout();
 
   // Load content
-  const { data: contents } = await supabase.from('site_content').select('*').in('key', ['terms', 'privacy']);
+  const contents_list = supabase ? (await supabase.from('site_content').select('*').in('key', ['terms', 'privacy'])).data : null;
+  const { data: contents } = { data: contents_list };
   (contents || []).forEach(c => {
     if (c.key === 'terms') {
       document.getElementById('termsTitle').value = c.title || '';

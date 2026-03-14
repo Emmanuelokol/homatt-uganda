@@ -14,8 +14,10 @@
   <link rel="stylesheet" href="css/pages.css">
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
   <style>
+    /* Critical: prevent outer app-screen from scrolling — let each step's inner div scroll instead */
+    .app-screen { overflow: hidden !important; display:flex; flex-direction:column; }
     .cb-step { display:none; }
-    .cb-step.active { display:flex; flex-direction:column; height:100%; }
+    .cb-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
     .cb-hero { text-align:center; padding:28px 24px 16px; }
     .cb-hero-icon { width:72px; height:72px; border-radius:24px; background:linear-gradient(135deg,#1B5E20,#4CAF50); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
     .cb-hero-icon .material-icons-outlined { font-size:36px; color:#fff; }
@@ -27,7 +29,8 @@
     .cb-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:6px; }
     .cb-field input, .cb-field select, .cb-field textarea {
       width:100%; padding:12px 16px; border:1.5px solid var(--border); border-radius:var(--radius-md);
-      font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s;
+      font-size:14px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary);
+      -webkit-text-fill-color:var(--text-primary); transition:border-color .2s;
     }
     .cb-field input:focus, .cb-field select:focus, .cb-field textarea:focus { border-color:var(--primary); }
     .cb-field textarea { resize:vertical; min-height:80px; }
@@ -101,7 +104,7 @@
 
     <!-- STEP 1: Urgency -->
     <div class="cb-step active" id="step1">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="cb-hero">
           <div class="cb-hero-icon"><span class="material-icons-outlined">local_hospital</span></div>
           <div class="cb-heading">How urgent is this?</div>
@@ -141,7 +144,7 @@
 
     <!-- STEP 2: Symptoms -->
     <div class="cb-step" id="step2">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="cb-hero">
           <div class="cb-hero-icon"><span class="material-icons-outlined">stethoscope</span></div>
           <div class="cb-heading">Describe your symptoms</div>
@@ -183,13 +186,45 @@
 
     <!-- STEP 3: Select Clinic -->
     <div class="cb-step" id="step3">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="cb-section" style="padding-top:20px">
-          <div class="cb-label">Nearby Clinics</div>
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
+        <div class="cb-section" style="padding-top:16px">
+          <div class="cb-field">
+            <label>Your Area / District <span style="color:#D32F2F">*</span></label>
+            <select id="userLocationSelect">
+              <option value="">Select your area...</option>
+              <option value="kampala">Kampala</option>
+              <option value="wakiso">Wakiso</option>
+              <option value="mukono">Mukono</option>
+              <option value="jinja">Jinja</option>
+              <option value="mbarara">Mbarara</option>
+              <option value="gulu">Gulu</option>
+              <option value="lira">Lira</option>
+              <option value="mbale">Mbale</option>
+              <option value="masaka">Masaka</option>
+              <option value="fort_portal">Fort Portal</option>
+              <option value="soroti">Soroti</option>
+              <option value="arua">Arua</option>
+              <option value="kabale">Kabale</option>
+              <option value="hoima">Hoima</option>
+              <option value="entebbe">Entebbe</option>
+              <option value="ntinda">Ntinda, Kampala</option>
+              <option value="nakawa">Nakawa, Kampala</option>
+              <option value="other">Other area</option>
+            </select>
+          </div>
+          <div class="cb-field" id="customLocationWrap" style="display:none">
+            <label>Enter your specific area</label>
+            <input type="text" id="customLocation" placeholder="e.g. Bwaise, Kawempe, Lugogo…">
+          </div>
+          <button onclick="searchClinics()" style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;touch-action:manipulation">
+            <span class="material-icons-outlined" style="font-size:18px">search</span>
+            Find Clinics Near Me
+          </button>
+          <div class="cb-label">Clinics in Your Area</div>
           <div id="clinicsList">
             <div style="text-align:center;padding:40px 0;color:var(--text-secondary)">
-              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">location_searching</span>
-              Loading clinics…
+              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">location_on</span>
+              Select your area above to find nearby clinics
             </div>
           </div>
         </div>
@@ -202,7 +237,7 @@
 
     <!-- STEP 4: Confirm -->
     <div class="cb-step" id="step4">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
         <div class="cb-hero">
           <div class="cb-hero-icon"><span class="material-icons-outlined">receipt_long</span></div>
           <div class="cb-heading">Confirm Booking</div>
@@ -298,10 +333,15 @@ function generatePIN() {
   return 'AFH-CHK-' + pin;
 }
 
-// Weighted clinic scoring: Quality 40% + Distance 20% + Price 20% + Availability 10% + Condition 10%
+// Weighted clinic scoring: Location 35% + Quality 30% + Price 20% + Availability 10% + Condition 5%
 function scoreClinic(c, userDistrict, aiCondition) {
   const qualPct  = (c.quality_score || c.avg_rating * 20 || 75) / 100;
-  const distPct  = (c.district||'').toLowerCase() === (userDistrict||'').toLowerCase() ? 1.0 : 0.65;
+  // Stronger location weighting — clinics in same district score much higher
+  const cDist = (c.district||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+  const uDist = (userDistrict||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+  let distPct = 0.3; // different district
+  if (uDist && cDist === uDist) distPct = 1.0;
+  else if (uDist && (cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.85;
   const fee      = c.consultation_fee || 25000;
   const feePct   = Math.max(0.2, 1 - Math.max(0, fee - 10000) / 60000);
   const availPct = c.avg_wait_minutes ? Math.max(0.2, 1 - c.avg_wait_minutes / 120) : 0.85;
@@ -310,7 +350,7 @@ function scoreClinic(c, userDistrict, aiCondition) {
     const key = aiCondition.toLowerCase().replace(/\s+/g,'_');
     if (c.condition_performance[key]) condPct = c.condition_performance[key] / 100;
   }
-  return Math.min(99, Math.round(qualPct*40 + distPct*20 + feePct*20 + availPct*10 + condPct*10));
+  return Math.min(99, Math.round(distPct*35 + qualPct*30 + feePct*20 + availPct*10 + condPct*5));
 }
 
 function fmtUGX(n) {
@@ -344,6 +384,27 @@ function goStep(n) {
   currentStep = n;
 }
 
+function searchClinics() {
+  const sel = document.getElementById('userLocationSelect');
+  if (!sel.value) { alert('Please select your area first'); sel.focus(); return; }
+  loadClinics();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Pre-fill location from session
+  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const locSel = document.getElementById('userLocationSelect');
+  if (locSel && session.district) {
+    const opt = locSel.querySelector(`option[value="${session.district.toLowerCase()}"]`);
+    if (opt) locSel.value = session.district.toLowerCase();
+  }
+  // Toggle custom location input
+  locSel?.addEventListener('change', () => {
+    const wrap = document.getElementById('customLocationWrap');
+    if (wrap) wrap.style.display = locSel.value === 'other' ? 'block' : 'none';
+  });
+}, { once: true });
+
 function selectUrgency(level) {
   booking.urgency = level;
   document.querySelectorAll('.urgency-option').forEach(o => o.classList.remove('selected'));
@@ -374,7 +435,10 @@ async function loadClinics() {
 
   const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
-  const userDist  = session.district || '';
+  // Use user-selected location from step 3 first, then session district
+  const selLoc    = document.getElementById('userLocationSelect')?.value || '';
+  const custLoc   = document.getElementById('customLocation')?.value.trim() || '';
+  const userDist  = selLoc === 'other' ? custLoc : (selLoc || session.district || '');
   const aiCond    = triage.primary_condition || triage.topCondition || '';
   const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
 
@@ -428,10 +492,11 @@ async function loadClinics() {
     </div>`).join('');
 
   // Show AI context hint if from triage
-  if (aiCond) {
-    list.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 10px;display:flex;gap:6px;align-items:center">
-      <span class="material-icons-outlined" style="font-size:14px;color:#1565C0">smart_toy</span>
-      Ranked for <strong>${aiCond}</strong>${aiConf ? ' ('+Math.round(aiConf*100||aiConf)+'% AI confidence)' : ''}
+  const locationHint = userDist ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>` : '';
+  const aiHint = aiCond ? `<span class="material-icons-outlined" style="font-size:14px;color:#1565C0;margin-left:8px">smart_toy</span> Ranked for <strong>${aiCond}</strong>` : '';
+  if (locationHint || aiHint) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+      ${locationHint}${aiHint}
     </div>` + list.innerHTML;
   }
 }
@@ -485,11 +550,22 @@ async function submitBooking() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Booking…';
 
-  const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
   const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
   const confPct   = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
   const discount  = confPct >= 75;
+
+  // Get Supabase auth session (works for properly logged-in users)
+  let authUserId = null;
+  if (supa) {
+    try {
+      const { data: authData } = await supa.auth.getSession();
+      authUserId = authData?.session?.user?.id || null;
+    } catch(e) {}
+  }
+
+  // Pull display info from homatt_user cache
+  const userCache = JSON.parse(localStorage.getItem('homatt_user') || '{}');
 
   const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
   const pinToken      = generatePIN();
@@ -498,12 +574,12 @@ async function submitBooking() {
   if (supa) {
     const isMockClinic = ['c1','c2','c3','c4'].includes(booking.clinicId);
     const payload = {
-      patient_id:       session.userId || null,
-      patient_name:     session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : (session.name || 'Patient'),
-      patient_age:      session.age  || null,
-      patient_sex:      session.sex  || null,
+      patient_id:       authUserId,
+      patient_name:     userCache.firstName ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ') : (session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : 'Patient'),
+      patient_age:      userCache.age  || session.age  || null,
+      patient_sex:      userCache.sex  || session.sex  || null,
       clinic_id:        isMockClinic ? null : booking.clinicId,
-      symptoms:         booking.symptoms,
+      symptoms:         booking.symptoms ? [booking.symptoms] : null,
       urgency_level:    booking.urgency,
       status:           'pending',
       booking_code:     bookingCode,
@@ -537,6 +613,13 @@ async function submitBooking() {
       }).maybeSingle();
     }
   }
+
+  // Save booking reference to localStorage so user can always retrieve it
+  try {
+    const saved = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
+    saved.unshift({ bookingCode, pinToken, pinExpiry, clinicName: booking.clinicName, symptoms: booking.symptoms, createdAt: new Date().toISOString() });
+    localStorage.setItem('homatt_bookings', JSON.stringify(saved.slice(0, 10)));
+  } catch(e) {}
 
   // Show success screen
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;

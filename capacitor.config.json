@@ -4,7 +4,7 @@
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://emmanuelokol.github.io/homatt-uganda",
+    "url": "https://emmanuelokol.github.io/homatt-uganda/welcome.html",
     "androidScheme": "https",
     "allowNavigation": [
       "*.supabase.co",
@@ -23,11 +23,11 @@
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 2500,
+      "launchShowDuration": 0,
       "launchAutoHide": true,
       "backgroundColor": "#1B5E20",
       "androidSplashResourceName": "splash",
-      "androidScaleType": "CENTER_CROP",
+      "androidScaleType": "FIT_CENTER",
       "showSpinner": false,
       "splashFullScreen": true,
       "splashImmersive": true
@@ -50,7 +50,7 @@
       "sound": "default"
     },
     "App": {
-      "launchUrl": "signin.html"
+      "launchUrl": "welcome.html"
     }
   }
 }

@@ -59,6 +59,155 @@
   </main>
 </div>
 
+<!-- Dispense Medication Details Modal -->
+<div class="admin-modal-overlay" id="dispenseModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">
+        <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px">medication</span>
+        Fill Dispensing Details
+      </div>
+      <button class="admin-modal-close" onclick="closeDispenseModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#5D4037">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">info</span>
+        These details are sent to the patient. They will be asked to check in after each dose. If they report getting worse, they will be referred to the nearest clinic immediately.
+      </div>
+      <input type="hidden" id="dispenseOrderId">
+      <input type="hidden" id="dispenseOrderType">
+      <input type="hidden" id="dispenseUserId">
+
+      <div style="display:grid;gap:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Medicine / Item Name *</label>
+          <input id="dispenseItemName" type="text" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none" placeholder="e.g. Amoxicillin 500mg">
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Dosage *</label>
+            <input id="dispenseDosage" type="text" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none" placeholder="e.g. 1 tablet, 5ml">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Form</label>
+            <select id="dispenseForm" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+              <option value="tablet">Tablet</option>
+              <option value="capsule">Capsule</option>
+              <option value="syrup">Syrup</option>
+              <option value="injection">Injection</option>
+              <option value="cream">Cream / Ointment</option>
+              <option value="drops">Drops</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Frequency (times per day) *</label>
+            <select id="dispenseFreq" onchange="updateDoseTimes()" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+              <option value="24">Once daily (every 24h)</option>
+              <option value="12">Twice daily (every 12h)</option>
+              <option value="8" selected>Three times daily (every 8h)</option>
+              <option value="6">Four times daily (every 6h)</option>
+              <option value="2">Every 2 hours (intensive)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Duration (days) *</label>
+            <input id="dispenseDuration" type="number" min="1" max="90" value="5" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Dose Times (first dose start time)</label>
+          <input id="dispenseFirstDose" type="time" value="07:00" onchange="updateDoseTimes()" style="padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+          <div id="doseTimesPreview" style="margin-top:6px;font-size:12px;color:#388E3C;font-weight:500"></div>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Instructions for Patient</label>
+          <textarea id="dispenseInstructions" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:none" placeholder="e.g. Take with food. Complete the full course even if feeling better."></textarea>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:6px">Warnings / Side effects to watch for</label>
+          <textarea id="dispenseWarnings" rows="2" style="width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:none" placeholder="e.g. May cause drowsiness. Do not drink alcohol."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeDispenseModal()">Cancel</button>
+      <button class="btn-admin success" id="saveDispenseBtn" onclick="saveDispenseDetails()">
+        <span class="material-icons-outlined" style="font-size:14px">send</span>
+        Save &amp; Schedule Check-ins
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Rate Patient Modal -->
+<div class="admin-modal-overlay" id="ratePatientModal" style="display:none">
+  <div class="admin-modal" style="max-width:440px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="ratePatientName">Rate Patient</div>
+      <button class="admin-modal-close" onclick="closeRatePatient()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="ratePatientOrderId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Rate this patient's behaviour during the medicine order. This helps us maintain service quality.</p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Punctuality / Availability</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="punctuality" onclick="setPatientStar('punctuality',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Communication / Responsiveness</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="communication" onclick="setPatientStar('communication',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Compliance (prescription / instructions)</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="compliance" onclick="setPatientStar('compliance',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Payment / No disputes</div>
+          <div style="display:flex;gap:4px">
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',1)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',2)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',3)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',4)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+            <button class="ps-star" data-key="payment" onclick="setPatientStar('payment',5)" style="font-size:26px;background:none;border:none;cursor:pointer;color:#E0E0E0">★</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px">Additional Notes (optional)</div>
+          <textarea id="patientRatingComment" rows="3" style="width:100%;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;resize:none;outline:none" placeholder="Any issues or comments about this patient?"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeRatePatient()">Cancel</button>
+      <button class="btn-admin success" onclick="submitPatientRating()">
+        <span class="material-icons-outlined" style="font-size:14px">star</span> Submit Rating
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Order Detail Modal -->
 <div class="admin-modal-overlay" id="orderModal" style="display:none">
   <div class="admin-modal" style="max-width:540px">
@@ -109,6 +258,7 @@ function setupRealtime(supa, pharmacyId) {
   const badge = document.getElementById('realtimeBadge');
   if (badge) badge.style.display = 'flex';
 
+  // Listen for prescription-based pharmacy orders
   supa.channel('pharmacy-orders-' + pharmacyId)
     .on('postgres_changes', {
       event: 'INSERT',
@@ -118,8 +268,7 @@ function setupRealtime(supa, pharmacyId) {
     }, payload => {
       allOrders.unshift(payload.new);
       render();
-      showToast('New order received!', 'success');
-      // Flash the incoming badge
+      showToast('New prescription order received!', 'success');
       const b = document.getElementById('badge-incoming');
       if (b) { b.style.animation = 'none'; b.offsetHeight; b.style.animation = 'pulse 0.6s ease 3'; }
     })
@@ -134,18 +283,64 @@ function setupRealtime(supa, pharmacyId) {
       render();
     })
     .subscribe();
+
+  // Listen for marketplace (OTC shop) orders routed to this pharmacy
+  supa.channel('mkt-orders-' + pharmacyId)
+    .on('postgres_changes', {
+      event: 'INSERT',
+      schema: 'public',
+      table: 'marketplace_orders',
+      filter: `pharmacy_id=eq.${pharmacyId}`
+    }, payload => {
+      const o = payload.new;
+      const normalised = {
+        ...o,
+        order_type: 'otc_shop',
+        urgency: 'standard',
+        medication_cost: (o.total_amount || 0) - (o.delivery_fee || 2000),
+        delivery_cost: o.delivery_fee || 2000,
+        total_cost: o.total_amount || 0,
+        status: 'incoming',
+        _source: 'marketplace',
+      };
+      allOrders.unshift(normalised);
+      render();
+      showToast('New shop order received!', 'success');
+      const b = document.getElementById('badge-incoming');
+      if (b) { b.style.animation = 'none'; b.offsetHeight; b.style.animation = 'pulse 0.6s ease 3'; }
+    })
+    .subscribe();
 }
 
 async function loadLive(supa, pharmacyId) {
-  const { data } = await supa.from('pharmacy_orders').select('*')
+  // Load prescription-based pharmacy orders
+  const { data: rxOrders } = await supa.from('pharmacy_orders').select('*')
     .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
-  allOrders = data || [];
 
-  // Load e-prescriptions routed to this pharmacy
+  // Also load OTC marketplace orders routed to this pharmacy
+  const { data: mktOrders } = await supa.from('marketplace_orders').select('*')
+    .eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false});
+
+  // Normalise marketplace_orders to the same shape as pharmacy_orders
+  const normalisedMkt = (mktOrders || []).map(o => ({
+    ...o,
+    order_type: 'otc_shop',
+    urgency: 'standard',
+    medication_cost: (o.total_amount || 0) - (o.delivery_fee || 2000),
+    delivery_cost: o.delivery_fee || 2000,
+    total_cost: o.total_amount || 0,
+    status: o.status === 'pending' ? 'incoming' : o.status,
+    _source: 'marketplace',
+  }));
+
+  allOrders = [...(rxOrders || []), ...normalisedMkt]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  // Load e-prescriptions: ones routed specifically to this pharmacy OR unrouted (any pharmacy)
   const { data: rxData } = await supa.from('e_prescriptions')
-    .select('*,clinic_diagnoses(confirmed_diagnosis,icd10_code,ai_match)')
-    .eq('routed_to_pharmacy_id', pharmacyId)
-    .eq('status', 'active')
+    .select('*')
+    .in('status', ['active'])
+    .or(`routed_to_pharmacy_id.eq.${pharmacyId},routed_to_pharmacy_id.is.null`)
     .order('created_at', { ascending: false });
   allPrescriptions = rxData || [];
 
@@ -187,27 +382,28 @@ function renderPrescriptions() {
   }
   document.getElementById('ordersEmpty').style.display = 'none';
   document.getElementById('ordersList').innerHTML = allPrescriptions.map(rx => {
-    const diag = rx.clinic_diagnoses;
-    const drugs = (rx.items || []).map(i => `${i.drug_name}${i.strength?' '+i.strength:''} ×${i.duration}d`).join(', ');
+    const diagnosis = rx.diagnosis || '—';
+    const drugs = (rx.items || []).map(i => `${i.drug_name||i.name||'?'}${i.strength?' '+i.strength:''} ×${i.duration||'?'}d`).join(', ');
+    const routed = rx.routed_to_pharmacy_id ? '' : '<span style="background:#FFF3E0;color:#E65100;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">Any Pharmacy</span>';
     return `
-    <div class="order-card" style="cursor:pointer;border-left:4px solid #0D47A1" onclick="openRxModal('${rx.id}')">
+    <div class="order-card" style="cursor:pointer;border-left:4px solid #0D47A1" onclick="openRxDetail('${rx.id}')">
       <div class="order-card-header">
         <span class="order-ref" style="color:#0D47A1">
           <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span>
           E-Prescription
         </span>
         <span class="status-badge confirmed">${rx.status||'active'}</span>
-        ${diag?.icd10_code ? `<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px">${diag.icd10_code}</span>` : ''}
+        ${routed}
       </div>
       <div class="order-meds">${drugs || '—'}</div>
       <div class="order-meta">
-        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">local_hospital</span> ${diag?.confirmed_diagnosis || '—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ${rx.patient_name||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">local_hospital</span> ${diagnosis}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(rx.created_at)}</span>
-        ${diag?.ai_match === true ? '<span style="color:#2E7D32;font-size:12px">✓ AI confirmed</span>' : ''}
       </div>
       <div class="order-actions" onclick="event.stopPropagation()">
-        <button class="btn-admin primary sm" onclick="openRxModal('${rx.id}')">
-          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View & Dispense
+        <button class="btn-admin primary sm" onclick="openRxDetail('${rx.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View &amp; Dispense
         </button>
       </div>
     </div>`;
@@ -263,6 +459,12 @@ function render() {
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(o.created_at)}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">payments</span> ${formatUGX(o.total_cost)}</span>
       </div>
+      ${o.patient_symptom_description ? `
+      <div style="background:#E8F5E9;border-left:3px solid #2E7D32;border-radius:0 6px 6px 0;padding:6px 10px;margin:6px 0;font-size:12px;color:#1B5E20">
+        <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:4px">chat_bubble_outline</span>
+        Patient: <em>"${o.patient_symptom_description.slice(0,80)}${o.patient_symptom_description.length>80?'…':''}"</em>
+        ${o.condition_tags ? `<span style="margin-left:8px;background:#C8E6C9;color:#1B5E20;font-size:11px;font-weight:700;padding:2px 7px;border-radius:10px">${o.condition_tags}</span>` : ''}
+      </div>` : ''}
       <div class="order-actions" onclick="event.stopPropagation()">${actions}</div>
     </div>`;
   }).join('');
@@ -289,12 +491,19 @@ function getActions(o) {
       <span class="material-icons-outlined" style="font-size:14px">medication</span> Start Preparing
     </button>`;
   if (o.status === 'preparing') return `
-    <button class="btn-admin success sm" onclick="updateStatus('${o.id}','ready')">
-      <span class="material-icons-outlined" style="font-size:14px">done_all</span> Mark Ready
+    <button class="btn-admin success sm" onclick="openDispenseModal('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">done_all</span> Mark Ready + Dispense Details
     </button>`;
   if (o.status === 'ready') return `
     <button class="btn-admin warning sm" onclick="updateStatus('${o.id}','in_transit')">
       <span class="material-icons-outlined" style="font-size:14px">local_shipping</span> Dispatched
+    </button>
+    <button class="btn-admin secondary sm" onclick="openDispenseModal('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">assignment</span> Dispensing Details
+    </button>`;
+  if (o.status === 'delivered') return `
+    <button class="btn-admin secondary sm" onclick="event.stopPropagation();openRatePatient('${o.id}')">
+      <span class="material-icons-outlined" style="font-size:14px">star_rate</span> Rate Patient
     </button>`;
   return '';
 }
@@ -321,36 +530,42 @@ window.confirmWithSafetyCheck = async id => {
   showToast('Order confirmed', 'success');
 };
 
-window.openRxModal = id => {
+window.openRxDetail = id => {
   const rx = allPrescriptions.find(x => x.id === id);
   if (!rx) return;
-  const diag = rx.clinic_diagnoses || {};
   const items = rx.items || [];
+  const diagnosis = rx.diagnosis || '—';
   document.getElementById('orderModalTitle').textContent = 'E-Prescription — Dispense';
   document.getElementById('orderModalBody').innerHTML = `
     <div style="background:#E3F2FD;border-radius:10px;padding:14px;margin-bottom:16px">
       <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
-        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span> E-Prescription
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">description</span> E-Prescription Details
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px">
-        <div><span style="color:#5F6368">Diagnosis:</span> <strong>${diag.confirmed_diagnosis||'—'}</strong></div>
-        <div><span style="color:#5F6368">ICD-10:</span> ${diag.icd10_code||'—'}</div>
-        <div><span style="color:#5F6368">AI Match:</span> ${diag.ai_match===true?'<span style="color:#2E7D32">✓ Confirmed</span>':diag.ai_match===false?'<span style="color:#C62828">✗ Different</span>':'Partial'}</div>
+        <div><span style="color:#5F6368">Patient:</span> <strong>${rx.patient_name||'—'}</strong></div>
+        <div><span style="color:#5F6368">Diagnosis:</span> <strong>${diagnosis}</strong></div>
+        <div><span style="color:#5F6368">Valid From:</span> ${rx.start_date||'—'}</div>
+        <div><span style="color:#5F6368">Valid Until:</span> ${rx.end_date||'—'}</div>
         <div><span style="color:#5F6368">Issued:</span> ${fmtDateTime(rx.created_at)}</div>
+        <div><span style="color:#5F6368">Routed to:</span> ${rx.routed_to_pharmacy_id ? 'This pharmacy' : 'Any pharmacy'}</div>
       </div>
+      ${rx.notes ? `<div style="margin-top:10px;font-size:13px;color:#1B5E20;background:#E8F5E9;border-radius:6px;padding:8px 12px"><strong>Instructions:</strong> ${rx.notes}</div>` : ''}
     </div>
     <div style="background:#F8F9FA;border-radius:10px;padding:14px;margin-bottom:16px">
-      <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Prescribed Drugs</div>
-      ${items.map(i => {
-        const safetyFlag = otcSafetyRules.find(r => (i.drug_name||'').toLowerCase().includes(r.drug_name.toLowerCase()));
-        return `<div style="padding:8px 0;border-bottom:1px solid #E0E0E0">
-          <div style="font-weight:600;font-size:13px">${i.drug_name} ${i.strength||''}</div>
-          <div style="font-size:12px;color:#5F6368">${(i.route||'oral').toUpperCase()} · ${(i.frequency||'').replace(/_/g,' ')} · ${i.duration||5} days · Qty: ${i.qty||1}</div>
+      <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Prescribed Medications</div>
+      ${items.length ? items.map(i => {
+        const safetyFlag = otcSafetyRules.find(r => (i.drug_name||i.name||'').toLowerCase().includes(r.drug_name.toLowerCase()));
+        return `<div style="padding:8px 0;border-bottom:1px solid #E0E0E0;last-child:border-none">
+          <div style="font-weight:600;font-size:13px">${i.drug_name||i.name||'—'} ${i.strength||''}</div>
+          <div style="font-size:12px;color:#5F6368">${(i.frequency||'').replace(/_/g,' ')} · ${i.duration||'?'} days</div>
           ${safetyFlag ? `<div style="font-size:11px;color:#E65100;margin-top:3px">⚠ ${safetyFlag.warning_message}</div>` : ''}
         </div>`;
-      }).join('')}
+      }).join('') : '<div style="color:#9AA0A6;font-size:13px">No medications listed</div>'}
     </div>
-    <div style="font-size:12px;color:#5F6368">Dispensing this prescription will mark it as dispensed and update the e-prescription record.</div>`;
+    <div style="font-size:12px;color:#5F6368;background:#FFF8E1;border-radius:6px;padding:8px 12px">
+      <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">info</span>
+      Dispensing this prescription will mark it as <strong>dispensed</strong>. This cannot be undone.
+    </div>`;
 
   const footer = document.getElementById('orderModalFooter');
   footer.innerHTML = `
@@ -394,9 +609,23 @@ window.openModal = id => {
           <div style="font-size:13px;font-weight:500;margin-top:3px">${v}</div>
         </div>`).join('')}
     </div>
+    ${o.patient_symptom_description ? `
+    <div style="background:#E8F5E9;border-left:4px solid #2E7D32;border-radius:0 10px 10px 0;padding:14px;margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">medical_information</span>
+        Patient Describes Their Illness
+      </div>
+      <div style="font-size:14px;color:#1B5E20;font-style:italic;line-height:1.5">"${o.patient_symptom_description}"</div>
+      ${o.condition_tags ? `<div style="margin-top:8px;font-size:12px;color:#388E3C;font-weight:600">
+        Condition category: <span style="background:#C8E6C9;padding:2px 8px;border-radius:10px">${o.condition_tags}</span>
+      </div>` : ''}
+      ${o.order_type === 'rx' ? `<div style="margin-top:6px;font-size:12px;color:#7B1FA2;font-weight:600">
+        ⚕ Prescription order${o.rx_doctor ? ` — Dr. ${o.rx_doctor}` : ''}${o.rx_booking_code ? ` (Code: ${o.rx_booking_code})` : ''}
+      </div>` : ''}
+    </div>` : ''}
     ${o.items ? `
       <div style="background:#F8F9FA;border-radius:8px;padding:14px">
-        <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Medications</div>
+        <div style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;margin-bottom:10px">Medications Ordered</div>
         ${o.items.map(i => `
           <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #E0E0E0;font-size:13px">
             <span>${i.name}</span>
@@ -423,6 +652,202 @@ window.updateStatus = async (id, status) => {
   if (o) o.status = status;
   render();
   showToast(`Order marked as ${status.replace('_',' ')}`, 'success');
+};
+
+/* ── Patient Rating ── */
+window.openRatePatient = id => {
+  const o = allOrders.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('ratePatientOrderId').value = id;
+  document.getElementById('ratePatientName').textContent = 'Rate: ' + (o.patient_name || 'Patient');
+  // Reset stars
+  ['punctuality','communication','compliance','payment'].forEach(k => setPatientStar(k, 0));
+  document.getElementById('patientRatingComment').value = '';
+  document.getElementById('ratePatientModal').style.display = 'flex';
+};
+
+window.closeRatePatient = () => { document.getElementById('ratePatientModal').style.display = 'none'; };
+
+var patientStars = { punctuality:0, communication:0, compliance:0, payment:0 };
+window.setPatientStar = (key, val) => {
+  patientStars[key] = val;
+  document.querySelectorAll('.ps-star[data-key="' + key + '"]').forEach(function(s, i) {
+    s.style.color = i < val ? '#F9A825' : '#E0E0E0';
+  });
+};
+
+window.submitPatientRating = async () => {
+  const id = document.getElementById('ratePatientOrderId').value;
+  const o = allOrders.find(x => x.id === id);
+  const overall = Math.round((patientStars.punctuality + patientStars.communication + patientStars.compliance + patientStars.payment) / 4) || 3;
+  const comment = document.getElementById('patientRatingComment').value.trim();
+  const session = requirePharmacy();
+
+  if (window._pharmSupa) {
+    await window._pharmSupa.from('ratings').insert({
+      pharmacy_id: session?.pharmacyId || null,
+      order_id: id,
+      rating_type: 'patient_review',
+      is_patient_review: true,
+      patient_rating_type: 'patient',
+      score: overall,
+      score_speed: patientStars.punctuality,
+      score_quality: patientStars.compliance,
+      score_comms: patientStars.communication,
+      score_cost: patientStars.payment,
+      comment: comment || null,
+      created_at: new Date().toISOString()
+    });
+  }
+  closeRatePatient();
+  showToast('Patient rated successfully', 'success');
+};
+
+/* ── Dispense Medication Details ── */
+
+function calcDoseTimes(firstTime, intervalHours) {
+  const times = [];
+  const [h, m] = firstTime.split(':').map(Number);
+  const count = Math.floor(24 / intervalHours);
+  for (let i = 0; i < count; i++) {
+    const totalMins = h * 60 + m + i * intervalHours * 60;
+    const hh = String(Math.floor((totalMins % 1440) / 60)).padStart(2, '0');
+    const mm = String(totalMins % 60).padStart(2, '0');
+    times.push(`${hh}:${mm}`);
+  }
+  return times;
+}
+
+window.updateDoseTimes = function() {
+  const freq = parseInt(document.getElementById('dispenseFreq').value);
+  const first = document.getElementById('dispenseFirstDose').value || '07:00';
+  const times = calcDoseTimes(first, freq);
+  document.getElementById('doseTimesPreview').textContent = 'Dose times: ' + times.join(', ');
+};
+
+window.openDispenseModal = function(orderId) {
+  const o = allOrders.find(x => x.id === orderId);
+  if (!o) return;
+  document.getElementById('dispenseOrderId').value = orderId;
+  document.getElementById('dispenseOrderType').value = o._source === 'marketplace' ? 'marketplace' : 'pharmacy';
+  document.getElementById('dispenseUserId').value = o.user_id || o.patient_id || '';
+
+  // Pre-fill medicine name from first item
+  const firstName = o.items && o.items.length ? o.items[0].name : '';
+  document.getElementById('dispenseItemName').value = firstName;
+  document.getElementById('dispenseDosage').value = '';
+  document.getElementById('dispenseForm').value = 'tablet';
+  document.getElementById('dispenseFreq').value = '8';
+  document.getElementById('dispenseDuration').value = '5';
+  document.getElementById('dispenseFirstDose').value = '07:00';
+  document.getElementById('dispenseInstructions').value = '';
+  document.getElementById('dispenseWarnings').value = '';
+  updateDoseTimes();
+
+  document.getElementById('dispenseModal').style.display = 'flex';
+};
+
+window.closeDispenseModal = function() {
+  document.getElementById('dispenseModal').style.display = 'none';
+};
+
+window.saveDispenseDetails = async function() {
+  const orderId     = document.getElementById('dispenseOrderId').value;
+  const orderType   = document.getElementById('dispenseOrderType').value;
+  const userId      = document.getElementById('dispenseUserId').value;
+  const itemName    = document.getElementById('dispenseItemName').value.trim();
+  const dosage      = document.getElementById('dispenseDosage').value.trim();
+  const form        = document.getElementById('dispenseForm').value;
+  const freqHours   = parseInt(document.getElementById('dispenseFreq').value);
+  const duration    = parseInt(document.getElementById('dispenseDuration').value);
+  const firstDose   = document.getElementById('dispenseFirstDose').value || '07:00';
+  const instructions = document.getElementById('dispenseInstructions').value.trim();
+  const warnings    = document.getElementById('dispenseWarnings').value.trim();
+
+  if (!itemName) { showToast('Medicine name is required', 'error'); return; }
+  if (!dosage)   { showToast('Dosage is required', 'error'); return; }
+  if (!duration || duration < 1) { showToast('Duration must be at least 1 day', 'error'); return; }
+
+  const btn = document.getElementById('saveDispenseBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const doseTimes = calcDoseTimes(firstDose, freqHours);
+  const session = requirePharmacy();
+  const supa = window._pharmSupa;
+
+  // 1. Insert dispensing record
+  const dispPayload = {
+    order_id:        orderId,
+    order_type:      orderType,
+    user_id:         userId || null,
+    pharmacy_id:     session?.pharmacyId || null,
+    item_name:       itemName,
+    dosage,
+    form,
+    frequency_hours: freqHours,
+    dose_times:      doseTimes,
+    duration_days:   duration,
+    instructions:    instructions || null,
+    warnings:        warnings || null,
+  };
+
+  let dispensingId = null;
+  if (supa) {
+    const { data: dispData, error: dispErr } = await supa
+      .from('medication_dispensing').insert(dispPayload).select('id').single();
+    if (dispErr) {
+      showToast('Failed to save dispensing: ' + dispErr.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">send</span> Save & Schedule Check-ins';
+      return;
+    }
+    dispensingId = dispData.id;
+  }
+
+  // 2. Generate check-in records (one per dose, for each day)
+  if (supa && userId && dispensingId) {
+    const now = new Date();
+    const checkins = [];
+    for (let day = 0; day < duration; day++) {
+      for (const t of doseTimes) {
+        const [h, m] = t.split(':').map(Number);
+        const scheduledAt = new Date(now);
+        scheduledAt.setDate(now.getDate() + day);
+        scheduledAt.setHours(h, m, 0, 0);
+        // Only schedule future check-ins
+        if (scheduledAt > now || day === 0) {
+          checkins.push({
+            dispensing_id: dispensingId,
+            user_id:       userId,
+            order_id:      orderId,
+            item_name:     itemName,
+            dosage,
+            scheduled_at:  scheduledAt.toISOString(),
+            status:        'pending',
+          });
+        }
+      }
+    }
+    if (checkins.length) {
+      await supa.from('medication_checkins').insert(checkins);
+    }
+  }
+
+  // 3. Advance order to 'ready' if currently 'preparing'
+  const o = allOrders.find(x => x.id === orderId);
+  if (o && o.status === 'preparing' && supa) {
+    const table = o._source === 'marketplace' ? 'marketplace_orders' : 'pharmacy_orders';
+    await supa.from(table).update({ status: 'ready', updated_at: new Date().toISOString() }).eq('id', orderId);
+    o.status = 'ready';
+  }
+
+  closeDispenseModal();
+  render();
+  showToast('Dispensing details saved. Patient check-ins scheduled!', 'success');
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">send</span> Save & Schedule Check-ins';
 };
 
 window.rejectPrompt = async id => {

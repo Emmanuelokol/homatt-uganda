@@ -14,74 +14,95 @@
   <link rel="stylesheet" href="css/pages.css">
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
   <style>
+    .app-screen { overflow:hidden !important; display:flex; flex-direction:column; }
     .mo-step { display:none; }
-    .mo-step.active { display:flex; flex-direction:column; height:100%; }
-    .mo-hero { text-align:center; padding:24px 20px 12px; }
-    .mo-hero-icon { width:66px; height:66px; border-radius:22px; background:linear-gradient(135deg,#00695C,#4DB6AC); display:flex; align-items:center; justify-content:center; margin:0 auto 14px; }
-    .mo-hero-icon .material-icons-outlined { font-size:34px; color:#fff; }
-    .mo-heading { font-size:20px; font-weight:700; color:var(--text-primary); margin-bottom:4px; }
-    .mo-subheading { font-size:13px; color:var(--text-secondary); line-height:1.5; }
-    .mo-section { padding:12px 20px; }
-    .mo-label { font-size:11px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+    .mo-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
+    .mo-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:24px; }
+    /* Progress bar */
+    .mo-prog { display:flex; gap:6px; padding:8px 20px 4px; }
+    .mo-prog-dot { flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .3s; }
+    .mo-prog-dot.active { background:#00695C; }
+    /* Top bar */
+    .mo-topbar { background:#00695C; color:#fff; padding:12px 16px; display:flex; align-items:center; gap:12px; flex-shrink:0; }
+    .mo-back-btn { background:rgba(255,255,255,.15); border:none; color:#fff; width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; cursor:pointer; touch-action:manipulation; flex-shrink:0; }
+    .mo-cart-btn { margin-left:auto; background:rgba(255,255,255,.15); border:none; color:#fff; padding:6px 12px; border-radius:20px; font-size:12px; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:4px; touch-action:manipulation; }
+    .cart-badge { background:#D32F2F; color:#fff; border-radius:10px; font-size:10px; font-weight:700; padding:2px 6px; }
+    /* Bottom action bar */
+    .mo-bottom { padding:14px 20px 28px; position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); flex-shrink:0; display:flex; gap:10px; }
+    .mo-btn { display:flex; align-items:center; justify-content:center; gap:8px; padding:14px; border-radius:var(--radius-md); font-size:15px; font-weight:600; border:none; cursor:pointer; transition:all .2s; touch-action:manipulation; flex:1; }
+    .mo-btn.primary { background:#00695C; color:#fff; }
+    .mo-btn.secondary { background:#F3F4F6; color:var(--text-primary); }
+    .mo-btn:active { opacity:.85; }
+    /* ── Category grid ── */
+    .cat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 16px 4px; }
+    .cat-tile {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      padding:12px 6px 10px; background:#fff; border:1.5px solid var(--border);
+      border-radius:12px; cursor:pointer; touch-action:manipulation;
+      transition:all .15s; -webkit-tap-highlight-color:transparent;
+      font-family:inherit;
+    }
+    .cat-tile:active { transform:scale(.96); }
+    .cat-tile.sel { border-color:#00695C; background:#E0F2F1; }
+    .cat-tile.rx-cat { border-color:#CE93D8; }
+    .cat-tile.rx-cat.sel { border-color:#7B1FA2; background:#F3E5F5; }
+    .cat-emoji { font-size:24px; line-height:1; margin-bottom:5px; }
+    .cat-name { font-size:10px; font-weight:600; color:var(--text-primary); text-align:center; line-height:1.3; }
+    .cat-tile.sel .cat-name { color:#00695C; }
+    .cat-tile.rx-cat.sel .cat-name { color:#7B1FA2; }
+    /* ── Medicine cards ── */
+    .med-item {
+      display:flex; align-items:center; gap:12px; padding:12px 16px;
+      background:#fff; border-radius:var(--radius-md); margin-bottom:8px;
+      border:1.5px solid var(--border); transition:border-color .15s;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .med-item.in-cart { border-color:#00695C; background:#E0F2F1; }
+    .med-icon { width:38px; height:38px; border-radius:10px; background:#E0F2F1; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .med-name { font-size:13px; font-weight:600; color:var(--text-primary); }
+    .med-use { font-size:11px; color:var(--text-secondary); margin-top:1px; line-height:1.3; }
+    .med-price { font-size:12px; color:#00695C; font-weight:600; margin-top:2px; }
+    .rx-badge { font-size:10px; background:#EDE7F6; color:#6A1B9A; padding:1px 6px; border-radius:8px; font-weight:700; margin-left:5px; vertical-align:middle; }
+    .qty-control { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+    .qty-btn {
+      width:30px; height:30px; border-radius:8px; border:none; background:#E0F2F1;
+      color:#00695C; font-size:18px; font-weight:700; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent; line-height:1;
+    }
+    .qty-btn:disabled { opacity:.35; cursor:default; }
+    .qty-btn:active:not(:disabled) { background:#B2DFDB; }
+    .qty-num { font-size:14px; font-weight:700; min-width:22px; text-align:center; color:var(--text-primary); }
+    /* ── Rx banner ── */
+    .rx-banner { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md); padding:10px 14px; margin:0 16px 10px; font-size:12px; color:#6A1B9A; display:flex; gap:8px; align-items:flex-start; }
+    /* ── Section label ── */
+    .mo-label { font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:8px; }
+    /* ── Fields ── */
     .mo-field { margin-bottom:12px; }
     .mo-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:5px; }
     .mo-field input, .mo-field select, .mo-field textarea {
       width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius-md);
-      font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s;
+      font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s; box-sizing:border-box;
     }
     .mo-field input:focus, .mo-field select:focus, .mo-field textarea:focus { border-color:#00695C; }
     .mo-field textarea { resize:vertical; min-height:70px; }
-    .med-item {
-      display:flex; align-items:center; gap:12px; padding:12px 16px;
-      background:#fff; border-radius:var(--radius-md); margin-bottom:8px;
-      border:1.5px solid var(--border); transition:border-color .2s;
-    }
-    .med-item.selected { border-color:#00695C; background:#E0F2F1; }
-    .med-icon { width:40px; height:40px; border-radius:10px; background:#E0F2F1; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .med-name { font-size:13px; font-weight:600; flex:1; }
-    .med-price { font-size:12px; color:#00695C; font-weight:600; }
-    .qty-control { display:flex; align-items:center; gap:8px; }
-    .qty-btn { width:28px; height:28px; border-radius:8px; border:none; background:#E0F2F1; color:#00695C; font-size:16px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; }
-    .qty-num { font-size:14px; font-weight:700; min-width:20px; text-align:center; }
-    .cart-badge { background:#D32F2F; color:#fff; border-radius:10px; font-size:10px; font-weight:700; padding:2px 6px; margin-left:4px; }
+    /* ── Urgency chips ── */
+    .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; touch-action:manipulation; display:inline-block; }
+    .urgency-chip.sel { background:#00695C; color:#fff; border-color:#00695C; }
+    /* ── Cart review ── */
     .cart-row { display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-bottom:1px solid #F0F0F0; }
     .cart-row:last-child { border-bottom:none; }
-    .total-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0 4px; border-top:2px solid var(--border); font-weight:700; font-size:15px; margin-top:4px; }
-    .mo-btn { display:flex; align-items:center; justify-content:center; gap:8px; width:100%; padding:14px; border-radius:var(--radius-md); font-size:15px; font-weight:600; border:none; cursor:pointer; transition:all .2s; }
-    .mo-btn.primary { background:#00695C; color:#fff; }
-    .mo-btn.secondary { background:#F3F4F6; color:var(--text-primary); }
-    .mo-btn:active { opacity:.85; }
-    .mo-bottom { padding:14px 20px 28px; position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); }
-    .mo-prog { display:flex; gap:6px; padding:0 20px 10px; }
-    .mo-prog-dot { flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .3s; }
-    .mo-prog-dot.active { background:#00695C; }
-    .pharmacy-card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px; transition:all .2s; }
-    .pharmacy-card.selected { border-color:#00695C; background:#E0F2F1; }
+    .total-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0 4px; border-top:2px solid var(--border); font-weight:700; font-size:15px; }
+    /* ── Pharmacy cards ── */
+    .pharmacy-card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px; transition:all .2s; touch-action:manipulation; }
+    .pharmacy-card.sel { border-color:#00695C; background:#E0F2F1; }
+    /* ── Success ── */
     .success-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 20px; text-align:center; height:100%; }
-    .order-code-box { background:#E0F2F1; border:1.5px dashed #00695C; border-radius:var(--radius-md); padding:14px 20px; margin:16px 0; width:100%; }
+    .order-code-box { background:#E0F2F1; border:1.5px dashed #00695C; border-radius:var(--radius-md); padding:14px 20px; margin:16px 0; width:100%; box-sizing:border-box; }
     .order-code-text { font-size:24px; font-weight:800; color:#00695C; letter-spacing:3px; }
-    .urgency-chips { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
-    .urgency-chip { padding:8px 14px; border-radius:20px; border:1.5px solid var(--border); font-size:13px; font-weight:500; cursor:pointer; transition:all .2s; }
-    .urgency-chip.selected { background:#00695C; color:#fff; border-color:#00695C; }
-    /* Condition/symptom selector */
-    .condition-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:12px; }
-    .cond-btn { display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px;
-      border:1.5px solid var(--border); border-radius:var(--radius-md); background:#fff;
-      font-size:11px; font-weight:600; color:var(--text-secondary); cursor:pointer; text-align:center;
-      transition:all .2s; font-family:inherit; }
-    .cond-btn .material-icons-outlined { font-size:22px; }
-    .cond-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
-    /* Drug type selector */
-    .drug-type-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px; }
-    .drug-type-btn { padding:10px 8px; border:1.5px solid var(--border); border-radius:var(--radius-md);
-      background:#fff; font-size:13px; font-weight:600; color:var(--text-secondary);
-      cursor:pointer; font-family:inherit; transition:all .2s; text-align:center; }
-    .drug-type-btn.selected { border-color:#00695C; background:#E0F2F1; color:#00695C; }
-    .drug-type-btn.rx-selected { border-color:#7B1FA2; background:#F3E5F5; color:#6A1B9A; }
-    .rx-notice { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md);
-      padding:10px 14px; font-size:12px; color:#6A1B9A; display:flex; gap:8px; align-items:flex-start;
-      margin-bottom:12px; display:none; }
-    .rx-notice.visible { display:flex; }
+    /* ── Rx approval block ── */
+    .rx-approval { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:12px; display:none; }
+    .rx-approval.show { display:block; }
   </style>
 </head>
 <body>
@@ -97,549 +118,873 @@
 
   <div class="app-screen">
     <!-- Top bar -->
-    <div style="background:#00695C;color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
-      <button onclick="history.back()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">
+    <div class="mo-topbar">
+      <button class="mo-back-btn" onclick="history.back()">
         <span class="material-icons-outlined">arrow_back</span>
       </button>
       <div>
         <div style="font-size:16px;font-weight:700">Order Medicines</div>
-        <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4</div>
+        <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4 — Choose Medicines</div>
       </div>
-      <button onclick="goMoStep(3)" style="margin-left:auto;background:rgba(255,255,255,0.15);border:none;color:#fff;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">
+      <button class="mo-cart-btn" onclick="goStep(2)">
         <span class="material-icons-outlined" style="font-size:16px">shopping_cart</span>
         Cart <span class="cart-badge" id="cartBadge">0</span>
       </button>
     </div>
 
-    <!-- Progress dots -->
+    <!-- Progress -->
     <div class="mo-prog">
-      <div class="mo-prog-dot active" id="mprog1"></div>
-      <div class="mo-prog-dot" id="mprog2"></div>
-      <div class="mo-prog-dot" id="mprog3"></div>
-      <div class="mo-prog-dot" id="mprog4"></div>
+      <div class="mo-prog-dot active" id="mp1"></div>
+      <div class="mo-prog-dot" id="mp2"></div>
+      <div class="mo-prog-dot" id="mp3"></div>
+      <div class="mo-prog-dot" id="mp4"></div>
     </div>
 
-    <!-- STEP 1: Select medicines -->
-    <div class="mo-step active" id="mostep1">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="mo-hero" style="padding-bottom:4px">
-          <div class="mo-hero-icon"><span class="material-icons-outlined">medication</span></div>
-          <div class="mo-heading">Order Medicines</div>
-          <div class="mo-subheading">Select your condition then choose medicines, or search by name.</div>
+    <!-- ═══════════════════════════════════════════════
+         STEP 1 — Choose medicines by symptom category
+         ═══════════════════════════════════════════════ -->
+    <div class="mo-step active" id="step1">
+      <div class="mo-scroll">
+
+        <!-- Instruction -->
+        <div style="padding:10px 16px 4px">
+          <div style="font-size:14px;font-weight:700;color:var(--text-primary)">What are you dealing with?</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Tap a category to see medicines. OTC medicines are confirmed by the pharmacy; prescription (Rx) drugs require a doctor.</div>
         </div>
 
-        <!-- Condition / Symptom selector -->
-        <div class="mo-section" style="padding-bottom:4px">
-          <div class="mo-label">What is the issue? (select one)</div>
-          <div class="condition-grid" id="conditionGrid">
-            <button class="cond-btn" data-cond="pain" onclick="selectCondition('pain')">
-              <span class="material-icons-outlined" style="color:#E53935">sentiment_very_dissatisfied</span>Pain / Ache
-            </button>
-            <button class="cond-btn" data-cond="fever" onclick="selectCondition('fever')">
-              <span class="material-icons-outlined" style="color:#FF7043">thermostat</span>Fever
-            </button>
-            <button class="cond-btn" data-cond="malaria" onclick="selectCondition('malaria')">
-              <span class="material-icons-outlined" style="color:#388E3C">bug_report</span>Malaria
-            </button>
-            <button class="cond-btn" data-cond="infection" onclick="selectCondition('infection')">
-              <span class="material-icons-outlined" style="color:#0288D1">coronavirus</span>Infection
-            </button>
-            <button class="cond-btn" data-cond="digestive" onclick="selectCondition('digestive')">
-              <span class="material-icons-outlined" style="color:#8D6E63">sick</span>Stomach / Gut
-            </button>
-            <button class="cond-btn" data-cond="chronic" onclick="selectCondition('chronic')">
-              <span class="material-icons-outlined" style="color:#7B1FA2">monitor_heart</span>Chronic Disease
-            </button>
-            <button class="cond-btn" data-cond="maternal" onclick="selectCondition('maternal')">
-              <span class="material-icons-outlined" style="color:#E91E63">pregnant_woman</span>Maternal
-            </button>
-            <button class="cond-btn" data-cond="skin" onclick="selectCondition('skin')">
-              <span class="material-icons-outlined" style="color:#FF8F00">face</span>Skin
-            </button>
-            <button class="cond-btn" data-cond="other" onclick="selectCondition('other')">
-              <span class="material-icons-outlined" style="color:#607D8B">more_horiz</span>Other
-            </button>
+        <!-- Category grid — 3 columns, descriptive labels -->
+        <div class="cat-grid" id="catGrid"></div>
+
+        <!-- Search bar (secondary option: "I know the drug name") -->
+        <div style="padding:4px 16px 8px">
+          <input type="text" id="medSearch" placeholder="Or search by medicine name…"
+            oninput="onSearch()"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box;transition:border-color .2s">
+        </div>
+
+        <!-- Rx warning (shown when Rx category selected) -->
+        <div class="rx-banner" id="rxBanner" style="display:none">
+          <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0;color:#7B1FA2">medical_services</span>
+          <span>These medicines require a valid prescription. The pharmacist will verify your prescription before dispensing.</span>
+        </div>
+
+        <!-- Medicine list -->
+        <div style="padding:4px 16px">
+          <div class="mo-label" id="medsLabel">All Common Medicines</div>
+          <div id="medsList">
+            <!-- Rendered by JS immediately on page load -->
           </div>
         </div>
 
-        <!-- Drug type: OTC or Prescription -->
-        <div class="mo-section" style="padding-top:4px;padding-bottom:4px">
-          <div class="mo-label">Drug type</div>
-          <div class="drug-type-row">
-            <button class="drug-type-btn selected" id="dtcOtc" onclick="selectDrugType('otc')">
-              💊 Over-the-Counter (OTC)<br><span style="font-size:11px;font-weight:400">No doctor needed</span>
-            </button>
-            <button class="drug-type-btn" id="dtcRx" onclick="selectDrugType('rx')">
-              📋 Prescription (Rx)<br><span style="font-size:11px;font-weight:400">Doctor required</span>
-            </button>
-          </div>
-          <div class="rx-notice" id="rxNotice">
-            <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">verified_user</span>
-            <span>Prescription drugs require a doctor's recommendation. Please add your doctor's name and upload or paste your prescription details below. Homatt will verify before dispensing.</span>
-          </div>
-          <!-- Prescription doctor input (shown only for Rx) -->
-          <div id="rxDoctorWrap" style="display:none">
-            <div class="mo-field">
-              <label>Prescribing Doctor *</label>
-              <input type="text" id="rxDoctorName" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
-            </div>
-          </div>
-        </div>
-
-        <div class="mo-section">
-          <div class="mo-field">
-            <input type="text" id="medSearch" placeholder="Search medicine name…" oninput="filterMeds()">
-          </div>
-          <div class="mo-label" id="medsListLabel">Suggested Medicines</div>
-          <div id="medsList"></div>
-        </div>
-        <div class="mo-section">
-          <div class="mo-label">Or paste your prescription</div>
-          <div class="mo-field">
-            <textarea id="prescriptionText" placeholder="e.g. Amoxicillin 500mg × 21, Paracetamol 500mg × 10…"></textarea>
-          </div>
+        <!-- Prescription paste (secondary) -->
+        <div style="padding:0 16px 8px">
+          <div class="mo-label">Or paste a prescription text</div>
+          <textarea id="prescriptionText"
+            placeholder="e.g. Amoxicillin 500mg × 21, Paracetamol 500mg × 10…"
+            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);-webkit-text-fill-color:var(--text-primary);resize:vertical;min-height:64px;box-sizing:border-box;transition:border-color .2s"></textarea>
         </div>
       </div>
+
       <div class="mo-bottom">
-        <button class="mo-btn primary" id="step1NextBtn" onclick="goMoStep(2)">
-          View Cart <span class="cart-badge" id="cartBadge2" style="font-size:12px;padding:2px 8px;border-radius:10px">0</span>
+        <button class="mo-btn primary" id="step1Btn" onclick="goStep(2)">
+          View Cart
+          <span class="cart-badge" id="cartBadge2" style="font-size:12px;padding:3px 9px">0</span>
           <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
         </button>
       </div>
     </div>
 
-    <!-- STEP 2: Delivery details -->
-    <div class="mo-step" id="mostep2">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="mo-section" style="padding-top:20px">
-          <div class="mo-label">Urgency</div>
-          <div class="urgency-chips">
-            <div class="urgency-chip" id="murg-standard" onclick="selectMUrgency('standard')">Standard (2–4h)</div>
-            <div class="urgency-chip" id="murg-urgent" onclick="selectMUrgency('urgent')">Urgent (within 1h)</div>
+    <!-- ═══════════════════════════════════════
+         STEP 2 — Delivery details
+         ═══════════════════════════════════════ -->
+    <div class="mo-step" id="step2">
+      <div class="mo-scroll" style="padding:16px 16px 80px">
+        <div class="mo-label">Urgency</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <div class="urgency-chip sel" id="urg-standard" onclick="setUrgency('standard')">Standard (2–4h)</div>
+          <div class="urgency-chip" id="urg-urgent" onclick="setUrgency('urgent')">Urgent (within 1h)</div>
+        </div>
+
+        <div class="mo-label">Delivery Address</div>
+        <div class="mo-field">
+          <input type="text" id="deliveryAddress" placeholder="e.g. Plot 14, Ntinda Estate, Kampala" required>
+        </div>
+        <div class="mo-field">
+          <label>Phone Number</label>
+          <input type="tel" id="deliveryPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="mo-field">
+          <label>Payment Method</label>
+          <select id="paymentMethod">
+            <option value="cash_on_delivery">Cash on Delivery</option>
+            <option value="mobile_money">Mobile Money (MTN / Airtel)</option>
+            <option value="wallet">Homatt Wallet</option>
+          </select>
+        </div>
+
+        <!-- Rx prescription block — shown only when Rx category was selected -->
+        <div class="rx-approval" id="rxApproval">
+          <div style="font-size:12px;color:#6A1B9A;font-weight:600;display:flex;gap:6px;align-items:flex-start;margin-bottom:8px">
+            <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">verified_user</span>
+            Prescription required. Enter doctor's name and prescription code (if you have one).
           </div>
-          <div class="mo-label">Delivery Address</div>
-          <div class="mo-field">
-            <input type="text" id="deliveryAddress" placeholder="e.g. Plot 14, Ntinda Estate, Kampala" required>
+          <div class="mo-field" style="margin-bottom:8px">
+            <label>Prescribing Doctor</label>
+            <input type="text" id="rxDoctor" placeholder="e.g. Dr. Namukasa, Mulago Hospital">
           </div>
-          <div class="mo-field">
-            <label>Phone Number for Delivery</label>
-            <input type="tel" id="deliveryPhone" placeholder="+256 7XX XXX XXX">
+          <div class="mo-field" style="margin-bottom:4px">
+            <label>Prescription Code (optional)</label>
+            <input type="text" id="rxCode" placeholder="e.g. HO-4892" style="text-transform:uppercase">
           </div>
-          <div class="mo-field">
-            <label>Payment Method</label>
-            <select id="paymentMethod">
-              <option value="cash_on_delivery">Cash on Delivery</option>
-              <option value="mobile_money">Mobile Money (MTN / Airtel)</option>
-              <option value="wallet">Homatt Wallet</option>
-            </select>
-          </div>
-          <div class="mo-field">
-            <label>Special instructions (optional)</label>
-            <textarea id="deliveryNotes" placeholder="e.g. Call on arrival, gate code is 1234…" style="min-height:60px"></textarea>
+          <div style="font-size:11px;color:#9C4DCC">
+            No code? <a href="clinic-booking.html" style="color:#7B1FA2;font-weight:600">Book a clinic visit →</a>
           </div>
         </div>
+
+        <div class="mo-field">
+          <label>Special instructions (optional)</label>
+          <textarea id="deliveryNotes" placeholder="e.g. Call on arrival, gate code is 1234…" style="min-height:60px"></textarea>
+        </div>
       </div>
-      <div class="mo-bottom" style="display:flex;gap:10px">
-        <button class="mo-btn secondary" style="flex:1" onclick="goMoStep(1)">← Back</button>
-        <button class="mo-btn primary" style="flex:2" onclick="goMoStep(3)">Review →</button>
+      <div class="mo-bottom">
+        <button class="mo-btn secondary" style="max-width:90px" onclick="goStep(1)">← Back</button>
+        <button class="mo-btn primary" onclick="goStep(3)">Review →</button>
       </div>
     </div>
 
-    <!-- STEP 3: Cart / Review -->
-    <div class="mo-step" id="mostep3">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="mo-section" style="padding-top:16px">
-          <div class="mo-label">Your Order</div>
-          <div id="cartSummary"></div>
-          <div style="background:#E0F2F1;border-radius:var(--radius-md);padding:12px 14px;font-size:12px;color:#00695C;display:flex;align-items:center;gap:8px;margin-top:10px">
-            <span class="material-icons-outlined" style="font-size:16px">local_shipping</span>
-            Delivery fee: <strong>UGX 5,000</strong> · Est. time: <span id="etaText">2–4 hours</span>
-          </div>
+    <!-- ═══════════════════════════════════════
+         STEP 3 — Review order + choose pharmacy
+         ═══════════════════════════════════════ -->
+    <div class="mo-step" id="step3">
+      <div class="mo-scroll" style="padding:16px 16px 80px">
+        <div class="mo-label">Your Order</div>
+        <div id="cartSummary"></div>
+        <div style="background:#E0F2F1;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#00695C;display:flex;align-items:center;gap:8px;margin-top:10px">
+          <span class="material-icons-outlined" style="font-size:16px">local_shipping</span>
+          Delivery fee: <strong>UGX 5,000</strong> · Est: <span id="etaText">2–4 hours</span>
         </div>
-        <div class="mo-section">
-          <div class="mo-label">Nearby Pharmacies</div>
-          <div id="pharmacyList">
-            <div style="text-align:center;padding:20px;color:var(--text-secondary)">Loading pharmacies…</div>
-          </div>
+
+        <div class="mo-label" style="margin-top:16px">Select a Pharmacy</div>
+        <div id="pharmList">
+          <div style="text-align:center;padding:20px;color:var(--text-secondary)">Loading pharmacies…</div>
         </div>
       </div>
-      <div class="mo-bottom" style="display:flex;gap:10px">
-        <button class="mo-btn secondary" style="flex:1" onclick="goMoStep(2)">← Back</button>
-        <button class="mo-btn primary" style="flex:2" id="moStep3Btn" onclick="goMoStep(4)">Confirm →</button>
+      <div class="mo-bottom">
+        <button class="mo-btn secondary" style="max-width:90px" onclick="goStep(2)">← Back</button>
+        <button class="mo-btn primary" onclick="goStep(4)">Confirm →</button>
       </div>
     </div>
 
-    <!-- STEP 4: Confirmation -->
-    <div class="mo-step" id="mostep4">
-      <div style="flex:1;overflow-y:auto;padding-bottom:80px">
-        <div class="mo-hero">
-          <div class="mo-hero-icon"><span class="material-icons-outlined">receipt_long</span></div>
-          <div class="mo-heading">Order Summary</div>
-          <div class="mo-subheading">Review before submitting your order</div>
+    <!-- ═══════════════════════════════════════
+         STEP 4 — Final review before submit
+         ═══════════════════════════════════════ -->
+    <div class="mo-step" id="step4">
+      <div class="mo-scroll" style="padding:16px 16px 80px">
+        <div style="text-align:center;padding:16px 0 12px">
+          <div style="width:60px;height:60px;border-radius:20px;background:linear-gradient(135deg,#00695C,#4DB6AC);display:flex;align-items:center;justify-content:center;margin:0 auto 10px">
+            <span class="material-icons-outlined" style="font-size:32px;color:#fff">receipt_long</span>
+          </div>
+          <div style="font-size:18px;font-weight:700">Order Summary</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">Review carefully before placing</div>
         </div>
-        <div class="mo-section">
-          <div id="finalSummary"></div>
-        </div>
+        <div id="finalSummary"></div>
       </div>
-      <div class="mo-bottom" style="display:flex;gap:10px">
-        <button class="mo-btn secondary" style="flex:1" onclick="goMoStep(3)">← Back</button>
-        <button class="mo-btn primary" style="flex:2" id="moSubmitBtn" onclick="submitOrder()">
+      <div class="mo-bottom">
+        <button class="mo-btn secondary" style="max-width:90px" onclick="goStep(3)">← Back</button>
+        <button class="mo-btn primary" id="submitBtn" onclick="submitOrder()">
           <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Place Order
         </button>
       </div>
     </div>
 
-    <!-- SUCCESS -->
-    <div class="mo-step" id="mostepSuccess">
+    <!-- ═══════════════════════════════════════
+         SUCCESS
+         ═══════════════════════════════════════ -->
+    <div class="mo-step" id="stepSuccess">
       <div class="success-container">
         <div style="width:80px;height:80px;border-radius:50%;background:#E0F2F1;display:flex;align-items:center;justify-content:center;margin-bottom:18px">
           <span class="material-icons-outlined" style="font-size:44px;color:#00695C">check_circle</span>
         </div>
         <div style="font-size:22px;font-weight:700;margin-bottom:8px">Order Placed!</div>
         <div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px">Your order reference:</div>
-        <div class="order-code-box">
-          <div class="order-code-text" id="orderCodeDisplay">ORD-XXXX</div>
-        </div>
+        <div class="order-code-box"><div class="order-code-text" id="orderCodeDisplay">ORD-XXXX</div></div>
         <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px">
-          The pharmacy has been notified. A rider will deliver your medicines to <strong id="confirmAddress">your address</strong>.<br>
-          You'll receive an SMS when the order is confirmed.
+          The pharmacy has been notified and will confirm your order shortly.<br>
+          Medicines will be delivered to <strong id="confirmAddress">your address</strong>.<br>
+          You'll receive an SMS confirmation.
         </div>
-        <button class="mo-btn primary" style="margin-bottom:10px" onclick="window.location.href='dashboard.html'">
+        <button class="mo-btn primary" style="margin-bottom:10px;width:100%" onclick="window.location.href='dashboard.html'">
           <span class="material-icons-outlined" style="font-size:18px">home</span> Back to Dashboard
         </button>
-        <button class="mo-btn secondary" onclick="window.location.href='medicine-orders.html'">Order Again</button>
+        <button class="mo-btn secondary" style="width:100%" onclick="window.location.href='medicine-orders.html'">Order Again</button>
       </div>
     </div>
 
-  </div>
-</div>
+  </div><!-- end app-screen -->
+</div><!-- end phone-frame -->
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/config.js"></script>
+<!-- Supabase CDN — loaded async so it never blocks the UI -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
+<script src="js/config.js" defer></script>
 <script>
-const cfg = window.HOMATT_CONFIG || {};
-const supa = (cfg.SUPABASE_URL && window.supabase)
-  ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+/* ═══════════════════════════════════════════════════════
+   HOMATT MEDICINE ORDERS — clean, self-contained module
+   All UI logic works WITHOUT any network requests.
+   Supabase is only used for the final submit.
+   ═══════════════════════════════════════════════════════ */
 
-document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
-
-let cart = {};     // { medicine_name: { name, qty, price } }
-let order = { urgency: 'standard', address: '', phone: '', payment: 'cash_on_delivery', notes: '', pharmacyId: null, pharmacyName: null, condition: '', drugType: 'otc', rxDoctor: '' };
-let allMeds = [];
-let selectedCondition = '';
-let selectedDrugType = 'otc';
-
-// Medicines grouped by condition
-const CONDITION_MEDS = {
-  pain:      ['Paracetamol 500mg', 'Ibuprofen 400mg', 'Diclofenac 50mg'],
-  fever:     ['Paracetamol 500mg', 'Ibuprofen 400mg', 'ORS Sachet'],
-  malaria:   ['Coartem 20/120mg (Malaria)', 'ORS Sachet', 'Paracetamol 500mg'],
-  infection: ['Amoxicillin 500mg', 'Ciprofloxacin 500mg', 'Metronidazole 400mg'],
-  digestive: ['ORS Sachet', 'Metronidazole 400mg', 'Omeprazole 20mg', 'Ibuprofen 400mg'],
-  chronic:   ['Metformin 500mg', 'Amlodipine 5mg', 'Prednisolone 5mg', 'Omeprazole 20mg'],
-  maternal:  ['Folic Acid 5mg', 'Ferrous Sulphate 200mg', 'ORS Sachet'],
-  skin:      ['Prednisolone 5mg', 'Ciprofloxacin 500mg', 'Amoxicillin 500mg'],
-  other:     [],
-};
-
-function selectCondition(cond) {
-  selectedCondition = cond;
-  document.querySelectorAll('.cond-btn').forEach(b => b.classList.toggle('selected', b.dataset.cond === cond));
-  const label = document.getElementById('medsListLabel');
-  if (label) label.textContent = cond === 'other' ? 'All Medicines' : 'Suggested for your condition';
-  filterMeds();
-}
-
-function selectDrugType(type) {
-  selectedDrugType = type;
-  order.drugType = type;
-  document.getElementById('dtcOtc').classList.toggle('selected', type === 'otc');
-  document.getElementById('dtcRx').classList.toggle('selected', false);
-  document.getElementById('dtcRx').classList.toggle('rx-selected', type === 'rx');
-  const notice = document.getElementById('rxNotice');
-  const wrap = document.getElementById('rxDoctorWrap');
-  if (type === 'rx') {
-    notice.classList.add('visible');
-    wrap.style.display = 'block';
-  } else {
-    notice.classList.remove('visible');
-    wrap.style.display = 'none';
-  }
-}
-
-const MOCK_MEDS = [
-  { name:'Coartem 20/120mg (Malaria)', price:3200 },
-  { name:'Paracetamol 500mg', price:500 },
-  { name:'Amoxicillin 500mg', price:850 },
-  { name:'ORS Sachet', price:1200 },
-  { name:'Metformin 500mg', price:600 },
-  { name:'Amlodipine 5mg', price:700 },
-  { name:'Folic Acid 5mg', price:300 },
-  { name:'Ferrous Sulphate 200mg', price:400 },
-  { name:'Metronidazole 400mg', price:900 },
-  { name:'Ibuprofen 400mg', price:600 },
-  { name:'Ciprofloxacin 500mg', price:1000 },
-  { name:'Omeprazole 20mg', price:800 },
-  { name:'Insulin (Actrapid 10ml)', price:28000 },
-  { name:'Salbutamol Inhaler', price:9500 },
-  { name:'Prednisolone 5mg', price:400 },
+/* ── Category definitions ── */
+var CATS = [
+  { id:'headache',  emoji:'🤕', name:'Headache',         desc:'Head pain, migraine',              rx:false },
+  { id:'fever',     emoji:'🌡', name:'Fever & Flu',       desc:'Temperature, body heat',            rx:false },
+  { id:'malaria',   emoji:'🦟', name:'Malaria',           desc:'Chills, shivering, joint pain',     rx:false },
+  { id:'throat',    emoji:'😷', name:'Throat & Cough',    desc:'Sore throat, cough, cold',          rx:false },
+  { id:'stomach',   emoji:'🤢', name:'Stomach Ache',      desc:'Cramps, ulcers, acidity',           rx:false },
+  { id:'diarrhea',  emoji:'💧', name:'Diarrhea',          desc:'Loose stool, vomiting, dehydration',rx:false },
+  { id:'back_pain', emoji:'💪', name:'Back & Joint Pain', desc:'Back pain, arthritis, muscle ache', rx:false },
+  { id:'eye_ear',   emoji:'👁', name:'Eye & Ear',         desc:'Eye infection, ear ache',           rx:false },
+  { id:'skin',      emoji:'🌿', name:'Skin & Allergy',    desc:'Rash, itching, eczema, hives',      rx:false },
+  { id:'women',     emoji:'🤰', name:"Women's Health",    desc:'Pregnancy, periods, iron',          rx:false },
+  { id:'children',  emoji:'👶', name:"Children's Health", desc:'Kids fever, diarrhea, cough',       rx:false },
+  { id:'chronic',   emoji:'💊', name:'Diabetes & BP',     desc:'Chronic conditions (Rx needed)',    rx:true  },
+  { id:'rx',        emoji:'📋', name:'Prescription (Rx)', desc:'Requires doctor approval',          rx:true  },
 ];
 
-const STEPS_MO = ['Select Medicines','Delivery Details','Review Order','Confirm'];
+/* ── Medicine catalog per category ── */
+var CAT_MEDS = {
+  headache:  [
+    { n:'Paracetamol 500mg',     p:500,  use:'Headache & mild pain' },
+    { n:'Ibuprofen 400mg',       p:600,  use:'Headache & inflammation' },
+    { n:'Aspirin 300mg',         p:400,  use:'Headache, mild fever' },
+    { n:'Diclofenac 50mg',       p:700,  use:'Severe headache & pain' },
+  ],
+  fever: [
+    { n:'Paracetamol 500mg',     p:500,  use:'Fever & body pain' },
+    { n:'Ibuprofen 400mg',       p:600,  use:'Fever & inflammation' },
+    { n:'ORS Sachet',            p:1200, use:'Rehydration during fever' },
+    { n:'Vitamin C 500mg',       p:600,  use:'Immune support' },
+  ],
+  malaria: [
+    { n:'Coartem 20/120mg',      p:3200, use:'Malaria treatment (AL)' },
+    { n:'Paracetamol 500mg',     p:500,  use:'Fever & pain relief' },
+    { n:'ORS Sachet',            p:1200, use:'Rehydration' },
+  ],
+  throat: [
+    { n:'Amoxicillin 500mg',     p:850,  use:'Bacterial throat infection' },
+    { n:'Strepsils Lozenges',    p:2500, use:'Throat soothing' },
+    { n:'Benadryl Cough Syrup',  p:4500, use:'Cough & cold relief' },
+    { n:'Paracetamol 500mg',     p:500,  use:'Throat pain & fever' },
+    { n:'Nasal Saline Spray',    p:6000, use:'Blocked nose & sinuses' },
+  ],
+  stomach: [
+    { n:'Omeprazole 20mg',       p:800,  use:'Stomach acid & ulcers' },
+    { n:'Buscopan 10mg',         p:1200, use:'Stomach cramps & spasms' },
+    { n:'Antacid Tablet',        p:300,  use:'Heartburn & acidity' },
+    { n:'Paracetamol 500mg',     p:500,  use:'Stomach pain' },
+    { n:'Metronidazole 400mg',   p:900,  use:'Stomach infection' },
+  ],
+  diarrhea: [
+    { n:'ORS Sachet',            p:1200, use:'Rehydration — MOST IMPORTANT' },
+    { n:'Metronidazole 400mg',   p:900,  use:'Intestinal infection' },
+    { n:'Zinc Sulphate 20mg',    p:500,  use:'Diarrhea recovery (children & adults)' },
+    { n:'Loperamide 2mg',        p:800,  use:'Stops diarrhea (adults only)' },
+  ],
+  back_pain: [
+    { n:'Diclofenac 50mg',       p:700,  use:'Back pain & arthritis' },
+    { n:'Ibuprofen 400mg',       p:600,  use:'Joint pain & swelling' },
+    { n:'Paracetamol 500mg',     p:500,  use:'Mild pain' },
+    { n:'Voltaren Gel 100g',     p:12000,use:'Topical pain relief (rub on)' },
+  ],
+  eye_ear: [
+    { n:'Chloramphenicol Eye Drops', p:2500, use:'Eye infection & redness' },
+    { n:'Gentamicin Eye Drops',  p:2800, use:'Bacterial eye infection' },
+    { n:'Ciprofloxacin Ear Drops',p:3500, use:'Ear infection' },
+    { n:'Normal Saline Eye Wash',p:2000, use:'Eye wash & foreign body' },
+  ],
+  skin: [
+    { n:'Hydrocortisone 1% Cream',p:3000,use:'Skin rash, eczema & itching' },
+    { n:'Cetirizine 10mg',       p:500,  use:'Allergy & hives' },
+    { n:'Chlorpheniramine 4mg',  p:300,  use:'Allergy & itching' },
+    { n:'Calamine Lotion',       p:2000, use:'Skin itching & rash' },
+    { n:'Amoxicillin 500mg',     p:850,  use:'Infected skin wound' },
+  ],
+  women: [
+    { n:'Folic Acid 5mg',        p:300,  use:'Pregnancy supplement (neural tube)' },
+    { n:'Ferrous Sulphate 200mg',p:400,  use:'Iron deficiency & anaemia' },
+    { n:'Mefenamic Acid 500mg',  p:800,  use:'Period pain & cramps' },
+    { n:'ORS Sachet',            p:1200, use:'Hydration during pregnancy' },
+    { n:'Vitamin B Complex',     p:900,  use:'Pregnancy vitamins' },
+  ],
+  children: [
+    { n:'Paracetamol Syrup 250mg/5ml', p:3500, use:'Fever & pain (children)' },
+    { n:'Amoxicillin Syrup 125mg/5ml', p:4500, use:'Infections (children)' },
+    { n:'ORS Sachet',                  p:1200, use:'Rehydration (most important)' },
+    { n:'Zinc Sulphate 20mg',          p:500,  use:'Diarrhea recovery in children' },
+    { n:'Benadryl Children Syrup',     p:4000, use:'Cough & cold (children)' },
+  ],
+  chronic: [
+    { n:'Metformin 500mg',       p:600,  use:'Type 2 diabetes',         rx:true },
+    { n:'Amlodipine 5mg',        p:700,  use:'High blood pressure',     rx:true },
+    { n:'Atenolol 50mg',         p:500,  use:'High blood pressure',     rx:true },
+    { n:'Glibenclamide 5mg',     p:400,  use:'Diabetes',                rx:true },
+    { n:'Prednisolone 5mg',      p:400,  use:'Inflammation & asthma',   rx:true },
+    { n:'Salbutamol Inhaler',    p:9500, use:'Asthma & breathing',      rx:true },
+  ],
+  rx: [
+    { n:'Ciprofloxacin 500mg',   p:1000, use:'Severe bacterial infection', rx:true },
+    { n:'Amoxicillin 500mg',     p:850,  use:'Bacterial infection',        rx:true },
+    { n:'Metformin 500mg',       p:600,  use:'Diabetes',                   rx:true },
+    { n:'Amlodipine 5mg',        p:700,  use:'Blood pressure',             rx:true },
+    { n:'Insulin Actrapid 10ml', p:28000,use:'Diabetes (insulin)',         rx:true },
+    { n:'Prednisolone 5mg',      p:400,  use:'Inflammation',               rx:true },
+  ],
+};
 
-function goMoStep(n) {
-  if (n === 2) {
-    const pText = document.getElementById('prescriptionText').value.trim();
-    if (!Object.keys(cart).length && !pText) { alert('Please add at least one medicine or paste a prescription'); return; }
-    // Collect drug type and doctor details
-    order.condition = selectedCondition;
-    order.drugType = selectedDrugType;
-    order.rxDoctor = (document.getElementById('rxDoctorName') || {}).value || '';
-    if (selectedDrugType === 'rx' && !order.rxDoctor.trim()) {
-      alert("For prescription drugs please enter the prescribing doctor's name.");
-      document.getElementById('rxDoctorName').focus();
-      return;
-    }
-    const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
-    if (session.city || session.district) {
-      const addr = document.getElementById('deliveryAddress');
-      if (!addr.value) addr.value = session.district ? session.district + ', Uganda' : '';
-    }
-    const ph = document.getElementById('deliveryPhone');
-    if (!ph.value && (session.phone_number || session.phone)) ph.value = session.phone_number || session.phone;
+/* ── Default all-OTC list (shown before any category selected) ── */
+var ALL_MEDS = [
+  { n:'Paracetamol 500mg',       p:500,  use:'Headache, fever & pain' },
+  { n:'Ibuprofen 400mg',         p:600,  use:'Pain, fever & inflammation' },
+  { n:'ORS Sachet',              p:1200, use:'Rehydration for diarrhea & fever' },
+  { n:'Coartem 20/120mg',        p:3200, use:'Malaria treatment' },
+  { n:'Amoxicillin 500mg',       p:850,  use:'Bacterial infections' },
+  { n:'Metronidazole 400mg',     p:900,  use:'Stomach & intestinal infections' },
+  { n:'Omeprazole 20mg',         p:800,  use:'Stomach acid & ulcers' },
+  { n:'Cetirizine 10mg',         p:500,  use:'Allergy & hives' },
+  { n:'Folic Acid 5mg',          p:300,  use:'Pregnancy supplement' },
+  { n:'Ferrous Sulphate 200mg',  p:400,  use:'Iron deficiency & anaemia' },
+  { n:'Diclofenac 50mg',         p:700,  use:'Joint & back pain' },
+  { n:'Zinc Sulphate 20mg',      p:500,  use:'Diarrhea recovery' },
+  { n:'Loperamide 2mg',          p:800,  use:'Stops diarrhea (adults)' },
+  { n:'Vitamin C 500mg',         p:600,  use:'Immune support' },
+  { n:'Aspirin 300mg',           p:400,  use:'Headache & mild fever' },
+];
+
+/* ── State ── */
+var cart = {};           // { "medicine name": { n, p, qty } }
+var order = {
+  urgency:'standard', address:'', phone:'', payment:'cash_on_delivery',
+  notes:'', pharmacyId:null, pharmacyName:null,
+  catId:'', isRx:false, rxDoctor:'', rxCode:''
+};
+var activeCat = null;   // currently selected category id
+
+/* ── Lazy Supabase (CDN loads async) ── */
+var _supa = null;
+function getSupa() {
+  if (_supa) return _supa;
+  var cfg = (window.HOMATT_CONFIG || {});
+  if (cfg.SUPABASE_URL && window.supabase) {
+    try { _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch(e) {}
   }
-  if (n === 3) {
-    order.urgency = document.querySelector('.urgency-chip.selected')?.id.replace('murg-','') || 'standard';
-    order.address = document.getElementById('deliveryAddress').value.trim();
-    order.phone = document.getElementById('deliveryPhone').value.trim();
-    order.payment = document.getElementById('paymentMethod').value;
-    order.notes = document.getElementById('deliveryNotes').value.trim();
-    if (!order.address) { alert('Please enter a delivery address'); return; }
-    document.getElementById('etaText').textContent = order.urgency === 'urgent' ? '30–60 min' : '2–4 hours';
-    renderCartSummary();
-    loadPharmacies();
-  }
-  if (n === 4) {
-    renderFinalSummary();
-  }
-  document.querySelectorAll('.mo-step').forEach(s => s.classList.remove('active'));
-  document.getElementById('mostep' + (n <= 4 ? n : 'Success')).classList.add('active');
-  for (let i = 1; i <= 4; i++) {
-    const d = document.getElementById('mprog' + i);
-    if (d) d.classList.toggle('active', i <= n);
-  }
-  document.getElementById('moStepLabel').textContent = `Step ${Math.min(n,4)} of 4 — ${STEPS_MO[Math.min(n,4)-1]}`;
+  return _supa;
 }
 
-function selectMUrgency(u) {
-  order.urgency = u;
-  document.querySelectorAll('.urgency-chip').forEach(c => c.classList.remove('selected'));
-  document.getElementById('murg-' + u)?.classList.add('selected');
-}
-selectMUrgency('standard');
+/* ══════════════════════════════════════
+   RENDERING
+   ══════════════════════════════════════ */
 
-function updateCartBadge() {
-  const total = Object.values(cart).reduce((s,m) => s + m.qty, 0);
-  ['cartBadge','cartBadge2'].forEach(id => {
-    const el = document.getElementById(id);
+function renderCatGrid() {
+  var html = CATS.map(function(c) {
+    var sel = activeCat === c.id ? ' sel' : '';
+    var rxCls = c.rx ? ' rx-cat' : '';
+    return '<button class="cat-tile' + sel + rxCls + '" onclick="selectCat(\'' + c.id + '\')" type="button">'
+      + '<span class="cat-emoji">' + c.emoji + '</span>'
+      + '<span class="cat-name">' + c.name + '</span>'
+      + '</button>';
+  }).join('');
+  var grid = document.getElementById('catGrid');
+  if (grid) grid.innerHTML = html;
+}
+
+function renderMedList(meds) {
+  var list = document.getElementById('medsList');
+  if (!list) return;
+  if (!meds || !meds.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No medicines in this category</div>';
+    return;
+  }
+  list.innerHTML = meds.map(function(m) {
+    var key = m.n;
+    var qty = (cart[key] && cart[key].qty) || 0;
+    var inCart = qty > 0;
+    var rxBadge = m.rx ? '<span class="rx-badge">Rx</span>' : '';
+    return '<div class="med-item' + (inCart ? ' in-cart' : '') + '">'
+      + '<div class="med-icon"><span class="material-icons-outlined" style="font-size:22px;color:#00695C">medication</span></div>'
+      + '<div style="flex:1;min-width:0">'
+      +   '<div class="med-name">' + key + rxBadge + '</div>'
+      +   '<div class="med-use">' + (m.use || '') + '</div>'
+      +   '<div class="med-price">UGX ' + m.p.toLocaleString() + ' each</div>'
+      + '</div>'
+      + '<div class="qty-control">'
+      +   '<button class="qty-btn" type="button" onclick="moRemove(\'' + esc(key) + '\')"' + (!inCart ? ' disabled' : '') + '>−</button>'
+      +   '<span class="qty-num">' + qty + '</span>'
+      +   '<button class="qty-btn" type="button" onclick="moAdd(\'' + esc(key) + '\',' + m.p + ')">+</button>'
+      + '</div>'
+      + '</div>';
+  }).join('');
+}
+
+function esc(s) { return s.replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+function renderCurrentMeds() {
+  var searchQ = (document.getElementById('medSearch') || {}).value || '';
+  searchQ = searchQ.toLowerCase().trim();
+
+  var meds;
+  if (searchQ.length >= 2) {
+    meds = ALL_MEDS.filter(function(m) { return m.n.toLowerCase().indexOf(searchQ) !== -1; });
+    // Also search category meds
+    Object.keys(CAT_MEDS).forEach(function(k) {
+      CAT_MEDS[k].forEach(function(m) {
+        if (m.n.toLowerCase().indexOf(searchQ) !== -1 && !meds.find(function(x){return x.n===m.n;})) {
+          meds.push(m);
+        }
+      });
+    });
+    var label = document.getElementById('medsLabel');
+    if (label) label.textContent = 'Search results for "' + searchQ + '"';
+  } else if (activeCat) {
+    // Special categories 'otc' and 'rx' filter the full ALL_MEDS list by rx flag
+    if (activeCat === 'otc') {
+      meds = ALL_MEDS.filter(function(m){ return !m.rx; });
+      // Also add all non-rx category meds
+      Object.keys(CAT_MEDS).forEach(function(k) {
+        CAT_MEDS[k].forEach(function(m) {
+          if (!m.rx && !meds.find(function(x){return x.n===m.n;})) meds.push(m);
+        });
+      });
+    } else if (activeCat === 'rx') {
+      meds = ALL_MEDS.filter(function(m){ return m.rx; });
+      Object.keys(CAT_MEDS).forEach(function(k) {
+        CAT_MEDS[k].forEach(function(m) {
+          if (m.rx && !meds.find(function(x){return x.n===m.n;})) meds.push(m);
+        });
+      });
+    } else {
+      meds = CAT_MEDS[activeCat] || [];
+    }
+  } else {
+    meds = ALL_MEDS;
+  }
+  renderMedList(meds);
+}
+
+/* ══════════════════════════════════════
+   INTERACTIONS
+   ══════════════════════════════════════ */
+
+function selectCat(id) {
+  activeCat = (activeCat === id) ? null : id;  // toggle off on second tap
+  order.catId = activeCat || '';
+
+  var cat = CATS.find(function(c){ return c.id === id; });
+  var isRx = cat && cat.rx;
+  order.isRx = !!isRx;
+
+  // Rx banner
+  var banner = document.getElementById('rxBanner');
+  if (banner) banner.style.display = (activeCat && isRx) ? 'flex' : 'none';
+
+  // Label
+  var label = document.getElementById('medsLabel');
+  if (label) {
+    if (!activeCat) label.textContent = 'All Common Medicines';
+    else label.textContent = cat ? cat.name + ' — suggested medicines' : 'Medicines';
+  }
+
+  // Clear search so category takes effect
+  var srch = document.getElementById('medSearch');
+  if (srch) srch.value = '';
+
+  renderCatGrid();
+  renderCurrentMeds();
+}
+
+function onSearch() {
+  activeCat = null;
+  order.catId = '';
+  var label = document.getElementById('medsLabel');
+  var srch = (document.getElementById('medSearch') || {}).value || '';
+  if (label) label.textContent = srch.length >= 2 ? 'Search results' : 'All Common Medicines';
+  renderCatGrid();
+  renderCurrentMeds();
+}
+
+function moAdd(name, price) {
+  if (!cart[name]) cart[name] = { n:name, p:price, qty:0 };
+  cart[name].qty++;
+  updateBadge();
+  renderCurrentMeds();
+}
+
+function moRemove(name) {
+  if (!cart[name]) return;
+  cart[name].qty--;
+  if (cart[name].qty <= 0) delete cart[name];
+  updateBadge();
+  renderCurrentMeds();
+}
+
+function updateBadge() {
+  var total = 0;
+  Object.values(cart).forEach(function(m){ total += m.qty; });
+  ['cartBadge','cartBadge2'].forEach(function(id){
+    var el = document.getElementById(id);
     if (el) el.textContent = total;
   });
 }
 
-function addToCart(name, price) {
-  if (!cart[name]) cart[name] = { name, qty: 0, price };
-  cart[name].qty++;
-  updateCartBadge();
-  renderMeds();
+function setUrgency(u) {
+  order.urgency = u;
+  document.querySelectorAll('.urgency-chip').forEach(function(c){ c.classList.remove('sel'); });
+  var chip = document.getElementById('urg-' + u);
+  if (chip) chip.classList.add('sel');
 }
 
-function removeFromCart(name) {
-  if (!cart[name]) return;
-  cart[name].qty--;
-  if (cart[name].qty <= 0) delete cart[name];
-  updateCartBadge();
-  renderMeds();
-}
+/* ══════════════════════════════════════
+   STEP NAVIGATION
+   ══════════════════════════════════════ */
 
-function filterMeds() {
-  const q = document.getElementById('medSearch').value.toLowerCase();
-  let displayed = allMeds;
-  if (q) {
-    displayed = allMeds.filter(m => m.name.toLowerCase().includes(q));
-  } else if (selectedCondition && selectedCondition !== 'other') {
-    const suggested = CONDITION_MEDS[selectedCondition] || [];
-    // Put suggested first, then rest
-    const suggSet = new Set(suggested);
-    const top = allMeds.filter(m => suggSet.has(m.name));
-    const rest = allMeds.filter(m => !suggSet.has(m.name));
-    displayed = [...top, ...rest];
+var STEP_LABELS = ['Choose Medicines','Delivery Details','Review Order','Confirm'];
+
+function goStep(n) {
+  if (n === 2) {
+    var items = Object.values(cart);
+    var pText = (document.getElementById('prescriptionText') || {}).value || '';
+    if (!items.length && !pText.trim()) {
+      alert('Please select at least one medicine or paste a prescription.');
+      return;
+    }
+    // Show Rx fields if needed
+    var rxBlk = document.getElementById('rxApproval');
+    if (rxBlk) rxBlk.className = 'rx-approval' + (order.isRx ? ' show' : '');
+    // Pre-fill from session
+    var sess = {};
+    try { sess = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e){}
+    var addr = document.getElementById('deliveryAddress');
+    if (addr && !addr.value && sess.district) addr.value = sess.district + ', Uganda';
+    var ph = document.getElementById('deliveryPhone');
+    if (ph && !ph.value && (sess.phone_number || sess.phone)) ph.value = sess.phone_number || sess.phone || '';
   }
-  document.getElementById('medsList').innerHTML = displayed.map(m => {
-    const c = cart[m.name];
-    return `<div class="med-item ${c ? 'selected' : ''}">
-      <div class="med-icon"><span class="material-icons-outlined" style="font-size:22px;color:#00695C">medication</span></div>
-      <div style="flex:1">
-        <div class="med-name">${m.name}</div>
-        <div class="med-price">UGX ${m.price.toLocaleString()} each</div>
-      </div>
-      <div class="qty-control">
-        <button class="qty-btn" onclick="removeFromCart('${m.name.replace(/'/g,'\\\'')}')" ${!c ? 'disabled style="opacity:.4"' : ''}>−</button>
-        <span class="qty-num">${c ? c.qty : 0}</span>
-        <button class="qty-btn" onclick="addToCart('${m.name.replace(/'/g,'\\\')}', ${m.price})">+</button>
-      </div>
-    </div>`;
-  }).join('') || '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No medicines found</div>';
+
+  if (n === 3) {
+    order.address  = (document.getElementById('deliveryAddress') || {}).value || '';
+    order.phone    = (document.getElementById('deliveryPhone') || {}).value || '';
+    order.payment  = (document.getElementById('paymentMethod') || {}).value || 'cash_on_delivery';
+    order.notes    = (document.getElementById('deliveryNotes') || {}).value || '';
+    order.rxDoctor = (document.getElementById('rxDoctor') || {}).value || '';
+    order.rxCode   = (document.getElementById('rxCode') || {}).value || '';
+    if (!order.address) { alert('Please enter a delivery address.'); return; }
+    if (order.isRx && !order.rxDoctor) { alert("Please enter the prescribing doctor's name for prescription medicines."); return; }
+    var eta = document.getElementById('etaText');
+    if (eta) eta.textContent = order.urgency === 'urgent' ? '30–60 min' : '2–4 hours';
+    renderCartSummary();
+    loadPharmacies();
+  }
+
+  if (n === 4) renderFinalSummary();
+
+  // Show correct step
+  ['step1','step2','step3','step4','stepSuccess'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  var target = (n >= 1 && n <= 4) ? 'step' + n : 'stepSuccess';
+  var tEl = document.getElementById(target);
+  if (tEl) tEl.classList.add('active');
+
+  // Progress dots
+  for (var i = 1; i <= 4; i++) {
+    var dot = document.getElementById('mp' + i);
+    if (dot) dot.classList.toggle('active', i <= n);
+  }
+  var lbl = document.getElementById('moStepLabel');
+  if (lbl) lbl.textContent = 'Step ' + Math.min(n,4) + ' of 4 — ' + (STEP_LABELS[Math.min(n,4)-1] || '');
 }
+
+/* ══════════════════════════════════════
+   CART SUMMARY & PHARMACY
+   ══════════════════════════════════════ */
 
 function renderCartSummary() {
-  const items = Object.values(cart);
-  const pText = document.getElementById('prescriptionText').value.trim();
-  const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
-  document.getElementById('cartSummary').innerHTML = `
-    <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px">
-      ${items.map(m => `
-        <div class="cart-row">
-          <span style="font-size:13px">${m.name}</span>
-          <span style="font-size:13px;font-weight:600">×${m.qty} — UGX ${(m.qty*m.price).toLocaleString()}</span>
-        </div>`).join('')}
-      ${pText ? `<div class="cart-row"><span style="font-size:12px;color:var(--text-secondary);font-style:italic">Prescription: ${pText.slice(0,60)}${pText.length>60?'…':''}</span></div>` : ''}
-      <div class="cart-row"><span>Delivery fee</span><span>UGX 5,000</span></div>
-      <div class="total-row">
-        <span>Total</span>
-        <span style="color:#00695C">UGX ${total.toLocaleString()}</span>
-      </div>
-    </div>`;
+  var items = Object.values(cart);
+  var pText = (document.getElementById('prescriptionText') || {}).value || '';
+  var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
+  var total = subtotal + 5000;
+  var el = document.getElementById('cartSummary');
+  if (!el) return;
+  el.innerHTML = '<div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px">'
+    + items.map(function(m){
+      return '<div class="cart-row">'
+        + '<span style="font-size:13px">' + m.n + '</span>'
+        + '<span style="font-size:13px;font-weight:600">×' + m.qty + ' — UGX ' + (m.qty*m.p).toLocaleString() + '</span>'
+        + '</div>';
+    }).join('')
+    + (pText ? '<div class="cart-row"><span style="font-size:12px;color:var(--text-secondary);font-style:italic">Prescription: ' + pText.slice(0,60) + (pText.length>60?'…':'') + '</span></div>' : '')
+    + '<div class="cart-row"><span>Delivery fee</span><span>UGX 5,000</span></div>'
+    + '<div class="total-row"><span>Total</span><span style="color:#00695C">UGX ' + total.toLocaleString() + '</span></div>'
+    + '</div>';
 }
 
-async function loadPharmacies() {
-  const list = document.getElementById('pharmacyList');
-  let pharmacies = [];
+function loadPharmacies() {
+  var listEl = document.getElementById('pharmList');
+  if (!listEl) return;
+  var supa = getSupa();
+
+  function renderPharms(pharmacies) {
+    listEl.innerHTML = pharmacies.map(function(p) {
+      return '<div class="pharmacy-card' + (order.pharmacyId === p.id ? ' sel' : '') + '" onclick="pickPharm(\'' + esc(String(p.id)) + '\',\'' + esc(p.name||'') + '\')">'
+        + '<div style="width:40px;height:40px;border-radius:10px;background:#E0F2F1;display:flex;align-items:center;justify-content:center;flex-shrink:0">'
+        +   '<span class="material-icons-outlined" style="color:#00695C;font-size:22px">local_pharmacy</span>'
+        + '</div>'
+        + '<div style="flex:1">'
+        +   '<div style="font-size:13px;font-weight:600">' + (p.name||'') + '</div>'
+        +   '<div style="font-size:11px;color:var(--text-secondary)">' + (p.address||'') + (p.district?', '+p.district:'') + '</div>'
+        + '</div>'
+        + '<span class="material-icons-outlined" style="color:var(--border)">chevron_right</span>'
+        + '</div>';
+    }).join('');
+  }
+
   if (supa) {
-    const { data } = await supa.from('pharmacies').select('id,name,address,district').eq('active', true).eq('verified', true).order('name');
-    pharmacies = data || [];
+    supa.from('pharmacies').select('id,name,address,district').eq('active',true).order('name')
+      .then(function(res) {
+        if (res.data && res.data.length) { renderPharms(res.data); return; }
+        renderPharms(MOCK_PHARMACIES);
+      })
+      .catch(function(){ renderPharms(MOCK_PHARMACIES); });
+  } else {
+    renderPharms(MOCK_PHARMACIES);
   }
-  if (!pharmacies.length) {
-    pharmacies = [
-      { id:'p1', name:'Ntinda Health Pharmacy', address:'Ntinda Estate', district:'Kampala' },
-      { id:'p2', name:'City Chemist Nakasero', address:'Nakasero Road', district:'Kampala' },
-      { id:'p3', name:'Kampala Pharmacy Wandegeya', address:'Wandegeya Market', district:'Kampala' },
-    ];
-  }
-  list.innerHTML = pharmacies.map(p => `
-    <div class="pharmacy-card" id="ph-${p.id}" onclick="selectPharmacy('${p.id}', '${(p.name||'').replace(/'/g,"\\'")}')">
-      <div style="width:40px;height:40px;border-radius:10px;background:#E0F2F1;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-        <span class="material-icons-outlined" style="color:#00695C;font-size:22px">local_pharmacy</span>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600">${p.name}</div>
-        <div style="font-size:11px;color:var(--text-secondary)">${p.address||''}, ${p.district||'Kampala'}</div>
-      </div>
-      <span class="material-icons-outlined" style="color:var(--border)">chevron_right</span>
-    </div>`).join('');
 }
 
-function selectPharmacy(id, name) {
-  order.pharmacyId = id;
+var MOCK_PHARMACIES = [
+  { id:'p1', name:'Ntinda Health Pharmacy',        address:'Ntinda Estate',   district:'Kampala' },
+  { id:'p2', name:'City Chemist Nakasero',          address:'Nakasero Road',   district:'Kampala' },
+  { id:'p3', name:'Kampala Pharmacy Wandegeya',     address:'Wandegeya Market',district:'Kampala' },
+];
+
+function pickPharm(id, name) {
+  order.pharmacyId   = id;
   order.pharmacyName = name;
-  document.querySelectorAll('.pharmacy-card').forEach(c => c.classList.remove('selected'));
-  document.getElementById('ph-' + id)?.classList.add('selected');
+  document.querySelectorAll('.pharmacy-card').forEach(function(c){ c.classList.remove('sel'); });
+  var el = document.getElementById('ph-' + id);
+  if (el) el.classList.add('sel');
+  // Also mark via re-render
+  loadPharmacies();
 }
 
 function renderFinalSummary() {
-  const items = Object.values(cart);
-  const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
-  document.getElementById('finalSummary').innerHTML = `
-    <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px;margin-bottom:12px">
-      ${[
-        ['Pharmacy', order.pharmacyName || 'Nearest available'],
-        ['Delivery to', order.address],
-        ['Urgency', order.urgency === 'urgent' ? 'Urgent (30–60 min)' : 'Standard (2–4h)'],
-        ['Payment', order.payment.replace(/_/g,' ')],
-        ['Total', 'UGX ' + total.toLocaleString()],
-      ].map(([k,v]) => `
-        <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:13px">
-          <span style="color:var(--text-secondary)">${k}</span>
-          <span style="font-weight:600;text-align:right;max-width:55%;text-transform:capitalize">${v}</span>
-        </div>`).join('')}
-    </div>
-    <div style="background:#E0F2F1;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#00695C;display:flex;gap:8px;align-items:center">
-      <span class="material-icons-outlined" style="font-size:16px">info</span>
-      Medicines will be delivered by a verified Homatt rider. You'll receive SMS updates.
-    </div>`;
+  var items = Object.values(cart);
+  var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
+  var total = subtotal + 5000;
+  var cat = CATS.find(function(c){ return c.id === order.catId; });
+  var rows = [
+    ['Category', cat ? cat.emoji + ' ' + cat.name : 'General OTC'],
+    ['Pharmacy', order.pharmacyName || 'Nearest available'],
+    ['Delivery to', order.address],
+    ['Urgency', order.urgency === 'urgent' ? 'Urgent (30–60 min)' : 'Standard (2–4h)'],
+    ['Payment', order.payment.replace(/_/g,' ')],
+  ];
+  if (order.isRx) {
+    rows.push(['Type', 'Prescription (Rx)']);
+    if (order.rxDoctor) rows.push(['Doctor', order.rxDoctor]);
+    if (order.rxCode)   rows.push(['Rx Code', order.rxCode]);
+  }
+  rows.push(['Total', 'UGX ' + total.toLocaleString()]);
+
+  var el = document.getElementById('finalSummary');
+  if (!el) return;
+  el.innerHTML = '<div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px;margin-bottom:12px">'
+    + rows.map(function(r){
+      return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #F0F0F0;font-size:13px">'
+        + '<span style="color:var(--text-secondary)">' + r[0] + '</span>'
+        + '<span style="font-weight:600;text-align:right;max-width:60%;text-transform:capitalize">' + r[1] + '</span>'
+        + '</div>';
+    }).join('')
+    + '</div>'
+    + (order.isRx && !order.rxCode
+      ? '<div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#795548;display:flex;gap:8px;align-items:center;margin-bottom:10px">'
+        + '<span class="material-icons-outlined" style="font-size:16px">warning</span>'
+        + 'No prescription code — the pharmacist will contact you to verify before dispensing.</div>'
+      : '')
+    + '<div style="background:#E0F2F1;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#00695C;display:flex;gap:8px;align-items:center">'
+    +   '<span class="material-icons-outlined" style="font-size:16px">info</span>'
+    +   'The pharmacy will review and confirm your order. Medicines delivered by a Homatt rider.'
+    + '</div>';
 }
 
-async function submitOrder() {
-  const btn = document.getElementById('moSubmitBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Placing order…';
+/* ══════════════════════════════════════
+   SUBMIT ORDER
+   ══════════════════════════════════════ */
 
-  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
-  const items = Object.values(cart);
-  const subtotal = items.reduce((s,m) => s + m.qty * m.price, 0);
-  const total = subtotal + 5000;
-  const pText = document.getElementById('prescriptionText').value.trim();
+function submitOrder() {
+  var sess = {};
+  try { sess = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
 
-  const orderItems = items.map(m => ({ name: m.name, qty: m.qty, price: m.price }));
-  if (!orderItems.length && pText) orderItems.push({ name: pText, qty: 1, price: 0 });
+  // ── Self-medication frequency guard ─────────────────────────
+  var supa0 = getSupa();
+  if (supa0 && sess.userId) {
+    var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    supa0.from('pharmacy_orders')
+      .select('id')
+      .eq('patient_id', sess.userId)
+      .gte('created_at', sevenDaysAgo)
+      .then(function(res) {
+        var count = (res.data || []).length;
+        if (count >= 5) {
+          alert('You have placed ' + count + ' prescription orders in the last 7 days.\n\nFrequent self-medication is dangerous. Please visit a clinic for a proper diagnosis.\n\nYou will be redirected to clinic booking.');
+          window.location.href = 'clinic-booking.html';
+          return;
+        }
+        if (count >= 3) {
+          var proceed = confirm('You have ordered medicine ' + count + ' times in the last 7 days.\n\nRepeated self-medication without proper diagnosis can be harmful.\n\nDo you still want to place this order?');
+          if (!proceed) return;
+        }
+        _doSubmitOrder(sess);
+      });
+    return;
+  }
+  _doSubmitOrder(sess);
+}
+// ────────────────────────────────────────────────────────────
 
-  if (supa && session.userId) {
-    const pharmacyId = (order.pharmacyId && !['p1','p2','p3'].includes(order.pharmacyId)) ? order.pharmacyId : null;
-    const payload = {
-      patient_id: session.userId,
-      patient_name: session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : session.name || 'Patient',
-      patient_phone: order.phone || session.phone_number || '',
-      delivery_address: order.address,
-      delivery_district: session.district || null,
-      pharmacy_id: pharmacyId,
-      items: orderItems,
-      urgency: order.urgency,
-      medication_cost: subtotal,
-      delivery_cost: 5000,
-      total_cost: total,
-      payment_method: order.payment,
-      payment_status: 'pending',
-      status: 'incoming',
+function _doSubmitOrder(sess) {
+  var btn = document.getElementById('submitBtn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Placing order…'; }
+
+  var items = Object.values(cart);
+  var pText = (document.getElementById('prescriptionText') || {}).value || '';
+  var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
+  var total = subtotal + 5000;
+
+  var orderItems = items.map(function(m){ return { name:m.n, qty:m.qty, price:m.p }; });
+  if (!orderItems.length && pText.trim()) orderItems.push({ name:pText, qty:1, price:0 });
+
+  var cat = CATS.find(function(c){ return c.id === order.catId; });
+
+  var supa = getSupa();
+  if (supa && sess.userId) {
+    var pharmId = order.pharmacyId;
+    if (pharmId === 'p1' || pharmId === 'p2' || pharmId === 'p3') pharmId = null;
+
+    var payload = {
+      patient_id:                  sess.userId,
+      patient_name:                sess.first_name ? ((sess.first_name||'') + ' ' + (sess.last_name||'')).trim() : (sess.name || 'Patient'),
+      patient_phone:               order.phone || sess.phone_number || '',
+      delivery_address:            order.address,
+      delivery_district:           sess.district || null,
+      pharmacy_id:                 pharmId || null,
+      items:                       orderItems,
+      urgency:                     order.urgency,
+      order_type:                  order.isRx ? 'rx' : 'otc',
+      rx_doctor:                   order.rxDoctor || null,
+      rx_booking_code:             order.rxCode || null,
+      condition_tags:              order.catId || null,
+      patient_symptom_description: cat ? cat.name + ' — ' + cat.desc : null,
+      medication_cost:             subtotal,
+      delivery_cost:               5000,
+      total_cost:                  total,
+      payment_method:              order.payment,
+      payment_status:              'pending',
+      status:                      'incoming',
     };
-    const { error } = await supa.from('pharmacy_orders').insert(payload);
-    if (error) {
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Place Order';
-      alert('Order failed: ' + error.message);
-      return;
-    }
+    supa.from('pharmacy_orders').insert(payload).then(function(res){
+      if (res.error) {
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Place Order'; }
+        alert('Order failed: ' + res.error.message);
+        return;
+      }
+      showSuccess();
+    }).catch(function(e){
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Place Order'; }
+      alert('Order failed. Please try again.');
+    });
+  } else {
+    // Guest / no Supabase — still show success (order stored locally)
+    showSuccess();
   }
-
-  const orderCode = 'ORD-' + Math.random().toString(36).toUpperCase().slice(2,6);
-  document.getElementById('orderCodeDisplay').textContent = orderCode;
-  document.getElementById('confirmAddress').textContent = order.address || 'your address';
-  document.querySelectorAll('.mo-step').forEach(s => s.classList.remove('active'));
-  document.getElementById('mostepSuccess').classList.add('active');
-  document.querySelector('.mo-prog').style.display = 'none';
 }
 
-// Init
-document.addEventListener('DOMContentLoaded', async () => {
-  // Load from cache first so list shows immediately offline
-  const cached = window.HomattCache ? window.HomattCache.load('medicines', []) : [];
-  if (cached.length) { allMeds = cached; filterMeds(); }
+function showSuccess() {
+  var code = 'ORD-' + Math.random().toString(36).toUpperCase().slice(2,6);
+  var codeEl = document.getElementById('orderCodeDisplay');
+  if (codeEl) codeEl.textContent = code;
+  var addrEl = document.getElementById('confirmAddress');
+  if (addrEl) addrEl.textContent = order.address || 'your address';
+  ['step1','step2','step3','step4'].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  var s = document.getElementById('stepSuccess');
+  if (s) s.classList.add('active');
+  var prog = document.querySelector('.mo-prog');
+  if (prog) prog.style.display = 'none';
+}
 
-  if (supa) {
-    const { data } = await supa.from('medicine_catalog').select('name,retail_price').order('name');
-    if (data && data.length) {
-      allMeds = data.map(m => ({ name: m.name, price: m.retail_price || 500 }));
-      if (window.HomattCache) window.HomattCache.save('medicines', allMeds);
-      filterMeds();
-    }
+/* ══════════════════════════════════════
+   PAGE INIT — runs on DOMContentLoaded
+   ══════════════════════════════════════ */
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Set time
+  var t = document.getElementById('statusTime');
+  if (t) t.textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+  // Render category grid
+  renderCatGrid();
+
+  // Render default medicine list immediately
+  renderCurrentMeds();
+
+  // Pre-fill delivery from session
+  var sess = {};
+  try { sess = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
+  var addr = document.getElementById('deliveryAddress');
+  if (addr && !addr.value && sess.district) addr.value = sess.district + ', Uganda';
+  var ph = document.getElementById('deliveryPhone');
+  if (ph && !ph.value && (sess.phone_number || sess.phone)) ph.value = sess.phone_number || sess.phone || '';
+
+  // Pre-select category from URL (e.g. ?cat=fever from symptom checker)
+  var urlCat = new URLSearchParams(window.location.search).get('cat')
+            || new URLSearchParams(window.location.search).get('condition');
+  if (urlCat && CATS.find(function(c){ return c.id === urlCat; })) selectCat(urlCat);
+
+  // Guest banner
+  var user    = null, sess2 = null;
+  try { user  = JSON.parse(localStorage.getItem('homatt_user')    || 'null'); } catch(e) {}
+  try { sess2 = JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) {}
+  if (!user && !sess2) {
+    var banner = document.getElementById('authBanner');
+    if (banner) banner.style.display = 'flex';
   }
-  if (!allMeds.length) { allMeds = MOCK_MEDS; filterMeds(); }
 
-  // Pre-fill delivery address from session
-  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
-  if (session.district) document.getElementById('deliveryAddress').value = session.district + ', Uganda';
-  if (session.phone_number || session.phone) document.getElementById('deliveryPhone').value = session.phone_number || session.phone;
+  // Background: load real medicines from Supabase when CDN is ready
+  window.addEventListener('load', function() {
+    var supa = getSupa();
+    if (supa) {
+      supa.from('medicine_catalog').select('name,retail_price').eq('is_active',true).order('name')
+        .then(function(res) {
+          if (res.data && res.data.length) {
+            // Update ALL_MEDS with live prices but keep category meds in sync
+            res.data.forEach(function(row) {
+              var found = ALL_MEDS.find(function(m){ return m.n === row.name; });
+              if (found && row.retail_price) found.p = row.retail_price;
+            });
+            // Re-render to reflect live prices
+            if (!activeCat) renderCurrentMeds();
+          }
+        })
+        .catch(function(){});
+    }
+  });
 });
 </script>
+
+<!-- Guest auth banner -->
+<div id="authBanner" style="display:none;background:#FFF8E1;border-top:1px solid #FFD54F;padding:10px 16px;font-size:12px;color:#795548;display:none;gap:8px;align-items:center">
+  <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">info</span>
+  <span>Browsing as guest. <a href="signin.html" style="color:#00695C;font-weight:600">Sign in</a> to save your order history.</span>
+</div>
 </body>
 </html>

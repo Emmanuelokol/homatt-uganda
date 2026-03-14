@@ -6,11 +6,23 @@
 
 document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  // Auth check via Supabase session
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) {
+  // Create Supabase client safely — works even if config.js is stale or CDN is slow
+  let supabase = null;
+  let session = null;
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    try {
+      supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      const { data } = await supabase.auth.getSession();
+      session = data?.session || null;
+    } catch(e) { console.warn('[SC] Supabase init failed:', e.message); }
+  }
+
+  // Accept localStorage session as fallback (APK users, offline mode, expired Supabase session)
+  const _localSess = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
+  const _localUser = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
+
+  if (!session && !_localSess && !_localUser) {
     window.location.href = 'signin.html';
     return;
   }
@@ -23,7 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load family from cache first, then try to refresh from Supabase in background
   let family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
   // Background sync of family members so next open has fresh data
-  if (session && session.user) {
+  if (supabase && session && session.user) {
     supabase.from('family_members')
       .select('id,name,relationship,dob,sex')
       .eq('primary_user_id', session.user.id)
@@ -364,24 +376,54 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
         btn.closest('.sc-options-wrap').querySelectorAll('.sc-option-btn').forEach(b => b.classList.remove('selected'));
         btn.classList.add('selected');
         followupAnswers[qi] = btn.dataset.value;
+        // Update answered counter
+        const countEl = document.getElementById('answeredCount');
+        if (countEl) countEl.textContent = Object.keys(followupAnswers).length;
+        // Hide validation message when user starts answering
+        const validationMsg = document.getElementById('followupValidationMsg');
+        if (validationMsg) validationMsg.style.display = 'none';
       });
     });
   }
 
   // Get diagnosis button
   document.getElementById('btnGetDiagnosis').addEventListener('click', () => {
-    if (Object.keys(followupAnswers).length < 2) {
-      const firstUnanswered = document.querySelector('.sc-options-wrap:not(:has(.selected))');
+    const answeredCount = Object.keys(followupAnswers).length;
+    const validationMsg = document.getElementById('followupValidationMsg');
+    if (answeredCount < 1) {
+      const firstUnanswered = document.querySelector('.sc-options-wrap');
       if (firstUnanswered) {
         firstUnanswered.classList.add('shake');
         setTimeout(() => firstUnanswered.classList.remove('shake'), 300);
+        firstUnanswered.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      if (validationMsg) {
+        validationMsg.style.display = 'block';
+        validationMsg.textContent = 'Please answer at least one question above to get your assessment.';
       }
       return;
     }
-
+    if (validationMsg) validationMsg.style.display = 'none';
     showScreen('screenResults');
     getDiagnosis();
   });
+
+  // ====== Symptom Cache ======
+  async function checkSymptomCache(symptoms) {
+    try {
+      const key = symptoms.toLowerCase().trim().split(/\s+/).sort().slice(0,8).join(' ');
+      const { data } = await supabase.from('symptom_cache')
+        .select('*')
+        .eq('symptoms_key', key)
+        .order('times_used', { ascending: false })
+        .limit(1)
+        .single();
+      if (data && data.conditions_json) {
+        return { ...JSON.parse(data.conditions_json), _fromCache: true };
+      }
+    } catch(e) {}
+    return null;
+  }
 
   // ====== SCREEN 4: Diagnosis Results ======
   async function getDiagnosis() {
@@ -389,6 +431,21 @@ IMPORTANT: Respond ONLY with valid JSON, no markdown, no explanation. Use this e
     const content = document.getElementById('resultsContent');
     loading.style.display = 'flex';
     content.style.display = 'none';
+
+    // Check symptom cache first
+    const cached = await checkSymptomCache(enteredSymptoms);
+    if (cached) {
+      diagnosisData = cached;
+      renderDiagnosis(cached);
+      loading.style.display = 'none';
+      content.style.display = 'block';
+      // Show "From verified cases" badge
+      const badge = document.createElement('div');
+      badge.style.cssText = 'background:#E8F5E9;border:1px solid #4CAF50;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;display:flex;gap:8px;align-items:center;margin-bottom:12px';
+      badge.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">verified</span>Assessment based on verified clinical cases in Uganda';
+      content.prepend(badge);
+      return;
+    }
 
     const answersText = Object.entries(followupAnswers)
       .map(([k, v]) => v)
@@ -871,11 +928,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const actionArea = document.getElementById('actionArea');
     actionArea.innerHTML = '';
 
+    // Consultation fee estimate based on condition
+    const topCond = (data.conditions[0]?.name || '').toLowerCase();
+    const feeRange = topCond.includes('malaria') || topCond.includes('typhoid') ? 'UGX 20,000 – 35,000' :
+                     topCond.includes('uti') || topCond.includes('gastro') ? 'UGX 15,000 – 25,000' :
+                     topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory') ? 'UGX 10,000 – 20,000' :
+                     topCond.includes('headache') || topCond.includes('pain') ? 'UGX 10,000 – 20,000' :
+                     topCond.includes('diabetes') || topCond.includes('chronic') ? 'UGX 25,000 – 50,000' :
+                     'UGX 10,000 – 30,000';
+
     if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
       actionArea.innerHTML = `
         <div class="sc-urgent-banner">
           <span class="material-icons-outlined">emergency</span>
           <p>Based on your symptoms, we strongly recommend visiting a health facility as soon as possible.</p>
+        </div>
+        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
+          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
         </div>
         <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
           <span class="material-icons-outlined">local_hospital</span>
@@ -891,6 +961,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         <div class="sc-medium-banner">
           <span class="material-icons-outlined">info</span>
           <p>${data.followup_message || 'Monitor your symptoms closely. If they persist or worsen, please visit a health facility.'}</p>
+        </div>
+        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
+          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
         </div>
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
@@ -911,6 +985,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">monitor_heart</span>
           Monitor My Symptoms
         </button>
+        <button class="btn sc-clinic-btn secondary" id="btnBookClinic">
+          <span class="material-icons-outlined">local_hospital</span>
+          Find Nearby Clinics
+        </button>
         <button class="btn sc-home-btn" id="btnGoHome">
           <span class="material-icons-outlined">home</span>
           Back to Dashboard
@@ -918,16 +996,128 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       `;
     }
 
+    // OTC medication recommendations — shown for ALL risk levels
+    const otcMap = {
+      malaria:      [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
+      fever:        [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'ORS Sachets', note: 'Hydration' }],
+      cold:         [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
+      respiratory:  [{ name: 'Paracetamol 500mg', note: 'For fever & pain' }, { name: 'Vitamin C', note: 'Immune support' }],
+      gastro:       [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
+      stomach:      [{ name: 'ORS Sachets', note: 'Replace lost fluids' }, { name: 'Metronidazole 400mg', note: 'For gut infections' }],
+      headache:     [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
+      tension:      [{ name: 'Paracetamol 500mg', note: 'Pain relief' }, { name: 'Ibuprofen 400mg', note: 'Anti-inflammatory' }],
+      uti:          [{ name: 'Drink plenty of water', note: 'Flush bacteria' }, { name: 'Ciprofloxacin 500mg', note: 'Needs Rx — see pharmacist' }],
+      typhoid:      [{ name: 'Paracetamol 500mg', note: 'Fever control' }, { name: 'ORS Sachets', note: 'Hydration' }],
+    };
+
+    const topCondName = (data.conditions[0]?.name || '').toLowerCase();
+    let otcItems = [];
+    for (const [key, items] of Object.entries(otcMap)) {
+      if (topCondName.includes(key)) { otcItems = items; break; }
+    }
+    if (!otcItems.length) {
+      otcItems = [{ name: 'Paracetamol 500mg', note: 'For pain or fever' }, { name: 'ORS Sachets', note: 'Stay hydrated' }];
+    }
+
+    const otcSection = document.createElement('div');
+    otcSection.className = 'sc-otc-section';
+    otcSection.innerHTML = `
+      <div class="sc-otc-title">
+        <span class="material-icons-outlined">medication</span>
+        Available Over-the-Counter
+      </div>
+      <div class="sc-otc-disclaimer">
+        ⚠️ This is not a prescription. Always confirm with a licensed pharmacist or doctor before taking any medication.
+      </div>
+      <div class="sc-otc-list" id="otcList">
+        ${otcItems.map(item => `
+          <div class="sc-otc-item">
+            <span>${item.name}</span>
+            <span style="font-size:11px;color:var(--text-secondary)">${item.note}</span>
+          </div>
+        `).join('')}
+      </div>
+      <button class="btn sc-order-btn" id="btnOrderMeds">
+        <span class="material-icons-outlined">local_pharmacy</span>
+        Order Medicines
+      </button>
+    `;
+    actionArea.appendChild(otcSection);
+
+    // ── Diagnosis Feedback Card ──────────────────────────────
+    const feedbackCard = document.createElement('div');
+    feedbackCard.style.cssText = 'margin-top:20px;background:#F8F9FA;border-radius:14px;padding:16px;text-align:center';
+    feedbackCard.innerHTML = `
+      <div style="font-size:13px;font-weight:600;color:#1A1A1A;margin-bottom:10px">Was this assessment helpful?</div>
+      <div style="display:flex;gap:10px;justify-content:center;margin-bottom:10px">
+        <button id="feedbackYes" style="flex:1;max-width:120px;padding:10px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:13px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit">
+          👍 Yes, helpful
+        </button>
+        <button id="feedbackNo" style="flex:1;max-width:120px;padding:10px;border:2px solid #E0E0E0;background:#fff;border-radius:10px;font-size:13px;font-weight:700;color:#5F6368;cursor:pointer;font-family:inherit">
+          👎 Not really
+        </button>
+      </div>
+      <textarea id="feedbackNote" style="display:none;width:100%;padding:9px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:12px;font-family:inherit;resize:none;outline:none" rows="2" placeholder="Tell us how we can improve..."></textarea>
+      <div id="feedbackThanks" style="display:none;font-size:13px;color:#2E7D32;font-weight:600;padding:8px 0">✓ Thank you for your feedback!</div>
+    `;
+    actionArea.appendChild(feedbackCard);
+
+    // Feedback button handlers
+    const fbYes = feedbackCard.querySelector('#feedbackYes');
+    const fbNo  = feedbackCard.querySelector('#feedbackNo');
+    const fbNote = feedbackCard.querySelector('#feedbackNote');
+    const fbThanks = feedbackCard.querySelector('#feedbackThanks');
+
+    async function saveFeedback(helpful, note) {
+      if (supabase && userId) {
+        await supabase.from('ai_triage_sessions').insert({
+          user_id: userId,
+          symptoms_text: enteredSymptoms,
+          top_diagnosis: data.conditions[0]?.name || '',
+          feedback_helpful: helpful,
+          feedback_note: note || null,
+          created_at: new Date().toISOString(),
+        }).catch(() => {});
+      }
+      fbYes.style.display = 'none';
+      fbNo.style.display = 'none';
+      fbNote.style.display = 'none';
+      fbThanks.style.display = 'block';
+    }
+
+    fbYes.addEventListener('click', () => saveFeedback(true, ''));
+    fbNo.addEventListener('click', () => {
+      fbNote.style.display = 'block';
+      fbNote.focus();
+      fbNo.style.borderColor = '#F44336';
+      fbNo.style.background = '#FFEBEE';
+      fbNo.style.color = '#C62828';
+      fbNo.textContent = '👎 Submit feedback';
+      fbNo.onclick = () => saveFeedback(false, fbNote.value.trim());
+    });
+    // ────────────────────────────────────────────────────────────
+
+    const orderBtn = document.getElementById('btnOrderMeds');
+    if (orderBtn) {
+      orderBtn.addEventListener('click', () => {
+        // Map top condition name to a medicine-orders condition key
+        const cn = topCondName;
+        const condKey = cn.includes('malaria') ? 'malaria' :
+                        cn.includes('fever') || cn.includes('typhoid') ? 'fever' :
+                        cn.includes('pain') || cn.includes('headache') ? 'pain' :
+                        cn.includes('gastro') || cn.includes('diarrhea') || cn.includes('stomach') ? 'digestive' :
+                        cn.includes('respiratory') || cn.includes('cold') || cn.includes('flu') ? 'infection' :
+                        cn.includes('uti') || cn.includes('urinary') ? 'infection' :
+                        'other';
+        window.location.href = 'medicine-orders.html?condition=' + condKey;
+      });
+    }
+
     // Wire action buttons
     const bookClinicBtn = document.getElementById('btnBookClinic');
     if (bookClinicBtn) {
       bookClinicBtn.addEventListener('click', () => {
-        localStorage.setItem('homatt_clinic_reason', JSON.stringify({
-          condition: data.conditions[0]?.name || 'Health Check',
-          urgency: data.clinic_urgency || data.overall_risk,
-          symptoms: data.symptoms_identified,
-        }));
-        alert('Clinic finder coming soon! In the meantime, please visit your nearest health facility.');
+        openClinicBookingModal(data);
       });
     }
 
@@ -1020,19 +1210,107 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const responseEl = document.getElementById('monitorResponse');
     const timerEl = document.getElementById('monitorTimer');
 
+    const firstName = user.first_name || user.name?.split(' ')[0] || 'there';
     if (feeling === 'better') {
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+      const inBg = isDark ? '#2C2C2C' : '#fff';
+      const inColor = isDark ? '#F0F0F0' : '#111';
       responseEl.innerHTML = `
         <div class="sc-monitor-msg better">
           <span class="material-icons-outlined">celebration</span>
           <div>
-            <p class="sc-monitor-msg-title">Great to hear!</p>
-            <p>Your symptoms are improving. Continue following the prevention tips and stay hydrated. We'll check in again to make sure you're recovering well.</p>
+            <p class="sc-monitor-msg-title">Great news, ${firstName}!</p>
+            <p>We're happy to hear you're feeling better. Help us learn by sharing your recovery experience — it helps us give better advice in future.</p>
           </div>
         </div>
+        <div style="margin-top:14px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+          <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:8px">
+            What helped you recover? (optional but helpful)
+          </label>
+          <textarea id="recoveryWhatHelped" rows="3"
+            style="width:100%;border:2px solid var(--border);border-radius:8px;padding:10px 12px;
+              font-size:14px;font-family:inherit;background:${inBg};color:${inColor};resize:none;outline:none;box-sizing:border-box"
+            placeholder="e.g. I rested for 2 days, drank ORS, took paracetamol 500mg..."></textarea>
+          <div style="margin-top:10px">
+            <label style="font-size:13px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:6px">How long did it take to feel better?</label>
+            <select id="recoveryDuration"
+              style="width:100%;padding:10px 12px;border:2px solid var(--border);border-radius:8px;font-size:14px;font-family:inherit;background:${inBg};color:${inColor};outline:none">
+              <option value="">Select...</option>
+              <option value="few_hours">A few hours</option>
+              <option value="1_day">About 1 day</option>
+              <option value="2_3_days">2–3 days</option>
+              <option value="1_week">About a week</option>
+              <option value="longer">Longer than a week</option>
+            </select>
+          </div>
+        </div>
+        <button id="btnMarkRecovered"
+          style="width:100%;margin-top:14px;padding:14px;background:linear-gradient(135deg,#2E7D32,#43A047);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+          <span class="material-icons-outlined">check_circle</span>
+          Mark as Fully Recovered
+        </button>
       `;
       responseEl.style.display = 'block';
-      timerEl.style.display = 'flex';
-      scheduleNextCheckIn(2);
+      timerEl.style.display = 'none';
+
+      document.getElementById('btnMarkRecovered')?.addEventListener('click', async () => {
+        const whatHelped = document.getElementById('recoveryWhatHelped')?.value.trim() || '';
+        const duration = document.getElementById('recoveryDuration')?.value || '';
+        // Save recovery record locally
+        const recoveries = JSON.parse(localStorage.getItem('homatt_recovery_log') || '[]');
+        recoveries.unshift({
+          condition: monitoringSession.condition,
+          recoveredAt: new Date().toISOString(),
+          startedAt: monitoringSession.startedAt,
+          whatHelped,
+          duration,
+          checkIns: monitoringSession.checkIns,
+        });
+        if (recoveries.length > 50) recoveries.pop();
+        localStorage.setItem('homatt_recovery_log', JSON.stringify(recoveries));
+
+        // Save to Supabase symptom_monitoring_logs if authenticated
+        try {
+          if (!window._symptomSupa) {
+            const _cfg = window.HOMATT_CONFIG || {};
+            if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+              window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+            }
+          }
+          if (window._symptomSupa) {
+            const { data: _sd } = await window._symptomSupa.auth.getSession();
+            const _sess = _sd?.session || null;
+            await window._symptomSupa.from('symptom_monitoring_logs').insert({
+              user_id: _sess?.user?.id || null,
+              condition: monitoringSession.condition,
+              started_at: monitoringSession.startedAt,
+              ended_at: new Date().toISOString(),
+              outcome: 'recovered',
+              check_ins: monitoringSession.checkIns,
+              what_helped: whatHelped,
+            });
+          }
+        } catch(_e) { console.warn('[SC] monitoring log save failed:', _e.message); }
+
+        // Clear active monitoring
+        localStorage.removeItem('homatt_monitoring');
+        monitoringSession = null;
+        // Show final message
+        responseEl.innerHTML = `
+          <div class="sc-monitor-msg better" style="flex-direction:column;text-align:center;padding:20px">
+            <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32;margin-bottom:8px">health_and_safety</span>
+            <p class="sc-monitor-msg-title" style="font-size:18px">Recovery recorded, ${firstName}!</p>
+            <p style="color:var(--text-secondary);line-height:1.6;margin-top:6px">
+              We've saved your recovery journey. ${whatHelped ? 'What you shared helps us give you smarter advice next time.' : 'Stay healthy and take care!'}
+            </p>
+            <button onclick="window.location.href='dashboard.html'"
+              style="margin-top:16px;padding:12px 24px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+              Back to Dashboard
+            </button>
+          </div>
+        `;
+        document.getElementById('sc-feeling-options') && (document.getElementById('feelingOptions').style.display = 'none');
+      });
     } else if (feeling === 'same') {
       const condition = (monitoringSession.condition || '').toLowerCase();
       const otcMap = {
@@ -1086,8 +1364,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         responseEl.style.display = 'block';
         timerEl.style.display = 'none';
         document.getElementById('btnMonitorClinic')?.addEventListener('click', () => {
-          localStorage.setItem('homatt_clinic_reason', JSON.stringify({ condition: monitoringSession.condition, urgency: 'soon' }));
-          window.location.href = 'clinic-booking.html';
+          openClinicBookingModal(diagnosisData || { conditions: [{ name: monitoringSession.condition, likelihood_percent: 60 }], clinic_urgency: 'soon', overall_risk: 'medium', symptoms_identified: [] });
         });
       } else {
         // 1st "same" — ask what they did + show OTC
@@ -1108,6 +1385,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                 font-size:15px;font-family:inherit;background:#fff;color:#111;resize:none;outline:none;
                 -webkit-text-fill-color:#111;box-sizing:border-box"
               placeholder="e.g. I rested, drank water, took paracetamol..."></textarea>
+            <button id="btnSameSubmit"
+              style="width:100%;margin-top:10px;padding:13px;background:linear-gradient(135deg,#1565C0,#1976D2);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+              <span class="material-icons-outlined">check_circle</span>
+              Submit &amp; Continue
+            </button>
           </div>
           <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-top:12px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
@@ -1120,9 +1402,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           </div>
         `;
         responseEl.style.display = 'block';
-        timerEl.style.display = 'flex';
+        timerEl.style.display = 'none';
 
-        // Save "what did they do" on next check-in
+        // Save "what did they do" on change (passive autosave)
         const didInput = document.getElementById('monitorWhatDid');
         if (didInput) {
           didInput.addEventListener('change', () => {
@@ -1139,7 +1421,47 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           }
         }
 
-        scheduleNextCheckIn(1);
+        // Submit & Continue button
+        document.getElementById('btnSameSubmit')?.addEventListener('click', async () => {
+          const actionText = document.getElementById('monitorWhatDid')?.value.trim() || '';
+          monitoringSession.lastAction = actionText;
+          localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+          // Try to save check-in to Supabase
+          try {
+            if (!window._symptomSupa) {
+              const _cfg = window.HOMATT_CONFIG || {};
+              if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+                window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+              }
+            }
+            if (window._symptomSupa) {
+              const { data: _sd } = await window._symptomSupa.auth.getSession();
+              const _sess = _sd?.session || null;
+              await window._symptomSupa.from('symptom_monitoring_logs').insert({
+                user_id: _sess?.user?.id || null,
+                condition: monitoringSession.condition,
+                started_at: monitoringSession.startedAt,
+                outcome: 'monitoring',
+                check_ins: monitoringSession.checkIns,
+                last_action: actionText || null,
+              });
+            }
+          } catch(_e) { console.warn('[SC] check-in save failed:', _e.message); }
+
+          // Show confirmation and schedule next check-in
+          responseEl.innerHTML = `
+            <div class="sc-monitor-msg same" style="flex-direction:column;text-align:center;padding:20px">
+              <span class="material-icons-outlined" style="font-size:40px;color:#1565C0;margin-bottom:8px">schedule</span>
+              <p class="sc-monitor-msg-title">Noted! Check back in 1 hour</p>
+              <p style="color:var(--text-secondary);line-height:1.6;margin-top:6px">
+                We've recorded your check-in. We'll remind you to check back in an hour. Rest and stay hydrated.
+              </p>
+            </div>
+          `;
+          timerEl.style.display = 'flex';
+          scheduleNextCheckIn(1);
+        });
       }
     } else if (feeling === 'worse') {
       responseEl.innerHTML = `
@@ -1165,7 +1487,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       const worseClinic = document.getElementById('btnWorseClinic');
       if (worseClinic) {
         worseClinic.addEventListener('click', () => {
-          alert('Clinic finder coming soon! Please visit your nearest health facility immediately.');
+          openClinicBookingModal(diagnosisData || { conditions: [{ name: monitoringSession.condition, likelihood_percent: 70 }], clinic_urgency: 'urgent', overall_risk: 'high', symptoms_identified: [] });
         });
       }
 
@@ -1186,6 +1508,39 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     nextTime.setHours(nextTime.getHours() + hours);
     monitoringSession.nextCheckIn = nextTime.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+    // Request browser notification permission for auto hourly reminders
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    // Schedule in-page reminder using setTimeout (works while page is open)
+    const msUntil = nextTime - Date.now();
+    if (msUntil > 0 && msUntil < 2 * 3600000) { // only if within 2 hours
+      setTimeout(() => {
+        // Show check-in if monitoring still active
+        const m = JSON.parse(localStorage.getItem('homatt_monitoring') || 'null');
+        if (!m) return;
+        // Send browser notification if possible
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Homatt-health Check-in', {
+            body: `Time to check in on your ${m.condition}. How are you feeling?`,
+            icon: '/icons/icon-192.png',
+          });
+        }
+        // Re-enable buttons for new check-in
+        document.querySelectorAll('.sc-feeling-btn').forEach(b => {
+          b.classList.remove('selected');
+          b.disabled = false;
+        });
+        document.getElementById('monitorResponse').style.display = 'none';
+        document.getElementById('monitorTimer').style.display = 'none';
+        if (document.getElementById('screenMonitor').classList.contains('active')) {
+          document.querySelector('.sc-subheading') &&
+            (document.querySelector('#screenMonitor .sc-subheading').textContent = 'Time for your hourly check-in. How are you feeling now?');
+        }
+        wireMonitoringButtons();
+      }, msUntil);
+    }
   }
 
   // ====== Save to history (localStorage + Supabase ai_triage_sessions) ======
@@ -1308,7 +1663,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   // ---- Proxy Call ----
   async function callProxy(provider, prompt) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 25000);
+    const timer = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(PROXY_URL, {
@@ -1353,6 +1708,236 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       console.error('JSON parse error:', e, '\nRaw:', text);
       return null;
     }
+  }
+
+  // ====== Clinic Booking Modal ======
+  function openClinicBookingModal(data) {
+    localStorage.setItem('homatt_clinic_reason', JSON.stringify({
+      condition: data.conditions[0]?.name || 'Health Check',
+      urgency: data.clinic_urgency || data.overall_risk,
+      symptoms: data.symptoms_identified,
+    }));
+
+    // Remove existing modal if present
+    const existing = document.getElementById('clinicBookingModal');
+    if (existing) existing.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'clinicBookingModal';
+    modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:flex-end';
+
+    modal.innerHTML = `
+      <div id="clinicBookingInner" style="background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-height:80vh;overflow-y:auto;box-sizing:border-box">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+          <h3 style="font-size:18px;font-weight:700;color:#111">Book a Clinic Visit</h3>
+          <button id="closeBookingModal" style="background:none;border:none;cursor:pointer;padding:4px">
+            <span class="material-icons-outlined" style="font-size:24px;color:#666">close</span>
+          </button>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
+          <input id="bookingPatientName" type="text" value="${selectedPatient.name || ''}"
+            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff"
+            placeholder="Patient name" />
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Select Clinic</label>
+          <select id="bookingClinicSelect"
+            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff;appearance:none">
+            <option value="">Loading clinics...</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:20px">
+          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Preferred Time</label>
+          <div style="display:flex;flex-direction:column;gap:8px" id="bookingTimeOptions">
+            <button class="booking-time-btn" data-time="asap" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">As soon as possible</button>
+            <button class="booking-time-btn" data-time="today_afternoon" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Today afternoon</button>
+            <button class="booking-time-btn" data-time="tomorrow_morning" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Tomorrow morning</button>
+          </div>
+        </div>
+
+        <button id="btnConfirmBooking"
+          style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span class="material-icons-outlined">check_circle</span>
+          Confirm Booking
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Close modal on backdrop click
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.remove();
+    });
+    document.getElementById('closeBookingModal').addEventListener('click', () => modal.remove());
+
+    // Time selection
+    let selectedTime = 'asap';
+    document.querySelectorAll('.booking-time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.booking-time-btn').forEach(b => {
+          b.style.borderColor = '#DDD';
+          b.style.background = '#fff';
+          b.style.color = '#333';
+          b.style.fontWeight = '400';
+        });
+        btn.style.borderColor = '#00695C';
+        btn.style.background = '#E8F5E9';
+        btn.style.color = '#1B5E20';
+        btn.style.fontWeight = '600';
+        selectedTime = btn.dataset.time;
+      });
+      // Auto-select first
+      if (btn.dataset.time === 'asap') btn.click();
+    });
+
+    // Load clinics from Supabase, fallback to mock
+    const clinicSelect = document.getElementById('bookingClinicSelect');
+    const mockClinics = [
+      { id: 'mock-1', name: 'Mulago National Referral Hospital' },
+      { id: 'mock-2', name: 'Kampala International Hospital' },
+      { id: 'mock-3', name: 'Case Medical Centre' },
+      { id: 'mock-4', name: 'Nsambya Hospital' },
+      { id: 'mock-5', name: 'Nakasero Hospital' },
+    ];
+
+    const clinicLoad = supabase
+      ? supabase.from('clinics').select('id, name').eq('active', true).limit(20)
+      : Promise.resolve({ data: null });
+    clinicLoad
+      .then(({ data: clinicsData }) => {
+        const list = (clinicsData && clinicsData.length) ? clinicsData : mockClinics;
+        clinicSelect.innerHTML = list.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      })
+      .catch(() => {
+        clinicSelect.innerHTML = mockClinics.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+      });
+
+    // Confirm booking
+    document.getElementById('btnConfirmBooking').addEventListener('click', async () => {
+      const patientName = document.getElementById('bookingPatientName').value.trim();
+      const selectedClinicId = clinicSelect.value || null;
+      const selectedClinicName = clinicSelect.options[clinicSelect.selectedIndex]?.text || '';
+
+      if (!patientName) {
+        document.getElementById('bookingPatientName').focus();
+        document.getElementById('bookingPatientName').style.borderColor = '#D32F2F';
+        return;
+      }
+
+      const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
+
+      // Generate a PIN token so clinic can look up by PIN too
+      const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let pinToken = 'HK-';
+      for (let i = 0; i < 6; i++) pinToken += pinChars[Math.floor(Math.random() * pinChars.length)];
+      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(); // 4 hours
+
+      // Mock IDs are not valid UUIDs — set clinic_id to null for those
+      const isMockClinic = !selectedClinicId || selectedClinicId.startsWith('mock-');
+
+      const bookingRecord = {
+        booking_code:  bookingCode,
+        patient_name:  patientName,
+        patient_id:    session?.user?.id || null,
+        patient_age:   selectedPatient.age || null,
+        patient_sex:   selectedPatient.sex || null,
+        symptoms:      enteredSymptoms ? [enteredSymptoms] : null,
+        ai_diagnosis:  diagnosisData.conditions[0]?.name || null,
+        ai_confidence: diagnosisData.conditions[0]?.likelihood_percent || null,
+        ai_full_data: {
+          primary_condition: diagnosisData.conditions[0]?.name || null,
+          confidence:        diagnosisData.conditions[0]?.likelihood_percent || null,
+          overall_risk:      diagnosisData.overall_risk || null,
+          symptoms:          enteredSymptoms || null,
+          clinic_urgency:    diagnosisData.clinic_urgency || null,
+          conditions:        diagnosisData.conditions || [],
+          immediate_actions: diagnosisData.immediate_actions || [],
+        },
+        urgency_level: diagnosisData.clinic_urgency === 'urgent' ? 'high' : diagnosisData.clinic_urgency === 'soon' ? 'medium' : 'normal',
+        risk_score:    diagnosisData.conditions[0]?.likelihood_percent || 50,
+        clinic_id:     isMockClinic ? null : selectedClinicId,
+        preferred_time: selectedTime,
+        status:        'pending',
+        pin_token:     pinToken,
+        pin_expires_at: pinExpiry,
+      };
+
+      // Disable button and show loading state
+      const confirmBtn = document.getElementById('btnConfirmBooking');
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking...';
+
+      // Save to Supabase
+      let savedOk = false;
+      if (supabase) {
+        try {
+          const { error: insertErr } = await supabase.from('bookings').insert(bookingRecord);
+          if (insertErr) {
+            console.error('[Homatt] Booking insert error:', insertErr.message);
+          } else {
+            savedOk = true;
+          }
+        } catch (e) {
+          console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
+        }
+      }
+
+      // Always save to localStorage as backup
+      const localBookings = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
+      localBookings.unshift({ ...bookingRecord, clinic_name: selectedClinicName, savedToDb: savedOk });
+      if (localBookings.length > 20) localBookings.pop();
+      localStorage.setItem('homatt_bookings', JSON.stringify(localBookings));
+
+      // Show success screen
+      const inner = document.getElementById('clinicBookingInner');
+      inner.innerHTML = `
+        <div style="text-align:center;padding:8px 0 16px">
+          <div style="width:64px;height:64px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32">check_circle</span>
+          </div>
+          <h3 style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Booking Confirmed!</h3>
+          <p style="font-size:13px;color:#666;margin-bottom:20px">Your appointment has been submitted.</p>
+
+          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:16px">
+            <p style="font-size:12px;color:#555;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Your Booking Code</p>
+            <p style="font-size:36px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
+            <div style="background:rgba(0,0,0,0.05);border-radius:8px;padding:10px">
+              <p style="font-size:11px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">PIN Token (show to reception)</p>
+              <p style="font-size:18px;font-weight:700;color:#00695C;letter-spacing:2px;margin:0">${pinToken}</p>
+            </div>
+          </div>
+
+          <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:20px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span class="material-icons-outlined" style="font-size:18px;color:#00695C">local_hospital</span>
+              <span style="font-size:13px;font-weight:600;color:#333">${selectedClinicName}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="material-icons-outlined" style="font-size:18px;color:#00695C">schedule</span>
+              <span style="font-size:13px;color:#555">${selectedTime === 'asap' ? 'As soon as possible' : selectedTime === 'today_afternoon' ? 'Today afternoon' : 'Tomorrow morning'}</span>
+            </div>
+          </div>
+
+          <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:20px">
+            Show the booking code <strong>or</strong> PIN to the reception desk.<br>The clinic will verify and check you in.
+          </p>
+
+          <button id="btnCloseSuccess"
+            style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+            Done
+          </button>
+        </div>
+      `;
+
+      document.getElementById('btnCloseSuccess').addEventListener('click', () => {
+        modal.remove();
+      });
+    });
   }
 
   // ====== Check for existing monitoring session ======

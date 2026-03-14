@@ -7,6 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/rider.css">
+  <script>
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        Promise.all(regs.map(r => r.unregister())).then(() => location.reload());
+      });
+    }
+  </script>
 </head>
 <body>
 <div class="admin-login-page">
@@ -51,11 +58,22 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script>
-  if (localStorage.getItem('rider_session')) window.location.href = 'dashboard.html';
+  (function() {
+    try {
+      const s = JSON.parse(localStorage.getItem('rider_session') || 'null');
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('rider_session');
+  })();
 
   const cfg = window.HOMATT_CONFIG || {};
   const _supa = (cfg.SUPABASE_URL && window.supabase)
-    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { persistSession: false }
+      }) : null;
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();

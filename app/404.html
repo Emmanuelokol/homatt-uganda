@@ -4,14 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Homatt Health</title>
-  <!-- GitHub Pages SPA redirect: send every unknown URL back to index.html -->
   <script>
-    // Preserve the path so deep links still work after redirect
-    var path = window.location.pathname.replace('/homatt-uganda', '');
-    var search = window.location.search;
-    var hash = window.location.hash;
-    var redirectUrl = '/homatt-uganda/' + (path.replace(/^\//, '') || 'index.html') + search + hash;
-    window.location.replace(redirectUrl);
+    // Redirect unknown URLs to the home page — avoids infinite loops on bad paths
+    window.location.replace('/homatt-uganda/');
   </script>
 </head>
 <body>

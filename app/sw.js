@@ -7,7 +7,7 @@
  *   • Everything else: Network-first, fall back to cache
  */
 
-const CACHE_NAME = 'homatt-shell-v5';
+const CACHE_NAME = 'homatt-shell-v15';
 
 const APP_SHELL = [
   './',
@@ -97,6 +97,17 @@ self.addEventListener('fetch', (event) => {
       })
     );
     return;
+  }
+
+  // Portal pages (admin/clinic/pharmacy/rider): do NOT intercept — browser fetches fresh every time
+  // (Calling respondWith with a potentially-undefined fallback causes reload loops)
+  if (
+    url.pathname.includes('/admin/') ||
+    url.pathname.includes('/clinic/') ||
+    url.pathname.includes('/pharmacy/') ||
+    url.pathname.includes('/rider/')
+  ) {
+    return; // Let browser handle natively — no SW caching for auth-sensitive portals
   }
 
   // App shell: cache-first, refresh in background (stale-while-revalidate)

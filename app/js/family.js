@@ -74,6 +74,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (tab) tab.classList.add('active');
     const pane = document.getElementById('pane-' + target);
     if (pane) pane.classList.add('active');
+    // Close any open sheets and health log panel when switching tabs
+    const overlayEl = document.getElementById('sheetOverlay');
+    if (overlayEl) overlayEl.classList.remove('visible');
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    closeMemberDetail();
 
     // Cart FAB only on shop tab
     const cartFab = document.getElementById('cartFab');
@@ -537,8 +542,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     localStorage.setItem('homatt_cart', JSON.stringify(cart));
     updateCartBadge();
-    // Re-render items to update button state
-    loadItems(selectedCategoryId);
+    // Re-render from cached items only — no DB fetch on every tap (prevents slowness)
+    const searchTerm = (document.getElementById('shopSearch') || {}).value || '';
+    const term = searchTerm.toLowerCase();
+    const filtered = term ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term)) : items;
+    renderItems(filtered);
     showToast(`${item.name} added to cart`);
   }
 
@@ -580,9 +588,27 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
         </div>`).join('');
 
-      const total = cart.reduce((s, c) => s + c.price * c.qty, 0);
-      document.getElementById('cartTotal').textContent = total.toLocaleString();
-      totalRow.style.display = 'flex';
+      const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : 2000;
+      document.getElementById('cartSubtotal').textContent = subtotal.toLocaleString();
+      document.getElementById('cartDeliveryFee').textContent = curDeliveryFee.toLocaleString();
+      document.getElementById('cartTotal').textContent = (subtotal + curDeliveryFee).toLocaleString();
+
+      // Show nearest pharmacy info
+      const pharmInfo = document.getElementById('cartPharmacyInfo');
+      if (_nearestPharmacy && pharmInfo) {
+        pharmInfo.style.display = 'block';
+        pharmInfo.innerHTML = `<span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">local_pharmacy</span>
+          Routed to: <strong>${_nearestPharmacy.name}</strong> — ${_nearestPharmacy.distanceKm.toFixed(1)} km away`;
+      } else if (pharmInfo) {
+        pharmInfo.style.display = 'none';
+        // Trigger async pharmacy lookup in background (updates on next cart open)
+        getUserCoords().then(coords => {
+          if (coords) findNearestPharmacy(coords[0], coords[1]);
+        });
+      }
+
+      totalRow.style.display = 'block';
       checkoutArea.style.display = 'block';
 
       listEl.querySelectorAll('.cart-qty-btn').forEach(btn => {
@@ -608,10 +634,214 @@ document.addEventListener('DOMContentLoaded', async () => {
     openSheet(document.getElementById('cartSheet'));
   }
 
+  // ====== Pharmacy Routing Helpers ======
+
+  // Uganda district approximate coordinates (lat, lon)
+  const DISTRICT_COORDS = {
+    'kampala':       [0.3163, 32.5822], 'wakiso':        [0.4000, 32.4500],
+    'mukono':        [0.3540, 32.7550], 'jinja':         [0.4244, 33.2041],
+    'mbale':         [1.0800, 34.1750], 'gulu':          [2.7747, 32.2990],
+    'mbarara':      [-0.6167, 30.6500], 'fort portal':   [0.6710, 30.2750],
+    'arua':          [3.0200, 30.9100], 'lira':          [2.2499, 32.8999],
+    'soroti':        [1.7150, 33.6110], 'kabale':       [-1.2480, 29.9890],
+    'masaka':       [-0.3350, 31.7350], 'tororo':        [0.6920, 34.1810],
+    'entebbe':       [0.0600, 32.4600], 'ntinda':        [0.3600, 32.6200],
+    'nansana':       [0.3700, 32.5100], 'kireka':        [0.3500, 32.6500],
+    'kyanja':        [0.3900, 32.6300], 'namugongo':     [0.3700, 32.6600],
+    'najjera':       [0.3500, 32.6400], 'kira':          [0.4100, 32.6400],
+    'bweyogerere':   [0.3300, 32.6700], 'namasuba':      [0.2800, 32.5400],
+    'makindye':      [0.2900, 32.6000], 'rubaga':        [0.3100, 32.5500],
+    'kawempe':       [0.3700, 32.5500], 'nakawa':        [0.3200, 32.6200],
+  };
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+    const R = 6371, toRad = d => d * Math.PI / 180;
+    const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
+    const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  // Compute delivery fee: 2000 UGX base + 500/km, rounded to nearest 500
+  function calcDeliveryFee(distanceKm) {
+    const fee = 2000 + Math.round(distanceKm) * 500;
+    return Math.max(2000, Math.round(fee / 500) * 500);
+  }
+
+  // Cache for nearest pharmacy result
+  let _nearestPharmacy = null;
+
+  async function findNearestPharmacy(userLat, userLon) {
+    if (_nearestPharmacy) return _nearestPharmacy;
+    try {
+      const { data: pharmacies } = await supabase
+        .from('pharmacies')
+        .select('id, name, latitude, longitude, delivery_fee, delivery_radius_km')
+        .eq('active', true)
+        .not('latitude', 'is', null);
+      if (!pharmacies?.length) return null;
+      let best = null, bestDist = Infinity;
+      for (const p of pharmacies) {
+        const dist = haversineKm(userLat, userLon, parseFloat(p.latitude), parseFloat(p.longitude));
+        if (dist < bestDist) { bestDist = dist; best = { ...p, distanceKm: dist }; }
+      }
+      _nearestPharmacy = best;
+      return best;
+    } catch(e) { return null; }
+  }
+
+  function getUserCoords() {
+    return new Promise(resolve => {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+          () => resolve(null),
+          { timeout: 4000 }
+        );
+      } else resolve(null);
+    });
+  }
+
+  // ====== Checkout — Place Order ======
+  window.submitOrder = async function() {
+    const addr = (document.getElementById('cartDeliveryAddress')?.value || '').trim();
+    if (!addr) {
+      showToast('Please enter your delivery address');
+      document.getElementById('cartDeliveryAddress')?.focus();
+      return;
+    }
+    if (cart.length === 0) return;
+
+    // ── Self-medication frequency guard ─────────────────────────
+    // Check how many orders this user has placed in the last 7 days
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recentOrders } = await supabase
+      .from('marketplace_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', sevenDaysAgo);
+    const recentCount = (recentOrders || []).length;
+
+    if (recentCount >= 5) {
+      // Hard block — too many orders, must see clinic
+      closeAllSheets();
+      document.getElementById('clinicReferralBanner') &&
+        (document.getElementById('clinicReferralBanner').style.display = 'block');
+      showToast('You have ordered medicine 5+ times this week. Please visit a clinic for a proper check-up.');
+      // Also show a modal-like warning
+      const blocked = confirm(
+        'You have placed ' + recentCount + ' medicine orders in the last 7 days.\n\n' +
+        'Frequent self-medication can be harmful.\n\n' +
+        'We strongly recommend visiting a clinic for a proper diagnosis before ordering more medicine.\n\n' +
+        'Press OK to go to clinic booking, or Cancel to go back.'
+      );
+      if (blocked) window.location.href = 'clinic-booking.html';
+      return;
+    }
+
+    if (recentCount >= 3) {
+      // Soft warning — require confirmation
+      const proceed = confirm(
+        'You have ordered medicine ' + recentCount + ' times in the last 7 days.\n\n' +
+        'Repeated self-medication without a proper diagnosis can be dangerous.\n\n' +
+        'We recommend visiting a clinic for a check-up. Do you still want to place this order?'
+      );
+      if (!proceed) return;
+    }
+    // ────────────────────────────────────────────────────────────
+
+    const btn = document.getElementById('cartCheckoutBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Placing order…'; }
+
+    const itemsTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
+
+    // Get user profile for name/phone/location
+    let patientName = 'Customer', patientPhone = null, userDistrict = null;
+    try {
+      const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
+      if (prof) {
+        patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+        patientPhone = prof.phone || null;
+        userDistrict = prof.district || null;
+      }
+    } catch(e) {}
+
+    // Determine user coordinates for pharmacy routing
+    let userLat = null, userLon = null;
+    const gpsCoords = await getUserCoords();
+    if (gpsCoords) {
+      [userLat, userLon] = gpsCoords;
+    } else if (userDistrict) {
+      const key = userDistrict.toLowerCase();
+      const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+      if (dc) [userLat, userLon] = dc;
+    }
+
+    // Find nearest pharmacy and compute delivery fee
+    let pharmacyId = null, deliveryFee = 2000;
+    if (userLat && userLon) {
+      const nearest = await findNearestPharmacy(userLat, userLon);
+      if (nearest) {
+        pharmacyId = nearest.id;
+        deliveryFee = calcDeliveryFee(nearest.distanceKm);
+      }
+    }
+
+    const total = itemsTotal + deliveryFee;
+
+    // Save order to marketplace_orders
+    const orderPayload = {
+      user_id: userId,
+      patient_name: patientName,
+      patient_phone: patientPhone,
+      delivery_address: addr,
+      items: itemsPayload,
+      total_amount: total,
+      status: 'pending',
+      payment_method: 'cash_on_delivery',
+      pharmacy_id: pharmacyId,
+      delivery_fee: deliveryFee,
+      user_latitude: userLat,
+      user_longitude: userLon,
+    };
+
+    const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
+
+    if (orderErr) {
+      showToast('Order failed: ' + orderErr.message);
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
+      return;
+    }
+
+    // Deduct stock for each item (best-effort, ignore errors)
+    try {
+      for (const item of cart) {
+        await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
+      }
+    } catch(e) {}
+
+    // Clear cart and close ALL panels including health log
+    cart = [];
+    localStorage.removeItem('homatt_cart');
+    updateCartBadge();
+    closeAllSheets(); // also calls closeMemberDetail() internally
+    showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
+  };
+
   // ====== Sheet / Overlay Management ======
   const overlay = document.getElementById('sheetOverlay');
 
   function openSheet(sheet) {
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      if (s !== sheet) s.classList.remove('open');
+    });
+    // Immediately hide the member-detail panel — no transition delay so it
+    // cannot bleed through the top of the cart/action sheet.
+    const detailPanel = document.getElementById('memberDetailPanel');
+    if (detailPanel) {
+      detailPanel.classList.remove('open');
+      detailPanel.style.display = 'none';
+    }
     overlay.classList.add('visible');
     sheet.classList.add('open');
   }
@@ -619,6 +849,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   function closeAllSheets() {
     overlay.classList.remove('visible');
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+    // Always close the health-log panel (not a .bottom-sheet, but must be hidden)
+    closeMemberDetail();
   }
 
   overlay.addEventListener('click', closeAllSheets);
@@ -827,17 +1059,31 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ====== Member Detail Panel ======
+  function closeMemberDetail() {
+    const panel = document.getElementById('memberDetailPanel');
+    panel.classList.remove('open');
+    // Wait for slide-out transition (300ms), then fully remove from layout
+    setTimeout(() => {
+      if (!panel.classList.contains('open')) panel.style.display = 'none';
+    }, 320);
+    logEventForMemberId = null;
+  }
+
   function openMemberDetail(member) {
+    const panel = document.getElementById('memberDetailPanel');
+    // Reset display so it's visible before animating in
+    panel.style.display = 'flex';
+    panel.offsetHeight; // force reflow so CSS transition fires
     logEventForMemberId = member.id;
     document.getElementById('memberDetailName').textContent = member.name;
     document.getElementById('memberDetailRel').textContent =
       member.relationship ? member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1) : '—';
-    document.getElementById('memberDetailPanel').classList.add('open');
+    panel.classList.add('open');
     loadMemberHealthLog(member.id);
   }
 
   document.getElementById('memberDetailBack').addEventListener('click', () => {
-    document.getElementById('memberDetailPanel').classList.remove('open');
+    closeMemberDetail();
     logEventForMemberId = null;
   });
 

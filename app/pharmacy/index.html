@@ -7,6 +7,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/pharmacy.css">
+  <script>
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        Promise.all(regs.map(r => r.unregister())).then(() => location.reload());
+      });
+    }
+  </script>
 </head>
 <body>
 <div class="admin-login-page">
@@ -47,11 +54,27 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script>
-  if (localStorage.getItem('pharmacy_session')) window.location.href = 'dashboard.html';
+  // Validate session is a real non-null object before redirecting
+  // (a raw truthy check like !!localStorage.getItem() would loop on "null" or bad JSON)
+  (function() {
+    try {
+      const s = JSON.parse(localStorage.getItem('pharmacy_session') || 'null');
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+    } catch(e) {}
+    // Corrupted data — clear it to break any existing loop
+    localStorage.removeItem('pharmacy_session');
+  })();
 
   const cfg = window.HOMATT_CONFIG || {};
+  // Use a named storageKey so pharmacy auth session is stored separately from
+  // the patient session and the admin session, avoiding conflicts.
   const _supa = (cfg.SUPABASE_URL && window.supabase)
-    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-pharmacy-auth' }
+      }) : null;
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();

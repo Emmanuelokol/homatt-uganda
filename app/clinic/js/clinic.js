@@ -1,21 +1,72 @@
 /* Homatt Health — Clinic Portal shared JS */
 
+function _getClinicSupabase() {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return null;
+  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-clinic-auth' }
+  });
+}
+
 function requireClinic() {
-  const raw = localStorage.getItem('clinic_session');
-  if (!raw) { window.location.href = 'index.html'; return null; }
-  const s = JSON.parse(raw);
-  const name = s.name || 'Clinic Staff';
+  // Hide content immediately so there's no flash of protected content before redirect
+  document.body.style.visibility = 'hidden';
+  let s;
+  try { s = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
+  if (!s || typeof s !== 'object' || Array.isArray(s)) {
+    localStorage.removeItem('clinic_session');
+    window.location.href = 'index.html';
+    return null;
+  }
+  // Auth passed — show the page
+  document.body.style.visibility = 'visible';
+  const name = s.staffName || s.name || 'Clinic Staff';
   const el1 = document.getElementById('clinicUserName');
   const el2 = document.getElementById('clinicUserNameTop');
   const av  = document.getElementById('clinicUserAvatar');
   if (el1) el1.textContent = name;
   if (el2) el2.textContent = name;
   if (av)  av.textContent  = name[0].toUpperCase();
+
+  // Non-demo: validate Supabase session in background.
+  // If the stored session is a fake (no real Supabase token), redirect after short delay.
+  // This prevents URL manipulation while still showing the page immediately for real users.
+  if (!s.demo) {
+    setTimeout(async () => {
+      try {
+        const supa = _getClinicSupabase();
+        if (!supa) return;
+        const { data } = await supa.auth.getSession();
+        if (!data?.session) {
+          // No valid Supabase session — the localStorage was faked or expired
+          localStorage.removeItem('clinic_session');
+          window.location.href = 'index.html';
+          return;
+        }
+        // Verify the session belongs to the stored user
+        if (s.userId && data.session.user.id !== s.userId) {
+          localStorage.removeItem('clinic_session');
+          window.location.href = 'index.html';
+        }
+      } catch(e) { /* Network error — allow offline access */ }
+    }, 200);
+  }
+
   return s;
 }
 
 function setupClinicLogout() {
-  document.getElementById('clinicLogoutBtn')?.addEventListener('click', () => {
+  document.getElementById('clinicLogoutBtn')?.addEventListener('click', async () => {
+    // Sign out of Supabase auth so the session token is invalidated
+    const cfg = window.HOMATT_CONFIG || {};
+    if (window.supabase && cfg.SUPABASE_URL) {
+      try {
+        const tmpSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+          auth: { storageKey: 'sb-homatt-clinic-auth' }
+        });
+        await tmpSupa.auth.signOut();
+      } catch(e) {}
+    }
     localStorage.removeItem('clinic_session');
     window.location.href = 'index.html';
   });

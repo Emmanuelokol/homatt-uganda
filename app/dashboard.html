@@ -73,6 +73,52 @@
       <!-- Dashboard Content -->
       <div class="dash-content">
 
+        <!-- ── Medication Check-in Banner (shown when a dose check-in is due) ── -->
+        <div id="medCheckinBanner" style="display:none;margin-bottom:16px;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+          <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:14px 16px 10px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+              <span class="material-icons-outlined" style="font-size:22px;color:#fff">medication</span>
+              <span style="font-size:15px;font-weight:700;color:#fff">Medication Check-in Due</span>
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.85)" id="checkinMedName">—</div>
+          </div>
+          <div style="background:#fff;padding:14px 16px">
+            <div style="font-size:13px;font-weight:600;color:#1B5E20;margin-bottom:4px" id="checkinDosage"></div>
+            <div id="checkinInstructions" style="font-size:12px;color:#5F6368;margin-bottom:12px"></div>
+            <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling after this dose?</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button onclick="respondCheckin('well')" style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit">
+                😊<br>Feeling Well
+              </button>
+              <button onclick="respondCheckin('better')" style="flex:1;padding:10px 6px;border:2px solid #FF9800;background:#FFF3E0;border-radius:10px;font-size:12px;font-weight:700;color:#E65100;cursor:pointer;font-family:inherit">
+                😐<br>Getting Better
+              </button>
+              <button onclick="respondCheckin('worse')" style="flex:1;padding:10px 6px;border:2px solid #F44336;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit">
+                😔<br>Feeling Worse
+              </button>
+            </div>
+            <div id="checkinWarnings" style="display:none;font-size:11px;color:#E65100;background:#FFF3E0;border-radius:6px;padding:7px 10px;margin-bottom:10px"></div>
+          </div>
+        </div>
+
+        <!-- ── Clinic Referral Card (shown when user reports feeling worse) ── -->
+        <div id="clinicReferralBanner" style="display:none;margin-bottom:16px;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:16px;padding:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span class="material-icons-outlined" style="font-size:24px;color:#C62828">local_hospital</span>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#B71C1C">Please Visit a Clinic</div>
+              <div style="font-size:12px;color:#C62828">Your condition may need medical attention</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#5F6368;margin-bottom:12px">
+            You reported feeling worse after your last dose. Our records have been flagged and we strongly recommend you see a doctor as soon as possible.
+          </div>
+          <button onclick="window.location.href='clinic-booking.html'" style="width:100%;padding:12px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">directions</span>
+            Book Nearest Clinic Now
+          </button>
+        </div>
+
         <!-- Check My Health - Hero Card -->
         <div class="dash-hero-card" id="symptomChecker">
           <div class="hero-card-icon">
@@ -170,7 +216,36 @@
               </div>
               <span class="feature-label">Digestive</span>
             </div>
+            <div class="feature-card" id="featureChildGrowth">
+              <div class="feature-icon-wrap" style="background:#E3F2FD">
+                <span class="material-icons-outlined" style="color:#1976D2">child_care</span>
+              </div>
+              <span class="feature-label">Child Growth</span>
+            </div>
+            <div class="feature-card" id="featureMalaria">
+              <div class="feature-icon-wrap" style="background:#FBE9E7">
+                <span class="material-icons-outlined" style="color:#E65100">coronavirus</span>
+              </div>
+              <span class="feature-label">Malaria</span>
+            </div>
+            <div class="feature-card" onclick="window.location.href='feedback.html'" style="cursor:pointer">
+              <div class="feature-icon-wrap" style="background:#FFF3E0">
+                <span class="material-icons-outlined" style="color:#E65100">star_rate</span>
+              </div>
+              <span class="feature-label">Rate Us</span>
+            </div>
           </div>
+        </div>
+
+        <!-- Health Prediction Section -->
+        <div class="dash-section" id="healthPredictionSection" style="display:none">
+          <div class="section-header">
+            <h3 class="section-title">
+              <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;color:var(--primary)">psychology</span>
+              Health Insights
+            </h3>
+          </div>
+          <div id="healthPredictionList" style="display:flex;flex-direction:column;gap:12px"></div>
         </div>
 
         <!-- Malaria Risk Alert -->

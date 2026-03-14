@@ -7,6 +7,109 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/admin.css">
+  <script>
+    // Portals must never be served from SW cache — unregister any active SW then reload once
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        Promise.all(regs.map(r => r.unregister())).then(() => location.reload());
+      });
+    }
+
+    // ── Global action functions (defined early, before any CDN loads) ──
+    function _saveAdminSession(obj) {
+      const val = JSON.stringify(obj);
+      try { sessionStorage.setItem('admin_session', val); } catch(e) {}
+      try { localStorage.setItem('admin_session', val); } catch(e) {}
+    }
+
+    function adminOpenDemo() {
+      _saveAdminSession({ name: 'Homatt Admin (Demo)', email: 'demo@homatt.ug', demo: true });
+      window.location.href = 'dashboard.html';
+    }
+
+    async function adminSignIn() {
+      const email    = document.getElementById('adminEmail').value.trim();
+      const password = document.getElementById('adminPassword').value;
+      const errEl    = document.getElementById('loginError');
+      const btn      = document.getElementById('loginBtn');
+      const btnText  = document.getElementById('loginBtnText');
+
+      errEl.style.display = 'none';
+      if (!email || !password) {
+        errEl.textContent  = 'Please enter email/phone and password';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // Convert 9-digit Uganda phone number → Supabase email format
+      const phoneOnly = email.replace(/\s/g, '');
+      const loginEmail = /^[0-9]{9}$/.test(phoneOnly)
+        ? '256' + phoneOnly + '@homatt.ug'
+        : email;
+
+      const cfg = window.HOMATT_CONFIG || {};
+      if (!window.supabase || !cfg.SUPABASE_URL) {
+        errEl.textContent  = 'Service still loading — please wait a moment and try again.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      let supa;
+      try {
+        supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+          auth: { storageKey: 'sb-homatt-admin-auth' }
+        });
+      } catch(e) {
+        errEl.textContent  = 'Could not connect to service. Please retry.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      btn.disabled  = true;
+      btnText.textContent = 'Signing in…';
+
+      try {
+        const { data, error } = await supa.auth.signInWithPassword({ email: loginEmail, password });
+
+        if (error) {
+          errEl.textContent  = 'Invalid credentials. Please try again.';
+          errEl.style.display = 'block';
+          btn.disabled  = false;
+          btnText.textContent = 'Sign In to Admin Portal';
+          return;
+        }
+
+        const { data: profile } = await supa.from('profiles')
+          .select('first_name, last_name, is_admin')
+          .eq('id', data.user.id)
+          .single();
+
+        if (!profile || !profile.is_admin) {
+          await supa.auth.signOut();
+          errEl.textContent  = 'Access denied. This account is not an admin account.';
+          errEl.style.display = 'block';
+          btn.disabled  = false;
+          btnText.textContent = 'Sign In to Admin Portal';
+          return;
+        }
+
+        _saveAdminSession({
+          email:   data.user.email,
+          name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+          isAdmin: true,
+          userId:  data.user.id
+        });
+
+        window.location.href = 'dashboard.html';
+
+      } catch(e) {
+        errEl.textContent  = 'Network error. Please check your connection and retry.';
+        errEl.style.display = 'block';
+        btn.disabled  = false;
+        btnText.textContent = 'Sign In to Admin Portal';
+      }
+    }
+  </script>
 </head>
 <body>
   <div class="admin-login-page">
@@ -20,22 +123,30 @@
       </div>
 
       <div class="login-field">
-        <label>Email Address</label>
-        <input type="email" id="adminEmail" placeholder="admin@homatt.ug" autocomplete="email">
+        <label>Email or Phone Number</label>
+        <input type="text" id="adminEmail" placeholder="admin@homatt.ug or 7XX XXX XXX" autocomplete="email" inputmode="email"
+               onkeydown="if(event.key==='Enter')adminSignIn()">
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Enter your email or Uganda phone number (9 digits, no +256)</div>
       </div>
       <div class="login-field">
         <label>Password</label>
-        <input type="password" id="adminPassword" placeholder="••••••••" autocomplete="current-password">
+        <input type="password" id="adminPassword" placeholder="••••••••" autocomplete="current-password"
+               onkeydown="if(event.key==='Enter')adminSignIn()">
       </div>
 
-      <button class="login-btn" id="loginBtn">
+      <button class="login-btn" id="loginBtn" onclick="adminSignIn()" style="touch-action:manipulation">
         <span id="loginBtnText">Sign In to Admin Portal</span>
       </button>
 
       <div class="login-error" id="loginError"></div>
 
-      <div style="text-align:center;margin-top:20px;font-size:12px;color:#9AA0A6">
-        Only authorised Homatt Health admin accounts can access this portal.
+      <div style="text-align:center;margin:14px 0 0">
+        <div style="color:#9AA0A6;font-size:12px;margin-bottom:10px">— or —</div>
+        <button id="demoAdminBtn" onclick="adminOpenDemo()" style="touch-action:manipulation;width:100%;padding:12px;background:#F1F8E9;border:1.5px solid #A5D6A7;border-radius:8px;color:#1B5E20;font-size:14px;font-weight:600;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px">play_circle</span>
+          Open Demo Dashboard
+        </button>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:10px">Only authorised Homatt Health admin accounts can access this portal.</div>
       </div>
     </div>
   </div>
@@ -43,58 +154,42 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="../js/config.js"></script>
   <script>
-    const cfg = window.HOMATT_CONFIG || {};
-    const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-
-    // Check if already logged in as admin
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', session.user.id).single();
-        if (profile && profile.is_admin) {
-          window.location.href = 'dashboard.html';
+    // Auto-redirect if already logged in (runs after CDN loads)
+    window.addEventListener('load', async () => {
+      let stored = null;
+      for (const store of [sessionStorage, localStorage]) {
+        try { const r = store.getItem('admin_session'); if (r) { stored = JSON.parse(r); break; } } catch(e) {}
+      }
+      // Only auto-redirect for REAL admin sessions — demo mode must NOT auto-redirect
+      // so the admin can log in with real credentials to see live data
+      if (stored && typeof stored === 'object' && stored.isAdmin && !stored.demo) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+      // Check live Supabase session
+      if (!window.supabase || !window.HOMATT_CONFIG?.SUPABASE_URL) return;
+      try {
+        const supa = window.supabase.createClient(
+          window.HOMATT_CONFIG.SUPABASE_URL,
+          window.HOMATT_CONFIG.SUPABASE_ANON_KEY,
+          { auth: { storageKey: 'sb-homatt-admin-auth' } }
+        );
+        const { data: { session } } = await supa.auth.getSession();
+        if (session) {
+          const { data: profile } = await supa.from('profiles')
+            .select('first_name, last_name, is_admin')
+            .eq('id', session.user.id).single();
+          if (profile && profile.is_admin) {
+            _saveAdminSession({
+              email:   session.user.email,
+              name:    (`${profile.first_name || ''} ${profile.last_name || ''}`).trim() || 'Admin',
+              isAdmin: true,
+              userId:  session.user.id
+            });
+            window.location.href = 'dashboard.html';
+          }
         }
-      }
-    })();
-
-    document.getElementById('loginBtn').addEventListener('click', async () => {
-      const email = document.getElementById('adminEmail').value.trim();
-      const password = document.getElementById('adminPassword').value;
-      const errEl = document.getElementById('loginError');
-      const btn = document.getElementById('loginBtn');
-
-      errEl.style.display = 'none';
-      if (!email || !password) { errEl.textContent = 'Please enter email and password'; errEl.style.display = 'block'; return; }
-
-      btn.disabled = true;
-      document.getElementById('loginBtnText').textContent = 'Signing in...';
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-      btn.disabled = false;
-      document.getElementById('loginBtnText').textContent = 'Sign In to Admin Portal';
-
-      if (error) {
-        errEl.textContent = 'Invalid credentials. Please try again.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      // Check admin flag
-      const { data: profile } = await supabase.from('profiles').select('is_admin').eq('id', data.user.id).single();
-      if (!profile || !profile.is_admin) {
-        await supabase.auth.signOut();
-        errEl.textContent = 'Access denied. Your account is not an admin account.';
-        errEl.style.display = 'block';
-        return;
-      }
-
-      window.location.href = 'dashboard.html';
-    });
-
-    // Enter key support
-    document.getElementById('adminPassword').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+      } catch(e) { console.warn('[Admin] session check failed:', e.message); }
     });
   </script>
 </body>
