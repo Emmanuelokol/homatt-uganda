@@ -165,15 +165,25 @@
          MEMBER DETAIL PANEL (Health Log)
          ========================================= -->
     <div class="member-detail-panel" id="memberDetailPanel">
+      <!-- Header -->
       <div class="member-detail-header">
         <button class="member-detail-back" id="memberDetailBack">
           <span class="material-icons-outlined">arrow_back</span>
         </button>
-        <div>
+        <div class="mdh-avatar" id="memberDetailAvatar">?</div>
+        <div style="flex:1;min-width:0">
           <div class="member-detail-title" id="memberDetailName">Member</div>
-          <div style="font-size:11px;color:rgba(255,255,255,0.7)" id="memberDetailRel">—</div>
+          <div class="mdh-meta" id="memberDetailMeta">—</div>
         </div>
       </div>
+
+      <!-- Health summary strip -->
+      <div class="mdp-summary" id="memberDetailSummary" style="display:none">
+        <div id="memberDetailConditions"></div>
+        <div id="memberDetailMeds"></div>
+        <div id="memberDetailAllergies"></div>
+      </div>
+
       <div class="member-detail-body">
 
         <button class="log-event-btn" id="logEventForMemberBtn">
@@ -181,12 +191,16 @@
           Log Health Event
         </button>
 
-        <div style="font-size:12px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px">Health Log</div>
+        <div class="mdp-timeline-header">
+          <span class="material-icons-outlined" style="font-size:16px;color:#1565C0">timeline</span>
+          Health Log
+          <span class="mdp-event-count" id="memberEventCount" style="display:none">0</span>
+        </div>
 
         <div class="timeline-wrap" id="memberTimeline">
           <div class="timeline-empty">
-            <span class="material-icons-outlined">history</span>
-            No health events yet.<br>Log a symptom check, vaccination, or treatment to start the timeline.
+            <span class="material-icons-outlined">favorite_border</span>
+            No health events yet.<br>Tap "Log Health Event" to start the timeline.
           </div>
         </div>
 

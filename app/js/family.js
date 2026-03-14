@@ -1071,13 +1071,52 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openMemberDetail(member) {
     const panel = document.getElementById('memberDetailPanel');
-    // Reset display so it's visible before animating in
     panel.style.display = 'flex';
     panel.offsetHeight; // force reflow so CSS transition fires
     logEventForMemberId = member.id;
+
+    // Header — name
     document.getElementById('memberDetailName').textContent = member.name;
-    document.getElementById('memberDetailRel').textContent =
-      member.relationship ? member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1) : '—';
+
+    // Header — avatar
+    const avatarEl = document.getElementById('memberDetailAvatar');
+    if (member.avatar_url) {
+      avatarEl.innerHTML = `<img src="${member.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      avatarEl.textContent = member.name ? member.name.charAt(0).toUpperCase() : '?';
+    }
+
+    // Header — meta line (relationship · age · sex)
+    const metaParts = [];
+    if (member.relationship) metaParts.push(member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1));
+    if (member.dob) { const age = calcAge(member.dob); if (age !== null) metaParts.push(age + ' yrs'); }
+    if (member.sex) metaParts.push(member.sex === 'male' ? '♂ Male' : '♀ Female');
+    if (member.location) metaParts.push(member.location);
+    document.getElementById('memberDetailMeta').textContent = metaParts.join(' · ') || '—';
+
+    // Summary strip — conditions
+    const summaryEl = document.getElementById('memberDetailSummary');
+    const conditions = (member.chronic_conditions || []).filter(c => c !== 'none');
+    const meds = member.medications || [];
+    const allergies = member.allergies || [];
+    const hasSummary = conditions.length || meds.length || allergies.length;
+
+    if (hasSummary) {
+      summaryEl.style.display = 'block';
+      document.getElementById('memberDetailConditions').innerHTML = conditions.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#6A1B9A">medical_information</span><div><div class="mdp-summary-label">Conditions</div><div class="mdp-chips">${conditions.map(c => `<span class="mdp-chip mdp-chip-purple">${escHtml(c.replace(/_/g,' '))}</span>`).join('')}</div></div></div>` : '';
+      document.getElementById('memberDetailMeds').innerHTML = meds.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#1565C0">medication</span><div><div class="mdp-summary-label">Medications</div><div class="mdp-chips">${meds.map(m => `<span class="mdp-chip mdp-chip-blue">${escHtml(m)}</span>`).join('')}</div></div></div>` : '';
+      document.getElementById('memberDetailAllergies').innerHTML = allergies.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#E65100">warning_amber</span><div><div class="mdp-summary-label">Allergies</div><div class="mdp-chips">${allergies.map(a => `<span class="mdp-chip mdp-chip-orange">${escHtml(a)}</span>`).join('')}</div></div></div>` : '';
+    } else {
+      summaryEl.style.display = 'none';
+    }
+
+    // Reset event count badge
+    const countBadge = document.getElementById('memberEventCount');
+    countBadge.style.display = 'none';
+
     panel.classList.add('open');
     loadMemberHealthLog(member.id);
   }
@@ -1129,10 +1168,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const allEvents = [...(events || []), ...doseEvents]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+    // Update event count badge
+    const countBadge = document.getElementById('memberEventCount');
+    if (allEvents.length > 0) {
+      countBadge.textContent = allEvents.length;
+      countBadge.style.display = 'inline-flex';
+    } else {
+      countBadge.style.display = 'none';
+    }
+
     if (allEvents.length === 0) {
       timelineEl.innerHTML = `
         <div class="timeline-empty">
-          <span class="material-icons-outlined">history</span>
+          <span class="material-icons-outlined">favorite_border</span>
           No health events yet.<br>Tap "Log Health Event" to start the timeline.
         </div>`;
       return;
