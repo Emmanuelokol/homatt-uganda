@@ -81,7 +81,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       s.classList.remove('open');
       s.style.visibility = 'hidden';
     });
-    closeMemberDetail();
+    // Immediately hide the member-detail-panel — no transition delay
+    const detailPanelTab = document.getElementById('memberDetailPanel');
+    if (detailPanelTab) {
+      detailPanelTab.classList.remove('open');
+      detailPanelTab.style.display = 'none';
+      detailPanelTab.style.visibility = 'hidden';
+    }
+    logEventForMemberId = null;
 
     // Cart FAB only on shop tab
     const cartFab = document.getElementById('cartFab');
@@ -849,6 +856,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (detailPanel) {
       detailPanel.classList.remove('open');
       detailPanel.style.display = 'none';
+      detailPanel.style.visibility = 'hidden';
     }
     overlay.classList.add('visible');
     sheet.style.visibility = ''; // let CSS class handle it
