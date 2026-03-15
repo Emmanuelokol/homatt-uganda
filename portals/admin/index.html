@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt — Admin Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="../portals.css">
+  <style>
+    .sidebar { --sidebar-accent: #C62828; }
+    .nav-item.active::before { background: #EF9A9A; }
+    .escalation-row td { border-left: 3px solid transparent; }
+    .escalation-row.emergency td:first-child { border-left-color: var(--accent-red); }
+    .escalation-row.urgent td:first-child { border-left-color: var(--accent-orange); }
+    .compliance-flag {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px 16px; background: #FFF8E1;
+      border: 1px solid #FFE082; border-radius: 10px; margin-bottom: 10px;
+    }
+    .compliance-flag.red { background: #FFEBEE; border-color: #FFCDD2; }
+    .compliance-flag-icon { flex-shrink: 0; color: #F57F17; }
+    .compliance-flag.red .compliance-flag-icon { color: var(--accent-red); }
+    .compliance-flag-body { flex: 1; }
+    .compliance-flag-title { font-size: 13px; font-weight: 700; color: var(--text-dark); }
+    .compliance-flag-desc { font-size: 12px; color: var(--text-light); margin-top: 3px; }
+    .report-card {
+      background: linear-gradient(135deg, var(--brand-primary), var(--brand-mid));
+      color: white; border-radius: 12px; padding: 20px; margin-bottom: 12px;
+    }
+    .report-title { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .report-sub { font-size: 12px; opacity: 0.8; }
+    .report-btn {
+      margin-top: 12px; padding: 8px 14px; background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4); border-radius: 8px;
+      color: white; font-size: 12px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .report-btn:hover { background: rgba(255,255,255,0.3); }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon" style="background:#C62828">
+        <span class="material-icons-outlined">admin_panel_settings</span>
+      </div>
+      <div class="login-logo-name">Admin Portal</div>
+    </div>
+    <div class="login-subtitle">Homatt Health — System Oversight</div>
+    <div class="login-field">
+      <label>Admin Email</label>
+      <input type="email" id="loginEmail" placeholder="admin@homatt.ug">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••">
+    </div>
+    <div class="login-error" id="loginError">Invalid credentials. Try demo mode below.</div>
+    <button class="login-btn" onclick="doLogin()" style="background:#C62828">Sign In as Admin</button>
+    <div class="login-divider">or</div>
+    <button class="demo-btn" onclick="enterDemo()" style="color:#C62828;border-color:#C62828">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">science</span>
+      Enter Demo Mode (No Login Required)
+    </button>
+    <div class="login-back"><a href="../">← Back to Portal Hub</a></div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="appLayout" class="portal-layout" style="display:none">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge">
+        <div class="logo-icon" style="background:#C62828">
+          <span class="material-icons-outlined">admin_panel_settings</span>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">Homatt</span>
+          <span class="logo-tag">Admin Portal</span>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="s-user-name" id="sUserName">System Admin</div>
+      <div class="s-user-role">Super Administrator</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Overview</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </div>
+      <div class="nav-section-label">Operations</div>
+      <div class="nav-item" onclick="showPage('bookings',this)">
+        <span class="material-icons-outlined">calendar_month</span> Bookings
+        <span class="nav-badge" id="badgeBookings">12</span>
+      </div>
+      <div class="nav-item" onclick="showPage('escalations',this)">
+        <span class="material-icons-outlined">emergency</span> Escalations
+        <span class="nav-badge" id="badgeEscalations">3</span>
+      </div>
+      <div class="nav-item" onclick="showPage('prescriptions',this)">
+        <span class="material-icons-outlined">medication</span> Prescriptions
+      </div>
+      <div class="nav-section-label">Shop</div>
+      <div class="nav-item" onclick="showPage('shop-orders',this)">
+        <span class="material-icons-outlined">storefront</span> Shop Orders
+        <span class="nav-badge" id="badgeShopOrders">0</span>
+      </div>
+      <div class="nav-section-label">Compliance</div>
+      <div class="nav-item" onclick="showPage('compliance',this)">
+        <span class="material-icons-outlined">verified_user</span> Compliance
+        <span class="nav-badge" id="badgeFlags">2</span>
+      </div>
+      <div class="nav-item" onclick="showPage('reports',this)">
+        <span class="material-icons-outlined">summarize</span> Reports
+      </div>
+      <div class="nav-section-label">Registry</div>
+      <div class="nav-item" onclick="showPage('clinics',this)">
+        <span class="material-icons-outlined">local_hospital</span> Clinics
+      </div>
+      <div class="nav-item" onclick="showPage('pharmacies',this)">
+        <span class="material-icons-outlined">local_pharmacy</span> Pharmacies
+      </div>
+      <div class="nav-item" onclick="showPage('riders',this)">
+        <span class="material-icons-outlined">two_wheeler</span> Riders
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="doLogout()">
+        <span class="material-icons-outlined">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="pageTitle">Dashboard</div>
+        <div class="topbar-subtitle">Homatt Health — System Oversight</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-icon-btn" title="Notifications">
+          <span class="material-icons-outlined">notifications_outlined</span>
+          <span class="notif-dot"></span>
+        </button>
+        <button class="topbar-icon-btn" title="Settings">
+          <span class="material-icons-outlined">settings</span>
+        </button>
+        <button class="avatar-btn" id="avatarBtn" title="Admin" style="background:#C62828">A</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- ─── DASHBOARD ─── -->
+      <div class="page active" id="page-dashboard">
+        <div class="demo-banner">
+          <span class="material-icons-outlined">science</span>
+          Demo Mode — Showing sample data. Real-time data loads from Supabase when authenticated.
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon green"><span class="material-icons-outlined">calendar_month</span></div>
+            <div class="stat-info">
+              <div class="stat-value">47</div>
+              <div class="stat-label">Total Bookings This Week</div>
+              <div class="stat-delta up">↑ 18% vs last week</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon red"><span class="material-icons-outlined">emergency</span></div>
+            <div class="stat-info">
+              <div class="stat-value">3</div>
+              <div class="stat-label">Active Escalations</div>
+              <div class="stat-delta down">↓ 2 resolved today</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><span class="material-icons-outlined">medication</span></div>
+            <div class="stat-info">
+              <div class="stat-value">23</div>
+              <div class="stat-label">Prescriptions Issued</div>
+              <div class="stat-delta up">↑ 5 new today</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><span class="material-icons-outlined">payments</span></div>
+            <div class="stat-info">
+              <div class="stat-value">2.4M</div>
+              <div class="stat-label">Revenue (UGX) This Week</div>
+              <div class="stat-delta up">↑ 12% vs last week</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon teal"><span class="material-icons-outlined">delivery_dining</span></div>
+            <div class="stat-info">
+              <div class="stat-value">31</div>
+              <div class="stat-label">Deliveries Completed</div>
+              <div class="stat-delta up">Avg 42 min ETA</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><span class="material-icons-outlined">verified_user</span></div>
+            <div class="stat-info">
+              <div class="stat-value">100%</div>
+              <div class="stat-label">Prescription Compliance</div>
+              <div class="stat-delta up">0 unverified drugs today</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon teal"><span class="material-icons-outlined">storefront</span></div>
+            <div class="stat-info">
+              <div class="stat-value" id="dashShopCount">6</div>
+              <div class="stat-label">Shop Orders Today</div>
+              <div class="stat-delta up" id="dashShopPending">↑ 2 pending</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Recent Bookings -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">calendar_month</span> Recent Bookings</div>
+              <button class="btn btn-ghost btn-sm" onclick="showPage('bookings',null)">View All</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Code</th><th>Patient</th><th>Urgency</th><th>Status</th></tr></thead>
+                <tbody id="dashBookingsTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Recent Escalations -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">emergency</span> Escalation Feed</div>
+              <button class="btn btn-ghost btn-sm" onclick="showPage('escalations',null)">View All</button>
+            </div>
+            <div class="card-body">
+              <ul class="timeline" id="dashEscalationsTimeline"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-24 grid-2">
+          <!-- Prescription Audit (mini) -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">medication</span> Recent Prescriptions</div>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead><tr><th>Patient</th><th>Doctor</th><th>Diagnosis</th><th>Status</th></tr></thead>
+                <tbody id="dashPrescTable"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Compliance Flags -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">flag</span> Compliance Flags</div>
+              <span class="badge badge-urgent">2 Active</span>
+            </div>
+            <div class="card-body" id="dashFlags"></div>
+          </div>
+        </div>
+
+        <!-- Recent Shop Orders -->
+        <div class="card mt-24">
+          <div class="card-header">
+            <div class="card-title"><span class="material-icons-outlined">storefront</span> Recent Shop Orders</div>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('shop-orders',null)">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Order ID</th><th>Product</th><th>Qty</th><th>Total</th><th>Address</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="dashShopOrdersTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ─── BOOKINGS ─── -->
+      <div class="page" id="page-bookings">
+        <div class="section-header">
+          <div>
+            <div class="section-title">All Bookings</div>
+            <div class="section-sub">Track all patient bookings and their statuses</div>
+          </div>
+          <div class="flex-center gap-8">
+            <div class="search-bar">
+              <span class="material-icons-outlined">search</span>
+              <input type="text" placeholder="Search booking code..." oninput="filterBookings(this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="filter-bar" id="bookingFilters">
+          <span class="filter-chip active" onclick="filterByStatus('all',this)">All</span>
+          <span class="filter-chip" onclick="filterByStatus('pending',this)">Pending</span>
+          <span class="filter-chip" onclick="filterByStatus('confirmed',this)">Confirmed</span>
+          <span class="filter-chip" onclick="filterByStatus('completed',this)">Completed</span>
+          <span class="filter-chip" onclick="filterByStatus('cancelled',this)">Cancelled</span>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Booking Code</th><th>Patient</th><th>Age/Sex</th>
+                  <th>Diagnosis</th><th>Urgency</th><th>Clinic</th>
+                  <th>Status</th><th>Date</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="allBookingsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── ESCALATIONS ─── -->
+      <div class="page" id="page-escalations">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Escalation Log</div>
+            <div class="section-sub">All urgent and emergency cases requiring immediate attention</div>
+          </div>
+          <span class="badge badge-emergency">3 Active</span>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Patient</th><th>Level</th><th>Symptoms</th>
+                  <th>AI Diagnosis</th><th>Confidence</th><th>Location</th>
+                  <th>Action Taken</th><th>Time</th><th>Resolved</th>
+                </tr>
+              </thead>
+              <tbody id="escalationsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PRESCRIPTIONS ─── -->
+      <div class="page" id="page-prescriptions">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Prescription Audit Log</div>
+            <div class="section-sub">All doctor-issued e-prescriptions — digitally signed and immutable</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Rx ID</th><th>Patient</th><th>Doctor</th><th>License</th>
+                  <th>Diagnosis</th><th>AI Confirmed</th><th>Drugs</th>
+                  <th>Status</th><th>Issued</th>
+                </tr>
+              </thead>
+              <tbody id="prescriptionsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── COMPLIANCE ─── -->
+      <div class="page" id="page-compliance">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Compliance Monitoring</div>
+            <div class="section-sub">AI-flagged anomalies and policy violations</div>
+          </div>
+          <button class="btn btn-outline btn-sm">
+            <span class="material-icons-outlined">download</span> Export Report
+          </button>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><span class="material-icons-outlined">flag</span> Active Flags</div>
+              </div>
+              <div class="card-body" id="complianceFlags"></div>
+            </div>
+          </div>
+          <div>
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title"><span class="material-icons-outlined">bar_chart</span> Metrics</div>
+              </div>
+              <div class="card-body">
+                <div style="margin-bottom:14px">
+                  <div class="flex-between text-sm mb-2">
+                    <span class="fw-600">Prescriptions with verified doctor</span>
+                    <span class="text-green fw-600">100%</span>
+                  </div>
+                  <div style="height:8px;background:#E8F5E9;border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:100%;background:var(--brand-primary);border-radius:4px"></div>
+                  </div>
+                </div>
+                <div style="margin-bottom:14px">
+                  <div class="flex-between text-sm mb-2">
+                    <span class="fw-600">Deliveries with QR scan</span>
+                    <span class="text-green fw-600">96%</span>
+                  </div>
+                  <div style="height:8px;background:#E8F5E9;border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:96%;background:var(--brand-primary);border-radius:4px"></div>
+                  </div>
+                </div>
+                <div style="margin-bottom:14px">
+                  <div class="flex-between text-sm mb-2">
+                    <span class="fw-600">Clinic visit completion rate</span>
+                    <span style="color:var(--accent-orange)" class="fw-600">87%</span>
+                  </div>
+                  <div style="height:8px;background:#FFF3E0;border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:87%;background:var(--accent-orange);border-radius:4px"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex-between text-sm mb-2">
+                    <span class="fw-600">Antibiotic without prescription</span>
+                    <span class="text-green fw-600">0%</span>
+                  </div>
+                  <div style="height:8px;background:#E8F5E9;border-radius:4px;overflow:hidden">
+                    <div style="height:100%;width:0%;background:var(--accent-red);border-radius:4px"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── REPORTS ─── -->
+      <div class="page" id="page-reports">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Reports</div>
+            <div class="section-sub">Generated compliance and audit exports</div>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="report-card">
+              <div class="report-title">Weekly Compliance Report</div>
+              <div class="report-sub">Week of 24 Feb – 2 Mar 2026 · 47 bookings · 23 prescriptions</div>
+              <button class="report-btn"><span class="material-icons-outlined" style="font-size:16px">download</span> Download PDF</button>
+            </div>
+            <div class="report-card" style="background:linear-gradient(135deg,#1565C0,#1976D2)">
+              <div class="report-title">NDA-Ready Audit Export</div>
+              <div class="report-sub">Full chain audit — bookings → prescriptions → deliveries</div>
+              <button class="report-btn"><span class="material-icons-outlined" style="font-size:16px">download</span> Export CSV</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">summarize</span> Report Summary</div>
+            </div>
+            <div class="card-body">
+              <table>
+                <tbody>
+                  <tr><td class="text-muted text-sm">Period</td><td class="fw-600">Feb 24 – Mar 2, 2026</td></tr>
+                  <tr><td class="text-muted text-sm">Total Bookings</td><td class="fw-600">47</td></tr>
+                  <tr><td class="text-muted text-sm">Escalations</td><td class="fw-600">5 (3 emergency, 2 urgent)</td></tr>
+                  <tr><td class="text-muted text-sm">Prescriptions</td><td class="fw-600">23 (all verified)</td></tr>
+                  <tr><td class="text-muted text-sm">Deliveries</td><td class="fw-600">31 (avg 42 min)</td></tr>
+                  <tr><td class="text-muted text-sm">Revenue</td><td class="fw-600">UGX 2,400,000</td></tr>
+                  <tr><td class="text-muted text-sm">Compliance Score</td><td class="fw-600 text-green">98.7%</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── CLINICS ─── -->
+      <div class="page" id="page-clinics">
+        <div class="section-header">
+          <div class="section-title">Verified Clinics Registry</div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>District</th><th>Phone</th><th>License</th><th>Specialties</th><th>Status</th></tr></thead>
+              <tbody id="clinicsTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── PHARMACIES ─── -->
+      <div class="page" id="page-pharmacies">
+        <div class="section-header">
+          <div class="section-title">Pharmacies Registry</div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>District</th><th>Phone</th><th>License</th><th>Status</th></tr></thead>
+              <tbody id="pharmaciesTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── RIDERS ─── -->
+      <div class="page" id="page-riders">
+        <div class="section-header">
+          <div class="section-title">Rider Fleet</div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Name</th><th>Phone</th><th>Plate</th><th>Deliveries</th><th>Rating</th><th>Status</th></tr></thead>
+              <tbody id="ridersTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SHOP ORDERS ─── -->
+      <div class="page" id="page-shop-orders">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Preventive Shop Orders</div>
+            <div class="section-sub">Orders placed by users for preventive health products</div>
+          </div>
+          <div class="flex-center gap-8">
+            <div class="search-bar">
+              <span class="material-icons-outlined">search</span>
+              <input type="text" placeholder="Search by product or customer..." oninput="filterShopOrders(this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <span class="filter-chip active" onclick="filterShopByStatus('all',this)">All</span>
+          <span class="filter-chip" onclick="filterShopByStatus('pending',this)">Pending</span>
+          <span class="filter-chip" onclick="filterShopByStatus('processing',this)">Processing</span>
+          <span class="filter-chip" onclick="filterShopByStatus('shipped',this)">Shipped</span>
+          <span class="filter-chip" onclick="filterShopByStatus('delivered',this)">Delivered</span>
+          <span class="filter-chip" onclick="filterShopByStatus('completed',this)">Completed</span>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th><th>Product</th><th>Qty</th><th>Total (UGX)</th>
+                  <th>Phone</th><th>Address</th><th>Status</th><th>Date</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="shopOrdersTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end page-content -->
+  </main>
+</div><!-- end appLayout -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

@@ -23,25 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
   updateTime();
   setInterval(updateTime, 30000);
 
-  // If already logged in via Supabase session AND has a Homatt patient profile, go to dashboard.
-  // We must verify the profile exists: portal staff (pharmacy/clinic/rider) sign in with the
-  // same Supabase project but have no 'profiles' record — without this check the app would
-  // redirect them to dashboard.html causing a cross-portal redirect loop.
-  supabase.auth.getSession().then(async ({ data: { session } }) => {
-    if (!session) return;
-    try {
-      const { data: profile } = await supabase
-        .from('profiles').select('id').eq('id', session.user.id).single();
-      if (profile) {
-        window.location.href = 'dashboard.html';
-      } else {
-        // Valid Supabase session but no patient profile — must be a portal staff account.
-        // Sign out of the shared session so the login form shows cleanly.
-        await supabase.auth.signOut();
-      }
-    } catch (e) {
-      // Network error — don't redirect, just show the login form
-    }
+  // If already logged in via Supabase session, go to dashboard
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    if (session) window.location.href = 'dashboard.html';
   });
 
   // Password toggle
@@ -147,9 +131,6 @@ document.addEventListener('DOMContentLoaded', () => {
         healthGoals: profile.health_goals,
       }));
     }
-
-    // Link this user's push token to their Supabase UUID for targeted notifications
-    if (typeof oneSignalLogin === 'function') oneSignalLogin(data.user.id);
 
     window.location.href = 'dashboard.html';
   });

@@ -973,11 +973,3 @@
 .sc-action-area {
   margin-top: 16px;
 }
-
-/* ====== OTC Medication Section ====== */
-.sc-otc-section { background:#F1F8E9; border-radius:12px; padding:16px; margin-top:16px; }
-.sc-otc-title { font-size:14px; font-weight:700; color:#1B5E20; display:flex; align-items:center; gap:8px; margin-bottom:8px; }
-.sc-otc-disclaimer { font-size:11px; color:#E65100; background:#FFF8E1; border-radius:8px; padding:8px 10px; margin-bottom:12px; line-height:1.5; }
-.sc-otc-item { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(27,94,32,0.1); font-size:13px; }
-.sc-otc-item:last-child { border-bottom:none; }
-.sc-order-btn { background:#00695C; color:#fff; border:none; border-radius:10px; padding:12px 20px; width:100%; font-size:14px; font-weight:600; margin-top:12px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }

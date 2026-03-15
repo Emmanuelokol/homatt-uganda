@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <meta name="theme-color" content="#1B5E20">
-  <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Homatt Health - Symptom Checker</title>
@@ -12,7 +11,6 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/symptom-checker.css">
-  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
 </head>
 <body>
   <div class="phone-frame">
@@ -110,18 +108,11 @@
 
           <div class="sc-followup-content" id="followupContent" style="display:none">
             <h3 class="sc-heading">A few more questions</h3>
-            <p class="sc-subheading">Tap an answer for each question, then press <strong>Get Assessment</strong></p>
-
-            <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#1B5E20;display:flex;align-items:center;gap:8px">
-              <span class="material-icons-outlined" style="font-size:16px">touch_app</span>
-              <span>Tap your answer for each question below — answered: <strong id="answeredCount">0</strong></span>
-            </div>
+            <p class="sc-subheading">Help us understand your symptoms better</p>
 
             <div class="sc-questions-list" id="questionsList">
               <!-- Populated by AI -->
             </div>
-
-            <div id="followupValidationMsg" style="display:none;background:#FFEBEE;border-radius:8px;padding:9px 14px;font-size:12px;color:#C62828;margin-bottom:10px;font-weight:600"></div>
 
             <button class="btn btn-next sc-continue-btn" id="btnGetDiagnosis">
               <span class="material-icons-outlined">psychology</span>
@@ -263,6 +254,5 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/symptom-checker.js"></script>
-  <script src="js/native-bridge.js"></script>
 </body>
 </html>

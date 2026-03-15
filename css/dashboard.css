@@ -434,20 +434,20 @@
   color: white;
 }
 
-.feature-icon-wrap.cycle-tracker {
-  background: linear-gradient(135deg, #AD1457, #E91E63);
+.feature-icon-wrap.menstrual {
+  background: linear-gradient(135deg, #E91E63, #F48FB1);
 }
 
-.feature-icon-wrap.mood-tracker {
-  background: linear-gradient(135deg, #4527A0, #7B1FA2);
+.feature-icon-wrap.pregnancy {
+  background: linear-gradient(135deg, #7B1FA2, #CE93D8);
 }
 
-.feature-icon-wrap.pain-tracker {
-  background: linear-gradient(135deg, #BF360C, #D32F2F);
+.feature-icon-wrap.child {
+  background: linear-gradient(135deg, #0288D1, #4FC3F7);
 }
 
-.feature-icon-wrap.digestive-tracker {
-  background: linear-gradient(135deg, #004D40, #00695C);
+.feature-icon-wrap.bp {
+  background: linear-gradient(135deg, #D32F2F, #EF9A9A);
 }
 
 .feature-label {

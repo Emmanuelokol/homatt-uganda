@@ -61,7 +61,7 @@ body {
   position: relative;
 }
 
-/* On actual mobile, remove the frame and status bar */
+/* On actual mobile, remove the frame */
 @media (max-width: 430px) {
   body {
     background: var(--background);
@@ -71,13 +71,8 @@ body {
   .phone-frame {
     border-radius: 0;
     box-shadow: none;
-    height: 100dvh;        /* dynamic viewport height — no chrome overlap */
-    height: 100vh;         /* fallback for older Android */
+    height: 100vh;
     max-width: 100%;
-  }
-  /* Hide the fake status bar — phone already has one */
-  .status-bar {
-    display: none !important;
   }
 }
 
@@ -164,13 +159,6 @@ body {
 .logo-icon {
   color: white;
   font-size: 30px;
-}
-
-.logo-img {
-  width: 44px;
-  height: 44px;
-  object-fit: contain;
-  border-radius: 10px;
 }
 
 .app-title {
@@ -332,18 +320,18 @@ body {
 .input-wrapper {
   display: flex;
   align-items: center;
-  background: #ffffff;
-  border: 2px solid #C8C8C8;
+  background: var(--background);
+  border: 1.5px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0 14px;
   transition: all 0.2s ease;
-  height: 52px;            /* slightly taller — easier tap on Android */
+  height: 48px;
 }
 
 .input-wrapper:focus-within {
   border-color: var(--primary);
-  background: #ffffff;
-  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.12);
+  background: white;
+  box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.1);
 }
 
 .input-wrapper.error {
@@ -367,18 +355,16 @@ body {
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 16px;          /* 16px prevents iOS zoom; good readability on Android */
-  color: #111111;
+  font-size: 15px;
+  color: var(--text-primary);
   font-family: inherit;
   outline: none;
   height: 100%;
   width: 100%;
-  -webkit-text-fill-color: #111111;   /* force dark text even on autofill */
 }
 
 .input-field::placeholder {
-  color: #9AA0A6;
-  opacity: 1;
+  color: var(--text-hint);
 }
 
 .select-field {
@@ -925,12 +911,6 @@ body {
   animation: shake 0.3s ease;
 }
 
-/* Spin animation for loading states */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
 /* Ripple effect */
 .ripple {
   position: relative;
@@ -957,301 +937,4 @@ body {
   transform: scale(0);
   opacity: 1;
   transition: 0s;
-}
-
-/* ============================================
-   KEYBOARD-OPEN STATE
-   When keyboard is visible, give bottom-sheets extra breathing room
-   and speed up keyboard-dismiss transitions.
-   ============================================ */
-body.keyboard-open .bottom-sheet.open {
-  /* Ensure the sheet doesn't fight with the keyboard */
-  transition: none;
-}
-
-body.keyboard-open .sheet-body {
-  /* Smooth scrolling when navigating between inputs */
-  scroll-behavior: smooth;
-}
-
-/* ============================================
-   DARK MODE TRANSITION — smooth fade-out/in
-   Applied by JS when toggling via .theme-transitioning class
-   ============================================ */
-.phone-frame.theme-transitioning {
-  opacity: 0;
-  transition: opacity 0.12s ease !important;
-}
-
-/* ============================================
-   PERFORMANCE — GPU layers for animated elements
-   ============================================ */
-.app-screen,
-.bottom-nav,
-.dash-header,
-.tracker-tabs,
-.modal-overlay,
-.tracker-toast {
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  will-change: transform;
-}
-
-/* Smooth scroll on Android Chrome */
-.app-screen {
-  overscroll-behavior-y: contain;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Disable text selection (feels more native) */
-.nav-item, .feature-card, .btn, .choice-btn, .chip-toggle,
-.tracker-tab, .tracker-back-btn, .dash-icon-btn {
-  -webkit-user-select: none;
-  user-select: none;
-}
-
-/* Larger tap targets on mobile for old Android */
-@media (max-width: 430px) {
-  .btn, .choice-btn, .tracker-tab {
-    min-height: 48px;
-  }
-  .counter-btn, .qty-btn {
-    min-width: 44px;
-    min-height: 44px;
-  }
-}
-
-/* ============================================
-   DARK MODE
-   ============================================ */
-:root[data-theme="dark"] {
-  --primary: #66BB6A;
-  --primary-light: #81C784;
-  --primary-dark: #4CAF50;
-  --primary-surface: #1a3a1c;
-  --primary-surface-hover: #2a5a2c;
-  --accent: #FFA726;
-  --accent-light: #FFB74D;
-  --text-primary: #E8EAED;
-  --text-secondary: #9AA0A6;
-  --text-hint: #6E7478;
-  --surface: #1E1E1E;
-  --background: #121212;
-  --border: #333333;
-  --border-focus: #66BB6A;
-  --error-bg: #3B1A1A;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
-}
-
-[data-theme="dark"] body {
-  background: #0A0A0A;
-}
-
-[data-theme="dark"] .phone-frame {
-  box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
-}
-
-[data-theme="dark"] .bottom-nav {
-  background: #1E1E1E;
-  border-top: 1px solid #333;
-}
-
-[data-theme="dark"] .status-bar {
-  background: #111;
-}
-
-[data-theme="dark"] .page-body {
-  background: var(--surface);
-}
-
-[data-theme="dark"] .bottom-sheet {
-  background: #1E1E1E;
-}
-
-/* Global dark mode: ensure ALL inputs, selects and textareas are readable */
-[data-theme="dark"] input,
-[data-theme="dark"] select,
-[data-theme="dark"] textarea {
-  background: #2C2C2C;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: #555;
-}
-[data-theme="dark"] input:focus,
-[data-theme="dark"] select:focus,
-[data-theme="dark"] textarea:focus {
-  background: #3a3a3a;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-}
-[data-theme="dark"] input::placeholder,
-[data-theme="dark"] textarea::placeholder {
-  color: #6E7478;
-  opacity: 1;
-}
-
-/* Dark mode input fields — clearly visible white text on dark bg */
-[data-theme="dark"] .input-wrapper {
-  background: #2C2C2C;
-  border-color: #555555;
-}
-
-[data-theme="dark"] .input-wrapper:focus-within {
-  background: #333333;
-  border-color: #66BB6A;
-  box-shadow: 0 0 0 3px rgba(102,187,106,0.15);
-}
-
-[data-theme="dark"] .input-field {
-  color: #F0F0F0;
-  -webkit-text-fill-color: #F0F0F0;
-}
-
-[data-theme="dark"] .input-field::placeholder {
-  color: #6E7478;
-}
-
-[data-theme="dark"] .sheet-input,
-[data-theme="dark"] .sheet-textarea,
-[data-theme="dark"] .sheet-select {
-  background: #2C2C2C;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: #555;
-}
-
-/* Prevent focus state from reverting to white bg+light text in dark mode */
-[data-theme="dark"] .sheet-input:focus,
-[data-theme="dark"] .sheet-textarea:focus,
-[data-theme="dark"] .sheet-select:focus {
-  background: #3a3a3a;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: var(--primary);
-}
-
-/* Dark mode: medicine order inputs */
-[data-theme="dark"] .mo-field input,
-[data-theme="dark"] .mo-field select,
-[data-theme="dark"] .mo-field textarea {
-  background: #2C2C2C;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: #555;
-}
-
-[data-theme="dark"] .mo-field input:focus,
-[data-theme="dark"] .mo-field select:focus,
-[data-theme="dark"] .mo-field textarea:focus {
-  background: #3a3a3a;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-}
-
-[data-theme="dark"] .sheet-chip {
-  background: #2C2C2C;
-  color: var(--text-primary);
-  border-color: #444;
-}
-
-[data-theme="dark"] .rx-card,
-[data-theme="dark"] .family-member-card,
-[data-theme="dark"] .item-card,
-[data-theme="dark"] .dash-hero-card,
-[data-theme="dark"] .dash-tip-card,
-[data-theme="dark"] .dash-quiz-card,
-[data-theme="dark"] .feature-card,
-[data-theme="dark"] .reminder-item,
-[data-theme="dark"] .wallet-card-full,
-[data-theme="dark"] .action-sheet-item {
-  background: #2C2C2C;
-}
-
-[data-theme="dark"] .primary-member-card {
-  background: linear-gradient(135deg, #1a3a1c, #2a5a2c);
-}
-
-[data-theme="dark"] .profile-section {
-  border-bottom-color: #2C2C2C;
-}
-
-[data-theme="dark"] .settings-item {
-  border-bottom-color: #2C2C2C;
-}
-
-[data-theme="dark"] .tip-text {
-  color: var(--text-secondary);
-}
-
-[data-theme="dark"] .dash-content {
-  background: var(--background);
-}
-
-[data-theme="dark"] .dash-header {
-  background: linear-gradient(135deg, #1a3a1c 0%, #2a5a2c 100%);
-}
-
-[data-theme="dark"] .health-score-card {
-  background: rgba(255,255,255,0.08);
-}
-
-[data-theme="dark"] .section-title {
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .tracker-tab {
-  color: var(--text-secondary);
-}
-
-[data-theme="dark"] .tracker-tab.active {
-  color: var(--primary);
-}
-
-[data-theme="dark"] .family-header {
-  background: linear-gradient(135deg, #0d2f55 0%, #1565C0 100%);
-}
-
-[data-theme="dark"] .shop-search-wrap {
-  background: #2C2C2C;
-  border-color: #444;
-}
-
-[data-theme="dark"] .shop-search-input {
-  background: transparent;
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .cat-chip {
-  background: #2C2C2C;
-  border-color: #444;
-  color: var(--text-primary);
-}
-
-[data-theme="dark"] .timeline-event {
-  background: #2C2C2C;
-}
-
-[data-theme="dark"] .member-detail-panel {
-  background: var(--background);
-}
-
-/* Skeleton shimmer for loading states */
-@keyframes shimmer {
-  0% { background-position: -400px 0; }
-  100% { background-position: 400px 0; }
-}
-
-.skeleton {
-  background: linear-gradient(90deg, var(--border) 25%, var(--background) 50%, var(--border) 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.5s infinite;
-  border-radius: var(--radius-sm);
-}
-
-.skeleton-card {
-  height: 96px;
-  margin: 12px 16px;
-  border-radius: var(--radius-md);
 }

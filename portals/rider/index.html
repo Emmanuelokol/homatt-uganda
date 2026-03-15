@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Homatt — Rider Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="../portals.css">
+  <style>
+    /* Rider portal is mobile-first */
+    body { background: #F4F6F4; }
+    .rider-layout { max-width: 500px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+    .rider-header {
+      background: linear-gradient(135deg, var(--accent-orange), #FF6D00);
+      color: white; padding: 16px 20px; position: sticky; top: 0; z-index: 50;
+    }
+    .rider-header-top { display: flex; align-items: center; justify-content: space-between; }
+    .rider-logo { font-size: 18px; font-weight: 800; }
+    .rider-status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #69F0AE; border: 2px solid rgba(255,255,255,0.6); display: inline-block;
+    }
+    .online-toggle {
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 20px; padding: 6px 12px; cursor: pointer; font-size: 13px; color: white;
+    }
+    .rider-content { flex: 1; padding: 16px; overflow-y: auto; }
+    .rider-bottom-nav {
+      background: white; border-top: 1px solid var(--border);
+      display: flex; position: sticky; bottom: 0; z-index: 50;
+    }
+    .r-nav-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 10px 4px; cursor: pointer; color: var(--text-light); font-size: 10px; transition: color 0.15s;
+    }
+    .r-nav-item .material-icons-outlined { font-size: 22px; margin-bottom: 2px; }
+    .r-nav-item.active { color: var(--accent-orange); }
+    .r-page { display: none; }
+    .r-page.active { display: block; }
+    .delivery-card {
+      background: white; border-radius: 14px; padding: 16px; margin-bottom: 12px;
+      box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+    }
+    .delivery-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 10px; }
+    .delivery-patient { font-size: 15px; font-weight: 700; }
+    .delivery-address { font-size: 13px; color: var(--text-light); margin-top: 4px; }
+    .delivery-meta { font-size: 12px; color: var(--text-light); margin-top: 6px; display: flex; gap: 12px; }
+    .delivery-meta span { display: flex; align-items: center; gap: 4px; }
+    .delivery-meta .material-icons-outlined { font-size: 14px; }
+    .earnings-display {
+      background: linear-gradient(135deg, var(--accent-orange), #FF6D00);
+      color: white; border-radius: 16px; padding: 20px; margin-bottom: 16px; text-align: center;
+    }
+    .earnings-amount { font-size: 36px; font-weight: 800; }
+    .earnings-label { font-size: 13px; opacity: 0.8; margin-top: 4px; }
+    .step-tracker { display: flex; gap: 0; margin-bottom: 16px; }
+    .step {
+      flex: 1; padding: 10px 6px; text-align: center; font-size: 11px;
+      background: var(--bg); border: 1px solid var(--border); color: var(--text-light);
+    }
+    .step:first-child { border-radius: 8px 0 0 8px; }
+    .step:last-child { border-radius: 0 8px 8px 0; }
+    .step.done { background: var(--brand-pale); color: var(--brand-primary); border-color: var(--brand-primary); font-weight: 700; }
+    .step.active { background: var(--accent-orange); color: white; border-color: var(--accent-orange); font-weight: 700; }
+    .rule-item {
+      display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);
+    }
+    .rule-item:last-child { border-bottom: none; }
+    .rule-icon { color: var(--accent-orange); flex-shrink: 0; }
+    .rule-text { font-size: 13px; color: var(--text-dark); }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="loginScreen" class="login-screen" style="background:linear-gradient(135deg,#E65100,#FF6D00)">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon" style="background:#E65100">
+        <span class="material-icons-outlined">two_wheeler</span>
+      </div>
+      <div class="login-logo-name">Rider Portal</div>
+    </div>
+    <div class="login-subtitle">Homatt Health — Boda Boda Delivery</div>
+    <div class="login-field">
+      <label>Phone Number</label>
+      <input type="tel" id="loginPhone" placeholder="+256 7XX XXX XXX">
+    </div>
+    <div class="login-field">
+      <label>Password / PIN</label>
+      <input type="password" id="loginPassword" placeholder="••••">
+    </div>
+    <div class="login-error" id="loginError">Invalid credentials.</div>
+    <button class="login-btn" onclick="doLogin()" style="background:#E65100">Sign In as Rider</button>
+    <div class="login-divider">or</div>
+    <button class="demo-btn" onclick="enterDemo()" style="color:#E65100;border-color:#E65100">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">science</span>
+      Demo Mode — No Login Required
+    </button>
+    <div class="login-back"><a href="../">← Back to Portal Hub</a></div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="appLayout" style="display:none">
+  <div class="rider-layout">
+
+    <!-- HEADER -->
+    <div class="rider-header">
+      <div class="rider-header-top">
+        <div>
+          <div class="rider-logo">Homatt Rider</div>
+          <div style="font-size:12px;opacity:0.8;margin-top:2px" id="riderSubtitle">David Mukasa · UAA 123B</div>
+        </div>
+        <div class="online-toggle" onclick="toggleOnline()">
+          <span class="rider-status-dot" id="statusDot"></span>
+          <span id="statusLabel">Online</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="rider-content">
+
+      <!-- ─── AVAILABLE ─── -->
+      <div class="r-page active" id="rpage-available">
+        <div class="demo-banner">
+          <span class="material-icons-outlined">science</span>
+          Demo Mode — Tap "Accept" to pick up a delivery.
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:16px">
+          <div class="stat-card" style="flex:1;padding:12px">
+            <div class="stat-icon orange" style="width:36px;height:36px"><span class="material-icons-outlined" style="font-size:18px">delivery_dining</span></div>
+            <div class="stat-info"><div class="stat-value" style="font-size:20px">2</div><div class="stat-label" style="font-size:11px">Available</div></div>
+          </div>
+          <div class="stat-card" style="flex:1;padding:12px">
+            <div class="stat-icon green" style="width:36px;height:36px"><span class="material-icons-outlined" style="font-size:18px">payments</span></div>
+            <div class="stat-info"><div class="stat-value" style="font-size:20px">27K</div><div class="stat-label" style="font-size:11px">Today (UGX)</div></div>
+          </div>
+        </div>
+
+        <div id="availableDeliveries"></div>
+      </div>
+
+      <!-- ─── ACTIVE ─── -->
+      <div class="r-page" id="rpage-active">
+        <div id="activeDelivery" class="delivery-card">
+          <div class="step-tracker">
+            <div class="step done" id="step1">Assigned</div>
+            <div class="step active" id="step2">At Pharmacy</div>
+            <div class="step" id="step3">In Transit</div>
+            <div class="step" id="step4">Delivered</div>
+          </div>
+
+          <div class="delivery-patient" id="activePatient">Sarah Nalwoga</div>
+          <div class="delivery-address" id="activeAddress">15 Muyenga Hill, Kampala</div>
+          <div class="delivery-meta" id="activeMeta">
+            <span><span class="material-icons-outlined">schedule</span>ETA: 35 min</span>
+            <span><span class="material-icons-outlined">route</span>4.2 km</span>
+            <span><span class="material-icons-outlined">payments</span>UGX 3,000</span>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="alert alert-warning" style="margin-bottom:12px">
+            <span class="material-icons-outlined">warning</span>
+            <div>Never open packages. Never substitute medicine. All handoffs need QR scan.</div>
+          </div>
+
+          <div id="activeButtons">
+            <button class="btn btn-primary" onclick="scanPickup()" style="width:100%;background:#E65100;margin-bottom:8px">
+              <span class="material-icons-outlined">qr_code_scanner</span> Scan Pickup QR at Pharmacy
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── HISTORY ─── -->
+      <div class="r-page" id="rpage-history">
+        <div style="margin-bottom:16px">
+          <div style="font-size:15px;font-weight:700">Delivery History</div>
+          <div class="text-muted text-sm">This week: 8 deliveries · UGX 27,000 earned</div>
+        </div>
+        <div id="historyList"></div>
+      </div>
+
+      <!-- ─── EARNINGS ─── -->
+      <div class="r-page" id="rpage-earnings">
+        <div class="earnings-display">
+          <div style="font-size:12px;opacity:0.8;margin-bottom:4px">Today's Earnings</div>
+          <div class="earnings-amount">UGX 27,000</div>
+          <div class="earnings-label">8 deliveries this week · ⭐ 4.90 rating</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+          <div class="stat-card" style="padding:14px">
+            <div class="stat-info"><div class="stat-value" style="font-size:20px">27K</div><div class="stat-label" style="font-size:11px">This Week (UGX)</div></div>
+          </div>
+          <div class="stat-card" style="padding:14px">
+            <div class="stat-info"><div class="stat-value" style="font-size:20px">8</div><div class="stat-label" style="font-size:11px">Deliveries</div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title"><span class="material-icons-outlined">receipt</span> Earnings Log</div>
+          </div>
+          <div class="card-body">
+            <div id="earningsList"></div>
+          </div>
+        </div>
+        <div class="card mt-16">
+          <div class="card-header">
+            <div class="card-title"><span class="material-icons-outlined">rule</span> Rider Rules</div>
+          </div>
+          <div class="card-body">
+            <div class="rule-item">
+              <span class="material-icons-outlined rule-icon">block</span>
+              <span class="rule-text">Never open packages or alter medicines</span>
+            </div>
+            <div class="rule-item">
+              <span class="material-icons-outlined rule-icon">schedule</span>
+              <span class="rule-text">Maintain delivery ETA &lt; 60 minutes for urgent orders</span>
+            </div>
+            <div class="rule-item">
+              <span class="material-icons-outlined rule-icon">qr_code_scanner</span>
+              <span class="rule-text">All handoffs require QR validation — pickup AND delivery</span>
+            </div>
+            <div class="rule-item">
+              <span class="material-icons-outlined rule-icon">report</span>
+              <span class="rule-text">Escalate if address unreachable, patient unreachable, or security concern</span>
+            </div>
+            <div class="rule-item">
+              <span class="material-icons-outlined rule-icon">payments</span>
+              <span class="rule-text">Payment released per delivery after QR scan confirmation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- BOTTOM NAV -->
+    <div class="rider-bottom-nav">
+      <div class="r-nav-item active" onclick="rShowPage('available',this)">
+        <span class="material-icons-outlined">local_shipping</span>
+        <span>Available</span>
+      </div>
+      <div class="r-nav-item" onclick="rShowPage('active',this)">
+        <span class="material-icons-outlined">directions_bike</span>
+        <span>Active</span>
+      </div>
+      <div class="r-nav-item" onclick="rShowPage('history',this)">
+        <span class="material-icons-outlined">history</span>
+        <span>History</span>
+      </div>
+      <div class="r-nav-item" onclick="rShowPage('earnings',this)">
+        <span class="material-icons-outlined">account_balance_wallet</span>
+        <span>Earnings</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="rider.js"></script>
+</body>
+</html>

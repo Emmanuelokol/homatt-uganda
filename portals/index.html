@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Portal Hub</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #1B2A1E 0%, #2E4D32 60%, #1B5E20 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .hub-header {
+      text-align: center;
+      margin-bottom: 48px;
+      color: white;
+    }
+    .hub-logo {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 12px;
+    }
+    .hub-logo-icon {
+      width: 60px; height: 60px;
+      background: rgba(255,255,255,0.15);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      backdrop-filter: blur(10px);
+    }
+    .hub-logo-icon .material-icons-outlined { font-size: 32px; color: white; }
+    .hub-logo-text { text-align: left; }
+    .hub-logo-name { font-size: 32px; font-weight: 800; color: white; letter-spacing: -0.5px; }
+    .hub-logo-tag { font-size: 13px; color: rgba(255,255,255,0.6); margin-top: 2px; }
+    .hub-tagline {
+      font-size: 15px;
+      color: rgba(255,255,255,0.7);
+      max-width: 480px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    .portals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      width: 100%;
+      max-width: 1100px;
+    }
+
+    .portal-card {
+      background: rgba(255,255,255,0.96);
+      border-radius: 18px;
+      padding: 28px;
+      text-decoration: none;
+      color: #1A1A2E;
+      transition: transform 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.15);
+      display: flex;
+      flex-direction: column;
+      border: 2px solid transparent;
+    }
+
+    .portal-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25);
+    }
+
+    .portal-icon {
+      width: 56px; height: 56px;
+      border-radius: 14px;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .portal-icon .material-icons-outlined { font-size: 28px; color: white; }
+    .portal-icon.admin     { background: linear-gradient(135deg, #C62828, #E53935); }
+    .portal-icon.clinic    { background: linear-gradient(135deg, #1565C0, #1976D2); }
+    .portal-icon.pharmacy  { background: linear-gradient(135deg, #00695C, #00897B); }
+    .portal-icon.rider     { background: linear-gradient(135deg, #E65100, #F4511E); }
+
+    .portal-name {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: #1A1A2E;
+    }
+    .portal-desc {
+      font-size: 13px;
+      color: #666;
+      line-height: 1.6;
+      flex: 1;
+    }
+    .portal-features {
+      list-style: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid #EEE;
+    }
+    .portal-features li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .portal-features li .material-icons-outlined { font-size: 14px; }
+    .feat-admin { color: #C62828; }
+    .feat-clinic { color: #1565C0; }
+    .feat-pharmacy { color: #00695C; }
+    .feat-rider { color: #E65100; }
+
+    .portal-cta {
+      margin-top: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .portal-cta-text.admin    { color: #C62828; }
+    .portal-cta-text.clinic   { color: #1565C0; }
+    .portal-cta-text.pharmacy { color: #00695C; }
+    .portal-cta-text.rider    { color: #E65100; }
+
+    .arrow-icon { font-size: 18px; transition: transform 0.2s; }
+    .portal-card:hover .arrow-icon { transform: translateX(4px); }
+
+    .hub-footer {
+      margin-top: 40px;
+      text-align: center;
+      color: rgba(255,255,255,0.45);
+      font-size: 12px;
+    }
+    .hub-footer a { color: rgba(255,255,255,0.65); text-decoration: none; }
+    .hub-footer a:hover { color: white; }
+
+    .badge-demo-note {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255,165,0,0.2);
+      border: 1px solid rgba(255,165,0,0.4);
+      border-radius: 20px;
+      padding: 5px 14px;
+      font-size: 12px;
+      color: #FFD54F;
+      margin-bottom: 24px;
+    }
+    .badge-demo-note .material-icons-outlined { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="hub-header">
+    <div class="hub-logo">
+      <div class="hub-logo-icon">
+        <span class="material-icons-outlined">health_and_safety</span>
+      </div>
+      <div class="hub-logo-text">
+        <div class="hub-logo-name">Homatt Health</div>
+        <div class="hub-logo-tag">Medical Portal Hub — Uganda</div>
+      </div>
+    </div>
+    <p class="hub-tagline">Closed-loop digital healthcare. Select your portal to access the management dashboard.</p>
+    <br>
+    <div class="badge-demo-note">
+      <span class="material-icons-outlined">science</span>
+      Preview Mode — Demo data loaded. Connect Supabase for live data.
+    </div>
+  </div>
+
+  <div class="portals-grid">
+
+    <!-- Admin Portal -->
+    <a href="admin/" class="portal-card">
+      <div class="portal-icon admin">
+        <span class="material-icons-outlined">admin_panel_settings</span>
+      </div>
+      <div class="portal-name">Admin Portal</div>
+      <div class="portal-desc">Oversight, compliance monitoring, audit trails, and system-wide analytics for all operations.</div>
+      <ul class="portal-features">
+        <li><span class="material-icons-outlined feat-admin">bar_chart</span> Bookings &amp; escalations dashboard</li>
+        <li><span class="material-icons-outlined feat-admin">gavel</span> Prescription audit log</li>
+        <li><span class="material-icons-outlined feat-admin">warning</span> Compliance flag monitoring</li>
+        <li><span class="material-icons-outlined feat-admin">summarize</span> Weekly compliance reports</li>
+      </ul>
+      <div class="portal-cta">
+        <span class="portal-cta-text admin">Open Admin Portal</span>
+        <span class="material-icons-outlined arrow-icon feat-admin">arrow_forward</span>
+      </div>
+    </a>
+
+    <!-- Clinic Portal -->
+    <a href="clinic/" class="portal-card">
+      <div class="portal-icon clinic">
+        <span class="material-icons-outlined">local_hospital</span>
+      </div>
+      <div class="portal-name">Clinic Portal</div>
+      <div class="portal-desc">Doctor dashboard for patient queue management, QR scan on arrival, AI diagnosis review, and e-prescription issuing.</div>
+      <ul class="portal-features">
+        <li><span class="material-icons-outlined feat-clinic">queue</span> Patient queue with priority flags</li>
+        <li><span class="material-icons-outlined feat-clinic">qr_code_scanner</span> QR code scan on arrival</li>
+        <li><span class="material-icons-outlined feat-clinic">psychology</span> AI diagnosis confirmation</li>
+        <li><span class="material-icons-outlined feat-clinic">medication</span> E-prescription builder</li>
+      </ul>
+      <div class="portal-cta">
+        <span class="portal-cta-text clinic">Open Clinic Portal</span>
+        <span class="material-icons-outlined arrow-icon feat-clinic">arrow_forward</span>
+      </div>
+    </a>
+
+    <!-- Pharmacy Portal -->
+    <a href="pharmacy/" class="portal-card">
+      <div class="portal-icon pharmacy">
+        <span class="material-icons-outlined">local_pharmacy</span>
+      </div>
+      <div class="portal-name">Pharmacy Portal</div>
+      <div class="portal-desc">Prescription verification, stock management, order fulfilment, and rider handoff coordination for pharmacists.</div>
+      <ul class="portal-features">
+        <li><span class="material-icons-outlined feat-pharmacy">verified</span> Prescription authenticity check</li>
+        <li><span class="material-icons-outlined feat-pharmacy">inventory</span> Stock confirmation &amp; labelling</li>
+        <li><span class="material-icons-outlined feat-pharmacy">delivery_dining</span> Rider handoff via QR</li>
+        <li><span class="material-icons-outlined feat-pharmacy">payments</span> Weekly revenue summary</li>
+      </ul>
+      <div class="portal-cta">
+        <span class="portal-cta-text pharmacy">Open Pharmacy Portal</span>
+        <span class="material-icons-outlined arrow-icon feat-pharmacy">arrow_forward</span>
+      </div>
+    </a>
+
+    <!-- Rider Portal -->
+    <a href="rider/" class="portal-card">
+      <div class="portal-icon rider">
+        <span class="material-icons-outlined">two_wheeler</span>
+      </div>
+      <div class="portal-name">Rider Portal</div>
+      <div class="portal-desc">Boda boda delivery management — accept orders, scan QR at pickup and drop-off, track earnings and delivery history.</div>
+      <ul class="portal-features">
+        <li><span class="material-icons-outlined feat-rider">assignment</span> Available delivery orders</li>
+        <li><span class="material-icons-outlined feat-rider">qr_code_scanner</span> Pickup &amp; delivery QR scan</li>
+        <li><span class="material-icons-outlined feat-rider">timer</span> ETA tracking (&lt;60 min urgent)</li>
+        <li><span class="material-icons-outlined feat-rider">account_balance_wallet</span> Daily &amp; weekly earnings</li>
+      </ul>
+      <div class="portal-cta">
+        <span class="portal-cta-text rider">Open Rider Portal</span>
+        <span class="material-icons-outlined arrow-icon feat-rider">arrow_forward</span>
+      </div>
+    </a>
+
+  </div>
+
+  <div class="hub-footer">
+    <p>Homatt Health &copy; 2026 &mdash; Uganda &mdash; <a href="../">Back to App</a></p>
+  </div>
+</body>
+</html>

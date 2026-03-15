@@ -9,10 +9,16 @@
   <title>Homatt Health - Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
-  <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/dashboard.css">
-  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <link rel="stylesheet" href="css/shop.css">
+  <style>
+    /* Spin animation for loading button */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* Active screen toggling */
+    .app-screen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .app-screen:not(.active) { display: none; }
+  </style>
 </head>
 <body>
   <div class="phone-frame">
@@ -27,7 +33,7 @@
     </div>
 
     <!-- App Content -->
-    <div class="app-screen">
+    <div class="app-screen active" id="homeScreen">
       <!-- Dashboard Header -->
       <div class="dash-header">
         <div class="dash-header-top">
@@ -72,52 +78,6 @@
 
       <!-- Dashboard Content -->
       <div class="dash-content">
-
-        <!-- ── Medication Check-in Banner (shown when a dose check-in is due) ── -->
-        <div id="medCheckinBanner" style="display:none;margin-bottom:16px;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
-          <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:14px 16px 10px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-              <span class="material-icons-outlined" style="font-size:22px;color:#fff">medication</span>
-              <span style="font-size:15px;font-weight:700;color:#fff">Medication Check-in Due</span>
-            </div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.85)" id="checkinMedName">—</div>
-          </div>
-          <div style="background:#fff;padding:14px 16px">
-            <div style="font-size:13px;font-weight:600;color:#1B5E20;margin-bottom:4px" id="checkinDosage"></div>
-            <div id="checkinInstructions" style="font-size:12px;color:#5F6368;margin-bottom:12px"></div>
-            <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling after this dose?</div>
-            <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button onclick="respondCheckin('well')" style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit">
-                😊<br>Feeling Well
-              </button>
-              <button onclick="respondCheckin('better')" style="flex:1;padding:10px 6px;border:2px solid #FF9800;background:#FFF3E0;border-radius:10px;font-size:12px;font-weight:700;color:#E65100;cursor:pointer;font-family:inherit">
-                😐<br>Getting Better
-              </button>
-              <button onclick="respondCheckin('worse')" style="flex:1;padding:10px 6px;border:2px solid #F44336;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit">
-                😔<br>Feeling Worse
-              </button>
-            </div>
-            <div id="checkinWarnings" style="display:none;font-size:11px;color:#E65100;background:#FFF3E0;border-radius:6px;padding:7px 10px;margin-bottom:10px"></div>
-          </div>
-        </div>
-
-        <!-- ── Clinic Referral Card (shown when user reports feeling worse) ── -->
-        <div id="clinicReferralBanner" style="display:none;margin-bottom:16px;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:16px;padding:16px">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <span class="material-icons-outlined" style="font-size:24px;color:#C62828">local_hospital</span>
-            <div>
-              <div style="font-size:14px;font-weight:700;color:#B71C1C">Please Visit a Clinic</div>
-              <div style="font-size:12px;color:#C62828">Your condition may need medical attention</div>
-            </div>
-          </div>
-          <div style="font-size:12px;color:#5F6368;margin-bottom:12px">
-            You reported feeling worse after your last dose. Our records have been flagged and we strongly recommend you see a doctor as soon as possible.
-          </div>
-          <button onclick="window.location.href='clinic-booking.html'" style="width:100%;padding:12px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-            <span class="material-icons-outlined" style="font-size:16px">directions</span>
-            Book Nearest Clinic Now
-          </button>
-        </div>
 
         <!-- Check My Health - Hero Card -->
         <div class="dash-hero-card" id="symptomChecker">
@@ -167,85 +127,35 @@
           </button>
         </div>
 
-        <!-- Health Services -->
-        <div class="dash-section">
-          <h3 class="section-title">Health Services</h3>
-          <div class="feature-grid" style="grid-template-columns:1fr 1fr">
-            <div class="feature-card" onclick="window.location.href='clinic-booking.html'" style="cursor:pointer;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
-              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
-                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_hospital</span>
-              </div>
-              <span style="font-size:13px;font-weight:700;color:#fff">Book Clinic</span>
-              <span style="font-size:11px;opacity:.8;color:#fff">Visit a nearby clinic</span>
-            </div>
-            <div class="feature-card" onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
-              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
-                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_pharmacy</span>
-              </div>
-              <span style="font-size:13px;font-weight:700;color:#fff">Order Medicines</span>
-              <span style="font-size:11px;opacity:.8;color:#fff">Home delivery</span>
-            </div>
-          </div>
-        </div>
-
         <!-- Feature Grid Section -->
         <div class="dash-section">
           <h3 class="section-title">Health Trackers</h3>
           <div class="feature-grid">
-            <div class="feature-card" id="featureCycle">
-              <div class="feature-icon-wrap cycle-tracker">
+            <div class="feature-card" id="featureMenstrual">
+              <div class="feature-icon-wrap menstrual">
                 <span class="material-icons-outlined">calendar_month</span>
               </div>
               <span class="feature-label">Cycle Tracker</span>
             </div>
-            <div class="feature-card" id="featureMoodSleep">
-              <div class="feature-icon-wrap mood-tracker">
-                <span class="material-icons-outlined">bedtime</span>
+            <div class="feature-card" id="featurePregnancy">
+              <div class="feature-icon-wrap pregnancy">
+                <span class="material-icons-outlined">pregnant_woman</span>
               </div>
-              <span class="feature-label">Mood & Sleep</span>
-            </div>
-            <div class="feature-card" id="featurePain">
-              <div class="feature-icon-wrap pain-tracker">
-                <span class="material-icons-outlined">healing</span>
-              </div>
-              <span class="feature-label">Pain Tracker</span>
-            </div>
-            <div class="feature-card" id="featureDigestive">
-              <div class="feature-icon-wrap digestive-tracker">
-                <span class="material-icons-outlined">restaurant</span>
-              </div>
-              <span class="feature-label">Digestive</span>
+              <span class="feature-label">Pregnancy</span>
             </div>
             <div class="feature-card" id="featureChildGrowth">
-              <div class="feature-icon-wrap" style="background:#E3F2FD">
-                <span class="material-icons-outlined" style="color:#1976D2">child_care</span>
+              <div class="feature-icon-wrap child">
+                <span class="material-icons-outlined">child_care</span>
               </div>
               <span class="feature-label">Child Growth</span>
             </div>
-            <div class="feature-card" id="featureMalaria">
-              <div class="feature-icon-wrap" style="background:#FBE9E7">
-                <span class="material-icons-outlined" style="color:#E65100">coronavirus</span>
+            <div class="feature-card" id="featureBP">
+              <div class="feature-icon-wrap bp">
+                <span class="material-icons-outlined">monitor_heart</span>
               </div>
-              <span class="feature-label">Malaria</span>
-            </div>
-            <div class="feature-card" onclick="window.location.href='feedback.html'" style="cursor:pointer">
-              <div class="feature-icon-wrap" style="background:#FFF3E0">
-                <span class="material-icons-outlined" style="color:#E65100">star_rate</span>
-              </div>
-              <span class="feature-label">Rate Us</span>
+              <span class="feature-label">Blood Pressure</span>
             </div>
           </div>
-        </div>
-
-        <!-- Health Prediction Section -->
-        <div class="dash-section" id="healthPredictionSection" style="display:none">
-          <div class="section-header">
-            <h3 class="section-title">
-              <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;color:var(--primary)">psychology</span>
-              Health Insights
-            </h3>
-          </div>
-          <div id="healthPredictionList" style="display:flex;flex-direction:column;gap:12px"></div>
         </div>
 
         <!-- Malaria Risk Alert -->
@@ -309,22 +219,195 @@
           </div>
         </div>
 
+        <!-- Wallet Preview -->
+        <div class="dash-section">
+          <div class="section-header">
+            <h3 class="section-title">My Wallets</h3>
+            <button class="section-link">Manage</button>
+          </div>
+          <div class="wallet-cards">
+            <div class="wallet-card family-wallet">
+              <div class="wallet-header">
+                <span class="material-icons-outlined">account_balance_wallet</span>
+                <span class="wallet-name">Family Wallet</span>
+              </div>
+              <p class="wallet-balance">UGX <span id="familyBalance">0</span></p>
+              <div class="wallet-actions">
+                <button class="wallet-btn">
+                  <span class="material-icons-outlined" style="font-size:16px">add</span>
+                  Deposit
+                </button>
+              </div>
+            </div>
+            <div class="wallet-card care-wallet">
+              <div class="wallet-header">
+                <span class="material-icons-outlined">health_and_safety</span>
+                <span class="wallet-name">Care Wallet</span>
+              </div>
+              <p class="wallet-balance">UGX <span id="careBalance">0</span></p>
+              <div class="wallet-actions">
+                <button class="wallet-btn">
+                  <span class="material-icons-outlined" style="font-size:16px">add</span>
+                  Deposit
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Bottom spacer for scroll -->
         <div style="height: 16px;"></div>
       </div>
-    </div>
+    </div><!-- end homeScreen -->
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         PREVENTIVE SHOP SCREEN
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="shop-screen" id="shopScreen">
+
+      <!-- Shop Header -->
+      <div class="shop-header">
+        <div class="shop-header-top">
+          <div>
+            <div class="shop-header-title">Preventive Shop</div>
+            <div class="shop-header-sub">Stay healthy before you get sick</div>
+          </div>
+          <button class="shop-orders-btn" id="shopOrdersBtn">
+            <span class="material-icons-outlined">receipt_long</span>
+            My Orders
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Filter -->
+      <div class="shop-cats">
+        <div class="cat-chip active" data-cat="all">
+          <span class="material-icons-outlined">apps</span>
+          All Items
+        </div>
+        <div class="cat-chip" data-cat="malaria">
+          <span class="material-icons-outlined">bed</span>
+          Malaria
+        </div>
+        <div class="cat-chip" data-cat="hygiene">
+          <span class="material-icons-outlined">soap</span>
+          Hygiene
+        </div>
+        <div class="cat-chip" data-cat="nutrition">
+          <span class="material-icons-outlined">medication</span>
+          Nutrition
+        </div>
+        <div class="cat-chip" data-cat="protection">
+          <span class="material-icons-outlined">shield</span>
+          Protection
+        </div>
+      </div>
+
+      <!-- Products Grid -->
+      <div class="shop-products">
+        <div class="products-grid" id="shopProductsGrid">
+          <!-- Rendered by shop.js -->
+        </div>
+      </div>
+
+      <!-- ── Product Detail Overlay (bottom sheet) ── -->
+      <div class="product-overlay" id="productOverlay">
+        <div class="overlay-handle"></div>
+        <div class="overlay-header">
+          <button class="overlay-back" id="productOverlayBack">
+            <span class="material-icons-outlined">close</span>
+          </button>
+          <div class="overlay-title" id="overlayTitle">Product</div>
+        </div>
+        <div class="overlay-body">
+          <div class="detail-icon-wrap malaria" id="detailIcon">
+            <span class="material-icons-outlined" id="detailIconInner">health_and_safety</span>
+          </div>
+          <div class="detail-name" id="detailName"></div>
+          <div class="detail-price" id="detailPrice"></div>
+          <div class="detail-cat-badge malaria" id="detailCatBadge"></div>
+          <div class="detail-desc" id="detailDesc"></div>
+
+          <!-- Quantity -->
+          <div class="qty-row">
+            <span class="qty-label">Quantity</span>
+            <div class="qty-controls">
+              <button class="qty-btn" id="qtyDecrease">−</button>
+              <span class="qty-value" id="qtyValue">1</span>
+              <button class="qty-btn" id="qtyIncrease">+</button>
+            </div>
+          </div>
+
+          <!-- Order Form -->
+          <div class="order-form">
+            <label class="form-label">Phone Number</label>
+            <input class="form-input" id="orderPhone" type="tel" placeholder="e.g. 0701234567">
+            <label class="form-label">Delivery Address / District</label>
+            <input class="form-input" id="orderAddress" type="text" placeholder="e.g. Kampala, Nakasero">
+          </div>
+
+          <!-- Total -->
+          <div class="order-total-row">
+            <span class="order-total-label">Total</span>
+            <span class="order-total-value" id="orderTotalValue">UGX 0</span>
+          </div>
+
+          <button class="btn-order" id="btnPlaceOrder">
+            <span class="material-icons-outlined">shopping_cart</span>
+            Confirm Order
+          </button>
+        </div>
+      </div>
+
+      <!-- ── My Orders Overlay (slides in from right) ── -->
+      <div class="orders-overlay" id="ordersOverlay">
+        <div class="orders-header">
+          <button class="orders-back-btn" id="ordersBackBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <div class="orders-header-title">My Orders</div>
+        </div>
+        <div class="orders-list" id="myOrdersList">
+          <!-- Rendered by shop.js -->
+        </div>
+      </div>
+
+      <!-- ── Order Success Overlay ── -->
+      <div class="order-success" id="orderSuccessOverlay">
+        <div class="order-success-card">
+          <div class="success-icon-wrap">
+            <span class="material-icons-outlined">check_circle</span>
+          </div>
+          <div class="success-title">Order Placed!</div>
+          <div class="success-sub">
+            Your order for <strong id="successProductName"></strong> has been received.
+            We will process it shortly and deliver to your address.
+          </div>
+          <button class="btn-success-close" id="btnSuccessClose">View My Orders</button>
+        </div>
+      </div>
+
+    </div><!-- end shopScreen -->
 
     <!-- Bottom Navigation Bar -->
     <div class="bottom-nav">
-      <div class="nav-item active">
+      <div class="nav-item active" id="navHome">
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
       </div>
-      <div class="nav-item" id="navFamily" onclick="window.location.href='family.html'" style="cursor:pointer">
+      <div class="nav-item" id="navShop">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
+      <div class="nav-item" id="navFamily">
         <span class="material-icons-outlined">family_restroom</span>
         <span class="nav-label">Family</span>
       </div>
-      <div class="nav-item" id="navProfile" onclick="window.location.href='profile.html'" style="cursor:pointer">
+      <div class="nav-item" id="navWallet">
+        <span class="material-icons-outlined">account_balance_wallet</span>
+        <span class="nav-label">Wallet</span>
+      </div>
+      <div class="nav-item" id="navProfile">
         <span class="material-icons-outlined">person</span>
         <span class="nav-label">Profile</span>
       </div>
@@ -333,8 +416,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/shop.js"></script>
   <script src="js/dashboard.js"></script>
-  <script src="js/onesignal.js"></script>
-  <script src="js/native-bridge.js"></script>
 </body>
 </html>
