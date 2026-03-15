@@ -5,6 +5,7 @@
 
 const SUPABASE_URL  = 'https://kgkdiykzmqjougwzzewi.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8';
+const NOTIFY_URL    = `${SUPABASE_URL}/functions/v1/notify`;
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -483,21 +484,45 @@ function filterShopByStatus(status, el) {
 }
 
 async function updateShopOrder(id, newStatus) {
-  if (!confirm(`Mark this order as "${newStatus}"?`)) return;
+  const statusLabels = { processing:'Processing', shipped:'Shipped', delivered:'Delivered' };
+  if (!confirm(`Mark this order as "${statusLabels[newStatus] || newStatus}"?`)) return;
+
+  const order = _allShopOrders.find(o => o.id === id);
+
   if (!isDemoMode) {
     const { error } = await sb
       .from('shop_orders')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
       .eq('id', id);
-    if (error) { alert('Could not update order status.'); return; }
+    if (error) { alert('Could not update order status. Please try again.'); return; }
+
+    // Notify the user via OneSignal (fire and forget)
+    if (order?.user_id) {
+      fetch(NOTIFY_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json',
+                   'Authorization': `Bearer ${SUPABASE_ANON}` },
+        body: JSON.stringify({
+          type:         'order_update',
+          user_id:      order.user_id,
+          product_name: order.product_name,
+          new_status:   newStatus,
+        }),
+      }).catch(() => {});
+    }
   }
-  // Update local state
+
+  // Update local state immediately
   const idx = _allShopOrders.findIndex(o => o.id === id);
   if (idx !== -1) _allShopOrders[idx].status = newStatus;
+
   renderShopOrdersTable(_allShopOrders);
-  // Refresh badge
+  renderDashShopOrders(_allShopOrders.slice(0, 5));
+
+  // Refresh badges
   const pending = _allShopOrders.filter(o => o.status === 'pending').length;
   document.getElementById('badgeShopOrders').textContent = pending;
+  document.getElementById('dashShopPending').textContent = `↑ ${pending} pending`;
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
