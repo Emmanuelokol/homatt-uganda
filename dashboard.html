@@ -12,9 +12,9 @@
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/shop.css">
+  <!-- OneSignal Web Push SDK -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <style>
-    /* Spin animation for loading button */
-    @keyframes spin { to { transform: rotate(360deg); } }
     /* Active screen toggling */
     .app-screen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
     .app-screen:not(.active) { display: none; }
@@ -268,7 +268,7 @@
       <!-- Shop Header -->
       <div class="shop-header">
         <div class="shop-header-top">
-          <div>
+          <div class="shop-header-text">
             <div class="shop-header-title">Preventive Shop</div>
             <div class="shop-header-sub">Stay healthy before you get sick</div>
           </div>
@@ -373,15 +373,15 @@
       </div>
 
       <!-- ── Order Success Overlay ── -->
-      <div class="order-success" id="orderSuccessOverlay">
+      <div class="order-success-backdrop" id="orderSuccessOverlay">
         <div class="order-success-card">
-          <div class="success-icon-wrap">
+          <div class="success-check-wrap">
             <span class="material-icons-outlined">check_circle</span>
           </div>
           <div class="success-title">Order Placed!</div>
-          <div class="success-sub">
+          <div class="success-sub" id="successSubText">
             Your order for <strong id="successProductName"></strong> has been received.
-            We will process it shortly and deliver to your address.
+            We will contact you to confirm delivery soon.
           </div>
           <button class="btn-success-close" id="btnSuccessClose">View My Orders</button>
         </div>
