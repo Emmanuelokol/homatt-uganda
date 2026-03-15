@@ -583,7 +583,8 @@
           <span class="material-icons-outlined">close</span>
         </button>
       </div>
-      <div class="sheet-body">
+      <!-- Scrollable items + totals area -->
+      <div class="sheet-body" id="cartScrollBody">
         <div id="cartItemsList"></div>
         <div id="cartTotalRow" style="display:none">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--text-secondary)">
@@ -602,24 +603,25 @@
             <span class="cart-total-amount">UGX <span id="cartTotal">0</span></span>
           </div>
         </div>
-        <div id="cartCheckoutArea" style="display:none">
-          <div style="margin-bottom:10px">
-            <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:6px">
-              <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">location_on</span>
-              Delivery Address *
-            </label>
-            <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none">
-          </div>
-          <div id="cartPharmacyInfo" style="display:none;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:11px;color:#0D47A1"></div>
-          <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:10px;font-size:11px;color:#1B5E20">
-            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
-            Payment on delivery (cash). Our team will confirm your order and call to arrange delivery.
-          </div>
-          <button class="cart-checkout-btn" id="cartCheckoutBtn" onclick="submitOrder()">
-            <span class="material-icons-outlined">shopping_bag</span>
-            Place Order
-          </button>
+      </div>
+      <!-- Sticky checkout footer — always visible at the bottom of the sheet -->
+      <div class="cart-checkout-footer" id="cartCheckoutArea" style="display:none">
+        <div id="cartPharmacyInfo" style="display:none;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px;font-size:11px;color:#0D47A1"></div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">location_on</span>
+            Delivery Address *
+          </label>
+          <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
         </div>
+        <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:7px 10px;margin-bottom:10px;font-size:11px;color:#1B5E20">
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
+          Payment on delivery (cash). We will call to confirm your order.
+        </div>
+        <button class="cart-checkout-btn" id="cartCheckoutBtn" onclick="submitOrder()">
+          <span class="material-icons-outlined">shopping_bag</span>
+          Place Order
+        </button>
       </div>
     </div>
 

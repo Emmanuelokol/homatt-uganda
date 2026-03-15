@@ -861,7 +861,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       s.classList.remove('open');
       s.style.visibility = 'hidden';
     });
-    closeMemberDetail();
+    // Immediately hide the member-detail-panel — don't wait for the CSS
+    // transform transition, as it can leak the --background colour on
+    // some Android WebViews even after the transition completes.
+    const detailPanel = document.getElementById('memberDetailPanel');
+    if (detailPanel) {
+      detailPanel.classList.remove('open');
+      detailPanel.style.display = 'none';
+      detailPanel.style.visibility = 'hidden';
+    }
+    logEventForMemberId = null;
   }
 
   overlay.addEventListener('click', closeAllSheets);
@@ -1083,6 +1092,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   function openMemberDetail(member) {
     const panel = document.getElementById('memberDetailPanel');
     panel.style.display = 'flex';
+    panel.style.visibility = '';  // let CSS class handle it
     panel.offsetHeight; // force reflow so CSS transition fires
     logEventForMemberId = member.id;
 
