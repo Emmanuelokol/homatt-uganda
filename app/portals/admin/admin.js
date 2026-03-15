@@ -13,6 +13,17 @@ let currentFilter = 'all';
 
 // ── DEMO DATA ───────────────────────────────────────────────────────────────
 
+// ── SHOP ORDER DEMO DATA ─────────────────────────────────────────────────────
+
+const DEMO_SHOP_ORDERS = [
+  { id: 'so-001', product_name: 'Mosquito Net',            quantity: 2, unit_price: 15000, total_price: 30000, contact_phone: '0701234567', delivery_address: 'Kampala, Nakasero',    status: 'pending',    created_at: '2026-03-14T09:00:00Z' },
+  { id: 'so-002', product_name: 'Hand Sanitizer 500ml',    quantity: 3, unit_price: 5000,  total_price: 15000, contact_phone: '0702345678', delivery_address: 'Wakiso, Nansana',      status: 'processing', created_at: '2026-03-14T08:30:00Z' },
+  { id: 'so-003', product_name: 'ORS Sachets (20 pcs)',    quantity: 1, unit_price: 4000,  total_price: 4000,  contact_phone: '0703456789', delivery_address: 'Kampala, Rubaga',      status: 'shipped',    created_at: '2026-03-13T14:00:00Z' },
+  { id: 'so-004', product_name: 'Mosquito Repellent Spray',quantity: 4, unit_price: 8000,  total_price: 32000, contact_phone: '0704567890', delivery_address: 'Mukono, Seeta',        status: 'delivered',  created_at: '2026-03-12T11:00:00Z' },
+  { id: 'so-005', product_name: 'Face Masks (10 pcs)',     quantity: 5, unit_price: 6000,  total_price: 30000, contact_phone: '0705678901', delivery_address: 'Kampala, Mengo',       status: 'completed',  created_at: '2026-03-11T10:00:00Z' },
+  { id: 'so-006', product_name: 'Vitamin C 500mg (30 tabs)',quantity: 2, unit_price: 10000,total_price: 20000, contact_phone: '0706789012', delivery_address: 'Jinja, Main Street',   status: 'pending',    created_at: '2026-03-14T07:45:00Z' },
+];
+
 const DEMO = {
   bookings: [
     { booking_code: 'AFH-20260302-4827', patient_name: 'Sarah Nalwoga', patient_age: 34, patient_sex: 'female', ai_diagnosis: 'Pneumonia', urgency_level: 'urgent',   status: 'confirmed',  clinic: 'Kampala Medical Center',       created_at: '2026-03-02T08:14:00Z' },
@@ -105,13 +116,14 @@ function showPage(name, el) {
   document.getElementById('pageTitle').textContent =
     { dashboard:'Dashboard', bookings:'Bookings', escalations:'Escalations',
       prescriptions:'Prescriptions', compliance:'Compliance', reports:'Reports',
-      clinics:'Clinics Registry', pharmacies:'Pharmacies Registry', riders:'Rider Fleet' }[name] || name;
+      clinics:'Clinics Registry', pharmacies:'Pharmacies Registry', riders:'Rider Fleet',
+      'shop-orders': 'Shop Orders' }[name] || name;
 }
 
 // ── DATA LOADING ─────────────────────────────────────────────────────────────
 
 async function loadAllData() {
-  let bookings, escalations, prescriptions, clinics, pharmacies, riders;
+  let bookings, escalations, prescriptions, clinics, pharmacies, riders, shopOrders;
 
   if (isDemoMode) {
     bookings      = DEMO.bookings;
@@ -120,21 +132,24 @@ async function loadAllData() {
     clinics       = DEMO.clinics;
     pharmacies    = DEMO.pharmacies;
     riders        = DEMO.riders;
+    shopOrders    = DEMO_SHOP_ORDERS;
   } else {
-    const [b, e, p, cl, ph, r] = await Promise.all([
+    const [b, e, p, cl, ph, r, so] = await Promise.all([
       sb.from('bookings').select('*').order('created_at', { ascending: false }).limit(50),
       sb.from('escalations').select('*').order('created_at', { ascending: false }).limit(20),
       sb.from('doctor_prescriptions').select('*').order('created_at', { ascending: false }).limit(20),
       sb.from('clinics').select('*').eq('verified', true),
       sb.from('pharmacies').select('*').eq('verified', true),
       sb.from('riders').select('*'),
+      sb.from('shop_orders').select('*').order('created_at', { ascending: false }).limit(100),
     ]);
-    bookings      = b.data || DEMO.bookings;
-    escalations   = e.data || DEMO.escalations;
-    prescriptions = p.data || DEMO.prescriptions;
+    bookings      = b.data  || DEMO.bookings;
+    escalations   = e.data  || DEMO.escalations;
+    prescriptions = p.data  || DEMO.prescriptions;
     clinics       = cl.data || DEMO.clinics;
     pharmacies    = ph.data || DEMO.pharmacies;
     riders        = r.data  || DEMO.riders;
+    shopOrders    = so.data || DEMO_SHOP_ORDERS;
   }
 
   renderDashBookings(bookings.slice(0, 5));
@@ -148,6 +163,14 @@ async function loadAllData() {
   renderPharmacies(pharmacies);
   renderRiders(riders);
   renderComplianceFlags();
+  renderShopOrders(shopOrders);
+  renderDashShopOrders(shopOrders.slice(0, 5));
+
+  // Update shop orders badge with pending count
+  const pending = shopOrders.filter(o => o.status === 'pending').length;
+  document.getElementById('badgeShopOrders').textContent = pending;
+  document.getElementById('dashShopCount').textContent = shopOrders.length;
+  document.getElementById('dashShopPending').textContent = `↑ ${pending} pending`;
 }
 
 // ── RENDERERS ────────────────────────────────────────────────────────────────
@@ -362,6 +385,119 @@ function renderComplianceFlags() {
       </div>
     </div>
   `).join('');
+}
+
+// ── SHOP ORDERS ──────────────────────────────────────────────────────────────
+
+function renderDashShopOrders(orders) {
+  const tb = document.getElementById('dashShopOrdersTable');
+  if (!tb) return;
+  tb.innerHTML = orders.map(o => `
+    <tr>
+      <td><span class="code-badge">${String(o.id).slice(0,8).toUpperCase()}</span></td>
+      <td class="fw-600">${o.product_name}</td>
+      <td class="text-sm">${o.quantity}</td>
+      <td class="fw-600">UGX ${o.total_price.toLocaleString()}</td>
+      <td class="text-sm text-muted">${o.delivery_address||'—'}</td>
+      <td>${shopOrderStatusBadge(o.status)}</td>
+      <td>
+        ${o.status === 'pending'
+          ? `<button class="btn btn-ghost btn-sm" onclick="updateShopOrder('${o.id}','processing')">Process</button>`
+          : `<span class="text-muted text-sm">—</span>`}
+      </td>
+    </tr>
+  `).join('');
+}
+
+
+let _allShopOrders = [];
+
+function shopOrderStatusBadge(s) {
+  const map = {
+    pending:    'badge-pending',
+    processing: 'badge-progress',
+    shipped:    'badge-confirmed',
+    delivered:  'badge-dispensed',
+    completed:  'badge-completed',
+  };
+  const labels = {
+    pending: 'Pending', processing: 'Processing',
+    shipped: 'Shipped', delivered: 'Delivered', completed: 'Completed',
+  };
+  return `<span class="badge ${map[s]||''}">${labels[s]||s}</span>`;
+}
+
+function renderShopOrders(orders) {
+  _allShopOrders = orders;
+  renderShopOrdersTable(orders);
+}
+
+function renderShopOrdersTable(orders) {
+  const tb = document.getElementById('shopOrdersTable');
+  if (!orders.length) {
+    tb.innerHTML = '<tr><td colspan="9" class="text-muted text-sm" style="text-align:center;padding:24px">No shop orders yet</td></tr>';
+    return;
+  }
+  tb.innerHTML = orders.map(o => `
+    <tr>
+      <td><span class="code-badge">${String(o.id).slice(0,8).toUpperCase()}</span></td>
+      <td class="fw-600">${o.product_name}</td>
+      <td class="text-sm">${o.quantity}</td>
+      <td class="fw-600">UGX ${o.total_price.toLocaleString()}</td>
+      <td class="text-sm">${o.contact_phone||'—'}</td>
+      <td class="text-sm text-muted">${o.delivery_address||'—'}</td>
+      <td>${shopOrderStatusBadge(o.status)}</td>
+      <td class="text-sm text-muted">${fmtDate(o.created_at)}</td>
+      <td>
+        ${o.status === 'pending'
+          ? `<button class="btn btn-ghost btn-sm" onclick="updateShopOrder('${o.id}','processing')">Process</button>`
+          : ''}
+        ${o.status === 'processing'
+          ? `<button class="btn btn-ghost btn-sm" onclick="updateShopOrder('${o.id}','shipped')">Mark Shipped</button>`
+          : ''}
+        ${o.status === 'shipped'
+          ? `<button class="btn btn-ghost btn-sm" onclick="updateShopOrder('${o.id}','delivered')">Mark Delivered</button>`
+          : ''}
+        ${o.status === 'delivered' || o.status === 'completed'
+          ? `<span class="text-muted text-sm">—</span>`
+          : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function filterShopOrders(q) {
+  const filtered = _allShopOrders.filter(o =>
+    o.product_name.toLowerCase().includes(q.toLowerCase()) ||
+    (o.contact_phone||'').includes(q) ||
+    (o.delivery_address||'').toLowerCase().includes(q.toLowerCase())
+  );
+  renderShopOrdersTable(filtered);
+}
+
+function filterShopByStatus(status, el) {
+  document.querySelectorAll('#page-shop-orders .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  const filtered = status === 'all' ? _allShopOrders : _allShopOrders.filter(o => o.status === status);
+  renderShopOrdersTable(filtered);
+}
+
+async function updateShopOrder(id, newStatus) {
+  if (!confirm(`Mark this order as "${newStatus}"?`)) return;
+  if (!isDemoMode) {
+    const { error } = await sb
+      .from('shop_orders')
+      .update({ status: newStatus, updated_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) { alert('Could not update order status.'); return; }
+  }
+  // Update local state
+  const idx = _allShopOrders.findIndex(o => o.id === id);
+  if (idx !== -1) _allShopOrders[idx].status = newStatus;
+  renderShopOrdersTable(_allShopOrders);
+  // Refresh badge
+  const pending = _allShopOrders.filter(o => o.status === 'pending').length;
+  document.getElementById('badgeShopOrders').textContent = pending;
 }
 
 // ── INIT ─────────────────────────────────────────────────────────────────────
