@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Prescriptions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">dashboard</span> Dashboard</a>
+      <div class="sidebar-section-label">Clinical</div>
+      <a href="prescriptions.html" class="sidebar-link active"><span class="material-icons-outlined">medication</span> Prescriptions</a>
+      <a href="lab-requests.html" class="sidebar-link"><span class="material-icons-outlined">science</span> Lab Requests</a>
+      <a href="patients.html" class="sidebar-link"><span class="material-icons-outlined">person_search</span> Patient Search</a>
+      <div class="sidebar-section-label">Reports</div>
+      <a href="daily-report.html" class="sidebar-link"><span class="material-icons-outlined">bar_chart</span> Daily Report</a>
+      <div class="sidebar-section-label">Settings</div>
+      <a href="settings.html" class="sidebar-link"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Prescriptions Issued</div>
+      <div class="admin-topbar-right">
+        <input id="searchInput" type="text" placeholder="Search patient or drug…" style="padding:7px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;outline:none;width:220px" oninput="filterRx()">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Stats row -->
+      <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">receipt_long</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Total Rx Issued</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statActive">—</div><div class="stat-label">Active</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">hourglass_empty</span></div>
+          <div><div class="stat-number" id="statPending">—</div><div class="stat-label">Pending Fill</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">local_pharmacy</span></div>
+          <div><div class="stat-number" id="statFilled">—</div><div class="stat-label">Filled Today</div></div>
+        </div>
+      </div>
+
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">E-Prescriptions</div>
+          <select id="statusFilter" onchange="filterRx()" style="padding:7px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px;outline:none">
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="dispensed">Dispensed</option>
+            <option value="expired">Expired</option>
+          </select>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Patient</th>
+              <th>Diagnosis</th>
+              <th>Medications</th>
+              <th>Pharmacy</th>
+              <th>Status</th>
+              <th>Issued</th>
+              <th>Expires</th>
+            </tr>
+          </thead>
+          <tbody id="rxBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+const MOCK_RX = [
+  { id:'rx-001', patient_name:'Ssempa Robert',   diagnosis:'Hypertension',              items:[{drug_name:'Amlodipine',strength:'5mg',frequency:'once_daily',duration:30},{drug_name:'Aspirin',strength:'75mg',frequency:'once_daily',duration:30}], status:'active',    issued_at: new Date(Date.now()-86400000).toISOString(),  end_date: new Date(Date.now()+2592000000).toISOString(), pharmacy:'Ntinda Health Pharmacy' },
+  { id:'rx-002', patient_name:'Nakato Brenda',    diagnosis:'Malaria',                   items:[{drug_name:'Coartem',strength:'20/120mg',frequency:'twice_daily',duration:3}],                                                                       status:'dispensed', issued_at: new Date(Date.now()-172800000).toISOString(), end_date: new Date(Date.now()+86400000).toISOString(),  pharmacy:'City Chemist Nakasero' },
+  { id:'rx-003', patient_name:'Mubiru John',      diagnosis:'Respiratory Tract Infection',items:[{drug_name:'Amoxicillin',strength:'500mg',frequency:'three_daily',duration:7},{drug_name:'Paracetamol',strength:'500mg',frequency:'three_daily',duration:5}], status:'active', issued_at: new Date(Date.now()-3600000).toISOString(),   end_date: new Date(Date.now()+604800000).toISOString(), pharmacy:'Any Pharmacy' },
+  { id:'rx-004', patient_name:'Namutebi Agnes',   diagnosis:'Iron Deficiency Anaemia',   items:[{drug_name:'Ferrous Sulphate',strength:'200mg',frequency:'twice_daily',duration:60},{drug_name:'Folic Acid',strength:'5mg',frequency:'once_daily',duration:60}], status:'active', issued_at: new Date(Date.now()-7200000).toISOString(),  end_date: new Date(Date.now()+5184000000).toISOString(), pharmacy:'Any Pharmacy' },
+  { id:'rx-005', patient_name:'Kibuuka Paul',     diagnosis:'Type 2 Diabetes',           items:[{drug_name:'Metformin',strength:'500mg',frequency:'twice_daily',duration:30},{drug_name:'Omeprazole',strength:'20mg',frequency:'once_daily',duration:30}], status:'dispensed', issued_at: new Date(Date.now()-259200000).toISOString(), end_date: new Date(Date.now()+2332800000).toISOString(), pharmacy:'Ntinda Health Pharmacy' },
+];
+
+let allRx = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+
+  document.getElementById('clinicUserDate').textContent =
+    new Date().toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+
+  const cfg = window.HOMATT_CONFIG || {};
+  let supa = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
+    }
+  } catch(e) {}
+
+  if (supa) {
+    try {
+      let q = supa.from('e_prescriptions')
+        .select('id,patient_name:bookings(patient_name),diagnosis:clinic_diagnoses(confirmed_diagnosis),items,status,start_date,end_date,routed_to_pharmacy_id,pharmacies(name),created_at')
+        .order('created_at', { ascending: false })
+        .limit(50);
+      if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
+      const { data } = await q;
+      if (data && data.length) {
+        allRx = data.map(r => ({
+          id: r.id,
+          patient_name: r.patient_name?.patient_name || r.patient_name || '—',
+          diagnosis: r.diagnosis?.confirmed_diagnosis || r.diagnosis || '—',
+          items: r.items || [],
+          status: r.status || 'active',
+          issued_at: r.created_at,
+          end_date: r.end_date,
+          pharmacy: r.pharmacies?.name || 'Any Pharmacy',
+        }));
+      }
+    } catch(e) {}
+  }
+
+  if (!allRx.length) allRx = MOCK_RX;
+  renderStats();
+  renderTable(allRx);
+});
+
+function renderStats() {
+  document.getElementById('statTotal').textContent   = allRx.length;
+  document.getElementById('statActive').textContent  = allRx.filter(r => r.status === 'active').length;
+  document.getElementById('statPending').textContent = allRx.filter(r => r.status === 'active').length;
+  const today = new Date().toDateString();
+  document.getElementById('statFilled').textContent  = allRx.filter(r => r.status === 'dispensed' && new Date(r.issued_at).toDateString() === today).length;
+}
+
+function renderTable(rx) {
+  const tbody = document.getElementById('rxBody');
+  if (!rx.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No prescriptions found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rx.map(r => {
+    const meds = Array.isArray(r.items)
+      ? r.items.slice(0,3).map(i => `<span style="background:#E3F2FD;color:#1565C0;border-radius:4px;padding:2px 6px;font-size:11px;font-weight:600;margin-right:4px">${i.drug_name||i.name||'—'}${i.strength?' '+i.strength:''}</span>`).join('')
+      : '—';
+    const statusClass = r.status === 'active' ? 'active' : r.status === 'dispensed' ? 'completed' : 'urgent';
+    return `<tr>
+      <td><strong>${r.patient_name}</strong></td>
+      <td style="font-size:12px;max-width:140px">${r.diagnosis}</td>
+      <td style="max-width:200px">${meds}${r.items?.length>3?`<span style="font-size:11px;color:#9AA0A6">+${r.items.length-3} more</span>`:''}</td>
+      <td style="font-size:12px">${r.pharmacy}</td>
+      <td><span class="status-badge ${statusClass}">${r.status}</span></td>
+      <td style="font-size:12px;color:#9AA0A6">${fmtDate(r.issued_at)}</td>
+      <td style="font-size:12px;color:#9AA0A6">${r.end_date ? fmtDate(r.end_date) : '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function filterRx() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const s = document.getElementById('statusFilter').value;
+  const filtered = allRx.filter(r =>
+    (s === 'all' || r.status === s) &&
+    (!q || r.patient_name.toLowerCase().includes(q) || r.diagnosis.toLowerCase().includes(q) ||
+     (r.items||[]).some(i => (i.drug_name||'').toLowerCase().includes(q)))
+  );
+  renderTable(filtered);
+}
+</script>
+</body>
+</html>

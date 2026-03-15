@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <title>Homatt Health - Daily Health Quiz</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    .quiz-screen { display: none; flex-direction: column; height: 100%; }
+    .quiz-screen.active { display: flex; }
+
+    .quiz-header {
+      background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 60%, #66BB6A 100%);
+      padding: 0 20px 24px;
+      flex-shrink: 0;
+    }
+    .quiz-topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; height: 48px;
+    }
+    .quiz-back-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .quiz-title { font-size: 16px; font-weight: 700; color: white; }
+    .quiz-streak-badge {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.2); padding: 5px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 700; color: white;
+    }
+    .quiz-streak-badge .material-icons-outlined { font-size: 16px; }
+
+    .quiz-progress-wrap {
+      margin-top: 12px;
+    }
+    .quiz-progress-label {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: rgba(255,255,255,0.8); margin-bottom: 6px;
+    }
+    .quiz-progress-bar {
+      height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden;
+    }
+    .quiz-progress-fill {
+      height: 100%; background: white; border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .quiz-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px; }
+
+    .quiz-q-num {
+      font-size: 11px; font-weight: 700; color: var(--text-hint);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px;
+    }
+    .quiz-question {
+      font-size: 17px; font-weight: 700; color: var(--text-primary);
+      line-height: 1.4; margin-bottom: 20px;
+    }
+
+    .quiz-options { display: flex; flex-direction: column; gap: 10px; }
+    .quiz-option-btn {
+      width: 100%; padding: 14px 16px; text-align: left;
+      background: var(--surface); border: 2px solid var(--border);
+      border-radius: var(--radius-md); font-size: 14px; font-weight: 500;
+      color: var(--text-primary); cursor: pointer; font-family: inherit;
+      transition: all 0.15s ease; display: flex; align-items: center; gap: 12px;
+      min-height: 52px;
+    }
+    .quiz-option-btn:active { transform: scale(0.98); }
+    .quiz-option-letter {
+      width: 28px; height: 28px; border-radius: 50%; background: var(--background);
+      border: 1.5px solid var(--border); display: flex; align-items: center;
+      justify-content: center; font-size: 12px; font-weight: 700;
+      color: var(--text-secondary); flex-shrink: 0;
+    }
+    .quiz-option-btn.correct { border-color: #2E7D32; background: #E8F5E9; }
+    .quiz-option-btn.correct .quiz-option-letter { background: #2E7D32; border-color: #2E7D32; color: white; }
+    .quiz-option-btn.wrong { border-color: #C62828; background: #FFEBEE; }
+    .quiz-option-btn.wrong .quiz-option-letter { background: #C62828; border-color: #C62828; color: white; }
+    .quiz-option-btn.show-correct { border-color: #2E7D32; background: #E8F5E9; }
+    .quiz-option-btn.show-correct .quiz-option-letter { background: #2E7D32; border-color: #2E7D32; color: white; }
+    .quiz-option-btn:disabled { cursor: default; transform: none; }
+
+    .quiz-explanation {
+      margin-top: 16px; padding: 14px 16px;
+      background: #F1F8E9; border: 1px solid #A5D6A7; border-radius: var(--radius-md);
+      font-size: 13px; color: #33691E; line-height: 1.6; display: none;
+    }
+    [data-theme="dark"] .quiz-explanation { background: #1B2E1B; border-color: #388E3C; color: #A5D6A7; }
+
+    .quiz-next-btn {
+      margin-top: 20px; width: 100%; padding: 14px;
+      background: var(--primary); color: white; border: none;
+      border-radius: var(--radius-md); font-size: 15px; font-weight: 600;
+      cursor: pointer; font-family: inherit; display: none; align-items: center;
+      justify-content: center; gap: 8px;
+    }
+    .quiz-next-btn.visible { display: flex; }
+
+    /* Result screen */
+    .quiz-result-body { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 20px; }
+    .quiz-result-hero { text-align: center; padding: 20px 0 24px; }
+    .quiz-score-ring {
+      width: 100px; height: 100px; margin: 0 auto 16px;
+      position: relative;
+    }
+    .quiz-score-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+    .quiz-score-text {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .quiz-score-big { font-size: 26px; font-weight: 800; color: var(--text-primary); }
+    .quiz-score-sub { font-size: 11px; color: var(--text-hint); }
+    .quiz-result-title { font-size: 20px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px; }
+    .quiz-result-subtitle { font-size: 13px; color: var(--text-secondary); line-height: 1.5; }
+
+    .quiz-streak-card {
+      background: linear-gradient(135deg, #1B5E20, #43A047);
+      border-radius: var(--radius-md); padding: 16px 20px;
+      display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+      color: white;
+    }
+    .quiz-streak-card .material-icons-outlined { font-size: 32px; }
+    .quiz-streak-card-num { font-size: 28px; font-weight: 800; }
+    .quiz-streak-card-label { font-size: 12px; opacity: 0.85; }
+
+    .quiz-review-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .quiz-review-item {
+      background: var(--surface); border-radius: var(--radius-md);
+      padding: 12px 14px; border: 1px solid var(--border);
+    }
+    .quiz-review-q { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+    .quiz-review-status { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+    .quiz-review-status .material-icons-outlined { font-size: 16px; }
+    .quiz-review-status.correct-ans { color: #2E7D32; }
+    .quiz-review-status.wrong-ans { color: #C62828; }
+
+    .quiz-done-btn {
+      width: 100%; padding: 14px; background: var(--primary); color: white;
+      border: none; border-radius: var(--radius-md); font-size: 15px;
+      font-weight: 600; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-bottom: 20px;
+    }
+    .quiz-done-btn:active { opacity: 0.85; }
+  </style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+      <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+      <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+    </div>
+  </div>
+
+  <div class="app-screen">
+
+    <!-- ===== QUIZ SCREEN ===== -->
+    <div class="quiz-screen active" id="screenQuiz">
+      <div class="quiz-header">
+        <div class="quiz-topbar">
+          <button class="quiz-back-btn" id="backBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <span class="quiz-title">Daily Health Quiz</span>
+          <div class="quiz-streak-badge">
+            <span class="material-icons-outlined">local_fire_department</span>
+            <span id="headerStreak">0</span>
+          </div>
+        </div>
+        <div class="quiz-progress-wrap">
+          <div class="quiz-progress-label">
+            <span id="progressLabel">Question 1 of 5</span>
+            <span id="progressPct">0%</span>
+          </div>
+          <div class="quiz-progress-bar">
+            <div class="quiz-progress-fill" id="progressFill" style="width:0%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="quiz-body">
+        <div class="quiz-q-num" id="qNum">Question 1</div>
+        <div class="quiz-question" id="qText"></div>
+        <div class="quiz-options" id="qOptions"></div>
+        <div class="quiz-explanation" id="qExplanation"></div>
+        <button class="quiz-next-btn" id="nextBtn">
+          <span id="nextBtnText">Next Question</span>
+          <span class="material-icons-outlined">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===== RESULT SCREEN ===== -->
+    <div class="quiz-screen" id="screenResult">
+      <div class="quiz-header" style="padding-bottom:16px">
+        <div class="quiz-topbar">
+          <button class="quiz-back-btn" id="resultBackBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <span class="quiz-title">Your Results</span>
+          <div style="width:36px"></div>
+        </div>
+      </div>
+
+      <div class="quiz-result-body">
+        <div class="quiz-result-hero">
+          <div class="quiz-score-ring">
+            <svg viewBox="0 0 36 36">
+              <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--border)" stroke-width="3"/>
+              <circle id="scoreCircle" cx="18" cy="18" r="15.9" fill="none"
+                stroke="#2E7D32" stroke-width="3"
+                stroke-dasharray="0, 100" stroke-linecap="round"
+                style="transition:stroke-dasharray 0.8s ease"/>
+            </svg>
+            <div class="quiz-score-text">
+              <div class="quiz-score-big" id="scoreBig">0/5</div>
+              <div class="quiz-score-sub">correct</div>
+            </div>
+          </div>
+          <div class="quiz-result-title" id="resultTitle">Well done!</div>
+          <div class="quiz-result-subtitle" id="resultSubtitle">Keep learning about your health every day.</div>
+        </div>
+
+        <div class="quiz-streak-card" id="streakCard">
+          <span class="material-icons-outlined">local_fire_department</span>
+          <div>
+            <div class="quiz-streak-card-num" id="streakNum">1</div>
+            <div class="quiz-streak-card-label">day streak — keep it up!</div>
+          </div>
+        </div>
+
+        <div class="quiz-review-list" id="reviewList"></div>
+
+        <button class="quiz-done-btn" id="doneBtn">
+          <span class="material-icons-outlined">home</span>
+          Back to Dashboard
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // ====== Time ======
+  function updateTime() {
+    const d = new Date();
+    document.getElementById('statusTime').textContent =
+      `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+  updateTime();
+  setInterval(updateTime, 30000);
+
+  // ====== Question Bank ======
+  // Rotates daily — take a slice of 5 based on day of year
+  const ALL_QUESTIONS = [
+    {
+      q: 'How many glasses of water should a healthy adult drink every day?',
+      options: ['2-3 glasses', 'At least 8 glasses', '4-5 glasses', '1-2 litres only'],
+      correct: 1,
+      explanation: 'Doctors recommend at least 8 glasses (about 2 litres) of water daily. Staying hydrated helps your kidneys, digestion, energy levels, and immune system.',
+    },
+    {
+      q: 'Which of these is the BEST way to prevent cholera?',
+      options: ['Taking antibiotics daily', 'Drinking boiled or treated water and washing hands', 'Avoiding cold food', 'Wearing a face mask'],
+      correct: 1,
+      explanation: 'Cholera spreads through contaminated water and food. Drinking safe water and frequent handwashing with soap are the most effective prevention methods.',
+    },
+    {
+      q: 'What is a normal body temperature for an adult?',
+      options: ['35°C / 95°F', '36.5–37.5°C / 97.7–99.5°F', '38.5°C / 101.3°F', '40°C / 104°F'],
+      correct: 1,
+      explanation: 'A healthy adult temperature is between 36.5°C and 37.5°C. A reading of 38°C or above is considered a fever and may need medical attention.',
+    },
+    {
+      q: 'Which mosquito transmits malaria?',
+      options: ['Culex mosquito (day-biter)', 'Aedes mosquito', 'Anopheles mosquito (night-biter)', 'Any mosquito can transmit it'],
+      correct: 2,
+      explanation: 'Only the female Anopheles mosquito transmits malaria. It bites mainly between dusk and dawn — which is why sleeping under a mosquito net is so effective.',
+    },
+    {
+      q: 'What is the FIRST thing to do for a child with mild diarrhea at home?',
+      options: ['Give antibiotics immediately', 'Fast the child for 24 hours', 'Give ORS (Oral Rehydration Salts) and fluids', 'Rush to the hospital right away'],
+      correct: 2,
+      explanation: 'ORS (Oral Rehydration Salts) replaces fluids and electrolytes lost through diarrhea. This is the WHO-recommended first response for mild diarrhea, especially in children.',
+    },
+    {
+      q: 'Which vitamin does your body produce from sunlight?',
+      options: ['Vitamin A', 'Vitamin B12', 'Vitamin C', 'Vitamin D'],
+      correct: 3,
+      explanation: 'Vitamin D is produced in your skin when exposed to sunlight. It is essential for strong bones, immune function, and mood. 15-20 minutes of sun exposure daily is beneficial.',
+    },
+    {
+      q: 'How often should a healthy adult visit a clinic for a general check-up?',
+      options: ['Only when sick', 'Every 5 years', 'At least once a year', 'Every 10 years'],
+      correct: 2,
+      explanation: 'Annual health check-ups can catch conditions like high blood pressure, diabetes, and certain cancers early — before you feel any symptoms. Prevention is better than cure.',
+    },
+    {
+      q: 'Which of these is NOT a symptom of malaria?',
+      options: ['High fever and chills', 'Headache and body aches', 'Skin rash and sneezing', 'Fatigue and sweating'],
+      correct: 2,
+      explanation: 'Malaria symptoms include fever, chills, headache, body aches, fatigue, nausea, and sweating — but NOT typically a skin rash or sneezing. Those are more common with allergies or common cold.',
+    },
+    {
+      q: 'What does HIV stand for?',
+      options: ['Human Immunity Virus', 'Human Immunodeficiency Virus', 'High Infection Virus', 'Hereditary Immune Virus'],
+      correct: 1,
+      explanation: 'HIV stands for Human Immunodeficiency Virus. It attacks the immune system. With modern ARV treatment, people with HIV can live long, healthy lives. Testing is key.',
+    },
+    {
+      q: 'How long should you wash your hands with soap to kill germs?',
+      options: ['5 seconds', '10 seconds', 'At least 20 seconds', '1 minute exactly'],
+      correct: 2,
+      explanation: 'The WHO and CDC recommend scrubbing your hands with soap for at least 20 seconds — about the time it takes to hum "Happy Birthday" twice. This removes most harmful germs.',
+    },
+    {
+      q: 'Which food group should make up the largest part of a balanced meal?',
+      options: ['Proteins (meat, beans)', 'Fats and oils', 'Carbohydrates (cereals, tubers)', 'Vitamins and minerals only'],
+      correct: 2,
+      explanation: 'Carbohydrates like posho, rice, cassava, and sweet potatoes provide the main energy for your body. A balanced plate includes carbs, proteins, vegetables, and a small amount of healthy fats.',
+    },
+    {
+      q: 'What is the most common cause of blindness in Uganda that is preventable?',
+      options: ['Old age', 'Cataracts', 'Glaucoma', 'Vitamin A deficiency'],
+      correct: 1,
+      explanation: 'Cataracts — clouding of the eye lens — are the leading cause of treatable blindness in Uganda. A simple operation can restore sight. Regular eye check-ups help catch it early.',
+    },
+    {
+      q: 'At what age should children receive their first measles vaccine?',
+      options: ['At birth', 'At 6 months', 'At 9 months', 'At 2 years'],
+      correct: 2,
+      explanation: 'In Uganda, the first measles vaccine (MR1) is given at 9 months. A second dose (MR2) is given at 15 months. Vaccination has dramatically reduced measles deaths.',
+    },
+    {
+      q: 'Which of these is a warning sign of high blood pressure (hypertension)?',
+      options: ['Yellow eyes', 'Frequent severe headaches and dizziness', 'Swollen knees', 'Dry cough'],
+      correct: 1,
+      explanation: 'Hypertension is often called a "silent killer" because it usually has no symptoms. However, severe cases can cause headaches, dizziness, and blurred vision. Regular blood pressure checks are vital.',
+    },
+    {
+      q: 'What is the recommended amount of sleep for adults each night?',
+      options: ['4-5 hours', '5-6 hours', '7-9 hours', '10-12 hours'],
+      correct: 2,
+      explanation: 'Adults need 7-9 hours of sleep per night. Chronic sleep deprivation weakens your immune system, affects mood, increases risk of obesity, diabetes, and heart disease.',
+    },
+  ];
+
+  // Pick 5 questions based on today's date (rotates daily)
+  const dayOfYear = Math.floor((new Date() - new Date(new Date().getFullYear(), 0, 0)) / 86400000);
+  const startIdx = (dayOfYear * 5) % ALL_QUESTIONS.length;
+  const questions = [];
+  for (let i = 0; i < 5; i++) {
+    questions.push(ALL_QUESTIONS[(startIdx + i) % ALL_QUESTIONS.length]);
+  }
+
+  // ====== State ======
+  let currentQ = 0;
+  let score = 0;
+  let answered = [];
+  let streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
+  const lastQuizDate = localStorage.getItem('homatt_quiz_last_date') || '';
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  // Show streak in header
+  document.getElementById('headerStreak').textContent = streak;
+
+  // ====== Navigation ======
+  document.getElementById('backBtn').addEventListener('click', () => window.location.href = 'dashboard.html');
+  document.getElementById('resultBackBtn').addEventListener('click', () => window.location.href = 'dashboard.html');
+  document.getElementById('doneBtn').addEventListener('click', () => window.location.href = 'dashboard.html');
+
+  // ====== Render Question ======
+  function renderQuestion(idx) {
+    const q = questions[idx];
+    const letters = ['A', 'B', 'C', 'D'];
+
+    document.getElementById('qNum').textContent = `Question ${idx + 1}`;
+    document.getElementById('qText').textContent = q.q;
+    document.getElementById('qExplanation').style.display = 'none';
+    document.getElementById('nextBtn').classList.remove('visible');
+
+    const progressPct = Math.round((idx / questions.length) * 100);
+    document.getElementById('progressLabel').textContent = `Question ${idx + 1} of ${questions.length}`;
+    document.getElementById('progressPct').textContent = progressPct + '%';
+    document.getElementById('progressFill').style.width = progressPct + '%';
+
+    const optionsEl = document.getElementById('qOptions');
+    optionsEl.innerHTML = '';
+    q.options.forEach((opt, oi) => {
+      const btn = document.createElement('button');
+      btn.className = 'quiz-option-btn';
+      btn.innerHTML = `<span class="quiz-option-letter">${letters[oi]}</span>${opt}`;
+      btn.addEventListener('click', () => handleAnswer(oi));
+      optionsEl.appendChild(btn);
+    });
+  }
+
+  // ====== Handle Answer ======
+  function handleAnswer(selectedIdx) {
+    const q = questions[currentQ];
+    const buttons = document.querySelectorAll('.quiz-option-btn');
+    const isCorrect = selectedIdx === q.correct;
+
+    if (isCorrect) score++;
+    answered.push({ q: q.q, isCorrect, selectedIdx, correctIdx: q.correct, explanation: q.explanation });
+
+    // Disable all buttons and show result
+    buttons.forEach((btn, bi) => {
+      btn.disabled = true;
+      if (bi === q.correct) btn.classList.add('correct');
+      else if (bi === selectedIdx && !isCorrect) btn.classList.add('wrong');
+    });
+
+    // Show explanation
+    const expEl = document.getElementById('qExplanation');
+    expEl.textContent = q.explanation;
+    expEl.style.display = 'block';
+
+    // Show next button
+    const nextBtn = document.getElementById('nextBtn');
+    const nextBtnText = document.getElementById('nextBtnText');
+    nextBtnText.textContent = currentQ < questions.length - 1 ? 'Next Question' : 'See Results';
+    nextBtn.classList.add('visible');
+  }
+
+  // ====== Next Button ======
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    currentQ++;
+    if (currentQ < questions.length) {
+      renderQuestion(currentQ);
+    } else {
+      showResults();
+    }
+  });
+
+  // ====== Show Results ======
+  function showResults() {
+    // Update streak
+    if (lastQuizDate !== todayStr) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      if (lastQuizDate === yesterdayStr) {
+        streak++;
+      } else {
+        streak = 1;
+      }
+      localStorage.setItem('homatt_quiz_streak', String(streak));
+      localStorage.setItem('homatt_quiz_last_date', todayStr);
+    }
+
+    // Switch screens
+    document.getElementById('screenQuiz').classList.remove('active');
+    document.getElementById('screenResult').classList.add('active');
+
+    // Score ring
+    const pct = Math.round((score / questions.length) * 100);
+    document.getElementById('scoreBig').textContent = `${score}/${questions.length}`;
+    setTimeout(() => {
+      document.getElementById('scoreCircle').setAttribute('stroke-dasharray', `${pct}, 100`);
+    }, 100);
+
+    // Title
+    const titles = ['Keep practising!', 'Good effort!', 'Well done!', 'Excellent!', 'Perfect score!'];
+    const subs = [
+      'Every quiz makes you a little more health-savvy.',
+      'You\'re building great health knowledge.',
+      'You know your health! Keep the streak going.',
+      'Outstanding! Your health knowledge is impressive.',
+      'Amazing! You got everything right today!',
+    ];
+    const titleIdx = Math.min(score, 4);
+    document.getElementById('resultTitle').textContent = titles[titleIdx];
+    document.getElementById('resultSubtitle').textContent = subs[titleIdx];
+
+    // Streak card
+    document.getElementById('streakNum').textContent = streak;
+
+    // Review list
+    const reviewList = document.getElementById('reviewList');
+    reviewList.innerHTML = '';
+    answered.forEach(a => {
+      const item = document.createElement('div');
+      item.className = 'quiz-review-item';
+      const statusClass = a.isCorrect ? 'correct-ans' : 'wrong-ans';
+      const icon = a.isCorrect ? 'check_circle' : 'cancel';
+      const label = a.isCorrect ? 'Correct' : `Incorrect — correct answer: ${['A','B','C','D'][a.correctIdx]}`;
+      item.innerHTML = `
+        <div class="quiz-review-q">${a.q}</div>
+        <div class="quiz-review-status ${statusClass}">
+          <span class="material-icons-outlined">${icon}</span>
+          ${label}
+        </div>
+      `;
+      reviewList.appendChild(item);
+    });
+
+    // Update dashboard streak display
+    localStorage.setItem('homatt_quiz_streak', String(streak));
+  }
+
+  // ====== Start ======
+  renderQuestion(0);
+});
+</script>
+</body>
+</html>

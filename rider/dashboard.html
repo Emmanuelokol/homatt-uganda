@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Rider Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/rider.css">
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="riderUserName">Rider Portal</div>
+      <div class="sidebar-logo-sub">Homatt Deliveries — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </a>
+      <div class="sidebar-section-label">Deliveries</div>
+      <a href="#requests" class="sidebar-link">
+        <span class="material-icons-outlined">notifications_active</span> New Requests
+        <span id="requestBadge" style="margin-left:auto;background:#D32F2F;color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;display:none">0</span>
+      </a>
+      <a href="#active" class="sidebar-link">
+        <span class="material-icons-outlined">local_shipping</span> Active Deliveries
+      </a>
+      <a href="#history" class="sidebar-link">
+        <span class="material-icons-outlined">history</span> History
+      </a>
+      <div class="sidebar-section-label">Account</div>
+      <a href="#" class="sidebar-link">
+        <span class="material-icons-outlined">payments</span> Earnings
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <span class="material-icons-outlined" style="font-size:14px">electric_moped</span> Rider
+      </div>
+      <div style="font-size:12px;color:rgba(76,175,80,0.9);margin:6px 0 10px" id="riderStatus">● Online</div>
+      <button class="logout-sidebar-btn" id="riderLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Rider Dashboard</div>
+      <div class="admin-topbar-right">
+        <div class="online-toggle" id="onlineToggle" style="cursor:pointer" title="Click to toggle status">
+          <div class="toggle-dot online" id="onlineDot"></div>
+          <span class="toggle-label" id="onlineLabel">Online</span>
+        </div>
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="riderUserAvatar">R</div>
+          <span id="riderUserNameTop">Rider</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Earnings summary chip -->
+      <div class="earnings-chip">
+        <span class="material-icons-outlined" style="font-size:36px">account_balance_wallet</span>
+        <div>
+          <div class="earnings-amount" id="todayEarnings">UGX 0</div>
+          <div class="earnings-label" id="todaySummary">0 deliveries completed today</div>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <div class="rating-stars" id="ratingStars">★★★★★</div>
+          <div style="font-size:12px;opacity:.85;margin-top:4px" id="ratingValue">5.0 rating</div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">notifications_active</span></div>
+          <div><div class="stat-number" id="statRequests">0</div><div class="stat-label">New Requests</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">local_shipping</span></div>
+          <div><div class="stat-number" id="statActive">0</div><div class="stat-label">Active Deliveries</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Completed Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">route</span></div>
+          <div><div class="stat-number" id="statKm">0</div><div class="stat-label">km Today</div></div>
+        </div>
+      </div>
+
+      <!-- New delivery requests -->
+      <div style="background:transparent;box-shadow:none;padding:0;margin-bottom:24px" id="requests">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="font-size:16px;font-weight:700">New Delivery Requests</div>
+          <span style="font-size:12px;color:#5F6368">Accept within 2 minutes</span>
+        </div>
+        <div class="delivery-requests" id="requestsList">
+          <div style="background:#fff;border-radius:12px;padding:32px;text-align:center;color:#9AA0A6;box-shadow:0 2px 8px rgba(0,0,0,0.08)">
+            <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">inbox</span>
+            Loading requests…
+          </div>
+        </div>
+      </div>
+
+      <!-- Active deliveries -->
+      <div class="admin-table-wrap" id="active">
+        <div class="table-header">
+          <div class="table-title">Active Deliveries</div>
+        </div>
+        <div id="activeList">
+          <div style="padding:32px;text-align:center;color:#9AA0A6">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Completed today -->
+      <div class="admin-table-wrap" id="history">
+        <div class="table-header">
+          <div class="table-title">Completed Today</div>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>ID</th><th>Order</th><th>Delivered To</th><th>Earnings</th><th>Time</th><th>Status</th></tr></thead>
+          <tbody id="historyBody"><tr><td colspan="6" style="text-align:center;padding:24px;color:#9AA0A6">Loading…</td></tr></tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="riderToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/rider.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = requireRider();
+  if (!session) return;
+  setupRiderLogout();
+
+  // Show session rating
+  if (session.rating) {
+    const stars = Math.round(session.rating);
+    document.getElementById('ratingStars').textContent = '★'.repeat(stars) + '☆'.repeat(5 - stars);
+    document.getElementById('ratingValue').textContent = Number(session.rating).toFixed(1) + ' rating';
+  }
+
+  // Live clock
+  function tick() {
+    document.getElementById('liveClock').textContent =
+      new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  tick(); setInterval(tick, 1000);
+
+  // Online toggle
+  const cfg = window.HOMATT_CONFIG || {};
+  const supa = (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase && session.riderId)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-rider-auth' } })
+    : null;
+  window._riderSupa = supa;
+
+  let isOnline = true;
+  document.getElementById('onlineToggle').addEventListener('click', async () => {
+    isOnline = !isOnline;
+    document.getElementById('onlineDot').classList.toggle('online', isOnline);
+    document.getElementById('onlineLabel').textContent = isOnline ? 'Online' : 'Offline';
+    const st = document.getElementById('riderStatus');
+    st.textContent = isOnline ? '● Online' : '○ Offline';
+    st.style.color = isOnline ? 'rgba(76,175,80,0.9)' : 'rgba(255,255,255,0.45)';
+    if (supa && session.riderId) {
+      await supa.from('riders').update({ available: isOnline }).eq('id', session.riderId);
+    }
+    showToast(isOnline ? 'You are now online!' : 'You are offline — no new requests', isOnline ? 'success' : 'warning');
+  });
+
+  if (supa && session.riderId) {
+    await loadLive(supa, session.riderId);
+  } else {
+    loadDemo();
+  }
+});
+
+function loadDemo() {
+  document.getElementById('statRequests').textContent = DELIVERY_REQUESTS.length;
+  document.getElementById('statActive').textContent = ACTIVE_DELIVERIES.length;
+  document.getElementById('statCompleted').textContent = COMPLETED_TODAY.length;
+  document.getElementById('statKm').textContent = '19.6';
+  document.getElementById('todayEarnings').textContent = 'UGX 62,500';
+  document.getElementById('todaySummary').textContent = COMPLETED_TODAY.length + ' deliveries completed today';
+
+  const badge = document.getElementById('requestBadge');
+  badge.textContent = DELIVERY_REQUESTS.length;
+  badge.style.display = DELIVERY_REQUESTS.length ? 'inline' : 'none';
+
+  renderDemoRequests();
+  renderDemoActive();
+  renderDemoHistory();
+}
+
+function renderDemoRequests() {
+  if (!DELIVERY_REQUESTS.length) {
+    document.getElementById('requestsList').innerHTML =
+      '<div style="background:#fff;border-radius:12px;padding:32px;text-align:center;color:#9AA0A6;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">inbox</span>No new requests right now. Stay online to receive deliveries.</div>';
+    return;
+  }
+  document.getElementById('requestsList').innerHTML = DELIVERY_REQUESTS.map(r => `
+    <div class="delivery-card ${r.urgent ? 'urgent' : ''}" id="req-${r.id}">
+      <div class="delivery-icon"><span class="material-icons-outlined">${r.type === 'Lab Result' ? 'science' : 'medication'}</span></div>
+      <div class="delivery-info">
+        <div class="delivery-id">${r.id}${r.urgent ? ' 🔴 URGENT' : ''}</div>
+        <div class="delivery-title">${r.item}</div>
+        <div class="delivery-meta">
+          <span><span class="material-icons-outlined" style="font-size:14px">store</span> ${r.from}</span>
+          <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${r.to}</span>
+          <span><span class="material-icons-outlined" style="font-size:14px">straighten</span> ${r.dist}</span>
+          <span style="color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:14px">payments</span> ${r.pay}</span>
+        </div>
+      </div>
+      <div class="delivery-actions">
+        <button class="btn-admin success sm" onclick="acceptDemo('${r.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">check</span> Accept
+        </button>
+        <button class="btn-admin secondary sm" onclick="declineDemo('${r.id}')">
+          <span class="material-icons-outlined" style="font-size:14px">close</span> Decline
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+function renderDemoActive() {
+  document.getElementById('statActive').textContent = ACTIVE_DELIVERIES.length;
+  if (!ACTIVE_DELIVERIES.length) {
+    document.getElementById('activeList').innerHTML =
+      '<div style="padding:32px;text-align:center;color:#9AA0A6">No active deliveries. Accept a request above to get started.</div>';
+    return;
+  }
+  document.getElementById('activeList').innerHTML = ACTIVE_DELIVERIES.map(d => `
+    <div style="display:flex;align-items:flex-start;gap:16px;padding:18px 20px;border-bottom:1px solid #F0F0F0">
+      <div class="delivery-icon"><span class="material-icons-outlined">local_shipping</span></div>
+      <div style="flex:1">
+        <div style="font-size:11px;font-weight:600;color:#5F6368;text-transform:uppercase">${d.id}</div>
+        <div style="font-size:14px;font-weight:600;margin:4px 0">${d.item}</div>
+        <div style="font-size:12px;color:#5F6368;margin-bottom:8px">
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">store</span> ${d.from}
+          <span style="margin:0 8px">→</span>
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${d.to}
+        </div>
+        <div style="display:flex;gap:14px;font-size:12px">
+          <span><b>${d.dist}</b> away</span>
+          <span style="color:#E65100;font-weight:600">${d.elapsed} elapsed</span>
+          <span style="color:#2E7D32;font-weight:600">${d.pay}</span>
+        </div>
+      </div>
+      <div>
+        <span class="status-badge in_transit">In Transit</span>
+        <div style="margin-top:10px">
+          <button class="btn-admin success sm" onclick="completeDemo('${d.id}')">
+            <span class="material-icons-outlined" style="font-size:14px">check_circle</span> Mark Delivered
+          </button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderDemoHistory() {
+  document.getElementById('statCompleted').textContent = COMPLETED_TODAY.length;
+  document.getElementById('historyBody').innerHTML = COMPLETED_TODAY.map(d => `
+    <tr>
+      <td style="font-weight:600;color:#5F6368">${d.id}</td>
+      <td>${d.item}</td>
+      <td>${d.to}</td>
+      <td style="color:#2E7D32;font-weight:600">${d.pay}</td>
+      <td style="color:#9AA0A6;font-size:12px">${d.time}</td>
+      <td><span class="status-badge delivered">Delivered</span></td>
+    </tr>`).join('');
+}
+
+window.acceptDemo = id => {
+  const req = DELIVERY_REQUESTS.find(r => r.id === id);
+  if (!req) return;
+  DELIVERY_REQUESTS = DELIVERY_REQUESTS.filter(r => r.id !== id);
+  ACTIVE_DELIVERIES.push({ id: id.replace('REQ','DEL'), item: req.item, from: req.from, to: req.to, dist: req.dist, status:'in_transit', pay: req.pay, elapsed:'0 min' });
+  document.getElementById('statRequests').textContent = DELIVERY_REQUESTS.length;
+  const badge = document.getElementById('requestBadge');
+  badge.textContent = DELIVERY_REQUESTS.length;
+  badge.style.display = DELIVERY_REQUESTS.length ? 'inline' : 'none';
+  renderDemoRequests(); renderDemoActive();
+  showToast(`Accepted! Head to ${req.from} to pick up ${req.item}`);
+};
+
+window.declineDemo = id => {
+  DELIVERY_REQUESTS = DELIVERY_REQUESTS.filter(r => r.id !== id);
+  document.getElementById('statRequests').textContent = DELIVERY_REQUESTS.length;
+  renderDemoRequests();
+  showToast('Request declined', 'warning');
+};
+
+window.completeDemo = id => {
+  const d = ACTIVE_DELIVERIES.find(x => x.id === id);
+  if (!d) return;
+  ACTIVE_DELIVERIES = ACTIVE_DELIVERIES.filter(x => x.id !== id);
+  COMPLETED_TODAY.unshift({ id, item: d.item, to: d.to, pay: d.pay, time: new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) });
+  renderDemoActive(); renderDemoHistory();
+  showToast(`Delivery complete! ${d.pay} added to your earnings`, 'success');
+};
+
+// GPS tracking: update rider_lat/rider_lon every 30s while active deliveries exist
+let _gpsWatchId = null;
+let _gpsLastUpdate = 0;
+function startGpsTracking(supa, riderId) {
+  if (_gpsWatchId !== null || !navigator.geolocation) return;
+  _gpsWatchId = navigator.geolocation.watchPosition(pos => {
+    const now = Date.now();
+    if (now - _gpsLastUpdate < 30000) return; // throttle to every 30s
+    _gpsLastUpdate = now;
+    supa.from('rider_deliveries')
+      .update({ rider_lat: pos.coords.latitude, rider_lon: pos.coords.longitude, rider_updated_at: new Date().toISOString() })
+      .eq('rider_user_id', riderId)   // column is rider_user_id, not rider_id
+      .in('status', ['pending', 'in_transit'])
+      .then(() => {}).catch(() => {});
+  }, null, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
+}
+
+function stopGpsTracking() {
+  if (_gpsWatchId !== null) {
+    navigator.geolocation.clearWatch(_gpsWatchId);
+    _gpsWatchId = null;
+  }
+}
+
+async function loadLive(supa, riderId) {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+
+  // Resolve rider_user_id from portal_users if needed
+  let riderUserId = riderId;
+  try {
+    const { data: pu } = await supa.from('portal_users').select('rider_user_id').eq('id', riderId).maybeSingle();
+    if (pu?.rider_user_id) riderUserId = pu.rider_user_id;
+  } catch(_e) {}
+
+  const [pendingRes, activeRes, completedRes] = await Promise.all([
+    supa.from('rider_deliveries')
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items, pharmacy_id)')
+      .eq('rider_user_id', riderUserId).eq('status', 'pending'),
+    supa.from('rider_deliveries')
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items)')
+      .eq('rider_user_id', riderUserId).eq('status', 'in_transit'),
+    supa.from('rider_deliveries')
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount)')
+      .eq('rider_user_id', riderUserId).eq('status', 'delivered')
+      .gte('updated_at', todayStart.toISOString()),   // delivered_at also works once set
+
+  ]);
+
+  // Fallback to old deliveries table if rider_deliveries returned no data
+  const hasPending   = pendingRes.data && pendingRes.data.length > 0;
+  const hasActive    = activeRes.data  && activeRes.data.length  > 0;
+  const hasCompleted = completedRes.data && completedRes.data.length > 0;
+
+  let pending, active, completed;
+  if (!hasPending && !hasActive && !hasCompleted) {
+    // Try legacy deliveries/pharmacy_orders schema
+    const [lp, la, lc] = await Promise.all([
+      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items, urgency)')
+        .eq('rider_id', riderId).eq('status', 'pending'),
+      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items)')
+        .eq('rider_id', riderId).eq('status', 'in_transit'),
+      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost)')
+        .eq('rider_id', riderId).eq('status', 'delivered').gte('delivered_at', todayStart.toISOString()),
+    ]);
+    // Map legacy schema to unified shape
+    pending   = (lp.data||[]).map(d => ({ ...d, _legacy:true, marketplace_orders: d.pharmacy_orders ? { buyer_name: d.pharmacy_orders.patient_name, delivery_address: d.pharmacy_orders.delivery_address, total_amount: d.pharmacy_orders.total_cost, items: d.pharmacy_orders.items, urgency: d.pharmacy_orders.urgency } : {} }));
+    active    = (la.data||[]).map(d => ({ ...d, _legacy:true, marketplace_orders: d.pharmacy_orders ? { buyer_name: d.pharmacy_orders.patient_name, delivery_address: d.pharmacy_orders.delivery_address, total_amount: d.pharmacy_orders.total_cost, items: d.pharmacy_orders.items } : {} }));
+    completed = (lc.data||[]).map(d => ({ ...d, _legacy:true, marketplace_orders: d.pharmacy_orders ? { buyer_name: d.pharmacy_orders.patient_name, delivery_address: d.pharmacy_orders.delivery_address, total_amount: d.pharmacy_orders.total_cost } : {} }));
+    if (!pending.length && !active.length && !completed.length) {
+      loadDemo(); return;
+    }
+  } else {
+    pending   = pendingRes.data   || [];
+    active    = activeRes.data    || [];
+    completed = completedRes.data || [];
+  }
+
+  const todayEarnings = completed.reduce((s,d) => s + (d.earnings||0), 0);
+  const todayKm = completed.reduce((s,d) => s + (d.distance_km||0), 0);
+
+  document.getElementById('statRequests').textContent = pending.length;
+  document.getElementById('statActive').textContent = active.length;
+  document.getElementById('statCompleted').textContent = completed.length;
+  document.getElementById('statKm').textContent = todayKm.toFixed(1);
+  document.getElementById('todayEarnings').textContent = 'UGX ' + todayEarnings.toLocaleString();
+  document.getElementById('todaySummary').textContent = completed.length + ' deliveries completed today';
+
+  const badge = document.getElementById('requestBadge');
+  badge.textContent = pending.length;
+  badge.style.display = pending.length ? 'inline' : 'none';
+
+  // Render pending requests
+  if (!pending.length) {
+    document.getElementById('requestsList').innerHTML =
+      '<div style="background:#fff;border-radius:12px;padding:32px;text-align:center;color:#9AA0A6;box-shadow:0 2px 8px rgba(0,0,0,0.08)"><span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">inbox</span>No new requests right now. Stay online to receive deliveries.</div>';
+  } else {
+    document.getElementById('requestsList').innerHTML = pending.map(d => {
+      const o = d.marketplace_orders || {};
+      const patientName = o.patient_name || o.buyer_name || 'Customer';
+      return `<div class="delivery-card" id="req-${d.id}">
+        <div class="delivery-icon"><span class="material-icons-outlined">medication</span></div>
+        <div class="delivery-info">
+          <div class="delivery-id">DEL-${d.id.slice(-6).toUpperCase()}</div>
+          <div class="delivery-title">${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : 'Order'}</div>
+          <div class="delivery-meta">
+            <span><span class="material-icons-outlined" style="font-size:14px">person</span> ${patientName}</span>
+            <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${o.delivery_address||'—'}</span>
+            <span style="color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:14px">payments</span> UGX ${(d.earnings||5000).toLocaleString()}</span>
+          </div>
+        </div>
+        <div class="delivery-actions">
+          <button class="btn-admin success sm" onclick="acceptLive('${d.id}')">
+            <span class="material-icons-outlined" style="font-size:14px">check</span> Accept
+          </button>
+          <button class="btn-admin secondary sm" onclick="declineLive('${d.id}')">
+            <span class="material-icons-outlined" style="font-size:14px">close</span> Decline
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Render active
+  if (!active.length) {
+    document.getElementById('activeList').innerHTML =
+      '<div style="padding:32px;text-align:center;color:#9AA0A6">No active deliveries. Accept a request above to get started.</div>';
+    stopGpsTracking();
+  } else {
+    document.getElementById('activeList').innerHTML = active.map(d => {
+      const o = d.marketplace_orders || {};
+      const elapsed = Math.floor((Date.now() - new Date(d.created_at)) / 60000);
+      return `<div style="display:flex;align-items:flex-start;gap:16px;padding:18px 20px;border-bottom:1px solid #F0F0F0">
+        <div class="delivery-icon"><span class="material-icons-outlined">local_shipping</span></div>
+        <div style="flex:1">
+          <div style="font-size:11px;font-weight:600;color:#5F6368;text-transform:uppercase">DEL-${d.id.slice(-6).toUpperCase()}</div>
+          <div style="font-size:14px;font-weight:600;margin:4px 0">${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : 'Order'}</div>
+          <div style="font-size:12px;color:#5F6368;margin-bottom:8px">
+            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}
+          </div>
+          <div style="font-size:12px;color:#E65100;font-weight:600">${elapsed} min elapsed</div>
+        </div>
+        <div>
+          <span class="status-badge in_transit">In Transit</span>
+          <div style="margin-top:10px">
+            <button class="btn-admin success sm" onclick="completeLive('${d.id}')">
+              <span class="material-icons-outlined" style="font-size:14px">check_circle</span> Mark Delivered
+            </button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    // Start GPS tracking while there are active deliveries
+    startGpsTracking(supa, riderUserId);
+  }
+
+  // Render history
+  document.getElementById('historyBody').innerHTML = completed.length
+    ? completed.map(d => {
+        const o = d.marketplace_orders || {};
+        return `<tr>
+          <td style="font-weight:600;color:#5F6368">DEL-${d.id.slice(-6).toUpperCase()}</td>
+          <td>${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : '—'}</td>
+          <td>${o.delivery_address||'—'}</td>
+          <td style="color:#2E7D32;font-weight:600">UGX ${(d.earnings||0).toLocaleString()}</td>
+          <td style="color:#9AA0A6;font-size:12px">${(d.delivered_at||d.updated_at) ? new Date(d.delivered_at||d.updated_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+          <td><span class="status-badge delivered">Delivered</span></td>
+        </tr>`;
+      }).join('')
+    : '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9AA0A6">No deliveries completed today yet</td></tr>';
+}
+
+window.acceptLive = async id => {
+  const supa = window._riderSupa;
+  if (supa) {
+    // Try rider_deliveries first, fall back to deliveries
+    const { error } = await supa.from('rider_deliveries')
+      .update({ status: 'in_transit', updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) await supa.from('deliveries').update({ status: 'in_transit', updated_at: new Date().toISOString() }).eq('id', id);
+    const s = JSON.parse(localStorage.getItem('rider_session') || '{}');
+    if (s.riderId) await loadLive(supa, s.riderId);
+  }
+  showToast('Delivery accepted! Head to the pickup point.', 'success');
+};
+
+window.declineLive = async id => {
+  // Just remove from local view; driver doesn't get reassigned automatically
+  document.getElementById('req-' + id)?.remove();
+  showToast('Request declined', 'warning');
+};
+
+window.completeLive = async id => {
+  const supa = window._riderSupa;
+  if (supa) {
+    const now = new Date().toISOString();
+    // Try rider_deliveries first
+    const { error } = await supa.from('rider_deliveries').update({
+      status: 'delivered',
+      delivered: true,
+      delivered_at: now,
+      updated_at: now,
+    }).eq('id', id);
+    if (error) {
+      // Fall back to legacy deliveries table
+      await supa.from('deliveries').update({
+        status: 'delivered',
+        delivery_qr_scanned: true,
+        delivered_at: now,
+        updated_at: now,
+      }).eq('id', id);
+      // Also update the related pharmacy_order status
+      const { data: del } = await supa.from('deliveries').select('order_id').eq('id', id).single();
+      if (del?.order_id) {
+        await supa.from('pharmacy_orders').update({ status: 'delivered', updated_at: now }).eq('id', del.order_id);
+      }
+    } else {
+      // Update related marketplace_order status
+      const { data: del } = await supa.from('rider_deliveries').select('order_id').eq('id', id).single();
+      if (del?.order_id) {
+        await supa.from('marketplace_orders').update({ status: 'delivered', updated_at: now }).eq('id', del.order_id);
+      }
+    }
+    const s = JSON.parse(localStorage.getItem('rider_session') || '{}');
+    if (s.riderId) await loadLive(supa, s.riderId);
+  }
+  showToast('Delivery marked complete! Earnings added.', 'success');
+};
+</script>
+</body>
+</html>

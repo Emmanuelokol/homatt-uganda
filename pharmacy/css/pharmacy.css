@@ -1,0 +1,170 @@
+/* ================================================
+   Homatt Health — Pharmacy Portal Styles
+   ================================================ */
+:root {
+  --primary:   #00695C;
+  --primary-d: #00352C;
+  --accent:    #FFB300;
+  --surface:   #FFFFFF;
+  --bg:        #F0FAF8;
+  --sidebar:   #00251A;
+  --sidebar-hv:#003828;
+  --text:      #1A1A1A;
+  --text-lt:   #5F6368;
+  --border:    #E0E0E0;
+  --danger:    #D32F2F;
+  --success:   #2E7D32;
+  --warning:   #E65100;
+  --radius:    12px;
+  --shadow:    0 2px 8px rgba(0,0,0,0.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Layout ── */
+.admin-layout{display:flex;min-height:100vh}
+.admin-sidebar{width:240px;background:var(--sidebar);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.sidebar-logo-text{font-size:16px;font-weight:700;color:#4DB6AC}
+.sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px}
+.sidebar-nav{padding:12px 0;flex:1}
+.sidebar-section-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:12px 20px 6px}
+.sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;transition:background .15s,color .15s;border-left:3px solid transparent}
+.sidebar-link:hover{background:rgba(255,255,255,0.07);color:#fff}
+.sidebar-link.active{background:rgba(77,182,172,0.18);color:#4DB6AC;border-left-color:#4DB6AC}
+.sidebar-link .material-icons-outlined{font-size:20px}
+.sidebar-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.1)}
+.admin-badge{display:inline-flex;align-items:center;gap:6px;background:#4DB6AC22;color:#4DB6AC;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;margin-bottom:8px}
+.logout-sidebar-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.logout-sidebar-btn:hover{background:rgba(211,47,47,0.15);border-color:#D32F2F;color:#EF9A9A}
+
+/* ── Main ── */
+.admin-main{margin-left:240px;flex:1;display:flex;flex-direction:column}
+.admin-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+.admin-topbar-title{font-size:18px;font-weight:700}
+.admin-topbar-right{display:flex;align-items:center;gap:14px}
+.admin-user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-lt)}
+.admin-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.admin-content{padding:28px;flex:1}
+
+/* ── Login ── */
+.admin-login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#00251A 0%,#003828 100%)}
+.admin-login-card{background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
+.admin-login-logo{text-align:center;margin-bottom:28px}
+.admin-login-logo-mark{width:56px;height:56px;background:linear-gradient(135deg,#00695C,#4DB6AC);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#fff}
+.admin-login-title{font-size:20px;font-weight:700}
+.admin-login-sub{font-size:13px;color:var(--text-lt);margin-top:4px}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+.login-field input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+.login-field input:focus{border-color:var(--primary)}
+.login-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:12px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+.login-btn:hover{background:var(--primary-d)}
+.demo-btn{width:100%;background:#F3F4F6;color:var(--text);border:1px solid var(--border);padding:11px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;margin-top:10px;transition:background .2s}
+.demo-btn:hover{background:#E5E7EB}
+.login-divider{text-align:center;color:var(--text-lt);font-size:12px;margin:14px 0;position:relative}
+.login-divider::before,.login-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+.login-divider::before{left:0}.login-divider::after{right:0}
+.login-error{background:#FFEBEE;color:#D32F2F;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:14px;display:none}
+
+/* ── Incoming order alert ── */
+.order-alert{background:linear-gradient(135deg,#E65100,#BF360C);color:#fff;border-radius:12px;padding:18px 22px;margin-bottom:20px;display:flex;align-items:center;gap:16px;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(230,81,0,0.4)}50%{box-shadow:0 0 0 10px rgba(230,81,0,0)}}
+.order-alert-icon{font-size:36px}
+.order-alert-count{font-size:28px;font-weight:700;line-height:1}
+.order-alert-label{font-size:13px;opacity:.9}
+
+/* ── Stats ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:14px}
+.stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-icon.green{background:#E8F5E9;color:#2E7D32}
+.stat-icon.blue{background:#E3F2FD;color:#1565C0}
+.stat-icon.orange{background:#FFF3E0;color:#E65100}
+.stat-icon.red{background:#FFEBEE;color:#C62828}
+.stat-icon.teal{background:#E0F2F1;color:#00695C}
+.stat-number{font-size:24px;font-weight:700;line-height:1;margin-bottom:4px}
+.stat-label{font-size:12px;color:var(--text-lt)}
+
+/* ── Order cards (incoming) ── */
+.order-card{background:var(--surface);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);border-left:4px solid var(--accent);margin-bottom:14px}
+.order-card.urgent{border-left-color:#D32F2F}
+.order-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.order-ref{font-size:12px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px}
+.order-urgency{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
+.order-urgency.urgent{background:#FFEBEE;color:#C62828}
+.order-urgency.standard{background:#E3F2FD;color:#1565C0}
+.order-meds{font-size:14px;font-weight:600;margin-bottom:6px}
+.order-meta{font-size:12px;color:var(--text-lt);display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.order-actions{display:flex;gap:10px}
+.timer-badge{margin-left:auto;display:inline-flex;align-items:center;gap:4px;background:#FFF3E0;color:#E65100;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px}
+
+/* ── Table ── */
+.admin-table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
+.table-title{font-size:16px;font-weight:700}
+.table-filter{display:flex;gap:10px;align-items:center}
+.table-filter select,.table-filter input{padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+.admin-table{width:100%;border-collapse:collapse}
+.admin-table th{background:#F8F9FA;padding:12px 18px;text-align:left;font-size:12px;font-weight:600;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.admin-table td{padding:14px 18px;font-size:13px;border-bottom:1px solid #F0F0F0;vertical-align:middle}
+.admin-table tr:hover td{background:#F0FAF8}
+.admin-table tr:last-child td{border-bottom:none}
+
+/* ── Status badges ── */
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.status-badge.incoming{background:#FFF3E0;color:#E65100}
+.status-badge.confirmed,.status-badge.preparing{background:#E3F2FD;color:#1565C0}
+.status-badge.ready{background:#E8F5E9;color:#2E7D32}
+.status-badge.in_transit{background:#F3E5F5;color:#6A1B9A}
+.status-badge.delivered,.status-badge.completed{background:#E8F5E9;color:#2E7D32}
+.status-badge.rejected,.status-badge.cancelled{background:#FFEBEE;color:#C62828}
+.status-badge.urgent{background:#FFEBEE;color:#C62828}
+.status-badge.standard{background:#F3F4F6;color:#6B7280}
+
+/* ── Inventory stock indicators ── */
+.stock-bar-wrap{display:flex;align-items:center;gap:10px}
+.stock-bar{height:6px;border-radius:3px;flex:1;background:#E0E0E0;overflow:hidden}
+.stock-fill{height:100%;border-radius:3px;transition:width .3s}
+.stock-fill.high{background:#4CAF50}
+.stock-fill.medium{background:#FFC107}
+.stock-fill.low{background:#F44336}
+.stock-qty{font-size:12px;font-weight:600;min-width:36px;text-align:right}
+
+/* ── Buttons ── */
+.btn-admin{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+.btn-admin.primary{background:var(--primary);color:#fff}
+.btn-admin.primary:hover{background:var(--primary-d)}
+.btn-admin.secondary{background:#F3F4F6;color:var(--text);border:1px solid var(--border)}
+.btn-admin.secondary:hover{background:#E5E7EB}
+.btn-admin.danger{background:var(--danger);color:#fff}
+.btn-admin.success{background:var(--success);color:#fff}
+.btn-admin.warning{background:var(--warning);color:#fff}
+.btn-admin.sm{padding:6px 12px;font-size:12px}
+
+/* ── Routing score card ── */
+.score-card{background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:22px 24px;display:flex;align-items:center;gap:18px;margin-bottom:24px}
+.score-circle{width:72px;height:72px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;flex-shrink:0}
+.score-details{flex:1}
+.score-title{font-size:14px;font-weight:600;opacity:.85;margin-bottom:4px}
+.score-factors{font-size:12px;opacity:.75;line-height:1.8}
+
+/* ── Modal ── */
+.admin-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px}
+.admin-modal{background:#fff;border-radius:var(--radius);width:100%;max-width:500px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.admin-modal-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.admin-modal-title{font-size:16px;font-weight:700}
+.admin-modal-close{background:none;border:none;cursor:pointer;color:var(--text-lt);padding:4px;border-radius:6px}
+.admin-modal-body{padding:20px 24px}
+.admin-modal-footer{padding:16px 24px;border-top:1px solid var(--border);display:flex;gap:10px;justify-content:flex-end}
+.admin-form-group{margin-bottom:16px}
+.admin-form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+.admin-form-group input,.admin-form-group select,.admin-form-group textarea{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;transition:border-color .2s;resize:vertical}
+.admin-form-group input:focus,.admin-form-group select:focus,.admin-form-group textarea:focus{border-color:var(--primary)}
+
+/* ── Toast ── */
+.admin-toast{position:fixed;bottom:24px;right:24px;background:#1E1E1E;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,0.3);transform:translateY(60px);opacity:0;transition:all .3s ease;z-index:999}
+.admin-toast.visible{transform:translateY(0);opacity:1}
+
+/* ── Responsive ── */
+@media(max-width:768px){.admin-sidebar{width:0;overflow:hidden}.admin-main{margin-left:0}.stats-grid{grid-template-columns:1fr 1fr}}

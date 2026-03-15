@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Clinics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .tab-row { display:flex; gap:0; border-bottom:2px solid #E0E0E0; margin-bottom:20px; }
+    .tab-btn { padding:10px 18px; border:none; background:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; color:#9AA0A6; border-bottom:2px solid transparent; margin-bottom:-2px; }
+    .tab-btn.active { color:#1B5E20; border-bottom-color:#1B5E20; font-weight:600; }
+    .modal-section { background:#F8F9FA; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+    .modal-section-title { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.6px; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .hours-grid { display:grid; grid-template-columns:80px 1fr 1fr 60px; gap:6px; align-items:center; font-size:12px; }
+    .hours-grid .day-label { font-weight:600; font-size:12px; }
+    .hours-input { border:1px solid #E0E0E0; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:100%; }
+    .chip-input-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid #E0E0E0; border-radius:8px; padding:8px; min-height:42px; cursor:text; }
+    .chip { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:3px 10px; font-size:12px; font-weight:500; }
+    .chip-del { background:none; border:none; cursor:pointer; padding:0; color:#2E7D32; font-size:15px; line-height:1; }
+    .chip-input { border:none; outline:none; font-family:inherit; font-size:12px; min-width:120px; flex:1; background:transparent; }
+    .facility-checks { display:flex; flex-wrap:wrap; gap:8px; }
+    .facility-check { display:flex; align-items:center; gap:5px; background:#F0F0F0; border-radius:8px; padding:5px 10px; cursor:pointer; font-size:12px; font-weight:500; }
+    .facility-check input { accent-color:#1B5E20; }
+    .scrollable-modal { max-height:70vh; overflow-y:auto; padding-right:4px; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Management</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin info" id="createClinicAccountBtn">
+          <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Clinic Account
+        </button>
+        <button class="btn-admin primary" id="addClinicBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Clinic
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Clinics</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="active">Active</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input type="text" id="searchClinics" placeholder="Search by name..." style="width:180px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>Consultation Fee</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="clinicsBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Clinic Modal -->
+<div class="admin-modal-overlay" id="clinicModal" style="display:none">
+  <div class="admin-modal" style="max-width:640px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="clinicModalTitle">Add New Clinic</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body scrollable-modal">
+      <input type="hidden" id="clinicId">
+
+      <!-- Tab nav -->
+      <div class="tab-row" style="margin-top:-4px">
+        <button class="tab-btn active" onclick="switchTab('basic',this)">Basic Info</button>
+        <button class="tab-btn" onclick="switchTab('location',this)">Location & Hours</button>
+        <button class="tab-btn" onclick="switchTab('services',this)">Services & Fees</button>
+        <button class="tab-btn" onclick="switchTab('admin',this)">Admin</button>
+      </div>
+
+      <!-- Tab: Basic Info -->
+      <div id="tab-basic">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Clinic Name *</label>
+              <input type="text" id="clinicName" placeholder="e.g. Kampala Medical Centre">
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Short Description / Tagline</label>
+              <textarea id="clinicDescription" rows="2" style="min-height:60px" placeholder="e.g. Full-service clinic specialising in maternity and paediatrics"></textarea>
+            </div>
+            <div class="admin-form-group">
+              <label>Phone Number *</label>
+              <input type="text" id="clinicPhone" placeholder="+256 7XX XXX XXX">
+            </div>
+            <div class="admin-form-group">
+              <label>WhatsApp Number</label>
+              <input type="text" id="clinicWhatsapp" placeholder="+256 7XX XXX XXX">
+            </div>
+            <div class="admin-form-group">
+              <label>Email</label>
+              <input type="email" id="clinicEmail" placeholder="clinic@example.com">
+            </div>
+            <div class="admin-form-group">
+              <label>Contact Person</label>
+              <input type="text" id="clinicContact" placeholder="Dr. Name / Manager Name">
+            </div>
+            <div class="admin-form-group">
+              <label>License Number</label>
+              <input type="text" id="clinicLicense" placeholder="MOH-2024-XXXX">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Location & Hours -->
+      <div id="tab-location" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">location_on</span> Location</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>District *</label>
+              <input type="text" id="clinicDistrict" placeholder="e.g. Kampala">
+            </div>
+            <div class="admin-form-group">
+              <label>City / Subcounty</label>
+              <input type="text" id="clinicCity" placeholder="e.g. Nakawa">
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Full Address</label>
+              <input type="text" id="clinicAddress" placeholder="Plot number, street, area">
+            </div>
+            <div class="admin-form-group">
+              <label>Latitude (GPS)</label>
+              <input type="number" id="clinicLat" placeholder="e.g. 0.3476" step="0.0001">
+              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Use Google Maps to find exact coordinates</div>
+            </div>
+            <div class="admin-form-group">
+              <label>Longitude (GPS)</label>
+              <input type="number" id="clinicLng" placeholder="e.g. 32.5825" step="0.0001">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">schedule</span> Opening Hours</div>
+          <div class="hours-grid" style="margin-bottom:8px;font-weight:700;font-size:11px;color:#5F6368;text-transform:uppercase">
+            <div>Day</div><div>Open From</div><div>Close At</div><div>Closed?</div>
+          </div>
+          <div id="hoursGrid"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Services & Fees -->
+      <div id="tab-services" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">healing</span> Conditions Treated / Specialties</div>
+          <div style="font-size:12px;color:#5F6368;margin-bottom:8px">Type a condition and press Enter or comma to add</div>
+          <div class="chip-input-wrap" id="specialtiesChipWrap" onclick="document.getElementById('specialtyInput').focus()">
+            <input class="chip-input" id="specialtyInput" placeholder="e.g. Malaria, Diabetes, Maternity..." onkeydown="handleChipInput(event,'specialties')">
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">payments</span> Consultation Fees (UGX)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>General Consultation</label>
+              <input type="number" id="clinicFeeGeneral" placeholder="e.g. 30000" min="0">
+            </div>
+            <div class="admin-form-group">
+              <label>Specialist Consultation</label>
+              <input type="number" id="clinicFeeSpecialist" placeholder="e.g. 80000" min="0">
+            </div>
+            <div class="admin-form-group">
+              <label>Ante-natal / Maternity</label>
+              <input type="number" id="clinicFeeMaternity" placeholder="e.g. 50000" min="0">
+            </div>
+            <div class="admin-form-group">
+              <label>Child (Paediatric)</label>
+              <input type="number" id="clinicFeePaed" placeholder="e.g. 25000" min="0">
+            </div>
+            <div class="admin-form-group">
+              <label>Emergency / After-hours</label>
+              <input type="number" id="clinicFeeEmergency" placeholder="e.g. 100000" min="0">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">medical_services</span> Available Facilities</div>
+          <div class="facility-checks" id="facilitiesChecks"></div>
+        </div>
+      </div>
+
+      <!-- Tab: Admin -->
+      <div id="tab-admin" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">admin_panel_settings</span> Admin Settings</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>Commission Rate (%)</label>
+              <input type="number" id="clinicCommission" value="15" min="0" max="50">
+            </div>
+            <div class="admin-form-group">
+              <label>Status</label>
+              <select id="clinicStatus">
+                <option value="approved">Approved</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" id="clinicVerified" style="width:18px;height:18px;accent-color:#1B5E20"> Verified by Homatt
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+              <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" id="clinicActive" style="width:18px;height:18px;accent-color:#1B5E20"> Active (visible to patients)
+              </label>
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Internal Notes</label>
+              <textarea id="clinicNotes" style="min-height:70px" placeholder="Internal admin notes about this clinic..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveClinicBtn">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save Clinic
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Staff Modal -->
+<div class="admin-modal-overlay" id="staffModal" style="display:none">
+  <div class="admin-modal" style="max-width:480px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Assign Clinic Staff Login</div>
+      <button class="admin-modal-close" onclick="closeStaffModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="staffClinicId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Create a portal login for clinic staff. Share the credentials so they can log into the clinic portal.</p>
+      <div class="admin-form-group">
+        <label>Full Name *</label>
+        <input type="text" id="staffName" placeholder="Dr. Firstname Lastname">
+      </div>
+      <div class="admin-form-group">
+        <label>Email Address *</label>
+        <input type="email" id="staffEmail" placeholder="staff@clinic.ug">
+      </div>
+      <div class="admin-form-group">
+        <label>Password *</label>
+        <input type="text" id="staffPassword" placeholder="Min 8 characters — share this with the staff member">
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">They can change this after first login.</div>
+      </div>
+      <div class="admin-form-group">
+        <label>Role</label>
+        <select id="staffRole">
+          <option value="doctor">Doctor</option>
+          <option value="nurse">Nurse</option>
+          <option value="receptionist">Receptionist</option>
+          <option value="manager">Clinic Manager</option>
+        </select>
+      </div>
+      <div id="staffResult" style="display:none;margin-top:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:14px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px">✓ Login created!</div>
+        <div style="font-family:monospace;font-size:12px;line-height:2;background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:10px" id="staffResultText"></div>
+        <button class="btn-admin secondary sm" style="margin-top:8px" onclick="copyStaffCreds()">Copy</button>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeStaffModal()">Close</button>
+      <button class="btn-admin primary" id="saveStaffBtn">
+        <span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Clinic Account Modal -->
+<div class="admin-modal-overlay" id="createClinicAccountModal" style="display:none">
+  <div class="admin-modal" style="max-width:540px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Create Clinic Account</div>
+      <button class="admin-modal-close" onclick="closeCreateClinicAccountModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="clinicAccountDemoNote" style="display:none;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#795548">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px;margin-right:4px">info</span>
+        In demo mode, account creation requires real Supabase credentials.
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+        Registers a new clinic and creates a login for their portal. Share the credentials so they can manage bookings, patients, and prescriptions.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Clinic Name *</label>
+          <input type="text" id="caClinicName" placeholder="e.g. Kampala Medical Centre">
+        </div>
+        <div class="admin-form-group">
+          <label>District *</label>
+          <input type="text" id="caClinicDistrict" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group">
+          <label>City / Area</label>
+          <input type="text" id="caClinicCity" placeholder="e.g. Ntinda">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Full Address</label>
+          <input type="text" id="caClinicAddress" placeholder="Plot no., street, area">
+        </div>
+        <div class="admin-form-group">
+          <label>Phone Number</label>
+          <input type="text" id="caClinicPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>WhatsApp</label>
+          <input type="text" id="caClinicWhatsapp" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Contact Person</label>
+          <input type="text" id="caClinicContact" placeholder="Dr. / Manager name">
+        </div>
+        <div class="admin-form-group">
+          <label>License No. (MOH)</label>
+          <input type="text" id="caClinicLicense" placeholder="MOH-2024-XXXX">
+        </div>
+        <div class="admin-form-group">
+          <label>General Consultation Fee (UGX)</label>
+          <input type="number" id="caClinicFee" placeholder="e.g. 30000" min="0">
+        </div>
+        <div class="admin-form-group">
+          <label>Commission Rate (%)</label>
+          <input type="number" id="caClinicCommission" value="15" min="0" max="50">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Staff Login Email *</label>
+          <input type="email" id="caClinicEmail" placeholder="clinic@example.com">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">This will be their portal login email.</div>
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Password *</label>
+          <input type="text" id="caClinicPassword" placeholder="Min 8 characters" autocomplete="new-password">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Share this with the clinic staff. Minimum 8 characters.</div>
+        </div>
+      </div>
+
+      <div id="caClinicSuccessBox" style="display:none;margin-top:16px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:16px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Clinic Account Created!
+        </div>
+        <div style="font-size:13px;color:#2E7D32;margin-bottom:10px">Share these credentials with the clinic staff:</div>
+        <div style="background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:12px;font-family:monospace;font-size:12px;line-height:2" id="caClinicCredentials"></div>
+        <button class="btn-admin secondary sm" style="margin-top:10px;font-size:12px" onclick="copyClinicCredentials()">
+          <span class="material-icons-outlined" style="font-size:14px">content_copy</span> Copy Credentials
+        </button>
+      </div>
+    </div>
+    <div class="admin-modal-footer" id="caClinicFooter">
+      <button class="btn-admin secondary" onclick="closeCreateClinicAccountModal()">Cancel</button>
+      <button class="btn-admin primary" id="createClinicAccountSubmitBtn">
+        <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+var allClinics = [];
+var _adminSession = null;
+var currentSpecialties = [];
+
+/* ── Tab switching ── */
+function switchTab(name, btn) {
+  ['basic','location','services','admin'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+}
+
+/* ── Chip input (specialties) ── */
+function handleChipInput(e, type) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var val = e.target.value.trim().replace(/,$/,'');
+    if (val && !currentSpecialties.includes(val)) {
+      currentSpecialties.push(val);
+      renderSpecialtyChips();
+    }
+    e.target.value = '';
+  }
+}
+function renderSpecialtyChips() {
+  var wrap = document.getElementById('specialtiesChipWrap');
+  var input = document.getElementById('specialtyInput');
+  wrap.innerHTML = '';
+  currentSpecialties.forEach(function(s, i) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = s + '<button class="chip-del" onclick="removeSpecialty(' + i + ')">×</button>';
+    wrap.appendChild(chip);
+  });
+  wrap.appendChild(input);
+  input.value = '';
+}
+window.removeSpecialty = function(i) {
+  currentSpecialties.splice(i, 1);
+  renderSpecialtyChips();
+};
+
+/* ── Hours grid ── */
+var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+var hoursData = {};
+
+function buildHoursGrid(existingHours) {
+  hoursData = existingHours || {};
+  var el = document.getElementById('hoursGrid');
+  el.innerHTML = DAYS.map(function(day) {
+    var h = hoursData[day] || {};
+    var closed = h.closed === true;
+    return '<div class="hours-grid" style="margin-bottom:6px">' +
+      '<div class="day-label">' + day.slice(0,3) + '</div>' +
+      '<input class="hours-input" type="time" id="h-open-' + day + '" value="' + (h.open || '08:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<input class="hours-input" type="time" id="h-close-' + day + '" value="' + (h.close || '17:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">' +
+        '<input type="checkbox" id="h-closed-' + day + '" ' + (closed?'checked':'') + ' onchange="toggleDayClosed(\'' + day + '\')" style="accent-color:#D32F2F"> Closed' +
+      '</label>' +
+    '</div>';
+  }).join('');
+}
+
+window.toggleDayClosed = function(day) {
+  var closed = document.getElementById('h-closed-' + day).checked;
+  document.getElementById('h-open-' + day).disabled = closed;
+  document.getElementById('h-close-' + day).disabled = closed;
+};
+
+function getHoursData() {
+  var result = {};
+  DAYS.forEach(function(day) {
+    var closed = document.getElementById('h-closed-' + day)?.checked;
+    result[day] = {
+      open: document.getElementById('h-open-' + day)?.value || '08:00',
+      close: document.getElementById('h-close-' + day)?.value || '17:00',
+      closed: closed || false
+    };
+  });
+  return result;
+}
+
+/* ── Facilities ── */
+var FACILITIES = ['Laboratory','X-ray','Ultrasound / Scan','ICU','Maternity / Delivery','Operating Theatre','Pharmacy','Dental','Eye Clinic','Physiotherapy','Immunisation','Ambulance'];
+var currentFacilities = [];
+
+function buildFacilitiesChecks(existing) {
+  currentFacilities = existing || [];
+  var el = document.getElementById('facilitiesChecks');
+  el.innerHTML = FACILITIES.map(function(f) {
+    var checked = currentFacilities.includes(f);
+    return '<label class="facility-check">' +
+      '<input type="checkbox" value="' + f + '" ' + (checked?'checked':'') + ' onchange="toggleFacility(this)" style="accent-color:#1B5E20"> ' + f +
+    '</label>';
+  }).join('');
+}
+
+window.toggleFacility = function(cb) {
+  if (cb.checked) {
+    if (!currentFacilities.includes(cb.value)) currentFacilities.push(cb.value);
+  } else {
+    currentFacilities = currentFacilities.filter(function(f){return f !== cb.value;});
+  }
+};
+
+/* ── Demo data ── */
+var DEMO_CLINICS = [
+  { id:'c1', name:'Kampala Medical Centre', district:'Kampala', city:'Kampala', phone:'+256 41 234 567', license_number:'HC-2021-001', contact_person:'Dr. Namukasa', consultation_fee:30000, status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*30).toISOString() },
+  { id:'c2', name:'Ntinda Health Clinic',   district:'Kampala', city:'Kampala', phone:'+256 41 345 678', license_number:'HC-2021-002', contact_person:'Dr. Mubiru',   consultation_fee:25000, status:'approved', verified:true, active:true, created_at: new Date(Date.now()-86400000*20).toISOString() },
+  { id:'c3', name:'Mulago Community Clinic',district:'Kampala', city:'Kampala', phone:'+256 41 456 789', license_number:'HC-2022-003', contact_person:'Dr. Ssempa',   consultation_fee:15000, status:'approved', verified:false,active:true, created_at: new Date(Date.now()-86400000*10).toISOString() },
+  { id:'c4', name:'Nakawa Health Centre',   district:'Kampala', city:'Kampala', phone:'+256 41 567 890', license_number:'HC-2022-004', contact_person:'Dr. Nabirye',  consultation_fee:20000, status:'pending',  verified:false,active:false,created_at: new Date(Date.now()-86400000*2).toISOString() },
+];
+
+/* ── Load ── */
+document.addEventListener('DOMContentLoaded', async function() {
+  buildAdminSidebar('clinics');
+  var session = await requireAdmin();
+  if (!session) return;
+  _adminSession = session;
+  setupAdminLogout();
+  await loadClinics();
+
+  document.getElementById('addClinicBtn').addEventListener('click', function(){ openModal(); });
+  document.getElementById('createClinicAccountBtn').addEventListener('click', function(){ openCreateClinicAccountModal(); });
+  document.getElementById('filterStatus').addEventListener('change', renderClinics);
+  document.getElementById('searchClinics').addEventListener('input', renderClinics);
+  document.getElementById('saveClinicBtn').addEventListener('click', saveClinic);
+  document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+  document.getElementById('createClinicAccountSubmitBtn').addEventListener('click', submitCreateClinicAccount);
+});
+
+async function loadClinics() {
+  // Demo mode: only use demo data if explicitly in demo session
+  if (_adminSession && _adminSession.demo) {
+    allClinics = DEMO_CLINICS;
+    renderClinics();
+    return;
+  }
+  var supa = adminSupa();
+  if (!supa) {
+    showAdminToast('Cannot connect to database — please sign in again', 'error');
+    allClinics = [];
+    renderClinics();
+    return;
+  }
+  try {
+    var res = await supa.from('clinics').select('*').order('created_at', {ascending:false});
+    if (res.error) {
+      showAdminToast('Error loading clinics: ' + res.error.message, 'error');
+      allClinics = [];
+    } else {
+      // Always use real DB data — never silently fall back to demo when authenticated
+      allClinics = res.data || [];
+    }
+  } catch(e) {
+    showAdminToast('Network error loading clinics', 'error');
+    allClinics = [];
+  }
+  renderClinics();
+}
+
+function renderClinics() {
+  var statusF = document.getElementById('filterStatus').value;
+  var searchF = document.getElementById('searchClinics').value.toLowerCase();
+  var filtered = allClinics.filter(function(c) {
+    return (!statusF || c.status === statusF) && (!searchF || c.name.toLowerCase().includes(searchF));
+  });
+  var tbody = document.getElementById('clinicsBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(function(c) {
+    var fee = c.consultation_fee ? 'UGX ' + Number(c.consultation_fee).toLocaleString() : '—';
+    return '<tr>' +
+      '<td><div style="font-weight:600">' + c.name + '</div>' + (c.contact_person ? '<div style="font-size:11px;color:#9AA0A6">' + c.contact_person + '</div>' : '') + '</td>' +
+      '<td>' + ([c.district,c.city].filter(Boolean).join(', ')||'—') + '</td>' +
+      '<td style="font-size:12px">' + (c.phone||'—') + '</td>' +
+      '<td style="font-size:12px;font-weight:600;color:#1B5E20">' + fee + '</td>' +
+      '<td>' + (c.verified ? '<span class="status-badge resolved">Verified</span>' : '<span class="status-badge open">Unverified</span>') + '</td>' +
+      '<td><span class="status-badge ' + (c.status||'approved') + '">' + (c.status||'approved') + '</span></td>' +
+      '<td style="font-size:12px;color:#9AA0A6">' + formatShortDate(c.created_at) + '</td>' +
+      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
+        (!c.verified ? '<button class="btn-admin primary sm" onclick="toggleVerify(\'' + c.id + '\',true)">Verify</button>' : '') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openModal(id) {
+  var c = id ? allClinics.find(function(x){return x.id===id;}) : null;
+  switchTab('basic', document.querySelector('.tab-btn'));
+  document.getElementById('clinicModalTitle').textContent = c ? 'Edit Clinic' : 'Add New Clinic';
+  document.getElementById('clinicId').value = c?.id || '';
+  document.getElementById('clinicName').value = c?.name || '';
+  document.getElementById('clinicDescription').value = c?.description || '';
+  document.getElementById('clinicPhone').value = c?.phone || '';
+  document.getElementById('clinicWhatsapp').value = c?.whatsapp || '';
+  document.getElementById('clinicEmail').value = c?.email || '';
+  document.getElementById('clinicContact').value = c?.contact_person || '';
+  document.getElementById('clinicLicense').value = c?.license_number || '';
+  document.getElementById('clinicDistrict').value = c?.district || '';
+  document.getElementById('clinicCity').value = c?.city || '';
+  document.getElementById('clinicAddress').value = c?.address || '';
+  document.getElementById('clinicLat').value = c?.latitude || '';
+  document.getElementById('clinicLng').value = c?.longitude || '';
+  document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
+  document.getElementById('clinicStatus').value = c?.status || 'approved';
+  document.getElementById('clinicVerified').checked = c?.verified || false;
+  document.getElementById('clinicActive').checked = c?.active !== false;
+  document.getElementById('clinicNotes').value = c?.notes || '';
+
+  // Service fees from services JSONB
+  var svcs = c?.services || [];
+  var feeMap = {};
+  if (Array.isArray(svcs)) {
+    svcs.forEach(function(s){ feeMap[s.type] = s.fee; });
+  }
+  document.getElementById('clinicFeeGeneral').value = c?.consultation_fee || feeMap['general'] || '';
+  document.getElementById('clinicFeeSpecialist').value = feeMap['specialist'] || '';
+  document.getElementById('clinicFeeMaternity').value = feeMap['maternity'] || '';
+  document.getElementById('clinicFeePaed').value = feeMap['paediatric'] || '';
+  document.getElementById('clinicFeeEmergency').value = feeMap['emergency'] || '';
+
+  // Specialties
+  currentSpecialties = c?.specialties || [];
+  renderSpecialtyChips();
+
+  // Hours
+  buildHoursGrid(c?.opening_hours || {});
+
+  // Facilities
+  buildFacilitiesChecks(c?.facilities || []);
+
+  document.getElementById('clinicModal').style.display = 'flex';
+}
+
+function closeModal() { document.getElementById('clinicModal').style.display = 'none'; }
+
+async function saveClinic() {
+  var id = document.getElementById('clinicId').value;
+  var name = document.getElementById('clinicName').value.trim();
+  if (!name) { showAdminToast('Clinic name is required', 'error'); return; }
+
+  // Build services array
+  var services = [];
+  [['general','clinicFeeGeneral'],['specialist','clinicFeeSpecialist'],['maternity','clinicFeeMaternity'],['paediatric','clinicFeePaed'],['emergency','clinicFeeEmergency']].forEach(function(pair) {
+    var val = Number(document.getElementById(pair[1]).value);
+    if (val) services.push({ type: pair[0], fee: val });
+  });
+
+  var payload = {
+    name: name,
+    description: document.getElementById('clinicDescription').value.trim() || null,
+    district: document.getElementById('clinicDistrict').value.trim() || null,
+    city: document.getElementById('clinicCity').value.trim() || null,
+    address: document.getElementById('clinicAddress').value.trim() || null,
+    phone: document.getElementById('clinicPhone').value.trim() || null,
+    whatsapp: document.getElementById('clinicWhatsapp').value.trim() || null,
+    email: document.getElementById('clinicEmail').value.trim() || null,
+    contact_person: document.getElementById('clinicContact').value.trim() || null,
+    license_number: document.getElementById('clinicLicense').value.trim() || null,
+    latitude: parseFloat(document.getElementById('clinicLat').value) || null,
+    longitude: parseFloat(document.getElementById('clinicLng').value) || null,
+    commission_rate: Number(document.getElementById('clinicCommission').value) || 15,
+    consultation_fee: Number(document.getElementById('clinicFeeGeneral').value) || null,
+    status: document.getElementById('clinicStatus').value,
+    verified: document.getElementById('clinicVerified').checked,
+    active: document.getElementById('clinicActive').checked,
+    notes: document.getElementById('clinicNotes').value.trim() || null,
+    specialties: currentSpecialties.length ? currentSpecialties : null,
+    facilities: currentFacilities.length ? currentFacilities : null,
+    services: services.length ? services : null,
+    opening_hours: getHoursData(),
+    updated_at: new Date().toISOString()
+  };
+
+  var btn = document.getElementById('saveClinicBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Not connected to database', 'error'); btn.disabled=false; btn.textContent='Save Clinic'; return; }
+
+  var result = id
+    ? await supa.from('clinics').update(payload).eq('id', id)
+    : await supa.from('clinics').insert(payload);
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">save</span> Save Clinic';
+
+  if (result.error) { showAdminToast('Save failed: ' + result.error.message, 'error'); return; }
+  closeModal();
+  await loadClinics();
+  showAdminToast(id ? 'Clinic updated!' : 'Clinic added!', 'success');
+}
+
+async function toggleVerify(id, verified) {
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Not connected', 'error'); return; }
+  var { error } = await supa.from('clinics').update({ verified: verified }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadClinics();
+  showAdminToast('Clinic verified!', 'success');
+}
+
+/* ── Staff modal ── */
+function openStaffModal(clinicId) {
+  document.getElementById('staffClinicId').value = clinicId;
+  ['staffName','staffEmail','staffPassword'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('staffResult').style.display = 'none';
+  document.getElementById('staffModal').style.display = 'flex';
+}
+function closeStaffModal() { document.getElementById('staffModal').style.display = 'none'; }
+
+var _lastStaffCreds = '';
+async function saveStaff() {
+  var clinicId = document.getElementById('staffClinicId').value;
+  var name     = document.getElementById('staffName').value.trim();
+  var email    = document.getElementById('staffEmail').value.trim();
+  var password = document.getElementById('staffPassword').value;
+  var role     = document.getElementById('staffRole').value;
+
+  if (!name || !email || !password) { showAdminToast('All fields required', 'error'); return; }
+  if (password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  var btn = document.getElementById('saveStaffBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Not connected to database', 'error'); btn.disabled=false; btn.textContent='Create Login'; return; }
+
+  // Use a fresh client with persistSession:false so admin session is not overwritten
+  var tmpSupa = window.supabase.createClient(window.HOMATT_CONFIG.SUPABASE_URL, window.HOMATT_CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  var { data: su, error: suErr } = await tmpSupa.auth.signUp({ email: email, password: password });
+
+  if (suErr || !su?.user) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login';
+    showAdminToast('Auth error: ' + (suErr?.message || 'Email may already be registered'), 'error');
+    return;
+  }
+
+  var { error: puErr } = await supa.from('portal_users').insert({
+    auth_user_id: su.user.id, full_name: name, email: email, role: 'clinic_staff', clinic_id: clinicId, is_active: true
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login';
+
+  if (puErr) { showAdminToast('Portal user error: ' + puErr.message, 'error'); return; }
+
+  _lastStaffCreds = 'Name: ' + name + '\nRole: ' + role + '\nEmail: ' + email + '\nPassword: ' + password + '\nPortal URL: ' + window.location.origin.replace('/admin','') + '/clinic/';
+  document.getElementById('staffResultText').textContent = _lastStaffCreds;
+  document.getElementById('staffResult').style.display = 'block';
+  showAdminToast('Login created for ' + name, 'success');
+}
+
+window.copyStaffCreds = function() {
+  navigator.clipboard.writeText(_lastStaffCreds).then(function(){ showAdminToast('Copied!','success'); });
+};
+
+/* ── Create Clinic Account Modal ── */
+function openCreateClinicAccountModal() {
+  ['caClinicName','caClinicDistrict','caClinicCity','caClinicAddress','caClinicPhone','caClinicWhatsapp','caClinicContact','caClinicLicense','caClinicEmail','caClinicPassword'].forEach(function(id){
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('caClinicFee').value = '';
+  document.getElementById('caClinicCommission').value = 15;
+  document.getElementById('caClinicSuccessBox').style.display = 'none';
+  document.getElementById('caClinicFooter').style.display = 'flex';
+  var btn = document.getElementById('createClinicAccountSubmitBtn');
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+  document.getElementById('clinicAccountDemoNote').style.display = (_adminSession && _adminSession.demo) ? 'block' : 'none';
+  document.getElementById('createClinicAccountModal').style.display = 'flex';
+}
+
+function closeCreateClinicAccountModal() { document.getElementById('createClinicAccountModal').style.display = 'none'; }
+
+var _lastClinicCredentials = '';
+
+async function submitCreateClinicAccount() {
+  var name     = document.getElementById('caClinicName').value.trim();
+  var district = document.getElementById('caClinicDistrict').value.trim();
+  var city     = document.getElementById('caClinicCity').value.trim();
+  var address  = document.getElementById('caClinicAddress').value.trim();
+  var phone    = document.getElementById('caClinicPhone').value.trim();
+  var whatsapp = document.getElementById('caClinicWhatsapp').value.trim();
+  var contact  = document.getElementById('caClinicContact').value.trim();
+  var license  = document.getElementById('caClinicLicense').value.trim();
+  var fee      = Number(document.getElementById('caClinicFee').value) || null;
+  var comm     = Number(document.getElementById('caClinicCommission').value) || 15;
+  var email    = document.getElementById('caClinicEmail').value.trim();
+  var password = document.getElementById('caClinicPassword').value;
+
+  if (!name)     { showAdminToast('Clinic name is required', 'error'); return; }
+  if (!district) { showAdminToast('District is required', 'error'); return; }
+  if (!email)    { showAdminToast('Staff email is required', 'error'); return; }
+  if (!password || password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  var btn = document.getElementById('createClinicAccountSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">hourglass_top</span> Creating…';
+
+  var supa = adminSupa();
+  if (!supa) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Not connected to database', 'error');
+    return;
+  }
+
+  // Use fresh client with persistSession:false so admin session is not overwritten
+  var tmpSupa = window.supabase.createClient(window.HOMATT_CONFIG.SUPABASE_URL, window.HOMATT_CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  var signUpRes = await tmpSupa.auth.signUp({ email: email, password: password });
+
+  if (signUpRes.error) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Auth error: ' + signUpRes.error.message, 'error');
+    return;
+  }
+
+  var authUserId = signUpRes.data?.user?.id;
+  if (!authUserId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Email may already be registered — try a different email', 'error');
+    return;
+  }
+
+  var insertPayload = {
+    name: name, district: district, status: 'approved', verified: false, active: true,
+    email: email, auth_user_id: authUserId,
+    commission_rate: comm
+  };
+  if (city) insertPayload.city = city;
+  if (address) insertPayload.address = address;
+  if (phone) insertPayload.phone = phone;
+  if (whatsapp) insertPayload.whatsapp = whatsapp;
+  if (contact) insertPayload.contact_person = contact;
+  if (license) insertPayload.license_number = license;
+  if (fee) insertPayload.consultation_fee = fee;
+
+  var { data: clinicRow, error: insertErr } = await supa.from('clinics').insert(insertPayload).select().single();
+
+  if (insertErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Clinic record error: ' + insertErr.message, 'error');
+    return;
+  }
+
+  // Also create portal_users entry
+  await supa.from('portal_users').insert({
+    auth_user_id: authUserId, full_name: contact || name, email: email,
+    role: 'clinic_staff', clinic_id: clinicRow.id, is_active: true
+  });
+
+  var portalUrl = window.location.href.replace('admin/clinics.html','clinic/');
+  _lastClinicCredentials = 'Clinic: ' + name + '\nLocation: ' + district + (city?', '+city:'') + (address?'\nAddress: '+address:'') + (phone?'\nPhone: '+phone:'') + '\nLogin Email: ' + email + '\nPassword: ' + password + '\nPortal URL: ' + portalUrl;
+
+  document.getElementById('caClinicCredentials').textContent = _lastClinicCredentials;
+  document.getElementById('caClinicSuccessBox').style.display = 'block';
+  document.getElementById('caClinicFooter').style.display = 'none';
+
+  await loadClinics();
+  showAdminToast('Clinic account created successfully!', 'success');
+}
+
+function copyClinicCredentials() {
+  navigator.clipboard.writeText(_lastClinicCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+</script>
+</body>
+</html>

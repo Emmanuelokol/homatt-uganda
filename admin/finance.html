@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Finance & Payouts</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .fin-summary { display:flex; gap:0; background:#F1F8E9; border:1.5px solid #A5D6A7; border-radius:12px; margin-bottom:24px; overflow:hidden; flex-wrap:wrap; }
+    .fin-sum-item { flex:1; min-width:140px; padding:16px 20px; border-right:1px solid #C8E6C9; }
+    .fin-sum-item:last-child { border-right:none; }
+    .fin-sum-label { font-size:10px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.6px; margin-bottom:4px; }
+    .fin-sum-value { font-size:20px; font-weight:700; color:#1B5E20; }
+    .fin-sum-value.orange { color:#E65100; }
+    .fin-sum-value.blue   { color:#1565C0; }
+    .fin-sum-value.grey   { color:#5F6368; }
+    .ref-chip { display:inline-block; background:#E8F5E9; color:#1B5E20; border-radius:4px; padding:2px 8px; font-size:11px; font-weight:600; font-family:monospace; }
+    .data-badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:14px; font-size:11px; font-weight:600; }
+    .data-badge.live { background:#E8F5E9; color:#1B5E20; }
+    .data-badge.demo { background:#FFF3E0; color:#E65100; }
+    .payout-note { font-size:11px; color:#9AA0A6; font-style:italic; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Finance &amp; Payouts</div>
+      <div class="admin-topbar-right">
+        <span id="dataBadge"></span>
+        <button class="btn-admin primary" id="newPayoutBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> New Payout
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Stat cards -->
+      <div class="stats-grid" style="margin-bottom:16px">
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">shopping_bag</span></div>
+          <div><div class="stat-number" id="statTotalOrders">—</div><div class="stat-label">Total Orders</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">local_hospital</span></div>
+          <div><div class="stat-number" id="statPendingClinicPayouts">—</div><div class="stat-label">Pending Clinic Payouts</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">local_pharmacy</span></div>
+          <div><div class="stat-number" id="statPendingPharmPayouts">—</div><div class="stat-label">Pending Pharmacy Payouts</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">electric_moped</span></div>
+          <div><div class="stat-number" id="statPendingRiderPayouts">—</div><div class="stat-label">Pending Rider Payouts</div></div>
+        </div>
+      </div>
+
+      <!-- Financial totals bar -->
+      <div class="fin-summary">
+        <div class="fin-sum-item">
+          <div class="fin-sum-label">Total Paid Out</div>
+          <div class="fin-sum-value" id="sumPaid">—</div>
+        </div>
+        <div class="fin-sum-item">
+          <div class="fin-sum-label">Pending (not yet approved)</div>
+          <div class="fin-sum-value orange" id="sumPending">—</div>
+        </div>
+        <div class="fin-sum-item">
+          <div class="fin-sum-label">Approved (awaiting payment)</div>
+          <div class="fin-sum-value blue" id="sumApproved">—</div>
+        </div>
+        <div class="fin-sum-item">
+          <div class="fin-sum-label">Payouts This Month</div>
+          <div class="fin-sum-value grey" id="sumMonthCount">—</div>
+        </div>
+      </div>
+
+      <!-- Payouts table -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Payout Records</div>
+          <div class="table-filter">
+            <select id="filterType" onchange="renderPayouts()">
+              <option value="">All Types</option>
+              <option value="clinic">Clinics</option>
+              <option value="pharmacy">Pharmacies</option>
+              <option value="rider">Riders</option>
+            </select>
+            <select id="filterPayStatus" onchange="renderPayouts()">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Recipient</th><th>Type</th><th>Amount (UGX)</th>
+              <th>Period</th><th>Method</th><th>Reference / Notes</th>
+              <th>Status</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="payoutsBody">
+            <tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ══════════ NEW PAYOUT MODAL ══════════ -->
+<div class="admin-modal-overlay" id="payoutModal" style="display:none">
+  <div class="admin-modal" style="max-width:540px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Create New Payout</div>
+      <button class="admin-modal-close" onclick="closePayoutModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div class="admin-form-group">
+        <label>Recipient Type *</label>
+        <select id="payoutType" onchange="loadRecipients()">
+          <option value="clinic">Clinic</option>
+          <option value="pharmacy">Pharmacy</option>
+          <option value="rider">Rider</option>
+        </select>
+      </div>
+      <div class="admin-form-group">
+        <label>Recipient *</label>
+        <select id="payoutRecipient"><option>Loading…</option></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="admin-form-group">
+          <label>Amount (UGX) *</label>
+          <input type="number" id="payoutAmount" placeholder="e.g. 150000" min="1">
+        </div>
+        <div class="admin-form-group">
+          <label>Payment Method</label>
+          <select id="payoutMethod">
+            <option value="mtn_mobile_money">MTN Mobile Money</option>
+            <option value="airtel_money">Airtel Money</option>
+            <option value="bank_transfer">Bank Transfer</option>
+            <option value="cash">Cash</option>
+          </select>
+        </div>
+        <div class="admin-form-group">
+          <label>Period Start</label>
+          <input type="date" id="payoutPeriodStart">
+        </div>
+        <div class="admin-form-group">
+          <label>Period End</label>
+          <input type="date" id="payoutPeriodEnd">
+        </div>
+      </div>
+      <div class="admin-form-group">
+        <label>Reference Number <small style="color:#9AA0A6;font-weight:400">(optional — e.g. MTN transaction ID)</small></label>
+        <input type="text" id="payoutReference" placeholder="e.g. MTN-2603-4456789">
+      </div>
+      <div class="admin-form-group">
+        <label>Notes</label>
+        <textarea id="payoutNotes" style="min-height:60px" placeholder="e.g. Week 1 March 2026 — 12 clinic consultations"></textarea>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closePayoutModal()">Cancel</button>
+      <button class="btn-admin primary" id="savePayoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">send</span> Create Payout
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MARK PAID — REFERENCE MODAL ══════════ -->
+<div class="admin-modal-overlay" id="paidRefModal" style="display:none">
+  <div class="admin-modal" style="max-width:420px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Confirm Payment — Enter Reference</div>
+      <button class="admin-modal-close" onclick="closePaidRefModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+        Add the transaction or payment reference number. This creates a permanent audit trail for this payout.
+      </p>
+      <div class="admin-form-group">
+        <label>Reference / Transaction Number *</label>
+        <input type="text" id="paidRefInput" placeholder="e.g. MTN-2603-789123 or BANK-REF-00456" autocomplete="off">
+      </div>
+      <div class="admin-form-group">
+        <label>Payment Note <small style="color:#9AA0A6;font-weight:400">(optional)</small></label>
+        <input type="text" id="paidRefNote" placeholder="e.g. Paid via MTN MoMo — confirmed by Okello">
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closePaidRefModal()">Cancel</button>
+      <button class="btn-admin success" id="confirmPaidBtn">
+        <span class="material-icons-outlined" style="font-size:16px">check_circle</span> Confirm Paid
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ VIEW PAYOUT DETAILS MODAL ══════════ -->
+<div class="admin-modal-overlay" id="viewPayoutModal" style="display:none">
+  <div class="admin-modal" style="max-width:480px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Payout Details</div>
+      <button class="admin-modal-close" onclick="document.getElementById('viewPayoutModal').style.display='none'"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body" id="viewPayoutBody"></div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="document.getElementById('viewPayoutModal').style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+/* ── module-level Supabase client (via admin.js helper) ── */
+let _supa = null;
+function getSupa() { if (!_supa) _supa = adminSupa(); return _supa; }
+
+let allPayouts = [];
+let _demoMode  = false;
+let _markPaidId = null;
+
+/* ══════════ INIT ══════════ */
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('finance');
+  const session = await requireAdmin();
+  if (!session) return;
+  setupAdminLogout();
+
+  _demoMode = !!(session.demo);
+  const badge = document.getElementById('dataBadge');
+  if (badge) {
+    badge.innerHTML = _demoMode
+      ? '<span class="data-badge demo"><span class="material-icons-outlined" style="font-size:13px">info</span> Demo Mode</span>'
+      : '<span class="data-badge live"><span class="material-icons-outlined" style="font-size:13px">wifi</span> Live Data</span>';
+  }
+
+  await loadData();
+
+  document.getElementById('newPayoutBtn').addEventListener('click', openPayoutModal);
+  document.getElementById('savePayoutBtn').addEventListener('click', savePayout);
+});
+
+/* ══════════ DEMO DATA ══════════ */
+const DEMO_PAYOUTS = [
+  { id:'p1', recipient_type:'pharmacy', recipient_name:'Ntinda Pharmacy',      amount:285000, period_start:'2026-02-14', period_end:'2026-02-21', payment_method:'mtn_mobile_money', reference_number:'MTN-2602-445566', notes:'Week 2 Feb — 19 orders',        status:'paid',      paid_at: new Date(Date.now()-864e5*2).toISOString(),  created_at: new Date(Date.now()-864e5*3).toISOString() },
+  { id:'p2', recipient_type:'clinic',   recipient_name:'Kisugu Health Centre', amount:150000, period_start:'2026-02-14', period_end:'2026-02-21', payment_method:'bank_transfer',    reference_number:'BANK-KHC-0221',  notes:'Feb wk2 clinic fee share',      status:'approved',  paid_at: null,                                         created_at: new Date(Date.now()-864e5*4).toISOString() },
+  { id:'p3', recipient_type:'rider',    recipient_name:'Kato Moses',           amount:42000,  period_start:'2026-02-21', period_end:'2026-02-28', payment_method:'airtel_money',     reference_number:'AIR-KM-9900334', notes:'12 deliveries wk3',             status:'paid',      paid_at: new Date(Date.now()-864e5*1).toISOString(),  created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'p4', recipient_type:'pharmacy', recipient_name:'Wandegeya Pharmacy',   amount:195000, period_start:'2026-03-01', period_end:'2026-03-07', payment_method:'mtn_mobile_money', reference_number:null,             notes:'March wk1 pharmacy',            status:'pending',   paid_at: null,                                         created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'p5', recipient_type:'rider',    recipient_name:'Ssali David',          amount:36500,  period_start:'2026-03-01', period_end:'2026-03-07', payment_method:'mtn_mobile_money', reference_number:null,             notes:'8 deliveries March wk1',        status:'pending',   paid_at: null,                                         created_at: new Date(Date.now()-864e5*1).toISOString() },
+];
+
+const DEMO_RECIPIENTS = {
+  clinic:   [{id:'c1',name:'Kampala Medical Centre'},{id:'c2',name:'Ntinda Health Clinic'}],
+  pharmacy: [{id:'p1',name:'Ntinda Health Pharmacy'},{id:'p2',name:'City Chemist Nakasero'}],
+  rider:    [{id:'r1',full_name:'Kato Moses'},{id:'r2',full_name:'Ssali David'}],
+};
+
+/* ══════════ LOAD DATA ══════════ */
+async function loadData() {
+  if (_demoMode) {
+    allPayouts = DEMO_PAYOUTS;
+    document.getElementById('statTotalOrders').textContent = '38';
+    updateSummary();
+    renderPayouts();
+    return;
+  }
+
+  const supa = getSupa();
+  if (!supa) {
+    showAdminToast('Cannot connect — please sign in again', 'error');
+    renderPayouts();
+    return;
+  }
+
+  try {
+    const [ordersR, payoutsR] = await Promise.all([
+      supa.from('pharmacy_orders').select('id', { count:'exact', head:true }),
+      supa.from('payouts').select('*').order('created_at', { ascending:false }),
+    ]);
+
+    document.getElementById('statTotalOrders').textContent = ordersR.count ?? '—';
+
+    if (payoutsR.error) {
+      showAdminToast('DB error: ' + payoutsR.error.message, 'error');
+      allPayouts = [];
+    } else {
+      allPayouts = payoutsR.data || [];
+    }
+  } catch(e) {
+    showAdminToast('Network error loading finance data', 'error');
+    allPayouts = [];
+  }
+
+  updateSummary();
+  renderPayouts();
+}
+
+/* ══════════ SUMMARY BAR ══════════ */
+function updateSummary() {
+  const ugx = n => 'UGX ' + Number(n||0).toLocaleString();
+  const sum  = arr => arr.reduce((t, p) => t + (Number(p.amount)||0), 0);
+  const paid     = allPayouts.filter(p => p.status === 'paid');
+  const pending  = allPayouts.filter(p => p.status === 'pending');
+  const approved = allPayouts.filter(p => p.status === 'approved');
+
+  document.getElementById('sumPaid').textContent    = ugx(sum(paid));
+  document.getElementById('sumPending').textContent = ugx(sum(pending));
+  document.getElementById('sumApproved').textContent = ugx(sum(approved));
+
+  document.getElementById('statPendingClinicPayouts').textContent = pending.filter(p=>p.recipient_type==='clinic').length;
+  document.getElementById('statPendingPharmPayouts').textContent  = pending.filter(p=>p.recipient_type==='pharmacy').length;
+  document.getElementById('statPendingRiderPayouts').textContent  = pending.filter(p=>p.recipient_type==='rider').length;
+
+  const now = new Date();
+  const monthCount = allPayouts.filter(p => {
+    const d = new Date(p.created_at);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+  document.getElementById('sumMonthCount').textContent = monthCount + ' payout' + (monthCount !== 1 ? 's' : '');
+}
+
+/* ══════════ RENDER TABLE ══════════ */
+function renderPayouts() {
+  const tf = document.getElementById('filterType').value;
+  const sf = document.getElementById('filterPayStatus').value;
+  const rows = allPayouts.filter(p => (!tf || p.recipient_type===tf) && (!sf || p.status===sf));
+
+  const tbody = document.getElementById('payoutsBody');
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No payouts found</td></tr>';
+    return;
+  }
+
+  const sc = s => s === 'paid' ? 'resolved' : s === 'approved' ? 'approved' : s === 'cancelled' ? 'urgent' : 'open';
+
+  tbody.innerHTML = rows.map(p => {
+    const refCell = p.reference_number
+      ? `<div><span class="ref-chip">${p.reference_number}</span></div>${p.notes ? `<div class="payout-note">${p.notes}</div>` : ''}`
+      : (p.notes ? `<span class="payout-note">${p.notes}</span>` : '<span style="color:#CCC">—</span>');
+
+    const dateCell = p.status === 'paid' && p.paid_at
+      ? `<div style="font-size:12px;color:#1B5E20;font-weight:600">${formatDate(p.paid_at)}</div><div style="font-size:10px;color:#9AA0A6">Paid on</div>`
+      : `<div style="font-size:12px;color:#9AA0A6">${formatShortDate(p.created_at)}</div><div style="font-size:10px;color:#9AA0A6">Created</div>`;
+
+    const actions = [
+      `<button class="btn-admin secondary sm" title="View details" onclick='viewPayout(${JSON.stringify(JSON.stringify(p))})'>
+        <span class="material-icons-outlined" style="font-size:14px">info</span>
+       </button>`,
+      p.status === 'pending' ? `<button class="btn-admin primary sm" onclick="doApprove('${p.id}')">Approve</button>` : '',
+      (p.status === 'pending' || p.status === 'approved') ? `<button class="btn-admin success sm" onclick="openPaidRef('${p.id}')">Mark Paid</button>` : '',
+      (p.status === 'pending' || p.status === 'approved') ? `<button class="btn-admin secondary sm" title="Cancel" onclick="doCancelPayout('${p.id}')" style="color:#D32F2F"><span class="material-icons-outlined" style="font-size:14px">cancel</span></button>` : '',
+    ].join('');
+
+    return `<tr>
+      <td style="font-weight:600">${p.recipient_name || '—'}</td>
+      <td><span style="text-transform:capitalize;font-size:12px">${p.recipient_type||'—'}</span></td>
+      <td style="font-weight:700;color:#1B5E20">UGX ${Number(p.amount||0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#9AA0A6">${p.period_start ? formatShortDate(p.period_start)+' – '+formatShortDate(p.period_end) : '—'}</td>
+      <td style="font-size:12px;text-transform:capitalize">${(p.payment_method||'').replace(/_/g,' ')}</td>
+      <td>${refCell}</td>
+      <td><span class="status-badge ${sc(p.status)}">${p.status}</span></td>
+      <td>${dateCell}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ══════════ VIEW DETAILS ══════════ */
+function viewPayout(pJson) {
+  const p = JSON.parse(pJson);
+  document.getElementById('viewPayoutBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      ${[
+        ['Recipient',      p.recipient_name || '—'],
+        ['Type',           p.recipient_type || '—'],
+        ['Amount',         'UGX ' + Number(p.amount||0).toLocaleString()],
+        ['Method',         (p.payment_method||'—').replace(/_/g,' ')],
+        ['Period',         p.period_start ? formatShortDate(p.period_start)+' – '+formatShortDate(p.period_end) : '—'],
+        ['Status',         `<span class="status-badge ${p.status === 'paid' ? 'resolved' : p.status}">${p.status}</span>`],
+        ['Reference No.',  p.reference_number ? `<span class="ref-chip">${p.reference_number}</span>` : '—'],
+        ['Notes',          p.notes || '—'],
+        ['Created',        formatDate(p.created_at)],
+        ['Paid At',        p.paid_at ? formatDate(p.paid_at) : '—'],
+      ].map(([k,v]) => `
+        <div>
+          <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${k}</div>
+          <div style="font-size:13px;font-weight:500">${v}</div>
+        </div>`).join('')}
+    </div>`;
+  document.getElementById('viewPayoutModal').style.display = 'flex';
+}
+
+/* ══════════ CREATE PAYOUT ══════════ */
+let recipientData = {};
+
+async function openPayoutModal() {
+  ['payoutAmount','payoutReference','payoutNotes','payoutPeriodStart','payoutPeriodEnd']
+    .forEach(id => { document.getElementById(id).value = ''; });
+  await loadRecipients();
+  document.getElementById('payoutModal').style.display = 'flex';
+}
+function closePayoutModal() { document.getElementById('payoutModal').style.display = 'none'; }
+
+async function loadRecipients() {
+  const type = document.getElementById('payoutType').value;
+  const sel  = document.getElementById('payoutRecipient');
+  sel.innerHTML = '<option>Loading…</option>';
+  let data = [];
+
+  const supa = getSupa();
+  if (!supa || _demoMode) {
+    data = DEMO_RECIPIENTS[type] || [];
+  } else {
+    try {
+      let res;
+      if (type === 'clinic')   res = await supa.from('clinics').select('id,name').eq('active',true);
+      if (type === 'pharmacy') res = await supa.from('pharmacies').select('id,name').eq('active',true);
+      if (type === 'rider')    res = await supa.from('riders').select('id,full_name').eq('active',true);
+      data = (res?.data?.length) ? res.data : (DEMO_RECIPIENTS[type] || []);
+    } catch(e) { data = DEMO_RECIPIENTS[type] || []; }
+  }
+
+  recipientData = Object.fromEntries(data.map(d => [d.id, d.name || d.full_name]));
+  sel.innerHTML = data.length
+    ? data.map(d => `<option value="${d.id}">${d.name || d.full_name}</option>`).join('')
+    : '<option value="">— No recipients —</option>';
+}
+
+async function savePayout() {
+  const type   = document.getElementById('payoutType').value;
+  const recId  = document.getElementById('payoutRecipient').value;
+  const amount = Number(document.getElementById('payoutAmount').value);
+  if (!recId || !amount) { showAdminToast('Recipient and amount are required', 'error'); return; }
+
+  if (_demoMode) { showAdminToast('Demo mode — payout not saved to database', 'error'); return; }
+
+  const supa = getSupa();
+  if (!supa) { showAdminToast('Not connected to database', 'error'); return; }
+
+  const btn = document.getElementById('savePayoutBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">hourglass_empty</span> Saving…';
+
+  try {
+    const { error } = await supa.from('payouts').insert({
+      recipient_type:   type,
+      recipient_id:     recId,
+      recipient_name:   recipientData[recId] || '—',
+      amount,
+      period_start:     document.getElementById('payoutPeriodStart').value || null,
+      period_end:       document.getElementById('payoutPeriodEnd').value   || null,
+      payment_method:   document.getElementById('payoutMethod').value,
+      reference_number: document.getElementById('payoutReference').value.trim() || null,
+      notes:            document.getElementById('payoutNotes').value.trim() || null,
+      status:           'pending',
+    });
+    if (error) { showAdminToast('Error: ' + error.message, 'error'); }
+    else { closePayoutModal(); await loadData(); showAdminToast('Payout created!', 'success'); }
+  } catch(e) { showAdminToast('Network error — try again', 'error'); }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">send</span> Create Payout';
+}
+
+/* ══════════ APPROVE ══════════ */
+async function doApprove(id) {
+  if (_demoMode) {
+    const p = allPayouts.find(x => x.id === id);
+    if (p) p.status = 'approved';
+    updateSummary(); renderPayouts();
+    showAdminToast('Approved (demo mode)', 'success');
+    return;
+  }
+  const supa = getSupa();
+  if (!supa) return;
+  const { error } = await supa.from('payouts').update({ status:'approved' }).eq('id', id);
+  if (error) { showAdminToast('Error: ' + error.message, 'error'); return; }
+  await loadData();
+  showAdminToast('Payout approved!', 'success');
+}
+
+/* ══════════ MARK PAID — with reference ══════════ */
+function openPaidRef(id) {
+  _markPaidId = id;
+  document.getElementById('paidRefInput').value = '';
+  document.getElementById('paidRefNote').value  = '';
+  document.getElementById('paidRefModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('paidRefInput').focus(), 120);
+  document.getElementById('confirmPaidBtn').onclick = confirmMarkPaid;
+}
+function closePaidRefModal() {
+  _markPaidId = null;
+  document.getElementById('paidRefModal').style.display = 'none';
+}
+
+async function confirmMarkPaid() {
+  const ref  = document.getElementById('paidRefInput').value.trim();
+  const note = document.getElementById('paidRefNote').value.trim();
+  if (!ref) { showAdminToast('Please enter a reference number', 'error'); return; }
+
+  if (_demoMode) {
+    const p = allPayouts.find(x => x.id === _markPaidId);
+    if (p) { p.status = 'paid'; p.reference_number = ref; p.notes = note || p.notes; p.paid_at = new Date().toISOString(); }
+    closePaidRefModal(); updateSummary(); renderPayouts();
+    showAdminToast('Marked as paid (demo mode)', 'success');
+    return;
+  }
+
+  const supa = getSupa();
+  if (!supa || !_markPaidId) return;
+
+  const btn = document.getElementById('confirmPaidBtn');
+  btn.disabled = true;
+
+  try {
+    const updateObj = { status:'paid', paid_at: new Date().toISOString(), reference_number: ref };
+    if (note) updateObj.notes = note;
+    const { error } = await supa.from('payouts').update(updateObj).eq('id', _markPaidId);
+    if (error) { showAdminToast('Error: ' + error.message, 'error'); }
+    else { closePaidRefModal(); await loadData(); showAdminToast('Payout marked as paid!', 'success'); }
+  } catch(e) { showAdminToast('Network error — try again', 'error'); }
+
+  btn.disabled = false;
+}
+
+/* ══════════ CANCEL ══════════ */
+async function doCancelPayout(id) {
+  if (!confirm('Cancel this payout? This action cannot be undone.')) return;
+
+  if (_demoMode) {
+    const p = allPayouts.find(x => x.id === id);
+    if (p) p.status = 'cancelled';
+    updateSummary(); renderPayouts();
+    showAdminToast('Payout cancelled (demo mode)', 'success');
+    return;
+  }
+
+  const supa = getSupa();
+  if (!supa) return;
+  const { error } = await supa.from('payouts').update({ status:'cancelled' }).eq('id', id);
+  if (error) { showAdminToast('Error: ' + error.message, 'error'); return; }
+  await loadData();
+  showAdminToast('Payout cancelled', 'success');
+}
+</script>
+</body>
+</html>

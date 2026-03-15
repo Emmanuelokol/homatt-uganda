@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health - Wallet</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Wallet Header -->
+      <div class="page-header">
+        <div class="page-header-top">
+          <span class="page-header-title">My Wallets</span>
+          <button class="page-header-action" id="refreshBtn" title="Refresh">
+            <span class="material-icons-outlined">refresh</span>
+          </button>
+        </div>
+        <!-- Total Balance Hero -->
+        <div class="wallet-hero">
+          <p class="wallet-hero-label">Total Balance</p>
+          <p class="wallet-hero-amount">UGX <span id="totalBalance">0</span></p>
+          <p class="wallet-hero-sub">Family + Care Wallets</p>
+        </div>
+      </div>
+
+      <!-- Wallet Body -->
+      <div class="page-body">
+
+        <!-- Dual Wallet Cards -->
+        <div class="wallet-pair">
+          <div class="wallet-card-full wallet-family" id="familyWalletCard">
+            <div class="wallet-card-icon">
+              <span class="material-icons-outlined">account_balance_wallet</span>
+            </div>
+            <div class="wallet-card-name">Family Wallet</div>
+            <div class="wallet-card-balance">
+              <small>UGX</small> <span id="familyBalanceCard">0</span>
+            </div>
+            <button class="wallet-card-add-btn" data-wallet="family" id="addMoneyFamilyBtn">
+              <span class="material-icons-outlined">add</span>
+              Add Money
+            </button>
+          </div>
+          <div class="wallet-card-full wallet-care" id="careWalletCard">
+            <div class="wallet-card-icon">
+              <span class="material-icons-outlined">health_and_safety</span>
+            </div>
+            <div class="wallet-card-name">Care Wallet</div>
+            <div class="wallet-card-balance">
+              <small>UGX</small> <span id="careBalanceCard">0</span>
+            </div>
+            <button class="wallet-card-add-btn" data-wallet="care" id="addMoneyCareBtn">
+              <span class="material-icons-outlined">add</span>
+              Add Money
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Money Section -->
+        <div class="wallet-section">
+          <div class="wallet-section-title">Add Money</div>
+          <div class="payment-method-item" id="mtnBtn">
+            <div class="payment-method-icon pm-mtn">
+              <span class="material-icons-outlined">smartphone</span>
+            </div>
+            <div class="payment-method-text">
+              <div class="payment-method-name">MTN Mobile Money</div>
+              <div class="payment-method-sub">Deposit via MTN MoMo</div>
+            </div>
+            <span class="coming-soon-chip">Coming Soon</span>
+          </div>
+          <div class="payment-method-item" id="airtelBtn">
+            <div class="payment-method-icon pm-airtel">
+              <span class="material-icons-outlined">smartphone</span>
+            </div>
+            <div class="payment-method-text">
+              <div class="payment-method-name">Airtel Money</div>
+              <div class="payment-method-sub">Deposit via Airtel Money</div>
+            </div>
+            <span class="coming-soon-chip">Coming Soon</span>
+          </div>
+          <div class="payment-method-item" id="cardBtn">
+            <div class="payment-method-icon pm-card">
+              <span class="material-icons-outlined">credit_card</span>
+            </div>
+            <div class="payment-method-text">
+              <div class="payment-method-name">Bank / Debit Card</div>
+              <div class="payment-method-sub">Visa, Mastercard</div>
+            </div>
+            <span class="coming-soon-chip">Coming Soon</span>
+          </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="wallet-section">
+          <div class="wallet-section-title">Quick Actions</div>
+          <div class="payment-method-item" id="transferBtn">
+            <div class="payment-method-icon" style="background:linear-gradient(135deg,var(--primary),var(--primary-light))">
+              <span class="material-icons-outlined">swap_horiz</span>
+            </div>
+            <div class="payment-method-text">
+              <div class="payment-method-name">Transfer Between Wallets</div>
+              <div class="payment-method-sub">Move funds between Family &amp; Care</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--text-hint);font-size:18px">chevron_right</span>
+          </div>
+          <div class="payment-method-item">
+            <div class="payment-method-icon" style="background:linear-gradient(135deg,#6A1B9A,#7B1FA2)">
+              <span class="material-icons-outlined">history</span>
+            </div>
+            <div class="payment-method-text">
+              <div class="payment-method-name">Full Statement</div>
+              <div class="payment-method-sub">Download or view all transactions</div>
+            </div>
+            <span class="coming-soon-chip">Coming Soon</span>
+          </div>
+        </div>
+
+        <!-- Transaction History -->
+        <div class="wallet-section">
+          <div class="wallet-section-title">Recent Transactions</div>
+          <div class="txn-list" id="txnList">
+            <div class="txn-empty">
+              <span class="material-icons-outlined">receipt_long</span>
+              No transactions yet
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="window.location.href='dashboard.html'">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='family.html'">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='profile.html'">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+
+    <!-- Sheet Overlay -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+
+    <!-- Add Money Sheet -->
+    <div class="bottom-sheet" id="addMoneySheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title" id="addMoneySheetTitle">Add Money</span>
+        <button class="sheet-close-btn" id="closeAddMoneySheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <!-- Wallet type selector -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Select Wallet</label>
+          <div class="wallet-type-toggle">
+            <button class="wt-option selected" data-wt="family" id="wtFamily">
+              <span class="material-icons-outlined" style="font-size:16px;display:block;margin-bottom:2px">account_balance_wallet</span>
+              Family Wallet
+            </button>
+            <button class="wt-option" data-wt="care" id="wtCare">
+              <span class="material-icons-outlined" style="font-size:16px;display:block;margin-bottom:2px">health_and_safety</span>
+              Care Wallet
+            </button>
+          </div>
+        </div>
+
+        <!-- Amount input -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Amount (UGX)</label>
+          <div class="wallet-amount-wrap">
+            <span class="wallet-currency-label">UGX</span>
+            <input type="number" class="wallet-amount-field" id="depositAmount" placeholder="0" min="500" step="500">
+          </div>
+          <p style="font-size:11px;color:var(--text-hint);margin-top:4px">Minimum deposit: UGX 500</p>
+        </div>
+
+        <!-- Quick amounts -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Quick Amounts</label>
+          <div class="sheet-chip-group">
+            <button class="sheet-chip quick-amt" data-amount="5000">5,000</button>
+            <button class="sheet-chip quick-amt" data-amount="10000">10,000</button>
+            <button class="sheet-chip quick-amt" data-amount="20000">20,000</button>
+            <button class="sheet-chip quick-amt" data-amount="50000">50,000</button>
+            <button class="sheet-chip quick-amt" data-amount="100000">100,000</button>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Description (optional)</label>
+          <input type="text" class="sheet-input" id="depositDesc" placeholder="e.g. Monthly health savings">
+        </div>
+
+        <div style="background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:12px 14px;margin-bottom:16px;">
+          <p style="font-size:12px;color:#1565C0;line-height:1.5;">
+            <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">info</span>
+            Mobile money integration coming soon. For now, balances are tracked manually for planning purposes.
+          </p>
+        </div>
+
+        <button class="sheet-submit-btn" id="confirmDepositBtn">
+          <span class="material-icons-outlined">add_circle</span>
+          Record Deposit
+        </button>
+      </div>
+    </div>
+
+    <!-- Transfer Sheet -->
+    <div class="bottom-sheet" id="transferSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Transfer Funds</span>
+        <button class="sheet-close-btn" id="closeTransferSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <div class="sheet-input-group">
+          <label class="sheet-label">Transfer Direction</label>
+          <div class="wallet-type-toggle">
+            <button class="wt-option selected" id="transferFtC">Family → Care</button>
+            <button class="wt-option" id="transferCtF">Care → Family</button>
+          </div>
+        </div>
+        <div class="sheet-input-group">
+          <label class="sheet-label">Amount (UGX)</label>
+          <div class="wallet-amount-wrap">
+            <span class="wallet-currency-label">UGX</span>
+            <input type="number" class="wallet-amount-field" id="transferAmount" placeholder="0" min="500">
+          </div>
+        </div>
+        <button class="sheet-submit-btn" id="confirmTransferBtn">
+          <span class="material-icons-outlined">swap_horiz</span>
+          Confirm Transfer
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="walletToast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/wallet.js"></script>
+  <script src="js/native-bridge.js"></script>
+</body>
+</html>

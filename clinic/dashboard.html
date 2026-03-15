@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Clinic Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <!-- Prefetch sibling pages for instant navigation -->
+  <link rel="prefetch" href="prescriptions.html">
+  <link rel="prefetch" href="patients.html">
+  <link rel="prefetch" href="lab-requests.html">
+  <link rel="prefetch" href="daily-report.html">
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section-label">Overview</div>
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">dashboard</span> Dashboard
+      </a>
+      <div class="sidebar-section-label">Patients</div>
+      <a href="#queue" class="sidebar-link">
+        <span class="material-icons-outlined">queue</span> Today's Queue
+      </a>
+      <a href="#appointments" class="sidebar-link">
+        <span class="material-icons-outlined">calendar_today</span> Appointments
+      </a>
+      <a href="#checkin" class="sidebar-link">
+        <span class="material-icons-outlined">how_to_reg</span> Check-In Station
+      </a>
+      <div class="sidebar-section-label">Clinical</div>
+      <a href="prescriptions.html" class="sidebar-link">
+        <span class="material-icons-outlined">medication</span> Prescriptions
+      </a>
+      <a href="lab-requests.html" class="sidebar-link">
+        <span class="material-icons-outlined">science</span> Lab Requests
+      </a>
+      <a href="patients.html" class="sidebar-link">
+        <span class="material-icons-outlined">person_search</span> Patient Search
+      </a>
+      <div class="sidebar-section-label">Reports</div>
+      <a href="daily-report.html" class="sidebar-link">
+        <span class="material-icons-outlined">bar_chart</span> Daily Report
+      </a>
+      <div class="sidebar-section-label">Settings</div>
+      <a href="settings.html" class="sidebar-link">
+        <span class="material-icons-outlined">tune</span> Clinic Profile
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic
+      </div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Dashboard</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Emergency alert (urgent queue items) -->
+      <div class="alert-banner" id="urgentAlert" style="display:none">
+        <span class="material-icons-outlined">warning</span>
+        <span id="urgentAlertMsg">Urgent patients in queue</span>
+      </div>
+
+      <!-- ===== RECEPTION CHECK-IN STATION ===== -->
+      <div class="admin-table-wrap" id="checkin" style="margin-bottom:28px">
+        <div class="table-header" style="background:linear-gradient(135deg,#004D40,#00897B);border-radius:12px 12px 0 0;padding:16px 22px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:22px">how_to_reg</span>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#fff">Reception Check-In Station</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px">Enter the patient's PIN token or booking code to verify and check them in</div>
+            </div>
+          </div>
+          <div style="font-size:11px;font-weight:600;color:rgba(255,255,255,0.7);background:rgba(255,255,255,0.12);padding:5px 12px;border-radius:20px;letter-spacing:.5px">
+            RECEPTION
+          </div>
+        </div>
+        <!-- Mode tabs -->
+        <div style="display:flex;border-bottom:2px solid #E0E0E0;padding:0 24px;gap:0">
+          <button id="tabCode" onclick="switchCheckinTab('code')"
+                  style="padding:12px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#00897B;border-bottom:2px solid #00897B;margin-bottom:-2px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">pin</span>PIN / Code
+          </button>
+          <button id="tabWalkin" onclick="switchCheckinTab('walkin')"
+                  style="padding:12px 18px;font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;color:#9AA0A6;border-bottom:2px solid transparent;margin-bottom:-2px;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">person_add</span>Walk-in Patient
+          </button>
+        </div>
+
+        <!-- PIN tab -->
+        <div id="panelCode" style="padding:20px 24px">
+          <div style="display:flex;gap:10px;margin-bottom:14px">
+            <div style="position:relative;flex:1">
+              <span class="material-icons-outlined" style="position:absolute;left:14px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:20px;pointer-events:none">pin</span>
+              <input id="pinInput" type="text" placeholder="Enter PIN (e.g. AFH-CHK-7R3NMX) or booking code (e.g. HM-A7KF)"
+                     style="width:100%;padding:13px 16px 13px 44px;border:2px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:border-color .2s;box-sizing:border-box;text-transform:uppercase;letter-spacing:.5px"
+                     onkeydown="if(event.key==='Enter')verifyPin()"
+                     oninput="clearPinResult()"
+                     onfocus="this.style.borderColor='#00897B'"
+                     onblur="this.style.borderColor='#E0E0E0'">
+            </div>
+            <button onclick="verifyPin()" id="verifyBtn"
+                    style="padding:13px 24px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0">
+              <span class="material-icons-outlined" id="verifyIcon" style="font-size:18px">search</span>
+              <span id="verifyLabel">Verify Patient</span>
+            </button>
+          </div>
+          <div id="pinResult" style="display:none"></div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#9AA0A6;margin-top:6px">
+            <span class="material-icons-outlined" style="font-size:14px">info</span>
+            Patient receives a PIN when they complete booking on the Homatt app. PIN is valid for 2 hours.
+          </div>
+        </div>
+
+        <!-- Walk-in tab -->
+        <div id="panelWalkin" style="display:none;padding:20px 24px">
+          <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Register a walk-in patient who has not used the Homatt app.</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+            <div style="grid-column:span 2">
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Patient Full Name *</label>
+              <input id="wiName" type="text" placeholder="e.g. Nakato Brenda"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Age</label>
+              <input id="wiAge" type="number" placeholder="e.g. 35" min="0" max="120"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Sex</label>
+              <select id="wiSex" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+                <option value="">—</option>
+                <option value="M">Male</option>
+                <option value="F">Female</option>
+              </select>
+            </div>
+            <div style="grid-column:span 2">
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Chief Complaint / Symptoms *</label>
+              <textarea id="wiSymptoms" rows="2" placeholder="e.g. Fever and headache for 2 days, cough…"
+                        style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Urgency</label>
+              <select id="wiUrgency" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+                <option value="normal">Standard</option>
+                <option value="high">Urgent</option>
+                <option value="emergency">Emergency</option>
+                <option value="low">Routine</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:5px">Phone (optional)</label>
+              <input id="wiPhone" type="tel" placeholder="e.g. 0700 000 000"
+                     style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+            </div>
+          </div>
+          <button onclick="registerWalkin()"
+                  style="width:100%;padding:13px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+            <span class="material-icons-outlined" style="font-size:18px">person_add</span>
+            Register &amp; Add to Queue
+          </button>
+        </div>
+      </div>
+      <!-- ===== END CHECK-IN STATION ===== -->
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">groups</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Patients Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">pending_actions</span></div>
+          <div><div class="stat-number" id="statWaiting">—</div><div class="stat-label">In Queue</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statCompleted">—</div><div class="stat-label">Completed</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">emergency</span></div>
+          <div><div class="stat-number" id="statUrgent">—</div><div class="stat-label">Urgent Cases</div></div>
+        </div>
+      </div>
+
+      <!-- Queue + Appointments -->
+      <div class="content-row">
+        <!-- Patient Queue -->
+        <div>
+          <!-- Diagnosis tip banner -->
+          <div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px;font-size:13px;color:#1565C0">
+            <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">info</span>
+            <span><strong>To enter diagnosis &amp; prescription:</strong> click the <strong style="background:#1565C0;color:#fff;padding:2px 8px;border-radius:4px">Call</strong> button next to a pending patient in the queue below. This opens the full consultation form.</span>
+          </div>
+          <div class="admin-table-wrap" id="queue">
+            <div class="table-header">
+              <div class="table-title">Today's Patient Queue</div>
+              <div class="table-filter">
+                <select id="queueFilter">
+                  <option value="all">All</option>
+                  <option value="pending">Pending</option>
+                  <option value="high">Urgent</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="attended">Attended</option>
+                </select>
+              </div>
+            </div>
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Patient</th><th>Complaint</th><th>AI Risk</th><th>Urgency</th><th>Status</th><th>Time</th><th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="queueBody">
+                <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Appointments sidebar (recent bookings) -->
+        <div id="appointments">
+          <div class="admin-table-wrap appt-card">
+            <div class="table-header">
+              <div class="table-title">Recent Bookings</div>
+            </div>
+            <div id="apptList" style="padding:0 0 8px"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- ===== CLINICIAN CONFIRMATION MODAL ===== -->
+<div id="attendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;overflow-y:auto;padding:20px 0">
+  <div style="background:#fff;border-radius:16px;max-width:660px;margin:0 auto;padding:0 0 20px;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+
+    <!-- Modal header -->
+    <div style="background:linear-gradient(135deg,#1B5E20,#4CAF50);padding:20px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:16px;font-weight:700;color:#fff" id="attendModalTitle">Patient Consultation</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8)" id="attendModalSub">Fill in diagnosis and treatment plan</div>
+      </div>
+      <button onclick="closeAttendModal()" style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:36px;height:36px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Step indicator -->
+    <div style="display:flex;border-bottom:1px solid #E0E0E0;background:#F8F9FA">
+      <div id="attendStep1Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#1B5E20;border-bottom:2px solid #1B5E20">
+        1. Patient Info
+      </div>
+      <div id="attendStep2Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#9AA0A6">
+        2. Diagnosis
+      </div>
+      <div id="attendStep3Tab" style="flex:1;padding:12px;text-align:center;font-size:12px;font-weight:600;color:#9AA0A6">
+        3. Prescription
+      </div>
+    </div>
+
+    <!-- STEP 1: Patient Info -->
+    <div id="attendPane1" style="padding:20px 24px">
+      <div id="patientInfoCard" style="background:#F8F9FA;border-radius:12px;padding:16px;margin-bottom:16px"></div>
+      <!-- AI Diagnosis card -->
+      <div id="aiDiagCard" style="display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:12px;padding:14px;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
+          <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">smart_toy</span> AI Pre-Diagnosis
+        </div>
+        <div id="aiDiagText" style="font-size:13px;color:#1565C0;font-weight:600"></div>
+        <div id="aiDiagConf" style="font-size:12px;color:#1976D2;margin-top:4px"></div>
+        <div id="aiDiagSymptoms" style="font-size:12px;color:#1976D2;margin-top:4px;opacity:.8"></div>
+      </div>
+      <!-- Token validity -->
+      <div id="tokenCard" style="display:none;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <span class="material-icons-outlined" style="font-size:20px" id="tokenIcon">verified</span>
+        <div>
+          <div style="font-size:13px;font-weight:600" id="tokenLabel">Token Valid</div>
+          <div style="font-size:11px;color:#555" id="tokenExpiry"></div>
+        </div>
+      </div>
+      <button onclick="goAttendStep(2)" style="background:#1B5E20;color:#fff;border:none;width:100%;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+        Proceed to Diagnosis →
+      </button>
+    </div>
+
+    <!-- STEP 2: Diagnosis Form -->
+    <div id="attendPane2" style="display:none;padding:20px 24px">
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Did AI diagnosis match?</label>
+        <div style="display:flex;gap:8px">
+          <button id="aiMatchYes" onclick="setAIMatch('yes')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ✓ Yes, Matches
+          </button>
+          <button id="aiMatchPartial" onclick="setAIMatch('partial')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ~ Partial
+          </button>
+          <button id="aiMatchNo" onclick="setAIMatch('no')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
+            ✗ Different
+          </button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Confirmed Diagnosis *</label>
+        <input id="diagnosisInput" type="text" placeholder="e.g. Malaria (Plasmodium Falciparum)" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">ICD-10 Code</label>
+        <input id="icd10Input" type="text" placeholder="e.g. B54 (Unspecified malaria)" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Severity</label>
+        <select id="severitySelect" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+          <option value="">Select severity</option>
+          <option value="mild">Mild</option>
+          <option value="moderate">Moderate</option>
+          <option value="severe">Severe</option>
+          <option value="critical">Critical — refer</option>
+        </select>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Lab Tests Ordered</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px" id="labTestChips">
+          <button type="button" onclick="toggleLabTest('Malaria RDT')" data-test="Malaria RDT" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Malaria RDT</button>
+          <button type="button" onclick="toggleLabTest('Full Blood Count')" data-test="Full Blood Count" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Full Blood Count</button>
+          <button type="button" onclick="toggleLabTest('Blood Glucose')" data-test="Blood Glucose" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Blood Glucose</button>
+          <button type="button" onclick="toggleLabTest('Urine Analysis')" data-test="Urine Analysis" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Urine Analysis</button>
+          <button type="button" onclick="toggleLabTest('Liver Function')" data-test="Liver Function" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Liver Function</button>
+          <button type="button" onclick="toggleLabTest('Chest X-Ray')" data-test="Chest X-Ray" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Chest X-Ray</button>
+          <button type="button" onclick="toggleLabTest('HIV Test')" data-test="HIV Test" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">HIV Test</button>
+          <button type="button" onclick="toggleLabTest('Pregnancy Test')" data-test="Pregnancy Test" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Pregnancy Test</button>
+          <button type="button" onclick="toggleLabTest('Sputum Culture')" data-test="Sputum Culture" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Sputum Culture</button>
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Treatment Plan</label>
+        <textarea id="treatmentInput" placeholder="Describe the treatment plan…" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;min-height:80px;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Follow-up in (days)</label>
+        <input id="followUpDays" type="number" value="7" min="1" max="90" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="goAttendStep(1)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
+        <button onclick="goAttendStep(3)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Issue Prescription →</button>
+        <button onclick="submitDiagnosis(false)" style="flex:2;background:#0D47A1;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Save (No Rx)</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: E-Prescription Writer -->
+    <div id="attendPane3" style="display:none;padding:20px 24px">
+      <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Add medications to the prescription. Each drug line will be sent to the pharmacy.</div>
+      <div id="rxLines"></div>
+      <button onclick="addRxLine()" style="width:100%;padding:10px;border:2px dashed #4CAF50;border-radius:8px;font-size:13px;color:#1B5E20;font-weight:600;cursor:pointer;background:#F1F8E9;margin-bottom:16px">
+        + Add Drug
+      </button>
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Route to Pharmacy</label>
+        <select id="rxPharmacySelect" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
+          <option value="">Patient collects from any pharmacy</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="goAttendStep(2)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
+        <button onclick="submitDiagnosis(true)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">send</span> Save & Send Rx
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+<!-- ===== END MODAL ===== -->
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+
+  const now = new Date();
+  document.getElementById('clinicUserDate').textContent =
+    now.toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+
+  function updateClock() {
+    document.getElementById('liveClock').textContent =
+      new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  // Update clinic name from session
+  const clinicNameEl = document.getElementById('clinicUserName');
+  if (clinicNameEl && session.clinicName) clinicNameEl.textContent = session.clinicName;
+
+  const cfg = window.HOMATT_CONFIG || {};
+  // Use named storageKey to pick up the session saved at login (clinic portal)
+  let supa = null;
+  try {
+    if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+      supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
+      });
+    }
+  } catch(e) {}
+
+  let bookings = [];
+  let lastVerifiedBooking = null; // booking found via verifyPin that may not be in local array
+
+  if (supa) {
+    try {
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      let q = supa.from('bookings')
+        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,risk_score,status,created_at,ai_full_data,pin_token,pin_expires_at')
+        .gte('created_at', todayStart.toISOString())
+        .order('created_at', { ascending: false });
+      // Filter by clinic if logged in as real clinic staff; otherwise show all today's bookings
+      if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
+      const { data } = await q;
+      bookings = data || [];
+    } catch(e) {}
+  }
+
+  if (!bookings.length && session.demo) {
+    // Demo mode only: show mock patients so the demo always looks populated
+    bookings = MOCK_PATIENTS.map((p, i) => ({
+      id: String(p.q), booking_code: p.id,
+      patient_name: p.name, patient_age: p.age, patient_sex: p.sex,
+      symptoms: p.complaint, ai_diagnosis: null, ai_confidence: null,
+      urgency_level: p.priority === 'urgent' ? 'high' : 'normal',
+      risk_score: p.priority === 'urgent' ? 85 : p.priority === 'high' ? 65 : 30,
+      status: p.status === 'done' ? 'attended' : p.status === 'in-progress' ? 'in_progress' : 'pending',
+      created_at: new Date(Date.now() - i * 900000).toISOString()
+    }));
+  }
+
+  // Stats
+  const todayBookings = bookings;
+  const waiting = bookings.filter(b => b.status === 'pending');
+  const completed = bookings.filter(b => b.status === 'attended' || b.status === 'completed');
+  const urgent = bookings.filter(b => b.urgency_level === 'high' && b.status === 'pending');
+
+  document.getElementById('statTotal').textContent = todayBookings.length;
+  document.getElementById('statWaiting').textContent = waiting.length;
+  document.getElementById('statCompleted').textContent = completed.length;
+  document.getElementById('statUrgent').textContent = urgent.length;
+
+  if (urgent.length > 0) {
+    document.getElementById('urgentAlert').style.display = 'flex';
+    document.getElementById('urgentAlertMsg').textContent =
+      `${urgent.length} urgent patient(s) in queue — prioritise immediately: ` +
+      urgent.slice(0,2).map(b => b.patient_name).join(', ');
+  }
+
+  // Queue render
+  let activeFilter = 'all';
+  function renderQueue() {
+    const filtered = activeFilter === 'all'
+      ? bookings
+      : bookings.filter(b => b.status === activeFilter || b.urgency_level === activeFilter);
+
+    const sorted = [...filtered].sort((a,b) => {
+      const urgencyOrder = { high:0, medium:1, normal:2, low:3 };
+      return (urgencyOrder[a.urgency_level]??9) - (urgencyOrder[b.urgency_level]??9);
+    });
+
+    document.getElementById('queueBody').innerHTML = sorted.length
+      ? sorted.map((b, idx) => {
+          const riskColor = b.risk_score >= 70 ? '#D32F2F' : b.risk_score >= 40 ? '#E65100' : '#2E7D32';
+          const urgencyClass = b.urgency_level === 'high' ? 'urgent' : 'normal';
+          const statusClass = b.status === 'attended' || b.status === 'completed' ? 'delivered' : b.status === 'in_progress' ? 'confirmed' : 'incoming';
+          return `<tr>
+            <td><div class="queue-number">${idx + 1}</div></td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="patient-avatar">${(b.patient_name||'?')[0]}</div>
+                <div>
+                  <div style="font-weight:600;font-size:13px">${b.patient_name||'Unknown'}</div>
+                  <div style="font-size:11px;color:#9AA0A6">${b.booking_code||''} · ${b.patient_age||'?'}y · ${b.patient_sex||'?'}</div>
+                </div>
+              </div>
+            </td>
+            <td style="max-width:180px;font-size:12px">${b.symptoms||b.ai_diagnosis||'—'}</td>
+            <td style="font-weight:700;color:${riskColor}">${b.risk_score ? b.risk_score + '%' : '—'}</td>
+            <td><span class="status-badge ${urgencyClass}">${b.urgency_level||'normal'}</span></td>
+            <td><span class="status-badge ${statusClass}">${(b.status||'pending').replace('_',' ')}</span></td>
+            <td style="color:#9AA0A6;font-size:12px">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</td>
+            <td>
+              ${b.status === 'pending'
+                ? `<button class="btn-admin primary sm" onclick="callPatient('${b.id}')">
+                    <span class="material-icons-outlined" style="font-size:14px">person_add</span> Call
+                  </button>`
+                : b.status === 'in_progress'
+                ? `<button class="btn-admin success sm" onclick="completePatient('${b.id}')">
+                    <span class="material-icons-outlined" style="font-size:14px">check</span> Done
+                  </button>`
+                : '<span style="color:#9AA0A6;font-size:12px">Attended</span>'
+              }
+            </td>
+          </tr>`;
+        }).join('')
+      : '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No patients in this category</td></tr>';
+  }
+
+  renderQueue();
+  document.getElementById('queueFilter').addEventListener('change', e => {
+    activeFilter = e.target.value;
+    renderQueue();
+  });
+
+  // ── Reception Check-In Station ──────────────────────────────────────
+  function updateStats() {
+    document.getElementById('statTotal').textContent     = bookings.length;
+    document.getElementById('statWaiting').textContent   = bookings.filter(b => b.status === 'pending').length;
+    document.getElementById('statCompleted').textContent = bookings.filter(b => b.status === 'attended' || b.status === 'completed').length;
+    document.getElementById('statUrgent').textContent    = bookings.filter(b => b.urgency_level === 'high' && b.status === 'pending').length;
+  }
+
+  window.clearPinResult = () => {
+    const r = document.getElementById('pinResult');
+    r.style.display = 'none';
+    r.innerHTML = '';
+  };
+
+  function renderPinResult(b, expired, alreadyIn) {
+    const urgColor = b.urgency_level === 'high' ? '#D32F2F' : '#1565C0';
+    const urgBg    = b.urgency_level === 'high' ? '#FFEBEE' : '#E3F2FD';
+
+    let headerBg, headerBorder, iconHtml, titleHtml, subHtml, badgeHtml;
+    if (alreadyIn) {
+      headerBg = '#F3E5F5'; headerBorder = '#CE93D8';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#7B1FA2;font-size:24px">info</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#4A148C">Already In Queue</div>';
+      subHtml   = '<div style="font-size:12px;color:#7B1FA2;margin-top:2px">This patient is already checked in and appears in today\'s queue</div>';
+      badgeHtml = '<div style="background:#7B1FA2;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">IN QUEUE</div>';
+    } else if (expired) {
+      headerBg = '#FFF8E1'; headerBorder = '#FFB300';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#E65100;font-size:24px">warning</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#E65100">PIN Expired — Override Available</div>';
+      subHtml   = '<div style="font-size:12px;color:#F57F17;margin-top:2px">PIN has expired but you can manually check this patient in</div>';
+      badgeHtml = '<div style="background:#E65100;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">PIN EXPIRED</div>';
+    } else {
+      headerBg = '#E8F5E9'; headerBorder = '#4CAF50';
+      iconHtml  = '<span class="material-icons-outlined" style="color:#2E7D32;font-size:24px">check_circle</span>';
+      titleHtml = '<div style="font-weight:700;font-size:14px;color:#1B5E20">Patient Verified</div>';
+      subHtml   = '<div style="font-size:12px;color:#2E7D32;margin-top:2px">PIN is valid · Patient confirmed · Ready to check in</div>';
+      badgeHtml = '<div style="background:#2E7D32;color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;white-space:nowrap">PIN VALID</div>';
+    }
+
+    const pinExpiry = b.pin_expires_at
+      ? new Date(b.pin_expires_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' })
+      : '—';
+
+    // Build AI Patient Brief from ai_full_data
+    const aiData  = b.ai_full_data || {};
+    const aiCond  = aiData.primary_condition || b.ai_diagnosis || null;
+    const aiConf  = aiData.confidence || aiData.ai_confidence || b.ai_confidence || null;
+    const aiRisk  = aiData.overall_risk || null;
+    const aiSymp  = aiData.symptoms || (Array.isArray(b.symptoms) ? b.symptoms.join(', ') : b.symptoms) || null;
+    const aiUrg   = aiData.clinic_urgency || null;
+    const riskColor = aiRisk === 'high' ? '#D32F2F' : aiRisk === 'medium' ? '#E65100' : '#2E7D32';
+    const riskBg   = aiRisk === 'high' ? '#FFEBEE' : aiRisk === 'medium' ? '#FFF3E0' : '#E8F5E9';
+
+    const aiBriefHtml = aiCond ? `
+      <div style="background:#EDE7F6;border:1.5px solid #9575CD;border-radius:10px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="color:#512DA8;font-size:18px">psychology</span>
+          <span style="font-weight:700;font-size:12px;color:#512DA8;text-transform:uppercase;letter-spacing:.6px">AI Symptom Checker Brief</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <div style="background:#fff;border-radius:8px;padding:10px">
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Probable Condition</div>
+            <div style="font-size:14px;font-weight:700;color:#311B92">${aiCond}</div>
+            ${aiConf ? `<div style="font-size:12px;color:#512DA8;margin-top:2px">${Math.round(aiConf)}% likelihood</div>` : ''}
+          </div>
+          <div style="background:${riskBg};border-radius:8px;padding:10px">
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Risk Level</div>
+            <div style="font-size:14px;font-weight:700;color:${riskColor};text-transform:capitalize">${aiRisk || 'unknown'}</div>
+            ${aiUrg ? `<div style="font-size:12px;color:${riskColor};margin-top:2px;text-transform:capitalize">Urgency: ${aiUrg}</div>` : ''}
+          </div>
+        </div>
+        ${aiSymp ? `
+        <div style="background:#fff;border-radius:8px;padding:10px">
+          <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Patient-Reported Symptoms</div>
+          <div style="font-size:13px;color:#202124;line-height:1.5">${aiSymp}</div>
+        </div>` : ''}
+        ${b.notes ? `
+        <div style="background:#FFF8E1;border-radius:8px;padding:10px;margin-top:8px">
+          <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Patient Notes for Doctor</div>
+          <div style="font-size:13px;color:#202124;line-height:1.5">${b.notes}</div>
+        </div>` : ''}
+      </div>` : (aiSymp ? `
+      <div style="background:#F3F4F6;border-radius:10px;padding:12px;margin-bottom:12px">
+        <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Reported Symptoms</div>
+        <div style="font-size:13px;color:#202124;line-height:1.5">${aiSymp}</div>
+      </div>` : '');
+
+    const details = [
+      ['Patient',      b.patient_name  || '—'],
+      ['Booking Code', b.booking_code  || '—'],
+      ['Age / Sex',    (b.patient_age||'?') + 'y · ' + (b.patient_sex||'?')],
+      ['Urgency',      `<span style="font-weight:700;color:${urgColor};background:${urgBg};padding:2px 8px;border-radius:4px;text-transform:capitalize">${b.urgency_level||'normal'}</span>`],
+      ['Booked',       new Date(b.created_at).toLocaleString('en-UG',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})],
+      ['PIN Expires',  pinExpiry],
+    ];
+
+    let actionBtn;
+    if (alreadyIn) {
+      actionBtn = `<button onclick="callPatient('${b.id}')"
+                           style="flex:1;background:#7B1FA2;color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+                     <span class="material-icons-outlined" style="font-size:18px">open_in_full</span>Open Consultation
+                   </button>`;
+    } else {
+      const btnBg = expired ? '#E65100' : '#00897B';
+      const btnLabel = expired ? 'Override &amp; Check In' : 'Check Patient In';
+      actionBtn = `<button onclick="confirmCheckIn('${b.id}')"
+                           style="flex:1;background:${btnBg};color:#fff;border:none;padding:13px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+                     <span class="material-icons-outlined" style="font-size:18px">how_to_reg</span>${btnLabel}
+                   </button>`;
+    }
+
+    document.getElementById('pinResult').style.display = 'block';
+    document.getElementById('pinResult').innerHTML = `
+      <div style="background:${headerBg};border:1.5px solid ${headerBorder};border-radius:12px;padding:16px">
+        <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
+          ${iconHtml}
+          <div style="flex:1">${titleHtml}${subHtml}</div>
+          ${badgeHtml}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:#fff;border-radius:8px;padding:14px;margin-bottom:12px">
+          ${details.map(([k,v]) => `
+            <div>
+              <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">${k}</div>
+              <div style="font-size:13px;color:#202124;font-weight:500">${v}</div>
+            </div>`).join('')}
+        </div>
+        ${aiBriefHtml}
+        <div style="display:flex;gap:10px">
+          ${actionBtn}
+          <button onclick="clearPinResult();document.getElementById('pinInput').value=''"
+                  style="padding:13px 20px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff;color:#5F6368;flex-shrink:0">
+            Cancel
+          </button>
+        </div>
+      </div>`;
+  }
+
+  window.verifyPin = async () => {
+    const raw = document.getElementById('pinInput').value.trim().toUpperCase().replace(/\s/g,'');
+    if (!raw) { showToast('Enter a PIN token or booking code', 'error'); return; }
+
+    const btn   = document.getElementById('verifyBtn');
+    const icon  = document.getElementById('verifyIcon');
+    const label = document.getElementById('verifyLabel');
+    btn.disabled = true;
+    icon.textContent  = 'refresh';
+    icon.style.animation = 'checkin-spin 0.8s linear infinite';
+    label.textContent = 'Verifying…';
+
+    let found = null;
+
+    if (supa) {
+      try {
+        const { data } = await supa.from('bookings')
+          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,ai_confidence,ai_full_data,notes,discount_applied,discount_pct,created_at')
+          .or(`pin_token.eq.${raw},booking_code.eq.${raw}`)
+          .maybeSingle();
+        found = data;
+      } catch(e) {}
+    }
+
+    // Fallback: search in already-loaded bookings array (covers demo/mock mode)
+    if (!found) {
+      found = bookings.find(b =>
+        (b.pin_token    && b.pin_token.toUpperCase().replace(/\s/g,'')    === raw) ||
+        (b.booking_code && b.booking_code.toUpperCase().replace(/\s/g,'') === raw)
+      ) || null;
+    }
+
+    // Store so confirmCheckIn can find it even if not in local bookings array
+    lastVerifiedBooking = found || null;
+
+    btn.disabled = false;
+    icon.textContent = 'search';
+    icon.style.animation = '';
+    label.textContent = 'Verify Patient';
+
+    if (!found) {
+      document.getElementById('pinResult').style.display = 'block';
+      document.getElementById('pinResult').innerHTML = `
+        <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:16px;display:flex;align-items:flex-start;gap:12px">
+          <span class="material-icons-outlined" style="color:#D32F2F;font-size:24px;flex-shrink:0">error</span>
+          <div>
+            <div style="font-weight:700;font-size:14px;color:#B71C1C">No Patient Found</div>
+            <div style="font-size:13px;color:#D32F2F;margin-top:4px">No booking matched: <strong>${raw}</strong></div>
+            <div style="font-size:12px;color:#9AA0A6;margin-top:6px">Check the code and try again. The patient's PIN is shown on their Homatt app booking confirmation screen.</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const expired   = found.pin_expires_at ? new Date(found.pin_expires_at) < new Date() : false;
+    const alreadyIn = found.status === 'in_progress' || found.status === 'attended' || found.status === 'completed';
+    renderPinResult(found, expired, alreadyIn);
+  };
+
+  window.confirmCheckIn = async id => {
+    // Look in local array first, fall back to lastVerifiedBooking (cross-clinic walk-in)
+    let b = bookings.find(x => x.id === id);
+    if (!b && lastVerifiedBooking && lastVerifiedBooking.id === id) {
+      b = lastVerifiedBooking;
+      // Add to local bookings array so queue updates
+      bookings.unshift(b);
+    }
+    if (!b) return;
+
+    if (supa) {
+      try {
+        await supa.from('bookings').update({
+          status:         'pending',
+          updated_at:     new Date().toISOString(),
+        }).eq('id', id);
+      } catch(e) {}
+    }
+
+    b.status = 'pending';
+    lastVerifiedBooking = null;
+    renderQueue();
+    updateStats();
+    clearPinResult();
+    document.getElementById('pinInput').value = '';
+    showToast(`${b.patient_name} checked in — added to queue`, 'success');
+    setTimeout(() => {
+      document.getElementById('queue').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 400);
+  };
+  // ── Walk-in registration & tab switching ────────────────────────────
+  window.switchCheckinTab = tab => {
+    const isCode = tab === 'code';
+    document.getElementById('panelCode').style.display   = isCode ? 'block' : 'none';
+    document.getElementById('panelWalkin').style.display = isCode ? 'none'  : 'block';
+    const tCode   = document.getElementById('tabCode');
+    const tWalkin = document.getElementById('tabWalkin');
+    tCode.style.color         = isCode ? '#00897B' : '#9AA0A6';
+    tCode.style.borderBottomColor   = isCode ? '#00897B' : 'transparent';
+    tWalkin.style.color       = isCode ? '#9AA0A6' : '#00897B';
+    tWalkin.style.borderBottomColor = isCode ? 'transparent' : '#00897B';
+    if (isCode) clearPinResult();
+  };
+
+  window.registerWalkin = async () => {
+    const name     = document.getElementById('wiName').value.trim();
+    const symptoms = document.getElementById('wiSymptoms').value.trim();
+    if (!name)     { showToast('Patient name is required', 'error'); return; }
+    if (!symptoms) { showToast('Chief complaint is required', 'error'); return; }
+
+    const age     = parseInt(document.getElementById('wiAge').value) || null;
+    const sex     = document.getElementById('wiSex').value || null;
+    const urgency = document.getElementById('wiUrgency').value || 'normal';
+    const phone   = document.getElementById('wiPhone').value.trim() || null;
+    const code    = 'WI-' + Math.random().toString(36).toUpperCase().slice(2,6);
+    const clinicId = session.clinicId || null;
+
+    const walkin = {
+      id:           'wi-' + Date.now(),
+      booking_code: code,
+      patient_name: name,
+      patient_age:  age,
+      patient_sex:  sex,
+      symptoms:     symptoms,
+      urgency_level: urgency,
+      status:       'pending',
+      created_at:   new Date().toISOString(),
+      pin_token:    null,
+      ai_full_data: null,
+      notes:        phone ? 'Phone: ' + phone : null,
+    };
+
+    if (supa) {
+      try {
+        const { data: ins } = await supa.from('bookings').insert({
+          booking_code:   code,
+          patient_name:   name,
+          patient_age:    age,
+          patient_sex:    sex,
+          symptoms:       [symptoms],
+          urgency_level:  urgency,
+          status:         'pending',
+          clinic_id:      clinicId,
+          notes:          phone ? 'Phone: ' + phone : null,
+        }).select('id').single();
+        if (ins?.id) walkin.id = ins.id;
+      } catch(e) {}
+    }
+
+    bookings.unshift(walkin);
+    renderQueue();
+    updateStats();
+
+    // Reset form
+    ['wiName','wiAge','wiSymptoms','wiPhone'].forEach(id => { document.getElementById(id).value = ''; });
+    document.getElementById('wiSex').value = '';
+    document.getElementById('wiUrgency').value = 'normal';
+
+    showToast(`${name} registered (${code}) — added to queue`, 'success');
+    switchCheckinTab('code');
+    setTimeout(() => document.getElementById('queue').scrollIntoView({ behavior:'smooth', block:'start' }), 400);
+  };
+  // ── End Check-In Station ────────────────────────────────────────────
+
+  const supa2 = supa;
+  let activeBooking = null;
+  let selectedLabTests = [];
+  let aiMatchValue = null;
+  let rxLineCount = 0;
+
+  window.callPatient = async id => {
+    if (supa2) {
+      await supa2.from('bookings').update({ status:'in_progress', updated_at: new Date().toISOString() }).eq('id', id);
+    }
+    const b = bookings.find(x => x.id === id);
+    if (b) { b.status = 'in_progress'; renderQueue(); }
+    openAttendModal(id);
+  };
+
+  window.completePatient = id => openAttendModal(id);
+
+  function openAttendModal(id) {
+    // Look in local array first, then lastVerifiedBooking
+    let b = bookings.find(x => x.id === id);
+    if (!b && lastVerifiedBooking && lastVerifiedBooking.id === id) b = lastVerifiedBooking;
+    if (!b) return;
+    activeBooking = b;
+    selectedLabTests = [];
+    aiMatchValue = null;
+    rxLineCount = 0;
+
+    // Populate patient info card
+    const aiData = b.ai_full_data || {};
+    document.getElementById('patientInfoCard').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${[
+          ['Patient',  b.patient_name || '—'],
+          ['Age/Sex',  (b.patient_age||'?') + 'y · ' + (b.patient_sex||'?')],
+          ['Booking',  b.booking_code || '—'],
+          ['Urgency',  '<span style="font-weight:600;color:'+(b.urgency_level==='high'?'#D32F2F':'#1565C0')+'">'+(b.urgency_level||'normal')+'</span>'],
+          ['Symptoms', b.symptoms || '—'],
+          ['Arrived',  new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})],
+        ].map(([k,v]) => `
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">${k}</div>
+            <div style="font-size:13px;color:#202124;margin-top:2px">${v}</div>
+          </div>`).join('')}
+      </div>`;
+
+    // AI diagnosis card
+    const aiDiag = b.ai_diagnosis || aiData.primary_condition || aiData.topCondition;
+    if (aiDiag) {
+      document.getElementById('aiDiagCard').style.display = 'block';
+      document.getElementById('aiDiagText').textContent = aiDiag;
+      const conf = b.ai_confidence || aiData.confidence;
+      document.getElementById('aiDiagConf').textContent = conf ? `Confidence: ${conf}%` : '';
+      document.getElementById('aiDiagSymptoms').textContent = b.symptoms ? `Reported: ${b.symptoms.slice(0,80)}` : '';
+    } else {
+      document.getElementById('aiDiagCard').style.display = 'none';
+    }
+
+    // Token validity
+    const tokenCard = document.getElementById('tokenCard');
+    if (b.pin_token) {
+      tokenCard.style.display = 'flex';
+      const expired = b.pin_expires_at && new Date(b.pin_expires_at) < new Date();
+      tokenCard.style.background = expired ? '#FFEBEE' : '#E8F5E9';
+      document.getElementById('tokenIcon').textContent  = expired ? 'error' : 'verified';
+      document.getElementById('tokenIcon').style.color  = expired ? '#C62828' : '#2E7D32';
+      document.getElementById('tokenLabel').textContent = (expired ? 'Token Expired — ' : 'Token Valid — ') + b.pin_token;
+      document.getElementById('tokenLabel').style.color = expired ? '#C62828' : '#2E7D32';
+      document.getElementById('tokenExpiry').textContent = b.pin_expires_at
+        ? 'Expires ' + new Date(b.pin_expires_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'}) : '';
+    } else { tokenCard.style.display = 'none'; }
+
+    // Reset form fields
+    document.getElementById('diagnosisInput').value = aiDiag || '';
+    document.getElementById('icd10Input').value = '';
+    document.getElementById('severitySelect').value = '';
+    document.getElementById('treatmentInput').value = '';
+    document.getElementById('followUpDays').value = '7';
+    document.querySelectorAll('#labTestChips button').forEach(b => {
+      b.style.background = '#fff'; b.style.borderColor = '#E0E0E0'; b.style.color = '#202124';
+    });
+    document.getElementById('rxLines').innerHTML = '';
+    rxLineCount = 0;
+    addRxLine();
+
+    // Load pharmacies for routing
+    if (supa2) {
+      supa2.from('pharmacies').select('id,name,district').eq('active', true).then(({ data }) => {
+        const sel = document.getElementById('rxPharmacySelect');
+        sel.innerHTML = '<option value="">Patient collects from any pharmacy</option>';
+        (data||[]).forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id; opt.textContent = `${p.name} (${p.district||'—'})`;
+          sel.appendChild(opt);
+        });
+      });
+    }
+
+    document.getElementById('attendModalTitle').textContent = `${b.patient_name} — Consultation`;
+    document.getElementById('attendModalSub').textContent = `Booking ${b.booking_code||b.id.slice(-6).toUpperCase()}`;
+    goAttendStep(1);
+    document.getElementById('attendModal').style.display = 'block';
+  }
+
+  window.closeAttendModal = () => {
+    document.getElementById('attendModal').style.display = 'none';
+    activeBooking = null;
+  };
+
+  window.goAttendStep = n => {
+    [1,2,3].forEach(i => {
+      document.getElementById('attendPane' + i).style.display = i === n ? 'block' : 'none';
+      const tab = document.getElementById('attendStep' + i + 'Tab');
+      tab.style.color = i === n ? '#1B5E20' : '#9AA0A6';
+      tab.style.borderBottom = i === n ? '2px solid #1B5E20' : '2px solid transparent';
+    });
+  };
+
+  window.setAIMatch = val => {
+    aiMatchValue = val;
+    ['yes','partial','no'].forEach(v => {
+      const btn = document.getElementById('aiMatch' + v.charAt(0).toUpperCase() + v.slice(1));
+      const active = v === val;
+      btn.style.borderColor = active ? '#1B5E20' : '#E0E0E0';
+      btn.style.background  = active ? '#E8F5E9' : '#fff';
+      btn.style.color       = active ? '#1B5E20' : '#202124';
+    });
+  };
+
+  window.toggleLabTest = name => {
+    const idx = selectedLabTests.indexOf(name);
+    if (idx === -1) selectedLabTests.push(name); else selectedLabTests.splice(idx, 1);
+    document.querySelectorAll('#labTestChips button').forEach(btn => {
+      const active = selectedLabTests.includes(btn.dataset.test);
+      btn.style.background  = active ? '#E8F5E9' : '#fff';
+      btn.style.borderColor = active ? '#4CAF50' : '#E0E0E0';
+      btn.style.color       = active ? '#1B5E20' : '#202124';
+    });
+  };
+
+  window.addRxLine = () => {
+    rxLineCount++;
+    const n = rxLineCount;
+    const div = document.createElement('div');
+    div.id = 'rxLine' + n;
+    div.style.cssText = 'background:#F8F9FA;border-radius:10px;padding:12px;margin-bottom:10px;position:relative';
+    div.innerHTML = `
+      <button onclick="document.getElementById('rxLine${n}').remove()" style="position:absolute;top:8px;right:8px;background:none;border:none;cursor:pointer;color:#9AA0A6;font-size:18px">×</button>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Drug Name *</label>
+          <input type="text" id="rxDrug${n}" placeholder="e.g. Artemether-Lumefantrine" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Strength</label>
+          <input type="text" id="rxStrength${n}" placeholder="e.g. 80/480mg" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Route</label>
+          <select id="rxRoute${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
+            <option value="oral">Oral</option><option value="iv">IV</option><option value="im">IM</option><option value="topical">Topical</option><option value="inhaled">Inhaled</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Frequency</label>
+          <select id="rxFreq${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
+            <option value="once_daily">Once daily</option><option value="twice_daily">Twice daily</option><option value="three_daily">3× daily</option><option value="four_daily">4× daily</option><option value="as_needed">As needed</option><option value="stat">Stat (once)</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Days</label>
+          <input type="number" id="rxDays${n}" value="5" min="1" max="365" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Qty</label>
+          <input type="number" id="rxQty${n}" value="1" min="1" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+        </div>
+      </div>`;
+    document.getElementById('rxLines').appendChild(div);
+  };
+
+  window.submitDiagnosis = async withPrescription => {
+    const diagnosis = document.getElementById('diagnosisInput').value.trim();
+    if (!diagnosis) { alert('Please enter the confirmed diagnosis'); return; }
+    if (!activeBooking) return;
+
+    const b           = activeBooking;
+    const icd10       = document.getElementById('icd10Input').value.trim();
+    const severity    = document.getElementById('severitySelect').value;
+    const treatment   = document.getElementById('treatmentInput').value.trim();
+    const followUp    = parseInt(document.getElementById('followUpDays').value) || 7;
+
+    // Build prescription items
+    let rxItems = [];
+    if (withPrescription) {
+      for (let i = 1; i <= rxLineCount; i++) {
+        const drug = document.getElementById('rxDrug' + i);
+        if (!drug) continue;
+        const name = drug.value.trim();
+        if (!name) continue;
+        rxItems.push({
+          drug_name:  name,
+          strength:   document.getElementById('rxStrength' + i)?.value || '',
+          route:      document.getElementById('rxRoute'    + i)?.value || 'oral',
+          frequency:  document.getElementById('rxFreq'     + i)?.value || 'once_daily',
+          duration:   parseInt(document.getElementById('rxDays' + i)?.value) || 5,
+          qty:        parseInt(document.getElementById('rxQty'  + i)?.value) || 1,
+        });
+      }
+    }
+
+    const pharmacyId = document.getElementById('rxPharmacySelect').value || null;
+
+    if (supa2) {
+      // Save clinic_diagnoses record
+      const { data: diagRecord, error: diagErr } = await supa2.from('clinic_diagnoses').insert({
+        booking_id:           b.id,
+        clinic_id:            session.clinicId || null,
+        clinician_id:         session.userId   || null,
+        ai_suggested_diagnosis: b.ai_diagnosis || null,
+        ai_confidence:        b.ai_confidence  || null,
+        ai_match:             aiMatchValue === 'yes' ? true : aiMatchValue === 'no' ? false : null,
+        confirmed_diagnosis:  diagnosis,
+        icd10_code:           icd10   || null,
+        lab_tests_ordered:    selectedLabTests.length ? selectedLabTests : [],
+        severity:             severity || null,
+        treatment_plan:       treatment || null,
+        follow_up_days:       followUp,
+        prescription_items:   rxItems,
+        routed_pharmacy_id:   pharmacyId,
+      }).select('id').single();
+
+      if (diagErr) { alert('Save failed: ' + diagErr.message); return; }
+
+      // If prescription, save to e_prescriptions + create pharmacy_order
+      if (withPrescription && rxItems.length && diagRecord) {
+        const startDate = new Date().toISOString().split('T')[0];
+        const maxDays   = Math.max(...rxItems.map(x => x.duration));
+        const endDate   = new Date(Date.now() + maxDays * 86400000).toISOString().split('T')[0];
+
+        const { data: rxRecord } = await supa2.from('e_prescriptions').insert({
+          diagnosis_id:   diagRecord.id,
+          booking_id:     b.id,
+          patient_id:     b.patient_id || null,
+          clinic_id:      session.clinicId || null,
+          issued_by:      session.userId || null,
+          items:          rxItems,
+          status:         'active',
+          start_date:     startDate,
+          end_date:       endDate,
+          routed_to_pharmacy_id: pharmacyId || null,
+          notes:          treatment || null,
+        }).select('id').single();
+
+        // Create pharmacy_order linked to prescription
+        if (rxRecord && pharmacyId) {
+          await supa2.from('pharmacy_orders').insert({
+            pharmacy_id:      pharmacyId,
+            patient_name:     b.patient_name,
+            patient_phone:    null,
+            items:            rxItems.map(x => ({ name: x.drug_name + (x.strength?' '+x.strength:''), qty: x.qty })),
+            status:           'incoming',
+            urgency:          b.urgency_level === 'high' ? 'urgent' : 'standard',
+            e_prescription_id: rxRecord.id,
+            order_type:       'prescription',
+            delivery_address: 'Clinic Pickup',
+            total_cost:       0,
+            notes:            `E-Prescription from ${diagnosis}`,
+          });
+        }
+      }
+
+      // Update booking status
+      await supa2.from('bookings').update({
+        status:              'attended',
+        attended_at:         new Date().toISOString(),
+        updated_at:          new Date().toISOString(),
+        clinic_diagnosis_id: diagRecord?.id || null,
+      }).eq('id', b.id);
+
+      // ── Symptom cache: save confirmed diagnosis for future AI checks ──
+      if (b.symptoms && diagnosis) {
+        try {
+          const sympKey = (b.symptoms || '').toLowerCase().trim().split(/\s+/).sort().slice(0,8).join(' ');
+          const cachePayload = {
+            symptoms_key: sympKey,
+            symptoms_text: b.symptoms,
+            confirmed_diagnosis: diagnosis,
+            conditions_json: JSON.stringify([{
+              name: diagnosis,
+              likelihood_percent: 85,
+              severity: severity || 'medium',
+              description: treatment || diagnosis + ' — clinician confirmed.',
+              icd10: icd10 || null,
+            }]),
+            ai_match: aiMatchValue,
+            source: 'clinician',
+            updated_at: new Date().toISOString(),
+          };
+          await supa2.from('symptom_cache')
+            .upsert(cachePayload, { onConflict: 'symptoms_key', ignoreDuplicates: false });
+        } catch(e) {}
+      }
+
+      // ── Preventive recommendations after confirmed diagnosis ──
+      const diagLower = diagnosis.toLowerCase();
+      const PREVENTIVE = {
+        malaria:     { msg: 'Recommend to patient: Insecticide-treated mosquito net, mosquito repellent, and clearing stagnant water near home.', product: 'Mosquito Net' },
+        typhoid:     { msg: 'Recommend to patient: Boil drinking water, typhoid vaccine, and improved sanitation practices.', product: 'Water purification tablets' },
+        tuberculosis:{ msg: 'Recommend to patient: TB screening for household contacts, proper ventilation, and complete TB treatment course.', product: null },
+        hiv:         { msg: 'Recommend to patient: HIV counselling, partner testing, and consistent condom use.', product: null },
+        diabetes:    { msg: 'Recommend to patient: Blood glucose monitor, low-sugar diet, regular exercise, and foot care.', product: 'Blood glucose monitor' },
+        hypertension:{ msg: 'Recommend to patient: Home BP monitor, low-salt diet, regular exercise, and medication compliance.', product: 'Blood pressure monitor' },
+        cholera:     { msg: 'Recommend to patient: Oral rehydration salts, boiled water, cholera vaccine if available.', product: 'ORS sachets' },
+      };
+      const matchedPrev = Object.entries(PREVENTIVE).find(([k]) => diagLower.includes(k));
+      if (matchedPrev) {
+        const [, info] = matchedPrev;
+        setTimeout(() => showToast('🛡️ Prevention: ' + info.msg, 'warning'), 2000);
+        if (supa2 && info.product && b.id) {
+          try {
+            await supa2.from('preventive_recommendations').insert({
+              booking_id: b.id,
+              diagnosis: diagnosis,
+              recommended_product: info.product,
+              recommendation_text: info.msg,
+              sent_to_patient: false,
+              created_at: new Date().toISOString(),
+            });
+          } catch(e) {}
+        }
+      }
+
+      // Update local state
+      b.status = 'attended';
+      document.getElementById('statWaiting').textContent   = bookings.filter(x => x.status === 'pending').length;
+      document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
+    } else {
+      // Demo/offline mode — simulate the flow locally
+      activeBooking.status = 'attended';
+      b.status = 'attended';
+    }
+
+    renderQueue();
+    closeAttendModal();
+    showToast(withPrescription ? `Diagnosis saved & prescription sent for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
+  };
+
+  // Recent bookings + scheduled appointments sidebar
+  const apptItems = bookings.slice(0, 6).map(b => `
+    <div class="appt-item">
+      <div class="appt-time">${new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})}</div>
+      <div class="appt-info">
+        <div class="appt-name">${b.patient_name||'Unknown'}</div>
+        <div class="appt-type">${b.symptoms ? b.symptoms.slice(0,40)+(b.symptoms.length>40?'…':'') : b.ai_diagnosis||'Visit'}</div>
+      </div>
+      <span class="status-badge ${b.status||'pending'}" style="font-size:10px">${(b.status||'pending').replace('_',' ')}</span>
+    </div>`);
+  // Append scheduled appointments from mock (or future DB source)
+  const schedItems = MOCK_APPOINTMENTS.map(a => `
+    <div class="appt-item" style="opacity:.85">
+      <div class="appt-time" style="color:#7B1FA2">${a.time}</div>
+      <div class="appt-info">
+        <div class="appt-name">${a.name}</div>
+        <div class="appt-type">${a.type}</div>
+      </div>
+      <span class="status-badge scheduled" style="font-size:10px">sched</span>
+    </div>`);
+  document.getElementById('apptList').innerHTML =
+    (apptItems.length ? apptItems.join('') : '') +
+    schedItems.join('') ||
+    '<div style="padding:16px;color:#9AA0A6;font-size:13px">No bookings today</div>';
+});
+</script>
+</body>
+</html>

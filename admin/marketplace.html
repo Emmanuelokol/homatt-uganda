@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Health Store</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Preventive Health Store</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin secondary" id="manageCategoriesBtn">
+          <span class="material-icons-outlined" style="font-size:16px">category</span> Categories
+        </button>
+        <button class="btn-admin primary" id="addProductBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Product
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <!-- Stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">storefront</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Total Products</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statActive">—</div><div class="stat-label">Active</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">star</span></div>
+          <div><div class="stat-number" id="statFeatured">—</div><div class="stat-label">Featured</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">inventory_2</span></div>
+          <div><div class="stat-number" id="statLowStock">—</div><div class="stat-label">Low / Out of Stock</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#EDE7F6"><span class="material-icons-outlined" style="color:#6A1B9A">receipt_long</span></div>
+          <div><div class="stat-number" id="statOrders">—</div><div class="stat-label">New Orders</div></div>
+        </div>
+      </div>
+
+      <!-- ===== CUSTOMER ORDERS ===== -->
+      <div id="demoOrdersNotice" style="display:none;background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#E65100">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">warning</span>
+        <strong>Demo mode:</strong> Sign in with real admin credentials to see live customer orders.
+      </div>
+      <div class="admin-table-wrap" style="margin-bottom:28px">
+        <div class="table-header">
+          <div class="table-title">Customer Orders</div>
+          <div class="table-filter" style="display:flex;gap:8px;align-items:center">
+            <select id="filterOrderStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="dispatched">Dispatched</option>
+              <option value="delivered">Delivered</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+            <button class="btn-admin secondary sm" onclick="loadOrders()">
+              <span class="material-icons-outlined" style="font-size:15px">refresh</span> Refresh
+            </button>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Customer &amp; Date</th>
+              <th>Items Ordered</th>
+              <th>Total</th>
+              <th>Delivery Address</th>
+              <th>Status / Payment</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ordersBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Products</div>
+          <div class="table-filter" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="text" id="searchProducts" placeholder="Search product name…" style="width:200px">
+            <select id="filterCategory" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+              <option value="">All Categories</option>
+            </select>
+            <select id="filterStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+              <option value="">All Statuses</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+              <option value="featured">Featured only</option>
+              <option value="low">Low stock (&lt;10)</option>
+            </select>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Price (UGX)</th>
+              <th>Unit</th>
+              <th>Stock</th>
+              <th>Featured</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="productsBody">
+            <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add / Edit Product Modal -->
+<div class="admin-modal-overlay" id="productModal" style="display:none">
+  <div class="admin-modal" style="max-width:600px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="productModalTitle">Add Product</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="mpId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Product Name *</label>
+          <input type="text" id="mpName" placeholder="e.g. Long-Lasting Insecticidal Net">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Category *</label>
+          <select id="mpCategory">
+            <option value="">Select category…</option>
+          </select>
+        </div>
+
+        <div class="admin-form-group">
+          <label>Manufacturer / Brand</label>
+          <input type="text" id="mpManufacturer" placeholder="e.g. Vestergaard, Aquatabs">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Unit Price (UGX) *</label>
+          <input type="number" id="mpPrice" placeholder="e.g. 15000" min="0">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Unit / Pack Size</label>
+          <input type="text" id="mpUnit" placeholder="e.g. piece, pack of 10, bottle 200ml">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Stock Quantity</label>
+          <input type="number" id="mpStock" placeholder="e.g. 200 (blank = unlimited)" min="0">
+        </div>
+
+        <div class="admin-form-group">
+          <label>Sort Order</label>
+          <input type="number" id="mpSortOrder" placeholder="1 = top, higher = lower" min="0" value="99">
+        </div>
+
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Description / Quality Notes</label>
+          <textarea id="mpDesc" rows="3" placeholder="Describe the product — quality standards, certifications, what it protects against, dosage guidance, etc."></textarea>
+        </div>
+
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Image URL <span style="font-weight:400;color:#9AA0A6">(optional — paste a direct image link)</span></label>
+          <input type="url" id="mpImage" placeholder="https://…">
+        </div>
+
+        <div style="grid-column:span 2;display:flex;gap:24px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+            <input type="checkbox" id="mpInStock" checked style="width:16px;height:16px"> In stock / available for purchase
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+            <input type="checkbox" id="mpFeatured" style="width:16px;height:16px"> Featured (shown prominently)
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px">
+            <input type="checkbox" id="mpActive" checked style="width:16px;height:16px"> Active (visible in store)
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="saveProductBtn" onclick="saveProduct()">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save Product
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Categories Modal -->
+<div class="admin-modal-overlay" id="categoriesModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Manage Categories</div>
+      <button class="admin-modal-close" onclick="document.getElementById('categoriesModal').style.display='none'"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="categoriesList" style="margin-bottom:16px"></div>
+      <hr style="border:none;border-top:1px solid #E0E0E0;margin:16px 0">
+      <div style="font-weight:600;font-size:13px;margin-bottom:10px">Add New Category</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Category Name *</label>
+          <input type="text" id="newCatName" placeholder="e.g. Hygiene">
+        </div>
+        <div class="admin-form-group">
+          <label>Icon (Material icon name)</label>
+          <input type="text" id="newCatIcon" placeholder="e.g. sanitizer">
+        </div>
+        <div class="admin-form-group">
+          <label>Sort Order</label>
+          <input type="number" id="newCatSort" value="99">
+        </div>
+      </div>
+      <button class="btn-admin primary" style="margin-top:8px" onclick="addCategory()">
+        <span class="material-icons-outlined" style="font-size:16px">add</span> Add Category
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let adminDb = null;   // Supabase client — use adminDb to avoid conflict with window.supabase (CDN global)
+let allProducts = [];
+let allCategories = [];
+let editingId = null;
+
+// Category map for quick name lookup
+function catName(id) {
+  const c = allCategories.find(x => x.id === id);
+  return c ? c.name : id || '—';
+}
+
+function closeModal() {
+  document.getElementById('productModal').style.display = 'none';
+  editingId = null;
+}
+
+function updateStats(list) {
+  document.getElementById('statTotal').textContent = list.length;
+  document.getElementById('statActive').textContent = list.filter(p => p.active !== false).length;
+  document.getElementById('statFeatured').textContent = list.filter(p => p.featured).length;
+  document.getElementById('statLowStock').textContent = list.filter(p => p.stock_count !== null && p.stock_count < 10).length;
+}
+
+function renderProducts(list) {
+  updateStats(list);
+  document.getElementById('productsBody').innerHTML = list.length ? list.map(p => `
+    <tr>
+      <td>
+        <div style="font-weight:600;font-size:13px">${p.name}</div>
+        ${p.manufacturer ? `<div style="font-size:11px;color:#9AA0A6">${p.manufacturer}</div>` : ''}
+        ${p.description ? `<div style="font-size:11px;color:#9AA0A6;margin-top:2px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description}</div>` : ''}
+      </td>
+      <td><span style="background:#E8F5E9;color:#1B5E20;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600">${catName(p.category_id)}</span></td>
+      <td style="font-weight:600">UGX ${Number(p.price || 0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#5F6368">${p.unit || '—'}</td>
+      <td>
+        ${p.stock_count !== null && p.stock_count !== undefined
+          ? `<span style="font-weight:600;color:${p.stock_count < 10 ? '#D32F2F' : '#1B5E20'}">${p.stock_count}</span>${p.stock_count < 10 ? '<span style="font-size:10px;color:#D32F2F;margin-left:4px">LOW</span>' : ''}`
+          : '<span style="color:#9AA0A6;font-size:12px">unlimited</span>'}
+      </td>
+      <td>${p.featured ? '<span class="material-icons-outlined" style="color:#F57C00;font-size:18px">star</span>' : '<span style="color:#E0E0E0;font-size:12px">—</span>'}</td>
+      <td><span class="status-badge ${p.active !== false ? 'delivered' : 'rejected'}">${p.active !== false ? 'Active' : 'Inactive'}</span></td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-admin secondary sm" onclick="openEdit('${p.id}')">Edit</button>
+          <button class="btn-admin ${p.active !== false ? 'danger' : 'primary'} sm" onclick="toggleActive('${p.id}', ${p.active !== false})">
+            ${p.active !== false ? 'Deactivate' : 'Activate'}
+          </button>
+        </div>
+      </td>
+    </tr>`).join('')
+    : '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No products found</td></tr>';
+}
+
+function applyFilter() {
+  const q    = document.getElementById('searchProducts').value.toLowerCase();
+  const cat  = document.getElementById('filterCategory').value;
+  const stat = document.getElementById('filterStatus').value;
+  const list = allProducts.filter(p => {
+    if (q   && !(p.name || '').toLowerCase().includes(q)) return false;
+    if (cat && p.category_id !== cat) return false;
+    if (stat === 'active'   && p.active === false) return false;
+    if (stat === 'inactive' && p.active !== false) return false;
+    if (stat === 'featured' && !p.featured) return false;
+    if (stat === 'low'      && (p.stock_count === null || p.stock_count >= 10)) return false;
+    return true;
+  });
+  renderProducts(list);
+}
+
+function populateCategoryDropdowns() {
+  const opts = allCategories
+    .filter(c => c.name !== 'All')
+    .sort((a, b) => (a.sort_order || 99) - (b.sort_order || 99))
+    .map(c => `<option value="${c.id}">${c.name}</option>`)
+    .join('');
+
+  document.getElementById('filterCategory').innerHTML = '<option value="">All Categories</option>' + opts;
+  document.getElementById('mpCategory').innerHTML = '<option value="">Select category…</option>' + opts;
+}
+
+function openAdd() {
+  editingId = null;
+  document.getElementById('productModalTitle').textContent = 'Add Product';
+  document.getElementById('mpId').value = '';
+  document.getElementById('mpName').value = '';
+  document.getElementById('mpCategory').value = '';
+  document.getElementById('mpManufacturer').value = '';
+  document.getElementById('mpPrice').value = '';
+  document.getElementById('mpUnit').value = '';
+  document.getElementById('mpStock').value = '';
+  document.getElementById('mpSortOrder').value = '99';
+  document.getElementById('mpDesc').value = '';
+  document.getElementById('mpImage').value = '';
+  document.getElementById('mpInStock').checked = true;
+  document.getElementById('mpFeatured').checked = false;
+  document.getElementById('mpActive').checked = true;
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+function openEdit(id) {
+  const p = allProducts.find(x => x.id === id);
+  if (!p) return;
+  editingId = id;
+  document.getElementById('productModalTitle').textContent = 'Edit Product';
+  document.getElementById('mpId').value            = p.id;
+  document.getElementById('mpName').value          = p.name || '';
+  document.getElementById('mpCategory').value      = p.category_id || '';
+  document.getElementById('mpManufacturer').value  = p.manufacturer || '';
+  document.getElementById('mpPrice').value         = p.price || '';
+  document.getElementById('mpUnit').value          = p.unit || '';
+  document.getElementById('mpStock').value         = p.stock_count ?? '';
+  document.getElementById('mpSortOrder').value     = p.sort_order ?? 99;
+  document.getElementById('mpDesc').value          = p.description || '';
+  document.getElementById('mpImage').value         = p.image_url || '';
+  document.getElementById('mpInStock').checked     = p.in_stock !== false;
+  document.getElementById('mpFeatured').checked    = !!p.featured;
+  document.getElementById('mpActive').checked      = p.active !== false;
+  document.getElementById('productModal').style.display = 'flex';
+}
+
+async function saveProduct() {
+  const name = document.getElementById('mpName').value.trim();
+  if (!name) { showAdminToast('Product name is required', 'error'); return; }
+
+  const btn = document.getElementById('saveProductBtn');
+  btn.disabled = true;
+
+  const stockVal = document.getElementById('mpStock').value;
+  const payload = {
+    name,
+    category_id:  document.getElementById('mpCategory').value || null,
+    manufacturer: document.getElementById('mpManufacturer').value.trim() || null,
+    price:        Number(document.getElementById('mpPrice').value) || 0,
+    unit:         document.getElementById('mpUnit').value.trim() || null,
+    stock_count:  stockVal !== '' ? Number(stockVal) : null,
+    sort_order:   Number(document.getElementById('mpSortOrder').value) || 99,
+    description:  document.getElementById('mpDesc').value.trim() || null,
+    image_url:    document.getElementById('mpImage').value.trim() || null,
+    in_stock:     document.getElementById('mpInStock').checked,
+    featured:     document.getElementById('mpFeatured').checked,
+    active:       document.getElementById('mpActive').checked,
+  };
+
+  let error;
+  if (editingId) {
+    ({ error } = await adminDb.from('marketplace_items').update(payload).eq('id', editingId));
+  } else {
+    ({ error } = await adminDb.from('marketplace_items').insert(payload));
+  }
+
+  btn.disabled = false;
+  if (error) { showAdminToast('Save failed: ' + error.message, 'error'); return; }
+
+  closeModal();
+  await loadProducts();
+  showAdminToast(editingId ? 'Product updated!' : 'Product added!', 'success');
+}
+
+async function toggleActive(id, currentlyActive) {
+  const { error } = await adminDb.from('marketplace_items').update({ active: !currentlyActive }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadProducts();
+  showAdminToast('Product ' + (!currentlyActive ? 'activated' : 'deactivated'), 'success');
+}
+
+async function loadProducts() {
+  if (!adminDb) {
+    document.getElementById('productsBody').innerHTML =
+      '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
+    return;
+  }
+  document.getElementById('productsBody').innerHTML =
+    '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>';
+  try {
+    const { data, error } = await adminDb.from('marketplace_items').select('*').order('sort_order').order('name');
+    if (error) {
+      document.getElementById('productsBody').innerHTML =
+        `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
+      return;
+    }
+    allProducts = data || [];
+    applyFilter();
+  } catch(e) {
+    document.getElementById('productsBody').innerHTML =
+      `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
+  }
+}
+
+async function loadCategories() {
+  if (!adminDb) return;
+  try {
+    const { data, error } = await adminDb.from('marketplace_categories').select('*').order('sort_order');
+    if (error) { console.error('loadCategories DB error:', error.message); return; }
+    allCategories = data || [];
+    try { populateCategoryDropdowns(); } catch(e) { console.error('populateCategoryDropdowns failed:', e); }
+    try { renderCategoriesList(); } catch(e) { console.error('renderCategoriesList failed:', e); }
+  } catch(e) {
+    console.error('loadCategories failed:', e);
+  }
+}
+
+function renderCategoriesList() {
+  document.getElementById('categoriesList').innerHTML = allCategories.map(c => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid #E0E0E0;border-radius:8px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="font-size:18px;color:#5F6368">${c.icon || 'label'}</span>
+        <span style="font-weight:600;font-size:13px">${c.name}</span>
+        <span style="font-size:11px;color:#9AA0A6">order: ${c.sort_order ?? '—'}</span>
+      </div>
+      ${c.name !== 'All' ? `<button class="btn-admin danger sm" onclick="deleteCategory('${c.id}','${c.name}')">Delete</button>` : ''}
+    </div>`).join('') || '<div style="color:#9AA0A6;font-size:13px">No categories yet</div>';
+}
+
+async function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  if (!name) { showAdminToast('Category name is required', 'error'); return; }
+  const icon = document.getElementById('newCatIcon').value.trim() || 'label';
+  const sort = Number(document.getElementById('newCatSort').value) || 99;
+
+  const { error } = await adminDb.from('marketplace_categories').insert({ name, icon, sort_order: sort });
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+
+  document.getElementById('newCatName').value = '';
+  document.getElementById('newCatIcon').value = '';
+  document.getElementById('newCatSort').value = '99';
+  await loadCategories();
+  showAdminToast('Category added!', 'success');
+}
+
+async function deleteCategory(id, name) {
+  if (!confirm(`Delete category "${name}"? Products in this category will have no category.`)) return;
+  const { error } = await adminDb.from('marketplace_categories').delete().eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadCategories();
+  showAdminToast('Category deleted', 'success');
+}
+
+// ===== ORDER MANAGEMENT =====
+let allOrders = [];
+
+const ORDER_STATUS_COLORS = {
+  pending: 'status-badge incoming',
+  confirmed: 'status-badge scheduled',
+  dispatched: 'status-badge in_progress',
+  delivered: 'status-badge delivered',
+  cancelled: 'status-badge rejected',
+};
+
+function renderOrders(list) {
+  document.getElementById('statOrders').textContent = list.filter(o => o.status === 'pending').length;
+  document.getElementById('ordersBody').innerHTML = list.length ? list.map(o => {
+    const items = Array.isArray(o.items) ? o.items : [];
+    // Build a detailed items breakdown
+    const itemsHtml = items.map(i =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F0F0F0;gap:12px">
+        <span style="font-size:12px;font-weight:500">${i.name || i.n || '?'}</span>
+        <span style="font-size:12px;color:#5F6368;white-space:nowrap">×${i.qty} &nbsp;<strong>UGX ${Number((i.price||i.p||0)*i.qty).toLocaleString()}</strong></span>
+      </div>`
+    ).join('');
+    const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    return `<tr>
+      <td>
+        <div style="font-weight:700;font-size:13px">${o.patient_name || 'Customer'}</div>
+        ${o.patient_phone ? `<div style="font-size:11px;color:#9AA0A6">${o.patient_phone}</div>` : ''}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:2px">${date}</div>
+      </td>
+      <td>
+        ${itemsHtml || '<span style="color:#9AA0A6;font-size:12px">—</span>'}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+      </td>
+      <td style="font-weight:700;font-size:14px;color:#1B5E20">UGX ${Number(o.total_amount||0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#5F6368">
+        ${o.delivery_address || '—'}
+        ${o.district ? `<div style="font-size:11px;color:#9AA0A6">${o.district}</div>` : ''}
+      </td>
+      <td>
+        <span class="${ORDER_STATUS_COLORS[o.status]||'status-badge'}" style="text-transform:capitalize">${o.status}</span>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:3px">${o.payment_method ? o.payment_method.replace(/_/g,' ') : ''}</div>
+      </td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${o.status === 'pending'   ? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','confirmed')">Confirm</button>` : ''}
+          ${o.status === 'confirmed' ? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','dispatched')">Dispatch</button>` : ''}
+          ${o.status === 'dispatched'? `<button class="btn-admin primary sm" onclick="updateOrderStatus('${o.id}','delivered')">Delivered</button>` : ''}
+          ${['pending','confirmed'].includes(o.status) ? `<button class="btn-admin danger sm" onclick="updateOrderStatus('${o.id}','cancelled')">Cancel</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
+}
+
+function applyOrderFilter() {
+  const st = document.getElementById('filterOrderStatus').value;
+  renderOrders(st ? allOrders.filter(o => o.status === st) : allOrders);
+}
+
+async function loadOrders() {
+  if (!adminDb) {
+    document.getElementById('ordersBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
+    return;
+  }
+  document.getElementById('ordersBody').innerHTML =
+    '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
+  try {
+    const { data, error } = await adminDb.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+    if (error) {
+      document.getElementById('ordersBody').innerHTML =
+        `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
+      return;
+    }
+    allOrders = data || [];
+    applyOrderFilter();
+  } catch(e) {
+    document.getElementById('ordersBody').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
+  }
+}
+
+window.updateOrderStatus = async function(id, status) {
+  const extra = {};
+  if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
+  if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
+  if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
+  const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
+  if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
+  await loadOrders();
+  showAdminToast('Order marked as ' + status, 'success');
+};
+
+// Wait up to 5 seconds for the Supabase SDK CDN script to finish loading
+function waitForSupabaseSDK(maxMs = 5000) {
+  return new Promise(resolve => {
+    if (window.supabase && typeof window.supabase.createClient === 'function') { resolve(true); return; }
+    const interval = 100;
+    let elapsed = 0;
+    const t = setInterval(() => {
+      elapsed += interval;
+      if (window.supabase && typeof window.supabase.createClient === 'function') { clearInterval(t); resolve(true); }
+      else if (elapsed >= maxMs) { clearInterval(t); resolve(false); }
+    }, interval);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('marketplace');
+
+  // Ensure CDN has finished before anything auth/db related
+  const sdkReady = await waitForSupabaseSDK();
+  if (!sdkReady) {
+    const errMsg = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>Could not load the database library. Check your internet connection and reload.</td></tr>';
+    document.getElementById('productsBody').innerHTML = errMsg;
+    document.getElementById('ordersBody').innerHTML = errMsg.replace('colspan="8"','colspan="6"');
+    document.body.style.visibility = 'visible';
+    return;
+  }
+
+  const session = await requireAdmin();
+  if (!session) return;
+  adminDb = adminSupa();
+  setupAdminLogout();
+
+  // Show demo warning if no real Supabase auth session
+  if (session.demo) {
+    const notice = document.getElementById('demoOrdersNotice');
+    if (notice) notice.style.display = 'block';
+  }
+
+  document.getElementById('addProductBtn').addEventListener('click', openAdd);
+  document.getElementById('manageCategoriesBtn').addEventListener('click', () => {
+    document.getElementById('categoriesModal').style.display = 'flex';
+  });
+  document.getElementById('searchProducts').addEventListener('input', applyFilter);
+  document.getElementById('filterCategory').addEventListener('change', applyFilter);
+  document.getElementById('filterStatus').addEventListener('change', applyFilter);
+  document.getElementById('filterOrderStatus').addEventListener('change', applyOrderFilter);
+
+  try { await loadCategories(); } catch(e) { console.error('loadCategories init error:', e); }
+  await Promise.all([loadProducts(), loadOrders()]);
+});
+</script>
+</body>
+</html>

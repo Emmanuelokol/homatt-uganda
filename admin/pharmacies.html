@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Pharmacies</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .tab-row { display:flex; gap:0; border-bottom:2px solid #E0E0E0; margin-bottom:20px; }
+    .tab-btn { padding:10px 18px; border:none; background:none; cursor:pointer; font-family:inherit; font-size:13px; font-weight:500; color:#9AA0A6; border-bottom:2px solid transparent; margin-bottom:-2px; }
+    .tab-btn.active { color:#1B5E20; border-bottom-color:#1B5E20; font-weight:600; }
+    .modal-section { background:#F8F9FA; border-radius:10px; padding:14px 16px; margin-bottom:14px; }
+    .modal-section-title { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.6px; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .hours-grid { display:grid; grid-template-columns:80px 1fr 1fr 60px; gap:6px; align-items:center; font-size:12px; }
+    .hours-grid .day-label { font-weight:600; font-size:12px; }
+    .hours-input { border:1px solid #E0E0E0; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:100%; }
+    .scrollable-modal { max-height:70vh; overflow-y:auto; padding-right:4px; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Pharmacy Management</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin info" id="createPharmacyAccountBtn">
+          <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Pharmacy Account
+        </button>
+        <button class="btn-admin primary" id="addPharmacyBtn">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Pharmacy
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Pharmacies</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All Statuses</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="active">Active</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <input type="text" id="searchPharmacies" placeholder="Search..." style="width:160px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Name</th><th>Location</th><th>Phone</th><th>Delivery</th><th>Routing Score</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="pharmaciesBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="admin-modal-overlay" id="pharmacyModal" style="display:none">
+  <div class="admin-modal" style="max-width:620px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="pharmacyModalTitle">Add New Pharmacy</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body scrollable-modal">
+      <input type="hidden" id="pharmacyId">
+
+      <div class="tab-row" style="margin-top:-4px">
+        <button class="tab-btn active" onclick="switchTab('basic',this)">Basic Info</button>
+        <button class="tab-btn" onclick="switchTab('location',this)">Location & Hours</button>
+        <button class="tab-btn" onclick="switchTab('delivery',this)">Delivery & Services</button>
+        <button class="tab-btn" onclick="switchTab('admin',this)">Admin</button>
+      </div>
+
+      <!-- Basic -->
+      <div id="tab-basic">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">local_pharmacy</span> Pharmacy Details</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Pharmacy Name *</label>
+              <input type="text" id="pharmacyName" placeholder="e.g. Nakawa Pharmacy">
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Description / Tagline</label>
+              <textarea id="pharmacyDescription" rows="2" style="min-height:58px" placeholder="e.g. Your trusted neighbourhood pharmacy with fast delivery"></textarea>
+            </div>
+            <div class="admin-form-group">
+              <label>Phone Number *</label>
+              <input type="text" id="pharmacyPhone" placeholder="+256 7XX XXX XXX">
+            </div>
+            <div class="admin-form-group">
+              <label>WhatsApp Number</label>
+              <input type="text" id="pharmacyWhatsapp" placeholder="+256 7XX XXX XXX">
+            </div>
+            <div class="admin-form-group">
+              <label>Email</label>
+              <input type="email" id="pharmacyEmail" placeholder="pharmacy@example.com">
+            </div>
+            <div class="admin-form-group">
+              <label>Contact Person (Owner / Manager)</label>
+              <input type="text" id="pharmacyContact" placeholder="Owner/Manager name">
+            </div>
+            <div class="admin-form-group">
+              <label>NDA License Number</label>
+              <input type="text" id="pharmacyLicense" placeholder="NDA-2024-XXXX">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location & Hours -->
+      <div id="tab-location" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">location_on</span> Location</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>District *</label>
+              <input type="text" id="pharmacyDistrict" placeholder="e.g. Kampala">
+            </div>
+            <div class="admin-form-group">
+              <label>City / Zone</label>
+              <input type="text" id="pharmacyCity" placeholder="e.g. Nakasero">
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Full Address</label>
+              <input type="text" id="pharmacyAddress" placeholder="Plot number, street, area">
+            </div>
+            <div class="admin-form-group">
+              <label>Latitude (GPS)</label>
+              <input type="number" id="pharmacyLat" placeholder="e.g. 0.3311" step="0.0001">
+              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Use Google Maps for coordinates</div>
+            </div>
+            <div class="admin-form-group">
+              <label>Longitude (GPS)</label>
+              <input type="number" id="pharmacyLng" placeholder="e.g. 32.5731" step="0.0001">
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">schedule</span> Opening Hours</div>
+          <div class="hours-grid" style="margin-bottom:8px;font-weight:700;font-size:11px;color:#5F6368;text-transform:uppercase">
+            <div>Day</div><div>Open From</div><div>Close At</div><div>Closed?</div>
+          </div>
+          <div id="pharmHoursGrid"></div>
+        </div>
+      </div>
+
+      <!-- Delivery & Services -->
+      <div id="tab-delivery" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">electric_moped</span> Delivery Settings</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div style="grid-column:span 2;display:flex;align-items:center;gap:10px;padding:8px 0">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" id="pharmacyDelivery" checked style="width:18px;height:18px;accent-color:#1B5E20"> Offers home delivery
+              </label>
+            </div>
+            <div class="admin-form-group">
+              <label>Delivery Fee (UGX)</label>
+              <input type="number" id="pharmacyDeliveryFee" placeholder="e.g. 5000" min="0">
+            </div>
+            <div class="admin-form-group">
+              <label>Delivery Radius (km)</label>
+              <input type="number" id="pharmacyDeliveryRadius" placeholder="e.g. 10" min="1" max="50">
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Delivery Notes</label>
+              <textarea id="pharmacyDeliveryNotes" rows="2" style="min-height:58px" placeholder="e.g. Free delivery for orders above UGX 30,000. Delivery within 45 mins."></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">inventory</span> Routing & Performance</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>Routing Score (0–100)</label>
+              <input type="number" id="pharmacyRoutingScore" value="100" min="0" max="100">
+              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Higher score = more order assignments</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Admin -->
+      <div id="tab-admin" style="display:none">
+        <div class="modal-section">
+          <div class="modal-section-title"><span class="material-icons-outlined" style="font-size:14px">admin_panel_settings</span> Admin Settings</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="admin-form-group">
+              <label>Status</label>
+              <select id="pharmacyStatus">
+                <option value="approved">Approved</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" id="pharmacyVerified" style="width:18px;height:18px;accent-color:#1B5E20"> Verified by Homatt
+              </label>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
+              <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+                <input type="checkbox" id="pharmacyActive" style="width:18px;height:18px;accent-color:#1B5E20"> Active (visible to users)
+              </label>
+            </div>
+            <div class="admin-form-group" style="grid-column:span 2">
+              <label>Internal Notes</label>
+              <textarea id="pharmacyNotes" style="min-height:70px" placeholder="Internal admin notes..."></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn-admin primary" id="savePharmacyBtn">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save Pharmacy
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Staff Modal -->
+<div class="admin-modal-overlay" id="staffModal" style="display:none">
+  <div class="admin-modal" style="max-width:460px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Assign Pharmacy Staff Login</div>
+      <button class="admin-modal-close" onclick="closeStaffModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <input type="hidden" id="staffPharmacyId">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Create a portal login for pharmacy staff so they can manage orders and inventory.</p>
+      <div class="admin-form-group">
+        <label>Full Name *</label>
+        <input type="text" id="staffName" placeholder="Pharmacist name">
+      </div>
+      <div class="admin-form-group">
+        <label>Email Address *</label>
+        <input type="email" id="staffEmail" placeholder="pharmacist@pharmacy.ug">
+      </div>
+      <div class="admin-form-group">
+        <label>Password *</label>
+        <input type="text" id="staffPassword" placeholder="Min 8 characters — share with pharmacist">
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">They can change this after first login.</div>
+      </div>
+      <div id="staffResult" style="display:none;margin-top:12px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:14px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px">✓ Login created!</div>
+        <div style="font-family:monospace;font-size:12px;line-height:2;background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:10px" id="staffResultText"></div>
+        <button class="btn-admin secondary sm" style="margin-top:8px" onclick="copyStaffCreds()">Copy</button>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeStaffModal()">Close</button>
+      <button class="btn-admin primary" id="saveStaffBtn">
+        <span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Create Pharmacy Account Modal -->
+<div class="admin-modal-overlay" id="createPharmacyAccountModal" style="display:none">
+  <div class="admin-modal" style="max-width:540px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Create Pharmacy Account</div>
+      <button class="admin-modal-close" onclick="closeCreatePharmacyAccountModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="pharmacyAccountDemoNote" style="display:none;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:12px;margin-bottom:16px;font-size:13px;color:#795548">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px;margin-right:4px">info</span>
+        In demo mode, account creation requires real Supabase credentials.
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">
+        Registers a new pharmacy and creates a login for their portal. Share the credentials so they can manage stock, orders, and patients.
+      </p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Pharmacy Name *</label>
+          <input type="text" id="paPharmacyName" placeholder="e.g. Nakawa Pharmacy">
+        </div>
+        <div class="admin-form-group">
+          <label>District *</label>
+          <input type="text" id="paPharmacyDistrict" placeholder="e.g. Kampala">
+        </div>
+        <div class="admin-form-group">
+          <label>City / Area</label>
+          <input type="text" id="paPharmacyCity" placeholder="e.g. Nakasero">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Full Address</label>
+          <input type="text" id="paPharmacyAddress" placeholder="Plot no., street, area">
+        </div>
+        <div class="admin-form-group">
+          <label>Phone Number</label>
+          <input type="text" id="paPharmacyPhone" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>WhatsApp</label>
+          <input type="text" id="paPharmacyWhatsapp" placeholder="+256 7XX XXX XXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Contact Person (Owner)</label>
+          <input type="text" id="paPharmacyContact" placeholder="Owner/Manager name">
+        </div>
+        <div class="admin-form-group">
+          <label>NDA License Number</label>
+          <input type="text" id="paPharmacyLicense" placeholder="NDA-2024-XXXX">
+        </div>
+        <div class="admin-form-group">
+          <label>Latitude (GPS)</label>
+          <input type="number" id="paPharmacyLat" placeholder="e.g. 0.3311" step="0.0001">
+        </div>
+        <div class="admin-form-group">
+          <label>Longitude (GPS)</label>
+          <input type="number" id="paPharmacyLng" placeholder="e.g. 32.5731" step="0.0001">
+        </div>
+        <div class="admin-form-group">
+          <label>Delivery Fee (UGX)</label>
+          <input type="number" id="paPharmacyDeliveryFee" placeholder="e.g. 5000" min="0">
+        </div>
+        <div class="admin-form-group">
+          <label>Delivery Radius (km)</label>
+          <input type="number" id="paPharmacyRadius" placeholder="e.g. 10" min="1" max="50">
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Staff Login Email *</label>
+          <input type="email" id="paPharmacyEmail" placeholder="pharmacy@example.com">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">This will be their portal login email.</div>
+        </div>
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Password *</label>
+          <input type="text" id="paPharmacyPassword" placeholder="Min 8 characters" autocomplete="new-password">
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Share this with the pharmacy. Minimum 8 characters.</div>
+        </div>
+      </div>
+
+      <div id="paPharmacySuccessBox" style="display:none;margin-top:16px;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:16px">
+        <div style="font-weight:600;color:#1B5E20;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Pharmacy Account Created!
+        </div>
+        <div style="font-size:13px;color:#2E7D32;margin-bottom:10px">Share these credentials with the pharmacy staff:</div>
+        <div style="background:#fff;border:1px solid #C8E6C9;border-radius:6px;padding:12px;font-family:monospace;font-size:12px;line-height:2" id="paPharmacyCredentials"></div>
+        <button class="btn-admin secondary sm" style="margin-top:10px;font-size:12px" onclick="copyPharmacyCredentials()">
+          <span class="material-icons-outlined" style="font-size:14px">content_copy</span> Copy Credentials
+        </button>
+      </div>
+    </div>
+    <div class="admin-modal-footer" id="paPharmacyFooter">
+      <button class="btn-admin secondary" onclick="closeCreatePharmacyAccountModal()">Cancel</button>
+      <button class="btn-admin primary" id="createPharmacyAccountSubmitBtn">
+        <span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+var allPharmacies = [];
+var _adminSession = null;
+
+/* ── Tab switching ── */
+function switchTab(name, btn) {
+  ['basic','location','delivery','admin'].forEach(function(t) {
+    document.getElementById('tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+}
+
+/* ── Hours grid ── */
+var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+function buildHoursGrid(existing) {
+  var el = document.getElementById('pharmHoursGrid');
+  el.innerHTML = DAYS.map(function(day) {
+    var h = (existing || {})[day] || {};
+    var closed = h.closed === true;
+    return '<div class="hours-grid" style="margin-bottom:6px">' +
+      '<div class="day-label">' + day.slice(0,3) + '</div>' +
+      '<input class="hours-input" type="time" id="ph-open-' + day + '" value="' + (h.open||'08:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<input class="hours-input" type="time" id="ph-close-' + day + '" value="' + (h.close||'20:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<label style="display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">' +
+        '<input type="checkbox" id="ph-closed-' + day + '" ' + (closed?'checked':'') + ' onchange="togglePHDay(\'' + day + '\')" style="accent-color:#D32F2F"> Closed' +
+      '</label>' +
+    '</div>';
+  }).join('');
+}
+window.togglePHDay = function(day) {
+  var closed = document.getElementById('ph-closed-' + day).checked;
+  document.getElementById('ph-open-' + day).disabled = closed;
+  document.getElementById('ph-close-' + day).disabled = closed;
+};
+function getHoursData() {
+  var result = {};
+  DAYS.forEach(function(day) {
+    result[day] = {
+      open: document.getElementById('ph-open-' + day)?.value || '08:00',
+      close: document.getElementById('ph-close-' + day)?.value || '20:00',
+      closed: document.getElementById('ph-closed-' + day)?.checked || false
+    };
+  });
+  return result;
+}
+
+/* ── Demo data ── */
+var DEMO_PHARMACIES = [
+  { id:'p1', name:'Ntinda Health Pharmacy', district:'Kampala', city:'Kampala', phone:'+256 77 123 4567', license_number:'PH-2021-001', contact_person:'Pharm. Ssali', delivery_available:true, delivery_fee:5000, status:'approved', verified:true, active:true, routing_score:95, created_at: new Date(Date.now()-86400000*25).toISOString() },
+  { id:'p2', name:'City Chemist Nakasero',  district:'Kampala', city:'Kampala', phone:'+256 77 234 5678', license_number:'PH-2021-002', contact_person:'Pharm. Nakato', delivery_available:true, delivery_fee:4000, status:'approved', verified:true, active:true, routing_score:88, created_at: new Date(Date.now()-86400000*18).toISOString() },
+  { id:'p3', name:'Wandegeya Pharmacy',     district:'Kampala', city:'Kampala', phone:'+256 77 345 6789', license_number:'PH-2022-003', contact_person:'Pharm. Mubiru', delivery_available:false, delivery_fee:0, status:'approved', verified:false,active:true, routing_score:72, created_at: new Date(Date.now()-86400000*7).toISOString() },
+];
+
+/* ── Load ── */
+document.addEventListener('DOMContentLoaded', async function() {
+  buildAdminSidebar('pharmacies');
+  var session = await requireAdmin();
+  if (!session) return;
+  _adminSession = session;
+  setupAdminLogout();
+  await loadPharmacies();
+
+  document.getElementById('addPharmacyBtn').addEventListener('click', function(){ openModal(); });
+  document.getElementById('createPharmacyAccountBtn').addEventListener('click', function(){ openCreatePharmacyAccountModal(); });
+  document.getElementById('filterStatus').addEventListener('change', renderPharmacies);
+  document.getElementById('searchPharmacies').addEventListener('input', renderPharmacies);
+  document.getElementById('savePharmacyBtn').addEventListener('click', savePharmacy);
+  document.getElementById('saveStaffBtn').addEventListener('click', saveStaff);
+  document.getElementById('createPharmacyAccountSubmitBtn').addEventListener('click', submitCreatePharmacyAccount);
+});
+
+async function loadPharmacies() {
+  var supa = adminSupa();
+  if (!supa) { allPharmacies = DEMO_PHARMACIES; renderPharmacies(); return; }
+  var res = await supa.from('pharmacies').select('*').order('created_at',{ascending:false});
+  allPharmacies = (res.data && res.data.length) ? res.data : DEMO_PHARMACIES;
+  renderPharmacies();
+}
+
+function renderPharmacies() {
+  var sf = document.getElementById('filterStatus').value;
+  var q  = document.getElementById('searchPharmacies').value.toLowerCase();
+  var filtered = allPharmacies.filter(function(p){ return (!sf||p.status===sf)&&(!q||p.name.toLowerCase().includes(q)); });
+  var tbody = document.getElementById('pharmaciesBody');
+  if (!filtered.length) { tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No pharmacies found</td></tr>'; return; }
+  tbody.innerHTML = filtered.map(function(p) {
+    var score = p.routing_score ?? 100;
+    var scoreColor = score >= 90 ? '#2E7D32' : score >= 70 ? '#E65100' : '#D32F2F';
+    var delivery = p.delivery_available ? '<span class="status-badge resolved" style="font-size:11px">Yes</span>' + (p.delivery_fee ? ' UGX '+Number(p.delivery_fee).toLocaleString() : '') : '<span class="status-badge open" style="font-size:11px">No</span>';
+    return '<tr>' +
+      '<td><div style="font-weight:600">' + p.name + '</div>' + (p.contact_person?'<div style="font-size:11px;color:#9AA0A6">'+p.contact_person+'</div>':'') + '</td>' +
+      '<td>' + ([p.district,p.city].filter(Boolean).join(', ')||'—') + '</td>' +
+      '<td style="font-size:12px">' + (p.phone||'—') + '</td>' +
+      '<td style="font-size:12px">' + delivery + '</td>' +
+      '<td><span style="font-weight:700;color:' + scoreColor + '">' + score + '</span>/100</td>' +
+      '<td><span class="status-badge ' + (p.status||'approved') + '">' + (p.status||'approved') + '</span></td>' +
+      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function openModal(id) {
+  var p = id ? allPharmacies.find(function(x){return x.id===id;}) : null;
+  switchTab('basic', document.querySelector('.tab-btn'));
+  document.getElementById('pharmacyModalTitle').textContent = p ? 'Edit Pharmacy' : 'Add New Pharmacy';
+  document.getElementById('pharmacyId').value = p?.id || '';
+  document.getElementById('pharmacyName').value = p?.name || '';
+  document.getElementById('pharmacyDescription').value = p?.description || '';
+  document.getElementById('pharmacyPhone').value = p?.phone || '';
+  document.getElementById('pharmacyWhatsapp').value = p?.whatsapp || '';
+  document.getElementById('pharmacyEmail').value = p?.email || '';
+  document.getElementById('pharmacyContact').value = p?.contact_person || '';
+  document.getElementById('pharmacyLicense').value = p?.license_number || '';
+  document.getElementById('pharmacyDistrict').value = p?.district || '';
+  document.getElementById('pharmacyCity').value = p?.city || '';
+  document.getElementById('pharmacyAddress').value = p?.address || '';
+  document.getElementById('pharmacyLat').value = p?.latitude || '';
+  document.getElementById('pharmacyLng').value = p?.longitude || '';
+  document.getElementById('pharmacyDelivery').checked = p?.delivery_available !== false;
+  document.getElementById('pharmacyDeliveryFee').value = p?.delivery_fee || '';
+  document.getElementById('pharmacyDeliveryRadius').value = p?.delivery_radius_km || '';
+  document.getElementById('pharmacyDeliveryNotes').value = '';
+  document.getElementById('pharmacyRoutingScore').value = p?.routing_score ?? 100;
+  document.getElementById('pharmacyStatus').value = p?.status || 'approved';
+  document.getElementById('pharmacyVerified').checked = p?.verified || false;
+  document.getElementById('pharmacyActive').checked = p?.active !== false;
+  document.getElementById('pharmacyNotes').value = p?.notes || '';
+  buildHoursGrid(p?.opening_hours || {});
+  document.getElementById('pharmacyModal').style.display = 'flex';
+}
+function closeModal() { document.getElementById('pharmacyModal').style.display = 'none'; }
+
+async function savePharmacy() {
+  var id   = document.getElementById('pharmacyId').value;
+  var name = document.getElementById('pharmacyName').value.trim();
+  if (!name) { showAdminToast('Name required', 'error'); return; }
+
+  var payload = {
+    name: name,
+    description: document.getElementById('pharmacyDescription').value.trim() || null,
+    district: document.getElementById('pharmacyDistrict').value.trim() || null,
+    city: document.getElementById('pharmacyCity').value.trim() || null,
+    address: document.getElementById('pharmacyAddress').value.trim() || null,
+    phone: document.getElementById('pharmacyPhone').value.trim() || null,
+    whatsapp: document.getElementById('pharmacyWhatsapp').value.trim() || null,
+    email: document.getElementById('pharmacyEmail').value.trim() || null,
+    contact_person: document.getElementById('pharmacyContact').value.trim() || null,
+    license_number: document.getElementById('pharmacyLicense').value.trim() || null,
+    latitude: parseFloat(document.getElementById('pharmacyLat').value) || null,
+    longitude: parseFloat(document.getElementById('pharmacyLng').value) || null,
+    delivery_available: document.getElementById('pharmacyDelivery').checked,
+    delivery_fee: Number(document.getElementById('pharmacyDeliveryFee').value) || 0,
+    delivery_radius_km: Number(document.getElementById('pharmacyDeliveryRadius').value) || 10,
+    routing_score: Number(document.getElementById('pharmacyRoutingScore').value) || 100,
+    status: document.getElementById('pharmacyStatus').value,
+    verified: document.getElementById('pharmacyVerified').checked,
+    active: document.getElementById('pharmacyActive').checked,
+    notes: document.getElementById('pharmacyNotes').value.trim() || null,
+    opening_hours: getHoursData(),
+    updated_at: new Date().toISOString()
+  };
+
+  var btn = document.getElementById('savePharmacyBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Not connected to database', 'error'); btn.disabled=false; btn.innerHTML='<span class="material-icons-outlined" style="font-size:16px">save</span> Save Pharmacy'; return; }
+
+  var result = id
+    ? await supa.from('pharmacies').update(payload).eq('id', id)
+    : await supa.from('pharmacies').insert(payload);
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">save</span> Save Pharmacy';
+
+  if (result.error) { showAdminToast('Save failed: ' + result.error.message, 'error'); return; }
+  closeModal();
+  await loadPharmacies();
+  showAdminToast(id ? 'Pharmacy updated!' : 'Pharmacy added!', 'success');
+}
+
+/* ── Staff modal ── */
+function openStaffModal(pharmacyId) {
+  document.getElementById('staffPharmacyId').value = pharmacyId;
+  ['staffName','staffEmail','staffPassword'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('staffResult').style.display = 'none';
+  document.getElementById('staffModal').style.display = 'flex';
+}
+function closeStaffModal() { document.getElementById('staffModal').style.display = 'none'; }
+
+var _lastStaffCreds = '';
+async function saveStaff() {
+  var pharmacyId = document.getElementById('staffPharmacyId').value;
+  var name       = document.getElementById('staffName').value.trim();
+  var email      = document.getElementById('staffEmail').value.trim();
+  var password   = document.getElementById('staffPassword').value;
+  if (!name || !email || password.length < 8) { showAdminToast('All fields required. Password min 8 chars.', 'error'); return; }
+
+  var btn = document.getElementById('saveStaffBtn');
+  btn.disabled = true;
+  btn.textContent = 'Creating…';
+
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Not connected', 'error'); btn.disabled=false; btn.textContent='Create Login'; return; }
+
+  var tmpSupa = window.supabase.createClient(window.HOMATT_CONFIG.SUPABASE_URL, window.HOMATT_CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  var { data: su, error: suErr } = await tmpSupa.auth.signUp({ email: email, password: password });
+
+  if (suErr || !su?.user) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login';
+    showAdminToast('Auth error: ' + (suErr?.message||'Email may already be registered'), 'error');
+    return;
+  }
+
+  var { error: puErr } = await supa.from('portal_users').insert({
+    auth_user_id: su.user.id, full_name: name, email: email, role: 'pharmacy_staff', pharmacy_id: pharmacyId, is_active: true
+  });
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">person_add</span> Create Login';
+  if (puErr) { showAdminToast('Portal user error: ' + puErr.message, 'error'); return; }
+
+  _lastStaffCreds = 'Name: ' + name + '\nEmail: ' + email + '\nPassword: ' + password + '\nPortal URL: ' + window.location.href.replace('admin/pharmacies.html','pharmacy/');
+  document.getElementById('staffResultText').textContent = _lastStaffCreds;
+  document.getElementById('staffResult').style.display = 'block';
+  showAdminToast('Login created for ' + name, 'success');
+}
+
+window.copyStaffCreds = function() {
+  navigator.clipboard.writeText(_lastStaffCreds).then(function(){ showAdminToast('Copied!','success'); });
+};
+
+/* ── Create Pharmacy Account Modal ── */
+function openCreatePharmacyAccountModal() {
+  ['paPharmacyName','paPharmacyDistrict','paPharmacyCity','paPharmacyAddress','paPharmacyPhone','paPharmacyWhatsapp','paPharmacyContact','paPharmacyLicense','paPharmacyEmail','paPharmacyPassword'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['paPharmacyLat','paPharmacyLng','paPharmacyDeliveryFee','paPharmacyRadius'].forEach(function(id){ document.getElementById(id).value=''; });
+  document.getElementById('paPharmacySuccessBox').style.display = 'none';
+  document.getElementById('paPharmacyFooter').style.display = 'flex';
+  var btn = document.getElementById('createPharmacyAccountSubmitBtn');
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+  document.getElementById('pharmacyAccountDemoNote').style.display = (_adminSession && _adminSession.demo) ? 'block' : 'none';
+  document.getElementById('createPharmacyAccountModal').style.display = 'flex';
+}
+function closeCreatePharmacyAccountModal() { document.getElementById('createPharmacyAccountModal').style.display = 'none'; }
+
+var _lastPharmacyCredentials = '';
+
+async function submitCreatePharmacyAccount() {
+  var name     = document.getElementById('paPharmacyName').value.trim();
+  var district = document.getElementById('paPharmacyDistrict').value.trim();
+  var city     = document.getElementById('paPharmacyCity').value.trim();
+  var address  = document.getElementById('paPharmacyAddress').value.trim();
+  var phone    = document.getElementById('paPharmacyPhone').value.trim();
+  var whatsapp = document.getElementById('paPharmacyWhatsapp').value.trim();
+  var contact  = document.getElementById('paPharmacyContact').value.trim();
+  var license  = document.getElementById('paPharmacyLicense').value.trim();
+  var lat      = parseFloat(document.getElementById('paPharmacyLat').value) || null;
+  var lng      = parseFloat(document.getElementById('paPharmacyLng').value) || null;
+  var delivFee = Number(document.getElementById('paPharmacyDeliveryFee').value) || 5000;
+  var radius   = Number(document.getElementById('paPharmacyRadius').value) || 10;
+  var email    = document.getElementById('paPharmacyEmail').value.trim();
+  var password = document.getElementById('paPharmacyPassword').value;
+
+  if (!name)     { showAdminToast('Pharmacy name is required', 'error'); return; }
+  if (!district) { showAdminToast('District is required', 'error'); return; }
+  if (!email)    { showAdminToast('Staff email is required', 'error'); return; }
+  if (!password || password.length < 8) { showAdminToast('Password must be at least 8 characters', 'error'); return; }
+
+  var btn = document.getElementById('createPharmacyAccountSubmitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">hourglass_top</span> Creating…';
+
+  var supa = adminSupa();
+  if (!supa) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Not connected to database', 'error');
+    return;
+  }
+
+  var tmpSupa = window.supabase.createClient(window.HOMATT_CONFIG.SUPABASE_URL, window.HOMATT_CONFIG.SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+  var signUpRes = await tmpSupa.auth.signUp({ email: email, password: password });
+
+  if (signUpRes.error) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Auth error: ' + signUpRes.error.message, 'error');
+    return;
+  }
+
+  var authUserId = signUpRes.data?.user?.id;
+  if (!authUserId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Email may already be registered — try a different email', 'error');
+    return;
+  }
+
+  var insertPayload = {
+    name: name, district: district, status: 'approved', verified: false, active: true,
+    email: email, auth_user_id: authUserId,
+    delivery_available: true, delivery_fee: delivFee, delivery_radius_km: radius
+  };
+  if (city) insertPayload.city = city;
+  if (address) insertPayload.address = address;
+  if (phone) insertPayload.phone = phone;
+  if (whatsapp) insertPayload.whatsapp = whatsapp;
+  if (contact) insertPayload.contact_person = contact;
+  if (license) insertPayload.license_number = license;
+  if (lat) insertPayload.latitude = lat;
+  if (lng) insertPayload.longitude = lng;
+
+  var { data: pharmRow, error: insertErr } = await supa.from('pharmacies').insert(insertPayload).select().single();
+
+  if (insertErr) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">vpn_key</span> Create Account';
+    showAdminToast('Pharmacy record error: ' + insertErr.message, 'error');
+    return;
+  }
+
+  // Also create portal_users entry
+  await supa.from('portal_users').insert({
+    auth_user_id: authUserId, full_name: contact || name, email: email,
+    role: 'pharmacy_staff', pharmacy_id: pharmRow.id, is_active: true
+  });
+
+  var portalUrl = window.location.href.replace('admin/pharmacies.html','pharmacy/');
+  _lastPharmacyCredentials = 'Pharmacy: ' + name + '\nLocation: ' + district + (city?', '+city:'') + (address?'\nAddress: '+address:'') + (phone?'\nPhone: '+phone:'') + '\nLogin Email: ' + email + '\nPassword: ' + password + '\nPortal URL: ' + portalUrl;
+
+  document.getElementById('paPharmacyCredentials').textContent = _lastPharmacyCredentials;
+  document.getElementById('paPharmacySuccessBox').style.display = 'block';
+  document.getElementById('paPharmacyFooter').style.display = 'none';
+
+  await loadPharmacies();
+  showAdminToast('Pharmacy account created successfully!', 'success');
+}
+
+function copyPharmacyCredentials() {
+  navigator.clipboard.writeText(_lastPharmacyCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+</script>
+</body>
+</html>

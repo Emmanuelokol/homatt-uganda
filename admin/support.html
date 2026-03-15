@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Support Tickets</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Support Tickets</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Support Requests</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All Statuses</option>
+              <option value="open">Open</option>
+              <option value="in_progress">In Progress</option>
+              <option value="resolved">Resolved</option>
+              <option value="closed">Closed</option>
+            </select>
+            <select id="filterCategory">
+              <option value="">All Categories</option>
+              <option value="general">General</option>
+              <option value="technical">Technical</option>
+              <option value="billing">Billing</option>
+              <option value="emergency">Emergency</option>
+              <option value="feedback">Feedback</option>
+            </select>
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Subject</th>
+              <th>Category</th>
+              <th>Priority</th>
+              <th>Status</th>
+              <th>Submitted</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ticketsTableBody">
+            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Respond Modal -->
+<div class="admin-modal-overlay" id="respondModal" style="display:none">
+  <div class="admin-modal">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Respond to Ticket</div>
+      <button class="admin-modal-close" id="closeRespondModal">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="ticketDetailView" style="margin-bottom:20px;padding:16px;background:#F8F9FA;border-radius:10px;font-size:13px;line-height:1.7"></div>
+      <div class="admin-form-group">
+        <label>Update Status</label>
+        <select id="ticketStatusUpdate">
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+      </div>
+      <div class="admin-form-group">
+        <label>Admin Response</label>
+        <textarea id="adminResponseText" placeholder="Enter your response to the user..."></textarea>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" id="cancelRespondBtn">Cancel</button>
+      <button class="btn-admin primary" id="submitResponseBtn">
+        <span class="material-icons-outlined" style="font-size:16px">send</span> Send Response
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let supabase = null;
+let allTickets = [];
+let activeTicketId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('support');
+  const session = await requireAdmin();
+  if (!session) return;
+  supabase = adminSupa();
+  setupAdminLogout();
+  await loadTickets();
+
+  document.getElementById('filterStatus').addEventListener('change', renderTickets);
+  document.getElementById('filterCategory').addEventListener('change', renderTickets);
+  document.getElementById('closeRespondModal').addEventListener('click', closeModal);
+  document.getElementById('cancelRespondBtn').addEventListener('click', closeModal);
+
+  document.getElementById('submitResponseBtn').addEventListener('click', async () => {
+    const status = document.getElementById('ticketStatusUpdate').value;
+    const response = document.getElementById('adminResponseText').value.trim();
+    const btn = document.getElementById('submitResponseBtn');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:16px">refresh</span> Sending...';
+
+    const update = { status, updated_at: new Date().toISOString() };
+    if (response) {
+      update.admin_response = response;
+      update.responded_at = new Date().toISOString();
+      update.responded_by = document.getElementById('adminUserName').textContent;
+    }
+
+    const { error } = await supabase.from('support_tickets').update(update).eq('id', activeTicketId);
+
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">send</span> Send Response';
+
+    if (error) { showAdminToast('Failed to update ticket', 'error'); return; }
+    closeModal();
+    await loadTickets();
+    showAdminToast('Ticket updated successfully', 'success');
+  });
+});
+
+const DEMO_TICKETS_DATA = [
+  { id:'t1', user_name:'Ssali Emmanuel', user_phone:'0772111222', subject:'Medicine delivery delayed', category:'delivery', priority:'high', status:'open', message:'My medicine order ORD-4821 has not arrived after 3 hours. I urgently need my insulin.', admin_response:null, created_at: new Date(Date.now()-7200000).toISOString() },
+  { id:'t2', user_name:'Rose Akello', user_phone:'0752333444', subject:'App login issue', category:'technical', priority:'normal', status:'open', message:'I cannot sign in to the app. It keeps saying incorrect password but I just registered yesterday.', admin_response:null, created_at: new Date(Date.now()-86400000).toISOString() },
+  { id:'t3', user_name:'Mugisha David', user_phone:'0700555666', subject:'Wrong medicine delivered', category:'pharmacy', priority:'high', status:'in_progress', message:'I ordered Paracetamol 500mg but received Ibuprofen instead. Please arrange replacement.', admin_response:'We have contacted the pharmacy and a replacement will be delivered within 1 hour.', created_at: new Date(Date.now()-172800000).toISOString() },
+  { id:'t4', user_name:'Nakigozi Sarah', user_phone:'0783777888', subject:'Refund request for cancelled booking', category:'billing', priority:'normal', status:'resolved', message:'I cancelled my clinic booking HO-4390 but have not received my refund of UGX 20,000.', admin_response:'Refund processed and will reflect in your Homatt Wallet within 24 hours.', created_at: new Date(Date.now()-259200000).toISOString() },
+];
+
+async function loadTickets() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo) { allTickets = DEMO_TICKETS_DATA; renderTickets(); return; }
+  if (!supabase) { renderTickets(); return; }
+  const { data } = await supabase
+    .from('support_tickets')
+    .select('*')
+    .order('created_at', { ascending: false });
+  allTickets = data || [];
+  renderTickets();
+}
+
+function renderTickets() {
+  const statusFilter = document.getElementById('filterStatus').value;
+  const categoryFilter = document.getElementById('filterCategory').value;
+  const filtered = allTickets.filter(t =>
+    (!statusFilter || t.status === statusFilter) &&
+    (!categoryFilter || t.category === categoryFilter)
+  );
+
+  const tbody = document.getElementById('ticketsTableBody');
+  if (filtered.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No tickets found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(t => `
+    <tr>
+      <td>
+        <div style="font-weight:600">${t.user_name || 'Anonymous'}</div>
+        ${t.user_phone ? `<div style="font-size:11px;color:#9AA0A6">${t.user_phone}</div>` : ''}
+      </td>
+      <td><div style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.subject}</div></td>
+      <td style="text-transform:capitalize">${t.category}</td>
+      <td><span class="status-badge ${t.priority}">${t.priority}</span></td>
+      <td><span class="status-badge ${t.status}">${t.status.replace('_',' ')}</span></td>
+      <td style="color:#9AA0A6;font-size:12px">${formatDate(t.created_at)}</td>
+      <td>
+        <button class="btn-admin info" onclick="openRespondModal('${t.id}')">
+          <span class="material-icons-outlined" style="font-size:15px">reply</span> Respond
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function openRespondModal(ticketId) {
+  const ticket = allTickets.find(t => t.id === ticketId);
+  if (!ticket) return;
+  activeTicketId = ticketId;
+
+  document.getElementById('ticketDetailView').innerHTML = `
+    <div style="margin-bottom:8px"><strong>From:</strong> ${ticket.user_name || 'Anonymous'} ${ticket.user_phone ? `(${ticket.user_phone})` : ''}</div>
+    <div style="margin-bottom:8px"><strong>Subject:</strong> ${ticket.subject}</div>
+    <div style="margin-bottom:8px"><strong>Category:</strong> ${ticket.category} | <strong>Priority:</strong> ${ticket.priority}</div>
+    <div style="margin-bottom:8px"><strong>Message:</strong></div>
+    <div style="background:white;border-radius:8px;padding:12px;border:1px solid #E0E0E0;white-space:pre-line">${ticket.message}</div>
+    ${ticket.admin_response ? `<div style="margin-top:10px"><strong>Previous Response:</strong><br>${ticket.admin_response}</div>` : ''}`;
+
+  document.getElementById('ticketStatusUpdate').value = ticket.status;
+  document.getElementById('adminResponseText').value = ticket.admin_response || '';
+  document.getElementById('respondModal').style.display = 'flex';
+}
+
+function closeModal() {
+  document.getElementById('respondModal').style.display = 'none';
+  activeTicketId = null;
+}
+</script>
+</body>
+</html>

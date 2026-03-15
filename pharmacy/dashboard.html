@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Pharmacy — Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/pharmacy.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Dashboard</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="pharmacyUserAvatar">P</div>
+          <span id="pharmacyUserNameTop">Pharmacist</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Incoming order alert (shown only when there are new orders) -->
+      <div class="order-alert" id="incomingAlert" style="display:none">
+        <div class="order-alert-icon"><span class="material-icons-outlined" style="font-size:36px">notifications_active</span></div>
+        <div>
+          <div class="order-alert-count" id="incomingCount">0</div>
+          <div class="order-alert-label">New order(s) waiting for confirmation</div>
+        </div>
+        <a href="orders.html" class="btn-admin warning" style="margin-left:auto">View Orders</a>
+      </div>
+
+      <!-- Low stock alert -->
+      <div id="lowStockAlert" style="display:none;background:#FFF3E0;border:1px solid #FFB300;border-radius:10px;padding:12px 18px;margin-bottom:20px;align-items:center;gap:12px;font-size:13px">
+        <span class="material-icons-outlined" style="color:#E65100">warning</span>
+        <span id="lowStockMsg">Loading stock status…</span>
+        <a href="inventory.html" style="margin-left:auto;color:#E65100;font-weight:600;font-size:12px;text-decoration:none">Manage Stock →</a>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid" style="margin-bottom:28px">
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">inbox</span></div>
+          <div><div class="stat-number" id="statIncoming">—</div><div class="stat-label">Incoming Orders</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">pending</span></div>
+          <div><div class="stat-number" id="statActive">—</div><div class="stat-label">Active Orders</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statDelivered">—</div><div class="stat-label">Delivered Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">payments</span></div>
+          <div><div class="stat-number" id="statRevenue">—</div><div class="stat-label">Revenue Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">inventory_2</span></div>
+          <div><div class="stat-number" id="statLowStock">—</div><div class="stat-label">Low Stock Items</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">star</span></div>
+          <div><div class="stat-number" id="statScore">—</div><div class="stat-label">Routing Score</div></div>
+        </div>
+      </div>
+
+      <!-- Incoming orders requiring action -->
+      <div class="admin-table-wrap" style="margin-bottom:24px">
+        <div class="table-header">
+          <div class="table-title">Incoming Orders — Action Required</div>
+          <a href="orders.html" class="btn-admin secondary sm" style="text-decoration:none">View All Orders</a>
+        </div>
+        <div id="incomingOrdersList" style="padding:8px 16px 16px"></div>
+      </div>
+
+      <!-- Recent orders + Low stock side by side -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header">
+            <div class="table-title">Recent Orders</div>
+          </div>
+          <table class="admin-table">
+            <thead><tr><th>Patient</th><th>Items</th><th>Status</th><th>Total</th></tr></thead>
+            <tbody id="recentOrdersBody">
+              <tr><td colspan="4" style="text-align:center;padding:24px;color:#9AA0A6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="admin-table-wrap" style="margin-bottom:0">
+          <div class="table-header">
+            <div class="table-title">Low Stock Items</div>
+            <a href="inventory.html" class="btn-admin secondary sm" style="text-decoration:none">Manage</a>
+          </div>
+          <table class="admin-table">
+            <thead><tr><th>Medicine</th><th>Stock</th><th>Status</th></tr></thead>
+            <tbody id="lowStockBody">
+              <tr><td colspan="3" style="text-align:center;padding:24px;color:#9AA0A6">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/pharmacy.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+  buildPharmacySidebar('dashboard');
+  const session = requirePharmacy();
+  if (!session) return;
+  setupPharmacyLogout();
+
+  // Live clock
+  function tick() {
+    document.getElementById('liveClock').textContent =
+      new Date().toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  }
+  tick(); setInterval(tick, 1000);
+
+  const supa = initPharmacySupabase();
+
+  if (supa && session.pharmacyId) {
+    await loadLive(supa, session.pharmacyId);
+  } else {
+    loadDemo();
+  }
+});
+
+function loadDemo() {
+  const today = new Date().toDateString();
+  const todayOrders = MOCK_ORDERS;
+  const incoming = todayOrders.filter(o => o.status === 'incoming');
+  const active = todayOrders.filter(o => ['confirmed','preparing','ready','in_transit'].includes(o.status));
+  const delivered = [];
+
+  document.getElementById('statIncoming').textContent = incoming.length;
+  document.getElementById('statActive').textContent = active.length;
+  document.getElementById('statDelivered').textContent = delivered.length;
+  document.getElementById('statRevenue').textContent = 'UGX 0';
+  const lowStock = MOCK_INVENTORY.filter(i => i.quantity <= i.reorder_threshold);
+  document.getElementById('statLowStock').textContent = lowStock.length;
+  document.getElementById('statScore').textContent = '87%';
+
+  if (incoming.length > 0) {
+    document.getElementById('incomingAlert').style.display = 'flex';
+    document.getElementById('incomingCount').textContent = incoming.length;
+  }
+
+  renderIncomingCards(incoming, null);
+
+  document.getElementById('recentOrdersBody').innerHTML = MOCK_ORDERS.map(o => `
+    <tr>
+      <td><strong>${o.patient_name}</strong></td>
+      <td style="font-size:12px">${o.items.map(i=>i.name).join(', ')}</td>
+      <td><span class="status-badge ${o.status}">${o.status}</span></td>
+      <td style="font-weight:600">${formatUGX(o.total_cost)}</td>
+    </tr>`).join('');
+
+  document.getElementById('lowStockBody').innerHTML = MOCK_INVENTORY
+    .filter(i => i.quantity <= i.reorder_threshold)
+    .map(i => {
+      const pct = Math.min(100, Math.round(i.quantity / i.reorder_threshold * 100));
+      const cls = i.quantity === 0 ? 'low' : i.quantity <= i.reorder_threshold * 0.5 ? 'low' : 'medium';
+      return `<tr>
+        <td><strong style="font-size:13px">${i.medicine_name}</strong></td>
+        <td>
+          <div class="stock-bar-wrap">
+            <div class="stock-bar"><div class="stock-fill ${cls}" style="width:${pct}%"></div></div>
+            <span class="stock-qty">${i.quantity}</span>
+          </div>
+        </td>
+        <td><span class="status-badge ${i.quantity === 0 ? 'rejected' : 'incoming'}">${i.quantity === 0 ? 'Out of stock' : 'Low'}</span></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="3" style="text-align:center;padding:24px;color:#9AA0A6">All stock levels OK</td></tr>';
+
+  if (MOCK_INVENTORY.filter(i => i.quantity <= i.reorder_threshold).length > 0) {
+    const la = document.getElementById('lowStockAlert');
+    la.style.display = 'flex';
+    document.getElementById('lowStockMsg').textContent =
+      `${lowStock.length} item(s) below reorder threshold — restock needed`;
+  }
+}
+
+async function loadLive(supa, pharmacyId) {
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+
+  const [ordersRes, invRes, pharmRes] = await Promise.all([
+    supa.from('pharmacy_orders').select('*').eq('pharmacy_id', pharmacyId).order('created_at',{ascending:false}).limit(20),
+    supa.from('pharmacy_inventory').select('*').eq('pharmacy_id', pharmacyId),
+    supa.from('pharmacies').select('routing_score').eq('id', pharmacyId).single()
+  ]);
+
+  const orders = ordersRes.data || [];
+  const inventory = invRes.data || [];
+  const incoming = orders.filter(o => o.status === 'incoming');
+  const active = orders.filter(o => ['confirmed','preparing','ready','in_transit'].includes(o.status));
+  const todayDelivered = orders.filter(o => o.status === 'delivered' && new Date(o.updated_at) >= todayStart);
+  const todayRevenue = todayDelivered.reduce((s,o) => s + (o.total_cost||0), 0);
+  const lowStock = inventory.filter(i => i.quantity <= (i.reorder_threshold||10));
+
+  document.getElementById('statIncoming').textContent = incoming.length;
+  document.getElementById('statActive').textContent = active.length;
+  document.getElementById('statDelivered').textContent = todayDelivered.length;
+  document.getElementById('statRevenue').textContent = formatUGX(todayRevenue);
+  document.getElementById('statLowStock').textContent = lowStock.length;
+  document.getElementById('statScore').textContent = pharmRes.data?.routing_score ? pharmRes.data.routing_score + '%' : '—';
+
+  if (incoming.length > 0) {
+    document.getElementById('incomingAlert').style.display = 'flex';
+    document.getElementById('incomingCount').textContent = incoming.length;
+  }
+
+  renderIncomingCards(incoming, supa);
+
+  document.getElementById('recentOrdersBody').innerHTML = orders.slice(0,8).map(o => `
+    <tr>
+      <td><strong>${o.patient_name||'—'}</strong></td>
+      <td style="font-size:12px">${o.items ? o.items.map(i=>i.name).join(', ') : '—'}</td>
+      <td><span class="status-badge ${o.status}">${(o.status||'').replace('_',' ')}</span></td>
+      <td style="font-weight:600">${formatUGX(o.total_cost)}</td>
+    </tr>`).join('') || '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No orders yet</td></tr>';
+
+  document.getElementById('lowStockBody').innerHTML = lowStock.map(i => {
+    const pct = Math.min(100, Math.round(i.quantity / (i.reorder_threshold||10) * 100));
+    const cls = i.quantity === 0 ? 'low' : i.quantity <= (i.reorder_threshold||10) * 0.5 ? 'low' : 'medium';
+    return `<tr>
+      <td><strong style="font-size:13px">${i.medicine_name}</strong></td>
+      <td>
+        <div class="stock-bar-wrap">
+          <div class="stock-bar"><div class="stock-fill ${cls}" style="width:${pct}%"></div></div>
+          <span class="stock-qty">${i.quantity}</span>
+        </div>
+      </td>
+      <td><span class="status-badge ${i.quantity === 0 ? 'rejected' : 'incoming'}">${i.quantity === 0 ? 'Out of stock' : 'Low'}</span></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="3" style="text-align:center;padding:20px;color:#9AA0A6">All stock levels OK</td></tr>';
+
+  if (lowStock.length > 0) {
+    document.getElementById('lowStockAlert').style.display = 'flex';
+    document.getElementById('lowStockMsg').textContent = `${lowStock.length} item(s) below reorder threshold`;
+  }
+}
+
+function renderIncomingCards(incoming, supa) {
+  const el = document.getElementById('incomingOrdersList');
+  if (!incoming.length) {
+    el.innerHTML = '<div style="text-align:center;padding:28px;color:#9AA0A6;font-size:13px">No incoming orders — all caught up!</div>';
+    return;
+  }
+  el.innerHTML = incoming.map(o => {
+    const elapsed = Math.floor((Date.now() - new Date(o.created_at)) / 60000);
+    const remaining = Math.max(0, 5 - elapsed);
+    return `
+    <div class="order-card ${o.urgency === 'urgent' ? 'urgent' : ''}">
+      <div class="order-card-header">
+        <span class="order-ref">#${(o.id||'').toUpperCase().slice(-6)}</span>
+        <span class="order-urgency ${o.urgency||'standard'}">${o.urgency||'standard'}</span>
+        <span class="timer-badge">
+          <span class="material-icons-outlined" style="font-size:13px">timer</span>
+          ${remaining > 0 ? remaining + 'm left' : 'Overdue'}
+        </span>
+      </div>
+      <div class="order-meds">${o.items ? o.items.map(i => `${i.name} ×${i.qty}`).join(', ') : o.patient_name}</div>
+      <div class="order-meta">
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ${o.patient_name}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">phone</span> ${o.patient_phone||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">payments</span> ${formatUGX(o.total_cost)}</span>
+      </div>
+      <div class="order-actions">
+        <button class="btn-admin success sm" onclick="confirmOrder('${o.id}', this)">
+          <span class="material-icons-outlined" style="font-size:14px">check_circle</span> Confirm
+        </button>
+        <button class="btn-admin danger sm" onclick="rejectOrder('${o.id}', this)">
+          <span class="material-icons-outlined" style="font-size:14px">cancel</span> Reject
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+window._pharmSupa = null;
+document.addEventListener('DOMContentLoaded', () => {
+  window._pharmSupa = initPharmacySupabase();
+});
+
+window.confirmOrder = async (id, btn) => {
+  btn.disabled = true;
+  if (window._pharmSupa) {
+    const { error } = await window._pharmSupa.from('pharmacy_orders')
+      .update({ status:'confirmed', updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); btn.disabled = false; return; }
+  } else {
+    const o = MOCK_ORDERS.find(x => x.id === id);
+    if (o) o.status = 'confirmed';
+  }
+  btn.closest('.order-card').remove();
+  const remaining = document.querySelectorAll('.order-card').length;
+  document.getElementById('statIncoming').textContent = remaining;
+  if (!remaining) {
+    document.getElementById('incomingAlert').style.display = 'none';
+    document.getElementById('incomingOrdersList').innerHTML =
+      '<div style="text-align:center;padding:28px;color:#9AA0A6;font-size:13px">No incoming orders — all caught up!</div>';
+  }
+  showToast('Order confirmed!', 'success');
+};
+
+window.rejectOrder = async (id, btn) => {
+  const reason = prompt('Rejection reason (optional):') || '';
+  btn.disabled = true;
+  if (window._pharmSupa) {
+    const { error } = await window._pharmSupa.from('pharmacy_orders')
+      .update({ status:'rejected', rejection_reason: reason, updated_at: new Date().toISOString() }).eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); btn.disabled = false; return; }
+  } else {
+    const o = MOCK_ORDERS.find(x => x.id === id);
+    if (o) o.status = 'rejected';
+  }
+  btn.closest('.order-card').remove();
+  const remaining = document.querySelectorAll('.order-card').length;
+  document.getElementById('statIncoming').textContent = remaining;
+  if (!remaining) document.getElementById('incomingAlert').style.display = 'none';
+  showToast('Order rejected', 'warning');
+};
+</script>
+</body>
+</html>
