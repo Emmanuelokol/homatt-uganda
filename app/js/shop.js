@@ -42,6 +42,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     t._timer = setTimeout(() => t.classList.remove('visible'), 3200);
   }
 
+  // Custom confirm dialog — window.confirm() is broken in Capacitor WebViews
+  function showConfirm(message, okText = 'OK') {
+    return new Promise(resolve => {
+      const overlay = document.getElementById('confirmOverlay');
+      const msgEl   = document.getElementById('confirmMsg');
+      const okBtn   = document.getElementById('confirmOkBtn');
+      const cancelBtn = document.getElementById('confirmCancelBtn');
+      msgEl.textContent = message;
+      okBtn.textContent = okText;
+      overlay.style.display = 'flex';
+
+      function done(result) {
+        overlay.style.display = 'none';
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        resolve(result);
+      }
+      function onOk()     { done(true);  }
+      function onCancel() { done(false); }
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+    });
+  }
+
   // ====== Tab Switching ======
   const tabs = document.querySelectorAll('.tracker-tab');
   const panes = document.querySelectorAll('.family-pane');
@@ -265,7 +289,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Cart FAB
   document.getElementById('cartFab').addEventListener('click', openCartSheet);
 
-  function openCartSheet() {
+  // Render cart contents in place — does NOT reopen the sheet (fixes recursive call + listener pile-up)
+  function renderCartContents() {
     const listEl       = document.getElementById('cartItemsList');
     const totalRow     = document.getElementById('cartTotalRow');
     const checkoutArea = document.getElementById('cartCheckoutArea');
@@ -274,63 +299,67 @@ document.addEventListener('DOMContentLoaded', async () => {
       listEl.innerHTML = `<div class="cart-empty"><span class="material-icons-outlined">shopping_cart</span>Your cart is empty</div>`;
       totalRow.style.display = 'none';
       checkoutArea.style.display = 'none';
-    } else {
-      listEl.innerHTML = cart.map(item => `
-        <div class="cart-item">
-          <div class="cart-item-icon" style="background:${item.color}">
-            <span class="material-icons-outlined">${item.icon}</span>
-          </div>
-          <div class="cart-item-body">
-            <div class="cart-item-name">${escHtml(item.name)}</div>
-            <div class="cart-item-price">UGX ${Number(item.price).toLocaleString()} / ${item.unit || 'piece'}</div>
-          </div>
-          <div class="cart-qty-control">
-            <button class="cart-qty-btn" data-cart-id="${item.id}" data-action="dec">−</button>
-            <span class="cart-qty-val">${item.qty}</span>
-            <button class="cart-qty-btn" data-cart-id="${item.id}" data-action="inc">+</button>
-          </div>
-        </div>`).join('');
+      return;
+    }
 
-      const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-      const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : 2000;
-      document.getElementById('cartSubtotal').textContent = subtotal.toLocaleString();
-      document.getElementById('cartDeliveryFee').textContent = curDeliveryFee.toLocaleString();
-      document.getElementById('cartTotal').textContent = (subtotal + curDeliveryFee).toLocaleString();
+    listEl.innerHTML = cart.map(item => `
+      <div class="cart-item">
+        <div class="cart-item-icon" style="background:${item.color}">
+          <span class="material-icons-outlined">${item.icon}</span>
+        </div>
+        <div class="cart-item-body">
+          <div class="cart-item-name">${escHtml(item.name)}</div>
+          <div class="cart-item-price">UGX ${Number(item.price).toLocaleString()} / ${item.unit || 'piece'}</div>
+        </div>
+        <div class="cart-qty-control">
+          <button class="cart-qty-btn" data-cart-id="${item.id}" data-action="dec">−</button>
+          <span class="cart-qty-val">${item.qty}</span>
+          <button class="cart-qty-btn" data-cart-id="${item.id}" data-action="inc">+</button>
+        </div>
+      </div>`).join('');
 
-      const pharmInfo = document.getElementById('cartPharmacyInfo');
-      if (_nearestPharmacy) {
-        pharmInfo.style.display = 'block';
-        pharmInfo.innerHTML = `<span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">local_pharmacy</span>
-          Routed to: <strong>${escHtml(_nearestPharmacy.name)}</strong> — ${_nearestPharmacy.distanceKm.toFixed(1)} km away`;
+    // Single delegated listener on parent — avoids listener accumulation on every re-render
+    listEl.onclick = (e) => {
+      const btn = e.target.closest('.cart-qty-btn');
+      if (!btn) return;
+      const id  = btn.dataset.cartId;
+      const idx = cart.findIndex(c => c.id === id);
+      if (idx === -1) return;
+      if (btn.dataset.action === 'inc') {
+        cart[idx].qty++;
       } else {
-        pharmInfo.style.display = 'none';
-        getUserCoords().then(coords => {
-          if (coords) findNearestPharmacy(coords[0], coords[1]);
-        });
+        cart[idx].qty--;
+        if (cart[idx].qty <= 0) cart.splice(idx, 1);
       }
+      localStorage.setItem('homatt_cart', JSON.stringify(cart));
+      updateCartBadge();
+      renderCartContents(); // re-render cart contents only, sheet stays open
+    };
 
-      totalRow.style.display = 'block';
-      checkoutArea.style.display = 'block';
+    const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+    const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : 2000;
+    document.getElementById('cartSubtotal').textContent = subtotal.toLocaleString();
+    document.getElementById('cartDeliveryFee').textContent = curDeliveryFee.toLocaleString();
+    document.getElementById('cartTotal').textContent = (subtotal + curDeliveryFee).toLocaleString();
 
-      listEl.querySelectorAll('.cart-qty-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const id     = btn.dataset.cartId;
-          const action = btn.dataset.action;
-          const idx    = cart.findIndex(c => c.id === id);
-          if (idx === -1) return;
-          if (action === 'inc') {
-            cart[idx].qty++;
-          } else {
-            cart[idx].qty--;
-            if (cart[idx].qty <= 0) cart.splice(idx, 1);
-          }
-          localStorage.setItem('homatt_cart', JSON.stringify(cart));
-          updateCartBadge();
-          openCartSheet();
-        });
+    const pharmInfo = document.getElementById('cartPharmacyInfo');
+    if (_nearestPharmacy) {
+      pharmInfo.style.display = 'block';
+      pharmInfo.innerHTML = `<span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">local_pharmacy</span>
+        Routed to: <strong>${escHtml(_nearestPharmacy.name)}</strong> — ${_nearestPharmacy.distanceKm.toFixed(1)} km away`;
+    } else {
+      pharmInfo.style.display = 'none';
+      getUserCoords().then(coords => {
+        if (coords) findNearestPharmacy(coords[0], coords[1]);
       });
     }
 
+    totalRow.style.display = 'block';
+    checkoutArea.style.display = 'block';
+  }
+
+  function openCartSheet() {
+    renderCartContents();
     openSheet(document.getElementById('cartSheet'));
   }
 
@@ -419,20 +448,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (recentCount >= 5) {
       closeSheet(document.getElementById('cartSheet'));
       showToast('You have ordered medicine 5+ times this week. Please visit a clinic.', 'error');
-      const go = confirm(
+      const go = await showConfirm(
         'You have placed ' + recentCount + ' medicine orders in the last 7 days.\n\n' +
         'Frequent self-medication can be harmful.\n\n' +
-        'We strongly recommend visiting a clinic. Press OK to book a clinic visit.'
+        'We strongly recommend visiting a clinic. Press OK to book a clinic visit.',
+        'Book Clinic'
       );
       if (go) window.location.href = 'clinic-booking.html';
       return;
     }
 
     if (recentCount >= 3) {
-      const proceed = confirm(
+      const proceed = await showConfirm(
         'You have ordered medicine ' + recentCount + ' times in the last 7 days.\n\n' +
         'Repeated self-medication without diagnosis can be dangerous.\n\n' +
-        'We recommend visiting a clinic. Do you still want to place this order?'
+        'We recommend visiting a clinic. Do you still want to place this order?',
+        'Place Order'
       );
       if (!proceed) return;
     }
@@ -444,22 +475,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     const itemsTotal   = cart.reduce((s, c) => s + c.price * c.qty, 0);
     const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
 
+    // Fetch profile and GPS in parallel to speed up order placement
     let patientName = 'Customer', patientPhone = null, userDistrict = null;
-    try {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('first_name,last_name,phone,district')
-        .eq('id', userId)
-        .single();
-      if (prof) {
-        patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
-        patientPhone = prof.phone || null;
-        userDistrict = prof.district || null;
-      }
-    } catch(e) {}
-
     let userLat = null, userLon = null;
-    const gpsCoords = await getUserCoords();
+
+    const [profResult, gpsCoords] = await Promise.all([
+      supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single().catch(() => ({ data: null })),
+      getUserCoords()
+    ]);
+
+    if (profResult && profResult.data) {
+      const prof = profResult.data;
+      patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+      patientPhone = prof.phone || null;
+      userDistrict = prof.district || null;
+    }
+
     if (gpsCoords) {
       [userLat, userLon] = gpsCoords;
     } else if (userDistrict) {
@@ -515,15 +546,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     ordersLoaded = false; // force reload next time My Orders tab is opened
     showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
 
-    // Refresh product grid to clear cart buttons
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
+
+    // Refresh product grid to clear "in cart" buttons
     const term     = document.getElementById('shopSearch').value.toLowerCase();
     const filtered = term
       ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
       : items;
     renderItems(filtered);
-
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
   }
 
   // ====== Search ======

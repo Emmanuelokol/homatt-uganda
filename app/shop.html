@@ -184,6 +184,17 @@
       <span class="cart-badge-dot" id="cartBadgeDot">0</span>
     </button>
 
+    <!-- Custom Confirm Modal (replaces window.confirm which breaks in WebView) -->
+    <div id="confirmOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:10000;align-items:center;justify-content:center;padding:20px;box-sizing:border-box">
+      <div style="background:var(--surface,#fff);border-radius:16px;padding:22px 20px 18px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,0.3)">
+        <div id="confirmMsg" style="font-size:14px;color:var(--text-primary,#111);line-height:1.55;margin-bottom:20px;white-space:pre-line"></div>
+        <div style="display:flex;gap:10px;justify-content:flex-end">
+          <button id="confirmCancelBtn" style="padding:10px 20px;border:1.5px solid var(--border,#ddd);border-radius:20px;background:transparent;font-size:13px;font-weight:600;color:var(--text-secondary,#555);cursor:pointer;font-family:inherit">Cancel</button>
+          <button id="confirmOkBtn" style="padding:10px 20px;border:none;border-radius:20px;background:#1565C0;font-size:13px;font-weight:600;color:white;cursor:pointer;font-family:inherit">OK</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Toast -->
