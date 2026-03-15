@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0D47A1">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health - Preventive Shop</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/trackers.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+</head>
+<body>
+  <div class="phone-frame">
+
+    <!-- Status Bar -->
+    <div class="status-bar" style="background:#0D47A1">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+
+      <!-- Shop Header -->
+      <div class="family-header">
+        <div class="family-header-top">
+          <div>
+            <div class="family-header-title">Preventive Shop</div>
+            <div class="family-header-sub">Health products delivered to your door</div>
+          </div>
+          <button class="family-add-btn" id="shopCartHeaderBtn" title="View cart" style="position:relative">
+            <span class="material-icons-outlined">shopping_cart</span>
+            <span class="cart-badge-dot" id="cartHeaderBadge" style="top:-6px;right:-6px">0</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tracker-tabs" style="border-bottom-color:rgba(13,71,161,0.2)">
+        <button class="tracker-tab active" data-tab="products" id="tabProducts">
+          <span class="material-icons-outlined">storefront</span>
+          Products
+        </button>
+        <button class="tracker-tab" data-tab="orders" id="tabOrders">
+          <span class="material-icons-outlined">receipt_long</span>
+          My Orders
+        </button>
+      </div>
+
+      <!-- =========================================
+           TAB 1: PRODUCTS
+           ========================================= -->
+      <div class="family-pane active" id="pane-products">
+
+        <!-- Search -->
+        <div class="shop-search-wrap">
+          <span class="material-icons-outlined">search</span>
+          <input type="text" class="shop-search-input" id="shopSearch" placeholder="Search health products...">
+        </div>
+
+        <!-- Categories scroll -->
+        <div class="category-scroll" id="categoryScroll">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Items section title -->
+        <div class="items-section-title" id="itemsSectionTitle">All Products</div>
+
+        <!-- Items grid -->
+        <div class="items-grid" id="itemsGrid">
+          <!-- Populated by JS -->
+        </div>
+
+        <!-- Loading state -->
+        <div id="shopLoading" style="text-align:center;padding:40px 20px;color:var(--text-hint);font-size:13px">
+          <span class="material-icons-outlined" style="font-size:40px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
+          Loading products...
+        </div>
+
+      </div>
+
+      <!-- =========================================
+           TAB 2: MY ORDERS
+           ========================================= -->
+      <div class="family-pane" id="pane-orders">
+
+        <div id="ordersLoading" style="text-align:center;padding:40px 20px;color:var(--text-hint);font-size:13px">
+          <span class="material-icons-outlined" style="font-size:40px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
+          Loading orders...
+        </div>
+
+        <div id="ordersList" style="padding:0 16px 16px"></div>
+
+      </div>
+
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item" onclick="window.location.href='dashboard.html'">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='family.html'">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item active">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
+      <div class="nav-item" onclick="window.location.href='profile.html'">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+
+    <!-- =========================================
+         OVERLAYS & SHEETS
+         ========================================= -->
+    <div class="sheet-overlay" id="sheetOverlay"></div>
+
+    <!-- Cart Sheet -->
+    <div class="bottom-sheet" id="cartSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Your Cart</span>
+        <button class="sheet-close-btn" id="closeCartSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" id="cartScrollBody">
+        <div id="cartItemsList"></div>
+        <div id="cartTotalRow" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--text-secondary)">
+            <span>Items subtotal</span>
+            <span>UGX <span id="cartSubtotal">0</span></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--text-secondary)">
+            <span>
+              <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:2px">local_shipping</span>
+              Delivery fee
+            </span>
+            <span>UGX <span id="cartDeliveryFee">2,000</span></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);margin-top:4px;font-weight:700;font-size:14px">
+            <span>Total</span>
+            <span class="cart-total-amount">UGX <span id="cartTotal">0</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="cart-checkout-footer" id="cartCheckoutArea" style="display:none">
+        <div id="cartPharmacyInfo" style="display:none;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px;font-size:11px;color:#0D47A1"></div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">location_on</span>
+            Delivery Address *
+          </label>
+          <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+        <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:7px 10px;margin-bottom:10px;font-size:11px;color:#1B5E20">
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
+          Payment on delivery (cash). We will call to confirm your order.
+        </div>
+        <button class="cart-checkout-btn" id="cartCheckoutBtn">
+          <span class="material-icons-outlined">shopping_bag</span>
+          Place Order
+        </button>
+      </div>
+    </div>
+
+    <!-- Cart FAB -->
+    <button class="cart-fab" id="cartFab">
+      <span class="material-icons-outlined">shopping_cart</span>
+      <span class="cart-badge-dot" id="cartBadgeDot">0</span>
+    </button>
+
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="shopToast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/shop.js"></script>
+  <script src="js/native-bridge.js"></script>
+</body>
+</html>

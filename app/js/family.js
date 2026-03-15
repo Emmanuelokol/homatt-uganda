@@ -89,34 +89,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       detailPanelTab.style.visibility = 'hidden';
     }
     logEventForMemberId = null;
-
-    // Cart FAB only on shop tab
-    const cartFab = document.getElementById('cartFab');
-    if (target === 'shop') {
-      cartFab.classList.add('visible');
-      if (categories.length === 0) loadShop();
-      // Bottom nav: Shop active
-      document.getElementById('bottomNavFamily').classList.remove('active');
-      document.getElementById('bottomNavShop').classList.add('active');
-    } else {
-      cartFab.classList.remove('visible');
-      // Bottom nav: Family active
-      document.getElementById('bottomNavFamily').classList.add('active');
-      document.getElementById('bottomNavShop').classList.remove('active');
-    }
   }
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => activateTab(tab.dataset.tab));
   });
 
-  // Bottom nav clicks
-  document.getElementById('bottomNavFamily').addEventListener('click', () => activateTab('members'));
-  document.getElementById('bottomNavShop').addEventListener('click', () => activateTab('shop'));
+  // Bottom nav: Family always active on this page
+  const bottomNavFamily = document.getElementById('bottomNavFamily');
+  if (bottomNavFamily) bottomNavFamily.classList.add('active');
 
-  // Auto-activate shop tab if #shop hash in URL
-  const startTab = window.location.hash === '#shop' ? 'shop' : 'members';
-  activateTab(startTab);
+  activateTab('members');
 
   // ====== Load family members ======
   async function loadMembers() {
@@ -561,16 +544,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateCartBadge() {
-    const total = cart.reduce((s, c) => s + c.qty, 0);
-    const badge = document.getElementById('cartBadgeDot');
-    badge.textContent = total;
-    badge.classList.toggle('visible', total > 0);
+    // Cart badge lives on shop.html — no-op here
   }
-
-  updateCartBadge();
-
-  // Cart sheet
-  document.getElementById('cartFab').addEventListener('click', openCartSheet);
 
   function openCartSheet() {
     const listEl = document.getElementById('cartItemsList');

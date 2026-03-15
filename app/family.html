@@ -52,10 +52,6 @@
           <span class="material-icons-outlined">medication</span>
           Prescriptions
         </button>
-        <button class="tracker-tab" data-tab="shop" id="tabShop">
-          <span class="material-icons-outlined">storefront</span>
-          Shop
-        </button>
       </div>
 
       <!-- =========================================
@@ -107,37 +103,6 @@
 
       </div>
 
-      <!-- =========================================
-           TAB 3: PREVENTION MARKETPLACE
-           ========================================= -->
-      <div class="family-pane" id="pane-shop">
-
-        <!-- Search -->
-        <div class="shop-search-wrap">
-          <span class="material-icons-outlined">search</span>
-          <input type="text" class="shop-search-input" id="shopSearch" placeholder="Search health products...">
-        </div>
-
-        <!-- Categories scroll -->
-        <div class="category-scroll" id="categoryScroll">
-          <!-- Populated by JS -->
-        </div>
-
-        <!-- Items section title -->
-        <div class="items-section-title" id="itemsSectionTitle">All Products</div>
-
-        <!-- Items grid -->
-        <div class="items-grid" id="itemsGrid">
-          <!-- Populated by JS -->
-        </div>
-
-        <!-- Loading state -->
-        <div id="shopLoading" style="text-align:center;padding:32px 20px;color:var(--text-hint);font-size:13px;display:none">
-          <span class="material-icons-outlined" style="font-size:32px;color:var(--border);display:block;margin-bottom:8px">hourglass_empty</span>
-          Loading products...
-        </div>
-
-      </div>
 
     </div>
 
@@ -147,11 +112,11 @@
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
       </div>
-      <div class="nav-item" id="bottomNavFamily">
+      <div class="nav-item active" id="bottomNavFamily">
         <span class="material-icons-outlined">family_restroom</span>
         <span class="nav-label">Family</span>
       </div>
-      <div class="nav-item" id="bottomNavShop">
+      <div class="nav-item" onclick="window.location.href='shop.html'">
         <span class="material-icons-outlined">storefront</span>
         <span class="nav-label">Shop</span>
       </div>
@@ -574,62 +539,6 @@
       </div>
     </div>
 
-    <!-- Cart Sheet -->
-    <div class="bottom-sheet" id="cartSheet">
-      <div class="sheet-handle"></div>
-      <div class="sheet-header">
-        <span class="sheet-title">Your Cart</span>
-        <button class="sheet-close-btn" id="closeCartSheet">
-          <span class="material-icons-outlined">close</span>
-        </button>
-      </div>
-      <!-- Scrollable items + totals area -->
-      <div class="sheet-body" id="cartScrollBody">
-        <div id="cartItemsList"></div>
-        <div id="cartTotalRow" style="display:none">
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--text-secondary)">
-            <span>Items subtotal</span>
-            <span>UGX <span id="cartSubtotal">0</span></span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;font-size:13px;color:var(--text-secondary)">
-            <span>
-              <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:2px">local_shipping</span>
-              Delivery fee
-            </span>
-            <span id="cartDeliveryFeeRow">UGX <span id="cartDeliveryFee">2,000</span></span>
-          </div>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-top:1px solid var(--border);margin-top:4px;font-weight:700;font-size:14px">
-            <span>Total</span>
-            <span class="cart-total-amount">UGX <span id="cartTotal">0</span></span>
-          </div>
-        </div>
-      </div>
-      <!-- Sticky checkout footer — always visible at the bottom of the sheet -->
-      <div class="cart-checkout-footer" id="cartCheckoutArea" style="display:none">
-        <div id="cartPharmacyInfo" style="display:none;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px;font-size:11px;color:#0D47A1"></div>
-        <div style="margin-bottom:8px">
-          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px">
-            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">location_on</span>
-            Delivery Address *
-          </label>
-          <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
-        </div>
-        <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:7px 10px;margin-bottom:10px;font-size:11px;color:#1B5E20">
-          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
-          Payment on delivery (cash). We will call to confirm your order.
-        </div>
-        <button class="cart-checkout-btn" id="cartCheckoutBtn" onclick="submitOrder()">
-          <span class="material-icons-outlined">shopping_bag</span>
-          Place Order
-        </button>
-      </div>
-    </div>
-
-    <!-- Cart FAB -->
-    <button class="cart-fab" id="cartFab">
-      <span class="material-icons-outlined">shopping_cart</span>
-      <span class="cart-badge-dot" id="cartBadgeDot">0</span>
-    </button>
 
   </div>
 
