@@ -211,6 +211,39 @@
   </div>
 </div>
 
+<!-- Dispatch to Rider Modal -->
+<div class="admin-modal-overlay" id="dispatchModal" style="display:none">
+  <div class="admin-modal" style="max-width:480px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">
+        <span class="material-icons-outlined" style="vertical-align:middle;margin-right:6px;color:#1B5E20">local_shipping</span>
+        Dispatch Order to Rider
+      </div>
+      <button class="admin-modal-close" onclick="document.getElementById('dispatchModal').style.display='none'"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Select an available rider to assign this delivery. The rider will see it immediately in their portal.</p>
+      <div class="admin-form-group">
+        <label>Select Rider *</label>
+        <select id="dispatchRiderSelect" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit">
+          <option value="">Loading riders…</option>
+        </select>
+      </div>
+      <div id="dispatchRiderInfo" style="display:none;background:#E8F5E9;border-radius:8px;padding:10px 14px;margin-top:10px;font-size:13px;color:#1B5E20"></div>
+      <div class="admin-form-group" style="margin-top:12px">
+        <label>Delivery Fee (UGX)</label>
+        <input type="number" id="dispatchEarnings" placeholder="e.g. 5000" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit">
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="document.getElementById('dispatchModal').style.display='none'">Cancel</button>
+      <button class="btn-admin primary" id="confirmDispatchBtn">
+        <span class="material-icons-outlined" style="font-size:16px">local_shipping</span> Confirm Dispatch
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- Manage Categories Modal -->
 <div class="admin-modal-overlay" id="categoriesModal" style="display:none">
   <div class="admin-modal" style="max-width:500px">
@@ -571,15 +604,94 @@ async function loadOrders() {
 }
 
 window.updateOrderStatus = async function(id, status) {
+  if (status === 'dispatched') {
+    await openDispatchModal(id);
+    return;
+  }
   const extra = {};
-  if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
-  if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
-  if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
+  if (status === 'confirmed') extra.confirmed_at = new Date().toISOString();
+  if (status === 'delivered') extra.delivered_at = new Date().toISOString();
   const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
   await loadOrders();
   showAdminToast('Order marked as ' + status, 'success');
 };
+
+async function openDispatchModal(orderId) {
+  const modal = document.getElementById('dispatchModal');
+  const select = document.getElementById('dispatchRiderSelect');
+  const infoBox = document.getElementById('dispatchRiderInfo');
+  const earningsInput = document.getElementById('dispatchEarnings');
+
+  // Pre-fill earnings from order delivery_fee
+  const order = allOrders.find(o => o.id === orderId);
+  if (order?.delivery_fee) earningsInput.value = order.delivery_fee;
+
+  select.innerHTML = '<option value="">Loading…</option>';
+  infoBox.style.display = 'none';
+  modal.style.display = 'flex';
+
+  // Load available riders
+  const { data: riders, error } = await adminDb
+    .from('riders')
+    .select('id, full_name, phone, vehicle_type, available, plate_number')
+    .eq('active', true)
+    .order('full_name');
+
+  if (error || !riders?.length) {
+    select.innerHTML = '<option value="">No active riders found</option>';
+    showAdminToast('Could not load riders: ' + (error?.message || 'none available'), 'error');
+    return;
+  }
+
+  select.innerHTML = '<option value="">— Select a rider —</option>' +
+    riders.map(r => `<option value="${r.id}" data-phone="${r.phone||''}" data-vehicle="${r.vehicle_type||'Boda'}" data-plate="${r.plate_number||''}" data-available="${r.available}">
+      ${r.full_name}${r.available ? ' ✓ Available' : ' (Busy)'}
+    </option>`).join('');
+
+  select.onchange = () => {
+    const opt = select.options[select.selectedIndex];
+    if (!opt.value) { infoBox.style.display = 'none'; return; }
+    infoBox.style.display = 'block';
+    infoBox.innerHTML = `
+      <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">electric_moped</span>
+      <strong>${opt.text.replace(/ [✓(].*/, '').trim()}</strong> &nbsp;|&nbsp;
+      ${opt.dataset.vehicle} · ${opt.dataset.plate || 'No plate'} &nbsp;|&nbsp;
+      📞 ${opt.dataset.phone || '—'} &nbsp;|&nbsp;
+      ${opt.dataset.available === 'true' ? '<span style="color:#2E7D32;font-weight:600">Available</span>' : '<span style="color:#E65100">Busy</span>'}
+    `;
+  };
+
+  // Confirm dispatch handler
+  document.getElementById('confirmDispatchBtn').onclick = async () => {
+    const riderId = select.value;
+    if (!riderId) { showAdminToast('Please select a rider', 'error'); return; }
+    const earnings = parseInt(earningsInput.value) || order?.delivery_fee || 2000;
+
+    // 1. Update marketplace_orders to dispatched
+    const now = new Date().toISOString();
+    const { error: orderErr } = await adminDb
+      .from('marketplace_orders')
+      .update({ status: 'dispatched', dispatched_at: now, updated_at: now })
+      .eq('id', orderId);
+    if (orderErr) { showAdminToast('Order update failed: ' + orderErr.message, 'error'); return; }
+
+    // 2. Create rider_deliveries record so rider sees it immediately
+    const { error: rdErr } = await adminDb
+      .from('rider_deliveries')
+      .insert({ order_id: orderId, rider_user_id: riderId, status: 'pending', earnings });
+    if (rdErr) {
+      // Rollback order status if rider assignment fails
+      await adminDb.from('marketplace_orders').update({ status: 'confirmed', dispatched_at: null, updated_at: now }).eq('id', orderId);
+      showAdminToast('Rider assignment failed: ' + rdErr.message, 'error');
+      return;
+    }
+
+    modal.style.display = 'none';
+    await loadOrders();
+    showAdminToast('Order dispatched! Rider notified.', 'success');
+  };
+}
 
 // Wait up to 5 seconds for the Supabase SDK CDN script to finish loading
 function waitForSupabaseSDK(maxMs = 5000) {

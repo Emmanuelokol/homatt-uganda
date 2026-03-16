@@ -344,12 +344,8 @@ function stopGpsTracking() {
 async function loadLive(supa, riderId) {
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
 
-  // Resolve rider_user_id from portal_users if needed
-  let riderUserId = riderId;
-  try {
-    const { data: pu } = await supa.from('portal_users').select('rider_user_id').eq('id', riderId).maybeSingle();
-    if (pu?.rider_user_id) riderUserId = pu.rider_user_id;
-  } catch(_e) {}
+  // riderId == riders.id (set from portal_users.rider_id at login)
+  const riderUserId = riderId;
 
   const [pendingRes, activeRes, completedRes] = await Promise.all([
     supa.from('rider_deliveries')
