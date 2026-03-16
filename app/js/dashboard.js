@@ -292,6 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ====== Bottom Nav ======
   document.getElementById('navFamily').addEventListener('click', () => { window.location.href = 'family.html'; });
+  document.getElementById('navShop').addEventListener('click', () => { window.location.href = 'shop.html'; });
   document.getElementById('navProfile').addEventListener('click', () => { window.location.href = 'profile.html'; });
 
   // Notification bell — slide-up panel
