@@ -71,8 +71,8 @@ body {
   .phone-frame {
     border-radius: 0;
     box-shadow: none;
-    height: 100dvh;        /* dynamic viewport height — no chrome overlap */
     height: 100vh;         /* fallback for older Android */
+    height: 100dvh;        /* dynamic viewport height — no chrome overlap */
     max-width: 100%;
   }
   /* Hide the fake status bar — phone already has one */
