@@ -70,16 +70,19 @@ body {
     background: var(--background);
     padding: 0;
     align-items: flex-start;
-    /* Capacitor "resize:body" sets body.style.height = viewport - keyboardHeight.
-       We need body to have a base height so the phone-frame (height:100%) tracks it. */
+    /* Capacitor "resize:body" works by setting body.style.height = viewportH - keyboardH.
+       The global body { min-height:100vh } would override that inline resize and keep the
+       body full-height, so the phone-frame would never shrink for the keyboard.
+       Setting min-height:0 here lets Capacitor's inline resize take effect. */
+    min-height: 0;
     height: 100dvh;
-    height: 100svh;        /* svh = stable viewport height, never changes with keyboard */
+    height: 100svh;        /* svh = stable viewport height — baseline before keyboard opens */
   }
   .phone-frame {
     border-radius: 0;
     box-shadow: none;
-    /* Follow body height — when Capacitor resizes body for keyboard, frame shrinks too,
-       so the bottom-sheet (position:absolute; bottom:0) rises above the keyboard. */
+    /* height:100% tracks body. When Capacitor shrinks body for the keyboard,
+       the frame shrinks too, so position:absolute; bottom:0 sheets rise above it. */
     height: 100%;
     max-width: 100%;
   }
