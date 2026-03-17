@@ -107,17 +107,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ====== Sheet Helpers ======
   const overlay = document.getElementById('sheetOverlay');
+  const appScreen = document.querySelector('.app-screen');
 
   function openSheet(el) {
     overlay.classList.add('visible');
     el.classList.add('open');
-    document.body.style.overflow = 'hidden';
+    // Lock the scrollable content area, NOT the body.
+    // Setting body.overflow:hidden conflicts with Capacitor's "resize:body" keyboard mode,
+    // which shrinks body.style.height when the keyboard opens — keeping body overflow
+    // unrestricted lets that resize propagate correctly so the sheet rises above the keyboard.
+    if (appScreen) appScreen.style.overflowY = 'hidden';
   }
 
   function closeSheet(el) {
     overlay.classList.remove('visible');
     el.classList.remove('open');
-    document.body.style.overflow = '';
+    if (appScreen) appScreen.style.overflowY = '';
   }
 
   overlay.addEventListener('click', () => {

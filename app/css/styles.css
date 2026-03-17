@@ -63,16 +63,24 @@ body {
 
 /* On actual mobile, remove the frame and status bar */
 @media (max-width: 430px) {
+  html {
+    height: 100%;
+  }
   body {
     background: var(--background);
     padding: 0;
     align-items: flex-start;
+    /* Capacitor "resize:body" sets body.style.height = viewport - keyboardHeight.
+       We need body to have a base height so the phone-frame (height:100%) tracks it. */
+    height: 100dvh;
+    height: 100svh;        /* svh = stable viewport height, never changes with keyboard */
   }
   .phone-frame {
     border-radius: 0;
     box-shadow: none;
-    height: 100vh;         /* fallback for older Android */
-    height: 100dvh;        /* dynamic viewport height — no chrome overlap */
+    /* Follow body height — when Capacitor resizes body for keyboard, frame shrinks too,
+       so the bottom-sheet (position:absolute; bottom:0) rises above the keyboard. */
+    height: 100%;
     max-width: 100%;
   }
   /* Hide the fake status bar — phone already has one */

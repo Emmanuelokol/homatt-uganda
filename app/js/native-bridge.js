@@ -113,10 +113,24 @@
 
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open');
-      // Scroll focused element into view after keyboard finishes animating in
+      // Scroll focused element into view after keyboard finishes animating in.
+      // Skip inputs inside a bottom-sheet: with Capacitor "resize:body" the body shrinks
+      // and the sheet rises above the keyboard automatically — calling scrollIntoView here
+      // on a sticky-footer input (outside sheet-body's scroll container) would try to
+      // scroll the body which has overflow:hidden set by some pages, causing a visual jump.
       setTimeout(() => {
         const el = document.activeElement;
-        if (el && el !== document.body) {
+        if (!el || el === document.body) return;
+        const sheet = el.closest('.bottom-sheet');
+        if (sheet) {
+          // Input is inside a bottom-sheet. The sheet body can scroll if needed.
+          const sheetBody = sheet.querySelector('.sheet-body');
+          if (sheetBody && sheetBody.contains(el)) {
+            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+          // If input is in the sticky footer area, it's already at the visible bottom —
+          // no scrolling needed; the Capacitor body resize moves the whole sheet up.
+        } else {
           el.scrollIntoView({ block: 'center', behavior: 'instant' });
         }
       }, 300);
