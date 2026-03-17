@@ -37,7 +37,8 @@
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "none"
+      "resize": "body",
+      "resizeOnFullScreen": true
     },
     "Camera": {
       "permissions": ["camera", "photos"]
