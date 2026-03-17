@@ -16,7 +16,6 @@
   },
   "android": {
     "allowMixedContent": false,
-    "captureInput": true,
     "webContentsDebuggingEnabled": false,
     "backgroundColor": "#1B5E20",
     "minWebViewVersion": 60
@@ -38,8 +37,7 @@
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "body",
-      "resizeOnFullScreen": true
+      "resize": "none"
     },
     "Camera": {
       "permissions": ["camera", "photos"]

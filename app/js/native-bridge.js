@@ -93,20 +93,12 @@
 
   // ─── KEYBOARD ────────────────────────────────────────────────────────────────
   function initKeyboard() {
-    // Scroll focused input above keyboard whenever any input gains focus inside a sheet
-    document.addEventListener('focusin', (e) => {
-      const el = e.target;
-      if (!el || !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
-      // Delay to let keyboard animate in first
-      setTimeout(() => {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }, 300);
-    }, { passive: true });
-
-    // Tap outside any input/textarea/select → blur immediately to dismiss keyboard fast
-    document.addEventListener('touchstart', (e) => {
+    // Tap outside any input/textarea/select → blur to dismiss keyboard.
+    // Use touchend (not touchstart) so taps on buttons near inputs still fire correctly.
+    document.addEventListener('touchend', (e) => {
       const tag = e.target && e.target.tagName;
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+      const interactiveTags = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'LABEL'];
+      if (!interactiveTags.includes(tag)) {
         const active = document.activeElement;
         if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
           active.blur();
@@ -121,13 +113,13 @@
 
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open');
-      // Re-scroll focused element into view after keyboard appears
+      // Scroll focused element into view after keyboard finishes animating in
       setTimeout(() => {
         const el = document.activeElement;
         if (el && el !== document.body) {
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+          el.scrollIntoView({ block: 'center', behavior: 'instant' });
         }
-      }, 350);
+      }, 300);
     });
 
     Keyboard.addListener('keyboardWillHide', () => {
