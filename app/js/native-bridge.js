@@ -118,6 +118,8 @@
       // and the sheet rises above the keyboard automatically — calling scrollIntoView here
       // on a sticky-footer input (outside sheet-body's scroll container) would try to
       // scroll the body which has overflow:hidden set by some pages, causing a visual jump.
+      // 450ms: Android keyboard animation is ~300ms; we wait until it fully settles
+      // before scrolling so our scroll doesn't compete with the resize animation.
       setTimeout(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return;
@@ -126,25 +128,26 @@
           // Input is inside a bottom-sheet. The sheet body can scroll if needed.
           const sheetBody = sheet.querySelector('.sheet-body');
           if (sheetBody && sheetBody.contains(el)) {
-            el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            // behavior:'instant' — CSS scroll-behavior was removed from .app-screen
+            // so smooth would be fine here, but instant is safer during layout shifts.
+            el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
           }
           // If input is in the sticky footer area, it's already at the visible bottom —
           // no scrolling needed; the Capacitor body resize moves the whole sheet up.
         } else {
-          // Directly scroll .app-screen to center the input.
-          // We avoid el.scrollIntoView() here because .app-screen has CSS
-          // scroll-behavior:smooth, which conflicts with behavior:'instant' in
-          // Android WebView and causes the page to freeze or visually break.
+          // Directly scroll .app-screen to bring the input into view.
+          // Use behavior:'instant' — scroll-behavior:smooth was removed from .app-screen
+          // CSS to prevent double-animation during Capacitor keyboard resize.
           const scroller = el.closest('.app-screen') || document.querySelector('.app-screen');
           if (scroller) {
             const elRect = el.getBoundingClientRect();
             const scrollerRect = scroller.getBoundingClientRect();
             const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
               - (scroller.clientHeight / 2) + (elRect.height / 2);
-            scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+            scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
           }
         }
-      }, 300);
+      }, 450);
     });
 
     Keyboard.addListener('keyboardWillHide', () => {

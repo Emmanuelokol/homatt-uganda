@@ -117,7 +117,10 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  /* NOTE: scroll-behavior:smooth intentionally removed.
+     On Android WebView with Capacitor resize:body, CSS smooth scroll causes
+     the viewport-resize scroll event (triggered when keyboard opens) to animate,
+     which conflicts with any JS scrollTo() call, producing a visual freeze. */
 }
 
 .app-screen::-webkit-scrollbar {
@@ -997,7 +1000,6 @@ body.keyboard-open .sheet-body {
 /* ============================================
    PERFORMANCE — GPU layers for animated elements
    ============================================ */
-.app-screen,
 .bottom-nav,
 .dash-header,
 .tracker-tabs,
@@ -1006,6 +1008,15 @@ body.keyboard-open .sheet-body {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   will-change: transform;
+}
+/* .app-screen intentionally excluded from will-change:transform.
+   Applying will-change:transform to an overflow scroll container on Android
+   WebView causes compositing conflicts during keyboard-driven viewport resizes,
+   contributing to the input-focus freeze. translateZ(0) hardware acceleration
+   is still applied separately via the scroll performance block below. */
+.app-screen {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Smooth scroll on Android Chrome */
