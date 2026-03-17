@@ -184,7 +184,7 @@
           </div>
           <div class="tracker-input-group">
             <label class="tracker-label">Basal Body Temp (°C) <span class="tracker-label-hint">(optional)</span></label>
-            <input type="number" id="bbt" class="tracker-date-input" placeholder="e.g. 36.5" min="35" max="39" step="0.1">
+            <input type="number" id="bbt" class="tracker-date-input" placeholder="e.g. 36.5" min="35" max="39" step="0.1" autocomplete="off" inputmode="decimal">
           </div>
         </div>
 
@@ -194,7 +194,7 @@
             <span class="material-icons-outlined">notes</span>
             Notes
           </div>
-          <textarea id="cycleNotes" class="tracker-notes-input" placeholder="Any other observations..."></textarea>
+          <textarea id="cycleNotes" class="tracker-notes-input" placeholder="Any other observations..." autocomplete="off" spellcheck="false"></textarea>
         </div>
 
         <button class="btn btn-next log-submit-btn" id="saveCycleLog">

@@ -131,7 +131,18 @@
           // If input is in the sticky footer area, it's already at the visible bottom —
           // no scrolling needed; the Capacitor body resize moves the whole sheet up.
         } else {
-          el.scrollIntoView({ block: 'center', behavior: 'instant' });
+          // Directly scroll .app-screen to center the input.
+          // We avoid el.scrollIntoView() here because .app-screen has CSS
+          // scroll-behavior:smooth, which conflicts with behavior:'instant' in
+          // Android WebView and causes the page to freeze or visually break.
+          const scroller = el.closest('.app-screen') || document.querySelector('.app-screen');
+          if (scroller) {
+            const elRect = el.getBoundingClientRect();
+            const scrollerRect = scroller.getBoundingClientRect();
+            const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+              - (scroller.clientHeight / 2) + (elRect.height / 2);
+            scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' });
+          }
         }
       }, 300);
     });

@@ -119,7 +119,7 @@
           </div>
           <div class="tracker-input-group">
             <label class="tracker-label">Duration (hours)</label>
-            <input type="number" id="painDuration" class="tracker-date-input" placeholder="e.g. 2.5" min="0" max="72" step="0.5">
+            <input type="number" id="painDuration" class="tracker-date-input" placeholder="e.g. 2.5" min="0" max="72" step="0.5" autocomplete="off" inputmode="decimal">
           </div>
           <div class="tracker-input-group">
             <label class="tracker-label">Time of Day</label>
@@ -141,7 +141,7 @@
           </div>
           <div class="tracker-input-group">
             <label class="tracker-label">What triggered it? <span class="tracker-label-hint">(optional)</span></label>
-            <input type="text" id="painTrigger" class="tracker-date-input" placeholder="e.g. stress, physical activity, food...">
+            <input type="text" id="painTrigger" class="tracker-date-input" placeholder="e.g. stress, physical activity, food..." autocomplete="off" spellcheck="false">
           </div>
           <div class="tracker-input-group">
             <label class="tracker-label">Relief Methods Tried</label>
@@ -178,7 +178,7 @@
             <span class="material-icons-outlined">notes</span>
             Notes
           </div>
-          <textarea id="painNotes" class="tracker-notes-input" placeholder="Describe the pain in your own words..."></textarea>
+          <textarea id="painNotes" class="tracker-notes-input" placeholder="Describe the pain in your own words..." autocomplete="off" spellcheck="false"></textarea>
         </div>
 
         <button class="btn btn-next log-submit-btn" id="savePainLog" style="background:#D32F2F;box-shadow:0 4px 12px rgba(211,47,47,0.25)">
