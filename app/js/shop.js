@@ -441,38 +441,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (cart.length === 0) return;
 
-    // Self-medication frequency guard
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-    const { data: recentOrders } = await supabase
-      .from('marketplace_orders')
-      .select('id')
-      .eq('user_id', userId)
-      .gte('created_at', sevenDaysAgo);
-    const recentCount = (recentOrders || []).length;
-
-    if (recentCount >= 5) {
-      closeSheet(document.getElementById('cartSheet'));
-      showToast('You have ordered medicine 5+ times this week. Please visit a clinic.', 'error');
-      const go = await showConfirm(
-        'You have placed ' + recentCount + ' medicine orders in the last 7 days.\n\n' +
-        'Frequent self-medication can be harmful.\n\n' +
-        'We strongly recommend visiting a clinic. Press OK to book a clinic visit.',
-        'Book Clinic'
-      );
-      if (go) window.location.href = 'clinic-booking.html';
-      return;
-    }
-
-    if (recentCount >= 3) {
-      const proceed = await showConfirm(
-        'You have ordered medicine ' + recentCount + ' times in the last 7 days.\n\n' +
-        'Repeated self-medication without diagnosis can be dangerous.\n\n' +
-        'We recommend visiting a clinic. Do you still want to place this order?',
-        'Place Order'
-      );
-      if (!proceed) return;
-    }
-
     const btn = document.getElementById('cartCheckoutBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Placing order…';

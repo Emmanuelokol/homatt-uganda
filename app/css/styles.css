@@ -96,11 +96,15 @@ body {
     display: none !important;
   }
 
-  /* When keyboard is open, cap bottom-sheet height so it never extends
-     behind the keyboard. Capacitor shrinks body, so 88% of the shrunken
-     body is the correct max — but avoid sheets taller than the visible area. */
-  body.keyboard-open .bottom-sheet {
-    max-height: 92%;
+  /* When keyboard is open and a bottom-sheet is visible, force it to fill the
+     entire visible area (the shrunken phone-frame = viewport minus keyboard).
+     This prevents the "blank gray / freeze" state where the sheet was sized for
+     the full-height frame but the frame shrank under it, leaving content off-screen.
+     height:100% + max-height:100% gives the sheet a definite height so that
+     sheet-body (flex:1; overflow-y:auto) has room to scroll. */
+  body.keyboard-open .bottom-sheet.open {
+    height: 100%;
+    max-height: 100%;
   }
 }
 
