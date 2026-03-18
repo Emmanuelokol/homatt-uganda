@@ -65,6 +65,11 @@ body {
 @media (max-width: 430px) {
   html {
     height: 100%;
+    /* CRITICAL: When Capacitor's resize:body shrinks <body> height to push content
+       above the keyboard, the area below <body> inside the <html> element would
+       expose the WebView's native background (black). Setting background here
+       ensures a seamless colour fill and prevents the black gap. */
+    background: var(--background);
   }
   body {
     background: var(--background);
@@ -89,6 +94,13 @@ body {
   /* Hide the fake status bar — phone already has one */
   .status-bar {
     display: none !important;
+  }
+
+  /* When keyboard is open, cap bottom-sheet height so it never extends
+     behind the keyboard. Capacitor shrinks body, so 88% of the shrunken
+     body is the correct max — but avoid sheets taller than the visible area. */
+  body.keyboard-open .bottom-sheet {
+    max-height: 92%;
   }
 }
 
