@@ -79,26 +79,26 @@
 
         <!-- Add Money Section -->
         <div class="wallet-section">
-          <div class="wallet-section-title">Add Money</div>
-          <div class="payment-method-item" id="mtnBtn">
+          <div class="wallet-section-title">Add Money via Mobile Money</div>
+          <div class="payment-method-item" id="mtnBtn" style="cursor:pointer">
             <div class="payment-method-icon pm-mtn">
               <span class="material-icons-outlined">smartphone</span>
             </div>
             <div class="payment-method-text">
               <div class="payment-method-name">MTN Mobile Money</div>
-              <div class="payment-method-sub">Deposit via MTN MoMo</div>
+              <div class="payment-method-sub">Instant top-up via MTN MoMo</div>
             </div>
-            <span class="coming-soon-chip">Coming Soon</span>
+            <span class="material-icons-outlined" style="color:var(--text-hint);font-size:18px">chevron_right</span>
           </div>
-          <div class="payment-method-item" id="airtelBtn">
+          <div class="payment-method-item" id="airtelBtn" style="cursor:pointer">
             <div class="payment-method-icon pm-airtel">
               <span class="material-icons-outlined">smartphone</span>
             </div>
             <div class="payment-method-text">
               <div class="payment-method-name">Airtel Money</div>
-              <div class="payment-method-sub">Deposit via Airtel Money</div>
+              <div class="payment-method-sub">Instant top-up via Airtel Money</div>
             </div>
-            <span class="coming-soon-chip">Coming Soon</span>
+            <span class="material-icons-outlined" style="color:var(--text-hint);font-size:18px">chevron_right</span>
           </div>
           <div class="payment-method-item" id="cardBtn">
             <div class="payment-method-icon pm-card">
@@ -237,6 +237,87 @@
         <button class="sheet-submit-btn" id="confirmDepositBtn">
           <span class="material-icons-outlined">add_circle</span>
           Record Deposit
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Money Payment Sheet -->
+    <div class="bottom-sheet" id="momoSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title" id="momoSheetTitle">Pay with Mobile Money</span>
+        <button class="sheet-close-btn" id="closeMomoSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <!-- Wallet selector -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Top-up Wallet</label>
+          <div class="wallet-type-toggle">
+            <button class="wt-option selected" id="momoWtFamily">
+              <span class="material-icons-outlined" style="font-size:16px;display:block;margin-bottom:2px">account_balance_wallet</span>
+              Family Wallet
+            </button>
+            <button class="wt-option" id="momoWtCare">
+              <span class="material-icons-outlined" style="font-size:16px;display:block;margin-bottom:2px">health_and_safety</span>
+              Care Wallet
+            </button>
+          </div>
+        </div>
+
+        <!-- Phone number -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Mobile Money Number</label>
+          <div class="wallet-amount-wrap">
+            <span class="wallet-currency-label" style="font-size:13px;width:36px">+256</span>
+            <input type="tel" class="wallet-amount-field" id="momoPhone" placeholder="7XXXXXXXX" maxlength="10" inputmode="numeric">
+          </div>
+          <p style="font-size:11px;color:var(--text-hint);margin-top:4px" id="momoPhoneHint">Enter your MTN number e.g. 0772 123 456</p>
+        </div>
+
+        <!-- Amount -->
+        <div class="sheet-input-group">
+          <label class="sheet-label">Amount (UGX)</label>
+          <div class="wallet-amount-wrap">
+            <span class="wallet-currency-label">UGX</span>
+            <input type="number" class="wallet-amount-field" id="momoAmount" placeholder="0" min="500" step="500">
+          </div>
+          <p style="font-size:11px;color:var(--text-hint);margin-top:4px">Minimum: UGX 500</p>
+        </div>
+
+        <!-- Quick amounts -->
+        <div class="sheet-input-group">
+          <div class="sheet-chip-group">
+            <button class="sheet-chip momo-quick-amt" data-amount="5000">5,000</button>
+            <button class="sheet-chip momo-quick-amt" data-amount="10000">10,000</button>
+            <button class="sheet-chip momo-quick-amt" data-amount="20000">20,000</button>
+            <button class="sheet-chip momo-quick-amt" data-amount="50000">50,000</button>
+            <button class="sheet-chip momo-quick-amt" data-amount="100000">100,000</button>
+          </div>
+        </div>
+
+        <!-- Info box -->
+        <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+          <p style="font-size:12px;color:#2E7D32;line-height:1.6;margin:0">
+            <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">info</span>
+            You will receive a prompt on your phone to approve the payment. Once you confirm, your Homatt wallet will be credited automatically.
+          </p>
+        </div>
+
+        <!-- Status area (hidden until request sent) -->
+        <div id="momoStatusArea" style="display:none;background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:14px;margin-bottom:16px;text-align:center">
+          <div id="momoStatusSpinner" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
+            <span class="material-icons-outlined" style="font-size:20px;color:#E65100;animation:spin 1.2s linear infinite">refresh</span>
+            <span style="font-size:13px;font-weight:600;color:#E65100">Waiting for your approval…</span>
+          </div>
+          <p style="font-size:12px;color:#BF360C;margin:0">Check your phone and enter your PIN to confirm.</p>
+          <p style="font-size:11px;color:#9AA0A6;margin:6px 0 0" id="momoStatusTimer"></p>
+        </div>
+
+        <button class="sheet-submit-btn" id="momoSubmitBtn">
+          <span class="material-icons-outlined">send_to_mobile</span>
+          <span id="momoSubmitLabel">Request Payment</span>
         </button>
       </div>
     </div>

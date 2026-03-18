@@ -150,21 +150,40 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 const DEMO_TICKETS_DATA = [
-  { id:'t1', user_name:'Ssali Emmanuel', user_phone:'0772111222', subject:'Medicine delivery delayed', category:'delivery', priority:'high', status:'open', message:'My medicine order ORD-4821 has not arrived after 3 hours. I urgently need my insulin.', admin_response:null, created_at: new Date(Date.now()-7200000).toISOString() },
+  { id:'t1', user_name:'Ssali Emmanuel', user_phone:'0772111222', subject:'Medicine delivery delayed', category:'general', priority:'high', status:'open', message:'My medicine order ORD-4821 has not arrived after 3 hours. I urgently need my insulin.', admin_response:null, created_at: new Date(Date.now()-7200000).toISOString() },
   { id:'t2', user_name:'Rose Akello', user_phone:'0752333444', subject:'App login issue', category:'technical', priority:'normal', status:'open', message:'I cannot sign in to the app. It keeps saying incorrect password but I just registered yesterday.', admin_response:null, created_at: new Date(Date.now()-86400000).toISOString() },
-  { id:'t3', user_name:'Mugisha David', user_phone:'0700555666', subject:'Wrong medicine delivered', category:'pharmacy', priority:'high', status:'in_progress', message:'I ordered Paracetamol 500mg but received Ibuprofen instead. Please arrange replacement.', admin_response:'We have contacted the pharmacy and a replacement will be delivered within 1 hour.', created_at: new Date(Date.now()-172800000).toISOString() },
+  { id:'t3', user_name:'Mugisha David', user_phone:'0700555666', subject:'Wrong medicine delivered', category:'general', priority:'high', status:'in_progress', message:'I ordered Paracetamol 500mg but received Ibuprofen instead. Please arrange replacement.', admin_response:'We have contacted the pharmacy and a replacement will be delivered within 1 hour.', created_at: new Date(Date.now()-172800000).toISOString() },
   { id:'t4', user_name:'Nakigozi Sarah', user_phone:'0783777888', subject:'Refund request for cancelled booking', category:'billing', priority:'normal', status:'resolved', message:'I cancelled my clinic booking HO-4390 but have not received my refund of UGX 20,000.', admin_response:'Refund processed and will reflect in your Homatt Wallet within 24 hours.', created_at: new Date(Date.now()-259200000).toISOString() },
+  { id:'t5', user_name:'Opio James', user_phone:'0701222333', subject:'Payment charged but booking failed', category:'billing', priority:'high', status:'open', message:'I paid UGX 30,000 for a clinic booking but the booking did not go through. Please refund or rebook.', admin_response:null, created_at: new Date(Date.now()-3600000).toISOString() },
 ];
 
 async function loadTickets() {
   const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
   if (demoSession?.demo) { allTickets = DEMO_TICKETS_DATA; renderTickets(); return; }
-  if (!supabase) { renderTickets(); return; }
-  const { data } = await supabase
-    .from('support_tickets')
-    .select('*')
-    .order('created_at', { ascending: false });
-  allTickets = data || [];
+  if (!supabase) { allTickets = DEMO_TICKETS_DATA; renderTickets(); return; }
+
+  // Race against a 10-second timeout so we never stay stuck on "Loading..."
+  try {
+    const fetchPromise = supabase
+      .from('support_tickets')
+      .select('id,user_id,user_name,user_phone,subject,message,category,priority,status,admin_response,responded_at,responded_by,created_at,updated_at')
+      .order('created_at', { ascending: false });
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const result = await Promise.race([fetchPromise, timeoutPromise]);
+    const { data, error } = result;
+    if (error) {
+      console.error('Tickets load error:', error);
+      allTickets = DEMO_TICKETS_DATA;
+      showAdminToast('Live data unavailable — showing demo tickets', 'default');
+    } else {
+      allTickets = (data && data.length > 0) ? data : DEMO_TICKETS_DATA;
+      if (!data || data.length === 0) showAdminToast('No tickets yet — showing demo data', 'default');
+    }
+  } catch(e) {
+    console.error('Tickets fetch failed:', e);
+    allTickets = DEMO_TICKETS_DATA;
+    showAdminToast('Connection issue — showing demo tickets', 'default');
+  }
   renderTickets();
 }
 

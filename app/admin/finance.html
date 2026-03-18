@@ -210,6 +210,52 @@
   </div>
 </div>
 
+<!-- ══════════ RELWORX DISBURSE MODAL ══════════ -->
+<div class="admin-modal-overlay" id="relworxModal" style="display:none">
+  <div class="admin-modal" style="max-width:480px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">
+        <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:6px;color:#1B5E20">send_to_mobile</span>
+        Pay via Relworx Mobile Money
+      </div>
+      <button class="admin-modal-close" onclick="closeRelworxModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body">
+      <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:12px;color:#2E7D32;line-height:1.6">
+        <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">info</span>
+        The recipient will receive a mobile money push to their phone instantly via Relworx. Make sure the phone number is correct before sending.
+      </div>
+      <div id="relworxPayoutSummary" style="background:#F8F9FA;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.8"></div>
+      <div class="admin-form-group">
+        <label>Recipient Mobile Money Number *</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span style="font-size:13px;font-weight:600;color:#5F6368;min-width:42px">+256</span>
+          <input type="tel" id="relworxMsisdn" placeholder="7XXXXXXXX" maxlength="10" style="flex:1" autocomplete="off">
+        </div>
+        <small style="color:#9AA0A6">Enter Uganda number (MTN or Airtel)</small>
+      </div>
+      <div class="admin-form-group">
+        <label>Description</label>
+        <input type="text" id="relworxDesc" placeholder="e.g. March Week 1 payout">
+      </div>
+      <!-- Status area -->
+      <div id="relworxStatus" style="display:none;background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:14px;text-align:center;margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
+          <span class="material-icons-outlined" style="font-size:20px;color:#E65100;animation:spin 1.2s linear infinite">refresh</span>
+          <span style="font-size:13px;font-weight:600;color:#E65100">Processing payment…</span>
+        </div>
+        <p style="font-size:12px;color:#9AA0A6;margin:0">This may take up to a minute. Do not close this window.</p>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeRelworxModal()">Cancel</button>
+      <button class="btn-admin primary" id="relworxSendBtn" onclick="sendRelworxPayout()">
+        <span class="material-icons-outlined" style="font-size:16px">send_to_mobile</span> Send Payment
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ VIEW PAYOUT DETAILS MODAL ══════════ -->
 <div class="admin-modal-overlay" id="viewPayoutModal" style="display:none">
   <div class="admin-modal" style="max-width:480px">
@@ -366,6 +412,7 @@ function renderPayouts() {
         <span class="material-icons-outlined" style="font-size:14px">info</span>
        </button>`,
       p.status === 'pending' ? `<button class="btn-admin primary sm" onclick="doApprove('${p.id}')">Approve</button>` : '',
+      (p.status === 'pending' || p.status === 'approved') ? `<button class="btn-admin success sm" title="Pay instantly via Relworx mobile money" onclick='openRelworxModal(${JSON.stringify(JSON.stringify(p))})' style="background:#1B5E20;gap:3px"><span class="material-icons-outlined" style="font-size:13px">send_to_mobile</span> Relworx</button>` : '',
       (p.status === 'pending' || p.status === 'approved') ? `<button class="btn-admin success sm" onclick="openPaidRef('${p.id}')">Mark Paid</button>` : '',
       (p.status === 'pending' || p.status === 'approved') ? `<button class="btn-admin secondary sm" title="Cancel" onclick="doCancelPayout('${p.id}')" style="color:#D32F2F"><span class="material-icons-outlined" style="font-size:14px">cancel</span></button>` : '',
     ].join('');
@@ -540,6 +587,96 @@ async function confirmMarkPaid() {
   } catch(e) { showAdminToast('Network error — try again', 'error'); }
 
   btn.disabled = false;
+}
+
+/* ══════════ RELWORX DISBURSEMENT ══════════ */
+let _relworxPayoutData = null;
+
+function openRelworxModal(pJson) {
+  const p = JSON.parse(pJson);
+  _relworxPayoutData = p;
+  document.getElementById('relworxMsisdn').value = '';
+  document.getElementById('relworxDesc').value = `${p.recipient_name || 'Payout'} — ${p.period_start ? formatShortDate(p.period_start) : 'Homatt payout'}`;
+  document.getElementById('relworxStatus').style.display = 'none';
+  document.getElementById('relworxSendBtn').disabled = false;
+  document.getElementById('relworxPayoutSummary').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div><div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Recipient</div><div style="font-weight:600">${p.recipient_name||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Type</div><div style="text-transform:capitalize">${p.recipient_type||'—'}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Amount</div><div style="font-weight:700;color:#1B5E20;font-size:16px">UGX ${Number(p.amount||0).toLocaleString()}</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Method</div><div>${(p.payment_method||'mobile_money').replace(/_/g,' ')}</div></div>
+    </div>`;
+  document.getElementById('relworxModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('relworxMsisdn').focus(), 150);
+}
+
+function closeRelworxModal() {
+  _relworxPayoutData = null;
+  document.getElementById('relworxModal').style.display = 'none';
+}
+
+async function sendRelworxPayout() {
+  const rawPhone = document.getElementById('relworxMsisdn').value.trim();
+  const desc = document.getElementById('relworxDesc').value.trim();
+  const p = _relworxPayoutData;
+
+  if (!rawPhone) { showAdminToast('Please enter recipient mobile money number', 'error'); return; }
+  if (!p) { showAdminToast('No payout selected', 'error'); return; }
+
+  const btn = document.getElementById('relworxSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px;animation:spin 1s linear infinite">refresh</span> Sending…';
+  document.getElementById('relworxStatus').style.display = 'block';
+
+  const cfg = window.HOMATT_CONFIG || {};
+  const supa = getSupa();
+  let accessToken = '';
+  if (supa) {
+    try {
+      const { data: { session } } = await supa.auth.getSession();
+      accessToken = session?.access_token || '';
+    } catch(e) {}
+  }
+
+  const fnUrl = `${(cfg.SUPABASE_URL||'').replace('/rest/v1','').replace(/\/$/, '')}/functions/v1/relworx-payment`;
+
+  try {
+    const resp = await fetch(fnUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken || cfg.SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        action: 'disburse',
+        msisdn: rawPhone,
+        amount: Number(p.amount),
+        payoutId: p.id,
+        recipientName: p.recipient_name || 'Recipient',
+        description: desc || `Homatt payout to ${p.recipient_name}`,
+      }),
+    });
+
+    const result = await resp.json();
+    document.getElementById('relworxStatus').style.display = 'none';
+
+    if (!resp.ok || !result.success) {
+      showAdminToast(result.error || 'Payment failed — check number and try again', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">send_to_mobile</span> Send Payment';
+      return;
+    }
+
+    closeRelworxModal();
+    await loadData();
+    showAdminToast(`✓ UGX ${Number(p.amount).toLocaleString()} sent to ${rawPhone} via Relworx!`, 'success');
+
+  } catch(e) {
+    document.getElementById('relworxStatus').style.display = 'none';
+    showAdminToast('Network error — please try again', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">send_to_mobile</span> Send Payment';
+  }
 }
 
 /* ══════════ CANCEL ══════════ */
