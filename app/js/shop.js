@@ -366,6 +366,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   function openCartSheet() {
     renderCartContents();
     openSheet(document.getElementById('cartSheet'));
+    // Auto-fill delivery address with GPS location if field is empty
+    const addrInput = document.getElementById('cartDeliveryAddress');
+    if (addrInput && !addrInput.value) autoFillCartAddress();
   }
 
   // ====== Pharmacy Routing ======
@@ -429,8 +432,54 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
+  async function reverseGeocode(lat, lon) {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en' } }
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      const a = data.address || {};
+      const parts = [
+        a.road || a.pedestrian || a.footway || a.path,
+        a.suburb || a.neighbourhood || a.quarter || a.village,
+        a.town || a.city || a.county || a.state_district
+      ].filter(Boolean);
+      return parts.length ? parts.join(', ') : (data.display_name || '').split(',').slice(0, 3).join(',').trim();
+    } catch(e) { return null; }
+  }
+
+  function autoFillCartAddress() {
+    const input = document.getElementById('cartDeliveryAddress');
+    const btn   = document.getElementById('cartAutoLocBtn');
+    if (!navigator.geolocation || !input) return;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
+    }
+    navigator.geolocation.getCurrentPosition(
+      async pos => {
+        const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }
+        if (addr && input && !input.value) input.value = addr;
+      },
+      () => {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }
+      },
+      { timeout: 8000, enableHighAccuracy: true }
+    );
+  }
+
   // ====== Checkout ======
   document.getElementById('cartCheckoutBtn').addEventListener('click', submitOrder);
+  document.getElementById('cartAutoLocBtn').addEventListener('click', autoFillCartAddress);
 
   async function submitOrder() {
     const addr = (document.getElementById('cartDeliveryAddress').value || '').trim();

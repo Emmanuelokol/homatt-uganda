@@ -208,6 +208,11 @@
         <div class="mo-label">Delivery Address</div>
         <div class="mo-field">
           <input type="text" id="deliveryAddress" placeholder="e.g. Plot 14, Ntinda Estate, Kampala" required>
+          <button type="button" id="autoLocBtn" onclick="autoFillAddress('deliveryAddress','autoLocBtn')"
+            style="margin-top:6px;display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #00695C;color:#00695C;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center">
+            <span class="material-icons-outlined" style="font-size:15px">my_location</span>
+            Use my current location
+          </button>
         </div>
         <div class="mo-field">
           <label>Phone Number</label>
@@ -634,6 +639,56 @@ function updateBadge() {
   });
 }
 
+/* ══════════════════════════════════════
+   LOCATION AUTO-FILL
+   ══════════════════════════════════════ */
+
+function reverseGeocode(lat, lon) {
+  return fetch(
+    'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon + '&zoom=16&addressdetails=1',
+    { headers: { 'Accept-Language': 'en' } }
+  ).then(function(r){ return r.ok ? r.json() : null; })
+   .then(function(data) {
+     if (!data) return null;
+     var a = data.address || {};
+     var parts = [
+       a.road || a.pedestrian || a.footway || a.path,
+       a.suburb || a.neighbourhood || a.quarter || a.village,
+       a.town || a.city || a.county || a.state_district
+     ].filter(Boolean);
+     return parts.length ? parts.join(', ') : (data.display_name || '').split(',').slice(0,3).join(',').trim();
+   })
+   .catch(function(){ return null; });
+}
+
+function autoFillAddress(inputId, btnId) {
+  var input = document.getElementById(inputId);
+  var btn   = document.getElementById(btnId);
+  if (!navigator.geolocation) return;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
+  }
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      reverseGeocode(pos.coords.latitude, pos.coords.longitude).then(function(addr) {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }
+        if (addr && input && !input.value) input.value = addr;
+      });
+    },
+    function() {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+      }
+    },
+    { timeout: 8000, enableHighAccuracy: true }
+  );
+}
+
 function setUrgency(u) {
   order.urgency = u;
   document.querySelectorAll('.urgency-chip').forEach(function(c){ c.classList.remove('sel'); });
@@ -665,6 +720,8 @@ function goStep(n) {
     if (addr && !addr.value && sess.district) addr.value = sess.district + ', Uganda';
     var ph = document.getElementById('deliveryPhone');
     if (ph && !ph.value && (sess.phone_number || sess.phone)) ph.value = sess.phone_number || sess.phone || '';
+    // Auto-detect GPS location if address is still empty
+    if (addr && !addr.value) autoFillAddress('deliveryAddress', 'autoLocBtn');
   }
 
   if (n === 3) {
