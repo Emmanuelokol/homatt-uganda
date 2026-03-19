@@ -103,6 +103,13 @@
     /* ── Rx approval block ── */
     .rx-approval { background:#F3E5F5; border:1px solid #CE93D8; border-radius:var(--radius-md); padding:12px 14px; margin-bottom:12px; display:none; }
     .rx-approval.show { display:block; }
+    /* ── Payment cards ── */
+    .pay-card { -webkit-tap-highlight-color:transparent; }
+    .pay-card:active { opacity:.85; transform:scale(.98); }
+    /* ── Mobile money status overlay ── */
+    .momo-status-bar { background:#FFF8E1; border:1px solid #FFD54F; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:none; text-align:center; }
+    .momo-spinner { display:inline-block; width:20px; height:20px; border:2px solid #FFD54F; border-top-color:#F57F17; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:6px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -218,13 +225,91 @@
           <label>Phone Number</label>
           <input type="tel" id="deliveryPhone" placeholder="+256 7XX XXX XXX">
         </div>
-        <div class="mo-field">
-          <label>Payment Method</label>
-          <select id="paymentMethod">
-            <option value="cash_on_delivery">Cash on Delivery</option>
-            <option value="mobile_money">Mobile Money (MTN / Airtel)</option>
-            <option value="wallet">Homatt Wallet</option>
-          </select>
+        <div class="mo-label">Payment Method</div>
+        <div id="paymentCards" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
+          <!-- Pay on Delivery -->
+          <div class="pay-card sel" id="pay-cod" onclick="selectPayment('cash_on_delivery')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #00695C;border-radius:12px;cursor:pointer;background:#E0F2F1;transition:all .2s;touch-action:manipulation">
+            <div style="width:38px;height:38px;border-radius:10px;background:#00695C;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:20px">local_shipping</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary)">Pay on Delivery</div>
+              <div style="font-size:11px;color:var(--text-secondary)">Cash when rider arrives — no upfront payment</div>
+            </div>
+            <span class="material-icons-outlined" style="color:#00695C;font-size:20px" id="cod-check">check_circle</span>
+          </div>
+          <!-- MTN MoMo -->
+          <div class="pay-card" id="pay-mtn" onclick="selectPayment('mtn_momo')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .2s;touch-action:manipulation">
+            <div style="width:38px;height:38px;border-radius:10px;background:#FFCC00;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span style="font-size:18px;font-weight:900;color:#000">M</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary)">MTN Mobile Money</div>
+              <div style="font-size:11px;color:var(--text-secondary)">Instant USSD — 0772 / 0782 / 0752 / 0762</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--border);font-size:20px" id="mtn-check">radio_button_unchecked</span>
+          </div>
+          <!-- Airtel Money -->
+          <div class="pay-card" id="pay-airtel" onclick="selectPayment('airtel_money')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .2s;touch-action:manipulation">
+            <div style="width:38px;height:38px;border-radius:10px;background:#E20010;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span style="font-size:18px;font-weight:900;color:#fff">A</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary)">Airtel Money</div>
+              <div style="font-size:11px;color:var(--text-secondary)">Instant USSD — 0700 / 0701 / 0750 / 0755</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--border);font-size:20px" id="airtel-check">radio_button_unchecked</span>
+          </div>
+          <!-- Bank Transfer -->
+          <div class="pay-card" id="pay-bank" onclick="selectPayment('bank_transfer')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .2s;touch-action:manipulation">
+            <div style="width:38px;height:38px;border-radius:10px;background:#1565C0;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:20px">account_balance</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary)">Bank Transfer</div>
+              <div style="font-size:11px;color:var(--text-secondary)">Stanbic / ABSA / Centenary — details shown</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--border);font-size:20px" id="bank-check">radio_button_unchecked</span>
+          </div>
+          <!-- Homatt Wallet -->
+          <div class="pay-card" id="pay-wallet" onclick="selectPayment('wallet')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--border);border-radius:12px;cursor:pointer;background:var(--surface);transition:all .2s;touch-action:manipulation">
+            <div style="width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#00695C,#4DB6AC);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:20px">account_balance_wallet</span>
+            </div>
+            <div style="flex:1">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary)">Homatt Wallet</div>
+              <div style="font-size:11px;color:var(--text-secondary)" id="walletBalanceHint">Balance: loading…</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--border);font-size:20px" id="wallet-check">radio_button_unchecked</span>
+          </div>
+        </div>
+        <!-- Mobile Money phone input — shown for MTN/Airtel -->
+        <div id="momoPhoneBlock" style="display:none;margin-bottom:14px">
+          <div class="mo-field" style="margin-bottom:0">
+            <label id="momoPhoneLabel">Mobile Money Number</label>
+            <input type="tel" id="momoPayPhone" placeholder="e.g. 0772 123 456"
+              style="font-size:16px;letter-spacing:.5px"
+              oninput="formatMomoPhone(this)">
+            <div style="font-size:11px;color:var(--text-secondary);margin-top:4px" id="momoPhoneHint2">
+              You will receive a USSD prompt on this number to confirm payment.
+            </div>
+          </div>
+        </div>
+        <!-- Bank details block — shown for bank transfer -->
+        <div id="bankDetailsBlock" style="display:none;margin-bottom:14px;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:12px 14px">
+          <div style="font-size:12px;font-weight:700;color:#3730A3;margin-bottom:8px;display:flex;gap:6px;align-items:center">
+            <span class="material-icons-outlined" style="font-size:16px">info</span>
+            Transfer to any of these accounts, then place your order
+          </div>
+          <div style="font-size:12px;color:#1E40AF;line-height:1.9">
+            <strong>Stanbic Bank</strong> — A/C: <strong>9030012345678</strong><br>
+            <strong>ABSA Bank</strong> — A/C: <strong>6008234567</strong><br>
+            <strong>Centenary Bank</strong> — A/C: <strong>3100123456</strong><br>
+            Account Name: <strong>Homatt Health Uganda Ltd</strong>
+          </div>
+          <div style="font-size:11px;color:#4338CA;margin-top:6px">
+            Use your phone number as the payment reference. Our team confirms within 2 hours.
+          </div>
         </div>
 
         <!-- Rx prescription block — shown only when Rx category was selected -->
@@ -251,9 +336,14 @@
           <textarea id="deliveryNotes" placeholder="e.g. Call on arrival, gate code is 1234…" style="min-height:60px"></textarea>
         </div>
       </div>
+      <div class="momo-status-bar" id="momoStatusBar">
+        <div><span class="momo-spinner"></span><strong id="momoStatusMsg">Waiting for payment approval…</strong></div>
+        <div style="font-size:11px;color:#795548;margin-top:4px" id="momoStatusSub">Check your phone and approve the USSD prompt.</div>
+        <button type="button" onclick="cancelMomoPayment()" style="margin-top:8px;background:none;border:1px solid #B71C1C;color:#B71C1C;border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer">Cancel</button>
+      </div>
       <div class="mo-bottom">
         <button class="mo-btn secondary" style="max-width:90px" onclick="goStep(1)">← Back</button>
-        <button class="mo-btn primary" onclick="goStep(3)">Review →</button>
+        <button class="mo-btn primary" id="step2NextBtn" onclick="goStep(3)">Review →</button>
       </div>
     </div>
 
@@ -468,6 +558,7 @@ var ALL_MEDS = [
 var cart = {};           // { "medicine name": { n, p, qty } }
 var order = {
   urgency:'standard', address:'', phone:'', payment:'cash_on_delivery',
+  momoPhone:'',
   notes:'', pharmacyId:null, pharmacyName:null,
   catId:'', isRx:false, rxDoctor:'', rxCode:''
 };
@@ -676,17 +767,103 @@ function autoFillAddress(inputId, btnId) {
           btn.disabled = false;
           btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
         }
-        if (addr && input && !input.value) input.value = addr;
+        if (addr && input) {
+          input.value = addr;
+          input.style.borderColor = '#00695C';
+          setTimeout(function(){ input.style.borderColor = ''; }, 1500);
+        }
       });
     },
-    function() {
+    function(err) {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">location_off</span> Location unavailable — enter manually';
+        setTimeout(function(){
+          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }, 3000);
       }
     },
-    { timeout: 8000, enableHighAccuracy: true }
+    { timeout: 10000, enableHighAccuracy: true, maximumAge: 30000 }
   );
+}
+
+/* ══════════════════════════════════════
+   PAYMENT SELECTION
+   ══════════════════════════════════════ */
+
+var PAYMENT_MAP = {
+  'cash_on_delivery': { card:'pay-cod', check:'cod-check',     label:'Pay on Delivery' },
+  'mtn_momo':         { card:'pay-mtn', check:'mtn-check',     label:'MTN Mobile Money' },
+  'airtel_money':     { card:'pay-airtel', check:'airtel-check', label:'Airtel Money' },
+  'bank_transfer':    { card:'pay-bank', check:'bank-check',   label:'Bank Transfer' },
+  'wallet':           { card:'pay-wallet', check:'wallet-check', label:'Homatt Wallet' },
+};
+
+function selectPayment(method) {
+  order.payment = method;
+
+  // Reset all cards
+  Object.keys(PAYMENT_MAP).forEach(function(m) {
+    var info = PAYMENT_MAP[m];
+    var card  = document.getElementById(info.card);
+    var check = document.getElementById(info.check);
+    if (card) {
+      card.style.borderColor = 'var(--border)';
+      card.style.background  = 'var(--surface)';
+    }
+    if (check) {
+      check.textContent  = 'radio_button_unchecked';
+      check.style.color  = 'var(--border)';
+    }
+  });
+
+  // Highlight selected
+  var sel = PAYMENT_MAP[method];
+  if (sel) {
+    var selCard  = document.getElementById(sel.card);
+    var selCheck = document.getElementById(sel.check);
+    if (selCard) {
+      selCard.style.borderColor = '#00695C';
+      selCard.style.background  = '#E0F2F1';
+    }
+    if (selCheck) {
+      selCheck.textContent = 'check_circle';
+      selCheck.style.color = '#00695C';
+    }
+  }
+
+  // Show/hide mobile money phone input
+  var momoBlock = document.getElementById('momoPhoneBlock');
+  var momoLabel = document.getElementById('momoPhoneLabel');
+  var momoHint  = document.getElementById('momoPhoneHint2');
+  var bankBlock = document.getElementById('bankDetailsBlock');
+  if (momoBlock) momoBlock.style.display = (method === 'mtn_momo' || method === 'airtel_money') ? 'block' : 'none';
+  if (bankBlock) bankBlock.style.display  = (method === 'bank_transfer') ? 'block' : 'none';
+  if (method === 'mtn_momo' && momoLabel) {
+    momoLabel.textContent = 'MTN Mobile Money Number';
+    if (momoHint) momoHint.textContent = 'You will get a USSD prompt on this MTN number (0772/0782/0752/0762) to enter your PIN.';
+  } else if (method === 'airtel_money' && momoLabel) {
+    momoLabel.textContent = 'Airtel Money Number';
+    if (momoHint) momoHint.textContent = 'You will get a USSD prompt on this Airtel number (0700/0701/0750/0755) to enter your PIN.';
+  }
+}
+
+function formatMomoPhone(input) {
+  // Remove non-digits
+  var v = input.value.replace(/\D/g,'');
+  // Keep max 10 digits
+  if (v.length > 10) v = v.slice(0,10);
+  input.value = v;
+}
+
+var momoPaymentPollTimer = null;
+
+function cancelMomoPayment() {
+  if (momoPaymentPollTimer) { clearInterval(momoPaymentPollTimer); momoPaymentPollTimer = null; }
+  var bar = document.getElementById('momoStatusBar');
+  if (bar) bar.style.display = 'none';
+  var btn = document.getElementById('step2NextBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Review →'; }
 }
 
 function setUrgency(u) {
@@ -722,16 +899,38 @@ function goStep(n) {
     if (ph && !ph.value && (sess.phone_number || sess.phone)) ph.value = sess.phone_number || sess.phone || '';
     // Auto-detect GPS location if address is still empty
     if (addr && !addr.value) autoFillAddress('deliveryAddress', 'autoLocBtn');
+
+    // Load wallet balance hint
+    var walletHint = document.getElementById('walletBalanceHint');
+    var cachedWallets = {};
+    try { cachedWallets = JSON.parse(localStorage.getItem('homatt_wallets') || '{}'); } catch(e){}
+    if (walletHint && cachedWallets.family !== undefined) {
+      var total = (cachedWallets.family || 0) + (cachedWallets.care || 0);
+      walletHint.textContent = 'Balance: UGX ' + total.toLocaleString();
+    }
+
+    // Pre-fill momo phone from session phone if available
+    var momoPhoneInput = document.getElementById('momoPayPhone');
+    if (momoPhoneInput && !momoPhoneInput.value && (sess.phone_number || sess.phone)) {
+      var ph = (sess.phone_number || sess.phone || '').replace(/\D/g,'').slice(-10);
+      if (ph.length === 10) momoPhoneInput.value = ph;
+    }
   }
 
   if (n === 3) {
     order.address  = (document.getElementById('deliveryAddress') || {}).value || '';
     order.phone    = (document.getElementById('deliveryPhone') || {}).value || '';
-    order.payment  = (document.getElementById('paymentMethod') || {}).value || 'cash_on_delivery';
+    // order.payment already set by selectPayment()
+    if (!order.payment) order.payment = 'cash_on_delivery';
+    order.momoPhone = (document.getElementById('momoPayPhone') || {}).value || '';
     order.notes    = (document.getElementById('deliveryNotes') || {}).value || '';
     order.rxDoctor = (document.getElementById('rxDoctor') || {}).value || '';
     order.rxCode   = (document.getElementById('rxCode') || {}).value || '';
     if (!order.address) { alert('Please enter a delivery address.'); return; }
+    if (!order.phone)   { alert('Please enter your phone number.'); return; }
+    if ((order.payment === 'mtn_momo' || order.payment === 'airtel_money') && order.momoPhone.length < 10) {
+      alert('Please enter your 10-digit mobile money number (e.g. 0772123456).'); return;
+    }
     if (order.isRx && !order.rxDoctor) { alert("Please enter the prescribing doctor's name for prescription medicines."); return; }
     var eta = document.getElementById('etaText');
     if (eta) eta.textContent = order.urgency === 'urgent' ? '30–60 min' : '2–4 hours';
@@ -831,6 +1030,17 @@ function pickPharm(id, name) {
   loadPharmacies();
 }
 
+function getPaymentLabel() {
+  var labels = {
+    'cash_on_delivery': 'Pay on Delivery (Cash)',
+    'mtn_momo':         'MTN Mobile Money' + (order.momoPhone ? ' (' + order.momoPhone + ')' : ''),
+    'airtel_money':     'Airtel Money' + (order.momoPhone ? ' (' + order.momoPhone + ')' : ''),
+    'bank_transfer':    'Bank Transfer (pending verification)',
+    'wallet':           'Homatt Wallet',
+  };
+  return labels[order.payment] || order.payment.replace(/_/g,' ');
+}
+
 function renderFinalSummary() {
   var items = Object.values(cart);
   var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
@@ -841,7 +1051,7 @@ function renderFinalSummary() {
     ['Pharmacy', order.pharmacyName || 'Nearest available'],
     ['Delivery to', order.address],
     ['Urgency', order.urgency === 'urgent' ? 'Urgent (30–60 min)' : 'Standard (2–4h)'],
-    ['Payment', order.payment.replace(/_/g,' ')],
+    ['Payment', getPaymentLabel()],
   ];
   if (order.isRx) {
     rows.push(['Type', 'Prescription (Rx)']);
@@ -943,7 +1153,8 @@ function _doSubmitOrder(sess) {
       delivery_cost:               5000,
       total_cost:                  total,
       payment_method:              order.payment,
-      payment_status:              'pending',
+      payment_status:              (order.payment === 'cash_on_delivery') ? 'pending' : (order.payment === 'wallet' ? 'paid' : 'pending'),
+      momo_phone:                  order.momoPhone || null,
       status:                      'incoming',
     };
     supa.from('pharmacy_orders').insert(payload).then(function(res){
