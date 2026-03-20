@@ -28,6 +28,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let cart = JSON.parse(localStorage.getItem('homatt_cart') || '[]');
   let selectedCategoryId = null;
   let _nearestPharmacy = null;
+  let _cachedCoords = null;
 
   // ====== Helpers ======
   function escHtml(s) {
@@ -730,12 +731,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function getUserCoords() {
+    if (_cachedCoords) return Promise.resolve(_cachedCoords);
     return new Promise(resolve => {
       if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(
-          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+          pos => {
+            _cachedCoords = [pos.coords.latitude, pos.coords.longitude];
+            resolve(_cachedCoords);
+          },
           () => resolve(null),
-          { timeout: 4000 }
+          { timeout: 5000, enableHighAccuracy: true }
         );
       } else resolve(null);
     });
@@ -759,16 +764,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { return null; }
   }
 
-  function autoFillCartAddress() {
+  async function autoFillCartAddress() {
     const input = document.getElementById('cartDeliveryAddress');
     const btn   = document.getElementById('cartAutoLocBtn');
-    if (!navigator.geolocation || !input) return;
+    if (!input) return;
+
+    // If we already have cached coords, resolve address instantly
+    if (_cachedCoords) {
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
+      }
+      const addr = await reverseGeocode(_cachedCoords[0], _cachedCoords[1]);
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+      }
+      if (addr && input && !input.value) input.value = addr;
+      return;
+    }
+
+    if (!navigator.geolocation) return;
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
     }
     navigator.geolocation.getCurrentPosition(
       async pos => {
+        _cachedCoords = [pos.coords.latitude, pos.coords.longitude];
         const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
         if (btn) {
           btn.disabled = false;

@@ -61,6 +61,7 @@ function buildAdminSidebar(activePage) {
     { label:'Operations', links:[
       { href:'users.html',         icon:'people',          id:'users',         text:'Users' },
       { href:'support.html',       icon:'contact_support', id:'support',       text:'Support Tickets' },
+      { href:'feedback.html',      icon:'star_rate',        id:'feedback',      text:'Feedback & Ratings' },
       { href:'prescriptions.html', icon:'medication',       id:'prescriptions', text:'Prescriptions' }
     ]},
     { label:'Content', links:[
