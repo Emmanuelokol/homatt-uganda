@@ -290,8 +290,28 @@
         </div>
 
         <div class="admin-form-group" style="grid-column:span 2">
+          <label>Prevents / Protects Against <span style="font-weight:400;color:#9AA0A6">(shown on product card in mobile app)</span></label>
+          <input type="text" id="mpPrevents" placeholder="e.g. Malaria, Mosquito bites · Typhoid, Cholera · Anaemia during pregnancy">
+        </div>
+
+        <div class="admin-form-group" style="grid-column:span 2">
+          <label>Health Trigger Tags <span style="font-weight:400;color:#9AA0A6">(tick all that apply — controls when this product appears in health context banners)</span></label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px" id="mpTagsWrap">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="malaria_diagnosis" class="mp-tag-cb"> 🦟 Post-Malaria Diagnosis</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="malaria_season"    class="mp-tag-cb"> ⚠️ Malaria Season</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="diarrhoea_child"  class="mp-tag-cb"> 💧 Diarrhoea / Child</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="gastro_diagnosis"  class="mp-tag-cb"> 🤢 Gastro Diagnosis</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="typhoid_diagnosis"  class="mp-tag-cb"> 🌡️ Typhoid Diagnosis</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="pregnancy"         class="mp-tag-cb"> 🤰 Pregnancy</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="diabetes_family"   class="mp-tag-cb"> ❤️ Diabetes (Family Member)</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="hypertension"      class="mp-tag-cb"> 💊 Hypertension</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" value="child_health"       class="mp-tag-cb"> 👶 Child / Infant Health</label>
+          </div>
+        </div>
+
+        <div class="admin-form-group" style="grid-column:span 2">
           <label>Description / Quality Notes</label>
-          <textarea id="mpDesc" rows="3" placeholder="Describe the product — quality standards, certifications, what it protects against, dosage guidance, etc."></textarea>
+          <textarea id="mpDesc" rows="3" placeholder="Describe the product — quality standards, certifications, dosage guidance, etc."></textarea>
         </div>
 
         <div class="admin-form-group" style="grid-column:span 2">
@@ -422,6 +442,7 @@ function renderProducts(list) {
       <td>
         <div style="font-weight:600;font-size:13px">${p.name}</div>
         ${p.manufacturer ? `<div style="font-size:11px;color:#9AA0A6">${p.manufacturer}</div>` : ''}
+        ${p.prevents_from ? `<div style="font-size:11px;color:#1B5E20;margin-top:3px;font-weight:500">🛡️ ${p.prevents_from}</div>` : ''}
         ${p.description ? `<div style="font-size:11px;color:#9AA0A6;margin-top:2px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.description}</div>` : ''}
       </td>
       <td><span style="background:#E8F5E9;color:#1B5E20;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600">${catName(p.category_id)}</span></td>
@@ -484,11 +505,13 @@ function openAdd() {
   document.getElementById('mpUnit').value = '';
   document.getElementById('mpStock').value = '';
   document.getElementById('mpSortOrder').value = '99';
+  document.getElementById('mpPrevents').value = '';
   document.getElementById('mpDesc').value = '';
   document.getElementById('mpImage').value = '';
   document.getElementById('mpInStock').checked = true;
   document.getElementById('mpFeatured').checked = false;
   document.getElementById('mpActive').checked = true;
+  document.querySelectorAll('.mp-tag-cb').forEach(cb => cb.checked = false);
   document.getElementById('productModal').style.display = 'flex';
 }
 
@@ -505,11 +528,14 @@ function openEdit(id) {
   document.getElementById('mpUnit').value          = p.unit || '';
   document.getElementById('mpStock').value         = p.stock_count ?? '';
   document.getElementById('mpSortOrder').value     = p.sort_order ?? 99;
+  document.getElementById('mpPrevents').value      = p.prevents_from || '';
   document.getElementById('mpDesc').value          = p.description || '';
   document.getElementById('mpImage').value         = p.image_url || '';
   document.getElementById('mpInStock').checked     = p.in_stock !== false;
   document.getElementById('mpFeatured').checked    = !!p.featured;
   document.getElementById('mpActive').checked      = p.active !== false;
+  const tags = Array.isArray(p.trigger_tags) ? p.trigger_tags : [];
+  document.querySelectorAll('.mp-tag-cb').forEach(cb => { cb.checked = tags.includes(cb.value); });
   document.getElementById('productModal').style.display = 'flex';
 }
 
@@ -521,19 +547,22 @@ async function saveProduct() {
   btn.disabled = true;
 
   const stockVal = document.getElementById('mpStock').value;
+  const selectedTags = Array.from(document.querySelectorAll('.mp-tag-cb:checked')).map(cb => cb.value);
   const payload = {
     name,
-    category_id:  document.getElementById('mpCategory').value || null,
-    manufacturer: document.getElementById('mpManufacturer').value.trim() || null,
-    price:        Number(document.getElementById('mpPrice').value) || 0,
-    unit:         document.getElementById('mpUnit').value.trim() || null,
-    stock_count:  stockVal !== '' ? Number(stockVal) : null,
-    sort_order:   Number(document.getElementById('mpSortOrder').value) || 99,
-    description:  document.getElementById('mpDesc').value.trim() || null,
-    image_url:    document.getElementById('mpImage').value.trim() || null,
-    in_stock:     document.getElementById('mpInStock').checked,
-    featured:     document.getElementById('mpFeatured').checked,
-    active:       document.getElementById('mpActive').checked,
+    category_id:   document.getElementById('mpCategory').value || null,
+    manufacturer:  document.getElementById('mpManufacturer').value.trim() || null,
+    price:         Number(document.getElementById('mpPrice').value) || 0,
+    unit:          document.getElementById('mpUnit').value.trim() || null,
+    stock_count:   stockVal !== '' ? Number(stockVal) : null,
+    sort_order:    Number(document.getElementById('mpSortOrder').value) || 99,
+    prevents_from: document.getElementById('mpPrevents').value.trim() || null,
+    description:   document.getElementById('mpDesc').value.trim() || null,
+    image_url:     document.getElementById('mpImage').value.trim() || null,
+    in_stock:      document.getElementById('mpInStock').checked,
+    featured:      document.getElementById('mpFeatured').checked,
+    active:        document.getElementById('mpActive').checked,
+    trigger_tags:  selectedTags,
   };
 
   let error;

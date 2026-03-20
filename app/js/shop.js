@@ -524,6 +524,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>
           <div class="item-name">${escHtml(item.name)}</div>
           ${item.manufacturer ? `<div class="item-manufacturer">${escHtml(item.manufacturer)}</div>` : ''}
+          ${item.prevents_from ? `<div style="font-size:11px;color:#1B5E20;background:#E8F5E9;border-radius:6px;padding:3px 7px;margin-bottom:4px;font-weight:600;line-height:1.4">🛡️ ${escHtml(item.prevents_from)}</div>` : ''}
           ${item.description ? `<div style="font-size:11px;color:var(--text-hint);margin-bottom:4px;line-height:1.4">${escHtml(item.description.substring(0,80))}${item.description.length>80?'…':''}</div>` : ''}
           <div class="item-price">UGX ${Number(item.price).toLocaleString()} <small>/ ${item.unit || 'piece'}</small></div>
           <span class="item-stock-badge ${item.in_stock !== false ? 'in' : 'out'}">${item.in_stock !== false ? '✓ In Stock' : '✗ Out of Stock'}</span>
