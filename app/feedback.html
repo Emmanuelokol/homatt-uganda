@@ -257,8 +257,8 @@
   .fb-chip.selected { background:#E8F5E9;border-color:#1B5E20;color:#1B5E20;font-weight:600; }
 </style>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
-<script src="js/config.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
 <script>
 var ratings = { clinic:0, pharmacy:0, rider:0, platform:0 };
 var aspects = {
@@ -329,8 +329,9 @@ document.getElementById('shareContact').addEventListener('change', function() {
 /* ── Supabase init ── */
 function getSupa() {
   if (_supa) return _supa;
-  if (window.supabase && window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
-    _supa = window.supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+  var cfg = window.HOMATT_CONFIG || {};
+  if (window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   }
   return _supa;
 }

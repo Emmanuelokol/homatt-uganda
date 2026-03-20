@@ -463,6 +463,7 @@ body {
 .btn-admin.danger:hover { background: #B71C1C; }
 .btn-admin.info { background: var(--admin-info); color: white; }
 .btn-admin.info:hover { background: #01579B; }
+.btn-admin.sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
 
 /* ---- Modal overlay ---- */
 .admin-modal-overlay {
