@@ -71,7 +71,8 @@ function buildAdminSidebar(activePage) {
       { href:'finance.html', icon:'payments', id:'finance', text:'Finance & Payouts' }
     ]},
     { label:'Marketplace', links:[
-      { href:'marketplace.html', icon:'storefront', id:'marketplace', text:'Products' }
+      { href:'marketplace.html', icon:'storefront',  id:'marketplace',  text:'Products & Shop' },
+      { href:'marketplace.html#medicine-orders', icon:'medication', id:'med-orders', text:'Medicine Orders' }
     ]}
   ];
 

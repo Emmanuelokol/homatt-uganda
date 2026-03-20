@@ -29,6 +29,30 @@
     </div>
 
     <div class="admin-content">
+
+      <!-- ===== LIVE ORDER ALERT BANNER ===== -->
+      <!-- Appears when a new order arrives via Supabase Realtime -->
+      <div id="newOrderAlert" style="display:none;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:white;border-radius:10px;padding:14px 18px;margin-bottom:20px;display:none;align-items:center;gap:12px;animation:pulseAlert 0.6s ease-out">
+        <span class="material-icons-outlined" style="font-size:24px;animation:bounceIcon 1s ease infinite">notifications_active</span>
+        <div style="flex:1">
+          <div style="font-weight:700;font-size:14px" id="alertOrderTitle">New Order Received!</div>
+          <div style="font-size:12px;opacity:0.85;margin-top:2px" id="alertOrderDetail">A customer just placed a new order</div>
+        </div>
+        <button onclick="dismissOrderAlert()" style="background:rgba(255,255,255,0.2);border:none;color:white;border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer;font-weight:600">View ↓</button>
+      </div>
+
+      <style>
+        @keyframes pulseAlert {
+          0%   { transform: scale(0.97); opacity: 0.8; }
+          50%  { transform: scale(1.01); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes bounceIcon {
+          0%, 100% { transform: translateY(0); }
+          50%       { transform: translateY(-3px); }
+        }
+      </style>
+
       <!-- Stats -->
       <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
         <div class="stat-card">
@@ -49,47 +73,133 @@
         </div>
         <div class="stat-card">
           <div class="stat-icon" style="background:#EDE7F6"><span class="material-icons-outlined" style="color:#6A1B9A">receipt_long</span></div>
-          <div><div class="stat-number" id="statOrders">—</div><div class="stat-label">New Orders</div></div>
+          <div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="stat-number" id="statOrders">—</div>
+              <span id="newOrderBadge" style="display:none;background:#D32F2F;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px;animation:pulseAlert 1s ease infinite">NEW</span>
+            </div>
+            <div class="stat-label">Pending Orders</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon" style="background:#E3F2FD"><span class="material-icons-outlined" style="color:#1565C0">medication</span></div>
+          <div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="stat-number" id="statMedOrders">—</div>
+              <span id="newMedOrderBadge" style="display:none;background:#D32F2F;color:white;font-size:10px;font-weight:700;padding:2px 6px;border-radius:10px">NEW</span>
+            </div>
+            <div class="stat-label">Medicine Orders</div>
+          </div>
         </div>
       </div>
 
-      <!-- ===== CUSTOMER ORDERS ===== -->
-      <div id="demoOrdersNotice" style="display:none;background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#E65100">
-        <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">warning</span>
-        <strong>Demo mode:</strong> Sign in with real admin credentials to see live customer orders.
+      <!-- ===== ORDER TABS ===== -->
+      <div style="display:flex;gap:0;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;margin-bottom:16px;background:#F8F9FA">
+        <button id="tabShopOrders" onclick="switchOrderTab('shop')"
+          style="flex:1;padding:12px;border:none;background:#1B5E20;color:white;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">storefront</span>
+          Preventive Shop Orders
+          <span id="shopOrderCount" style="background:rgba(255,255,255,0.25);padding:1px 6px;border-radius:10px;font-size:11px"></span>
+        </button>
+        <button id="tabMedOrders" onclick="switchOrderTab('medicine')"
+          style="flex:1;padding:12px;border:none;background:#F8F9FA;color:#5F6368;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">medication</span>
+          Medicine Orders
+          <span id="medOrderCount" style="background:#E8EAF6;padding:1px 6px;border-radius:10px;font-size:11px;color:#3949AB"></span>
+        </button>
       </div>
-      <div class="admin-table-wrap" style="margin-bottom:28px">
-        <div class="table-header">
-          <div class="table-title">Customer Orders</div>
-          <div class="table-filter" style="display:flex;gap:8px;align-items:center">
-            <select id="filterOrderStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
-              <option value="">All Statuses</option>
-              <option value="pending">Pending</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="dispatched">Dispatched</option>
-              <option value="delivered">Delivered</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-            <button class="btn-admin secondary sm" onclick="loadOrders()">
-              <span class="material-icons-outlined" style="font-size:15px">refresh</span> Refresh
-            </button>
-          </div>
+
+      <!-- ===== SHOP ORDERS PANEL ===== -->
+      <div id="panelShopOrders">
+        <div id="demoOrdersNotice" style="display:none;background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#E65100">
+          <span class="material-icons-outlined" style="font-size:15px;vertical-align:middle;margin-right:4px">warning</span>
+          <strong>Demo mode:</strong> Sign in with real admin credentials to see live customer orders.
         </div>
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Customer &amp; Date</th>
-              <th>Items Ordered</th>
-              <th>Total</th>
-              <th>Delivery Address</th>
-              <th>Status / Payment</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="ordersBody">
-            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>
-          </tbody>
-        </table>
+        <div class="admin-table-wrap" style="margin-bottom:28px">
+          <div class="table-header">
+            <div class="table-title" style="display:flex;align-items:center;gap:8px">
+              Preventive Shop Orders
+              <span id="realtimeIndicator" title="Live updates active"
+                style="width:8px;height:8px;border-radius:50%;background:#4CAF50;display:inline-block;animation:pulseAlert 2s ease infinite"></span>
+            </div>
+            <div class="table-filter" style="display:flex;gap:8px;align-items:center">
+              <select id="filterOrderStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+                <option value="">All Statuses</option>
+                <option value="pending">Pending</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <button class="btn-admin secondary sm" onclick="loadOrders()">
+                <span class="material-icons-outlined" style="font-size:15px">refresh</span> Refresh
+              </button>
+            </div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Customer &amp; Date</th>
+                <th>Items Ordered</th>
+                <th>Health Context</th>
+                <th>Total</th>
+                <th>Delivery Address</th>
+                <th>Status / Payment</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="ordersBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== MEDICINE ORDERS PANEL ===== -->
+      <div id="panelMedOrders" style="display:none">
+        <div class="admin-table-wrap" style="margin-bottom:28px">
+          <div class="table-header">
+            <div class="table-title" style="display:flex;align-items:center;gap:8px">
+              Medicine Orders (Pharmacy)
+              <span style="width:8px;height:8px;border-radius:50%;background:#4CAF50;display:inline-block;animation:pulseAlert 2s ease infinite"></span>
+            </div>
+            <div class="table-filter" style="display:flex;gap:8px;align-items:center">
+              <select id="filterMedOrderStatus" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+                <option value="">All Statuses</option>
+                <option value="incoming">Incoming</option>
+                <option value="confirmed">Confirmed</option>
+                <option value="preparing">Preparing</option>
+                <option value="dispatched">Dispatched</option>
+                <option value="delivered">Delivered</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+              <select id="filterMedOrderType" style="padding:8px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:13px">
+                <option value="">All Types</option>
+                <option value="otc">OTC</option>
+                <option value="prescription">Prescription (Rx)</option>
+              </select>
+              <button class="btn-admin secondary sm" onclick="loadMedOrders()">
+                <span class="material-icons-outlined" style="font-size:15px">refresh</span> Refresh
+              </button>
+            </div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Patient &amp; Date</th>
+                <th>Medicines</th>
+                <th>Type</th>
+                <th>Total</th>
+                <th>Delivery / Notes</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="medOrdersBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading medicine orders…</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div class="admin-table-wrap">
@@ -531,11 +641,24 @@ const ORDER_STATUS_COLORS = {
   cancelled: 'status-badge rejected',
 };
 
+const HEALTH_TRIGGER_LABELS = {
+  malaria_diagnosis: { label: '🦟 Post-Malaria',   color: '#B71C1C', bg: '#FFEBEE' },
+  malaria_season:    { label: '⚠️ Malaria Season',  color: '#E65100', bg: '#FFF3E0' },
+  diarrhoea_child:   { label: '💧 Diarrhoea/Child', color: '#0277BD', bg: '#E1F5FE' },
+  gastro_diagnosis:  { label: '🤢 Gastro',          color: '#0277BD', bg: '#E1F5FE' },
+  pregnancy:         { label: '🤰 Pregnancy',        color: '#880E4F', bg: '#FCE4EC' },
+  diabetes_family:   { label: '❤️ Diabetes',        color: '#E65100', bg: '#FFF3E0' },
+};
+
 function renderOrders(list) {
-  document.getElementById('statOrders').textContent = list.filter(o => o.status === 'pending').length;
+  const pendingCount = list.filter(o => o.status === 'pending').length;
+  document.getElementById('statOrders').textContent = pendingCount;
+
+  const countEl = document.getElementById('shopOrderCount');
+  if (countEl) countEl.textContent = list.length || '';
+
   document.getElementById('ordersBody').innerHTML = list.length ? list.map(o => {
     const items = Array.isArray(o.items) ? o.items : [];
-    // Build a detailed items breakdown
     const itemsHtml = items.map(i =>
       `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F0F0F0;gap:12px">
         <span style="font-size:12px;font-weight:500">${i.name || i.n || '?'}</span>
@@ -543,7 +666,19 @@ function renderOrders(list) {
       </div>`
     ).join('');
     const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
-    return `<tr>
+
+    // Health trigger badge
+    const triggerInfo = o.health_trigger ? HEALTH_TRIGGER_LABELS[o.health_trigger] : null;
+    const triggerBadge = triggerInfo
+      ? `<div style="display:inline-flex;align-items:center;gap:4px;background:${triggerInfo.bg};color:${triggerInfo.color};border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;margin-top:4px">${triggerInfo.label}</div>`
+      : '<span style="font-size:11px;color:#9AA0A6">—</span>';
+
+    // Highlight new pending orders
+    const rowStyle = o.status === 'pending'
+      ? 'background:#F9FBE7;'
+      : '';
+
+    return `<tr style="${rowStyle}">
       <td>
         <div style="font-weight:700;font-size:13px">${o.patient_name || 'Customer'}</div>
         ${o.patient_phone ? `<div style="font-size:11px;color:#9AA0A6">${o.patient_phone}</div>` : ''}
@@ -553,6 +688,7 @@ function renderOrders(list) {
         ${itemsHtml || '<span style="color:#9AA0A6;font-size:12px">—</span>'}
         <div style="font-size:11px;color:#9AA0A6;margin-top:4px">${items.length} item${items.length !== 1 ? 's' : ''}</div>
       </td>
+      <td>${triggerBadge}</td>
       <td style="font-weight:700;font-size:14px;color:#1B5E20">UGX ${Number(o.total_amount||0).toLocaleString()}</td>
       <td style="font-size:12px;color:#5F6368">
         ${o.delivery_address || '—'}
@@ -572,7 +708,7 @@ function renderOrders(list) {
       </td>
     </tr>`;
   }).join('')
-  : '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
+  : '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No orders yet</td></tr>';
 }
 
 function applyOrderFilter() {
@@ -583,23 +719,23 @@ function applyOrderFilter() {
 async function loadOrders() {
   if (!adminDb) {
     document.getElementById('ordersBody').innerHTML =
-      '<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
+      '<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>No database connection — please sign in again.</td></tr>';
     return;
   }
   document.getElementById('ordersBody').innerHTML =
-    '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
+    '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
   try {
     const { data, error } = await adminDb.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
     if (error) {
       document.getElementById('ordersBody').innerHTML =
-        `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
+        `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
       return;
     }
     allOrders = data || [];
     applyOrderFilter();
   } catch(e) {
     document.getElementById('ordersBody').innerHTML =
-      `<tr><td colspan="6" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
+      `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${e.message}</td></tr>`;
   }
 }
 
@@ -693,6 +829,253 @@ async function openDispatchModal(orderId) {
   };
 }
 
+// ===== ORDER TAB SWITCHING =====
+function switchOrderTab(tab) {
+  const isShop = tab === 'shop';
+  document.getElementById('panelShopOrders').style.display = isShop ? 'block' : 'none';
+  document.getElementById('panelMedOrders').style.display  = isShop ? 'none'  : 'block';
+
+  const shopBtn = document.getElementById('tabShopOrders');
+  const medBtn  = document.getElementById('tabMedOrders');
+
+  shopBtn.style.background = isShop ? '#1B5E20' : '#F8F9FA';
+  shopBtn.style.color      = isShop ? 'white'   : '#5F6368';
+  medBtn.style.background  = isShop ? '#F8F9FA' : '#1565C0';
+  medBtn.style.color       = isShop ? '#5F6368' : 'white';
+
+  if (!isShop && !allMedOrders.length) loadMedOrders();
+}
+
+// ===== MEDICINE ORDERS =====
+let allMedOrders = [];
+
+const MED_ORDER_STATUS_COLORS = {
+  incoming:   'status-badge incoming',
+  confirmed:  'status-badge scheduled',
+  preparing:  'status-badge in_progress',
+  dispatched: 'status-badge in_progress',
+  delivered:  'status-badge delivered',
+  cancelled:  'status-badge rejected',
+};
+
+function renderMedOrders(list) {
+  const pendingCount = list.filter(o => ['incoming','confirmed'].includes(o.status)).length;
+  document.getElementById('statMedOrders').textContent = pendingCount || list.length;
+
+  const countEl = document.getElementById('medOrderCount');
+  if (countEl) countEl.textContent = list.length || '';
+
+  document.getElementById('medOrdersBody').innerHTML = list.length ? list.map(o => {
+    const items = Array.isArray(o.items) ? o.items : [];
+    const itemsHtml = items.map(i =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F0F0F0;gap:12px">
+        <span style="font-size:12px;font-weight:500">${i.name || '?'}</span>
+        <span style="font-size:12px;color:#5F6368;white-space:nowrap">×${i.qty||1} &nbsp;<strong>UGX ${Number((i.price||0)*(i.qty||1)).toLocaleString()}</strong></span>
+      </div>`
+    ).join('');
+    const date = new Date(o.created_at).toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+    const typeBadge = o.order_type === 'prescription'
+      ? '<span style="background:#E8EAF6;color:#3949AB;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600">Rx Prescription</span>'
+      : '<span style="background:#E8F5E9;color:#1B5E20;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600">OTC</span>';
+
+    const rowStyle = o.status === 'incoming' ? 'background:#F9FBE7;' : '';
+
+    return `<tr style="${rowStyle}">
+      <td>
+        <div style="font-weight:700;font-size:13px">${o.patient_name || 'Patient'}</div>
+        ${o.patient_phone ? `<div style="font-size:11px;color:#9AA0A6">${o.patient_phone}</div>` : ''}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:2px">${date}</div>
+      </td>
+      <td>
+        ${itemsHtml || '<span style="color:#9AA0A6;font-size:12px">—</span>'}
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+      </td>
+      <td>${typeBadge}</td>
+      <td style="font-weight:700;font-size:14px;color:#1565C0">UGX ${Number(o.total_cost||0).toLocaleString()}</td>
+      <td style="font-size:12px;color:#5F6368">
+        <div>${o.delivery_address || '—'}</div>
+        ${o.booking_code ? `<div style="font-size:11px;color:#9AA0A6;margin-top:2px">Booking: ${o.booking_code}</div>` : ''}
+        ${o.rx_doctor_name ? `<div style="font-size:11px;color:#9AA0A6">Dr. ${o.rx_doctor_name}</div>` : ''}
+        ${o.notes ? `<div style="font-size:11px;color:#9AA0A6;font-style:italic;margin-top:2px">${o.notes}</div>` : ''}
+      </td>
+      <td>
+        <span class="${MED_ORDER_STATUS_COLORS[o.status]||'status-badge'}" style="text-transform:capitalize">${o.status}</span>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:3px">${o.urgency === 'urgent' ? '🚨 Urgent' : 'Standard'}</div>
+      </td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          ${o.status === 'incoming'   ? `<button class="btn-admin primary sm" onclick="updateMedOrderStatus('${o.id}','confirmed')">Confirm</button>` : ''}
+          ${o.status === 'confirmed'  ? `<button class="btn-admin primary sm" onclick="updateMedOrderStatus('${o.id}','preparing')">Preparing</button>` : ''}
+          ${o.status === 'preparing'  ? `<button class="btn-admin primary sm" onclick="updateMedOrderStatus('${o.id}','dispatched')">Dispatch</button>` : ''}
+          ${o.status === 'dispatched' ? `<button class="btn-admin primary sm" onclick="updateMedOrderStatus('${o.id}','delivered')">Delivered</button>` : ''}
+          ${['incoming','confirmed','preparing'].includes(o.status) ? `<button class="btn-admin danger sm" onclick="updateMedOrderStatus('${o.id}','cancelled')">Cancel</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('')
+  : '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No medicine orders yet</td></tr>';
+}
+
+function applyMedOrderFilter() {
+  const st   = document.getElementById('filterMedOrderStatus').value;
+  const type = document.getElementById('filterMedOrderType').value;
+  let list = allMedOrders;
+  if (st)   list = list.filter(o => o.status === st);
+  if (type) list = list.filter(o => (o.order_type || 'otc') === type);
+  renderMedOrders(list);
+}
+
+async function loadMedOrders() {
+  if (!adminDb) {
+    document.getElementById('medOrdersBody').innerHTML =
+      '<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F">No database connection.</td></tr>';
+    return;
+  }
+  document.getElementById('medOrdersBody').innerHTML =
+    '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading medicine orders…</td></tr>';
+  try {
+    const { data, error } = await adminDb
+      .from('pharmacy_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) {
+      document.getElementById('medOrdersBody').innerHTML =
+        `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F">${error.message}</td></tr>`;
+      return;
+    }
+    allMedOrders = data || [];
+    applyMedOrderFilter();
+  } catch(e) {
+    document.getElementById('medOrdersBody').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F">${e.message}</td></tr>`;
+  }
+}
+
+window.updateMedOrderStatus = async function(id, status) {
+  const extra = {};
+  if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
+  if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
+  if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
+  const { error } = await adminDb
+    .from('pharmacy_orders')
+    .update({ status, updated_at: new Date().toISOString(), ...extra })
+    .eq('id', id);
+  if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
+  await loadMedOrders();
+  showAdminToast('Medicine order marked as ' + status, 'success');
+};
+
+// ===== NEW ORDER ALERT =====
+let _alertTimeout = null;
+
+function showNewOrderAlert(orderRow, type) {
+  const banner = document.getElementById('newOrderAlert');
+  const title  = document.getElementById('alertOrderTitle');
+  const detail = document.getElementById('alertOrderDetail');
+
+  const typeLabel = type === 'medicine' ? 'Medicine' : 'Preventive Shop';
+  const customer  = orderRow.patient_name || 'A customer';
+  const itemCount = Array.isArray(orderRow.items) ? orderRow.items.length : '?';
+
+  title.textContent  = `🛍️ New ${typeLabel} Order!`;
+  detail.textContent = `${customer} just ordered ${itemCount} item${itemCount !== 1 ? 's' : ''}`;
+
+  banner.style.display = 'flex';
+  banner.style.animation = 'none';
+  setTimeout(() => { banner.style.animation = ''; }, 10);
+
+  // Show the "NEW" badge on stat
+  const badge = document.getElementById(type === 'medicine' ? 'newMedOrderBadge' : 'newOrderBadge');
+  if (badge) badge.style.display = 'inline-block';
+
+  // Auto-dismiss after 15s
+  clearTimeout(_alertTimeout);
+  _alertTimeout = setTimeout(dismissOrderAlert, 15000);
+
+  // Play alert beep using Web Audio API
+  playAlertBeep();
+}
+
+function dismissOrderAlert() {
+  const banner = document.getElementById('newOrderAlert');
+  banner.style.display = 'none';
+  clearTimeout(_alertTimeout);
+}
+
+function playAlertBeep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(660, ctx.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.4);
+  } catch(_e) {}
+}
+
+// ===== SUPABASE REALTIME — LIVE ORDER ALERTS =====
+let _realtimeChannel = null;
+
+function setupRealtimeAlerts(db) {
+  if (!db || _realtimeChannel) return;
+
+  _realtimeChannel = db
+    .channel('admin-order-alerts')
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'marketplace_orders' },
+      (payload) => {
+        // New preventive shop order
+        showNewOrderAlert(payload.new, 'shop');
+        // Reload the orders table
+        loadOrders();
+        // Request browser notification permission if not already granted
+        requestBrowserNotification(
+          '🛍️ New Preventive Shop Order',
+          `${payload.new.patient_name || 'Customer'} placed an order`
+        );
+      }
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'pharmacy_orders' },
+      (payload) => {
+        // New medicine order
+        showNewOrderAlert(payload.new, 'medicine');
+        loadMedOrders();
+        requestBrowserNotification(
+          '💊 New Medicine Order',
+          `${payload.new.patient_name || 'Patient'} placed a medicine order`
+        );
+      }
+    )
+    .subscribe((status) => {
+      const indicator = document.getElementById('realtimeIndicator');
+      if (indicator) {
+        indicator.style.background = status === 'SUBSCRIBED' ? '#4CAF50' : '#FF9800';
+        indicator.title = status === 'SUBSCRIBED' ? 'Live updates active' : 'Reconnecting…';
+      }
+    });
+}
+
+function requestBrowserNotification(title, body) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, icon: '/icons/icon-192.png' });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(perm => {
+      if (perm === 'granted') new Notification(title, { body, icon: '/icons/icon-192.png' });
+    });
+  }
+}
+
 // Wait up to 5 seconds for the Supabase SDK CDN script to finish loading
 function waitForSupabaseSDK(maxMs = 5000) {
   return new Promise(resolve => {
@@ -715,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!sdkReady) {
     const errMsg = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">wifi_off</span>Could not load the database library. Check your internet connection and reload.</td></tr>';
     document.getElementById('productsBody').innerHTML = errMsg;
-    document.getElementById('ordersBody').innerHTML = errMsg.replace('colspan="8"','colspan="6"');
+    document.getElementById('ordersBody').innerHTML = errMsg.replace('colspan="8"','colspan="7"');
     document.body.style.visibility = 'visible';
     return;
   }
@@ -739,9 +1122,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('filterCategory').addEventListener('change', applyFilter);
   document.getElementById('filterStatus').addEventListener('change', applyFilter);
   document.getElementById('filterOrderStatus').addEventListener('change', applyOrderFilter);
+  document.getElementById('filterMedOrderStatus').addEventListener('change', applyMedOrderFilter);
+  document.getElementById('filterMedOrderType').addEventListener('change', applyMedOrderFilter);
+
+  // Request browser notification permission proactively so it's ready when orders arrive
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
 
   try { await loadCategories(); } catch(e) { console.error('loadCategories init error:', e); }
   await Promise.all([loadProducts(), loadOrders()]);
+
+  // Start Supabase Realtime subscription for live order alerts
+  setupRealtimeAlerts(adminDb);
+
+  // Auto-switch to medicine orders tab if URL hash is #medicine-orders
+  if (window.location.hash === '#medicine-orders') {
+    switchOrderTab('medicine');
+  }
 });
 </script>
 </body>

@@ -133,6 +133,305 @@ document.addEventListener('DOMContentLoaded', async () => {
     closeSheet(document.getElementById('cartSheet'));
   });
 
+  // ====== Health Context — The Five Moments ======
+  // These are the moments Jumia can never replicate because they require health data.
+  // We have that data because the patient used the symptom checker.
+
+  const MALARIA_HIGH_RISK_DISTRICTS = [
+    'kampala','wakiso','mukono','jinja','gulu','lira','soroti','tororo','mbale',
+    'adjumani','moyo','arua','mbarara','masaka','entebbe','ntinda','nansana',
+    'kireka','kyanja','namugongo','najjera','kira','bweyogerere',
+  ];
+
+  async function detectHealthContext() {
+    const moments = [];
+    const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+    const district = (user.district || user.city || '').toLowerCase().trim();
+    const family = JSON.parse(localStorage.getItem('homatt_family') || '[]');
+
+    // ─── MOMENT 1 & 4: Malaria ─────────────────────────────
+    // After a malaria diagnosis in the symptom checker
+    const history = JSON.parse(localStorage.getItem('homatt_symptom_history') || '[]');
+    const thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+
+    const recentMalaria = history.some(h => {
+      if (!h.date || new Date(h.date).getTime() < thirtyDaysAgo) return false;
+      return (h.conditions || []).some(c =>
+        (c.name || '').toLowerCase().includes('malaria')
+      );
+    });
+
+    if (recentMalaria) {
+      moments.push({
+        type: 'malaria_diagnosis',
+        priority: 1,
+        icon: 'pest_control',
+        color: '#B71C1C',
+        bg: '#FFEBEE',
+        accent: '#EF9A9A',
+        title: 'Protect Against Malaria Reinfection',
+        subtitle: 'Based on your recent symptom check — mosquito nets, repellents and test kits to protect you and your family',
+        cta: 'Shop Protection Products',
+        tags: ['malaria_diagnosis','malaria_season'],
+      });
+    }
+
+    // ─── MOMENT 4: Malaria Season ──────────────────────────
+    // Seven days before predicted malaria season in user's district
+    // Uganda has two peak seasons: March–May (long rains) and October–December (short rains)
+    const month = new Date().getMonth() + 1; // 1–12
+    const isMalariaSeason = (month >= 3 && month <= 5) || (month >= 10 && month <= 12);
+    const isHighRiskDistrict = !district || MALARIA_HIGH_RISK_DISTRICTS.includes(district);
+
+    if (isMalariaSeason && isHighRiskDistrict && !recentMalaria) {
+      const seasonName = (month >= 3 && month <= 5) ? 'long rains season' : 'short rains season';
+      const districtLabel = district
+        ? district.charAt(0).toUpperCase() + district.slice(1)
+        : 'Your area';
+      moments.push({
+        type: 'malaria_season',
+        priority: 2,
+        icon: 'warning_amber',
+        color: '#E65100',
+        bg: '#FFF3E0',
+        accent: '#FFCC80',
+        title: 'Malaria Season Has Started',
+        subtitle: `${districtLabel} is in the ${seasonName} — high malaria risk period. Stock up on nets, repellents and test kits now before demand peaks`,
+        cta: 'Stock Up Before It Peaks',
+        tags: ['malaria_diagnosis','malaria_season'],
+      });
+    }
+
+    // ─── MOMENT 2: Diarrhoea (especially in a child) ───────
+    // After diarrhoea diagnosis for a child → ORS, zinc, water purification
+    const recentDiarrhoea = history.some(h => {
+      if (!h.date || new Date(h.date).getTime() < thirtyDaysAgo) return false;
+      return (h.conditions || []).some(c => {
+        const name = (c.name || '').toLowerCase();
+        return name.includes('diarr') || name.includes('gastro') || name.includes('stomach');
+      });
+    });
+
+    if (recentDiarrhoea) {
+      moments.push({
+        type: 'diarrhoea_child',
+        priority: 3,
+        icon: 'water_drop',
+        color: '#0277BD',
+        bg: '#E1F5FE',
+        accent: '#81D4FA',
+        title: 'Diarrhoea Recovery & Prevention',
+        subtitle: 'ORS sachets, zinc tablets and water purification drops — the WHO-recommended trio that stops dehydration and prevents the next episode',
+        cta: 'Get Recovery Supplies',
+        tags: ['diarrhoea_child','gastro_diagnosis'],
+      });
+    }
+
+    // ─── MOMENT 3: Pregnancy ───────────────────────────────
+    // When a pregnancy is logged in the profile → prenatal vitamins, iron, maternal kit
+    const isPregnant =
+      user.is_pregnant === true ||
+      (user.health_goals || []).some(g => {
+        const gl = g.toLowerCase();
+        return gl.includes('pregnan') || gl.includes('maternal') || gl.includes('prenatal');
+      });
+
+    if (isPregnant) {
+      moments.push({
+        type: 'pregnancy',
+        priority: 4,
+        icon: 'pregnant_woman',
+        color: '#880E4F',
+        bg: '#FCE4EC',
+        accent: '#F48FB1',
+        title: 'Maternal & Prenatal Care',
+        subtitle: 'Prenatal vitamins, iron + folic acid, and maternal care products recommended during pregnancy by the Ministry of Health Uganda',
+        cta: 'Shop Maternal Products',
+        tags: ['pregnancy'],
+      });
+    }
+
+    // ─── MOMENT 5: Diabetes in family ─────────────────────
+    // When a family member with diabetes is added → glucose meter, strips, snacks
+
+    // Check cached family members from localStorage first
+    const hasDiabetesCached = family.some(m =>
+      (m.health_conditions || []).some(c => c.toLowerCase().includes('diabet')) ||
+      (m.relation || '').toLowerCase().includes('diabet')
+    );
+
+    // Also check Supabase for family_members.health_conditions
+    let hasDiabetesDb = false;
+    if (supabase && userId) {
+      try {
+        const { data: famRows } = await supabase
+          .from('family_members')
+          .select('health_conditions')
+          .eq('primary_user_id', userId);
+        if (famRows) {
+          hasDiabetesDb = famRows.some(m =>
+            (m.health_conditions || []).some(c => c.toLowerCase().includes('diabet'))
+          );
+        }
+      } catch (_e) {}
+    }
+
+    if (hasDiabetesCached || hasDiabetesDb) {
+      moments.push({
+        type: 'diabetes_family',
+        priority: 5,
+        icon: 'monitor_heart',
+        color: '#E65100',
+        bg: '#FFF3E0',
+        accent: '#FFCC80',
+        title: 'Diabetes Management',
+        subtitle: 'A family member has diabetes — glucometer, test strips and dietary support to help them manage blood sugar safely at home',
+        cta: 'Shop Diabetes Supplies',
+        tags: ['diabetes_family'],
+      });
+    }
+
+    // Also check health_triggers table in Supabase for any active triggers
+    if (supabase && userId) {
+      try {
+        const { data: triggers } = await supabase
+          .from('health_triggers')
+          .select('trigger_type, trigger_data')
+          .eq('user_id', userId)
+          .eq('active', true)
+          .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString());
+
+        for (const t of triggers || []) {
+          // Only add if not already present
+          const alreadyHas = moments.some(m => m.type === t.trigger_type);
+          if (!alreadyHas) {
+            const momentMap = {
+              malaria_diagnosis: { type:'malaria_diagnosis', priority:1, icon:'pest_control', color:'#B71C1C', bg:'#FFEBEE', accent:'#EF9A9A', title:'Malaria Protection', subtitle:'Recommended based on your health record — protect yourself and family', cta:'Shop Protection', tags:['malaria_diagnosis','malaria_season'] },
+              pregnancy:         { type:'pregnancy',         priority:4, icon:'pregnant_woman', color:'#880E4F', bg:'#FCE4EC', accent:'#F48FB1', title:'Maternal & Prenatal Care', subtitle:'Recommended for your pregnancy', cta:'Shop Maternal Products', tags:['pregnancy'] },
+              diabetes_family:   { type:'diabetes_family',   priority:5, icon:'monitor_heart', color:'#E65100', bg:'#FFF3E0', accent:'#FFCC80', title:'Diabetes Management', subtitle:'Supplies for your family member with diabetes', cta:'Shop Diabetes Supplies', tags:['diabetes_family'] },
+            };
+            if (momentMap[t.trigger_type]) moments.push(momentMap[t.trigger_type]);
+          }
+        }
+      } catch (_e) {}
+    }
+
+    // Sort by priority
+    moments.sort((a, b) => a.priority - b.priority);
+    return moments;
+  }
+
+  function renderHealthContextBanner(moments) {
+    const container = document.getElementById('healthContextBanner');
+    if (!container) return;
+
+    if (moments.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    // Show up to 2 most relevant moments to keep the banner compact
+    const topMoments = moments.slice(0, 2);
+
+    container.innerHTML = `
+      <div style="padding:12px 16px 0">
+        <div style="font-size:11px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;display:flex;align-items:center;gap:5px">
+          <span class="material-icons-outlined" style="font-size:13px">health_and_safety</span>
+          Personalised For Your Health
+        </div>
+        ${topMoments.map(m => `
+          <div class="health-moment-card"
+               data-moment-type="${m.type}"
+               data-moment-tags="${m.tags.join(',')}"
+               style="background:${m.bg};border:1.5px solid ${m.accent};border-radius:14px;padding:12px 14px;margin-bottom:10px">
+            <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">
+              <div style="background:${m.color};border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">
+                <span class="material-icons-outlined" style="font-size:18px;color:white">${m.icon}</span>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:13px;font-weight:700;color:${m.color};margin-bottom:3px">${m.title}</div>
+                <div style="font-size:11px;color:var(--text-secondary);line-height:1.5">${m.subtitle}</div>
+              </div>
+            </div>
+            <button class="moment-shop-btn"
+                    data-moment-tags="${m.tags.join(',')}"
+                    data-moment-title="${m.title}"
+                    style="background:${m.color};color:white;border:none;border-radius:20px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer;width:100%;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">
+              <span class="material-icons-outlined" style="font-size:14px">${m.icon}</span>
+              ${m.cta}
+            </button>
+          </div>
+        `).join('')}
+      </div>`;
+
+    container.querySelectorAll('.moment-shop-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tags  = btn.dataset.momentTags.split(',').filter(Boolean);
+        const title = btn.dataset.momentTitle;
+        filterByHealthContext(tags, title);
+        // Scroll to the products section
+        const titleEl = document.getElementById('itemsSectionTitle');
+        if (titleEl) titleEl.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+
+    container.style.display = 'block';
+  }
+
+  function filterByHealthContext(tags, title) {
+    if (!tags.length) return;
+
+    // Find all items that have at least one of the requested tags
+    const contextItems = items.filter(item =>
+      (item.trigger_tags || []).some(t => tags.includes(t))
+    );
+
+    if (contextItems.length > 0) {
+      document.getElementById('itemsSectionTitle').textContent =
+        title + ' — Recommended Products';
+      renderItems(contextItems);
+    } else {
+      // No tagged products yet — show all and update title
+      document.getElementById('itemsSectionTitle').textContent =
+        title + ' — All Products';
+      renderItems(items);
+    }
+
+    // Deactivate category chips since we're now in context mode
+    document.querySelectorAll('.cat-chip').forEach(c => c.classList.remove('active'));
+  }
+
+  // ====== Notify Admins of New Order (push via OneSignal) ======
+  async function notifyAdminsNewOrder(patientName, itemsSummary) {
+    if (!supabase) return;
+    try {
+      const { data: admins } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('is_admin', true)
+        .limit(5);
+
+      if (!admins || admins.length === 0) return;
+
+      const short = itemsSummary.length > 55
+        ? itemsSummary.substring(0, 55) + '…'
+        : itemsSummary;
+
+      await Promise.all(admins.map(admin =>
+        supabase.functions.invoke('send-notification', {
+          body: {
+            userId:  admin.id,
+            title:   '🛍️ New Shop Order',
+            message: `${patientName || 'Customer'}: ${short}`,
+            data:    { screen: 'shop_order', id: '' },
+          },
+        }).catch(() => {}) // non-fatal
+      ));
+    } catch (_e) {
+      // Non-fatal — order was already placed
+    }
+  }
+
   // ====== Load Shop ======
   async function loadShop() {
     document.getElementById('shopLoading').style.display = 'block';
@@ -145,8 +444,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     categories = cats || [];
     renderCategories();
-    await loadItems(null);
+
+    // Load items and detect health context in parallel
+    const [, moments] = await Promise.all([
+      loadItems(null),
+      detectHealthContext(),
+    ]);
+
     document.getElementById('shopLoading').style.display = 'none';
+
+    // Render health context banner (non-blocking)
+    renderHealthContextBanner(moments);
   }
 
   function renderCategories() {
@@ -560,6 +868,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
       }
     } catch(e) {}
+
+    // Notify admin of new order (push notification)
+    const itemsSummary = cart.map(c => `${c.qty}× ${c.name}`).join(', ');
+    notifyAdminsNewOrder(patientName, itemsSummary);
 
     cart = [];
     localStorage.removeItem('homatt_cart');
