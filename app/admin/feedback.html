@@ -207,13 +207,19 @@ function statusBadge(s) {
 
 document.addEventListener('DOMContentLoaded', async () => {
   buildAdminSidebar('feedback');
-  const session = await requireAdmin();
+  let session;
+  try { session = await requireAdmin(); } catch(e) { console.error('requireAdmin failed:', e); }
   if (!session) return;
   supabase = adminSupa();
   setupAdminLogout();
 
-  await Promise.all([loadPlatform(), loadRatings()]);
-  computeKPIs();
+  try {
+    await Promise.all([loadPlatform(), loadRatings()]);
+  } catch(e) {
+    console.error('Data load failed:', e);
+    safeRenderPlatform(); safeRenderClinic(); safeRenderPharmacy();
+  }
+  try { computeKPIs(); } catch(e) { console.error('computeKPIs failed:', e); }
 
   // Tab switching
   document.querySelectorAll('.fb-tab').forEach(btn => {
@@ -249,36 +255,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (error) { showAdminToast('Failed to update: ' + error.message, 'error'); }
     else {
       showAdminToast('Status updated', 'success');
-      await loadPlatform();
-      computeKPIs();
+      try { await loadPlatform(); computeKPIs(); } catch(e) { console.error('reload failed:', e); }
     }
     btn.disabled = false;
     document.getElementById('reviewModal').style.display = 'none';
   });
 });
 
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
 async function loadPlatform() {
-  if (!supabase) { renderPlatform(); return; }
+  if (!supabase) { safeRenderPlatform(); return; }
   try {
-    const { data, error } = await supabase
-      .from('platform_feedback')
-      .select('id,patient_id,overall_score,category,message,contact_email,status,created_at,updated_at')
-      .order('created_at', { ascending: false })
-      .limit(200);
+    const { data, error } = await withTimeout(
+      supabase
+        .from('platform_feedback')
+        .select('id,patient_id,overall_score,category,message,contact_email,status,created_at,updated_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      10000
+    );
     if (error) { console.error('loadPlatform error:', error); allPlatform = []; }
     else { allPlatform = data || []; }
   } catch(e) { console.error('loadPlatform exception:', e); allPlatform = []; }
-  renderPlatform();
+  safeRenderPlatform();
 }
 
 async function loadRatings() {
-  if (!supabase) { renderClinic(); renderPharmacy(); return; }
+  if (!supabase) { safeRenderClinic(); safeRenderPharmacy(); return; }
   try {
-    const { data, error } = await supabase
-      .from('ratings')
-      .select('id,rating_type,score,score_speed,score_quality,score_cost,score_comms,comment,created_at')
-      .order('created_at', { ascending: false })
-      .limit(300);
+    const { data, error } = await withTimeout(
+      supabase
+        .from('ratings')
+        .select('id,rating_type,score,score_speed,score_quality,score_cost,score_comms,comment,created_at')
+        .order('created_at', { ascending: false })
+        .limit(300),
+      10000
+    );
     if (error) { console.error('loadRatings error:', error); allClinic = []; allPharmacy = []; }
     else {
       const rows = data || [];
@@ -286,9 +304,13 @@ async function loadRatings() {
       allPharmacy = rows.filter(r => r.rating_type === 'pharmacy');
     }
   } catch(e) { console.error('loadRatings exception:', e); allClinic = []; allPharmacy = []; }
-  renderClinic();
-  renderPharmacy();
+  safeRenderClinic();
+  safeRenderPharmacy();
 }
+
+function safeRenderPlatform() { try { renderPlatform(); } catch(e) { console.error('renderPlatform error:', e); const b = document.getElementById('platformBody'); if (b) b.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No feedback yet</td></tr>'; } }
+function safeRenderClinic()   { try { renderClinic();   } catch(e) { console.error('renderClinic error:', e);   const b = document.getElementById('clinicBody');   if (b) b.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No clinic ratings yet</td></tr>'; } }
+function safeRenderPharmacy() { try { renderPharmacy(); } catch(e) { console.error('renderPharmacy error:', e); const b = document.getElementById('pharmacyBody'); if (b) b.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No pharmacy ratings yet</td></tr>'; } }
 
 function computeKPIs() {
   const avg = arr => arr.length ? (arr.reduce((s,r) => s + (r.score||r.overall_score||0), 0) / arr.length).toFixed(1) : '—';
