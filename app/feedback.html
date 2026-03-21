@@ -433,15 +433,22 @@ async function submitFeedback() {
       patient_id: userId,
       overall_score: platformScore || null,
       category: fbCategory,
-      message: platformMsg || null,
+      message: platformMsg || '',
       contact_email: contactEmail || null,
       status: 'new',
       created_at: new Date().toISOString()
     }));
   }
 
-  if (inserts.length) {
-    await Promise.all(inserts);
+  try {
+    if (inserts.length) {
+      await Promise.all(inserts);
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">send</span> Submit Feedback';
+    alert('Something went wrong submitting your feedback. Please try again.');
+    return;
   }
 
   // Show success

@@ -784,7 +784,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      showToast('Location is not supported on this device', 'error');
+      return;
+    }
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
@@ -797,12 +800,18 @@ document.addEventListener('DOMContentLoaded', async () => {
           btn.disabled = false;
           btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
         }
-        if (addr && input && !input.value) input.value = addr;
+        if (addr && input) input.value = addr;
+        else if (!addr) showToast('Could not detect your address. Please type it in.', 'error');
       },
-      () => {
+      (err) => {
         if (btn) {
           btn.disabled = false;
           btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }
+        if (err && err.code === 1) {
+          showToast('Location permission denied. Please enable it in Settings.', 'error');
+        } else {
+          showToast('Could not get your location. Please type your address.', 'error');
         }
       },
       { timeout: 8000, enableHighAccuracy: true }
