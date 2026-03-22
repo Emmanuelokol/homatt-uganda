@@ -13,6 +13,12 @@
   <link rel="stylesheet" href="css/trackers.css">
   <link rel="stylesheet" href="css/pages.css">
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    .cart-info-box { background:#E8F5E9; border:1px solid #C8E6C9; color:#1B5E20; }
+    [data-theme="dark"] .cart-info-box { background:#1A3010; border-color:#2D5016; color:#81C784; }
+    [data-theme="dark"] #cartAutoLocBtn { border-color:#4DB6AC !important; color:#4DB6AC !important; }
+    [data-theme="dark"] .cart-total-amount { color:#4DB6AC; }
+  </style>
 </head>
 <body>
   <div class="phone-frame">
@@ -165,18 +171,14 @@
       <div class="cart-checkout-footer" id="cartCheckoutArea" style="display:none">
         <div id="cartPharmacyInfo" style="display:none;background:#E3F2FD;border:1px solid #BBDEFB;border-radius:var(--radius-md);padding:8px 12px;margin-bottom:8px;font-size:11px;color:#0D47A1"></div>
         <div style="margin-bottom:8px">
-          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:5px">
-            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">location_on</span>
-            Delivery Address *
-          </label>
-          <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
+          <input type="text" id="cartDeliveryAddress" placeholder="e.g. Ntinda, Plot 14, near Shell" style="display:none">
           <button type="button" id="cartAutoLocBtn"
-            style="margin-top:6px;display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #00695C;color:#00695C;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center">
-            <span class="material-icons-outlined" style="font-size:15px">my_location</span>
+            style="display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #00695C;color:#00695C;padding:10px 12px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;width:100%;justify-content:center">
+            <span class="material-icons-outlined" style="font-size:16px">my_location</span>
             Use my current location
           </button>
         </div>
-        <div style="background:#E8F5E9;border:1px solid #C8E6C9;border-radius:var(--radius-md);padding:7px 10px;margin-bottom:10px;font-size:11px;color:#1B5E20">
+        <div class="cart-info-box" style="border-radius:var(--radius-md);padding:7px 10px;margin-bottom:10px;font-size:11px">
           <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle;margin-right:3px">info</span>
           Payment on delivery (cash). We will call to confirm your order.
         </div>

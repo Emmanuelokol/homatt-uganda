@@ -37,7 +37,7 @@
     .cat-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; padding:12px 16px 4px; }
     .cat-tile {
       display:flex; flex-direction:column; align-items:center; justify-content:center;
-      padding:12px 6px 10px; background:#fff; border:1.5px solid var(--border);
+      padding:12px 6px 10px; background:var(--surface); border:1.5px solid var(--border);
       border-radius:12px; cursor:pointer; touch-action:manipulation;
       transition:all .15s; -webkit-tap-highlight-color:transparent;
       font-family:inherit;
@@ -53,7 +53,7 @@
     /* ── Medicine cards ── */
     .med-item {
       display:flex; align-items:center; gap:12px; padding:12px 16px;
-      background:#fff; border-radius:var(--radius-md); margin-bottom:8px;
+      background:var(--surface); border-radius:var(--radius-md); margin-bottom:8px;
       border:1.5px solid var(--border); transition:border-color .15s;
       -webkit-tap-highlight-color:transparent;
     }
@@ -82,7 +82,7 @@
     .mo-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:5px; }
     .mo-field input, .mo-field select, .mo-field textarea {
       width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius-md);
-      font-size:14px; font-family:inherit; outline:none; background:#fff; transition:border-color .2s; box-sizing:border-box;
+      font-size:14px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary); transition:border-color .2s; box-sizing:border-box;
     }
     .mo-field input:focus, .mo-field select:focus, .mo-field textarea:focus { border-color:#00695C; }
     .mo-field textarea { resize:vertical; min-height:70px; }
@@ -94,7 +94,7 @@
     .cart-row:last-child { border-bottom:none; }
     .total-row { display:flex; justify-content:space-between; align-items:center; padding:14px 0 4px; border-top:2px solid var(--border); font-weight:700; font-size:15px; }
     /* ── Pharmacy cards ── */
-    .pharmacy-card { background:#fff; border:1.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px; transition:all .2s; touch-action:manipulation; }
+    .pharmacy-card { background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-md); padding:12px 14px; margin-bottom:8px; cursor:pointer; display:flex; align-items:center; gap:12px; transition:all .2s; touch-action:manipulation; }
     .pharmacy-card.sel { border-color:#00695C; background:#E0F2F1; }
     /* ── Success ── */
     .success-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:32px 20px; text-align:center; height:100%; }
@@ -110,6 +110,22 @@
     .momo-status-bar { background:#FFF8E1; border:1px solid #FFD54F; border-radius:12px; padding:12px 14px; margin-bottom:14px; display:none; text-align:center; }
     .momo-spinner { display:inline-block; width:20px; height:20px; border:2px solid #FFD54F; border-top-color:#F57F17; border-radius:50%; animation:spin .8s linear infinite; vertical-align:middle; margin-right:6px; }
     @keyframes spin { to { transform:rotate(360deg); } }
+    /* ── Dark mode overrides ── */
+    [data-theme="dark"] .cat-tile.sel { background:#1A3835; }
+    [data-theme="dark"] .cat-tile.rx-cat.sel { background:#2D1A3A; }
+    [data-theme="dark"] .med-item.in-cart { background:#1A3835; }
+    [data-theme="dark"] .med-icon { background:#1A3835; }
+    [data-theme="dark"] .mo-btn.secondary { background:#2A2A2A; color:var(--text-primary); }
+    [data-theme="dark"] .pharmacy-card.sel { background:#1A3835; }
+    [data-theme="dark"] .rx-banner { background:#2D1A3A; border-color:#7B1FA2; }
+    [data-theme="dark"] .rx-approval { background:#2D1A3A; border-color:#7B1FA2; }
+    [data-theme="dark"] .mo-prog-dot { background:#333; }
+    [data-theme="dark"] .order-code-box { background:#1A3835; border-color:#00695C; }
+    [data-theme="dark"] .pay-card.sel[id="pay-cod"] { background:#1A3835; }
+    [data-theme="dark"] #bankDetailsBlock { background:#1A2040; border-color:#3730A3; }
+    [data-theme="dark"] #bankDetailsBlock div { color:#93C5FD !important; }
+    [data-theme="dark"] #momoStatusBar { background:#2D2500; border-color:#B45309; }
+    [data-theme="dark"] .autoLocBtn-style { border-color:#4DB6AC !important; color:#4DB6AC !important; }
   </style>
 </head>
 <body>
@@ -166,7 +182,7 @@
         <div style="padding:4px 16px 8px">
           <input type="text" id="medSearch" placeholder="Or search by medicine name…"
             oninput="onSearch()"
-            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box;transition:border-color .2s">
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box;transition:border-color .2s">
         </div>
 
         <!-- Rx warning (shown when Rx category selected) -->
@@ -214,10 +230,10 @@
 
         <div class="mo-label">Delivery Address</div>
         <div class="mo-field">
-          <input type="text" id="deliveryAddress" placeholder="e.g. Plot 14, Ntinda Estate, Kampala" required>
+          <input type="text" id="deliveryAddress" placeholder="e.g. Plot 14, Ntinda Estate, Kampala" style="display:none">
           <button type="button" id="autoLocBtn" onclick="autoFillAddress('deliveryAddress','autoLocBtn')"
-            style="margin-top:6px;display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #00695C;color:#00695C;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center">
-            <span class="material-icons-outlined" style="font-size:15px">my_location</span>
+            style="display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #00695C;color:#00695C;padding:10px 12px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;width:100%;justify-content:center">
+            <span class="material-icons-outlined" style="font-size:16px">my_location</span>
             Use my current location
           </button>
         </div>
