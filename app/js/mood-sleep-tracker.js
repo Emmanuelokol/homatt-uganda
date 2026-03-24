@@ -425,12 +425,24 @@ Respond ONLY with valid JSON:
     historyEmpty.classList.add('hidden');
     historyList.innerHTML = '';
 
-    const { data: logs } = await supabase
-      .from('mood_sleep_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('log_date', { ascending: false })
-      .limit(20);
+    let logs = null;
+
+    if (supabase && userId) {
+      try {
+        const { data } = await supabase
+          .from('mood_sleep_logs')
+          .select('*')
+          .eq('user_id', userId)
+          .order('log_date', { ascending: false })
+          .limit(20);
+        logs = data;
+      } catch(e) { console.warn('[MoodTracker] loadHistory failed:', e.message); }
+    }
+
+    // Fall back to localStorage
+    if (!logs || logs.length === 0) {
+      logs = JSON.parse(localStorage.getItem('homatt_mood_logs') || '[]').slice(0, 20);
+    }
 
     historyLoading.style.display = 'none';
 
@@ -470,10 +482,16 @@ Respond ONLY with valid JSON:
   async function callAI(prompt, cfg) {
     const proxyUrl = cfg.API_PROXY_URL;
     if (!proxyUrl) throw new Error('API_PROXY_URL not configured');
-    const { data: { session } } = await supabase.auth.getSession();
+    let accessToken = null;
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        accessToken = data?.session?.access_token || null;
+      } catch(e) {}
+    }
     const res = await fetch(proxyUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+      headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}) },
       body: JSON.stringify({ provider: 'groq', prompt }),
     });
     if (!res.ok) throw new Error(`AI proxy error: ${res.status}`);
