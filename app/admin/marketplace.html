@@ -596,7 +596,9 @@ async function loadProducts() {
   document.getElementById('productsBody').innerHTML =
     '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading products…</td></tr>';
   try {
-    const { data, error } = await adminDb.from('marketplace_items').select('*').order('sort_order').order('name');
+    const fetchPromise = adminDb.from('marketplace_items').select('*').order('sort_order').order('name');
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 12000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) {
       document.getElementById('productsBody').innerHTML =
         `<tr><td colspan="8" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
@@ -613,7 +615,9 @@ async function loadProducts() {
 async function loadCategories() {
   if (!adminDb) return;
   try {
-    const { data, error } = await adminDb.from('marketplace_categories').select('*').order('sort_order');
+    const fetchPromise = adminDb.from('marketplace_categories').select('*').order('sort_order');
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) { console.error('loadCategories DB error:', error.message); return; }
     allCategories = data || [];
     try { populateCategoryDropdowns(); } catch(e) { console.error('populateCategoryDropdowns failed:', e); }
@@ -754,7 +758,9 @@ async function loadOrders() {
   document.getElementById('ordersBody').innerHTML =
     '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading orders…</td></tr>';
   try {
-    const { data, error } = await adminDb.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+    const fetchPromise = adminDb.from('marketplace_orders').select('*').order('created_at', { ascending: false }).limit(100);
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 12000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) {
       document.getElementById('ordersBody').innerHTML =
         `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F"><span class="material-icons-outlined" style="vertical-align:middle;margin-right:4px">error</span>${error.message}</td></tr>`;
@@ -963,11 +969,13 @@ async function loadMedOrders() {
   document.getElementById('medOrdersBody').innerHTML =
     '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading medicine orders…</td></tr>';
   try {
-    const { data, error } = await adminDb
+    const fetchPromise = adminDb
       .from('pharmacy_orders')
       .select('*')
       .order('created_at', { ascending: false })
       .limit(100);
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 12000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) {
       document.getElementById('medOrdersBody').innerHTML =
         `<tr><td colspan="7" style="text-align:center;padding:32px;color:#D32F2F">${error.message}</td></tr>`;

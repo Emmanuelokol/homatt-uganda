@@ -137,6 +137,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       update.responded_by = document.getElementById('adminUserName').textContent;
     }
 
+    if (!supabase) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">send</span> Send Response';
+      showAdminToast('Demo mode — cannot update tickets', 'default');
+      closeModal();
+      return;
+    }
+
     const { error } = await supabase.from('support_tickets').update(update).eq('id', activeTicketId);
 
     btn.disabled = false;

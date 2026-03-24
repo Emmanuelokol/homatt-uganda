@@ -92,19 +92,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   supabase = adminSupa();
   setupAdminLogout();
 
-  // Load content
-  const contents_list = supabase ? (await supabase.from('site_content').select('*').in('key', ['terms', 'privacy'])).data : null;
-  const { data: contents } = { data: contents_list };
-  (contents || []).forEach(c => {
-    if (c.key === 'terms') {
-      document.getElementById('termsTitle').value = c.title || '';
-      document.getElementById('termsContent').value = c.content || '';
-      document.getElementById('termsUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
-    } else if (c.key === 'privacy') {
-      document.getElementById('privacyContent').value = c.content || '';
-      document.getElementById('privacyUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
+  // Load content with timeout fallback
+  document.getElementById('termsUpdated').textContent = 'Not saved yet';
+  document.getElementById('privacyUpdated').textContent = 'Not saved yet';
+  if (supabase) {
+    try {
+      const fetchPromise = supabase.from('site_content').select('*').in('key', ['terms', 'privacy']);
+      const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+      const { data: contents, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      if (!error) {
+        (contents || []).forEach(c => {
+          if (c.key === 'terms') {
+            document.getElementById('termsTitle').value = c.title || '';
+            document.getElementById('termsContent').value = c.content || '';
+            document.getElementById('termsUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
+          } else if (c.key === 'privacy') {
+            document.getElementById('privacyContent').value = c.content || '';
+            document.getElementById('privacyUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
+          }
+        });
+      }
+    } catch(e) {
+      console.error('Failed to load site content:', e);
     }
-  });
+  }
 
   // Save terms
   document.getElementById('saveTermsBtn').addEventListener('click', async () => {
@@ -115,14 +126,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = document.getElementById('saveTermsBtn');
     btn.disabled = true;
 
-    const adminName = document.getElementById('adminUserName').textContent;
+    if (!supabase) { btn.disabled = false; showAdminToast('Demo mode — cannot save content', 'default'); return; }
+    const adminName = (document.getElementById('adminUserName') || {}).textContent || 'Admin';
     const { error } = await supabase.from('site_content').upsert({
       key: 'terms', title: title || 'Terms of Service', content,
       updated_at: new Date().toISOString(), updated_by: adminName
     });
 
     btn.disabled = false;
-    if (error) { showAdminToast('Failed to save', 'error'); return; }
+    if (error) { showAdminToast('Failed to save: ' + error.message, 'error'); return; }
     document.getElementById('termsUpdated').textContent = 'Last updated: just now';
     showAdminToast('Terms of Service saved!', 'success');
   });
@@ -135,14 +147,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = document.getElementById('savePrivacyBtn');
     btn.disabled = true;
 
-    const adminName = document.getElementById('adminUserName').textContent;
+    if (!supabase) { btn.disabled = false; showAdminToast('Demo mode — cannot save content', 'default'); return; }
+    const adminName = (document.getElementById('adminUserName') || {}).textContent || 'Admin';
     const { error } = await supabase.from('site_content').upsert({
       key: 'privacy', title: 'Privacy Policy', content,
       updated_at: new Date().toISOString(), updated_by: adminName
     });
 
     btn.disabled = false;
-    if (error) { showAdminToast('Failed to save', 'error'); return; }
+    if (error) { showAdminToast('Failed to save: ' + error.message, 'error'); return; }
     document.getElementById('privacyUpdated').textContent = 'Last updated: just now';
     showAdminToast('Privacy Policy saved!', 'success');
   });

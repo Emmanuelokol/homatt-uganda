@@ -100,10 +100,19 @@ const DEMO_RIDERS = [
 
 async function loadRiders() {
   const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
-  if (demoSession?.demo) { allRiders = DEMO_RIDERS; renderRiders(); return; }
-  if (!supabase) { allRiders = []; renderRiders(); return; }
-  const { data } = await supabase.from('riders').select('*').order('created_at',{ascending:false});
-  allRiders = data || [];
+  if (demoSession?.demo || !supabase) { allRiders = DEMO_RIDERS; renderRiders(); return; }
+  try {
+    const fetchPromise = supabase.from('riders').select('*').order('created_at',{ascending:false});
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+    if (error) throw error;
+    allRiders = (data && data.length) ? data : DEMO_RIDERS;
+    if (!data || !data.length) showAdminToast('No riders yet — showing demo data', 'default');
+  } catch(e) {
+    console.error('loadRiders failed:', e);
+    allRiders = DEMO_RIDERS;
+    showAdminToast('Live data unavailable — showing demo riders', 'default');
+  }
   renderRiders();
 }
 
@@ -112,7 +121,7 @@ function renderRiders() {
   const q  = document.getElementById('searchRiders').value.toLowerCase();
   const filtered = allRiders.filter(r =>
     (!sf || r.status === sf) &&
-    (!q || r.full_name.toLowerCase().includes(q) || (r.phone||'').includes(q))
+    (!q || (r.full_name||'').toLowerCase().includes(q) || (r.phone_number||r.phone||'').includes(q))
   );
   const tbody = document.getElementById('ridersBody');
   if (!filtered.length) {
@@ -125,7 +134,7 @@ function renderRiders() {
         <div style="font-weight:600">${r.full_name}</div>
         ${r.email ? `<div style="font-size:11px;color:#9AA0A6">${r.email}</div>` : ''}
       </td>
-      <td style="font-size:12px">${r.phone || '—'}</td>
+      <td style="font-size:12px">${r.phone_number || r.phone || '—'}</td>
       <td style="text-transform:capitalize;font-size:12px">${r.vehicle_type || '—'}</td>
       <td style="font-size:12px">${r.plate_number || '—'}</td>
       <td style="font-weight:600">${r.total_deliveries || 0}</td>
@@ -147,7 +156,7 @@ function openModal(id) {
   document.getElementById('riderModalBody').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
       ${[
-        ['Full Name', r.full_name], ['Phone', r.phone||'—'],
+        ['Full Name', r.full_name||'—'], ['Phone', r.phone_number||r.phone||'—'],
         ['Email', r.email||'—'], ['Vehicle Type', r.vehicle_type||'—'],
         ['Plate Number', r.plate_number||'—'], ['National ID', r.national_id||'—'],
         ['Total Deliveries', r.total_deliveries||0], ['Rating', `★ ${(r.rating||5).toFixed(1)}`],

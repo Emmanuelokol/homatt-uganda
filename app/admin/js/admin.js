@@ -148,10 +148,12 @@ async function requireAdmin() {
 
   let profile;
   try {
-    const { data } = await supa.from('profiles')
+    const profileFetch = supa.from('profiles')
       .select('first_name, last_name, is_admin')
       .eq('id', session.user.id)
       .single();
+    const profileTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+    const { data } = await Promise.race([profileFetch, profileTimeout]);
     profile = data;
   } catch(e) {}
 

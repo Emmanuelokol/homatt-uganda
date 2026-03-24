@@ -81,12 +81,23 @@ const DEMO_RX = [
 ];
 
 async function loadRx() {
-  if (!supabase) { allRx = DEMO_RX; renderRx(); return; }
-  const { data } = await supabase
-    .from('prescriptions')
-    .select('*, profiles!prescriptions_user_id_fkey(first_name,last_name)')
-    .order('created_at', { ascending: false });
-  allRx = (data && data.length) ? data : DEMO_RX;
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo || !supabase) { allRx = DEMO_RX; renderRx(); return; }
+  try {
+    const fetchPromise = supabase
+      .from('prescriptions')
+      .select('*, profiles(first_name,last_name)')
+      .order('created_at', { ascending: false });
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+    if (error) throw error;
+    allRx = (data && data.length) ? data : DEMO_RX;
+    if (!data || !data.length) showAdminToast('No prescriptions yet — showing demo data', 'default');
+  } catch(e) {
+    console.error('loadRx failed:', e);
+    allRx = DEMO_RX;
+    showAdminToast('Live data unavailable — showing demo prescriptions', 'default');
+  }
   renderRx();
 }
 
