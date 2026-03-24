@@ -141,9 +141,11 @@ async function requireAdmin() {
 
   let session;
   try {
-    const { data } = await supa.auth.getSession();
+    const sessionFetch = supa.auth.getSession();
+    const sessionTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+    const { data } = await Promise.race([sessionFetch, sessionTimeout]);
     session = data?.session;
-  } catch(e) {}
+  } catch(e) { console.warn('requireAdmin: getSession failed/timed out', e); }
   if (!session) { clearAdminSession(); window.location.href = 'index.html'; return null; }
 
   let profile;
