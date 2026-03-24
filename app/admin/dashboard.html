@@ -410,8 +410,14 @@ async function loadLive() {
   var supa = adminSupa();
   if (!supa) { loadDemo(); return; }
 
+  function qt(p, ms) {
+    return Promise.race([p, new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms||12000); })]);
+  }
+
+  try {
+
   // KPIs in parallel
-  var results = await Promise.all([
+  var results = await qt(Promise.all([
     supa.from('profiles').select('id',{count:'exact',head:true}),
     supa.from('bookings').select('id',{count:'exact',head:true}),
     supa.from('pharmacy_orders').select('id',{count:'exact',head:true}),
@@ -420,7 +426,7 @@ async function loadLive() {
     supa.from('support_tickets').select('id',{count:'exact',head:true}).eq('status','open'),
     supa.from('prescriptions').select('id',{count:'exact',head:true}).eq('status','active'),
     supa.from('ratings').select('score').limit(1000),
-  ]);
+  ]));
 
   document.getElementById('statUsers').textContent = results[0].count ?? '—';
   document.getElementById('statBookings').textContent = results[1].count ?? '—';
@@ -436,19 +442,19 @@ async function loadLive() {
 
   // Signup trend chart — all profiles for last 14 days
   var since = new Date(); since.setDate(since.getDate()-13); since.setHours(0,0,0,0);
-  var { data: signupRows } = await supa.from('profiles').select('created_at').gte('created_at', since.toISOString()).order('created_at',{ascending:true});
-  buildTrendChart(signupRows || []);
+  var signupRes = await qt(supa.from('profiles').select('created_at').gte('created_at', since.toISOString()).order('created_at',{ascending:true}));
+  buildTrendChart((signupRes.data) || []);
 
   // Incoming orders for admin
-  var { data: incoming } = await supa.from('pharmacy_orders').select('*').eq('status','incoming').order('created_at',{ascending:false}).limit(20);
-  renderIncomingOrders(incoming || [], supa);
+  var incomingRes = await qt(supa.from('pharmacy_orders').select('*').eq('status','incoming').order('created_at',{ascending:false}).limit(20));
+  renderIncomingOrders((incomingRes.data) || [], supa);
 
   // Pending approvals
-  var [pC, pP, pRi] = await Promise.all([
+  var [pC, pP, pRi] = await qt(Promise.all([
     supa.from('clinics').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
     supa.from('pharmacies').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
     supa.from('riders').select('full_name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
-  ]);
+  ]));
   function renderPending(data, key, elId) {
     var d = document.getElementById(elId);
     if (!data || !data.length) { d.innerHTML='<span style="color:#9AA0A6">None pending</span>'; return; }
@@ -461,9 +467,9 @@ async function loadLive() {
   renderPending(pRi.data,'full_name','pendingRiders');
 
   // Clinic performance
-  var { data: clinicsPerf } = await supa.from('clinics').select('name,avg_patient_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8);
+  var { data: clinicsPerf } = await qt(supa.from('clinics').select('name,avg_patient_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8));
   // Also count bookings per clinic
-  var { data: bookingCounts } = await supa.from('bookings').select('clinic_id').limit(5000);
+  var { data: bookingCounts } = await qt(supa.from('bookings').select('clinic_id').limit(5000));
   var byClinc = {};
   (bookingCounts||[]).forEach(function(b){ byClinc[b.clinic_id] = (byClinc[b.clinic_id]||0)+1; });
   document.getElementById('clinicPerfBody').innerHTML = (clinicsPerf||[]).length ? (clinicsPerf||[]).map(function(c) {
@@ -471,8 +477,8 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No clinics found</td></tr>';
 
   // Pharmacy performance
-  var { data: pharmsPerf } = await supa.from('pharmacies').select('id,name,avg_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8);
-  var { data: orderCounts } = await supa.from('pharmacy_orders').select('pharmacy_id').limit(5000);
+  var { data: pharmsPerf } = await qt(supa.from('pharmacies').select('id,name,avg_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8));
+  var { data: orderCounts } = await qt(supa.from('pharmacy_orders').select('pharmacy_id').limit(5000));
   var byPharm = {};
   (orderCounts||[]).forEach(function(o){ byPharm[o.pharmacy_id] = (byPharm[o.pharmacy_id]||0)+1; });
   document.getElementById('pharmacyPerfBody').innerHTML = (pharmsPerf||[]).length ? (pharmsPerf||[]).map(function(p) {
@@ -480,7 +486,7 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No pharmacies found</td></tr>';
 
   // Recent signups — showing real first_name + last_name
-  var { data: recentUsers } = await supa.from('profiles').select('first_name,last_name,city,district,created_at').order('created_at',{ascending:false}).limit(8);
+  var { data: recentUsers } = await qt(supa.from('profiles').select('first_name,last_name,city,district,created_at').order('created_at',{ascending:false}).limit(8));
   document.getElementById('recentSignupsBody').innerHTML = (recentUsers||[]).length ? (recentUsers||[]).map(function(u) {
     var name = [u.first_name,u.last_name].filter(Boolean).join(' ') || 'Unknown';
     var loc = [u.city,u.district].filter(Boolean).join(', ') || '—';
@@ -488,22 +494,27 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="3" style="text-align:center;padding:20px;color:#9AA0A6">No users signed up yet</td></tr>';
 
   // Recent bookings
-  var { data: bk } = await supa.from('bookings').select('patient_name,urgency_level,status,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: bk } = await qt(supa.from('bookings').select('patient_name,urgency_level,status,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentBookingsBody').innerHTML = (bk||[]).length ? (bk||[]).map(function(b) {
     return '<tr><td><strong>' + (b.patient_name||'—') + '</strong></td><td><span class="status-badge ' + (b.urgency_level==='high'?'urgent':'normal') + '">' + (b.urgency_level||'—') + '</span></td><td><span class="status-badge ' + b.status + '">' + (b.status||'').replace('_',' ') + '</span></td><td style="font-size:12px;color:#9AA0A6">' + formatShortDate(b.created_at) + '</td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No bookings yet</td></tr>';
 
   // Recent orders
-  var { data: ord } = await supa.from('pharmacy_orders').select('patient_name,status,total_cost,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: ord } = await qt(supa.from('pharmacy_orders').select('patient_name,status,total_cost,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentOrdersBody').innerHTML = (ord||[]).length ? (ord||[]).map(function(o) {
     return '<tr><td><strong>' + (o.patient_name||'—') + '</strong></td><td><span class="status-badge ' + o.status + '">' + (o.status||'').replace('_',' ') + '</span></td><td style="font-weight:600">' + ugx(o.total_cost) + '</td><td style="font-size:12px;color:#9AA0A6">' + formatShortDate(o.created_at) + '</td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No orders yet</td></tr>';
 
   // Recent tickets
-  var { data: tk } = await supa.from('support_tickets').select('user_name,subject,priority,status,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: tk } = await qt(supa.from('support_tickets').select('user_name,subject,priority,status,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentTicketsBody').innerHTML = (tk||[]).length ? (tk||[]).map(function(t) {
     return '<tr><td><strong>' + (t.user_name||'Anonymous') + '</strong></td><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.subject + '</td><td><span class="status-badge ' + t.priority + '">' + t.priority + '</span></td><td><span class="status-badge ' + t.status + '">' + (t.status||'').replace('_',' ') + '</span></td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:24px;color:#9AA0A6">No tickets</td></tr>';
+
+  } catch(e) {
+    // DB unavailable or timed out — fall back to demo data so the page isn't blank
+    loadDemo();
+  }
 }
 </script>
 </body>

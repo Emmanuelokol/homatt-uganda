@@ -110,9 +110,12 @@ async function loadUsers() {
   }
 
   try {
-    const { data, error } = await supa.from('profiles')
-      .select('id,hommat_id,first_name,last_name,phone_number,city,district,dob,age,sex,has_family,family_size,is_admin,created_at')
-      .order('created_at', {ascending:false});
+    const { data, error } = await Promise.race([
+      supa.from('profiles')
+        .select('id,hommat_id,first_name,last_name,phone_number,city,district,dob,age,sex,has_family,family_size,is_admin,created_at')
+        .order('created_at', {ascending:false}),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    ]);
     if (error) {
       showAdminToast('Error loading users: ' + error.message, 'error');
       allUsers = [];
@@ -120,7 +123,7 @@ async function loadUsers() {
       allUsers = data || [];
     }
   } catch(e) {
-    showAdminToast('Network error loading users', 'error');
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading users', 'error');
     allUsers = [];
   }
   renderUsers();

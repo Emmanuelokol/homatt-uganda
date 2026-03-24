@@ -338,9 +338,12 @@ async function loadData() {
   }
 
   try {
-    const [ordersR, payoutsR] = await Promise.all([
-      supa.from('pharmacy_orders').select('id', { count:'exact', head:true }),
-      supa.from('payouts').select('*').order('created_at', { ascending:false }),
+    const [ordersR, payoutsR] = await Promise.race([
+      Promise.all([
+        supa.from('pharmacy_orders').select('id', { count:'exact', head:true }),
+        supa.from('payouts').select('*').order('created_at', { ascending:false }),
+      ]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
     ]);
 
     document.getElementById('statTotalOrders').textContent = ordersR.count ?? '—';
@@ -352,7 +355,7 @@ async function loadData() {
       allPayouts = payoutsR.data || [];
     }
   } catch(e) {
-    showAdminToast('Network error loading finance data', 'error');
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading finance data', 'error');
     allPayouts = [];
   }
 

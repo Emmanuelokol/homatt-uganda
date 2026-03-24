@@ -450,8 +450,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function loadPharmacies() {
   var supa = adminSupa();
   if (!supa) { allPharmacies = DEMO_PHARMACIES; renderPharmacies(); return; }
-  var res = await supa.from('pharmacies').select('*').order('created_at',{ascending:false});
-  allPharmacies = (res.data && res.data.length) ? res.data : DEMO_PHARMACIES;
+  try {
+    var res = await Promise.race([
+      supa.from('pharmacies').select('*').order('created_at',{ascending:false}),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 10000); })
+    ]);
+    if (res.error) {
+      showAdminToast('Error loading pharmacies: ' + res.error.message, 'error');
+      allPharmacies = [];
+    } else {
+      allPharmacies = res.data || [];
+    }
+  } catch(e) {
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading pharmacies', 'error');
+    allPharmacies = [];
+  }
   renderPharmacies();
 }
 

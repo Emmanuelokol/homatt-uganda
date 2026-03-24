@@ -542,7 +542,10 @@ async function loadClinics() {
     return;
   }
   try {
-    var res = await supa.from('clinics').select('*').order('created_at', {ascending:false});
+    var res = await Promise.race([
+      supa.from('clinics').select('*').order('created_at', {ascending:false}),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 10000); })
+    ]);
     if (res.error) {
       showAdminToast('Error loading clinics: ' + res.error.message, 'error');
       allClinics = [];
@@ -551,7 +554,7 @@ async function loadClinics() {
       allClinics = res.data || [];
     }
   } catch(e) {
-    showAdminToast('Network error loading clinics', 'error');
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading clinics', 'error');
     allClinics = [];
   }
   renderClinics();
