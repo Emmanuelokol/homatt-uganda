@@ -248,7 +248,7 @@ function renderIncomingOrders(orders, supa) {
       '<div style="font-size:12px;color:#5F6368;margin-bottom:2px">' +
         '<span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ' + (o.patient_name||'—') +
         ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">phone</span> ' + (o.patient_phone||'—') +
-        ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ' + (o.delivery_address||'—') +
+        ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ' + (o.delivery_address||'—') + ((o.delivery_lat && o.delivery_lon) ? ' <a href="https://www.google.com/maps?q=' + o.delivery_lat + ',' + o.delivery_lon + '" target="_blank" rel="noopener" style="color:#1976D2;text-decoration:none;vertical-align:middle" title="Open in Google Maps"><span class="material-icons-outlined" style="font-size:13px">open_in_new</span></a>' : '') +
       '</div>' +
       (o.patient_symptom_description ? '<div style="font-size:12px;color:#5F6368;font-style:italic;margin-bottom:4px">Patient: "' + o.patient_symptom_description.slice(0,80) + '"</div>' : '') +
       '<div style="font-size:13px;font-weight:600;color:#1B5E20;margin-bottom:8px">Total: ' + ugx(o.total_cost) + '</div>' +

@@ -167,7 +167,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Online toggle
   const cfg = window.HOMATT_CONFIG || {};
-  const supa = (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase && session.riderId)
+  // Use userId (auth UUID) to check if we can connect; riderId (riders.id) is used for riders table updates
+  const supa = (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase && session.userId)
     ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-rider-auth' } })
     : null;
   window._riderSupa = supa;
@@ -180,14 +181,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const st = document.getElementById('riderStatus');
     st.textContent = isOnline ? '● Online' : '○ Offline';
     st.style.color = isOnline ? 'rgba(76,175,80,0.9)' : 'rgba(255,255,255,0.45)';
-    if (supa && session.riderId) {
-      await supa.from('riders').update({ available: isOnline }).eq('id', session.riderId);
+    if (supa) {
+      // Update by auth_user_id (always present) or by riders.id if available
+      if (session.riderId) {
+        await supa.from('riders').update({ available: isOnline }).eq('id', session.riderId);
+      } else if (session.userId) {
+        await supa.from('riders').update({ available: isOnline }).eq('auth_user_id', session.userId);
+      }
     }
     showToast(isOnline ? 'You are now online!' : 'You are offline — no new requests', isOnline ? 'success' : 'warning');
   });
 
-  if (supa && session.riderId) {
-    await loadLive(supa, session.riderId);
+  if (supa && session.userId) {
+    await loadLive(supa, session.userId, session.riderId);
   } else {
     loadDemo();
   }
@@ -341,24 +347,22 @@ function stopGpsTracking() {
   }
 }
 
-async function loadLive(supa, riderId) {
+async function loadLive(supa, userId, riderId) {
+  // userId = auth.users UUID (rider_deliveries.rider_user_id)
+  // riderId = riders.id (legacy deliveries.rider_id, may be null)
   const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-
-  // riderId == riders.id (set from portal_users.rider_id at login)
-  const riderUserId = riderId;
 
   const [pendingRes, activeRes, completedRes] = await Promise.all([
     supa.from('rider_deliveries')
-      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items, pharmacy_id)')
-      .eq('rider_user_id', riderUserId).eq('status', 'pending'),
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items, pharmacy_id, user_latitude, user_longitude)')
+      .eq('rider_user_id', userId).eq('status', 'pending'),
     supa.from('rider_deliveries')
-      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items)')
-      .eq('rider_user_id', riderUserId).eq('status', 'in_transit'),
+      .select('*, marketplace_orders(patient_name, delivery_address, total_amount, items, user_latitude, user_longitude)')
+      .eq('rider_user_id', userId).eq('status', 'in_transit'),
     supa.from('rider_deliveries')
       .select('*, marketplace_orders(patient_name, delivery_address, total_amount)')
-      .eq('rider_user_id', riderUserId).eq('status', 'delivered')
-      .gte('updated_at', todayStart.toISOString()),   // delivered_at also works once set
-
+      .eq('rider_user_id', userId).eq('status', 'delivered')
+      .gte('updated_at', todayStart.toISOString()),
   ]);
 
   // Fallback to old deliveries table if rider_deliveries returned no data
@@ -368,14 +372,15 @@ async function loadLive(supa, riderId) {
 
   let pending, active, completed;
   if (!hasPending && !hasActive && !hasCompleted) {
-    // Try legacy deliveries/pharmacy_orders schema
+    // Try legacy deliveries/pharmacy_orders schema (rider_id = riders.id)
+    const legacyId = riderId || userId; // use riderId if available, else fall back to userId
     const [lp, la, lc] = await Promise.all([
-      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items, urgency)')
-        .eq('rider_id', riderId).eq('status', 'pending'),
-      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items)')
-        .eq('rider_id', riderId).eq('status', 'in_transit'),
+      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items, urgency, delivery_lat, delivery_lon)')
+        .eq('rider_id', legacyId).eq('status', 'pending'),
+      supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost, items, delivery_lat, delivery_lon)')
+        .eq('rider_id', legacyId).eq('status', 'in_transit'),
       supa.from('deliveries').select('*, pharmacy_orders(patient_name, delivery_address, total_cost)')
-        .eq('rider_id', riderId).eq('status', 'delivered').gte('delivered_at', todayStart.toISOString()),
+        .eq('rider_id', legacyId).eq('status', 'delivered').gte('delivered_at', todayStart.toISOString()),
     ]);
     // Map legacy schema to unified shape
     pending   = (lp.data||[]).map(d => ({ ...d, _legacy:true, marketplace_orders: d.pharmacy_orders ? { buyer_name: d.pharmacy_orders.patient_name, delivery_address: d.pharmacy_orders.delivery_address, total_amount: d.pharmacy_orders.total_cost, items: d.pharmacy_orders.items, urgency: d.pharmacy_orders.urgency } : {} }));
@@ -419,7 +424,7 @@ async function loadLive(supa, riderId) {
           <div class="delivery-title">${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : 'Order'}</div>
           <div class="delivery-meta">
             <span><span class="material-icons-outlined" style="font-size:14px">person</span> ${patientName}</span>
-            <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${o.delivery_address||'—'}</span>
+            <span><span class="material-icons-outlined" style="font-size:14px">location_on</span> ${o.delivery_address||'—'}${(() => { const lat = o.user_latitude; const lon = o.user_longitude; return (lat && lon) ? ` <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener" style="color:#1976D2;text-decoration:none" title="Open in Google Maps"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">open_in_new</span></a>` : ''; })()}</span>
             <span style="color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:14px">payments</span> UGX ${(d.earnings||5000).toLocaleString()}</span>
           </div>
         </div>
@@ -450,7 +455,7 @@ async function loadLive(supa, riderId) {
           <div style="font-size:11px;font-weight:600;color:#5F6368;text-transform:uppercase">DEL-${d.id.slice(-6).toUpperCase()}</div>
           <div style="font-size:14px;font-weight:600;margin:4px 0">${o.items ? (Array.isArray(o.items) ? o.items.map(i=>i.name||i).join(', ') : o.items) : 'Order'}</div>
           <div style="font-size:12px;color:#5F6368;margin-bottom:8px">
-            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}
+            <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}${(() => { const lat = o.user_latitude; const lon = o.user_longitude; return (lat && lon) ? ` <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener" style="color:#1976D2;text-decoration:none" title="Open in Google Maps"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">open_in_new</span></a>` : ''; })()}
           </div>
           <div style="font-size:12px;color:#E65100;font-weight:600">${elapsed} min elapsed</div>
         </div>
@@ -465,7 +470,7 @@ async function loadLive(supa, riderId) {
       </div>`;
     }).join('');
     // Start GPS tracking while there are active deliveries
-    startGpsTracking(supa, riderUserId);
+    startGpsTracking(supa, userId);
   }
 
   // Render history
@@ -492,7 +497,7 @@ window.acceptLive = async id => {
       .update({ status: 'in_transit', updated_at: new Date().toISOString() }).eq('id', id);
     if (error) await supa.from('deliveries').update({ status: 'in_transit', updated_at: new Date().toISOString() }).eq('id', id);
     const s = JSON.parse(localStorage.getItem('rider_session') || '{}');
-    if (s.riderId) await loadLive(supa, s.riderId);
+    if (s.userId) await loadLive(supa, s.userId, s.riderId);
   }
   showToast('Delivery accepted! Head to the pickup point.', 'success');
 };
@@ -535,7 +540,7 @@ window.completeLive = async id => {
       }
     }
     const s = JSON.parse(localStorage.getItem('rider_session') || '{}');
-    if (s.riderId) await loadLive(supa, s.riderId);
+    if (s.userId) await loadLive(supa, s.userId, s.riderId);
   }
   showToast('Delivery marked complete! Earnings added.', 'success');
 };
