@@ -884,7 +884,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
 
       if (orderErr) {
-        showToast('Order failed: ' + orderErr.message, 'error');
+        const msg = orderErr.message || '';
+        const friendly = (msg.includes('fetch') || msg.includes('network') || msg.includes('Network'))
+          ? 'No internet connection. Please check your network and try again.'
+          : 'Order failed. Please try again.';
+        showToast(friendly, 'error');
         btn.disabled = false;
         btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
         return;

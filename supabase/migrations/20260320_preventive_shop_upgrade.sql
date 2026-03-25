@@ -51,6 +51,9 @@ create table if not exists marketplace_items (
 );
 alter table marketplace_items enable row level security;
 
+-- Ensure trigger_tags column exists (idempotent — safe to run on existing tables)
+alter table marketplace_items add column if not exists trigger_tags text[] default '{}';
+
 do $$ begin
   if not exists (
     select 1 from pg_constraint
