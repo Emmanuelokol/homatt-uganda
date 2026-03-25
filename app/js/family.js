@@ -817,7 +817,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       closeAllSheets(); // also calls closeMemberDetail() internally
       showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
     } catch(e) {
-      showToast('Order failed. Please try again.');
+      console.error('submitOrder error:', e);
+      showToast('Order failed: ' + (e && e.message ? e.message : 'Please try again.'));
       if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
     }
   };

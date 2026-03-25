@@ -1192,7 +1192,7 @@ function _doSubmitOrder(sess) {
       showSuccess();
     }).catch(function(e){
       if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Place Order'; }
-      alert('Order failed. Please try again.');
+      alert('Order failed: ' + (e && e.message ? e.message : 'Please try again.'));
     });
   } else {
     // Guest / no Supabase — still show success (order stored locally)
