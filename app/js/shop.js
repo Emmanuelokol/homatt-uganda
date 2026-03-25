@@ -818,100 +818,108 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Placing order…';
 
-    const itemsTotal   = cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
+    try {
+      const itemsTotal   = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
 
-    // Fetch profile and GPS in parallel to speed up order placement
-    let patientName = 'Customer', patientPhone = null, userDistrict = null;
-    let userLat = null, userLon = null;
+      // Fetch profile and GPS in parallel to speed up order placement
+      let patientName = 'Customer', patientPhone = null, userDistrict = null;
+      let userLat = null, userLon = null;
 
-    // Wrap getUserCoords with a hard 7s timeout so a hung permission dialog
-    // never leaves the button stuck in "Placing order…" forever.
-    const gpsWithTimeout = Promise.race([
-      getUserCoords(),
-      new Promise(resolve => setTimeout(() => resolve(null), 7000)),
-    ]);
+      // Wrap getUserCoords with a hard 7s timeout so a hung permission dialog
+      // never leaves the button stuck in "Placing order…" forever.
+      const gpsWithTimeout = Promise.race([
+        getUserCoords(),
+        new Promise(resolve => setTimeout(() => resolve(null), 7000)),
+      ]);
 
-    const [profResult, gpsCoords] = await Promise.all([
-      supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single().catch(() => ({ data: null })),
-      gpsWithTimeout,
-    ]);
+      const [profResult, gpsCoords] = await Promise.all([
+        supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single().catch(() => ({ data: null })),
+        gpsWithTimeout,
+      ]);
 
-    if (profResult && profResult.data) {
-      const prof = profResult.data;
-      patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
-      patientPhone = prof.phone || null;
-      userDistrict = prof.district || null;
-    }
-
-    if (gpsCoords) {
-      [userLat, userLon] = gpsCoords;
-    } else if (userDistrict) {
-      const key = userDistrict.toLowerCase();
-      const dc  = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
-      if (dc) [userLat, userLon] = dc;
-    }
-
-    let pharmacyId = null, deliveryFee = 2000;
-    if (userLat && userLon) {
-      const nearest = await findNearestPharmacy(userLat, userLon);
-      if (nearest) {
-        pharmacyId  = nearest.id;
-        deliveryFee = calcDeliveryFee(nearest.distanceKm);
+      if (profResult && profResult.data) {
+        const prof = profResult.data;
+        patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+        patientPhone = prof.phone || null;
+        userDistrict = prof.district || null;
       }
-    }
 
-    const total = itemsTotal + deliveryFee;
+      if (gpsCoords) {
+        [userLat, userLon] = gpsCoords;
+      } else if (userDistrict) {
+        const key = userDistrict.toLowerCase();
+        const dc  = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+        if (dc) [userLat, userLon] = dc;
+      }
 
-    const { error: orderErr } = await supabase.from('marketplace_orders').insert({
-      user_id:          userId,
-      patient_name:     patientName,
-      patient_phone:    patientPhone,
-      delivery_address: addr,
-      items:            itemsPayload,
-      total_amount:     total,
-      status:           'pending',
-      payment_method:   'cash_on_delivery',
-      pharmacy_id:      pharmacyId,
-      delivery_fee:     deliveryFee,
-      user_latitude:    userLat,
-      user_longitude:   userLon,
-    });
+      let pharmacyId = null, deliveryFee = 2000;
+      if (userLat && userLon) {
+        try {
+          const nearest = await findNearestPharmacy(userLat, userLon);
+          if (nearest) {
+            pharmacyId  = nearest.id;
+            deliveryFee = calcDeliveryFee(nearest.distanceKm);
+          }
+        } catch(e) {}
+      }
 
-    if (orderErr) {
-      showToast('Order failed: ' + orderErr.message, 'error');
+      const total = itemsTotal + deliveryFee;
+
+      const { error: orderErr } = await supabase.from('marketplace_orders').insert({
+        user_id:          userId,
+        patient_name:     patientName,
+        patient_phone:    patientPhone,
+        delivery_address: addr,
+        items:            itemsPayload,
+        total_amount:     total,
+        status:           'pending',
+        payment_method:   'cash_on_delivery',
+        pharmacy_id:      pharmacyId,
+        delivery_fee:     deliveryFee,
+        user_latitude:    userLat,
+        user_longitude:   userLon,
+      });
+
+      if (orderErr) {
+        showToast('Order failed: ' + orderErr.message, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
+        return;
+      }
+
+      // Deduct stock (best-effort)
+      try {
+        for (const item of cart) {
+          await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
+        }
+      } catch(e) {}
+
+      // Notify admin of new order (push notification)
+      const itemsSummary = cart.map(c => `${c.qty}× ${c.name}`).join(', ');
+      notifyAdminsNewOrder(patientName, itemsSummary, addr);
+
+      cart = [];
+      localStorage.removeItem('homatt_cart');
+      updateCartBadge();
+      closeSheet(document.getElementById('cartSheet'));
+      ordersLoaded = false; // force reload next time My Orders tab is opened
+      showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
+
       btn.disabled = false;
       btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
-      return;
+
+      // Refresh product grid to clear "in cart" buttons
+      const term     = document.getElementById('shopSearch').value.toLowerCase();
+      const filtered = term
+        ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
+        : items;
+      renderItems(filtered);
+    } catch(e) {
+      showToast('Order failed. Please try again.', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
     }
-
-    // Deduct stock (best-effort)
-    try {
-      for (const item of cart) {
-        await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
-      }
-    } catch(e) {}
-
-    // Notify admin of new order (push notification)
-    const itemsSummary = cart.map(c => `${c.qty}× ${c.name}`).join(', ');
-    notifyAdminsNewOrder(patientName, itemsSummary, addr);
-
-    cart = [];
-    localStorage.removeItem('homatt_cart');
-    updateCartBadge();
-    closeSheet(document.getElementById('cartSheet'));
-    ordersLoaded = false; // force reload next time My Orders tab is opened
-    showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
-
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
-
-    // Refresh product grid to clear "in cart" buttons
-    const term     = document.getElementById('shopSearch').value.toLowerCase();
-    const filtered = term
-      ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
-      : items;
-    renderItems(filtered);
   }
 
   // ====== Search ======
