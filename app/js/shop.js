@@ -403,7 +403,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ====== Notify Admins of New Order (push via OneSignal) ======
-  async function notifyAdminsNewOrder(patientName, itemsSummary) {
+  async function notifyAdminsNewOrder(patientName, itemsSummary, deliveryAddress) {
     if (!supabase) return;
     try {
       const { data: admins } = await supabase
@@ -418,12 +418,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         ? itemsSummary.substring(0, 55) + '…'
         : itemsSummary;
 
+      const addrLine = deliveryAddress ? ` | 📍 ${deliveryAddress}` : '';
+
       await Promise.all(admins.map(admin =>
         supabase.functions.invoke('send-notification', {
           body: {
             userId:  admin.id,
             title:   '🛍️ New Shop Order',
-            message: `${patientName || 'Customer'}: ${short}`,
+            message: `${patientName || 'Customer'}: ${short}${addrLine}`,
             data:    { screen: 'shop_order', id: '' },
           },
         }).catch(() => {}) // non-fatal
@@ -823,9 +825,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     let patientName = 'Customer', patientPhone = null, userDistrict = null;
     let userLat = null, userLon = null;
 
+    // Wrap getUserCoords with a hard 7s timeout so a hung permission dialog
+    // never leaves the button stuck in "Placing order…" forever.
+    const gpsWithTimeout = Promise.race([
+      getUserCoords(),
+      new Promise(resolve => setTimeout(() => resolve(null), 7000)),
+    ]);
+
     const [profResult, gpsCoords] = await Promise.all([
       supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single().catch(() => ({ data: null })),
-      getUserCoords()
+      gpsWithTimeout,
     ]);
 
     if (profResult && profResult.data) {
@@ -885,7 +894,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Notify admin of new order (push notification)
     const itemsSummary = cart.map(c => `${c.qty}× ${c.name}`).join(', ');
-    notifyAdminsNewOrder(patientName, itemsSummary);
+    notifyAdminsNewOrder(patientName, itemsSummary, addr);
 
     cart = [];
     localStorage.removeItem('homatt_cart');
