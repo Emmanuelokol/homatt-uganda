@@ -729,80 +729,96 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = document.getElementById('cartCheckoutBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Placing order…'; }
 
-    const itemsTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
-
-    // Get user profile for name/phone/location
-    let patientName = 'Customer', patientPhone = null, userDistrict = null;
     try {
-      const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
-      if (prof) {
-        patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
-        patientPhone = prof.phone || null;
-        userDistrict = prof.district || null;
+      const itemsTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
+
+      // Get user profile for name/phone/location
+      let patientName = 'Customer', patientPhone = null, userDistrict = null;
+      try {
+        const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
+        if (prof) {
+          patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+          patientPhone = prof.phone || null;
+          userDistrict = prof.district || null;
+        }
+      } catch(e) {}
+
+      // Determine user coordinates for pharmacy routing
+      let userLat = null, userLon = null;
+      try {
+        const gpsCoords = await Promise.race([
+          getUserCoords(),
+          new Promise(resolve => setTimeout(() => resolve(null), 7000))
+        ]);
+        if (gpsCoords) {
+          [userLat, userLon] = gpsCoords;
+        } else if (userDistrict) {
+          const key = userDistrict.toLowerCase();
+          const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+          if (dc) [userLat, userLon] = dc;
+        }
+      } catch(e) {
+        if (userDistrict) {
+          const key = userDistrict.toLowerCase();
+          const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+          if (dc) [userLat, userLon] = dc;
+        }
       }
-    } catch(e) {}
 
-    // Determine user coordinates for pharmacy routing
-    let userLat = null, userLon = null;
-    const gpsCoords = await getUserCoords();
-    if (gpsCoords) {
-      [userLat, userLon] = gpsCoords;
-    } else if (userDistrict) {
-      const key = userDistrict.toLowerCase();
-      const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
-      if (dc) [userLat, userLon] = dc;
-    }
-
-    // Find nearest pharmacy and compute delivery fee
-    let pharmacyId = null, deliveryFee = 2000;
-    if (userLat && userLon) {
-      const nearest = await findNearestPharmacy(userLat, userLon);
-      if (nearest) {
-        pharmacyId = nearest.id;
-        deliveryFee = calcDeliveryFee(nearest.distanceKm);
+      // Find nearest pharmacy and compute delivery fee
+      let pharmacyId = null, deliveryFee = 2000;
+      if (userLat && userLon) {
+        const nearest = await findNearestPharmacy(userLat, userLon);
+        if (nearest) {
+          pharmacyId = nearest.id;
+          deliveryFee = calcDeliveryFee(nearest.distanceKm);
+        }
       }
-    }
 
-    const total = itemsTotal + deliveryFee;
+      const total = itemsTotal + deliveryFee;
 
-    // Save order to marketplace_orders
-    const orderPayload = {
-      user_id: userId,
-      patient_name: patientName,
-      patient_phone: patientPhone,
-      delivery_address: addr,
-      items: itemsPayload,
-      total_amount: total,
-      status: 'pending',
-      payment_method: 'cash_on_delivery',
-      pharmacy_id: pharmacyId,
-      delivery_fee: deliveryFee,
-      user_latitude: userLat,
-      user_longitude: userLon,
-    };
+      // Save order to marketplace_orders
+      const orderPayload = {
+        user_id: userId,
+        patient_name: patientName,
+        patient_phone: patientPhone,
+        delivery_address: addr,
+        items: itemsPayload,
+        total_amount: total,
+        status: 'pending',
+        payment_method: 'cash_on_delivery',
+        pharmacy_id: pharmacyId,
+        delivery_fee: deliveryFee,
+        user_latitude: userLat,
+        user_longitude: userLon,
+      };
 
-    const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
+      const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
 
-    if (orderErr) {
-      showToast('Order failed: ' + orderErr.message);
+      if (orderErr) {
+        showToast('Order failed: ' + orderErr.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
+        return;
+      }
+
+      // Deduct stock for each item (best-effort, ignore errors)
+      try {
+        for (const item of cart) {
+          await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
+        }
+      } catch(e) {}
+
+      // Clear cart and close ALL panels including health log
+      cart = [];
+      localStorage.removeItem('homatt_cart');
+      updateCartBadge();
+      closeAllSheets(); // also calls closeMemberDetail() internally
+      showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
+    } catch(e) {
+      showToast('Order failed. Please try again.');
       if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
-      return;
     }
-
-    // Deduct stock for each item (best-effort, ignore errors)
-    try {
-      for (const item of cart) {
-        await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
-      }
-    } catch(e) {}
-
-    // Clear cart and close ALL panels including health log
-    cart = [];
-    localStorage.removeItem('homatt_cart');
-    updateCartBadge();
-    closeAllSheets(); // also calls closeMemberDetail() internally
-    showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
   };
 
   // ====== Sheet / Overlay Management ======

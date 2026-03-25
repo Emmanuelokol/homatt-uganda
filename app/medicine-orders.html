@@ -790,6 +790,11 @@ function autoFillAddress(inputId, btnId) {
           input.style.borderColor = '#00695C';
           setTimeout(function(){ input.style.borderColor = ''; }, 1500);
         }
+      }).catch(function() {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+        }
       });
     },
     function(err) {
@@ -1126,6 +1131,9 @@ function submitOrder() {
           var proceed = confirm('You have ordered medicine ' + count + ' times in the last 7 days.\n\nRepeated self-medication without proper diagnosis can be harmful.\n\nDo you still want to place this order?');
           if (!proceed) return;
         }
+        _doSubmitOrder(sess);
+      }).catch(function() {
+        // If the frequency check fails (network error etc.), proceed with the order
         _doSubmitOrder(sess);
       });
     return;
