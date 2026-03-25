@@ -545,6 +545,9 @@
     });
 
     document.getElementById('tempInput').addEventListener('input', updateRiskDisplay);
+    // Dismiss keyboard after entering temperature or picking date/time
+    document.getElementById('tempInput').addEventListener('change', function() { this.blur(); });
+    document.getElementById('logDatetime').addEventListener('change', function() { this.blur(); });
 
     // ===== Default Datetime =====
     const now = new Date();
@@ -579,6 +582,8 @@
 
     // ===== Save Log =====
     document.getElementById('saveMalariaLog').addEventListener('click', () => {
+      // Dismiss any open keyboard before processing
+      if (document.activeElement) document.activeElement.blur();
       const checkedBoxes = Array.from(document.querySelectorAll('#symptomList input[type="checkbox"]:checked'));
       const symptoms = checkedBoxes.map(cb => cb.value);
       const temp = document.getElementById('tempInput').value;

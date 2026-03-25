@@ -771,6 +771,8 @@ function reverseGeocode(lat, lon) {
 function autoFillAddress(inputId, btnId) {
   var input = document.getElementById(inputId);
   var btn   = document.getElementById(btnId);
+  // Always reveal the address input so the user can see and edit it
+  if (input) input.style.display = 'block';
   if (!navigator.geolocation) return;
   if (btn) {
     btn.disabled = true;

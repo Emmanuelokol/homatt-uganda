@@ -760,6 +760,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn   = document.getElementById('cartAutoLocBtn');
     if (!input) return;
 
+    // Always reveal the address input so the user can see the result (or type manually)
+    input.style.display = 'block';
+
     // If we already have cached coords, resolve address instantly
     if (_cachedCoords) {
       if (btn) {
@@ -799,10 +802,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('cartAutoLocBtn').addEventListener('click', autoFillCartAddress);
 
   async function submitOrder() {
-    const addr = (document.getElementById('cartDeliveryAddress').value || '').trim();
+    const addrEl = document.getElementById('cartDeliveryAddress');
+    addrEl.style.display = 'block';
+    const addr = (addrEl.value || '').trim();
     if (!addr) {
       showToast('Please enter your delivery address', 'error');
-      document.getElementById('cartDeliveryAddress').focus();
+      addrEl.focus();
       return;
     }
     if (cart.length === 0) return;

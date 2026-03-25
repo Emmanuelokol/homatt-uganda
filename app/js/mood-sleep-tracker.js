@@ -103,6 +103,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     logSection.closest('.tracker-section').insertAdjacentElement('beforebegin', greetEl);
   }
 
+  // ---- Dismiss keyboard after time picker selection ----
+  document.getElementById('sleepStart').addEventListener('change', function() { this.blur(); });
+  document.getElementById('wakeTime').addEventListener('change', function() { this.blur(); });
+
   // ---- Counter: Night Awakenings ----
   let awakenings = 0;
   function updateAwakeDisplay() {
@@ -138,6 +142,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---- Save Log ----
   document.getElementById('saveMoodLog').addEventListener('click', async () => {
+    // Dismiss any open keyboard before saving
+    if (document.activeElement) document.activeElement.blur();
     const sleepStart = document.getElementById('sleepStart').value;
     const wakeTime = document.getElementById('wakeTime').value;
 
