@@ -674,16 +674,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { return null; }
   }
 
-  function getUserCoords() {
-    return new Promise(resolve => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
-          () => resolve(null),
-          { timeout: 4000 }
-        );
-      } else resolve(null);
-    });
+  async function getUserCoords() {
+    return window.HomattGeolocation.getCurrentPosition({ timeout: 4000 });
   }
 
   // ====== Checkout — Place Order ======

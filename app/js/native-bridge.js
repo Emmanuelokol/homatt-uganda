@@ -297,6 +297,82 @@
     }
   };
 
+  // ─── GEOLOCATION — Native wrapper ───────────────────────────────────────────
+  /**
+   * HomattGeolocation — wraps Capacitor Geolocation on native (which triggers
+   * the Android runtime permission dialog) and falls back to the browser API
+   * on web. Always use this instead of navigator.geolocation in the app.
+   */
+  window.HomattGeolocation = {
+    /**
+     * Returns [lat, lon] or null on failure.
+     * On native, requests permission first so Android shows the system dialog.
+     */
+    async getCurrentPosition(options) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: (options && options.timeout) || 8000,
+          });
+          return [pos.coords.latitude, pos.coords.longitude];
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      return new Promise(resolve => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: (options && options.timeout) || 8000 }
+        );
+      });
+    },
+
+    /**
+     * Starts watching position. Calls callback(lat, lon) on each update.
+     * Returns a watchId that can be passed to clearWatch().
+     */
+    async watchPosition(options, callback) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, maximumAge: options && options.maximumAge, timeout: options && options.timeout },
+            (pos, err) => { if (pos) callback(pos.coords.latitude, pos.coords.longitude); }
+          );
+          return { native: true, id: watchId };
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      if (!navigator.geolocation) return null;
+      const id = navigator.geolocation.watchPosition(
+        pos => callback(pos.coords.latitude, pos.coords.longitude),
+        null,
+        { enableHighAccuracy: true, maximumAge: (options && options.maximumAge) || 15000, timeout: (options && options.timeout) || 10000 }
+      );
+      return { native: false, id };
+    },
+
+    async clearWatch(handle) {
+      if (!handle) return;
+      if (handle.native && window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+        await window.Capacitor.Plugins.Geolocation.clearWatch({ id: handle.id }).catch(() => {});
+      } else {
+        navigator.geolocation.clearWatch(handle.id);
+      }
+    }
+  };
+
   // ─── HAPTICS ────────────────────────────────────────────────────────────────
   window.HomattHaptics = {
     light() {

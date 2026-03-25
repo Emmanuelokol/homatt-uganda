@@ -324,26 +324,29 @@ window.completeDemo = id => {
 };
 
 // GPS tracking: update rider_lat/rider_lon every 30s while active deliveries exist
-let _gpsWatchId = null;
+let _gpsWatchHandle = null;
 let _gpsLastUpdate = 0;
-function startGpsTracking(supa, riderId) {
-  if (_gpsWatchId !== null || !navigator.geolocation) return;
-  _gpsWatchId = navigator.geolocation.watchPosition(pos => {
-    const now = Date.now();
-    if (now - _gpsLastUpdate < 30000) return; // throttle to every 30s
-    _gpsLastUpdate = now;
-    supa.from('rider_deliveries')
-      .update({ rider_lat: pos.coords.latitude, rider_lon: pos.coords.longitude, rider_updated_at: new Date().toISOString() })
-      .eq('rider_user_id', riderId)   // column is rider_user_id, not rider_id
-      .in('status', ['pending', 'in_transit'])
-      .then(() => {}).catch(() => {});
-  }, null, { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 });
+async function startGpsTracking(supa, riderId) {
+  if (_gpsWatchHandle !== null) return;
+  _gpsWatchHandle = await window.HomattGeolocation.watchPosition(
+    { enableHighAccuracy: true, maximumAge: 15000, timeout: 10000 },
+    (lat, lon) => {
+      const now = Date.now();
+      if (now - _gpsLastUpdate < 30000) return; // throttle to every 30s
+      _gpsLastUpdate = now;
+      supa.from('rider_deliveries')
+        .update({ rider_lat: lat, rider_lon: lon, rider_updated_at: new Date().toISOString() })
+        .eq('rider_user_id', riderId)
+        .in('status', ['pending', 'in_transit'])
+        .then(() => {}).catch(() => {});
+    }
+  );
 }
 
-function stopGpsTracking() {
-  if (_gpsWatchId !== null) {
-    navigator.geolocation.clearWatch(_gpsWatchId);
-    _gpsWatchId = null;
+async function stopGpsTracking() {
+  if (_gpsWatchHandle !== null) {
+    await window.HomattGeolocation.clearWatch(_gpsWatchHandle);
+    _gpsWatchHandle = null;
   }
 }
 

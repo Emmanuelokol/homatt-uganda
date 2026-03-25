@@ -730,20 +730,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { return null; }
   }
 
-  function getUserCoords() {
-    if (_cachedCoords) return Promise.resolve(_cachedCoords);
-    return new Promise(resolve => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            _cachedCoords = [pos.coords.latitude, pos.coords.longitude];
-            resolve(_cachedCoords);
-          },
-          () => resolve(null),
-          { timeout: 5000, enableHighAccuracy: true }
-        );
-      } else resolve(null);
-    });
+  async function getUserCoords() {
+    if (_cachedCoords) return _cachedCoords;
+    const coords = await window.HomattGeolocation.getCurrentPosition({ timeout: 5000 });
+    if (coords) _cachedCoords = coords;
+    return coords;
   }
 
   async function reverseGeocode(lat, lon) {
@@ -784,38 +775,23 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    if (!navigator.geolocation) {
-      showToast('Location is not supported on this device', 'error');
-      return;
-    }
     if (btn) {
       btn.disabled = true;
       btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">hourglass_empty</span> Detecting location…';
     }
-    navigator.geolocation.getCurrentPosition(
-      async pos => {
-        _cachedCoords = [pos.coords.latitude, pos.coords.longitude];
-        const addr = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
-        }
-        if (addr && input) input.value = addr;
-        else if (!addr) showToast('Could not detect your address. Please type it in.', 'error');
-      },
-      (err) => {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
-        }
-        if (err && err.code === 1) {
-          showToast('Location permission denied. Please enable it in Settings.', 'error');
-        } else {
-          showToast('Could not get your location. Please type your address.', 'error');
-        }
-      },
-      { timeout: 8000, enableHighAccuracy: true }
-    );
+    const coords = await window.HomattGeolocation.getCurrentPosition({ timeout: 8000 });
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">my_location</span> Use my current location';
+    }
+    if (coords) {
+      _cachedCoords = coords;
+      const addr = await reverseGeocode(coords[0], coords[1]);
+      if (addr && input) input.value = addr;
+      else if (!addr) showToast('Could not detect your address. Please type it in.', 'error');
+    } else {
+      showToast('Location permission denied. Please enable it in Settings.', 'error');
+    }
   }
 
   // ====== Checkout ======
