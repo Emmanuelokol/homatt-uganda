@@ -884,43 +884,48 @@ document.addEventListener('DOMContentLoaded', async () => {
       }).catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
 
       if (orderErr) {
-        const msg = orderErr.message || '';
-        const friendly = (msg.includes('fetch') || msg.includes('network') || msg.includes('Network'))
-          ? 'No internet connection. Please check your network and try again.'
-          : 'Order failed. Please try again.';
-        showToast(friendly, 'error');
+        const msg = (orderErr.message || orderErr.details || orderErr.hint || '').toLowerCase();
+        const isNet = msg.includes('fetch') || msg.includes('network') || msg.includes('err_')
+          || msg.includes('connect') || msg.includes('timeout') || msg.includes('timed out')
+          || msg.includes('failed to') || msg.includes('unavailable') || msg.includes('jwt');
+        console.error('Order insert error:', orderErr);
+        showToast(
+          isNet
+            ? 'No internet connection. Please check your network and try again.'
+            : 'Order failed. Please try again.',
+          'error'
+        );
         btn.disabled = false;
         btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
         return;
       }
 
-      // Deduct stock (best-effort)
-      try {
-        for (const item of cart) {
-          await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
-        }
-      } catch(e) {}
-
-      // Notify admin of new order (push notification)
-      const itemsSummary = cart.map(c => `${c.qty}× ${c.name}`).join(', ');
-      notifyAdminsNewOrder(patientName, itemsSummary, addr);
-
-      cart = [];
-      localStorage.removeItem('homatt_cart');
-      updateCartBadge();
-      closeSheet(document.getElementById('cartSheet'));
-      ordersLoaded = false; // force reload next time My Orders tab is opened
+      // ── ORDER PLACED SUCCESSFULLY ──
+      // Show success & restore button NOW — before any cleanup — so that even if
+      // a cleanup step throws the user always sees "Order placed!" not "Order failed".
       showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
-
       btn.disabled = false;
       btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
 
-      // Refresh product grid to clear "in cart" buttons
-      const term     = document.getElementById('shopSearch').value.toLowerCase();
-      const filtered = term
-        ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
-        : items;
-      renderItems(filtered);
+      // Post-order cleanup: best-effort — errors here must NOT mask the success above.
+      try {
+        for (const item of cart) {
+          supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty }).catch(() => {});
+        }
+        notifyAdminsNewOrder(patientName, cart.map(c => `${c.qty}× ${c.name}`).join(', '), addr);
+        cart = [];
+        localStorage.removeItem('homatt_cart');
+        updateCartBadge();
+        closeSheet(document.getElementById('cartSheet'));
+        ordersLoaded = false; // force reload next time My Orders tab is opened
+        const searchEl = document.getElementById('shopSearch');
+        const term = searchEl ? searchEl.value.toLowerCase() : '';
+        renderItems(term
+          ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
+          : items);
+      } catch (postErr) {
+        console.error('post-order cleanup error (order was placed successfully):', postErr);
+      }
     } catch(e) {
       console.error('submitOrder error:', e);
       showToast('Order failed. Please try again.', 'error');
