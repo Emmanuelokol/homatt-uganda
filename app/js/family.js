@@ -748,7 +748,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       let userLat = null, userLon = null;
       try {
         const gpsCoords = await Promise.race([
-          getUserCoords(),
+          getUserCoords().catch(() => null),
           new Promise(resolve => setTimeout(() => resolve(null), 7000))
         ]);
         if (gpsCoords) {
@@ -794,7 +794,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         user_longitude: userLon,
       };
 
-      const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
+      const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload)
+        .catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
 
       if (orderErr) {
         showToast('Order failed: ' + orderErr.message);
