@@ -828,8 +828,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Wrap getUserCoords with a hard 7s timeout so a hung permission dialog
       // never leaves the button stuck in "Placing order…" forever.
+      // .catch(() => null) ensures any Geolocation rejection (e.g. Capacitor
+      // permission error on Android) never propagates to the outer try/catch.
       const gpsWithTimeout = Promise.race([
-        getUserCoords(),
+        getUserCoords().catch(() => null),
         new Promise(resolve => setTimeout(() => resolve(null), 7000)),
       ]);
 
@@ -916,6 +918,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         : items;
       renderItems(filtered);
     } catch(e) {
+      console.error('submitOrder error:', e);
       showToast('Order failed. Please try again.', 'error');
       btn.disabled = false;
       btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order';
