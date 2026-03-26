@@ -873,7 +873,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       const total = itemsTotal + deliveryFee;
 
-      const { error: orderErr } = await supabase.from('marketplace_orders').insert({
+      const { error: orderErr } = await Promise.resolve(supabase.from('marketplace_orders').insert({
         user_id:          userId,
         patient_name:     patientName,
         patient_phone:    patientPhone,
@@ -886,7 +886,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         delivery_fee:     deliveryFee,
         user_latitude:    userLat,
         user_longitude:   userLon,
-      }).catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
+      })).catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
 
       if (orderErr) {
         const msg = (orderErr.message || orderErr.details || orderErr.hint || '').toLowerCase();
