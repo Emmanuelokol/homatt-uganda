@@ -146,6 +146,14 @@ document.addEventListener('DOMContentLoaded', () => {
         familySize: profile.family_size,
         healthGoals: profile.health_goals,
       }));
+      localStorage.setItem('homatt_session', JSON.stringify({
+        userId:       data.user.id,
+        first_name:   profile.first_name,
+        last_name:    profile.last_name,
+        name:         ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim(),
+        phone_number: profile.phone_number,
+        district:     profile.district,
+      }));
     }
 
     // Link this user's push token to their Supabase UUID for targeted notifications

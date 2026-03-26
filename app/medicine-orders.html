@@ -1112,8 +1112,24 @@ function submitOrder() {
   var sess = {};
   try { sess = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
 
-  // ── Self-medication frequency guard ─────────────────────────
   var supa0 = getSupa();
+
+  // If userId is not cached locally, resolve it from the active Supabase auth session.
+  // This handles users who were already logged in before homatt_session was introduced.
+  if (!sess.userId && supa0) {
+    supa0.auth.getUser().then(function(r) {
+      if (r.data && r.data.user) sess.userId = r.data.user.id;
+      _runFrequencyCheckAndSubmit(sess, supa0);
+    }).catch(function() {
+      _runFrequencyCheckAndSubmit(sess, supa0);
+    });
+    return;
+  }
+  _runFrequencyCheckAndSubmit(sess, supa0);
+}
+
+function _runFrequencyCheckAndSubmit(sess, supa0) {
+  // ── Self-medication frequency guard ─────────────────────────
   if (supa0 && sess.userId) {
     var sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
     supa0.from('pharmacy_orders')
