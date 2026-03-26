@@ -836,14 +836,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       ]);
 
       const [profResult, gpsCoords] = await Promise.all([
-        supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single().catch(() => ({ data: null })),
+        Promise.resolve(supabase.from('profiles').select('first_name,last_name,phone_number,district').eq('id', userId).single()).catch(() => ({ data: null })),
         gpsWithTimeout,
       ]);
 
       if (profResult && profResult.data) {
         const prof = profResult.data;
         patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
-        patientPhone = prof.phone || null;
+        patientPhone = prof.phone_number || null;
         userDistrict = prof.district || null;
       }
 
@@ -864,6 +864,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             deliveryFee = calcDeliveryFee(nearest.distanceKm);
           }
         } catch(e) {}
+      } else if (_nearestPharmacy) {
+        // GPS unavailable during checkout but background lookup already found a pharmacy — use it
+        // so the inserted fee matches what the cart displayed to the user.
+        pharmacyId  = _nearestPharmacy.id;
+        deliveryFee = calcDeliveryFee(_nearestPharmacy.distanceKm);
       }
 
       const total = itemsTotal + deliveryFee;
