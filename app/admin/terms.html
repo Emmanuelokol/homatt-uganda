@@ -86,6 +86,10 @@
 <script>
 let supabase = null;
 document.addEventListener('DOMContentLoaded', async () => {
+  // Set initial state immediately so the page is never stuck on "Loading..."
+  document.getElementById('termsUpdated').textContent = 'Not saved yet';
+  document.getElementById('privacyUpdated').textContent = 'Not saved yet';
+
   buildAdminSidebar('terms');
   const session = await requireAdmin();
   if (!session) return;
@@ -93,8 +97,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   setupAdminLogout();
 
   // Load content with timeout fallback
-  document.getElementById('termsUpdated').textContent = 'Not saved yet';
-  document.getElementById('privacyUpdated').textContent = 'Not saved yet';
   if (supabase) {
     try {
       const fetchPromise = supabase.from('site_content').select('*').in('key', ['terms', 'privacy']);

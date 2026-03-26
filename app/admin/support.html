@@ -110,6 +110,10 @@ let allTickets = [];
 let activeTicketId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allTickets = DEMO_TICKETS_DATA;
+  renderTickets();
+
   buildAdminSidebar('support');
   const session = await requireAdmin();
   if (!session) return;

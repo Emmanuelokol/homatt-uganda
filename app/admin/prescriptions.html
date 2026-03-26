@@ -65,6 +65,10 @@ let supabase = null;
 let allRx = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allRx = DEMO_RX;
+  renderRx();
+
   buildAdminSidebar('prescriptions');
   const session = await requireAdmin();
   if (!session) return;
@@ -86,7 +90,7 @@ async function loadRx() {
   try {
     const fetchPromise = supabase
       .from('prescriptions')
-      .select('*, profiles(first_name,last_name)')
+      .select('id,user_id,drug_name,manufacturer,dosage,drug_form,frequency,start_date,end_date,prescribing_doctor,admin_verified,created_at')
       .order('created_at', { ascending: false });
     const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
@@ -113,7 +117,7 @@ function renderRx() {
 
   tbody.innerHTML = filtered.map(rx => {
     const p = rx.profiles;
-    const userName = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : 'User';
+    const userName = p ? `${p.first_name || ''} ${p.last_name || ''}`.trim() : (rx.user_id ? rx.user_id.slice(0, 8) + '…' : 'Patient');
     const start = rx.start_date ? new Date(rx.start_date).toLocaleDateString('en-UG', {month:'short',day:'numeric'}) : '—';
     const end = rx.end_date ? new Date(rx.end_date).toLocaleDateString('en-UG', {month:'short',day:'numeric'}) : '—';
     const freqMap = { once_daily:'Once daily', twice_daily:'Twice daily', three_times:'3× daily', four_times:'4× daily', as_needed:'As needed', weekly:'Weekly' };

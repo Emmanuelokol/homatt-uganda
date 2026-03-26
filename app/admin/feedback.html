@@ -220,6 +220,13 @@ function statusBadge(s) {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allPlatform = DEMO_PLATFORM;
+  allClinic = DEMO_CLINIC_RATINGS;
+  allPharmacy = DEMO_PHARMACY_RATINGS;
+  safeRenderPlatform(); safeRenderClinic(); safeRenderPharmacy();
+  try { computeKPIs(); } catch(e) {}
+
   buildAdminSidebar('feedback');
   let session;
   try { session = await requireAdmin(); } catch(e) { console.error('requireAdmin failed:', e); }
