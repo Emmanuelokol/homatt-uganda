@@ -376,6 +376,22 @@
         </div>
 
         <div class="mo-label" style="margin-top:16px">Select a Pharmacy</div>
+        <select id="pharmAreaSelect" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:var(--radius-md);font-size:13px;background:var(--surface);color:var(--text-primary);margin-bottom:8px" onchange="loadPharmacies()">
+          <option value="">All areas</option>
+          <option value="kampala">Kampala</option>
+          <option value="wakiso">Wakiso</option>
+          <option value="mukono">Mukono</option>
+          <option value="jinja">Jinja</option>
+          <option value="mbarara">Mbarara</option>
+          <option value="gulu">Gulu</option>
+          <option value="lira">Lira</option>
+          <option value="mbale">Mbale</option>
+          <option value="masaka">Masaka</option>
+          <option value="entebbe">Entebbe</option>
+          <option value="arua">Arua</option>
+          <option value="hoima">Hoima</option>
+          <option value="other">Other area</option>
+        </select>
         <div id="pharmList">
           <div style="text-align:center;padding:20px;color:var(--text-secondary)">Loading pharmacies…</div>
         </div>
@@ -958,10 +974,23 @@ function goStep(n) {
     var eta = document.getElementById('etaText');
     if (eta) eta.textContent = order.urgency === 'urgent' ? '30–60 min' : '2–4 hours';
     renderCartSummary();
+    // Pre-fill pharmacy area filter from session district
+    var pharmAreaSel = document.getElementById('pharmAreaSelect');
+    if (pharmAreaSel && !pharmAreaSel.value) {
+      var sess3 = {};
+      try { sess3 = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e){}
+      if (sess3.district) {
+        var d3 = sess3.district.toLowerCase();
+        if (pharmAreaSel.querySelector('option[value="' + d3 + '"]')) pharmAreaSel.value = d3;
+      }
+    }
     loadPharmacies();
   }
 
-  if (n === 4) renderFinalSummary();
+  if (n === 4) {
+    if (!order.pharmacyId) { alert('Please select a pharmacy to deliver your order.'); return; }
+    renderFinalSummary();
+  }
 
   // Show correct step
   ['step1','step2','step3','step4','stepSuccess'].forEach(function(id){
@@ -1009,16 +1038,37 @@ function loadPharmacies() {
   var listEl = document.getElementById('pharmList');
   if (!listEl) return;
   var supa = getSupa();
+  var filterDistrict = ((document.getElementById('pharmAreaSelect') || {}).value || '').toLowerCase();
 
   function renderPharms(pharmacies) {
-    listEl.innerHTML = pharmacies.map(function(p) {
+    // Sort: matching district first, then others alphabetically
+    var sorted = pharmacies.slice().sort(function(a, b) {
+      var aLocal = filterDistrict && (a.district||'').toLowerCase() === filterDistrict ? 0 : 1;
+      var bLocal = filterDistrict && (b.district||'').toLowerCase() === filterDistrict ? 0 : 1;
+      if (aLocal !== bLocal) return aLocal - bLocal;
+      return (a.name||'').localeCompare(b.name||'');
+    });
+
+    if (!sorted.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-secondary)">No pharmacies found. Try a different area.</div>';
+      return;
+    }
+
+    listEl.innerHTML = sorted.map(function(p) {
+      var isLocal = filterDistrict && (p.district||'').toLowerCase() === filterDistrict;
       return '<div class="pharmacy-card' + (order.pharmacyId === p.id ? ' sel' : '') + '" onclick="pickPharm(\'' + esc(String(p.id)) + '\',\'' + esc(p.name||'') + '\')">'
         + '<div style="width:40px;height:40px;border-radius:10px;background:#E0F2F1;display:flex;align-items:center;justify-content:center;flex-shrink:0">'
         +   '<span class="material-icons-outlined" style="color:#00695C;font-size:22px">local_pharmacy</span>'
         + '</div>'
         + '<div style="flex:1">'
-        +   '<div style="font-size:13px;font-weight:600">' + (p.name||'') + '</div>'
-        +   '<div style="font-size:11px;color:var(--text-secondary)">' + (p.address||'') + (p.district?', '+p.district:'') + '</div>'
+        +   '<div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;flex-wrap:wrap">'
+        +     (p.name||'')
+        +     (isLocal ? '<span style="font-size:10px;background:#E0F2F1;color:#00695C;border-radius:4px;padding:1px 6px;font-weight:600">NEARBY</span>' : '')
+        +   '</div>'
+        +   '<div style="font-size:11px;color:var(--text-secondary)">'
+        +     (p.address ? p.address + (p.district ? ', ' : '') : '')
+        +     (p.district || '')
+        +   '</div>'
         + '</div>'
         + '<span class="material-icons-outlined" style="color:var(--border)">chevron_right</span>'
         + '</div>';

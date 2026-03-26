@@ -459,11 +459,10 @@ async function loadClinics() {
     ];
   }
 
-  // Score and rank; show top 4
+  // Score and rank all clinics by area match and quality
   const scored = clinics
     .map(c => ({ ...c, score: scoreClinic(c, userDist, aiCond) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 4);
+    .sort((a, b) => b.score - a.score);
 
   list.innerHTML = scored.map((c, idx) => `
     <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0})">
