@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Preventive Shop — Homatt Health</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/preventive-shop.css">
+</head>
+<body>
+  <div class="phone-frame">
+
+    <!-- ── Header ─────────────────────────────────────────────────────────── -->
+    <div class="shop-header">
+      <div class="shop-header-top">
+        <button class="shop-back-btn" onclick="history.back()">
+          <span class="material-icons-outlined">arrow_back</span>
+        </button>
+        <div class="shop-header-title">
+          <h1>Preventive Shop</h1>
+          <p>Health products delivered to your door</p>
+        </div>
+        <button class="shop-cart-btn" id="cartBtn">
+          <span class="material-icons-outlined">shopping_cart</span>
+          <span class="cart-badge hidden" id="cartBadge">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Tabs ───────────────────────────────────────────────────────────── -->
+    <div class="shop-tabs">
+      <button class="shop-tab active" id="tabProducts" onclick="switchTab('products')">
+        <span class="material-icons-outlined">storefront</span>
+        Products
+      </button>
+      <button class="shop-tab" id="tabOrders" onclick="switchTab('orders')">
+        <span class="material-icons-outlined">receipt_long</span>
+        My Orders
+      </button>
+    </div>
+
+    <!-- ── Scroll Content ─────────────────────────────────────────────────── -->
+    <div class="shop-content">
+
+      <!-- Products Panel -->
+      <div class="shop-panel active" id="panelProducts">
+
+        <!-- Personalised Alert -->
+        <div class="personalised-section" id="personalBanner"></div>
+
+        <!-- Search -->
+        <div class="shop-search-wrap">
+          <div class="shop-search">
+            <span class="material-icons-outlined">search</span>
+            <input type="text" id="searchInput" placeholder="Search health products..." oninput="filterProducts()">
+          </div>
+        </div>
+
+        <!-- Category Chips -->
+        <div class="category-scroll" id="categoryScroll"></div>
+
+        <!-- Products Grid -->
+        <div class="products-grid" id="productsGrid">
+          <div class="shop-loading" style="grid-column:1/-1">Loading products…</div>
+        </div>
+
+      </div>
+
+      <!-- My Orders Panel -->
+      <div class="shop-panel" id="panelOrders">
+        <div class="orders-list" id="ordersList">
+          <div class="shop-loading">Loading your orders…</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── Cart Bottom Sheet ───────────────────────────────────────────────── -->
+    <div class="cart-overlay" id="cartOverlay">
+      <div class="cart-sheet">
+        <div class="cart-handle"></div>
+
+        <div class="cart-header">
+          <h3>Your Cart</h3>
+          <button class="cart-close-btn" onclick="closeCart()">
+            <span class="material-icons-outlined">close</span>
+          </button>
+        </div>
+
+        <div class="cart-body">
+
+          <!-- Cart Items -->
+          <div class="cart-items" id="cartItems"></div>
+
+          <!-- Totals -->
+          <div class="cart-totals" id="cartTotals">
+            <div class="cart-row">
+              <span class="label">Items subtotal</span>
+              <span id="cartSubtotal">UGX 0</span>
+            </div>
+            <div class="cart-row">
+              <span class="label">
+                <span class="material-icons-outlined">local_shipping</span>
+                Delivery fee
+              </span>
+              <span id="cartDelivery">UGX 0</span>
+            </div>
+            <div class="cart-row total">
+              <span>Total</span>
+              <span class="amount" id="cartTotal">UGX 0</span>
+            </div>
+          </div>
+
+          <!-- Routing -->
+          <div class="routing-info" id="routingInfo" style="display:none">
+            <span class="material-icons-outlined">local_pharmacy</span>
+            <span>Routed to: <strong id="routingPharmacy">—</strong> — <span id="routingDist">—</span></span>
+          </div>
+
+          <!-- Location -->
+          <div class="location-wrap">
+            <div class="location-input-row">
+              <input type="text" id="deliveryAddress" placeholder="Enter delivery address…">
+            </div>
+            <button class="use-location-btn" id="useLocationBtn" onclick="useMyLocation()">
+              <span class="material-icons-outlined">my_location</span>
+              Use my current location
+            </button>
+          </div>
+
+          <!-- Payment Method -->
+          <div class="payment-wrap">
+            <div class="payment-label">
+              <span class="material-icons-outlined">payment</span>
+              Payment method
+            </div>
+            <div class="payment-methods">
+              <button class="pay-opt selected" id="payCash" onclick="selectPayment('cash_on_delivery', this)">Cash on Delivery</button>
+              <button class="pay-opt" id="payMomo" onclick="selectPayment('mobile_money', this)">Mobile Money</button>
+            </div>
+          </div>
+
+          <!-- Place Order -->
+          <button class="place-order-btn" id="placeOrderBtn" onclick="placeOrder()">
+            <span class="material-icons-outlined">shopping_bag</span>
+            Place Order
+          </button>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Toast ──────────────────────────────────────────────────────────── -->
+    <div class="shop-toast" id="shopToast"></div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/preventive-shop.js"></script>
+</body>
+</html>
