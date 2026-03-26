@@ -244,7 +244,7 @@
         <div class="mo-label">Payment Method</div>
         <div id="paymentCards" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px">
           <!-- Pay on Delivery -->
-          <div class="pay-card sel" id="pay-cod" onclick="selectPayment('cash_on_delivery')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #00695C;border-radius:12px;cursor:pointer;background:#E0F2F1;transition:all .2s;touch-action:manipulation">
+          <div class="pay-card sel" id="pay-cod" onclick="selectPayment('pay_on_delivery')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid #00695C;border-radius:12px;cursor:pointer;background:#E0F2F1;transition:all .2s;touch-action:manipulation">
             <div style="width:38px;height:38px;border-radius:10px;background:#00695C;display:flex;align-items:center;justify-content:center;flex-shrink:0">
               <span class="material-icons-outlined" style="color:#fff;font-size:20px">local_shipping</span>
             </div>
@@ -589,7 +589,7 @@ var ALL_MEDS = [
 /* ── State ── */
 var cart = {};           // { "medicine name": { n, p, qty } }
 var order = {
-  urgency:'standard', address:'', phone:'', payment:'cash_on_delivery',
+  urgency:'standard', address:'', phone:'', payment:'pay_on_delivery',
   momoPhone:'',
   notes:'', pharmacyId:null, pharmacyName:null,
   catId:'', isRx:false, rxDoctor:'', rxCode:''
@@ -831,7 +831,7 @@ function autoFillAddress(inputId, btnId) {
    ══════════════════════════════════════ */
 
 var PAYMENT_MAP = {
-  'cash_on_delivery': { card:'pay-cod', check:'cod-check',     label:'Pay on Delivery' },
+  'pay_on_delivery':  { card:'pay-cod', check:'cod-check',     label:'Pay on Delivery' },
   'mtn_momo':         { card:'pay-mtn', check:'mtn-check',     label:'MTN Mobile Money' },
   'airtel_money':     { card:'pay-airtel', check:'airtel-check', label:'Airtel Money' },
   'bank_transfer':    { card:'pay-bank', check:'bank-check',   label:'Bank Transfer' },
@@ -960,7 +960,7 @@ function goStep(n) {
     order.address  = (document.getElementById('deliveryAddress') || {}).value || '';
     order.phone    = (document.getElementById('deliveryPhone') || {}).value || '';
     // order.payment already set by selectPayment()
-    if (!order.payment) order.payment = 'cash_on_delivery';
+    if (!order.payment) order.payment = 'pay_on_delivery';
     order.momoPhone = (document.getElementById('momoPayPhone') || {}).value || '';
     order.notes    = (document.getElementById('deliveryNotes') || {}).value || '';
     order.rxDoctor = (document.getElementById('rxDoctor') || {}).value || '';
@@ -1105,7 +1105,7 @@ function pickPharm(id, name) {
 
 function getPaymentLabel() {
   var labels = {
-    'cash_on_delivery': 'Pay on Delivery (Cash)',
+    'pay_on_delivery':  'Pay on Delivery (Cash)',
     'mtn_momo':         'MTN Mobile Money' + (order.momoPhone ? ' (' + order.momoPhone + ')' : ''),
     'airtel_money':     'Airtel Money' + (order.momoPhone ? ' (' + order.momoPhone + ')' : ''),
     'bank_transfer':    'Bank Transfer (pending verification)',
@@ -1245,7 +1245,7 @@ function _doSubmitOrder(sess) {
       delivery_cost:               5000,
       total_cost:                  total,
       payment_method:              order.payment,
-      payment_status:              (order.payment === 'cash_on_delivery') ? 'pending' : (order.payment === 'wallet' ? 'paid' : 'pending'),
+      payment_status:              (order.payment === 'pay_on_delivery') ? 'pending' : (order.payment === 'wallet' ? 'paid' : 'pending'),
       momo_phone:                  order.momoPhone || null,
       status:                      'incoming',
     };
