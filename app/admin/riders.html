@@ -32,16 +32,17 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="suspended">Suspended</option>
+              <option value="removed">Removed</option>
             </select>
             <input type="text" id="searchRiders" placeholder="Search by name/phone..." style="width:200px">
           </div>
         </div>
         <table class="admin-table">
           <thead>
-            <tr><th>Rider</th><th>Phone</th><th>Vehicle</th><th>Plate</th><th>Deliveries</th><th>Rating</th><th>Status</th><th>Actions</th></tr>
+            <tr><th>Rider</th><th>Phone</th><th>Vehicle</th><th>Plate</th><th>Deliveries</th><th>Rating</th><th>Status</th><th>Portal</th><th>Actions</th></tr>
           </thead>
           <tbody id="ridersBody">
-            <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            <tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
           </tbody>
         </table>
       </div>
@@ -59,11 +60,14 @@
     <div class="admin-modal-body" id="riderModalBody"></div>
     <div class="admin-modal-footer">
       <button class="btn-admin secondary" onclick="closeModal()">Close</button>
+      <button class="btn-admin danger" id="removeBtn" style="display:none" onclick="removeRider(activeRiderId)">
+        <span class="material-icons-outlined" style="font-size:16px">delete_forever</span> Remove
+      </button>
+      <button class="btn-admin warning" id="suspendBtn" style="display:none" onclick="updateStatus('suspended')">
+        <span class="material-icons-outlined" style="font-size:16px">block</span> Suspend
+      </button>
       <button class="btn-admin success" id="approveBtn" style="display:none" onclick="updateStatus('approved')">
         <span class="material-icons-outlined" style="font-size:16px">check_circle</span> Approve
-      </button>
-      <button class="btn-admin danger" id="suspendBtn" style="display:none" onclick="updateStatus('suspended')">
-        <span class="material-icons-outlined" style="font-size:16px">block</span> Suspend
       </button>
     </div>
   </div>
@@ -125,10 +129,15 @@ function renderRiders() {
   );
   const tbody = document.getElementById('ridersBody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No riders found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No riders found</td></tr>';
     return;
   }
-  tbody.innerHTML = filtered.map(r => `
+  tbody.innerHTML = filtered.map(r => {
+    const st = r.status || 'approved';
+    const portalBadge = r.portal_user_id
+      ? `<span class="status-badge approved" style="font-size:10px">Active</span>`
+      : `<span class="status-badge pending" style="font-size:10px">Not set up</span>`;
+    return `
     <tr>
       <td>
         <div style="font-weight:600">${r.full_name}</div>
@@ -139,13 +148,19 @@ function renderRiders() {
       <td style="font-size:12px">${r.plate_number || '—'}</td>
       <td style="font-weight:600">${r.total_deliveries || 0}</td>
       <td><span style="color:${(r.rating||5)>=4.5?'#2E7D32':'#E65100'};font-weight:700">★ ${(r.rating||5).toFixed(1)}</span></td>
-      <td><span class="status-badge ${r.status || 'approved'}">${r.status || 'approved'}</span></td>
-      <td>
+      <td><span class="status-badge ${st}">${st}</span></td>
+      <td>${portalBadge}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
         <button class="btn-admin secondary sm" onclick="openModal('${r.id}')">
-          <span class="material-icons-outlined" style="font-size:14px">visibility</span> View
+          <span class="material-icons-outlined" style="font-size:13px">visibility</span>
         </button>
+        ${st === 'pending' ? `<button class="btn-admin success sm" onclick="quickStatus('${r.id}','approved')"><span class="material-icons-outlined" style="font-size:13px">check</span></button>` : ''}
+        ${st === 'approved' ? `<button class="btn-admin warning sm" onclick="quickStatus('${r.id}','suspended')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>` : ''}
+        ${(st === 'suspended' || st === 'pending') ? `<button class="btn-admin success sm" onclick="quickStatus('${r.id}','approved')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>` : ''}
+        ${st !== 'removed' ? `<button class="btn-admin danger sm" onclick="removeRider('${r.id}')" title="Remove from platform"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>` : ''}
       </td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 function openModal(id) {
@@ -171,20 +186,60 @@ function openModal(id) {
 
   const approveBtn = document.getElementById('approveBtn');
   const suspendBtn = document.getElementById('suspendBtn');
-  approveBtn.style.display = r.status !== 'approved' ? 'inline-flex' : 'none';
+  const removeBtn  = document.getElementById('removeBtn');
+  approveBtn.style.display = (r.status !== 'approved' && r.status !== 'removed') ? 'inline-flex' : 'none';
   suspendBtn.style.display = r.status === 'approved' ? 'inline-flex' : 'none';
+  removeBtn.style.display  = r.status !== 'removed' ? 'inline-flex' : 'none';
   document.getElementById('riderModal').style.display = 'flex';
+
+  // Append portal info section
+  const portalSection = document.createElement('div');
+  portalSection.style.cssText = 'margin-top:16px;background:#F0F7FF;border-radius:10px;padding:14px;border:1px solid #BBDEFB';
+  portalSection.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+      <span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">electric_moped</span> Rider Portal
+    </div>
+    <div style="font-size:13px;color:#1565C0;margin-bottom:8px">
+      ${r.portal_user_id ? '✓ Portal account active' : '⚠ No portal account yet'}
+    </div>
+    <a href="../../rider/index.html" target="_blank" class="btn-admin info sm" style="text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:13px">open_in_new</span> Open Rider Portal
+    </a>`;
+  document.getElementById('riderModalBody').appendChild(portalSection);
 }
 
 function closeModal() { document.getElementById('riderModal').style.display = 'none'; activeRiderId = null; }
 
 async function updateStatus(status) {
   if (!activeRiderId) return;
-  const { error } = await supabase.from('riders').update({ status, active: status === 'approved', updated_at: new Date().toISOString() }).eq('id', activeRiderId);
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); closeModal(); return; }
+  const { error } = await supa.from('riders').update({ status, active: status === 'approved', updated_at: new Date().toISOString() }).eq('id', activeRiderId);
   if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
   closeModal();
   await loadRiders();
-  showAdminToast(`Rider ${status === 'approved' ? 'approved' : 'suspended'}!`, status === 'approved' ? 'success' : 'default');
+  const msg = { approved: 'Rider approved!', suspended: 'Rider suspended', removed: 'Rider removed' }[status] || 'Status updated';
+  showAdminToast(msg, status === 'approved' ? 'success' : 'default');
+}
+
+async function quickStatus(riderId, status) {
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  const { error } = await supa.from('riders').update({ status, active: status === 'approved', updated_at: new Date().toISOString() }).eq('id', riderId);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadRiders();
+  showAdminToast(status === 'approved' ? 'Rider approved!' : 'Rider suspended', status === 'approved' ? 'success' : 'default');
+}
+
+async function removeRider(riderId) {
+  if (!confirm('Remove this rider from the platform? They will no longer be able to receive deliveries.')) return;
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
+  const { error } = await supa.from('riders').update({ status: 'removed', active: false, available: false, updated_at: new Date().toISOString() }).eq('id', riderId || activeRiderId);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  if (activeRiderId) closeModal();
+  await loadRiders();
+  showAdminToast('Rider removed from platform', 'default');
 }
 </script>
 </body>

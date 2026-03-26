@@ -56,7 +56,9 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
+              <option value="removed">Removed</option>
             </select>
             <input type="text" id="searchClinics" placeholder="Search by name..." style="width:180px">
           </div>
@@ -581,10 +583,13 @@ function renderClinics() {
       '<td>' + (c.verified ? '<span class="status-badge resolved">Verified</span>' : '<span class="status-badge open">Unverified</span>') + '</td>' +
       '<td><span class="status-badge ' + (c.status||'approved') + '">' + (c.status||'approved') + '</span></td>' +
       '<td style="font-size:12px;color:#9AA0A6">' + formatShortDate(c.created_at) + '</td>' +
-      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
-        '<button class="btn-admin secondary sm" onclick="openModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
-        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
-        (!c.verified ? '<button class="btn-admin primary sm" onclick="toggleVerify(\'' + c.id + '\',true)">Verify</button>' : '') +
+      '<td style="display:flex;gap:4px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + c.id + '\')" title="Edit"><span class="material-icons-outlined" style="font-size:13px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + c.id + '\')" title="Add staff"><span class="material-icons-outlined" style="font-size:13px">person_add</span></button>' +
+        (!c.verified ? '<button class="btn-admin primary sm" onclick="toggleVerify(\'' + c.id + '\',true)" title="Verify">✓</button>' : '') +
+        (c.status !== 'suspended' && c.status !== 'removed' ? '<button class="btn-admin warning sm" onclick="toggleClinicStatus(\'' + c.id + '\',\'suspended\')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>' : '') +
+        (c.status === 'suspended' ? '<button class="btn-admin success sm" onclick="toggleClinicStatus(\'' + c.id + '\',\'approved\')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>' : '') +
+        (c.status !== 'removed' ? '<button class="btn-admin danger sm" onclick="removeClinic(\'' + c.id + '\')" title="Remove"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -875,6 +880,28 @@ async function submitCreateClinicAccount() {
 
 function copyClinicCredentials() {
   navigator.clipboard.writeText(_lastClinicCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+
+/* ── Suspend / Remove clinic ── */
+async function toggleClinicStatus(id, newStatus) {
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  var isActive = (newStatus === 'approved' || newStatus === 'active');
+  var { error } = await supa.from('clinics').update({ status: newStatus, active: isActive, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadClinics();
+  var msgs = { suspended: 'Clinic suspended', approved: 'Clinic reactivated!' };
+  showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
+}
+
+async function removeClinic(id) {
+  if (!confirm('Remove this clinic from the platform? Users will no longer be able to book appointments.')) return;
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
+  var { error } = await supa.from('clinics').update({ status: 'removed', active: false, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadClinics();
+  showAdminToast('Clinic removed from platform', 'default');
 }
 </script>
 </body>

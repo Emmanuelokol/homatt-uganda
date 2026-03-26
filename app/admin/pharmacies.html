@@ -49,7 +49,9 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
+              <option value="removed">Removed</option>
             </select>
             <input type="text" id="searchPharmacies" placeholder="Search..." style="width:160px">
           </div>
@@ -485,9 +487,12 @@ function renderPharmacies() {
       '<td style="font-size:12px">' + delivery + '</td>' +
       '<td><span style="font-weight:700;color:' + scoreColor + '">' + score + '</span>/100</td>' +
       '<td><span class="status-badge ' + (p.status||'approved') + '">' + (p.status||'approved') + '</span></td>' +
-      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
-        '<button class="btn-admin secondary sm" onclick="openModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
-        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
+      '<td style="display:flex;gap:4px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + p.id + '\')" title="Edit"><span class="material-icons-outlined" style="font-size:13px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + p.id + '\')" title="Add staff"><span class="material-icons-outlined" style="font-size:13px">person_add</span></button>' +
+        (p.status !== 'suspended' && p.status !== 'removed' ? '<button class="btn-admin warning sm" onclick="togglePharmacyStatus(\'' + p.id + '\',\'suspended\')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>' : '') +
+        (p.status === 'suspended' ? '<button class="btn-admin success sm" onclick="togglePharmacyStatus(\'' + p.id + '\',\'approved\')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>' : '') +
+        (p.status !== 'removed' ? '<button class="btn-admin danger sm" onclick="removePharmacy(\'' + p.id + '\')" title="Remove"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -735,6 +740,28 @@ async function submitCreatePharmacyAccount() {
 
 function copyPharmacyCredentials() {
   navigator.clipboard.writeText(_lastPharmacyCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+
+/* ── Suspend / Remove pharmacy ── */
+async function togglePharmacyStatus(id, newStatus) {
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  var isActive = (newStatus === 'approved' || newStatus === 'active');
+  var { error } = await supa.from('pharmacies').update({ status: newStatus, active: isActive, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadPharmacies();
+  var msgs = { suspended: 'Pharmacy suspended', approved: 'Pharmacy reactivated!' };
+  showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
+}
+
+async function removePharmacy(id) {
+  if (!confirm('Remove this pharmacy from the platform? Users will no longer be able to order medicine from them.')) return;
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
+  var { error } = await supa.from('pharmacies').update({ status: 'removed', active: false, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadPharmacies();
+  showAdminToast('Pharmacy removed from platform', 'default');
 }
 </script>
 </body>

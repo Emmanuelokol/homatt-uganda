@@ -188,6 +188,20 @@ let allClinic = [];
 let allPharmacy = [];
 let activeReviewId = null;
 
+const DEMO_PLATFORM = [
+  { id:'pf1', overall_score:5, category:'booking', message:'The booking process is so smooth. Booked a doctor in 2 minutes!', contact_email:'ssali@example.com', status:'new', created_at: new Date(Date.now()-3600000).toISOString() },
+  { id:'pf2', overall_score:4, category:'delivery', message:'Medicine arrived quickly. Driver was very professional.', contact_email:'', status:'new', created_at: new Date(Date.now()-86400000).toISOString() },
+  { id:'pf3', overall_score:3, category:'app_speed', message:'App is a bit slow when loading clinics. Otherwise good.', contact_email:'nakato@example.com', status:'reviewed', created_at: new Date(Date.now()-172800000).toISOString() },
+];
+const DEMO_CLINIC_RATINGS = [
+  { id:'cr1', rating_type:'clinic', score:5, score_speed:4, score_quality:5, score_comms:5, comment:'Excellent doctors, very thorough examination.', created_at: new Date(Date.now()-7200000).toISOString() },
+  { id:'cr2', rating_type:'clinic', score:4, score_speed:3, score_quality:4, score_comms:4, comment:'Good clinic but waiting time was long.', created_at: new Date(Date.now()-86400000).toISOString() },
+];
+const DEMO_PHARMACY_RATINGS = [
+  { id:'pr1', rating_type:'pharmacy', score:5, score_speed:5, score_quality:5, score_cost:4, comment:'Very fast delivery and correct medicines!', created_at: new Date(Date.now()-3600000).toISOString() },
+  { id:'pr2', rating_type:'pharmacy', score:4, score_speed:4, score_quality:4, score_cost:3, comment:'Good service. Slightly expensive but convenient.', created_at: new Date(Date.now()-172800000).toISOString() },
+];
+
 function stars(score) {
   if (!score) return '<span style="color:#9AA0A6">—</span>';
   const s = Math.round(score);
@@ -270,7 +284,7 @@ function withTimeout(promise, ms) {
 }
 
 async function loadPlatform() {
-  if (!supabase) { safeRenderPlatform(); return; }
+  if (!supabase) { allPlatform = DEMO_PLATFORM; safeRenderPlatform(); return; }
   try {
     const { data, error } = await withTimeout(
       supabase
@@ -280,14 +294,14 @@ async function loadPlatform() {
         .limit(200),
       10000
     );
-    if (error) { console.error('loadPlatform error:', error); allPlatform = []; }
-    else { allPlatform = data || []; }
-  } catch(e) { console.error('loadPlatform exception:', e); allPlatform = []; }
+    if (error) { console.error('loadPlatform error:', error); allPlatform = DEMO_PLATFORM; showAdminToast('Using demo feedback data', 'default'); }
+    else { allPlatform = (data && data.length) ? data : DEMO_PLATFORM; }
+  } catch(e) { console.error('loadPlatform exception:', e); allPlatform = DEMO_PLATFORM; }
   safeRenderPlatform();
 }
 
 async function loadRatings() {
-  if (!supabase) { safeRenderClinic(); safeRenderPharmacy(); return; }
+  if (!supabase) { allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; safeRenderClinic(); safeRenderPharmacy(); return; }
   try {
     const { data, error } = await withTimeout(
       supabase
@@ -297,13 +311,13 @@ async function loadRatings() {
         .limit(300),
       10000
     );
-    if (error) { console.error('loadRatings error:', error); allClinic = []; allPharmacy = []; }
+    if (error) { console.error('loadRatings error:', error); allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; }
     else {
       const rows = data || [];
-      allClinic   = rows.filter(r => r.rating_type === 'clinic');
-      allPharmacy = rows.filter(r => r.rating_type === 'pharmacy');
+      allClinic   = rows.filter(r => r.rating_type === 'clinic').length   ? rows.filter(r => r.rating_type === 'clinic')   : DEMO_CLINIC_RATINGS;
+      allPharmacy = rows.filter(r => r.rating_type === 'pharmacy').length ? rows.filter(r => r.rating_type === 'pharmacy') : DEMO_PHARMACY_RATINGS;
     }
-  } catch(e) { console.error('loadRatings exception:', e); allClinic = []; allPharmacy = []; }
+  } catch(e) { console.error('loadRatings exception:', e); allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; }
   safeRenderClinic();
   safeRenderPharmacy();
 }

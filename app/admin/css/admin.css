@@ -440,6 +440,13 @@ body {
 .status-badge.high { background: #FFF3E0; color: #E65100; }
 .status-badge.normal { background: #E3F2FD; color: #1565C0; }
 .status-badge.low { background: #F3F4F6; color: #6B7280; }
+/* Partner / user status badges */
+.status-badge.approved { background: #E8F5E9; color: #2E7D32; }
+.status-badge.active   { background: #E8F5E9; color: #1B5E20; }
+.status-badge.pending  { background: #FFF8E1; color: #F57F17; }
+.status-badge.rejected { background: #FFEBEE; color: #C62828; }
+.status-badge.suspended{ background: #FFF3E0; color: #E65100; }
+.status-badge.removed  { background: #F3F4F6; color: #9AA0A6; }
 
 /* ---- Buttons ---- */
 .btn-admin {
@@ -463,6 +470,10 @@ body {
 .btn-admin.danger:hover { background: #B71C1C; }
 .btn-admin.info { background: var(--admin-info); color: white; }
 .btn-admin.info:hover { background: #01579B; }
+.btn-admin.success { background: #2E7D32; color: white; }
+.btn-admin.success:hover { background: #1B5E20; }
+.btn-admin.warning { background: #E65100; color: white; }
+.btn-admin.warning:hover { background: #BF360C; }
 .btn-admin.sm { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
 
 /* ---- Modal overlay ---- */
