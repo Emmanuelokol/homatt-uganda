@@ -451,7 +451,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         .order('created_at', { ascending: false });
       // Filter by clinic if logged in as real clinic staff; otherwise show all today's bookings
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
-      const { data } = await q;
+      const { data } = await Promise.race([
+        q,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
       bookings = data || [];
     } catch(e) {}
   }

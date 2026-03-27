@@ -297,8 +297,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Load existing data
   if (_supa && _clinicId) {
-    await loadClinicProfile();
-    await loadCondFees();
+    await Promise.race([loadClinicProfile(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]).catch(() => {});
+    await Promise.race([loadCondFees(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]).catch(() => {});
   }
 });
 

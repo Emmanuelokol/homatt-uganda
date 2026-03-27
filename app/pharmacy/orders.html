@@ -242,11 +242,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   window._pharmSupa = supa;
 
   if (supa && session.pharmacyId) {
-    // Load OTC safety rules once
-    const { data: rules } = await supa.from('otc_safety_rules').select('*').eq('active', true);
-    otcSafetyRules = rules || [];
+    try {
+      // Load OTC safety rules once
+      const { data: rules } = await Promise.race([
+        supa.from('otc_safety_rules').select('*').eq('active', true),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+      ]).catch(() => ({ data: null }));
+      otcSafetyRules = rules || [];
 
-    await loadLive(supa, session.pharmacyId);
+      await Promise.race([
+        loadLive(supa, session.pharmacyId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      allOrders = [...MOCK_ORDERS];
+      render();
+    }
     setupRealtime(supa, session.pharmacyId);
   } else {
     allOrders = [...MOCK_ORDERS];

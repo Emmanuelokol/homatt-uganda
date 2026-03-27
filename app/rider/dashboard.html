@@ -193,7 +193,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   if (supa && session.userId) {
-    await loadLive(supa, session.userId, session.riderId);
+    try {
+      await Promise.race([
+        loadLive(supa, session.userId, session.riderId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      loadDemo();
+    }
   } else {
     loadDemo();
   }

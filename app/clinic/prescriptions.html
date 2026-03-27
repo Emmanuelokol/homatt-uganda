@@ -267,7 +267,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         .order('created_at', { ascending: false })
         .limit(100);
       if (clinicSession.clinicId) q = q.eq('clinic_id', clinicSession.clinicId);
-      const { data } = await q;
+      const { data } = await Promise.race([
+        q,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
       if (data && data.length) {
         // Group rows by patient_name + same-minute timestamp into prescription bundles
         const groups = {};
@@ -317,7 +320,10 @@ async function loadPharmacies() {
     return;
   }
   try {
-    const { data } = await clinicSupa.from('pharmacies').select('id,name').eq('active', true).order('name');
+    const { data } = await Promise.race([
+      clinicSupa.from('pharmacies').select('id,name').eq('active', true).order('name'),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    ]);
     if (data && data.length) allPharmacies = data;
   } catch(e) {}
 }
@@ -325,9 +331,12 @@ async function loadPharmacies() {
 async function loadClinicInventory() {
   if (!clinicSupa || !clinicSession?.clinicId) return;
   try {
-    const { data } = await clinicSupa.from('clinic_inventory')
-      .select('medicine_name,generic_name,quantity,is_available')
-      .eq('clinic_id', clinicSession.clinicId);
+    const { data } = await Promise.race([
+      clinicSupa.from('clinic_inventory')
+        .select('medicine_name,generic_name,quantity,is_available')
+        .eq('clinic_id', clinicSession.clinicId),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    ]);
     if (data) clinicInventoryCache = data;
   } catch(e) {}
 }

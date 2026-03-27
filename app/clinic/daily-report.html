@@ -162,7 +162,10 @@ async function loadReport() {
         .lte('created_at', dayEnd.toISOString())
         .order('created_at', { ascending: false });
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
-      const { data } = await q;
+      const { data } = await Promise.race([
+        q,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
       bookings = data || [];
     } catch(e) {}
   }

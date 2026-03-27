@@ -275,7 +275,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         .order('created_at', { ascending: false })
         .limit(200);
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
-      const { data } = await q;
+      const { data } = await Promise.race([
+        q,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
       if (data && data.length) allPatients = data;
     } catch(e) {}
   }
