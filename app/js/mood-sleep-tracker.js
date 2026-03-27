@@ -246,12 +246,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (supabase && userId) {
       try {
-        const { data: sbLogs } = await supabase
-          .from('mood_sleep_logs')
-          .select('*')
-          .eq('user_id', userId)
-          .gte('log_date', cutoff)
-          .order('log_date', { ascending: false });
+        const { data: sbLogs } = await Promise.race([
+          supabase.from('mood_sleep_logs').select('*').eq('user_id', userId).gte('log_date', cutoff).order('log_date', { ascending: false }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+        ]);
         if (sbLogs && sbLogs.length > logs.length) logs = sbLogs;
       } catch(e) {}
     }
@@ -435,12 +433,10 @@ Respond ONLY with valid JSON:
 
     if (supabase && userId) {
       try {
-        const { data } = await supabase
-          .from('mood_sleep_logs')
-          .select('*')
-          .eq('user_id', userId)
-          .order('log_date', { ascending: false })
-          .limit(20);
+        const { data } = await Promise.race([
+          supabase.from('mood_sleep_logs').select('*').eq('user_id', userId).order('log_date', { ascending: false }).limit(20),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+        ]);
         logs = data;
       } catch(e) { console.warn('[MoodTracker] loadHistory failed:', e.message); }
     }
@@ -495,14 +491,24 @@ Respond ONLY with valid JSON:
         accessToken = data?.session?.access_token || null;
       } catch(e) {}
     }
-    const res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}) },
-      body: JSON.stringify({ provider: 'groq', prompt }),
-    });
-    if (!res.ok) throw new Error(`AI proxy error: ${res.status}`);
-    const data = await res.json();
-    return data.text || '';
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    try {
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}) },
+        body: JSON.stringify({ provider: 'groq', prompt }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`AI proxy error: ${res.status}`);
+      const data = await res.json();
+      return data.text || '';
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out after 25s');
+      throw err;
+    }
   }
 
   function parseAIResponse(text) {
