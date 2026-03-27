@@ -146,49 +146,68 @@ function buildAdminSidebar(activePage) {
 
 /* ── Admin auth guard ── */
 async function requireAdmin() {
-  // Use an opaque overlay instead of body.visibility:hidden so the background
-  // colour is always visible (prevents black flash on Android WebView / dark OS)
-  let authOverlay = document.getElementById('_adminAuthOverlay');
-  if (!authOverlay) {
-    authOverlay = document.createElement('div');
-    authOverlay.id = '_adminAuthOverlay';
-    authOverlay.style.cssText = 'position:fixed;inset:0;background:#F4F6F9;z-index:9999;display:flex;align-items:center;justify-content:center';
-    authOverlay.innerHTML = '<div style="width:32px;height:32px;border:3px solid #1B5E20;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
-    document.body.appendChild(authOverlay);
-  }
-
   const stored = getAdminSession();
+  const CACHE_MS = 30 * 60 * 1000;
 
-  // Demo mode — allowed through but with a clear flag (no real DB access)
-  if (stored?.demo) {
-    authOverlay.remove();
-    const adminName = stored.name || 'Admin (Demo)';
+  // Helper to update the visible admin name/avatar elements
+  function _applyAdminUI(adminName) {
     const avatarEl = document.getElementById('adminUserAvatar');
     const nameEl   = document.getElementById('adminUserName');
     const nameTop  = document.getElementById('adminUserNameTop');
     if (avatarEl) avatarEl.textContent = adminName.charAt(0).toUpperCase();
     if (nameEl)   nameEl.textContent   = adminName;
     if (nameTop)  nameTop.textContent  = adminName;
+  }
+
+  // Helper to safely remove the overlay (if it exists)
+  function _removeOverlay() {
+    const el = document.getElementById('_adminAuthOverlay');
+    if (el) { try { el.remove(); } catch(e) {} }
+  }
+
+  // Demo mode — instant, no overlay needed
+  if (stored?.demo) {
+    const adminName = stored.name || 'Admin (Demo)';
+    _applyAdminUI(adminName);
     return stored;
   }
 
-  const supa = adminSupa();
-  if (!supa) { window.location.href = 'index.html'; return null; }
+  // If the admin session cache is still fresh, we can skip both the overlay
+  // AND the DB round-trip entirely — just verify the local JWT is present.
+  const hasFreshCache =
+    stored?.isAdmin === true &&
+    stored?.userId  &&
+    stored?.verifiedAt && (Date.now() - stored.verifiedAt) < CACHE_MS;
 
-  // Verify the live Supabase session (uses cached token — fast)
+  // Only show the full-page spinner when a slow DB check is actually needed.
+  // This prevents pages that have already rendered demo content from being
+  // hidden behind the overlay on every navigation.
+  if (!hasFreshCache) {
+    let authOverlay = document.getElementById('_adminAuthOverlay');
+    if (!authOverlay) {
+      authOverlay = document.createElement('div');
+      authOverlay.id = '_adminAuthOverlay';
+      authOverlay.style.cssText = 'position:fixed;inset:0;background:#F4F6F9;z-index:9999;display:flex;align-items:center;justify-content:center';
+      authOverlay.innerHTML = '<div style="width:32px;height:32px;border:3px solid #1B5E20;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style>';
+      document.body.appendChild(authOverlay);
+    }
+  }
+
+  const supa = adminSupa();
+  if (!supa) { _removeOverlay(); window.location.href = 'index.html'; return null; }
+
+  // Verify the live Supabase session (reads from local storage — fast)
   let session;
   try {
-    const sessionFetch = supa.auth.getSession();
+    const sessionFetch   = supa.auth.getSession();
     const sessionTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
     const { data } = await Promise.race([sessionFetch, sessionTimeout]);
     session = data?.session;
   } catch(e) { console.warn('requireAdmin: getSession failed/timed out', e); }
-  if (!session) { clearAdminSession(); window.location.href = 'index.html'; return null; }
 
-  // If we already have a recently-verified admin session for this exact user,
-  // skip the DB profile query (saves a round-trip on every page navigation).
-  // Cache is valid for 30 minutes; a full re-check happens after that.
-  const CACHE_MS = 30 * 60 * 1000;
+  if (!session) { _removeOverlay(); clearAdminSession(); window.location.href = 'index.html'; return null; }
+
+  // Re-check cache validity now that we have the real user id from the session
   const cacheValid =
     stored?.isAdmin === true &&
     stored?.userId  === session.user.id &&
@@ -201,7 +220,7 @@ async function requireAdmin() {
     // Full DB check — only needed on first login or after cache expires
     let profile;
     try {
-      const profileFetch = supa.from('profiles')
+      const profileFetch   = supa.from('profiles')
         .select('first_name, last_name, is_admin')
         .eq('id', session.user.id)
         .single();
@@ -210,7 +229,7 @@ async function requireAdmin() {
       profile = data;
     } catch(e) {}
 
-    if (!profile?.is_admin) { clearAdminSession(); window.location.href = 'index.html'; return null; }
+    if (!profile?.is_admin) { _removeOverlay(); clearAdminSession(); window.location.href = 'index.html'; return null; }
 
     adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
     setAdminSession({
@@ -222,13 +241,8 @@ async function requireAdmin() {
     });
   }
 
-  authOverlay.remove();
-  const avatarEl = document.getElementById('adminUserAvatar');
-  const nameEl   = document.getElementById('adminUserName');
-  const nameTop  = document.getElementById('adminUserNameTop');
-  if (avatarEl) avatarEl.textContent = adminName.charAt(0).toUpperCase();
-  if (nameEl)   nameEl.textContent   = adminName;
-  if (nameTop)  nameTop.textContent  = adminName;
+  _removeOverlay();
+  _applyAdminUI(adminName);
   return { email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id };
 }
 
