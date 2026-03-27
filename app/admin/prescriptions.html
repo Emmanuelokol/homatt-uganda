@@ -23,34 +23,83 @@
     </div>
 
     <div class="admin-content">
-      <div class="admin-table-wrap">
-        <div class="table-header">
-          <div class="table-title">Pending Prescription Reviews</div>
-          <div class="table-filter">
-            <select id="filterVerified">
-              <option value="false">Pending Review</option>
-              <option value="true">Verified</option>
-              <option value="">All</option>
-            </select>
-          </div>
-        </div>
-        <table class="admin-table">
-          <thead>
-            <tr>
-              <th>Drug</th>
-              <th>Dosage / Form</th>
-              <th>Frequency</th>
-              <th>Duration</th>
-              <th>Doctor</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="rxTableBody">
-            <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
-          </tbody>
-        </table>
+
+      <!-- Tab bar -->
+      <div style="display:flex;gap:0;border-bottom:2px solid #F0F0F0;margin-bottom:20px">
+        <button class="rx-tab active" data-tab="verify" style="padding:10px 20px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:600;color:#1A73E8;border-bottom:2px solid #1A73E8;margin-bottom:-2px;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px">verified</span> Verification Queue
+        </button>
+        <button class="rx-tab" data-tab="followup" style="padding:10px 20px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:500;color:#5F6368;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:15px;vertical-align:-3px">notifications_active</span> Follow-up Alerts
+          <span id="followupBadge" style="display:none;background:#D32F2F;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px">0</span>
+        </button>
       </div>
+
+      <!-- Tab: Verification -->
+      <div id="tabVerify">
+        <div class="admin-table-wrap">
+          <div class="table-header">
+            <div class="table-title">Pending Prescription Reviews</div>
+            <div class="table-filter">
+              <select id="filterVerified">
+                <option value="false">Pending Review</option>
+                <option value="true">Verified</option>
+                <option value="">All</option>
+              </select>
+            </div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Drug</th>
+                <th>Dosage / Form</th>
+                <th>Frequency</th>
+                <th>Duration</th>
+                <th>Doctor</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rxTableBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Tab: Follow-up Alerts -->
+      <div id="tabFollowup" style="display:none">
+        <div class="admin-table-wrap">
+          <div class="table-header">
+            <div class="table-title">Medication Follow-up Alerts</div>
+            <div class="table-filter">
+              <select id="filterFollowupStatus">
+                <option value="escalated">Escalated / Unresponsive</option>
+                <option value="pending">Pending</option>
+                <option value="">All</option>
+              </select>
+            </div>
+          </div>
+          <div id="followupAlertBanner" style="display:none;background:#FFEBEE;border-left:4px solid #D32F2F;padding:12px 16px;border-radius:8px;margin-bottom:14px;font-size:13px;color:#C62828"></div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Medication</th>
+                <th>Follow-up Date</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Attempts</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="followupTableBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   </main>
 </div>
@@ -63,20 +112,45 @@
 <script>
 let supabase = null;
 let allRx = [];
+let allFollowups = [];
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Show demo data immediately so the page is never stuck on "Loading..."
   allRx = DEMO_RX;
+  allFollowups = DEMO_FOLLOWUPS;
   renderRx();
+  renderFollowups();
 
   buildAdminSidebar('prescriptions');
   const session = await requireAdmin();
   if (!session) return;
   supabase = adminSupa();
   setupAdminLogout();
-  await loadRx();
+  await Promise.all([loadRx(), loadFollowups()]);
   document.getElementById('filterVerified').addEventListener('change', renderRx);
+  document.getElementById('filterFollowupStatus').addEventListener('change', renderFollowups);
+
+  // Tab switching
+  document.querySelectorAll('.rx-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.rx-tab').forEach(b => {
+        b.style.color = '#5F6368'; b.style.fontWeight = '500'; b.style.borderBottom = 'none';
+      });
+      btn.style.color = '#1A73E8'; btn.style.fontWeight = '600';
+      btn.style.borderBottom = '2px solid #1A73E8'; btn.style.marginBottom = '-2px';
+      const tab = btn.dataset.tab;
+      document.getElementById('tabVerify').style.display  = tab === 'verify'   ? '' : 'none';
+      document.getElementById('tabFollowup').style.display = tab === 'followup' ? '' : 'none';
+    });
+  });
 });
+
+const DEMO_FOLLOWUPS = [
+  { id:'fu1', patient_name:'Ssempa Robert',  patient_phone:'0772100011', medication_summary:'Amlodipine 5mg — 30 days', follow_up_date: new Date(Date.now()-86400000).toISOString().split('T')[0], follow_up_type:'week_1',    status:'escalated', attempts:3, max_attempts:3, admin_acknowledged:false, created_at: new Date(Date.now()-8*86400000).toISOString() },
+  { id:'fu2', patient_name:'Nakato Brenda',   patient_phone:'0752200022', medication_summary:'Coartem 20/120mg — 3 days',  follow_up_date: new Date(Date.now()-172800000).toISOString().split('T')[0], follow_up_type:'mid_course', status:'escalated', attempts:3, max_attempts:3, admin_acknowledged:false, created_at: new Date(Date.now()-5*86400000).toISOString() },
+  { id:'fu3', patient_name:'Mubiru John',     patient_phone:'0700300033', medication_summary:'Amoxicillin 500mg — 7 days', follow_up_date: new Date(Date.now()+86400000).toISOString().split('T')[0], follow_up_type:'end_course', status:'pending',   attempts:1, max_attempts:3, admin_acknowledged:false, created_at: new Date(Date.now()-6*86400000).toISOString() },
+  { id:'fu4', patient_name:'Namutebi Agnes',  patient_phone:'0783777888', medication_summary:'Metformin 500mg — 30 days',  follow_up_date: new Date().toISOString().split('T')[0],                  follow_up_type:'week_2',    status:'pending',   attempts:2, max_attempts:3, admin_acknowledged:false, created_at: new Date(Date.now()-14*86400000).toISOString() },
+];
 
 const DEMO_RX = [
   { id:'rx1', drug_name:'Amoxicillin 500mg', dosage:'500mg', drug_form:'Capsule', frequency:'three_times', start_date: new Date().toISOString(), end_date: new Date(Date.now()+7*86400000).toISOString(), prescribing_doctor:'Dr. Namukasa', admin_verified:false, profiles:{ first_name:'Ssempa', last_name:'Robert' }, created_at: new Date(Date.now()-3600000).toISOString() },
@@ -152,10 +226,125 @@ function renderRx() {
 }
 
 async function verifyRx(rxId, verified) {
+  if (!supabase) { showAdminToast('Demo mode — cannot update', 'default'); return; }
   const { error } = await supabase.from('prescriptions').update({ admin_verified: verified }).eq('id', rxId);
   if (error) { showAdminToast('Failed to update', 'error'); return; }
   await loadRx();
   showAdminToast(verified ? 'Prescription verified!' : 'Verification removed', verified ? 'success' : 'default');
+}
+
+/* ─── Follow-up alerts ─── */
+async function loadFollowups() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo || !supabase) { allFollowups = DEMO_FOLLOWUPS; renderFollowups(); return; }
+  try {
+    const { data, error } = await Promise.race([
+      supabase.from('medication_followups')
+        .select('id,prescription_id,patient_name,patient_phone,medication_summary,follow_up_date,follow_up_type,status,attempts,max_attempts,admin_acknowledged,admin_acknowledged_at,escalated_at,patient_response,created_at')
+        .order('follow_up_date', { ascending: true })
+        .limit(100),
+      new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+    ]);
+    if (error) throw error;
+    allFollowups = (data && data.length) ? data : DEMO_FOLLOWUPS;
+  } catch(e) {
+    console.error('loadFollowups failed:', e);
+    allFollowups = DEMO_FOLLOWUPS;
+  }
+  renderFollowups();
+}
+
+function renderFollowups() {
+  const filter = document.getElementById('filterFollowupStatus')?.value ?? 'escalated';
+  const filtered = filter === '' ? allFollowups : allFollowups.filter(f => f.status === filter);
+
+  const tbody = document.getElementById('followupTableBody');
+  if (!tbody) return;
+
+  // Count unacknowledged escalations for badge
+  const escalatedCount = allFollowups.filter(f => f.status === 'escalated' && !f.admin_acknowledged).length;
+  const badge = document.getElementById('followupBadge');
+  if (badge) {
+    badge.style.display = escalatedCount > 0 ? 'inline' : 'none';
+    badge.textContent = escalatedCount;
+  }
+
+  const alertBanner = document.getElementById('followupAlertBanner');
+  if (alertBanner && escalatedCount > 0) {
+    alertBanner.style.display = 'block';
+    alertBanner.innerHTML = `<strong>⚠ ${escalatedCount} patient${escalatedCount>1?'s':''} unresponsive to medication follow-up.</strong> Please review and contact directly or escalate to a clinician.`;
+  } else if (alertBanner) {
+    alertBanner.style.display = 'none';
+  }
+
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No follow-ups found</td></tr>';
+    return;
+  }
+
+  const typeLabel = {
+    mid_course:'Mid-course', end_course:'End of course', week_1:'Week 1',
+    week_2:'Week 2', month_1:'Month 1', month_2:'Month 2',
+  };
+  const today = new Date().toISOString().split('T')[0];
+
+  tbody.innerHTML = filtered.map(f => {
+    const isOverdue = f.follow_up_date < today && f.status !== 'responded';
+    const statusColor = f.status === 'escalated' ? 'urgent' : f.status === 'responded' ? 'completed' : 'pending';
+    return `<tr style="${isOverdue && f.status!=='responded' ? 'background:#FFF5F5' : ''}">
+      <td>
+        <div style="font-weight:600">${f.patient_name || '—'}</div>
+        ${f.patient_phone ? `<div style="font-size:11px;color:#9AA0A6">${f.patient_phone}</div>` : ''}
+      </td>
+      <td style="font-size:12px;max-width:180px">${f.medication_summary || '—'}</td>
+      <td style="font-size:12px${isOverdue&&f.status!=='responded'?';color:#D32F2F;font-weight:700':''}">${fmtFollowupDate(f.follow_up_date)}</td>
+      <td style="font-size:12px">${typeLabel[f.follow_up_type] || f.follow_up_type || '—'}</td>
+      <td><span class="status-badge ${statusColor}">${f.status || 'pending'}</span></td>
+      <td style="font-size:12px">${f.attempts || 0}/${f.max_attempts || 3}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        ${f.status === 'escalated' && !f.admin_acknowledged
+          ? `<button class="btn-admin success sm" onclick="acknowledgeFollowup('${f.id}')">
+               <span class="material-icons-outlined" style="font-size:13px">check</span> Acknowledge
+             </button>`
+          : ''}
+        ${f.patient_phone
+          ? `<a href="tel:${f.patient_phone}" class="btn-admin info sm" style="text-decoration:none">
+               <span class="material-icons-outlined" style="font-size:13px">phone</span>
+             </a>`
+          : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function fmtFollowupDate(d) {
+  if (!d) return '—';
+  const date = new Date(d);
+  const today = new Date();
+  const diffDays = Math.round((date - today) / 86400000);
+  const label = new Date(d).toLocaleDateString('en-UG', { day:'numeric', month:'short' });
+  if (diffDays < -1) return `${label} <span style="color:#D32F2F;font-size:11px">(${Math.abs(diffDays)}d overdue)</span>`;
+  if (diffDays === 0) return `${label} <span style="color:#E65100;font-size:11px">(today)</span>`;
+  if (diffDays === 1) return `${label} <span style="color:#F9A825;font-size:11px">(tomorrow)</span>`;
+  return label;
+}
+
+async function acknowledgeFollowup(id) {
+  if (!supabase) {
+    // Demo mode
+    const f = allFollowups.find(x => x.id === id);
+    if (f) { f.admin_acknowledged = true; f.admin_acknowledged_at = new Date().toISOString(); }
+    renderFollowups();
+    showAdminToast('Acknowledged (demo)', 'success');
+    return;
+  }
+  const { error } = await supabase.from('medication_followups').update({
+    admin_acknowledged: true,
+    admin_acknowledged_at: new Date().toISOString(),
+  }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadFollowups();
+  showAdminToast('Follow-up acknowledged', 'success');
 }
 </script>
 </body>

@@ -84,11 +84,53 @@
 <script src="../js/config.js"></script>
 <script src="js/admin.js"></script>
 <script>
+const DEMO_TERMS = `Terms of Service — Homatt Health Uganda
+
+1. ACCEPTANCE OF TERMS
+By using the Homatt Health application, you agree to these Terms of Service.
+
+2. SERVICES
+Homatt Health provides telemedicine, clinic booking, pharmacy delivery, and health monitoring services in Uganda.
+
+3. MEDICAL DISCLAIMER
+Services on this platform do not replace professional medical advice. Always consult a qualified healthcare provider for medical decisions.
+
+4. USER OBLIGATIONS
+You agree to provide accurate health information and not misuse the platform.
+
+5. PRIVACY
+Your personal health data is protected under our Privacy Policy and applicable Ugandan data protection laws.
+
+6. PAYMENTS
+All payments are processed securely. Refunds are processed within 24–48 hours for eligible cancellations.
+
+7. CONTACT
+For support, contact: support@homatt.ug | +256 800 000 000`;
+
+const DEMO_PRIVACY = `Privacy Policy — Homatt Health Uganda
+
+We collect health information, location data, and contact details to provide our services.
+
+DATA COLLECTED: Name, phone, symptoms, booking history, and location (for delivery).
+
+DATA USE: We use your data to match you with clinics, process bookings, deliver medicines, and improve care quality.
+
+DATA SHARING: We share data only with your consented healthcare providers. We never sell your data.
+
+SECURITY: All data is encrypted and stored securely on Supabase (EU-Central region).
+
+YOUR RIGHTS: You may request data deletion at any time by contacting support@homatt.ug.
+
+Last updated: ${new Date().toLocaleDateString('en-UG', {year:'numeric',month:'long',day:'numeric'})}`;
+
 let supabase = null;
 document.addEventListener('DOMContentLoaded', async () => {
-  // Set initial state immediately so the page is never stuck on "Loading..."
-  document.getElementById('termsUpdated').textContent = 'Not saved yet';
-  document.getElementById('privacyUpdated').textContent = 'Not saved yet';
+  // Pre-populate with demo content immediately so the page is never stuck
+  document.getElementById('termsTitle').value = 'Terms of Service';
+  document.getElementById('termsContent').value = DEMO_TERMS;
+  document.getElementById('privacyContent').value = DEMO_PRIVACY;
+  document.getElementById('termsUpdated').textContent = 'Demo content — loading live data…';
+  document.getElementById('privacyUpdated').textContent = 'Demo content — loading live data…';
 
   buildAdminSidebar('terms');
   const session = await requireAdmin();

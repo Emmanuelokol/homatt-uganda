@@ -98,8 +98,10 @@ let supabase = null;
 const DEMO_EMERGENCY = `Emergency Contacts — Uganda\n\nNational Ambulance: 0800 999 000 (toll-free)\nPolice: 999 / 112\nFire & Rescue: 0800 199 699\nUganda Red Cross: +256 41 4258700\nMulago National Referral Hospital: +256 41 4532 201\nUganda Cancer Institute: +256 41 4534 516`;
 
 document.addEventListener('DOMContentLoaded', async () => {
-  // Show default content immediately so the page is never stuck on "Loading..."
-  document.getElementById('emergencyUpdated').textContent = 'Loading content…';
+  // Show demo content immediately so the page is never stuck
+  document.getElementById('emergencyContent').value = DEMO_EMERGENCY;
+  document.getElementById('emergencyPreview').textContent = DEMO_EMERGENCY;
+  document.getElementById('emergencyUpdated').textContent = 'Demo content — loading live data…';
 
   buildAdminSidebar('emergency');
   const session = await requireAdmin();

@@ -84,6 +84,10 @@ let allRiders = [];
 let activeRiderId = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allRiders = DEMO_RIDERS;
+  renderRiders();
+
   buildAdminSidebar('riders');
   const session = await requireAdmin();
   if (!session) return;
