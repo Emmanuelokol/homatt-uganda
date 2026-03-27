@@ -646,9 +646,120 @@ body {
   to { transform: rotate(360deg); }
 }
 
-/* ---- Responsive ---- */
+/* ════════════════════════════════
+   Mobile / Phone — Hamburger Nav
+   ════════════════════════════════ */
+
+/* Hamburger button — hidden on desktop, visible on mobile */
+.sidebar-hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  background: none; border: none; cursor: pointer;
+  color: var(--admin-text); border-radius: 8px;
+  flex-shrink: 0;
+}
+.sidebar-hamburger:hover { background: #F0F0F0; }
+.sidebar-hamburger .material-icons-outlined { font-size: 24px; }
+
+/* Overlay that appears behind the open sidebar on mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 99;
+}
+.sidebar-overlay.active { display: block; }
+
 @media (max-width: 768px) {
-  .admin-sidebar { width: 0; overflow: hidden; }
+  /* Sidebar: slide in/out from left */
+  .admin-sidebar {
+    width: 260px;
+    transform: translateX(-100%);
+    transition: transform 0.26s ease;
+  }
+  .admin-sidebar.open {
+    transform: translateX(0);
+  }
+
+  /* Main content fills full width */
   .admin-main { margin-left: 0; }
+
+  /* Show hamburger, topbar shrinks */
+  .sidebar-hamburger { display: flex; }
+
+  .admin-topbar {
+    padding: 10px 14px;
+    gap: 8px;
+  }
+  .admin-topbar-title {
+    font-size: 15px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    min-width: 0;
+  }
+  .admin-topbar-right {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  /* Hide search inputs on mobile topbar to save space */
+  .admin-topbar-right input[type="text"] {
+    display: none;
+  }
+
+  /* Stats grid: 2 columns on phone */
   .stats-grid { grid-template-columns: 1fr 1fr; }
+
+  /* Admin content: tighter padding */
+  .admin-content { padding: 14px; }
+
+  /* Tables: allow horizontal scroll */
+  .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .admin-table { min-width: 560px; }
+
+  /* Table header: stack on mobile */
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+  .table-filter {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .table-filter select,
+  .table-filter input { flex: 1; min-width: 0; }
+
+  /* Login card: full width */
+  .admin-login-card {
+    width: calc(100vw - 32px);
+    padding: 28px 20px;
+  }
+
+  /* Modal: full screen on mobile */
+  .admin-modal-overlay { padding: 0; align-items: flex-end; }
+  .admin-modal {
+    max-width: 100%;
+    width: 100%;
+    border-radius: 16px 16px 0 0;
+    max-height: 92vh;
+  }
+
+  /* KPI row stacks */
+  .admin-kpi-row { flex-direction: column !important; }
+  .admin-kpi-card { min-width: unset !important; }
+
+  /* Buttons: ensure tap targets */
+  .btn-admin { min-height: 36px; }
+
+  /* Form groups */
+  .admin-form-group input,
+  .admin-form-group select,
+  .admin-form-group textarea {
+    font-size: 16px !important; /* prevent iOS zoom on focus */
+  }
 }

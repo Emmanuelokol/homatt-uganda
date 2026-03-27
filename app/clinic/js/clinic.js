@@ -55,7 +55,44 @@ function requireClinic() {
   return s;
 }
 
+function setupClinicMobileNav() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const topbar  = document.querySelector('.admin-topbar');
+  if (!sidebar || !topbar) return;
+
+  // Inject hamburger into topbar
+  if (!topbar.querySelector('.sidebar-hamburger')) {
+    const burger = document.createElement('button');
+    burger.className = 'sidebar-hamburger';
+    burger.innerHTML = '<span class="material-icons-outlined">menu</span>';
+    burger.setAttribute('aria-label', 'Open navigation menu');
+    topbar.insertBefore(burger, topbar.firstChild);
+  }
+
+  // Inject overlay
+  if (!document.getElementById('_sidebarOverlay')) {
+    const overlay = document.createElement('div');
+    overlay.id = '_sidebarOverlay';
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  const toggle = (open) => {
+    sidebar.classList.toggle('open', open);
+    document.getElementById('_sidebarOverlay').classList.toggle('active', open);
+  };
+
+  topbar.querySelector('.sidebar-hamburger').onclick = () => toggle(!sidebar.classList.contains('open'));
+  document.getElementById('_sidebarOverlay').onclick = () => toggle(false);
+  sidebar.querySelectorAll('.sidebar-link').forEach(l =>
+    l.addEventListener('click', () => { if (window.innerWidth <= 768) toggle(false); })
+  );
+}
+
 function setupClinicLogout() {
+  // Setup mobile nav (called from every portal page after DOMContentLoaded)
+  setupClinicMobileNav();
+
   document.getElementById('clinicLogoutBtn')?.addEventListener('click', async () => {
     // Sign out of Supabase auth so the session token is invalidated
     const cfg = window.HOMATT_CONFIG || {};

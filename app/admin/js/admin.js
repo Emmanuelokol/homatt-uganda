@@ -102,6 +102,46 @@ function buildAdminSidebar(activePage) {
         <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
       </button>
     </div>`;
+
+  // ── Mobile hamburger + overlay ──
+  // Inject hamburger button into topbar
+  const topbar = document.querySelector('.admin-topbar');
+  if (topbar && !topbar.querySelector('.sidebar-hamburger')) {
+    const burger = document.createElement('button');
+    burger.className = 'sidebar-hamburger';
+    burger.innerHTML = '<span class="material-icons-outlined">menu</span>';
+    burger.setAttribute('aria-label', 'Open navigation menu');
+    topbar.insertBefore(burger, topbar.firstChild);
+  }
+
+  // Inject overlay
+  if (!document.getElementById('_sidebarOverlay')) {
+    const overlay = document.createElement('div');
+    overlay.id = '_sidebarOverlay';
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  // Toggle sidebar open/close
+  function toggleSidebar(open) {
+    el.classList.toggle('open', open);
+    document.getElementById('_sidebarOverlay').classList.toggle('active', open);
+  }
+
+  // Hamburger click
+  const burger = document.querySelector('.sidebar-hamburger');
+  if (burger) burger.onclick = () => toggleSidebar(!el.classList.contains('open'));
+
+  // Overlay click closes sidebar
+  const overlay = document.getElementById('_sidebarOverlay');
+  if (overlay) overlay.onclick = () => toggleSidebar(false);
+
+  // Close sidebar when any nav link is tapped on mobile
+  el.querySelectorAll('.sidebar-link').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 768) toggleSidebar(false);
+    });
+  });
 }
 
 /* ── Admin auth guard ── */
