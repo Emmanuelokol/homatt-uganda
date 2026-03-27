@@ -291,8 +291,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('emergencyBtn').addEventListener('click', async () => {
     openSheet(emergencySheet);
     const bodyEl = document.getElementById('emergencySheetBody');
+    bodyEl.innerHTML = '<div style="text-align:center;padding:30px"><span class="material-icons-outlined" style="font-size:28px;color:var(--text-hint);animation:spin 1s linear infinite">refresh</span></div>';
 
-    const { data } = await supabase.from('site_content').select('content').eq('key', 'emergency').single();
+    const { data } = await Promise.race([
+      supabase.from('site_content').select('content').eq('key', 'emergency').single(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+    ]).catch(() => ({ data: null }));
+
     if (data && data.content) {
       bodyEl.innerHTML = `
         <div style="background:#FFEBEE;border-radius:var(--radius-md);padding:14px;margin-bottom:16px;border-left:4px solid #D32F2F">
@@ -317,8 +322,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('termsBtn').addEventListener('click', async () => {
     openSheet(termsSheet);
     const bodyEl = document.getElementById('termsSheetBody');
+    bodyEl.innerHTML = '<div style="text-align:center;padding:30px"><span class="material-icons-outlined" style="font-size:28px;color:var(--text-hint);animation:spin 1s linear infinite">refresh</span></div>';
 
-    const { data } = await supabase.from('site_content').select('title,content,updated_at').eq('key', 'terms').single();
+    const { data } = await Promise.race([
+      supabase.from('site_content').select('title,content,updated_at').eq('key', 'terms').single(),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 6000)),
+    ]).catch(() => ({ data: null }));
+
     if (data) {
       const updatedDate = data.updated_at ? new Date(data.updated_at).toLocaleDateString('en-UG', {year:'numeric',month:'long',day:'numeric'}) : '';
       bodyEl.innerHTML = `

@@ -172,13 +172,10 @@ async function requireAdmin() {
     return stored;
   }
 
-  // All non-demo sessions MUST validate against Supabase auth every time.
-  // This prevents localStorage manipulation — a manually crafted localStorage
-  // entry with {isAdmin:true} will fail here because Supabase won't have a
-  // matching live session token.
   const supa = adminSupa();
   if (!supa) { window.location.href = 'index.html'; return null; }
 
+  // Verify the live Supabase session (uses cached token — fast)
   let session;
   try {
     const sessionFetch = supa.auth.getSession();
@@ -188,21 +185,42 @@ async function requireAdmin() {
   } catch(e) { console.warn('requireAdmin: getSession failed/timed out', e); }
   if (!session) { clearAdminSession(); window.location.href = 'index.html'; return null; }
 
-  let profile;
-  try {
-    const profileFetch = supa.from('profiles')
-      .select('first_name, last_name, is_admin')
-      .eq('id', session.user.id)
-      .single();
-    const profileTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
-    const { data } = await Promise.race([profileFetch, profileTimeout]);
-    profile = data;
-  } catch(e) {}
+  // If we already have a recently-verified admin session for this exact user,
+  // skip the DB profile query (saves a round-trip on every page navigation).
+  // Cache is valid for 30 minutes; a full re-check happens after that.
+  const CACHE_MS = 30 * 60 * 1000;
+  const cacheValid =
+    stored?.isAdmin === true &&
+    stored?.userId  === session.user.id &&
+    stored?.verifiedAt && (Date.now() - stored.verifiedAt) < CACHE_MS;
 
-  if (!profile?.is_admin) { clearAdminSession(); window.location.href = 'index.html'; return null; }
+  let adminName;
+  if (cacheValid) {
+    adminName = stored.name || 'Admin';
+  } else {
+    // Full DB check — only needed on first login or after cache expires
+    let profile;
+    try {
+      const profileFetch = supa.from('profiles')
+        .select('first_name, last_name, is_admin')
+        .eq('id', session.user.id)
+        .single();
+      const profileTimeout = new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 8000));
+      const { data } = await Promise.race([profileFetch, profileTimeout]);
+      profile = data;
+    } catch(e) {}
 
-  const adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
-  setAdminSession({ email: session.user.email, name: adminName, isAdmin: true, userId: session.user.id });
+    if (!profile?.is_admin) { clearAdminSession(); window.location.href = 'index.html'; return null; }
+
+    adminName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || 'Admin';
+    setAdminSession({
+      email: session.user.email,
+      name: adminName,
+      isAdmin: true,
+      userId: session.user.id,
+      verifiedAt: Date.now(),
+    });
+  }
 
   authOverlay.remove();
   const avatarEl = document.getElementById('adminUserAvatar');

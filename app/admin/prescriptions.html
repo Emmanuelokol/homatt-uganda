@@ -164,7 +164,7 @@ async function loadRx() {
   try {
     const fetchPromise = supabase
       .from('prescriptions')
-      .select('id,user_id,drug_name,manufacturer,dosage,drug_form,frequency,start_date,end_date,prescribing_doctor,admin_verified,created_at')
+      .select('id,user_id,drug_name,manufacturer,dosage,drug_form,frequency,start_date,end_date,prescribing_doctor,admin_verified,created_at,profiles(first_name,last_name)')
       .order('created_at', { ascending: false });
     const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
