@@ -262,6 +262,10 @@
           <span class="material-icons-outlined">shield</span>
           Prevention
         </button>
+        <button class="tracker-tab" data-tab="patterns">
+          <span class="material-icons-outlined">psychology</span>
+          Patterns
+        </button>
       </div>
 
       <!-- ===== LOG TAB ===== -->
@@ -421,6 +425,99 @@
 
       </div>
 
+      <!-- ===== PATTERNS TAB ===== -->
+      <div class="tracker-tab-pane" id="panePatterns">
+
+        <!-- CTA state -->
+        <div class="pattern-cta" id="patternCta">
+          <div class="pattern-cta-icon" style="background:#FBE9E7">
+            <span class="material-icons-outlined" style="color:#E65100">psychology</span>
+          </div>
+          <h3>Analyse Your Malaria Risk Patterns</h3>
+          <p>Our AI reviews your symptom history to detect recurring high-risk episodes, seasonal trends, and whether you may need urgent testing or preventive action.</p>
+          <button class="analyze-btn" id="analyzeBtn" style="background:#E65100;box-shadow:0 4px 12px rgba(230,81,0,0.3)">
+            <span class="material-icons-outlined">psychology</span>
+            Analyse Patterns
+          </button>
+        </div>
+
+        <!-- Loading state -->
+        <div class="ai-loading" id="aiLoading">
+          <div class="ai-pulse-rings">
+            <div class="ai-pulse-ring"></div>
+            <div class="ai-pulse-ring"></div>
+            <div class="ai-pulse-ring"></div>
+            <div class="ai-pulse-center">
+              <span class="material-icons-outlined">psychology</span>
+            </div>
+          </div>
+          <p class="ai-loading-text">Analysing your symptom patterns…</p>
+        </div>
+
+        <!-- Results state -->
+        <div class="pattern-results" id="patternResults">
+
+          <!-- Risk stability badge -->
+          <div class="stability-row">
+            <span class="stability-badge green" id="stabilityBadge">
+              <span class="material-icons-outlined">check_circle</span>
+              <span id="stabilityLabel">Stable</span>
+            </span>
+            <span class="confidence-text" id="confidenceText">75% confidence</span>
+          </div>
+
+          <!-- Pattern summary -->
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined">summarize</span>
+              <h4>Pattern Summary</h4>
+            </div>
+            <p id="patternSummary"></p>
+          </div>
+
+          <!-- Trend interpretation -->
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined">trending_up</span>
+              <h4>Trend Analysis</h4>
+            </div>
+            <p id="trendInterpretation"></p>
+          </div>
+
+          <!-- Recommended next step -->
+          <div class="insight-card">
+            <div class="insight-card-header">
+              <span class="material-icons-outlined">task_alt</span>
+              <h4>Recommended Next Step</h4>
+            </div>
+            <p id="nextStep"></p>
+          </div>
+
+          <!-- Red flags (hidden when none) -->
+          <div class="red-flag-card hidden" id="redFlagCard">
+            <div class="red-flag-header">
+              <span class="material-icons-outlined">warning</span>
+              <h4>Warning Signs</h4>
+            </div>
+            <ul id="redFlagsList"></ul>
+          </div>
+
+          <!-- Clarifying data needed (hidden when none) -->
+          <div class="clarify-card hidden" id="clarifyCard">
+            <p id="clarifyText"></p>
+          </div>
+
+          <p class="pattern-disclaimer">This analysis is for informational purposes only and does not replace professional medical advice. If you have a fever, seek testing within 24 hours.</p>
+
+          <button class="re-analyze-btn" id="reAnalyzeBtn">
+            <span class="material-icons-outlined">refresh</span>
+            Re-analyse
+          </button>
+
+        </div>
+
+      </div>
+
     </div>
 
     <!-- Bottom Navigation Bar -->
@@ -454,6 +551,8 @@
     'use strict';
 
     const STORAGE_KEY = 'homatt_malaria_logs';
+    const cfg = window.HOMATT_CONFIG || {};
+    const PROXY_URL = cfg.API_PROXY_URL || '';
 
     // ===== Helpers =====
     function showToast(msg) {
@@ -671,6 +770,186 @@
         `;
       }).join('');
     }
+
+    // ===== Pattern Analysis =====
+    async function callProxy(provider, prompt) {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      try {
+        const response = await fetch(PROXY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, prompt }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!response.ok) {
+          const errBody = await response.text().catch(() => '');
+          throw new Error(`HTTP ${response.status}: ${errBody.slice(0, 100)}`);
+        }
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        return data.text || '';
+      } catch (err) {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') throw new Error('Request timed out after 25s');
+        throw err;
+      }
+    }
+
+    async function callAI(prompt) {
+      if (!PROXY_URL) throw new Error('API_PROXY_URL not set in config.js');
+      const providers = ['gemini', 'groq', 'openai'];
+      const errors = [];
+      for (const provider of providers) {
+        try {
+          const text = await callProxy(provider, prompt);
+          if (text) return text;
+          errors.push(`${provider}: empty response`);
+        } catch (err) {
+          errors.push(`${provider}: ${err.message}`);
+        }
+      }
+      throw new Error(errors.join(' | '));
+    }
+
+    function parseAIResponse(text) {
+      try {
+        let cleaned = text.trim();
+        if (cleaned.startsWith('```')) cleaned = cleaned.replace(/^```[a-z]*\n?/, '').replace(/```$/, '').trim();
+        return JSON.parse(cleaned);
+      } catch (e) {
+        return {
+          pattern_summary: 'Could not parse the AI response. Please try again.',
+          trend_interpretation: '',
+          risk_level: 'green',
+          risk_label: 'Stable',
+          recommended_next_step: '',
+          red_flags: [],
+          clarifying_data_needed: null,
+          confidence: 50,
+        };
+      }
+    }
+
+    function buildMalariaPrompt(logs) {
+      const highRisk = logs.filter(l => l.level === 'high').length;
+      const medRisk = logs.filter(l => l.level === 'medium').length;
+      const avgScore = (logs.reduce((s, l) => s + (l.score || 0), 0) / logs.length).toFixed(0);
+
+      const symFreq = {};
+      logs.forEach(l => (l.symptoms || []).forEach(s => { symFreq[s] = (symFreq[s] || 0) + 1; }));
+
+      const logSummary = logs.map(l => ({
+        datetime: l.datetime,
+        symptoms: l.symptoms,
+        temp: l.temp,
+        score: l.score,
+        level: l.level,
+      }));
+
+      return `You are a preventive health pattern analyzer for Homatt Health, a mobile app in Uganda.
+
+Analyze this malaria symptom log history to detect patterns, recurring risk episodes, and provide actionable guidance.
+
+Summary: ${logs.length} total logs, ${highRisk} high-risk episodes, ${medRisk} medium-risk episodes, avg risk score ${avgScore}/100
+Most frequent symptoms: ${Object.entries(symFreq).sort((a,b)=>b[1]-a[1]).map(([s,n])=>`${s}(${n}x)`).join(', ') || 'none'}
+
+Symptom logs (most recent first):
+${JSON.stringify(logSummary, null, 2)}
+
+Analysis rules:
+- NEVER diagnose or prescribe medication
+- Use non-diagnostic language ("pattern suggests", "may indicate", "worth discussing with a health worker")
+- Flag if high-risk episodes are recurring (≥2 high-risk logs): suggest RDT testing at nearest health facility
+- Flag if fever is recurring: may indicate incomplete treatment or reinfection
+- Flag if episodes cluster within 30 days: suggest follow-up with health worker
+- Single or mild episodes with low score: note and encourage preventive measures
+- Risk levels: green=low/stable, yellow=monitor (recurring mild), orange=evaluation recommended (recurring medium/high), red=urgent (multiple high-risk recent episodes)
+- Context: This is Uganda — malaria is endemic. Always recommend ITN net use and prompt RDT testing for fever.
+
+Respond ONLY with valid JSON in exactly this format:
+{
+  "pattern_summary": "2-3 sentence overview of the symptom pattern",
+  "trend_interpretation": "What the trends mean with cautious language",
+  "risk_level": "green|yellow|orange|red",
+  "risk_label": "Stable|Monitor|Evaluation Recommended|Urgent",
+  "recommended_next_step": "Specific actionable advice for Uganda context",
+  "red_flags": ["flag1", "flag2"],
+  "clarifying_data_needed": "What additional data would improve analysis, or null",
+  "confidence": 75
+}`;
+    }
+
+    function displayPatternResults(result) {
+      document.getElementById('aiLoading').classList.remove('visible');
+      document.getElementById('patternResults').classList.add('visible');
+
+      const badge = document.getElementById('stabilityBadge');
+      badge.className = `stability-badge ${result.risk_level || 'green'}`;
+      const iconMap = { green: 'check_circle', yellow: 'watch_later', orange: 'report_problem', red: 'emergency' };
+      badge.querySelector('.material-icons-outlined').textContent = iconMap[result.risk_level] || 'check_circle';
+      document.getElementById('stabilityLabel').textContent = result.risk_label || 'Stable';
+      document.getElementById('confidenceText').textContent = `${result.confidence || 75}% confidence`;
+
+      document.getElementById('patternSummary').textContent = result.pattern_summary || '';
+      document.getElementById('trendInterpretation').textContent = result.trend_interpretation || '';
+      document.getElementById('nextStep').textContent = result.recommended_next_step || '';
+
+      const redFlagCard = document.getElementById('redFlagCard');
+      const redFlagsList = document.getElementById('redFlagsList');
+      if (result.red_flags && result.red_flags.length > 0) {
+        redFlagsList.innerHTML = result.red_flags.map(f => `<li>${f}</li>`).join('');
+        redFlagCard.classList.remove('hidden');
+      } else {
+        redFlagCard.classList.add('hidden');
+      }
+
+      const clarifyCard = document.getElementById('clarifyCard');
+      if (result.clarifying_data_needed) {
+        document.getElementById('clarifyText').textContent = result.clarifying_data_needed;
+        clarifyCard.classList.remove('hidden');
+      } else {
+        clarifyCard.classList.add('hidden');
+      }
+    }
+
+    async function runAnalysis() {
+      const patternCta = document.getElementById('patternCta');
+      const aiLoading = document.getElementById('aiLoading');
+      const patternResults = document.getElementById('patternResults');
+
+      patternCta.style.display = 'none';
+      aiLoading.classList.add('visible');
+      patternResults.classList.remove('visible');
+
+      const logs = getLogs();
+      if (!logs.length) {
+        aiLoading.classList.remove('visible');
+        patternCta.style.display = 'block';
+        showToast('No logs yet. Log your symptoms first.');
+        return;
+      }
+
+      const prompt = buildMalariaPrompt(logs);
+      try {
+        const text = await callAI(prompt);
+        const result = parseAIResponse(text);
+        displayPatternResults(result);
+      } catch (err) {
+        aiLoading.classList.remove('visible');
+        patternCta.style.display = 'block';
+        showToast('AI analysis unavailable. Please try again later.');
+        console.error('[Malaria Patterns]', err);
+      }
+    }
+
+    document.getElementById('analyzeBtn').addEventListener('click', runAnalysis);
+    document.getElementById('reAnalyzeBtn').addEventListener('click', () => {
+      document.getElementById('patternResults').classList.remove('visible');
+      document.getElementById('patternCta').style.display = 'block';
+      runAnalysis();
+    });
 
   })();
   </script>
