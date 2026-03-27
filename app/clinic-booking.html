@@ -274,12 +274,22 @@
           <div style="font-size:11px;color:#1565C0;margin-top:4px;opacity:.8">Valid 2 hours · Show at clinic reception</div>
         </div>
 
+        <!-- Expected payment at facility -->
+        <div id="expectedPayBox" style="display:none;width:100%;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius-md);padding:14px 18px;margin:10px 0;text-align:left">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#2E7D32;margin-bottom:4px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">price_check</span>
+            Expected Amount to Pay at Facility
+          </div>
+          <div id="expectedPayAmount" style="font-size:24px;font-weight:800;color:#1B5E20">—</div>
+          <div id="expectedPayLabel" style="font-size:11px;color:#2E7D32;margin-top:2px"></div>
+        </div>
+
         <!-- Discount badge -->
-        <div id="discountBadge" style="display:none;width:100%;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:8px;padding:10px 16px;margin-bottom:12px;align-items:center;gap:10px">
-          <span class="material-icons-outlined" style="color:#2E7D32;font-size:18px">discount</span>
+        <div id="discountBadge" style="display:none;width:100%;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 16px;margin-bottom:12px;align-items:center;gap:10px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:18px">discount</span>
           <div style="text-align:left">
-            <div style="font-size:13px;font-weight:600;color:#1B5E20">15% Probable Condition Discount Applied</div>
-            <div style="font-size:11px;color:#2E7D32">Discount applies if clinician confirms AI diagnosis</div>
+            <div style="font-size:13px;font-weight:600;color:#E65100">15% Probable Condition Discount Applied</div>
+            <div style="font-size:11px;color:#E65100">Discount applies if clinician confirms AI diagnosis</div>
           </div>
         </div>
 
@@ -317,7 +327,9 @@ const supa = (cfg.SUPABASE_URL && window.supabase)
 let booking = {
   urgency: null, patient: null, patientName: null,
   symptoms: null, duration: null, notes: null,
-  clinicId: null, clinicName: null, clinicScore: 0, clinicFee: null
+  clinicId: null, clinicName: null, clinicScore: 0, clinicFee: null,
+  matchedConditionFee: null,   // specific fee if AI condition matches clinic's list
+  matchedConditionName: null   // the condition name that was matched
 };
 let currentStep = 1;
 const STEPS = ['Select Urgency', 'Describe Symptoms', 'Choose Clinic', 'Confirm Booking'];
@@ -443,11 +455,26 @@ async function loadClinics() {
   const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
 
   let clinics = [];
+  let condFeesMap = {};   // { clinic_id: [{ condition_name, fee, notes }] }
   if (supa) {
     const { data } = await supa.from('clinics')
       .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified')
       .eq('active', true).order('quality_score', { ascending: false });
     clinics = data || [];
+
+    // Fetch condition-based fees for all active clinics in one query
+    if (clinics.length) {
+      const clinicIds = clinics.map(c => c.id);
+      const { data: feeRows } = await supa.from('clinic_condition_fees')
+        .select('clinic_id,condition_name,fee,notes')
+        .in('clinic_id', clinicIds);
+      if (feeRows) {
+        feeRows.forEach(r => {
+          if (!condFeesMap[r.clinic_id]) condFeesMap[r.clinic_id] = [];
+          condFeesMap[r.clinic_id].push(r);
+        });
+      }
+    }
   }
 
   if (!clinics.length) {
@@ -461,11 +488,34 @@ async function loadClinics() {
 
   // Score and rank all clinics by area match and quality
   const scored = clinics
-    .map(c => ({ ...c, score: scoreClinic(c, userDist, aiCond) }))
+    .map(c => {
+      // Find matched condition fee for this clinic
+      const fees = condFeesMap[c.id] || [];
+      let matchedFee = null, matchedCond = null;
+      if (aiCond && fees.length) {
+        const aiLower = aiCond.toLowerCase();
+        const match = fees.find(f => {
+          const fLower = f.condition_name.toLowerCase();
+          return fLower === aiLower || fLower.includes(aiLower) || aiLower.includes(fLower);
+        });
+        if (match) { matchedFee = match.fee; matchedCond = match.condition_name; }
+      }
+      return { ...c, score: scoreClinic(c, userDist, aiCond), condFees: fees, matchedFee, matchedCond };
+    })
     .sort((a, b) => b.score - a.score);
 
-  list.innerHTML = scored.map((c, idx) => `
-    <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0})">
+  list.innerHTML = scored.map((c, idx) => {
+    const displayFee = c.matchedFee != null ? c.matchedFee : c.consultation_fee;
+    const feeLabel = c.matchedCond
+      ? `<span class="clinic-fee-chip" title="Fee for ${c.matchedCond}">
+           <span class="material-icons-outlined" style="font-size:11px;vertical-align:middle">health_and_safety</span>
+           ${c.matchedCond}: ${fmtUGX(c.matchedFee)}
+         </span>`
+      : (c.consultation_fee ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>` : '');
+    const matchedFeeArg = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || 0);
+    const matchedCondArg = (c.matchedCond || '').replace(/'/g,"\\'");
+    return `
+    <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0},${matchedFeeArg},'${matchedCondArg}')">
       <div class="clinic-card-icon">
         <span class="material-icons-outlined" style="color:var(--primary);font-size:24px">local_hospital</span>
       </div>
@@ -473,13 +523,14 @@ async function loadClinics() {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <div class="clinic-card-name">${c.name}</div>
           ${idx===0 ? '<span class="clinic-best-badge">BEST MATCH</span>' : ''}
+          ${c.matchedCond ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.5px">PRICE KNOWN</span>' : ''}
         </div>
         <div class="clinic-card-meta">
           <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">location_on</span>
           ${c.address ? c.address+', ' : ''}${c.district||'Kampala'}
         </div>
         <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
-          ${c.consultation_fee ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>` : ''}
+          ${feeLabel}
           <span style="font-size:11px;color:var(--text-secondary)">Match: <strong>${c.score}%</strong></span>
           ${c.avg_wait_minutes ? `<span style="font-size:11px;color:var(--text-secondary)">~${c.avg_wait_minutes}m wait</span>` : ''}
         </div>
@@ -488,7 +539,8 @@ async function loadClinics() {
         </div>
       </div>
       <span class="material-icons-outlined" style="color:var(--border);flex-shrink:0">chevron_right</span>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   // Show AI context hint if from triage
   const locationHint = userDist ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>` : '';
@@ -500,11 +552,13 @@ async function loadClinics() {
   }
 }
 
-function selectClinic(id, name, score, fee) {
+function selectClinic(id, name, score, fee, matchedFee, matchedCond) {
   booking.clinicId   = id;
   booking.clinicName = name;
   booking.clinicScore = score || 0;
   booking.clinicFee  = fee || null;
+  booking.matchedConditionFee  = (matchedFee && matchedFee > 0) ? matchedFee : null;
+  booking.matchedConditionName = matchedCond || null;
   document.querySelectorAll('.clinic-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('clinic-' + id)?.classList.add('selected');
   document.getElementById('step3Btn').disabled = false;
@@ -516,6 +570,17 @@ function renderConfirm() {
   const confPct  = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
   const discount = confPct >= 75;
 
+  // Determine fee to display — use clinic's specific condition fee if matched, else general fee
+  const hasMatchedFee = booking.matchedConditionFee && booking.matchedConditionFee > 0;
+  const baseFee = hasMatchedFee ? booking.matchedConditionFee : booking.clinicFee;
+  const discountedFee = (baseFee && discount) ? Math.round(baseFee * 0.85) : baseFee;
+  const feeDisplay = baseFee
+    ? fmtUGX(discountedFee) + (discount ? ' <span style="color:#E65100;font-weight:700">(−15%)</span>' : '')
+    : '—';
+  const feeLabel = hasMatchedFee
+    ? `Pay at facility — ${booking.matchedConditionName}`
+    : 'Est. Consultation Fee';
+
   document.getElementById('confirmDetails').innerHTML = `
     <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:16px;margin-bottom:12px">
       ${[
@@ -525,7 +590,6 @@ function renderConfirm() {
         ['Duration', booking.duration ? booking.duration.replace(/-/g,' ') : '—'],
         ['Clinic',   booking.clinicName],
         ['Match',    booking.clinicScore + '% match score'],
-        ['Est. Fee', booking.clinicFee ? fmtUGX(booking.clinicFee) + (discount ? ' <span style="color:#E65100;font-weight:700">−15%</span>' : '') : '—'],
         ['Notes',    booking.notes || 'None'],
       ].map(([k,v]) => `
         <div class="booking-confirm-row">
@@ -533,6 +597,18 @@ function renderConfirm() {
           <span class="booking-confirm-value">${v||'—'}</span>
         </div>`).join('')}
     </div>
+
+    ${baseFee ? `
+    <div style="background:${hasMatchedFee?'#E8F5E9':'#F3F4F6'};border:${hasMatchedFee?'1.5px solid #A5D6A7':'1px solid #E0E0E0'};border-radius:var(--radius-md);padding:14px 16px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:${hasMatchedFee?'#2E7D32':'#5F6368'};margin-bottom:4px">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">${hasMatchedFee?'price_check':'payments'}</span>
+        ${feeLabel}
+      </div>
+      <div style="font-size:22px;font-weight:800;color:${hasMatchedFee?'#1B5E20':'var(--text-primary)'}">${feeDisplay}</div>
+      ${hasMatchedFee ? '<div style="font-size:11px;color:#2E7D32;margin-top:2px">This is the clinic\'s listed fee for this condition. Pay at the facility after your consultation.</div>'
+        : '<div style="font-size:11px;color:#5F6368;margin-top:2px">Estimated fee — confirm with clinic at reception.</div>'}
+    </div>` : ''}
+
     ${discount ? `
     <div class="discount-preview">
       <span class="material-icons-outlined" style="font-size:18px;color:#E65100">discount</span>
@@ -591,7 +667,7 @@ async function submitBooking() {
       discount_applied: discount,
       discount_pct:     discount ? 15 : 0,
       ai_confidence:    confPct || null,
-      ai_full_data:     Object.keys(triage).length ? triage : null,
+      ai_full_data:     Object.keys(triage).length ? { ...triage, matched_condition_fee: booking.matchedConditionFee || null, matched_condition_name: booking.matchedConditionName || null } : null,
     };
 
     const { data: inserted, error } = await supa.from('bookings').insert(payload).select('id').single();
@@ -623,6 +699,19 @@ async function submitBooking() {
   // Show success screen
   document.getElementById('bookingCodeDisplay').textContent = bookingCode;
   document.getElementById('pinDisplay').textContent = pinToken;
+
+  // Show expected payment
+  const hasMatchedFee = booking.matchedConditionFee && booking.matchedConditionFee > 0;
+  const baseFee = hasMatchedFee ? booking.matchedConditionFee : booking.clinicFee;
+  if (baseFee) {
+    const finalFee = (discount && baseFee) ? Math.round(baseFee * 0.85) : baseFee;
+    document.getElementById('expectedPayAmount').textContent = fmtUGX(finalFee);
+    document.getElementById('expectedPayLabel').textContent = hasMatchedFee
+      ? `For ${booking.matchedConditionName} consultation${discount ? ' (after 15% discount)' : ''}`
+      : `General consultation estimate${discount ? ' (after 15% discount)' : ''}`;
+    document.getElementById('expectedPayBox').style.display = 'block';
+  }
+
   if (discount) {
     const badge = document.getElementById('discountBadge');
     badge.style.display = 'flex';

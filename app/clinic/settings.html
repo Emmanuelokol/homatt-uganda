@@ -44,6 +44,14 @@
     .fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; }
     .fee-input { border:1px solid #E0E0E0; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:130px; text-align:right; }
 
+    /* Condition fee table */
+    .cond-fee-table { width:100%; border-collapse:collapse; }
+    .cond-fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+    .cond-fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
+    .cond-fee-empty { text-align:center; padding:24px; color:#9AA0A6; font-size:13px; }
+    .cond-badge { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
+    .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+
     .save-btn { background:#1B5E20; color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
     .save-btn:active { background:#154d18; }
     .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
@@ -170,6 +178,29 @@
         </div>
       </div>
 
+      <!-- Condition-Based Fees -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_atm</span> Condition-Based Fees (UGX)
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Add the diseases / conditions you treat and what each costs. Patients will see this fee when their AI diagnosis matches a condition you offer — so they know exactly what to expect before arriving.</span>
+        </div>
+        <table class="cond-fee-table">
+          <thead><tr><th>Condition / Disease</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="condFeeTableBody">
+            <tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button onclick="addCondFeeRow()" style="background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
+          <button onclick="populateFromSpecialties()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
+          </button>
+        </div>
+      </div>
+
       <!-- Consultation Fees -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -223,6 +254,8 @@ var _clinicId = null;
 var _supa = null;
 var currentSpecs = [];
 var currentFacilities = [];
+var condFeeData = [];      // { id (existing uuid|null), condition_name, fee, notes, _delete }
+var condFeeDbRows = [];    // original rows fetched from DB
 
 var DEFAULT_FEES = [
   { type:'General Consultation', fee:'', notes:'Standard OPD visit' },
@@ -265,6 +298,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Load existing data
   if (_supa && _clinicId) {
     await loadClinicProfile();
+    await loadCondFees();
   }
 });
 
@@ -425,6 +459,97 @@ async function loadClinicProfile() {
 
 function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : s; }
 
+/* ── Condition-Based Fees ── */
+async function loadCondFees() {
+  if (!_supa || !_clinicId) return;
+  var res = await _supa.from('clinic_condition_fees')
+    .select('id,condition_name,fee,notes')
+    .eq('clinic_id', _clinicId)
+    .order('created_at', { ascending: true });
+  condFeeDbRows = res.data || [];
+  condFeeData = condFeeDbRows.map(function(r) {
+    return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '', _delete: false };
+  });
+  renderCondFeeTable();
+}
+
+function renderCondFeeTable() {
+  var tbody = document.getElementById('condFeeTableBody');
+  var visible = condFeeData.filter(function(r){ return !r._delete; });
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = condFeeData.map(function(r, i) {
+    if (r._delete) return '';
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(r.condition_name) + '" oninput="condFeeData['+i+'].condition_name=this.value" placeholder="e.g. Malaria, Typhoid…"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (r.fee||'') + '" oninput="condFeeData['+i+'].fee=Number(this.value)" placeholder="Amount" min="0" style="width:130px"></td>' +
+      '<td><input class="fee-input" style="width:100%" value="' + escHtml(r.notes||'') + '" oninput="condFeeData['+i+'].notes=this.value" placeholder="e.g. Includes RDT test"></td>' +
+      '<td><button onclick="removeCondFee('+i+')" title="Remove" style="background:none;border:none;cursor:pointer;color:#D32F2F;font-size:18px;line-height:1;padding:0">×</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.addCondFeeRow = function() {
+  condFeeData.push({ id: null, condition_name: '', fee: '', notes: '', _delete: false });
+  renderCondFeeTable();
+  // Focus the new row's condition input
+  var rows = document.querySelectorAll('#condFeeTableBody tr');
+  var last = rows[rows.length - 1];
+  if (last) { var inp = last.querySelector('input'); if (inp) inp.focus(); }
+};
+
+window.removeCondFee = function(i) {
+  if (condFeeData[i].id) {
+    condFeeData[i]._delete = true; // mark for deletion from DB
+  } else {
+    condFeeData.splice(i, 1);
+  }
+  renderCondFeeTable();
+};
+
+window.populateFromSpecialties = function() {
+  var existing = condFeeData.filter(function(r){ return !r._delete; }).map(function(r){ return r.condition_name.toLowerCase(); });
+  var added = 0;
+  currentSpecs.forEach(function(spec) {
+    if (!existing.includes(spec.toLowerCase())) {
+      condFeeData.push({ id: null, condition_name: spec, fee: '', notes: '', _delete: false });
+      added++;
+    }
+  });
+  if (added) {
+    renderCondFeeTable();
+    showToast(added + ' condition(s) added from specialties', 'success');
+  } else {
+    showToast('All specialties already have fee entries', 'info');
+  }
+};
+
+async function saveCondFees() {
+  if (!_supa || !_clinicId) return;
+
+  // Delete marked rows
+  var toDelete = condFeeData.filter(function(r){ return r._delete && r.id; }).map(function(r){ return r.id; });
+  if (toDelete.length) {
+    await _supa.from('clinic_condition_fees').delete().in('id', toDelete);
+  }
+
+  // Upsert remaining rows that have a condition_name and fee
+  var toUpsert = condFeeData.filter(function(r){ return !r._delete && r.condition_name && (r.fee !== '' && r.fee !== null); }).map(function(r) {
+    var row = { clinic_id: _clinicId, condition_name: r.condition_name.trim(), fee: Number(r.fee), notes: r.notes || null, updated_at: new Date().toISOString() };
+    if (r.id) row.id = r.id;
+    return row;
+  });
+  if (toUpsert.length) {
+    await _supa.from('clinic_condition_fees').upsert(toUpsert, { onConflict: 'id' });
+  }
+}
+
 /* ── Save ── */
 async function saveSettings() {
   var btn = document.getElementById('saveSettingsBtn');
@@ -470,6 +595,12 @@ async function saveSettings() {
   }
 
   var { error } = await _supa.from('clinics').update(payload).eq('id', _clinicId);
+
+  if (!error) {
+    await saveCondFees();
+    // Reload condition fees to get fresh IDs from DB
+    await loadCondFees();
+  }
 
   btn.disabled = false;
   btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
