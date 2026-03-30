@@ -1568,6 +1568,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       clinic_urgency:    data.clinic_urgency || 'none',
       symptoms:          enteredSymptoms,
       timestamp:         new Date().toISOString(),
+      ai_conditions:     data.conditions || [],   // all up-to-3 diagnoses with percentages
     };
     localStorage.setItem('homatt_last_triage', JSON.stringify(triageCtx));
 

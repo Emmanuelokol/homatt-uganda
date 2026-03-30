@@ -201,6 +201,55 @@
         </div>
       </div>
 
+      <!-- Appointment & Booking Settings -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">event_available</span> Appointment &amp; Booking Settings
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Configure how patients schedule appointments. These settings control slot duration, capacity, and advance booking window shown to patients on the booking page.</span>
+        </div>
+        <div class="settings-grid">
+          <div class="form-row">
+            <label>Appointment Slot Duration</label>
+            <select id="sSlotDuration" class="form-input">
+              <option value="15">15 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30" selected>30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Max Patients Per Slot</label>
+            <input type="number" id="sMaxPerSlot" class="form-input" min="1" max="50" value="3" placeholder="e.g. 3">
+          </div>
+          <div class="form-row">
+            <label>Buffer Between Slots (minutes)</label>
+            <input type="number" id="sSlotBuffer" class="form-input" min="0" max="30" value="0" placeholder="e.g. 5">
+          </div>
+          <div class="form-row">
+            <label>Advance Booking Window (days)</label>
+            <input type="number" id="sBookingWindow" class="form-input" min="1" max="90" value="14" placeholder="e.g. 14">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:#1B5E20" checked>
+            Accept online appointment bookings from patients
+          </label>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:#1B5E20">
+            Auto-confirm bookings (no manual review needed)
+          </label>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
+        </div>
+      </div>
+
       <!-- Consultation Fees -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -455,6 +504,14 @@ async function loadClinicProfile() {
 
   // Hours
   buildHours(c.opening_hours || {});
+
+  // Appointment settings
+  if (c.slot_duration_minutes) document.getElementById('sSlotDuration').value = String(c.slot_duration_minutes);
+  if (c.max_per_slot != null) document.getElementById('sMaxPerSlot').value = c.max_per_slot;
+  if (c.slot_buffer_minutes != null) document.getElementById('sSlotBuffer').value = c.slot_buffer_minutes;
+  if (c.booking_window_days != null) document.getElementById('sBookingWindow').value = c.booking_window_days;
+  if (c.accepts_online_slots != null) document.getElementById('sAcceptsOnlineSlots').checked = !!c.accepts_online_slots;
+  if (c.auto_confirm_slots != null) document.getElementById('sAutoConfirmSlots').checked = !!c.auto_confirm_slots;
 }
 
 function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : s; }
@@ -582,6 +639,12 @@ async function saveSettings() {
     services: services.length ? services : null,
     consultation_fee: generalFee ? Number(generalFee.fee) : null,
     opening_hours: getHours(),
+    slot_duration_minutes: parseInt(document.getElementById('sSlotDuration').value) || 30,
+    max_per_slot: parseInt(document.getElementById('sMaxPerSlot').value) || 3,
+    slot_buffer_minutes: parseInt(document.getElementById('sSlotBuffer').value) || 0,
+    booking_window_days: parseInt(document.getElementById('sBookingWindow').value) || 14,
+    accepts_online_slots: document.getElementById('sAcceptsOnlineSlots').checked,
+    auto_confirm_slots: document.getElementById('sAutoConfirmSlots').checked,
     updated_at: new Date().toISOString()
   };
 
