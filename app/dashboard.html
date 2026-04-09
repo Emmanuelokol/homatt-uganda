@@ -113,9 +113,9 @@
           <div style="font-size:12px;color:#5F6368;margin-bottom:12px">
             You reported feeling worse after your last dose. Our records have been flagged and we strongly recommend you see a doctor as soon as possible.
           </div>
-          <button onclick="window.location.href='clinic-booking.html'" style="width:100%;padding:12px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-            <span class="material-icons-outlined" style="font-size:16px">directions</span>
-            Book Nearest Clinic Now
+          <button onclick="window.location.href='symptom-checker.html'" style="width:100%;padding:12px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">stethoscope</span>
+            Check Symptoms &amp; Find Clinic
           </button>
         </div>
 
@@ -170,20 +170,26 @@
         <!-- Health Services -->
         <div class="dash-section">
           <h3 class="section-title">Health Services</h3>
-          <div class="feature-grid" style="grid-template-columns:1fr 1fr">
-            <div class="feature-card" onclick="window.location.href='clinic-booking.html'" style="cursor:pointer;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
-              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
-                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_hospital</span>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div onclick="window.location.href='symptom-checker.html'" style="cursor:pointer;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+              <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px;color:#fff">stethoscope</span>
               </div>
-              <span style="font-size:13px;font-weight:700;color:#fff">Book Clinic</span>
-              <span style="font-size:11px;opacity:.8;color:#fff">Visit a nearby clinic</span>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;color:#fff">Check Symptoms &amp; Book Clinic</div>
+                <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">AI assessment → nearest clinics with prices</div>
+              </div>
+              <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
             </div>
-            <div class="feature-card" onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;flex-direction:column;align-items:flex-start;gap:8px">
-              <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center">
-                <span class="material-icons-outlined" style="font-size:24px;color:#fff">local_pharmacy</span>
+            <div onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+              <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px;color:#fff">local_pharmacy</span>
               </div>
-              <span style="font-size:13px;font-weight:700;color:#fff">Order Medicines</span>
-              <span style="font-size:11px;opacity:.8;color:#fff">Home delivery</span>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;color:#fff">Order Medicines</div>
+                <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">Home delivery to your door</div>
+              </div>
+              <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
             </div>
           </div>
         </div>

@@ -1711,232 +1711,396 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
   }
 
-  // ====== Clinic Booking Modal ======
-  function openClinicBookingModal(data) {
+  // ====== Haversine distance (km) between two lat/lng points ======
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Get user GPS coords — returns {lat, lng} or null
+  async function getUserCoords() {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        ()  => resolve(null),
+        { timeout: 6000, maximumAge: 300000 }
+      );
+    });
+  }
+
+  // ====== Clinic Booking — Full Screen Modal ======
+  async function openClinicBookingModal(diagData) {
     localStorage.setItem('homatt_clinic_reason', JSON.stringify({
-      condition: data.conditions[0]?.name || 'Health Check',
-      urgency: data.clinic_urgency || data.overall_risk,
-      symptoms: data.symptoms_identified,
+      condition: diagData.conditions[0]?.name || 'Health Check',
+      urgency: diagData.clinic_urgency || diagData.overall_risk,
+      symptoms: diagData.symptoms_identified,
     }));
 
-    // Remove existing modal if present
     const existing = document.getElementById('clinicBookingModal');
     if (existing) existing.remove();
 
     const modal = document.createElement('div');
     modal.id = 'clinicBookingModal';
-    modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:flex-end';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:flex-end';
+
+    const topConditionName = diagData.conditions[0]?.name || 'Health Check';
+    const urgencyColor = diagData.overall_risk === 'high' ? '#C62828' :
+                         diagData.overall_risk === 'medium' ? '#E65100' : '#1B5E20';
 
     modal.innerHTML = `
-      <div id="clinicBookingInner" style="background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-height:80vh;overflow-y:auto;box-sizing:border-box">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <h3 style="font-size:18px;font-weight:700;color:#111">Book a Clinic Visit</h3>
-          <button id="closeBookingModal" style="background:none;border:none;cursor:pointer;padding:4px">
-            <span class="material-icons-outlined" style="font-size:24px;color:#666">close</span>
-          </button>
-        </div>
-
-        <div style="margin-bottom:16px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
-          <input id="bookingPatientName" type="text" value="${selectedPatient.name || ''}"
-            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff"
-            placeholder="Patient name" />
-        </div>
-
-        <div style="margin-bottom:16px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Select Clinic</label>
-          <select id="bookingClinicSelect"
-            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff;appearance:none">
-            <option value="">Loading clinics...</option>
-          </select>
-        </div>
-
-        <div style="margin-bottom:20px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Preferred Time</label>
-          <div style="display:flex;flex-direction:column;gap:8px" id="bookingTimeOptions">
-            <button class="booking-time-btn" data-time="asap" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">As soon as possible</button>
-            <button class="booking-time-btn" data-time="today_afternoon" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Today afternoon</button>
-            <button class="booking-time-btn" data-time="tomorrow_morning" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Tomorrow morning</button>
+      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;max-height:90vh;overflow-y:auto;box-sizing:border-box;display:flex;flex-direction:column">
+        <!-- Header -->
+        <div style="background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 16px;position:sticky;top:0;z-index:2;border-bottom:1px solid #F0F0F0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <h3 style="font-size:17px;font-weight:700;color:#111;margin:0">Clinics Near You</h3>
+            <button id="cbClose" style="background:none;border:none;cursor:pointer;padding:4px;color:#666">
+              <span class="material-icons-outlined" style="font-size:24px">close</span>
+            </button>
           </div>
+          <p style="font-size:12px;color:#666;margin:0">Based on your assessment: <strong style="color:${urgencyColor}">${topConditionName}</strong></p>
         </div>
 
-        <button id="btnConfirmBooking"
-          style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-          <span class="material-icons-outlined">check_circle</span>
-          Confirm Booking
-        </button>
+        <!-- Loading state -->
+        <div id="cbLoading" style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;gap:12px">
+          <span class="material-icons-outlined" style="font-size:40px;color:#1B5E20;animation:scBounce 1s ease-in-out infinite">my_location</span>
+          <p style="font-size:14px;color:#555;text-align:center;margin:0">Finding clinics near you…</p>
+        </div>
+
+        <!-- Clinic list -->
+        <div id="cbClinicList" style="display:none;padding:12px 16px 24px"></div>
+
+        <!-- Booking confirm step -->
+        <div id="cbConfirmStep" style="display:none;padding:20px 16px 28px"></div>
       </div>
     `;
 
     document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.getElementById('cbClose').addEventListener('click', () => modal.remove());
 
-    // Close modal on backdrop click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
+    // ── Fetch user location + clinics in parallel ──
+    const [userCoords, clinicsResult, feesResult] = await Promise.all([
+      getUserCoords(),
+      supabase
+        ? supabase.from('clinics')
+            .select('id, name, district, city, address, latitude, longitude, consultation_fee, specialties, accepts_online_slots')
+            .eq('active', true)
+            .limit(50)
+        : Promise.resolve({ data: null }),
+      supabase && diagData.conditions[0]?.name
+        ? supabase.from('clinic_condition_fees')
+            .select('clinic_id, condition_name, fee, notes')
+            .ilike('condition_name', `%${diagData.conditions[0].name.split(' ')[0]}%`)
+        : Promise.resolve({ data: null }),
+    ]);
+
+    const userLat = userCoords?.lat ?? null;
+    const userLng = userCoords?.lng ?? null;
+    const userDistrict = (user.district || user.location || '').toLowerCase();
+
+    // Build a map of clinic_id → matched condition fee
+    const condFeeMap = {};
+    if (feesResult?.data) {
+      feesResult.data.forEach(row => {
+        if (!condFeeMap[row.clinic_id]) condFeeMap[row.clinic_id] = row;
+      });
+    }
+
+    const mockClinics = [
+      { id: 'mock-1', name: 'Mulago National Referral Hospital', district: 'Kampala', address: 'Mulago Hill Rd', latitude: 0.3476, longitude: 32.5739, consultation_fee: 20000 },
+      { id: 'mock-2', name: 'Kampala International Hospital', district: 'Kampala', address: 'Namuwongo', latitude: 0.3137, longitude: 32.5811, consultation_fee: 50000 },
+      { id: 'mock-3', name: 'Case Medical Centre', district: 'Kampala', address: 'Kololo', latitude: 0.3392, longitude: 32.5942, consultation_fee: 45000 },
+      { id: 'mock-4', name: 'Nsambya Hospital', district: 'Kampala', address: 'Nsambya', latitude: 0.2946, longitude: 32.5889, consultation_fee: 25000 },
+      { id: 'mock-5', name: 'Nakasero Hospital', district: 'Kampala', address: 'Nakasero', latitude: 0.3329, longitude: 32.5833, consultation_fee: 60000 },
+    ];
+
+    let clinics = (clinicsResult?.data?.length) ? clinicsResult.data : mockClinics;
+
+    // Sort: if we have GPS, sort by distance; else sort by district match then name
+    if (userLat !== null && userLng !== null) {
+      clinics = clinics
+        .map(c => ({
+          ...c,
+          _distKm: (c.latitude && c.longitude)
+            ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
+            : 999,
+        }))
+        .sort((a, b) => a._distKm - b._distKm);
+    } else {
+      clinics = clinics.sort((a, b) => {
+        const aMatch = (a.district || '').toLowerCase() === userDistrict ? 0 : 1;
+        const bMatch = (b.district || '').toLowerCase() === userDistrict ? 0 : 1;
+        return aMatch - bMatch || (a.name || '').localeCompare(b.name || '');
+      });
+    }
+
+    // Only show the nearest/most relevant (max 10)
+    clinics = clinics.slice(0, 10);
+
+    // ── Render clinic cards ──
+    const cbLoading = document.getElementById('cbLoading');
+    const cbList    = document.getElementById('cbClinicList');
+    cbLoading.style.display = 'none';
+    cbList.style.display    = 'block';
+
+    if (!clinics.length) {
+      cbList.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:14px">No clinics found. Please try again later.</p>';
+      return;
+    }
+
+    const locationLabel = userCoords
+      ? '<span style="font-size:11px;color:#2E7D32;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">gps_fixed</span>Sorted by GPS distance</span>'
+      : `<span style="font-size:11px;color:#888">Showing clinics in ${user.district || 'your area'}</span>`;
+
+    cbList.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${locationLabel}</div>`;
+
+    clinics.forEach(clinic => {
+      const condFee = condFeeMap[clinic.id];
+      const feeDisplay = condFee
+        ? `UGX ${Number(condFee.fee).toLocaleString()}`
+        : clinic.consultation_fee
+          ? `UGX ${Number(clinic.consultation_fee).toLocaleString()}`
+          : 'Fee on visit';
+      const feeNote = condFee ? condFee.condition_name : 'General consultation';
+      const distLabel = (clinic._distKm !== undefined && clinic._distKm < 900)
+        ? `${clinic._distKm < 1 ? Math.round(clinic._distKm * 1000) + ' m' : clinic._distKm.toFixed(1) + ' km'} away`
+        : (clinic.district ? clinic.district : '');
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
+      card.innerHTML = `
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div style="width:40px;height:40px;border-radius:10px;background:#E8F5E9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">local_hospital</span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${clinic.name}</div>
+            <div style="font-size:11px;color:#888;margin-top:2px;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:12px">place</span>
+              ${distLabel}${distLabel && clinic.address ? ' · ' : ''}${clinic.address || ''}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
+              <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:4px 10px;font-size:12px;color:#795548;font-weight:600">
+                <span style="font-size:10px;color:#9E9E9E;font-weight:400">${feeNote}: </span>${feeDisplay}
+              </div>
+            </div>
+          </div>
+          <button class="cb-book-btn" data-clinic-id="${clinic.id}" data-clinic-name="${clinic.name.replace(/"/g, '&quot;')}" data-fee="${condFee?.fee || clinic.consultation_fee || 0}" data-fee-label="${feeDisplay}"
+            style="flex-shrink:0;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;align-self:center">
+            Book
+          </button>
+        </div>
+      `;
+      cbList.appendChild(card);
     });
-    document.getElementById('closeBookingModal').addEventListener('click', () => modal.remove());
 
-    // Time selection
-    let selectedTime = 'asap';
-    document.querySelectorAll('.booking-time-btn').forEach(btn => {
+    // ── Wire "Book" buttons ──
+    document.querySelectorAll('.cb-book-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.booking-time-btn').forEach(b => {
-          b.style.borderColor = '#DDD';
-          b.style.background = '#fff';
-          b.style.color = '#333';
-          b.style.fontWeight = '400';
+        const clinicId   = btn.dataset.clinicId;
+        const clinicName = btn.dataset.clinicName;
+        const feeLabel   = btn.dataset.feeLabel;
+        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel);
+      });
+    });
+  }
+
+  // ── Show booking confirmation step (time select + confirm) ──
+  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel) {
+    const cbList    = document.getElementById('cbClinicList');
+    const cbConfirm = document.getElementById('cbConfirmStep');
+    if (cbList)    cbList.style.display    = 'none';
+    if (!cbConfirm) return;
+    cbConfirm.style.display = 'block';
+
+    const isMock = !clinicId || clinicId.startsWith('mock-');
+
+    cbConfirm.innerHTML = `
+      <button id="cbBack" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:#1B5E20;font-size:13px;font-weight:600;font-family:inherit;padding:0;margin-bottom:16px">
+        <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back to clinics
+      </button>
+
+      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <span class="material-icons-outlined" style="font-size:24px;color:#1B5E20">local_hospital</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
+          <div style="font-size:12px;color:#555;margin-top:2px">Fee: <strong>${feeLabel}</strong></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
+        <input id="cbPatientName" type="text" value="${selectedPatient?.name || ''}"
+          style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff"
+          placeholder="Patient name" />
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:8px">Preferred Appointment Time</label>
+        <div style="display:flex;flex-direction:column;gap:8px" id="cbTimeOpts">
+          <button class="cb-time-btn" data-time="asap" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">As soon as possible</button>
+          <button class="cb-time-btn" data-time="today_afternoon" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">Today afternoon</button>
+          <button class="cb-time-btn" data-time="tomorrow_morning" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">Tomorrow morning</button>
+        </div>
+      </div>
+
+      <button id="cbConfirmBtn"
+        style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        <span class="material-icons-outlined">check_circle</span>
+        Confirm Booking
+      </button>
+    `;
+
+    document.getElementById('cbBack').addEventListener('click', () => {
+      cbConfirm.style.display = 'none';
+      cbConfirm.innerHTML = '';
+      document.getElementById('cbClinicList').style.display = 'block';
+    });
+
+    let selectedTime = 'asap';
+    document.querySelectorAll('.cb-time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.cb-time-btn').forEach(b => {
+          b.style.borderColor = '#DDD'; b.style.background = '#fff'; b.style.fontWeight = '400';
         });
         btn.style.borderColor = '#00695C';
-        btn.style.background = '#E8F5E9';
-        btn.style.color = '#1B5E20';
-        btn.style.fontWeight = '600';
+        btn.style.background  = '#E8F5E9';
+        btn.style.fontWeight  = '600';
         selectedTime = btn.dataset.time;
       });
-      // Auto-select first
       if (btn.dataset.time === 'asap') btn.click();
     });
 
-    // Load clinics from Supabase, fallback to mock
-    const clinicSelect = document.getElementById('bookingClinicSelect');
-    const mockClinics = [
-      { id: 'mock-1', name: 'Mulago National Referral Hospital' },
-      { id: 'mock-2', name: 'Kampala International Hospital' },
-      { id: 'mock-3', name: 'Case Medical Centre' },
-      { id: 'mock-4', name: 'Nsambya Hospital' },
-      { id: 'mock-5', name: 'Nakasero Hospital' },
-    ];
-
-    const clinicLoad = supabase
-      ? supabase.from('clinics').select('id, name').eq('active', true).limit(20)
-      : Promise.resolve({ data: null });
-    clinicLoad
-      .then(({ data: clinicsData }) => {
-        const list = (clinicsData && clinicsData.length) ? clinicsData : mockClinics;
-        clinicSelect.innerHTML = list.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      })
-      .catch(() => {
-        clinicSelect.innerHTML = mockClinics.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      });
-
-    // Confirm booking
-    document.getElementById('btnConfirmBooking').addEventListener('click', async () => {
-      const patientName = document.getElementById('bookingPatientName').value.trim();
-      const selectedClinicId = clinicSelect.value || null;
-      const selectedClinicName = clinicSelect.options[clinicSelect.selectedIndex]?.text || '';
-
+    document.getElementById('cbConfirmBtn').addEventListener('click', async () => {
+      const patientName = document.getElementById('cbPatientName').value.trim();
       if (!patientName) {
-        document.getElementById('bookingPatientName').focus();
-        document.getElementById('bookingPatientName').style.borderColor = '#D32F2F';
+        const inp = document.getElementById('cbPatientName');
+        inp.style.borderColor = '#D32F2F';
+        inp.focus();
         return;
       }
 
-      const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
+      const confirmBtn = document.getElementById('cbConfirmBtn');
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking…';
 
-      // Generate a PIN token so clinic can look up by PIN too
+      const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
       const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let pinToken = 'HK-';
       for (let i = 0; i < 6; i++) pinToken += pinChars[Math.floor(Math.random() * pinChars.length)];
-      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(); // 4 hours
-
-      // Mock IDs are not valid UUIDs — set clinic_id to null for those
-      const isMockClinic = !selectedClinicId || selectedClinicId.startsWith('mock-');
+      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
 
       const bookingRecord = {
-        booking_code:  bookingCode,
-        patient_name:  patientName,
-        patient_id:    session?.user?.id || null,
-        patient_age:   selectedPatient.age || null,
-        patient_sex:   selectedPatient.sex || null,
-        symptoms:      enteredSymptoms ? [enteredSymptoms] : null,
-        ai_diagnosis:  diagnosisData.conditions[0]?.name || null,
-        ai_confidence: diagnosisData.conditions[0]?.likelihood_percent || null,
-        ai_full_data: {
-          primary_condition: diagnosisData.conditions[0]?.name || null,
-          confidence:        diagnosisData.conditions[0]?.likelihood_percent || null,
-          overall_risk:      diagnosisData.overall_risk || null,
-          symptoms:          enteredSymptoms || null,
-          clinic_urgency:    diagnosisData.clinic_urgency || null,
-          conditions:        diagnosisData.conditions || [],
-          immediate_actions: diagnosisData.immediate_actions || [],
-        },
-        urgency_level: diagnosisData.clinic_urgency === 'urgent' ? 'high' : diagnosisData.clinic_urgency === 'soon' ? 'medium' : 'normal',
-        risk_score:    diagnosisData.conditions[0]?.likelihood_percent || 50,
-        clinic_id:     isMockClinic ? null : selectedClinicId,
+        booking_code:   bookingCode,
+        patient_name:   patientName,
+        patient_user_id: session?.user?.id || null,
+        patient_age:    selectedPatient?.age || null,
+        patient_sex:    selectedPatient?.sex || null,
+        symptoms:       enteredSymptoms || null,
+        ai_diagnosis:   diagData.conditions[0]?.name || null,
+        conditions_json: diagData.conditions || [],
+        ai_confidence:  diagData.conditions[0]?.likelihood_percent || null,
+        urgency_level:  diagData.clinic_urgency === 'urgent' ? 'high' : diagData.clinic_urgency === 'soon' ? 'medium' : 'normal',
+        risk_score:     diagData.conditions[0]?.likelihood_percent || 50,
+        clinic_id:      isMock ? null : clinicId,
         preferred_time: selectedTime,
-        status:        'pending',
-        pin_token:     pinToken,
+        status:         'pending',
+        pin_token:      pinToken,
         pin_expires_at: pinExpiry,
       };
 
-      // Disable button and show loading state
-      const confirmBtn = document.getElementById('btnConfirmBooking');
-      confirmBtn.disabled = true;
-      confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking...';
-
-      // Save to Supabase
       let savedOk = false;
+      let savedId  = null;
       if (supabase) {
         try {
-          const { error: insertErr } = await supabase.from('bookings').insert(bookingRecord);
+          const { data: inserted, error: insertErr } = await supabase
+            .from('bookings').insert(bookingRecord).select('id').single();
           if (insertErr) {
             console.error('[Homatt] Booking insert error:', insertErr.message);
           } else {
             savedOk = true;
+            savedId  = inserted?.id || null;
           }
         } catch (e) {
-          console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
+          console.warn('[Homatt] Booking insert failed (offline?):', e.message);
         }
       }
 
-      // Always save to localStorage as backup
+      // localStorage backup
       const localBookings = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
-      localBookings.unshift({ ...bookingRecord, clinic_name: selectedClinicName, savedToDb: savedOk });
+      localBookings.unshift({ ...bookingRecord, clinic_name: clinicName, savedToDb: savedOk, id: savedId });
       if (localBookings.length > 20) localBookings.pop();
       localStorage.setItem('homatt_bookings', JSON.stringify(localBookings));
 
-      // Show success screen
-      const inner = document.getElementById('clinicBookingInner');
-      inner.innerHTML = `
-        <div style="text-align:center;padding:8px 0 16px">
-          <div style="width:64px;height:64px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32">check_circle</span>
-          </div>
-          <h3 style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Booking Confirmed!</h3>
-          <p style="font-size:13px;color:#666;margin-bottom:20px">Your appointment has been submitted.</p>
+      // ── Push notification via OneSignal Edge Function ──
+      if (savedOk && supabase && session?.user?.id) {
+        const timeLabel = selectedTime === 'asap' ? 'as soon as possible'
+                        : selectedTime === 'today_afternoon' ? 'this afternoon'
+                        : 'tomorrow morning';
+        try {
+          await supabase.functions.invoke('send-notification', {
+            body: {
+              userId:  session.user.id,
+              title:   'Booking Confirmed!',
+              message: `Your visit to ${clinicName} is confirmed for ${timeLabel}. Show code ${bookingCode} at reception.`,
+              data:    { screen: 'appointment', id: savedId || bookingCode },
+            },
+          });
+        } catch (e) {
+          console.warn('[Homatt] Push notification failed:', e.message);
+        }
+      }
 
-          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:16px">
-            <p style="font-size:12px;color:#555;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Your Booking Code</p>
-            <p style="font-size:36px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
+      // ── Success screen ──
+      const cbConfirm = document.getElementById('cbConfirmStep');
+      if (!cbConfirm) return;
+      cbConfirm.innerHTML = `
+        <div style="text-align:center;padding:12px 0 8px">
+          <div style="width:68px;height:68px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <span class="material-icons-outlined" style="font-size:38px;color:#2E7D32">check_circle</span>
+          </div>
+          <h3 style="font-size:18px;font-weight:700;color:#111;margin:0 0 6px">Booking Confirmed!</h3>
+          <p style="font-size:13px;color:#666;margin:0 0 20px">A push notification has been sent to your device.</p>
+
+          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:14px">
+            <p style="font-size:11px;color:#555;margin:0 0 5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Booking Code</p>
+            <p style="font-size:34px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
             <div style="background:rgba(0,0,0,0.05);border-radius:8px;padding:10px">
-              <p style="font-size:11px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">PIN Token (show to reception)</p>
+              <p style="font-size:10px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">PIN (show to reception)</p>
               <p style="font-size:18px;font-weight:700;color:#00695C;letter-spacing:2px;margin:0">${pinToken}</p>
             </div>
           </div>
 
-          <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:20px">
+          <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:18px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
               <span class="material-icons-outlined" style="font-size:18px;color:#00695C">local_hospital</span>
-              <span style="font-size:13px;font-weight:600;color:#333">${selectedClinicName}</span>
+              <span style="font-size:13px;font-weight:600;color:#333">${clinicName}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
               <span class="material-icons-outlined" style="font-size:18px;color:#00695C">schedule</span>
               <span style="font-size:13px;color:#555">${selectedTime === 'asap' ? 'As soon as possible' : selectedTime === 'today_afternoon' ? 'Today afternoon' : 'Tomorrow morning'}</span>
             </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="material-icons-outlined" style="font-size:18px;color:#00695C">payments</span>
+              <span style="font-size:13px;color:#555">Expected fee: <strong>${feeLabel}</strong></span>
+            </div>
           </div>
 
-          <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:20px">
-            Show the booking code <strong>or</strong> PIN to the reception desk.<br>The clinic will verify and check you in.
-          </p>
-
-          <button id="btnCloseSuccess"
+          <button id="cbDoneBtn"
             style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
             Done
           </button>
         </div>
       `;
 
-      document.getElementById('btnCloseSuccess').addEventListener('click', () => {
-        modal.remove();
+      document.getElementById('cbDoneBtn').addEventListener('click', () => {
+        document.getElementById('clinicBookingModal')?.remove();
       });
     });
   }
