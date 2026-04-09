@@ -295,12 +295,13 @@
 
 <div id="clinicToast" class="admin-toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic.js" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
+var _sessionIsDemo = false;
 var currentSpecs = [];
 var currentFacilities = [];
 var condFeeData = [];      // { id (existing uuid|null), condition_name, fee, notes, _delete }
@@ -331,11 +332,33 @@ document.addEventListener('DOMContentLoaded', async function() {
   document.getElementById('clinicUserDate').textContent = new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long'});
 
   _clinicId = session.clinicId || null;
+  _sessionIsDemo = !!session.demo;
 
   // Init Supabase
   var cfg = window.HOMATT_CONFIG || {};
   if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
     _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
+  }
+
+  // If clinicId is missing but Supabase is available (non-demo), fetch it from portal_users
+  if (_supa && !_clinicId && !_sessionIsDemo) {
+    try {
+      var { data: authData } = await _supa.auth.getSession();
+      if (authData && authData.session && authData.session.user) {
+        var { data: pu } = await _supa
+          .from('portal_users')
+          .select('clinic_id, clinics(name)')
+          .eq('auth_user_id', authData.session.user.id)
+          .eq('role', 'clinic_staff')
+          .eq('is_active', true)
+          .single();
+        if (pu && pu.clinic_id) {
+          _clinicId = pu.clinic_id;
+          var updated = Object.assign({}, session, { clinicId: _clinicId, clinicName: (pu.clinics && pu.clinics.name) || session.clinicName });
+          localStorage.setItem('clinic_session', JSON.stringify(updated));
+        }
+      }
+    } catch(e) { /* silently ignore — will show proper message on save */ }
   }
 
   // Build UI sections
@@ -649,11 +672,20 @@ async function saveSettings() {
   };
 
   if (!_supa || !_clinicId) {
-    // Offline / demo — just show success feedback
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
-    msg.textContent = 'Settings saved locally (connect to Supabase to persist)';
-    showToast('Settings saved!', 'success');
+    if (_sessionIsDemo) {
+      msg.textContent = 'Demo mode — changes are not saved to the database.';
+      showToast('Demo mode — not saved', 'info');
+    } else if (!_supa) {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Cannot reach server. Check your internet connection.';
+      showToast('Connection error', 'error');
+    } else {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Your staff account is not linked to a clinic. Contact the admin.';
+      showToast('Account not linked to a clinic', 'error');
+    }
     return;
   }
 
