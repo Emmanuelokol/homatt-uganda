@@ -7,7 +7,7 @@
  *   • Everything else: Network-first, fall back to cache
  */
 
-const CACHE_NAME = 'homatt-shell-v18';
+const CACHE_NAME = 'homatt-shell-v19';
 
 const APP_SHELL = [
   './',
@@ -23,7 +23,6 @@ const APP_SHELL = [
   './cycle-tracker.html',
   './pain-tracker.html',
   './digestive-tracker.html',
-  './malaria-tracker.html',
   './child-growth-tracker.html',
   './quiz.html',
   './manifest.json',
@@ -34,8 +33,7 @@ const APP_SHELL = [
   './css/shop.css',
   './js/config.js',
   './js/native-bridge.js',
-  './js/app.js',
-  './js/signin.js',
+  './js/auth.js',
   './js/dashboard.js',
   './js/family.js',
   './js/symptom-checker.js',
@@ -45,7 +43,6 @@ const APP_SHELL = [
   './js/cycle-tracker.js',
   './js/pain-tracker.js',
   './js/digestive-tracker.js',
-  './js/malaria-tracker.js',
   './js/child-growth-tracker.js',
   './js/shop.js',
   './js/onesignal.js',

@@ -141,27 +141,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
   document.getElementById('streakCount').textContent = streak;
 
-  // ====== Malaria Alert Region ======
-  const riskLevels = {
-    kampala: 'medium', wakiso: 'medium', mukono: 'medium',
-    jinja: 'high', mbarara: 'medium', gulu: 'high',
-    lira: 'high', mbale: 'medium', masaka: 'medium',
-    fort_portal: 'medium', soroti: 'high', arua: 'high',
-    kabale: 'low', hoima: 'high', entebbe: 'medium',
-  };
-
-  const userRisk = riskLevels[user.district || user.location] || 'medium';
-  const alertLevel = document.querySelector('.alert-level');
-  alertLevel.textContent = userRisk.charAt(0).toUpperCase() + userRisk.slice(1) + ' Risk';
-  alertLevel.className = 'alert-level ' + userRisk;
-
-  const riskMessages = {
-    low: 'Risk is low but stay protected at night',
-    medium: 'Use mosquito nets and repellent',
-    high: 'High risk! Use nets, repellent & avoid standing water',
-  };
-  document.querySelector('.alert-detail').textContent = riskMessages[userRisk];
-
   // ====== Feature Cards Navigation ======
   document.getElementById('symptomChecker').addEventListener('click', () => {
     window.location.href = 'symptom-checker.html';
@@ -185,10 +164,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('featureChildGrowth').addEventListener('click', () => {
     window.location.href = 'child-growth-tracker.html';
-  });
-
-  document.getElementById('featureMalaria').addEventListener('click', () => {
-    window.location.href = 'malaria-tracker.html';
   });
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {

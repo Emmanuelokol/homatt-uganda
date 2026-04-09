@@ -8,9 +8,160 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Homatt Health - Sign In</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .auth-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      padding: 32px 24px;
+      background: linear-gradient(160deg, #1B5E20 0%, #2E7D32 40%, #388E3C 100%);
+      text-align: center;
+    }
+    .auth-logo {
+      width: 80px;
+      height: 80px;
+      border-radius: 22px;
+      background: rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .auth-logo .material-icons-outlined {
+      font-size: 44px;
+      color: #fff;
+    }
+    .auth-app-name {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      margin: 0 0 6px;
+      letter-spacing: -0.5px;
+    }
+    .auth-tagline {
+      font-size: 14px;
+      color: rgba(255,255,255,0.8);
+      margin: 0 0 48px;
+    }
+    .auth-card {
+      width: 100%;
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px 24px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }
+    .auth-card-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1B5E20;
+      margin: 0 0 6px;
+    }
+    .auth-card-sub {
+      font-size: 13px;
+      color: #5F6368;
+      margin: 0 0 24px;
+      line-height: 1.5;
+    }
+    .google-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 14px 20px;
+      background: #fff;
+      border: 2px solid #E0E0E0;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #202124;
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: 'Inter', sans-serif;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .google-btn:hover {
+      border-color: #1B5E20;
+      box-shadow: 0 4px 12px rgba(27,94,32,0.15);
+    }
+    .google-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .google-btn svg {
+      width: 22px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 20px 0;
+    }
+    .auth-divider hr {
+      flex: 1;
+      border: none;
+      border-top: 1px solid #E0E0E0;
+    }
+    .auth-divider span {
+      font-size: 12px;
+      color: #9AA0A6;
+    }
+    .auth-features {
+      list-style: none;
+      padding: 0;
+      margin: 20px 0 0;
+      text-align: left;
+    }
+    .auth-features li {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 12px;
+      color: #5F6368;
+      padding: 5px 0;
+    }
+    .auth-features li .material-icons-outlined {
+      font-size: 16px;
+      color: #4CAF50;
+    }
+    .auth-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 0;
+    }
+    .auth-loading .material-icons-outlined {
+      font-size: 32px;
+      color: #1B5E20;
+      animation: spin 1s linear infinite;
+    }
+    .auth-loading p {
+      font-size: 14px;
+      color: #5F6368;
+      margin: 0;
+    }
+    .auth-error {
+      background: #FFEBEE;
+      border: 1px solid #EF9A9A;
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 13px;
+      color: #C62828;
+      margin-top: 16px;
+      display: none;
+    }
+    .auth-error.visible { display: block; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
   <div class="phone-frame">
@@ -24,79 +175,63 @@
       </div>
     </div>
 
-    <!-- App Content -->
-    <div class="app-screen">
-      <!-- Header -->
-      <div class="signup-header signin-header">
-        <div class="logo-section">
-          <h1 class="app-title" style="font-size:28px;font-weight:800">Homatt-health</h1>
-          <p class="app-tagline">Welcome back to your health journey</p>
-        </div>
+    <!-- Auth Screen -->
+    <div class="auth-screen" id="authScreen">
+      <!-- Logo -->
+      <div class="auth-logo">
+        <span class="material-icons-outlined">local_hospital</span>
       </div>
+      <h1 class="auth-app-name">Homatt Health</h1>
+      <p class="auth-tagline">Your health companion for a better life</p>
 
-      <!-- Sign In Form -->
-      <div class="form-container">
-        <h2 class="form-title">Sign In</h2>
-        <p class="form-subtitle">Enter your phone number and password to continue</p>
+      <!-- Auth Card -->
+      <div class="auth-card">
+        <!-- Loading state (shown while checking session or during redirect) -->
+        <div class="auth-loading" id="authLoading">
+          <span class="material-icons-outlined">refresh</span>
+          <p>Setting up your account…</p>
+        </div>
 
-        <form id="signinForm" novalidate>
-          <div class="input-group">
-            <label class="input-label" for="phone">Phone Number</label>
-            <div class="input-wrapper phone-input">
-              <span class="country-code">
-                <span class="flag">🇺🇬</span>
-                <span>+256</span>
-              </span>
-              <input type="tel" id="phone" class="input-field phone-field" placeholder="7XX XXX XXX" required>
-            </div>
-            <span class="input-error" id="phoneError"></span>
-          </div>
+        <!-- Sign-in UI (hidden until we confirm no active session) -->
+        <div id="signInUI" style="display:none">
+          <h2 class="auth-card-title">Welcome</h2>
+          <p class="auth-card-sub">Sign in securely using your Google account to access your health dashboard.</p>
 
-          <div class="input-group">
-            <label class="input-label" for="password">Password</label>
-            <div class="input-wrapper">
-              <span class="material-icons-outlined input-icon">lock</span>
-              <input type="password" id="password" class="input-field" placeholder="Enter your password" required>
-              <button type="button" class="password-toggle" id="togglePassword">
-                <span class="material-icons-outlined">visibility_off</span>
-              </button>
-            </div>
-            <span class="input-error" id="passwordError"></span>
-          </div>
-
-          <div class="signin-options">
-            <label class="remember-me">
-              <input type="checkbox" id="rememberMe" checked>
-              <span class="checkmark-box"></span>
-              <span>Remember me</span>
-            </label>
-            <a href="#" class="forgot-link">Forgot password?</a>
-          </div>
-
-          <!-- General error message -->
-          <div class="signin-error" id="signinError"></div>
-
-          <button type="submit" class="btn btn-next signin-btn">
-            <span class="material-icons-outlined">login</span>
-            Sign In
+          <button class="google-btn" id="googleSignInBtn">
+            <!-- Google "G" logo -->
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            Continue with Google
           </button>
-        </form>
 
-        <div style="margin-top:16px;text-align:center">
-          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:10px">Don't have an account?</p>
-          <a href="index.html" style="display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border:2px solid var(--primary);border-radius:var(--radius-md);color:var(--primary);font-size:14px;font-weight:700;text-decoration:none;transition:all .2s">
-            <span class="material-icons-outlined" style="font-size:18px">person_add</span>
-            Create Account — Sign Up
-          </a>
+          <div class="auth-error" id="authError"></div>
+
+          <ul class="auth-features">
+            <li>
+              <span class="material-icons-outlined">lock</span>
+              Secure sign-in — no password needed
+            </li>
+            <li>
+              <span class="material-icons-outlined">person</span>
+              Your name &amp; photo synced automatically
+            </li>
+            <li>
+              <span class="material-icons-outlined">health_and_safety</span>
+              Personal health data stays private
+            </li>
+          </ul>
         </div>
       </div>
     </div>
-
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
-  <script src="js/signin.js"></script>
+  <script src="js/auth.js"></script>
   <script src="js/onesignal.js"></script>
   <script src="js/native-bridge.js"></script>
 </body>
