@@ -22,6 +22,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       window.location.href = 'signin.html';
       return;
     }
+    // If session exists but profile is not yet complete, go to onboarding
+    if (localSession && localSession.userId && !localSession.first_name) {
+      const localUserObj = localUser || {};
+      if (!localUserObj.firstName) {
+        window.location.href = 'onboarding.html';
+        return;
+      }
+    }
     // Offline or token expired but we have cached data — continue with cache
   }
 

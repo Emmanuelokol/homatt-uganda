@@ -7,7 +7,7 @@
   <link rel="manifest" href="manifest.json">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Homatt Health - Sign In</title>
+  <title>Homatt Health - Create Account</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <style>
@@ -51,19 +51,6 @@
     .auth-title { font-size:26px; font-weight:800; color:#fff; margin-bottom:6px; }
     .auth-subtitle { font-size:14px; color:rgba(255,255,255,0.6); line-height:1.5; }
 
-    .auth-loading {
-      display:flex; flex-direction:column; align-items:center; gap:14px;
-      padding:40px 0; flex:1; justify-content:center;
-    }
-    .loading-spinner {
-      width:40px; height:40px; border-radius:50%;
-      border:3px solid rgba(76,175,80,0.2);
-      border-top-color:#4CAF50;
-      animation:spin 0.8s linear infinite;
-    }
-    .auth-loading p { font-size:14px; color:rgba(255,255,255,0.5); }
-    @keyframes spin { to { transform:rotate(360deg); } }
-
     .auth-card {
       background:rgba(255,255,255,0.06);
       border:1px solid rgba(255,255,255,0.1);
@@ -77,9 +64,9 @@
       letter-spacing:0.5px; margin-bottom:8px;
     }
     .input-wrap { position:relative; }
-    .input-wrap > .material-icons-outlined {
+    .input-wrap .material-icons-outlined {
       position:absolute; left:14px; top:50%; transform:translateY(-50%);
-      font-size:18px; color:rgba(255,255,255,0.4); pointer-events:none;
+      font-size:18px; color:rgba(255,255,255,0.4);
     }
     .form-input {
       width:100%; padding:14px 14px 14px 44px;
@@ -92,6 +79,7 @@
     .form-input:focus { outline:none; border-color:#4CAF50; background:rgba(255,255,255,0.1); }
     .form-input::placeholder { color:rgba(255,255,255,0.3); }
 
+    .password-wrap { position:relative; }
     .password-wrap .form-input { padding-right:46px; }
     .toggle-pw {
       position:absolute; right:14px; top:50%; transform:translateY(-50%);
@@ -119,12 +107,17 @@
       font-size:13px; color:#FCA5A5; margin-top:14px; display:none;
     }
 
-    .signup-link {
+    .signin-link {
       text-align:center; margin-top:24px;
       font-size:14px; color:rgba(255,255,255,0.5);
     }
-    .signup-link a {
+    .signin-link a {
       color:#66BB6A; font-weight:600; text-decoration:none;
+    }
+
+    .password-hint {
+      font-size:11px; color:rgba(255,255,255,0.35);
+      margin-top:6px; padding-left:2px;
     }
   </style>
 </head>
@@ -140,65 +133,57 @@
   </div>
 
   <div class="auth-screen">
-    <!-- Loading state shown while checking existing session -->
-    <div class="auth-loading" id="authLoading">
-      <div class="loading-spinner"></div>
-      <p>Checking your session…</p>
+    <button class="back-btn" onclick="history.back()">
+      <span class="material-icons-outlined">arrow_back</span>
+      Back
+    </button>
+
+    <div class="auth-header">
+      <div class="auth-logo">
+        <span class="material-icons-outlined">health_and_safety</span>
+      </div>
+      <div class="auth-title">Create Account</div>
+      <div class="auth-subtitle">Join Homatt Health — your personal health companion built for Uganda.</div>
     </div>
 
-    <!-- Sign-in UI (hidden until session check completes) -->
-    <div id="signInUI" style="display:none">
-      <button class="back-btn" onclick="window.location.href='welcome.html'">
-        <span class="material-icons-outlined">arrow_back</span>
-        Back
-      </button>
-
-      <div class="auth-header">
-        <div class="auth-logo">
-          <span class="material-icons-outlined">health_and_safety</span>
+    <div class="auth-card">
+      <form id="signupForm" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address</label>
+          <div class="input-wrap">
+            <span class="material-icons-outlined">email</span>
+            <input class="form-input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email">
+          </div>
         </div>
-        <div class="auth-title">Welcome Back</div>
-        <div class="auth-subtitle">Sign in to your Homatt Health account.</div>
-      </div>
 
-      <div class="auth-card">
-        <form id="signInForm" novalidate>
-          <div class="form-group">
-            <label class="form-label" for="email">Email Address</label>
-            <div class="input-wrap">
-              <span class="material-icons-outlined">email</span>
-              <input class="form-input" type="email" id="email" placeholder="you@example.com" autocomplete="email" inputmode="email">
-            </div>
+        <div class="form-group">
+          <label class="form-label" for="password">Password</label>
+          <div class="input-wrap password-wrap">
+            <span class="material-icons-outlined">lock</span>
+            <input class="form-input" type="password" id="password" placeholder="At least 6 characters" autocomplete="new-password">
+            <button type="button" class="toggle-pw" id="togglePassword">
+              <span class="material-icons-outlined" id="eyeIcon">visibility</span>
+            </button>
           </div>
+          <p class="password-hint">Minimum 6 characters</p>
+        </div>
 
-          <div class="form-group">
-            <label class="form-label" for="password">Password</label>
-            <div class="input-wrap password-wrap">
-              <span class="material-icons-outlined">lock</span>
-              <input class="form-input" type="password" id="password" placeholder="Your password" autocomplete="current-password">
-              <button type="button" class="toggle-pw" id="togglePassword">
-                <span class="material-icons-outlined" id="eyeIcon">visibility</span>
-              </button>
-            </div>
-          </div>
+        <button type="submit" class="btn-submit" id="submitBtn">
+          Create Account
+        </button>
 
-          <button type="submit" class="btn-submit" id="submitBtn">Sign In</button>
-
-          <div class="auth-error" id="authError"></div>
-        </form>
-      </div>
-
-      <p class="signup-link">
-        Don't have an account? <a href="signup.html">Create one</a>
-      </p>
+        <div class="auth-error" id="authError"></div>
+      </form>
     </div>
+
+    <p class="signin-link">
+      Already have an account? <a href="signin.html">Sign in</a>
+    </p>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/onesignal.js"></script>
-<script src="js/native-bridge.js"></script>
+<script src="js/signup.js"></script>
 </body>
 </html>
