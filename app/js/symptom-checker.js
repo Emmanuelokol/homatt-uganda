@@ -1789,7 +1789,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       getUserCoords(),
       supabase
         ? supabase.from('clinics')
-            .select('id, name, district, city, address, latitude, longitude, consultation_fee, specialties, accepts_online_slots')
+            .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours')
             .eq('active', true)
             .limit(50)
         : Promise.resolve({ data: null }),
@@ -1860,6 +1860,25 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     cbList.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${locationLabel}</div>`;
 
+    // Helper: is clinic open right now?
+    function clinicOpenStatus(hours) {
+      if (!hours || typeof hours !== 'object') return null;
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const now = new Date();
+      const dayName = days[now.getDay()];
+      const h = hours[dayName];
+      if (!h || h.closed) return { open: false, label: 'Closed today' };
+      if (!h.open || !h.close) return null;
+      const [oh, om] = h.open.split(':').map(Number);
+      const [ch, cm] = h.close.split(':').map(Number);
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const openMin = oh * 60 + om;
+      const closeMin = ch * 60 + cm;
+      if (nowMin >= openMin && nowMin < closeMin) return { open: true, label: `Open · closes ${h.close}` };
+      if (nowMin < openMin) return { open: false, label: `Opens ${h.open}` };
+      return { open: false, label: `Closed · opens ${h.open} tomorrow` };
+    }
+
     clinics.forEach(clinic => {
       const condFee = condFeeMap[clinic.id];
       const feeDisplay = condFee
@@ -1871,6 +1890,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       const distLabel = (clinic._distKm !== undefined && clinic._distKm < 900)
         ? `${clinic._distKm < 1 ? Math.round(clinic._distKm * 1000) + ' m' : clinic._distKm.toFixed(1) + ' km'} away`
         : (clinic.district ? clinic.district : '');
+
+      const openStatus = clinicOpenStatus(clinic.opening_hours);
+      const openBadge = openStatus
+        ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:${openStatus.open ? '#E8F5E9' : '#FAFAFA'};color:${openStatus.open ? '#1B5E20' : '#9E9E9E'};border:1px solid ${openStatus.open ? '#A5D6A7' : '#E0E0E0'}">${openStatus.label}</span>`
+        : '';
+
+      const onlineBadge = clinic.accepts_online_slots
+        ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9">Online booking</span>`
+        : '';
+
+      const specChips = Array.isArray(clinic.specialties) && clinic.specialties.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${clinic.specialties.slice(0,3).map(s => `<span style="font-size:10px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:2px 7px">${s}</span>`).join('')}${clinic.specialties.length > 3 ? `<span style="font-size:10px;color:#9E9E9E">+${clinic.specialties.length - 3}</span>` : ''}</div>`
+        : '';
+
+      const phoneLink = clinic.phone
+        ? `<a href="tel:${clinic.phone.replace(/\s/g,'')}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;text-decoration:none;margin-top:5px"><span class="material-icons-outlined" style="font-size:13px">phone</span>${clinic.phone}</a>`
+        : '';
 
       const card = document.createElement('div');
       card.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
@@ -1885,11 +1921,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
               <span class="material-icons-outlined" style="font-size:12px">place</span>
               ${distLabel}${distLabel && clinic.address ? ' · ' : ''}${clinic.address || ''}
             </div>
-            <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
+            ${phoneLink}
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px">
               <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:4px 10px;font-size:12px;color:#795548;font-weight:600">
                 <span style="font-size:10px;color:#9E9E9E;font-weight:400">${feeNote}: </span>${feeDisplay}
               </div>
+              ${openBadge}
+              ${onlineBadge}
             </div>
+            ${specChips}
           </div>
           <button class="cb-book-btn" data-clinic-id="${clinic.id}" data-clinic-name="${clinic.name.replace(/"/g, '&quot;')}" data-fee="${condFee?.fee || clinic.consultation_fee || 0}" data-fee-label="${feeDisplay}"
             style="flex-shrink:0;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;align-self:center">
