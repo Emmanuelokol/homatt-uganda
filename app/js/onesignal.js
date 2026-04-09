@@ -5,51 +5,149 @@
  * App ID    : stored in android/app/src/main/res/values/strings.xml
  * REST Key  : stored as Supabase secret ONESIGNAL_REST_API_KEY
  *
- * Notification payload schema:
- *   { screen: 'appointment', id: '...' }
- *   { screen: 'prescription', id: '...' }
- *   { screen: 'lab_result', id: '...' }
- *   { screen: 'shop_order', id: '...' }
- *   { screen: 'medicine_order', id: '...' }
+ * Responsibilities:
+ *  1. Initialize OneSignal on app start
+ *  2. Request push permission; show in-app banner if denied
+ *  3. Capture OneSignal player ID and save to Supabase profiles
+ *  4. Handle notification tap → navigate to the correct screen
+ *  5. Expose oneSignalLogin / oneSignalLogout helpers
  */
 
 const ONESIGNAL_APP_ID = 'eb88a928-4a93-4713-9bab-027fd1fbf181';
 
-// Screen → URL mapping for notification tap navigation
+// ── Screen → URL mapping ──────────────────────────────────────
+// Every push notification includes data.screen; map it to an app URL.
 const SCREEN_URLS = {
-  appointment:    'clinic-booking.html',
-  prescription:   'medicine-orders.html',
-  lab_result:     'clinic-booking.html',
-  shop_order:     'family.html',
-  medicine_order: 'medicine-orders.html',
-  dashboard:      'dashboard.html',
+  home:               'dashboard.html',
+  dashboard:          'dashboard.html',
+  bookings:           'clinic-booking.html',
+  appointment:        'clinic-booking.html',
+  'book-followup':    'clinic-booking.html',
+  prescription:       'medicine-orders.html',
+  lab_result:         'clinic-booking.html',
+  orders:             'medicine-orders.html',
+  medicine_order:     'medicine-orders.html',
+  shop_order:         'shop.html',
+  'prevention-shop':  'shop.html',
+  'health-tracker':   'dashboard.html',
+  'complete-payment': 'wallet.html',
+  'recovery-check':   'dashboard.html',
 };
 
+// ── Deep link navigation ──────────────────────────────────────
 function navigateToScreen(data) {
   if (!data) return;
-  const screen = data.screen || data.type;
-  const id = data.id;
-  const url = SCREEN_URLS[screen] || 'dashboard.html';
-  // Append id as query param so the target page can highlight/open the item
-  window.location.href = id ? `${url}?notif_id=${id}&screen=${screen}` : url;
+  const screen  = data.screen || data.type;
+  const id      = data.id;
+  const clinicId = data.clinic_id;
+
+  let url = SCREEN_URLS[screen] || 'dashboard.html';
+
+  // Build query string
+  const params = new URLSearchParams();
+  if (id)       params.set('notif_id', id);
+  if (screen)   params.set('screen', screen);
+  if (clinicId) params.set('clinic_id', clinicId);
+
+  const qs = params.toString();
+  window.location.href = qs ? `${url}?${qs}` : url;
 }
 
+// ── Save player ID to Supabase profiles ───────────────────────
+async function savePlayerIdToSupabase(playerId) {
+  if (!playerId) return;
+  try {
+    const cfg = window.HOMATT_CONFIG || {};
+    if (!cfg.SUPABASE_URL || !window.supabase) return;
+
+    const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user?.id) return;
+
+    await client
+      .from('profiles')
+      .update({ onesignal_player_id: playerId })
+      .eq('id', session.user.id);
+
+    console.log('[OneSignal] player_id saved to Supabase profiles');
+  } catch (e) {
+    console.warn('[OneSignal] could not save player_id:', e);
+  }
+}
+
+// ── Permission denied banner ──────────────────────────────────
+function showPermissionDeniedBanner() {
+  if (document.getElementById('_onesignalBanner')) return; // already shown
+  const banner = document.createElement('div');
+  banner.id = '_onesignalBanner';
+  banner.style.cssText = [
+    'position:fixed', 'bottom:72px', 'left:12px', 'right:12px',
+    'background:#1565C0', 'color:#fff', 'border-radius:12px',
+    'padding:12px 16px', 'display:flex', 'align-items:center',
+    'gap:10px', 'z-index:9999', 'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
+    'font-size:13px', 'line-height:1.4'
+  ].join(';');
+  banner.innerHTML = `
+    <span class="material-icons-outlined" style="font-size:20px;flex-shrink:0">notifications_off</span>
+    <span style="flex:1">Enable notifications to get medicine reminders and appointment alerts.</span>
+    <button id="_onesignalBannerClose"
+      style="background:none;border:none;color:#fff;cursor:pointer;padding:4px;flex-shrink:0">
+      <span class="material-icons-outlined" style="font-size:18px">close</span>
+    </button>`;
+  document.body.appendChild(banner);
+
+  document.getElementById('_onesignalBannerClose').addEventListener('click', () => {
+    banner.remove();
+    // Don't re-show for 7 days
+    localStorage.setItem('_osPermBannerSnoozed', Date.now() + 7 * 24 * 3600 * 1000);
+  });
+}
+
+function shouldShowPermBanner() {
+  const snoozed = parseInt(localStorage.getItem('_osPermBannerSnoozed') || '0', 10);
+  return Date.now() > snoozed;
+}
+
+// ── Core init ─────────────────────────────────────────────────
 function initOneSignal() {
   if (typeof window.plugins === 'undefined' || !window.plugins.OneSignal) {
-    // Running in browser / PWA — OneSignal native plugin not available, skip silently
-    return;
+    return; // Not running inside Capacitor — skip silently
   }
 
   try {
     const OS = window.plugins.OneSignal;
 
-    // 1. Initialize with App ID
+    // 1. Initialise
     OS.initialize(ONESIGNAL_APP_ID);
 
-    // 2. Request notification permission (non-blocking — don't await)
-    OS.Notifications.requestPermission(true).catch(() => {});
+    // 2. Request permission and handle response
+    OS.Notifications.requestPermission(true).then((granted) => {
+      if (!granted && shouldShowPermBanner()) {
+        // Short delay so the page has finished rendering
+        setTimeout(showPermissionDeniedBanner, 1500);
+      }
+    }).catch(() => {});
 
-    // 3. Handle notification tap — navigate to the correct screen
+    // 3. Subscription observer — captures player ID whenever it changes
+    OS.User.pushSubscription.addEventListener('change', (event) => {
+      try {
+        const id = event?.current?.id || event?.to?.id;
+        if (id) {
+          console.log('[OneSignal] player_id:', id);
+          savePlayerIdToSupabase(id);
+        }
+      } catch (e) {
+        console.warn('[OneSignal] subscription change error:', e);
+      }
+    });
+
+    // Also try to get the player ID immediately (may already be subscribed)
+    try {
+      const existingId = OS.User.pushSubscription.id;
+      if (existingId) savePlayerIdToSupabase(existingId);
+    } catch (_) {}
+
+    // 4. Handle notification tap — navigate to the correct screen
     OS.Notifications.addEventListener('click', (event) => {
       try {
         const data = event?.notification?.additionalData || event?.data || {};
@@ -59,12 +157,11 @@ function initOneSignal() {
       }
     });
 
-    // 4. Handle foreground notifications — show a toast instead of system notification
+    // 5. Handle foreground notifications — display them normally
     OS.Notifications.addEventListener('foregroundWillDisplay', (event) => {
       try {
-        // Let the notification display normally
         event.getNotification().display();
-      } catch (e) {}
+      } catch (_) {}
     });
 
     console.log('[OneSignal] Initialized');
@@ -73,22 +170,35 @@ function initOneSignal() {
   }
 }
 
+// ── Auth helpers ──────────────────────────────────────────────
+
 /**
- * Call after successful Supabase login to link push tokens to this user.
- * @param {string} supabaseUserId — the Supabase auth user UUID
+ * Call after successful Supabase login.
+ * Links push token to the Supabase user UUID via OneSignal external_id.
+ * Also re-saves player_id in case it changed.
+ * @param {string} supabaseUserId
  */
 function oneSignalLogin(supabaseUserId) {
   if (!supabaseUserId) return;
   try {
     const OS = window.plugins?.OneSignal;
-    if (OS) OS.login(supabaseUserId);
+    if (!OS) return;
+    OS.login(supabaseUserId);
+    // Capture player_id after login
+    setTimeout(() => {
+      try {
+        const id = OS.User.pushSubscription.id;
+        if (id) savePlayerIdToSupabase(id);
+      } catch (_) {}
+    }, 2000);
   } catch (e) {
     console.error('[OneSignal] login error:', e);
   }
 }
 
 /**
- * Call on logout to unlink push tokens from this user.
+ * Call before supabase.auth.signOut().
+ * Does NOT delete the player_id from the database (user may log back in).
  */
 function oneSignalLogout() {
   try {
@@ -99,10 +209,9 @@ function oneSignalLogout() {
   }
 }
 
-// Initialize after Capacitor/Cordova bridge is ready
+// ── Boot ──────────────────────────────────────────────────────
 if (typeof window !== 'undefined') {
   document.addEventListener('deviceready', initOneSignal, false);
-  // Also try immediately in case deviceready already fired (page loaded late)
   if (document.readyState === 'complete') {
     setTimeout(() => {
       if (typeof window.plugins !== 'undefined' && window.plugins.OneSignal) {

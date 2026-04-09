@@ -874,5 +874,22 @@ window.rejectPrompt = async id => {
   showToast('Order rejected', 'warning');
 };
 </script>
+
+<!-- Realtime alerts -->
+<script src="../js/realtime-alerts.js"></script>
+<script>
+(function () {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return;
+  const s = (() => { try { return JSON.parse(localStorage.getItem('pharmacy_session') || 'null'); } catch(_) { return null; } })();
+  if (!s) return;
+  const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-pharmacy-auth' }
+  });
+  if (typeof initRealtimeAlerts === 'function') {
+    initRealtimeAlerts({ client, portal: 'pharmacy', entityId: s.pharmacyId || null });
+  }
+})();
+</script>
 </body>
 </html>

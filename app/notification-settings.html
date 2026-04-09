@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <title>Homatt Health - Notification Settings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <style>
+    .notif-section {
+      background: #fff;
+      border-radius: 12px;
+      margin: 0 16px 16px;
+      overflow: hidden;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+    .notif-section-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #9E9E9E;
+      text-transform: uppercase;
+      letter-spacing: .6px;
+      padding: 14px 16px 6px;
+    }
+    .notif-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-top: 1px solid #F5F5F5;
+    }
+    .notif-row:first-of-type { border-top: none; }
+    .notif-row-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: #E8F5E9;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      color: #388E3C;
+    }
+    .notif-row-body { flex: 1; }
+    .notif-row-label { font-size: 14px; font-weight: 500; color: #1B1B1B; }
+    .notif-row-desc  { font-size: 12px; color: #757575; margin-top: 2px; }
+
+    /* Toggle switch */
+    .toggle-wrap { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: #BDBDBD; border-radius: 13px;
+      cursor: pointer; transition: .25s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute;
+      width: 20px; height: 20px; border-radius: 50%;
+      background: #fff; left: 3px; top: 3px;
+      transition: .25s; box-shadow: 0 1px 4px rgba(0,0,0,.2);
+    }
+    input:checked + .toggle-slider { background: #388E3C; }
+    input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+    .save-bar {
+      position: sticky; bottom: 0;
+      padding: 12px 16px 24px;
+      background: #fff;
+      border-top: 1px solid #EEEEEE;
+    }
+    .save-bar button {
+      width: 100%;
+      background: #388E3C; color: #fff;
+      border: none; border-radius: 12px;
+      padding: 14px; font-size: 15px; font-weight: 600;
+      cursor: pointer;
+    }
+    .save-bar button:active { background: #2E7D32; }
+
+    .notif-banner {
+      margin: 0 16px 16px;
+      background: #FFF3E0;
+      border: 1px solid #FFB74D;
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex; gap: 10px; align-items: flex-start;
+      font-size: 13px; color: #E65100;
+    }
+  </style>
+</head>
+<body>
+  <script>(function(){var t=localStorage.getItem('homatt_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})()</script>
+
+  <div class="phone-frame">
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <div class="app-screen">
+      <div class="page-header">
+        <div class="page-header-top">
+          <button class="page-back-btn" onclick="history.back()">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <span class="page-header-title">Notification Settings</span>
+        </div>
+      </div>
+
+      <div class="page-content" style="padding-top:0">
+
+        <div id="permissionBanner" class="notif-banner" style="display:none">
+          <span class="material-icons-outlined" style="font-size:20px;flex-shrink:0">notifications_off</span>
+          <span>Push notifications are turned off on this device. <strong>Enable them in your phone settings</strong> to receive medicine reminders and appointment alerts.</span>
+        </div>
+
+        <div class="notif-section-title" style="padding:16px 16px 8px">
+          What would you like to hear about?
+        </div>
+
+        <div class="notif-section">
+          <div class="notif-section-title">Health &amp; Appointments</div>
+
+          <div class="notif-row">
+            <div class="notif-row-icon">
+              <span class="material-icons-outlined">event</span>
+            </div>
+            <div class="notif-row-body">
+              <div class="notif-row-label">Appointment reminders</div>
+              <div class="notif-row-desc">24hr and 2hr reminders before your clinic visit</div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="pref_appointment_reminders" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-row-icon" style="background:#E3F2FD;color:#1565C0">
+              <span class="material-icons-outlined">medication</span>
+            </div>
+            <div class="notif-row-body">
+              <div class="notif-row-label">Medicine reminders</div>
+              <div class="notif-row-desc">Daily dose reminders and adherence nudges</div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="pref_medicine_reminders" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-row-icon" style="background:#F3E5F5;color:#7B1FA2">
+              <span class="material-icons-outlined">favorite</span>
+            </div>
+            <div class="notif-row-body">
+              <div class="notif-row-label">Recovery check-ins</div>
+              <div class="notif-row-desc">How are you feeling? prompts after treatment</div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="pref_recovery_checkins" checked>
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="notif-section">
+          <div class="notif-section-title">Shop &amp; Promotions</div>
+
+          <div class="notif-row">
+            <div class="notif-row-icon" style="background:#FFF8E1;color:#F57F17">
+              <span class="material-icons-outlined">storefront</span>
+            </div>
+            <div class="notif-row-body">
+              <div class="notif-row-label">Prevention shop &amp; offers</div>
+              <div class="notif-row-desc">Product recommendations and seasonal health tips</div>
+            </div>
+            <label class="toggle-wrap">
+              <input type="checkbox" id="pref_promo_prevention_shop">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <div style="height:8px"></div>
+      </div><!-- .page-content -->
+
+      <div class="save-bar">
+        <button id="savePrefsBtn">Save preferences</button>
+      </div>
+    </div><!-- .app-screen -->
+  </div><!-- .phone-frame -->
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/config.js"></script>
+  <script>
+  (async function () {
+    const cfg    = window.HOMATT_CONFIG || {};
+    const supa   = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+    // Update time
+    function tick() {
+      const n = new Date();
+      document.getElementById('statusTime').textContent =
+        n.getHours().toString().padStart(2,'0') + ':' + n.getMinutes().toString().padStart(2,'0');
+    }
+    tick(); setInterval(tick, 30000);
+
+    // Auth guard
+    const { data: { session } } = await supa.auth.getSession();
+    if (!session) { window.location.href = 'signin.html'; return; }
+
+    const userId = session.user.id;
+
+    // Load existing preferences
+    const { data: profile } = await supa
+      .from('profiles')
+      .select('notification_preferences, onesignal_player_id')
+      .eq('id', userId)
+      .single();
+
+    const prefs = profile?.notification_preferences || {};
+
+    const KEYS = [
+      'appointment_reminders',
+      'medicine_reminders',
+      'recovery_checkins',
+      'promo_prevention_shop'
+    ];
+
+    KEYS.forEach(k => {
+      const el = document.getElementById('pref_' + k);
+      if (!el) return;
+      // Default: true unless explicitly set to false
+      el.checked = prefs[k] !== false;
+    });
+
+    // Show permission banner if player_id is absent (permission denied)
+    if (!profile?.onesignal_player_id) {
+      document.getElementById('permissionBanner').style.display = 'flex';
+    }
+
+    // Save
+    document.getElementById('savePrefsBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('savePrefsBtn');
+      btn.textContent = 'Saving…';
+      btn.disabled = true;
+
+      const newPrefs = {};
+      KEYS.forEach(k => {
+        const el = document.getElementById('pref_' + k);
+        if (el) newPrefs[k] = el.checked;
+      });
+
+      const { error } = await supa
+        .from('profiles')
+        .update({ notification_preferences: newPrefs })
+        .eq('id', userId);
+
+      btn.textContent = error ? 'Error — try again' : 'Saved ✓';
+      btn.disabled = false;
+      setTimeout(() => { btn.textContent = 'Save preferences'; }, 2000);
+    });
+  })();
+  </script>
+</body>
+</html>

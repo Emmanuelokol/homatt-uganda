@@ -655,5 +655,22 @@ function showPatient(pJson) {
   document.getElementById('patientModal').style.display = 'block';
 }
 </script>
+
+<!-- Realtime alerts -->
+<script src="../js/realtime-alerts.js"></script>
+<script>
+(function () {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return;
+  const s = (() => { try { return JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(_) { return null; } })();
+  if (!s) return;
+  const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-clinic-auth' }
+  });
+  if (typeof initRealtimeAlerts === 'function') {
+    initRealtimeAlerts({ client, portal: 'clinic', entityId: s.clinicId || null });
+  }
+})();
+</script>
 </body>
 </html>
