@@ -38,7 +38,8 @@
     },
     "Keyboard": {
       "resize": "body",
-      "resizeOnFullScreen": true
+      "resizeOnFullScreen": true,
+      "scrollAssist": true
     },
     "Camera": {
       "permissions": ["camera", "photos"]
