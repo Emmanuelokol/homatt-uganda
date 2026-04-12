@@ -1255,7 +1255,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     monitoringSession.countdownStartedAt = now.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
-    // Persist to Supabase so pg_cron can send hourly push reminders
+    // Persist to Supabase so pg_cron JOB 11 can send hourly push reminders
     try {
       if (!window._symptomSupa) {
         const _cfg = window.HOMATT_CONFIG || {};
@@ -1264,17 +1264,29 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         }
       }
       if (window._symptomSupa) {
-        window._symptomSupa.auth.getSession().then(({ data }) => {
+        window._symptomSupa.auth.getSession().then(async ({ data }) => {
           const userId = data?.session?.user?.id;
           if (!userId) return;
-          window._symptomSupa.from('symptom_monitoring_logs').upsert({
+          // Mark any previous active sessions for this user as abandoned first
+          // so pg_cron doesn't send stale reminders
+          await window._symptomSupa
+            .from('symptom_monitoring_logs')
+            .update({ outcome: 'abandoned', ended_at: monitoringSession.startedAt })
+            .eq('user_id', userId)
+            .eq('outcome', 'active')
+            .catch(() => {});
+          // Insert the new monitoring session
+          window._symptomSupa.from('symptom_monitoring_logs').insert({
             user_id: userId,
             condition: condName,
             started_at: monitoringSession.startedAt,
             outcome: 'active',
             check_ins: [],
             last_checkin_at: monitoringSession.startedAt,
-          }, { onConflict: 'user_id,started_at' }).catch(() => {});
+          }).then(({ error }) => {
+            if (error) console.warn('[SC] monitoring log insert failed:', error.message);
+            else monitoringSession._dbLogged = true;
+          });
         });
       }
     } catch (_e) { /* non-fatal */ }
@@ -1394,9 +1406,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         });
         newBtn.classList.add('selected');
 
+        const checkinTime = new Date().toISOString();
         monitoringSession.checkIns.push({
           feeling,
-          time: new Date().toISOString(),
+          time: checkinTime,
           initialAction: monitoringSession.initialAction || '',
         });
 
@@ -1407,6 +1420,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         }
 
         localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+        // Update last_checkin_at in DB so pg_cron resets its 55-min window
+        // and doesn't send a duplicate push notification
+        if (window._symptomSupa && monitoringSession.startedAt) {
+          window._symptomSupa.auth.getSession().then(({ data }) => {
+            const userId = data?.session?.user?.id;
+            if (!userId) return;
+            window._symptomSupa
+              .from('symptom_monitoring_logs')
+              .update({ last_checkin_at: checkinTime, check_ins: monitoringSession.checkIns })
+              .eq('user_id', userId)
+              .eq('started_at', monitoringSession.startedAt)
+              .eq('outcome', 'active')
+              .catch(() => {});
+          });
+        }
+
         handleMonitoringResponse(feeling);
       });
     });
