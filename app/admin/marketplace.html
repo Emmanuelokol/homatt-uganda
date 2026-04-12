@@ -822,39 +822,10 @@ window.updateOrderStatus = async function(id, status) {
   const extra = {};
   if (status === 'confirmed') extra.confirmed_at = new Date().toISOString();
   if (status === 'delivered') extra.delivered_at = new Date().toISOString();
-
-  // Fetch order before update so we have user_id + items for notification
-  let orderRow = null;
-  if (status === 'confirmed') {
-    const { data: ord } = await adminDb.from('marketplace_orders').select('user_id, items').eq('id', id).maybeSingle();
-    orderRow = ord;
-  }
-
   const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
-
-  // Push notification to customer on confirmation
-  if (status === 'confirmed' && orderRow && orderRow.user_id) {
-    try {
-      const items = Array.isArray(orderRow.items) ? orderRow.items : [];
-      const itemNames = items.map(i => i.name).filter(Boolean);
-      const itemList = itemNames.length > 0
-        ? itemNames.slice(0, 3).join(', ') + (itemNames.length > 3 ? ` and ${itemNames.length - 3} more` : '')
-        : 'your items';
-      await adminDb.functions.invoke('send-notification', {
-        body: {
-          userId: orderRow.user_id,
-          title: 'Order Confirmed',
-          message: `${itemList} ${itemNames.length === 1 ? 'is' : 'are'} confirmed for delivery today. Our rider will be with you soon!`,
-          data: { screen: 'shop_order', id },
-          pref_category: 'promo_prevention_shop',
-        },
-      });
-    } catch (notifErr) {
-      console.warn('Order confirmation notification failed:', notifErr);
-    }
-  }
-
+  // Note: customer push notification on confirmation is handled server-side
+  // by the shop_order_confirmed_notify database trigger (reliable, no browser dependency).
   await loadOrders();
   showAdminToast('Order marked as ' + status, 'success');
 };
