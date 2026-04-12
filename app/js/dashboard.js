@@ -622,21 +622,96 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   };
 
+  // ── Active Monitoring Banner (synced with symptom checker "Monitor my symptom") ──
+  function checkActiveMonitoring() {
+    const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+    const banner = document.getElementById('activeMonitorBanner');
+    if (!banner) return;
+
+    if (!monSession?.condition) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    banner.style.display = 'block';
+
+    const condEl = document.getElementById('monitorBannerCondition');
+    if (condEl) condEl.textContent = `Condition: ${monSession.condition}`;
+
+    const timeEl = document.getElementById('monitorBannerTime');
+    if (timeEl && monSession.startedAt) {
+      const diffMs = Date.now() - new Date(monSession.startedAt).getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) {
+        timeEl.textContent = 'Just started';
+      } else if (diffMins < 60) {
+        timeEl.textContent = `Started ${diffMins} min ago`;
+      } else {
+        const hrs = Math.floor(diffMins / 60);
+        const mins = diffMins % 60;
+        timeEl.textContent = `Started ${hrs}h ${mins > 0 ? mins + 'm ' : ''}ago`;
+      }
+    }
+
+    const checkinsEl = document.getElementById('monitorBannerCheckins');
+    if (checkinsEl) {
+      const checkIns = monSession.checkIns || [];
+      if (checkIns.length > 0) {
+        const last = checkIns[checkIns.length - 1];
+        const feelingLabel = { better: 'Better', same: 'Same', worse: 'Worse' }[last.feeling] || last.feeling;
+        checkinsEl.textContent = `Last: ${feelingLabel} at ${new Date(last.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+      } else {
+        checkinsEl.textContent = 'No check-ins yet';
+      }
+    }
+
+    // Scroll to top so banner is immediately visible when app opens from notification
+    document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Called when user taps a feeling button on the monitoring banner
+  window.respondMonitorCheckin = function(feeling) {
+    // Delegate to the main handler — it handles Supabase, localStorage, health insights
+    if (window.handleSymptomCheckin) window.handleSymptomCheckin(feeling);
+
+    const banner = document.getElementById('activeMonitorBanner');
+    if (feeling === 'better') {
+      // Show a brief recovery confirmation in the banner, then hide it
+      if (banner) {
+        banner.querySelector('div:last-child').innerHTML = `
+          <div style="text-align:center;padding:12px 0">
+            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">health_and_safety</span>
+            <div style="font-size:14px;font-weight:700;color:#1B5E20;margin-bottom:4px">Glad you're feeling better!</div>
+            <div style="font-size:12px;color:#388E3C">Monitoring ended. Keep resting and stay hydrated.</div>
+          </div>`;
+        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+      }
+    } else if (feeling === 'worse') {
+      if (banner) banner.style.display = 'none';
+      // Clinic referral banner is shown by handleSymptomCheckin
+    } else {
+      // 'same' — refresh banner with updated check-in info
+      setTimeout(checkActiveMonitoring, 200);
+    }
+  };
+
   // Handle ?feeling= param from push notification tap (action button)
+  // This runs when the user taps Better/Same/Worse on a push notification and the app opens
   (function handleNotifFeelingParam() {
     const urlParams = new URLSearchParams(window.location.search);
     const notifFeeling = urlParams.get('feeling');
     if (notifFeeling && ['better', 'same', 'worse'].includes(notifFeeling)) {
-      // Wait for DOMContentLoaded + monitoring data load, then process
+      // Show banner immediately so user sees context, then auto-process
+      checkActiveMonitoring();
       setTimeout(() => {
         const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
         if (monSession?.condition && window.handleSymptomCheckin) {
-          window.handleSymptomCheckin(notifFeeling);
+          window.respondMonitorCheckin(notifFeeling);
           // Clean URL
           const clean = window.location.pathname;
           history.replaceState({}, '', clean);
         }
-      }, 800);
+      }, 900);
     }
   })();
 
@@ -702,4 +777,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   };
 
   checkPendingCheckins();
+  checkActiveMonitoring();
 });
