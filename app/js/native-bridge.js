@@ -168,9 +168,26 @@
       if (document.body.style.height) {
         document.body.style.height = '';
       }
+      document.body.classList.remove('keyboard-open');
       // Trigger a layout recalculation so the viewport/body fills the screen again.
       window.dispatchEvent(new Event('resize'));
     });
+
+    // Fallback: visualViewport.resize fires when the visible area changes (keyboard
+    // open/close). On some Android builds Capacitor's keyboardDidHide event is
+    // unreliable — this ensures the body height is always restored when the keyboard
+    // is no longer covering the screen, preventing the persistent black-area bug.
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => {
+        // gap > 50px → keyboard is likely open; gap ≤ 50px → keyboard is gone.
+        const gap = window.innerHeight - Math.round(window.visualViewport.height);
+        if (gap <= 50 && document.body.style.height) {
+          document.body.style.height = '';
+          document.body.classList.remove('keyboard-open');
+          window.dispatchEvent(new Event('resize'));
+        }
+      });
+    }
   }
 
   // ─── NETWORK STATUS ─────────────────────────────────────────────────────────

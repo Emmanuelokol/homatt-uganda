@@ -107,6 +107,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   backBtn.addEventListener('click', handleBack);
 
+  // Scroll the monitoring action textarea into view when the user taps it.
+  // The monitoring screen has a header + condition card + tips card above it,
+  // so the textarea starts off-screen once the keyboard opens. Scrolling it
+  // into view prevents it being hidden behind the keyboard.
+  document.getElementById('monitorInitialAction').addEventListener('focus', () => {
+    setTimeout(() => {
+      const el = document.getElementById('monitorInitialAction');
+      if (!el) return;
+      const scroller = document.querySelector('.app-screen');
+      if (!scroller) return;
+      const elRect = el.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+        - (scroller.clientHeight / 2) + (elRect.height / 2);
+      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+    }, 350); // after the keyboard animation (~300 ms) settles
+  });
+
   // Register with native-bridge so the Android hardware back button does the same
   window.HomattBackHandler = function () {
     handleBack();
