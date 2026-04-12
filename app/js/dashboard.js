@@ -457,22 +457,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
     }
 
-    // — Active symptom monitoring (status card only — check-in is handled by the banner after 60 min)
-    if (symLogs && symLogs.condition) {
-      const lastEventTime = symLogs.checkIns?.length
-        ? new Date(symLogs.checkIns[symLogs.checkIns.length - 1].time).getTime()
-        : new Date(symLogs.startedAt).getTime();
-      const minsElapsed = (Date.now() - lastEventTime) / 60000;
-      const minsRemaining = Math.max(0, Math.ceil(60 - minsElapsed));
-      const nextCheckin = minsElapsed >= 60 ? 'Check-in is now due — see the banner above.' : `Next check-in in ${minsRemaining} min.`;
-      insights.push({
-        icon: 'monitor_heart', color: '#D32F2F', urgency: 'danger',
-        title: `Active Monitoring: ${symLogs.condition}`,
-        cause: `You reported ${symLogs.condition} and are being monitored every hour.`,
-        prediction: 'Unresolved symptoms can worsen if left unmanaged.',
-        action: nextCheckin,
-      });
-    }
+    // — Active symptom monitoring is shown in the dedicated banner above Health Insights;
+    //   no need to duplicate it here.
 
     // — Positive reinforcement
     if (insights.length === 0 && (moodLogs.length + painLogs.length) >= 5) {
