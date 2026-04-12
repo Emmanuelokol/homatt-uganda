@@ -114,9 +114,10 @@
 
       <div class="page-content" style="padding-top:0">
 
-        <div id="permissionBanner" class="notif-banner" style="display:none">
+        <div id="permissionBanner" class="notif-banner" style="display:none;cursor:pointer" role="button" onclick="requestNotificationPermission()">
           <span class="material-icons-outlined" style="font-size:20px;flex-shrink:0">notifications_off</span>
-          <span>Push notifications are turned off on this device. <strong>Enable them in your phone settings</strong> to receive medicine reminders and appointment alerts.</span>
+          <span style="flex:1">Push notifications are turned off on this device. <strong>Tap here to enable them</strong> or go to your phone settings to receive medicine reminders and appointment alerts.</span>
+          <span class="material-icons-outlined" style="font-size:20px;flex-shrink:0">chevron_right</span>
         </div>
 
         <div class="notif-section-title" style="padding:16px 16px 8px">
@@ -240,10 +241,35 @@
       el.checked = prefs[k] !== false;
     });
 
-    // Show permission banner if player_id is absent (permission denied)
-    if (!profile?.onesignal_player_id) {
-      document.getElementById('permissionBanner').style.display = 'flex';
+    // ── Permission banner logic ───────────────────────────────────────────────
+    // Check actual OS permission from OneSignal plugin first; fall back to DB field.
+    function getOsPermissionGranted() {
+      try {
+        const OS = window.plugins?.OneSignal;
+        if (OS?.Notifications?.permission !== undefined) {
+          return OS.Notifications.permission;          // boolean: true = granted
+        }
+      } catch (_) {}
+      return null; // unknown — rely on DB field
     }
+
+    function updatePermissionBanner() {
+      const osGranted = getOsPermissionGranted();
+      // Show banner only when we can confirm notifications are off.
+      // osGranted===false  → definitely off
+      // osGranted===null   → unknown, fall back to DB: no player_id → likely off
+      const showBanner = osGranted === false || (osGranted === null && !profile?.onesignal_player_id);
+      document.getElementById('permissionBanner').style.display = showBanner ? 'flex' : 'none';
+    }
+
+    updatePermissionBanner();
+
+    // Re-check when the user comes back from phone settings
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') updatePermissionBanner();
+    });
+    // Also check on Capacitor resume event
+    document.addEventListener('resume', updatePermissionBanner, false);
 
     // Save
     document.getElementById('savePrefsBtn').addEventListener('click', async () => {
@@ -267,6 +293,41 @@
       setTimeout(() => { btn.textContent = 'Save preferences'; }, 2000);
     });
   })();
+
+  // Called when the user taps the permission banner.
+  // Tries to (re-)request push permission; hides the banner if granted.
+  window.requestNotificationPermission = function () {
+    const OS = window.plugins?.OneSignal;
+    if (!OS?.Notifications) {
+      // Capacitor not available (web preview) — nothing to do
+      return;
+    }
+    OS.Notifications.requestPermission(true)
+      .then((granted) => {
+        if (granted) {
+          document.getElementById('permissionBanner').style.display = 'none';
+          // Capture the player ID now that permission is granted
+          setTimeout(() => {
+            try {
+              const id = OS.User.pushSubscription.id;
+              if (id) {
+                const cfg  = window.HOMATT_CONFIG || {};
+                const supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+                supa.auth.getSession().then(({ data: { session } }) => {
+                  if (session?.user?.id) {
+                    supa.from('profiles')
+                      .update({ onesignal_player_id: id })
+                      .eq('id', session.user.id)
+                      .then(() => console.log('[OneSignal] player_id saved after permission grant'));
+                  }
+                });
+              }
+            } catch (_) {}
+          }, 2000);
+        }
+      })
+      .catch(() => {});
+  };
   </script>
 </body>
 </html>
