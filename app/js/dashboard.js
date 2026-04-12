@@ -492,16 +492,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     list.innerHTML = insights.map(ins => {
       const checkinButtons = ins.type === 'symptom_checkin' ? `
         <div style="display:flex;gap:8px;margin-top:12px">
-          <button onclick="window.handleSymptomCheckin('better')"
-            style="flex:1;padding:10px 6px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+          <button onclick="window.handleSymptomCheckin('better',this)"
+            style="flex:1;padding:10px 6px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
             <span class="material-icons-outlined" style="font-size:16px">sentiment_very_satisfied</span>Better
           </button>
-          <button onclick="window.handleSymptomCheckin('same')"
-            style="flex:1;padding:10px 6px;background:#FFF8E1;border:2px solid #FFC107;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+          <button onclick="window.handleSymptomCheckin('same',this)"
+            style="flex:1;padding:10px 6px;background:#FFF8E1;border:2px solid #FFC107;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
             <span class="material-icons-outlined" style="font-size:16px">sentiment_neutral</span>Same
           </button>
-          <button onclick="window.handleSymptomCheckin('worse')"
-            style="flex:1;padding:10px 6px;background:#FFEBEE;border:2px solid #EF5350;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+          <button onclick="window.handleSymptomCheckin('worse',this)"
+            style="flex:1;padding:10px 6px;background:#FFEBEE;border:2px solid #EF5350;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
             <span class="material-icons-outlined" style="font-size:16px">sentiment_very_dissatisfied</span>Worse
           </button>
         </div>` : '';
@@ -524,9 +524,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ── Symptom check-in handler (called from card buttons or push notification) ──
-  window.handleSymptomCheckin = function(feeling) {
+  window.handleSymptomCheckin = function(feeling, btn) {
     const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
     if (!monSession) return;
+
+    // ── Instant press feedback: highlight tapped button, dim others immediately ──
+    if (btn) {
+      const row = btn.parentNode;
+      if (row) row.querySelectorAll('button').forEach(b => {
+        b.disabled = true;
+        b.style.transform = b === btn ? 'scale(0.91)' : 'scale(1)';
+        b.style.opacity   = b === btn ? '1' : '0.3';
+        b.style.transition = 'transform .12s ease, opacity .12s ease';
+      });
+    }
 
     monSession.checkIns = monSession.checkIns || [];
     monSession.checkIns.push({ feeling, time: new Date().toISOString() });
@@ -539,18 +550,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     const list    = document.getElementById('healthPredictionList');
     const section = document.getElementById('healthPredictionSection');
 
+    // ── Smooth fade-swap helper ──
+    function swapList(newHtml) {
+      if (!list) return;
+      if (section) section.style.display = 'block';
+      list.style.transition = 'opacity .15s ease';
+      list.style.opacity = '0';
+      setTimeout(() => {
+        list.innerHTML = newHtml;
+        list.style.opacity = '1';
+      }, 150);
+    }
+
     if (feeling === 'better') {
       localStorage.removeItem('homatt_monitoring');
-      if (section) section.style.display = 'block';
-      if (list) {
-        list.innerHTML = `
-          <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:14px;padding:20px 16px;text-align:center">
-            <span class="material-icons-outlined" style="font-size:40px;color:#2E7D32;display:block;margin-bottom:8px">health_and_safety</span>
-            <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:6px">Great! Glad you're feeling better</div>
-            <div style="font-size:13px;color:#388E3C;line-height:1.5">Monitoring ended. Keep resting and stay hydrated.</div>
-          </div>`;
-      }
-      // Save recovery to Supabase
+      swapList(`
+        <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:14px;padding:20px 16px;text-align:center">
+          <span class="material-icons-outlined" style="font-size:40px;color:#2E7D32;display:block;margin-bottom:8px">health_and_safety</span>
+          <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:6px">Great! Glad you're feeling better</div>
+          <div style="font-size:13px;color:#388E3C;line-height:1.5">Monitoring ended. Keep resting and stay hydrated.</div>
+        </div>`);
+      // Save recovery to Supabase (fire and forget — no blocking)
       if (supabase && session?.user?.id) {
         supabase.from('symptom_monitoring_logs').upsert({
           user_id: session.user.id,
@@ -566,7 +586,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else {
       localStorage.setItem('homatt_monitoring', JSON.stringify(monSession));
 
-      // Update Supabase last_checkin_at
+      // Update Supabase (fire and forget — no blocking)
       if (supabase && session?.user?.id) {
         supabase.from('symptom_monitoring_logs').upsert({
           user_id: session.user.id,
@@ -579,45 +599,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       if (feeling === 'worse' || monSession.symptomsSame >= 2) {
+        const escalMsg = feeling === 'worse'
+          ? 'Your symptoms are worsening — please visit a clinic now.'
+          : 'Symptoms not improving after multiple check-ins. A clinic visit is strongly recommended.';
+        swapList(`
+          <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:14px;padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#D32F2F;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:20px;color:#fff">local_hospital</span>
+              </div>
+              <div style="font-size:14px;font-weight:700;color:#B71C1C">Please see a clinic</div>
+            </div>
+            <div style="font-size:13px;color:#C62828;margin-bottom:12px">${escalMsg}</div>
+            <button onclick="window.location.href='symptom-checker.html'"
+              style="width:100%;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent">
+              <span class="material-icons-outlined" style="font-size:18px">local_hospital</span>Find Nearest Clinic
+            </button>
+          </div>`);
         const banner = document.getElementById('clinicReferralBanner');
         if (banner) {
           banner.style.display = 'block';
           document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' });
         }
-        if (list) {
-          const escalMsg = feeling === 'worse'
-            ? 'Your symptoms are worsening — please visit a clinic now.'
-            : 'Symptoms are not improving after multiple check-ins. A clinic visit is strongly recommended.';
-          list.innerHTML = `
-            <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:14px;padding:14px 16px">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                <div style="width:36px;height:36px;border-radius:10px;background:#D32F2F;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <span class="material-icons-outlined" style="font-size:20px;color:#fff">local_hospital</span>
-                </div>
-                <div style="font-size:14px;font-weight:700;color:#B71C1C">Escalation Required</div>
-              </div>
-              <div style="font-size:13px;color:#C62828;font-weight:600">${escalMsg}</div>
-              <button onclick="window.location.href='symptom-checker.html'"
-                style="width:100%;margin-top:12px;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
-                <span class="material-icons-outlined">local_hospital</span>Find Nearest Clinic
-              </button>
-            </div>`;
-        }
       } else {
-        // First "same" — reassure + schedule next check-in
-        if (list) {
-          list.innerHTML = `
-            <div style="background:#FFF8E1;border:1.5px solid #FFE082;border-radius:14px;padding:14px 16px">
-              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-                <div style="width:36px;height:36px;border-radius:10px;background:#F9A825;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                  <span class="material-icons-outlined" style="font-size:20px;color:#fff">schedule</span>
-                </div>
-                <div style="font-size:14px;font-weight:700;color:#E65100">Noted — monitoring continues</div>
+        // First "same" — reassure, monitoring continues
+        swapList(`
+          <div style="background:#FFF8E1;border:1.5px solid #FFE082;border-radius:14px;padding:14px 16px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <div style="width:36px;height:36px;border-radius:10px;background:#F9A825;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:20px;color:#fff">schedule</span>
               </div>
-              <div style="font-size:13px;color:#795548;margin-bottom:8px">Your check-in has been recorded. Rest, drink water, and we'll remind you to check in again in 1 hour.</div>
-              <div style="font-size:12px;font-weight:600;color:#F57F17"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span> Take your temperature, drink ORS/water, and rest.</div>
-            </div>`;
-        }
+              <div style="font-size:14px;font-weight:700;color:#E65100">Noted — still monitoring</div>
+            </div>
+            <div style="font-size:13px;color:#795548;margin-bottom:6px">Check-in recorded. Rest, drink water, and we'll remind you in 1 hour.</div>
+            <div style="font-size:12px;font-weight:600;color:#F57F17">
+              <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span>
+              Take your temperature, drink ORS/water, and rest.
+            </div>
+          </div>`);
       }
     }
   };
@@ -670,25 +689,44 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // Called when user taps a feeling button on the monitoring banner
-  window.respondMonitorCheckin = function(feeling) {
+  window.respondMonitorCheckin = function(feeling, btn) {
+    // Instant press feedback on the banner buttons
+    if (btn) {
+      const row = btn.parentNode;
+      if (row) row.querySelectorAll('button').forEach(b => {
+        b.disabled = true;
+        b.style.transform = b === btn ? 'scale(0.91)' : 'scale(1)';
+        b.style.opacity   = b === btn ? '1' : '0.3';
+        b.style.transition = 'transform .12s ease, opacity .12s ease';
+      });
+    }
+
     // Delegate to the main handler — it handles Supabase, localStorage, health insights
     if (window.handleSymptomCheckin) window.handleSymptomCheckin(feeling);
 
     const banner = document.getElementById('activeMonitorBanner');
     if (feeling === 'better') {
-      // Show a brief recovery confirmation in the banner, then hide it
+      // Smooth confirmation then fade out
       if (banner) {
-        banner.querySelector('div:last-child').innerHTML = `
-          <div style="text-align:center;padding:12px 0">
-            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">health_and_safety</span>
-            <div style="font-size:14px;font-weight:700;color:#1B5E20;margin-bottom:4px">Glad you're feeling better!</div>
-            <div style="font-size:12px;color:#388E3C">Monitoring ended. Keep resting and stay hydrated.</div>
-          </div>`;
-        setTimeout(() => { banner.style.display = 'none'; }, 3000);
+        const body = banner.querySelector('div:last-child');
+        if (body) {
+          body.style.transition = 'opacity .15s ease';
+          body.style.opacity = '0';
+          setTimeout(() => {
+            body.innerHTML = `
+              <div style="text-align:center;padding:12px 0">
+                <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">health_and_safety</span>
+                <div style="font-size:14px;font-weight:700;color:#1B5E20;margin-bottom:4px">Glad you're feeling better!</div>
+                <div style="font-size:12px;color:#388E3C">Monitoring ended. Keep resting and stay hydrated.</div>
+              </div>`;
+            body.style.opacity = '1';
+          }, 150);
+        }
+        setTimeout(() => { banner.style.transition = 'opacity .3s ease'; banner.style.opacity = '0'; setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = ''; banner.style.transition = ''; }, 300); }, 2500);
       }
     } else if (feeling === 'worse') {
-      if (banner) banner.style.display = 'none';
-      // Clinic referral banner is shown by handleSymptomCheckin
+      // Immediately hide banner — clinic referral shown by handleSymptomCheckin
+      if (banner) { banner.style.transition = 'opacity .2s ease'; banner.style.opacity = '0'; setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = ''; banner.style.transition = ''; }, 200); }
     } else {
       // 'same' — refresh banner with updated check-in info
       setTimeout(checkActiveMonitoring, 200);

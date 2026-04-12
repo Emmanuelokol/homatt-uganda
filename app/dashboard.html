@@ -141,16 +141,16 @@
             </div>
             <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling right now?</div>
             <div style="display:flex;gap:8px;margin-bottom:12px">
-              <button onclick="window.respondMonitorCheckin('better')"
-                style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              <button onclick="window.respondMonitorCheckin('better',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
                 😊<br>Better
               </button>
-              <button onclick="window.respondMonitorCheckin('same')"
-                style="flex:1;padding:10px 6px;border:2px solid #FFC107;background:#FFF8E1;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              <button onclick="window.respondMonitorCheckin('same',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #FFC107;background:#FFF8E1;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
                 😐<br>Same
               </button>
-              <button onclick="window.respondMonitorCheckin('worse')"
-                style="flex:1;padding:10px 6px;border:2px solid #EF5350;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              <button onclick="window.respondMonitorCheckin('worse',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #EF5350;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
                 😔<br>Worse
               </button>
             </div>
