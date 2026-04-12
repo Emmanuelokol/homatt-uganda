@@ -29,6 +29,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   let selectedCategoryId = null;
   let _nearestPharmacy = null;
   let _cachedCoords = null;
+  let _deliverySettings = { base_fee: 2000, per_km_rate: 500, min_fee: 2000 };
 
   // ====== Helpers ======
   function escHtml(s) {
@@ -654,7 +655,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : 2000;
+    const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : _deliverySettings.min_fee;
     document.getElementById('cartSubtotal').textContent = subtotal.toLocaleString();
     document.getElementById('cartDeliveryFee').textContent = curDeliveryFee.toLocaleString();
     document.getElementById('cartTotal').textContent = (subtotal + curDeliveryFee).toLocaleString();
@@ -708,9 +709,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   }
 
+  async function loadDeliverySettings() {
+    try {
+      const { data } = await supabase
+        .from('delivery_settings')
+        .select('base_fee, per_km_rate, min_fee')
+        .limit(1)
+        .single();
+      if (data) _deliverySettings = data;
+    } catch(e) { /* keep defaults on any error */ }
+  }
+
   function calcDeliveryFee(distanceKm) {
-    const fee = 2000 + Math.round(distanceKm) * 500;
-    return Math.max(2000, Math.round(fee / 500) * 500);
+    const { base_fee, per_km_rate, min_fee } = _deliverySettings;
+    const fee = base_fee + Math.round(distanceKm) * per_km_rate;
+    return Math.max(min_fee, Math.round(fee / 500) * 500);
   }
 
   async function findNearestPharmacy(userLat, userLon) {
@@ -855,7 +868,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dc) [userLat, userLon] = dc;
       }
 
-      let pharmacyId = null, deliveryFee = 2000;
+      let pharmacyId = null, deliveryFee = _deliverySettings.min_fee;
       if (userLat && userLon) {
         try {
           const nearest = await findNearestPharmacy(userLat, userLon);
@@ -1083,7 +1096,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ====== Init ======
-  loadShop();
+  // Fetch delivery settings and shop data in parallel
+  await Promise.all([loadDeliverySettings(), loadShop()]);
 
   // Start pharmacy lookup in background
   getUserCoords().then(coords => {

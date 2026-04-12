@@ -93,6 +93,46 @@
         </div>
       </div>
 
+      <!-- ===== DELIVERY COST SETTINGS ===== -->
+      <div class="admin-table-wrap" style="margin-bottom:24px;padding:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="material-icons-outlined" style="color:#1B5E20;font-size:22px">local_shipping</span>
+            <div>
+              <div style="font-weight:700;font-size:15px">Delivery Cost Settings</div>
+              <div style="font-size:12px;color:#9AA0A6;margin-top:2px">Controls the transport fee shown to customers on the mobile app</div>
+            </div>
+          </div>
+          <button class="btn-admin primary" onclick="saveDeliverySettings()" id="saveDeliveryBtn">
+            <span class="material-icons-outlined" style="font-size:15px">save</span> Save Settings
+          </button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:6px">Base Delivery Fee (UGX)</label>
+            <input type="number" id="dsBaseFee" min="0" step="100" value="2000"
+              style="width:100%;padding:10px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box"
+              placeholder="e.g. 2000">
+            <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Charged on every order regardless of distance</div>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:6px">Per-Km Rate (UGX / km)</label>
+            <input type="number" id="dsPerKm" min="0" step="50" value="500"
+              style="width:100%;padding:10px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box"
+              placeholder="e.g. 500">
+            <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Added per kilometre from nearest pharmacy</div>
+          </div>
+          <div>
+            <label style="display:block;font-size:12px;font-weight:600;color:#5F6368;margin-bottom:6px">Minimum Fee (UGX)</label>
+            <input type="number" id="dsMinFee" min="0" step="100" value="2000"
+              style="width:100%;padding:10px 12px;border:1px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;box-sizing:border-box"
+              placeholder="e.g. 2000">
+            <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Customers are never charged less than this</div>
+          </div>
+        </div>
+        <div id="deliverySettingsStatus" style="margin-top:12px;font-size:12px;color:#9AA0A6"></div>
+      </div>
+
       <!-- ===== ORDER TABS ===== -->
       <div style="display:flex;gap:0;border:1px solid #E0E0E0;border-radius:10px;overflow:hidden;margin-bottom:16px;background:#F8F9FA">
         <button id="tabShopOrders" onclick="switchOrderTab('shop')"
@@ -1057,6 +1097,65 @@ function playAlertBeep() {
   } catch(_e) {}
 }
 
+// ===== DELIVERY SETTINGS =====
+
+async function loadDeliverySettings() {
+  if (!adminDb) return;
+  try {
+    const { data, error } = await adminDb
+      .from('delivery_settings')
+      .select('base_fee, per_km_rate, min_fee')
+      .limit(1)
+      .single();
+    if (error || !data) return;
+    document.getElementById('dsBaseFee').value = data.base_fee;
+    document.getElementById('dsPerKm').value   = data.per_km_rate;
+    document.getElementById('dsMinFee').value  = data.min_fee;
+    const el = document.getElementById('deliverySettingsStatus');
+    if (el) el.textContent = 'Settings loaded from database.';
+  } catch(e) {
+    console.error('loadDeliverySettings failed:', e);
+  }
+}
+
+async function saveDeliverySettings() {
+  if (!adminDb) { showAdminToast('No database connection', 'error'); return; }
+  const base = parseInt(document.getElementById('dsBaseFee').value, 10);
+  const perKm = parseInt(document.getElementById('dsPerKm').value, 10);
+  const min  = parseInt(document.getElementById('dsMinFee').value, 10);
+  if (isNaN(base) || isNaN(perKm) || isNaN(min) || base < 0 || perKm < 0 || min < 0) {
+    showAdminToast('Please enter valid non-negative numbers for all fields', 'error');
+    return;
+  }
+  const btn = document.getElementById('saveDeliveryBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    // Update the single existing row
+    const { data: rows } = await adminDb.from('delivery_settings').select('id').limit(1);
+    let err;
+    if (rows && rows.length) {
+      ({ error: err } = await adminDb
+        .from('delivery_settings')
+        .update({ base_fee: base, per_km_rate: perKm, min_fee: min, updated_at: new Date().toISOString() })
+        .eq('id', rows[0].id));
+    } else {
+      ({ error: err } = await adminDb
+        .from('delivery_settings')
+        .insert({ base_fee: base, per_km_rate: perKm, min_fee: min }));
+    }
+    if (err) throw new Error(err.message);
+    showAdminToast('Delivery settings saved! Mobile app will use new rates on next load.', 'success');
+    const el = document.getElementById('deliverySettingsStatus');
+    if (el) el.textContent = `Saved at ${new Date().toLocaleTimeString()}`;
+  } catch(e) {
+    showAdminToast('Failed to save: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">save</span> Save Settings';
+  }
+}
+
 // ===== SUPABASE REALTIME — LIVE ORDER ALERTS =====
 let _realtimeChannel = null;
 
@@ -1168,7 +1267,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   try { await loadCategories(); } catch(e) { console.error('loadCategories init error:', e); }
-  await Promise.all([loadProducts(), loadOrders()]);
+  await Promise.all([loadProducts(), loadOrders(), loadDeliverySettings()]);
 
   // Start Supabase Realtime subscription for live order alerts
   setupRealtimeAlerts(adminDb);
