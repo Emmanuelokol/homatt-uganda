@@ -201,17 +201,69 @@
         <div class="sc-screen-inner">
           <div class="sc-monitor-header">
             <div class="sc-monitor-icon">
-              <span class="material-icons-outlined">monitor_heart</span>
+              <span class="material-icons-outlined" id="monitorHeaderIcon">monitor_heart</span>
             </div>
-            <h3 class="sc-heading">Follow-Up Check-In</h3>
-            <p class="sc-subheading">We're monitoring your symptoms. How are you feeling now?</p>
+            <h3 class="sc-heading" id="monitorHeading">Monitoring Your Health</h3>
+            <p class="sc-subheading" id="monitorSubheading">Follow these steps to help you feel better</p>
           </div>
 
           <div class="sc-monitor-condition" id="monitorCondition">
             <!-- Shows what we're monitoring -->
           </div>
 
-          <div class="sc-feeling-options" id="feelingOptions">
+          <!-- PHASE 1: Prevention tips + what are you doing? -->
+          <div id="monitorPhase1">
+            <div id="monitorTipsCard" class="sc-monitor-tips-card">
+              <!-- Condition-specific prevention tips rendered by JS -->
+            </div>
+            <div class="sc-monitor-action-wrap">
+              <label class="sc-monitor-action-label">
+                <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:4px">edit_note</span>
+                What are you currently doing to manage your symptoms?
+              </label>
+              <textarea id="monitorInitialAction" class="sc-monitor-action-textarea"
+                rows="3" placeholder="e.g. I am resting, drinking water, took paracetamol..."></textarea>
+              <button class="btn sc-monitor-start-btn" id="btnStartCountdown">
+                <span class="material-icons-outlined">timer</span>
+                Start 1-Hour Monitoring
+              </button>
+            </div>
+          </div>
+
+          <!-- PHASE 2: Live countdown -->
+          <div id="monitorPhase2" style="display:none">
+            <div class="sc-countdown-wrap">
+              <div class="sc-countdown-circle">
+                <svg class="sc-countdown-svg" viewBox="0 0 100 100">
+                  <circle class="sc-countdown-track" cx="50" cy="50" r="44"/>
+                  <circle class="sc-countdown-progress" id="countdownProgressCircle" cx="50" cy="50" r="44"
+                    style="stroke-dasharray:276.46;stroke-dashoffset:0"/>
+                </svg>
+                <div class="sc-countdown-text-wrap">
+                  <span id="countdownDisplay">60:00</span>
+                  <span class="sc-countdown-min-label">remaining</span>
+                </div>
+              </div>
+              <p class="sc-countdown-label">Your 1-hour monitoring has started</p>
+            </div>
+            <div id="monitorCountdownTips" class="sc-monitor-tips-card" style="margin-top:16px">
+              <!-- Same tips shown during countdown as reminder -->
+            </div>
+            <div id="monitorActionReminder" class="sc-action-reminder" style="display:none">
+              <!-- Reminder of what the user said they're doing -->
+            </div>
+          </div>
+
+          <!-- PHASE 3: Check-in prompt (after timer) -->
+          <div id="monitorPhase3" style="display:none">
+            <div class="sc-checkin-prompt">
+              <span class="material-icons-outlined">notification_important</span>
+              <p id="monitorCheckinText">Time for your check-in! How are you feeling now?</p>
+            </div>
+          </div>
+
+          <!-- Feeling buttons (hidden until check-in time) -->
+          <div class="sc-feeling-options" id="feelingOptions" style="display:none">
             <button class="sc-feeling-btn better" data-feeling="better">
               <span class="material-icons-outlined">sentiment_very_satisfied</span>
               <span>Much Better</span>
@@ -227,7 +279,7 @@
           </div>
 
           <div class="sc-monitor-response" id="monitorResponse" style="display:none">
-            <!-- AI response based on feeling -->
+            <!-- Response based on feeling selection -->
           </div>
 
           <div class="sc-monitor-timer" id="monitorTimer" style="display:none">

@@ -981,3 +981,225 @@
 .sc-otc-item { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(27,94,32,0.1); font-size:13px; }
 .sc-otc-item:last-child { border-bottom:none; }
 .sc-order-btn { background:#00695C; color:#fff; border:none; border-radius:10px; padding:12px 20px; width:100%; font-size:14px; font-weight:600; margin-top:12px; display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; }
+
+/* ====== Monitor Phase 1 — Prevention Tips Card ====== */
+.sc-monitor-tips-card {
+  background: #E8F5E9;
+  border: 1px solid #C8E6C9;
+  border-radius: var(--radius-md);
+  padding: 14px;
+  margin-bottom: 16px;
+}
+
+.sc-monitor-tips-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1B5E20;
+  margin-bottom: 10px;
+}
+
+.sc-monitor-tips-title .material-icons-outlined {
+  font-size: 18px;
+  color: #2E7D32;
+}
+
+.sc-monitor-tips-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.sc-monitor-tips-list li {
+  position: relative;
+  padding-left: 16px;
+  font-size: 13px;
+  color: #2E7D32;
+  line-height: 1.6;
+  margin-bottom: 4px;
+}
+
+.sc-monitor-tips-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  font-weight: 700;
+  color: #2E7D32;
+}
+
+.sc-monitor-tips-list li:last-child { margin-bottom: 0; }
+
+/* Monitor action textarea */
+.sc-monitor-action-wrap {
+  margin-bottom: 16px;
+}
+
+.sc-monitor-action-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.sc-monitor-action-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-primary);
+  background: var(--background);
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+  line-height: 1.5;
+}
+
+.sc-monitor-action-textarea:focus {
+  border-color: var(--primary);
+  background: white;
+}
+
+.sc-monitor-action-textarea::placeholder {
+  color: var(--text-hint);
+}
+
+/* Start monitoring button */
+.sc-monitor-start-btn {
+  width: 100%;
+  padding: 15px;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 4px 14px rgba(27, 94, 32, 0.3);
+  transition: all 0.2s ease;
+  margin-top: 12px;
+}
+
+.sc-monitor-start-btn:active {
+  background: var(--primary-dark);
+  transform: scale(0.98);
+}
+
+/* ====== Monitor Phase 2 — Countdown ====== */
+.sc-countdown-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sc-countdown-circle {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin-bottom: 10px;
+}
+
+.sc-countdown-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.sc-countdown-track {
+  fill: none;
+  stroke: var(--primary-surface);
+  stroke-width: 6;
+}
+
+.sc-countdown-progress {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 276.46;
+  stroke-dashoffset: 0;
+  transition: stroke-dashoffset 1s linear;
+}
+
+.sc-countdown-text-wrap {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+#countdownDisplay {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--primary);
+  display: block;
+  letter-spacing: 1px;
+}
+
+.sc-countdown-min-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
+.sc-countdown-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+/* Action reminder during countdown */
+.sc-action-reminder {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #E3F2FD;
+  border: 1px solid #90CAF9;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #0D47A1;
+  line-height: 1.5;
+  margin-top: 12px;
+}
+
+/* ====== Monitor Phase 3 — Check-in Prompt ====== */
+.sc-checkin-prompt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #FFF3E0;
+  border: 1px solid #FFE082;
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  animation: scFadeIn 0.4s ease;
+}
+
+.sc-checkin-prompt .material-icons-outlined {
+  font-size: 26px;
+  color: #E65100;
+  flex-shrink: 0;
+}
+
+.sc-checkin-prompt p {
+  font-size: 14px;
+  font-weight: 600;
+  color: #BF360C;
+  line-height: 1.4;
+}

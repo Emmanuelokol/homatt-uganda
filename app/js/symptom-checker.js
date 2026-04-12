@@ -1143,15 +1143,98 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   }
 
   // ====== SCREEN 5: Follow-up Monitoring ======
+  let countdownInterval = null;
+
+  // Prevention tips per condition (used in Phase 1 & 2)
+  function getPreventionTipsForCondition(conditionName, diagData) {
+    // Use AI-generated tips if available
+    if (diagData?.prevention_tips?.length) return diagData.prevention_tips;
+    const c = (conditionName || '').toLowerCase();
+    if (c.includes('malaria'))     return ['Sleep under a treated mosquito net tonight','Drink plenty of fluids and stay hydrated','Avoid going outside at dusk without mosquito repellent','Get a malaria rapid test (RDT) at the nearest clinic'];
+    if (c.includes('typhoid'))     return ['Drink only boiled or bottled water','Wash your hands thoroughly before eating','Eat freshly cooked food only','Visit a health facility for proper testing'];
+    if (c.includes('cold') || c.includes('respiratory') || c.includes('flu')) return ['Drink warm fluids — tea, soup, water with honey','Rest in a warm, well-ventilated room','Gargle with warm salt water for sore throat','Wash hands often to avoid spreading the infection'];
+    if (c.includes('gastro') || c.includes('diarrhea') || c.includes('stomach')) return ['Start ORS (Oral Rehydration Salts) right away','Eat small amounts of bland food: rice, bananas, toast','Avoid dairy, spicy and fatty foods until better','Visit a clinic if diarrhea lasts more than 3 days'];
+    if (c.includes('uti') || c.includes('urinary'))    return ['Drink at least 8 glasses of water today','Urinate frequently — don\'t hold it in','Avoid caffeine and alcohol while symptomatic','Visit a clinic for a urine test and antibiotics'];
+    if (c.includes('headache') || c.includes('tension')) return ['Drink 2 glasses of water immediately','Rest in a quiet, dim room for 20 minutes','Take paracetamol if the pain is strong','Apply a cool or warm cloth to your forehead'];
+    return ['Rest and get enough sleep','Drink plenty of water throughout the day','Eat light nutritious meals','Monitor your symptoms and visit a clinic if they worsen'];
+  }
+
+  function renderMonitorTipsCard(containerId, tips, conditionName) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="sc-monitor-tips-title">
+        <span class="material-icons-outlined">health_and_safety</span>
+        What to do for ${conditionName}
+      </div>
+      <ul class="sc-monitor-tips-list">
+        ${tips.map(t => `<li>${t}</li>`).join('')}
+      </ul>
+    `;
+  }
+
   function startMonitoring() {
+    const condName = diagnosisData.conditions[0]?.name || 'Your condition';
+    const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+
     monitoringSession = {
-      condition: diagnosisData.conditions[0]?.name || 'Your condition',
+      condition: condName,
       risk: diagnosisData.overall_risk,
-      startedAt: new Date().toISOString(),
+      startedAt: null, // set when countdown begins
       checkIns: [],
       symptomsSame: 0,
+      initialAction: '',
     };
 
+    // Update monitor header with personal greeting
+    const heading = document.getElementById('monitorHeading');
+    const subheading = document.getElementById('monitorSubheading');
+    if (heading) heading.textContent = `Hey ${firstName}, let's monitor your health`;
+    if (subheading) subheading.textContent = 'Follow the steps below while we check on you in 1 hour';
+
+    // Show condition card
+    document.getElementById('monitorCondition').innerHTML = `
+      <div class="sc-monitor-cond-card">
+        <span class="material-icons-outlined">medical_information</span>
+        <div>
+          <p class="sc-monitor-cond-name">Monitoring: ${condName}</p>
+          <p class="sc-monitor-cond-risk">Risk level: <strong class="${monitoringSession.risk}">${monitoringSession.risk}</strong></p>
+        </div>
+      </div>
+    `;
+
+    // Reset all phases
+    document.getElementById('monitorPhase1').style.display = 'block';
+    document.getElementById('monitorPhase2').style.display = 'none';
+    document.getElementById('monitorPhase3').style.display = 'none';
+    document.getElementById('feelingOptions').style.display = 'none';
+    document.getElementById('monitorResponse').style.display = 'none';
+    document.getElementById('monitorTimer').style.display = 'none';
+
+    // Render prevention tips in Phase 1
+    const tips = getPreventionTipsForCondition(condName, diagnosisData);
+    renderMonitorTipsCard('monitorTipsCard', tips, condName);
+
+    // Wire the "Start 1-Hour Monitoring" button
+    const startBtn = document.getElementById('btnStartCountdown');
+    if (startBtn) {
+      // Remove old listeners by cloning
+      const newStartBtn = startBtn.cloneNode(true);
+      startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+      newStartBtn.addEventListener('click', () => {
+        const action = document.getElementById('monitorInitialAction')?.value.trim() || '';
+        monitoringSession.initialAction = action;
+        beginCountdown(tips, condName, action);
+      });
+    }
+
+    showScreen('screenMonitor');
+  }
+
+  function beginCountdown(tips, condName, initialAction) {
+    const now = new Date();
+    monitoringSession.startedAt = now.toISOString();
+    monitoringSession.countdownStartedAt = now.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
     // Persist to Supabase so pg_cron can send hourly push reminders
@@ -1168,7 +1251,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           if (!userId) return;
           window._symptomSupa.from('symptom_monitoring_logs').upsert({
             user_id: userId,
-            condition: monitoringSession.condition,
+            condition: condName,
             started_at: monitoringSession.startedAt,
             outcome: 'active',
             check_ins: [],
@@ -1178,24 +1261,103 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       }
     } catch (_e) { /* non-fatal */ }
 
-    document.getElementById('monitorCondition').innerHTML = `
-      <div class="sc-monitor-cond-card">
-        <span class="material-icons-outlined">medical_information</span>
-        <div>
-          <p class="sc-monitor-cond-name">Monitoring: ${monitoringSession.condition}</p>
-          <p class="sc-monitor-cond-risk">Risk level: <strong class="${monitoringSession.risk}">${monitoringSession.risk}</strong></p>
-        </div>
-      </div>
-    `;
+    // Switch to Phase 2
+    document.getElementById('monitorPhase1').style.display = 'none';
+    document.getElementById('monitorPhase2').style.display = 'block';
 
-    document.getElementById('monitorResponse').style.display = 'none';
-    document.getElementById('monitorTimer').style.display = 'none';
+    // Render tips in countdown card too (reminder)
+    renderMonitorTipsCard('monitorCountdownTips', tips, condName);
+
+    // Show what the user said they're doing
+    const reminderEl = document.getElementById('monitorActionReminder');
+    if (reminderEl) {
+      if (initialAction) {
+        reminderEl.style.display = 'flex';
+        reminderEl.innerHTML = `
+          <span class="material-icons-outlined" style="font-size:18px;color:#1565C0;flex-shrink:0">check_circle</span>
+          <span><strong>You're doing:</strong> ${initialAction}</span>
+        `;
+      } else {
+        reminderEl.style.display = 'none';
+      }
+    }
+
+    // Start the visual countdown
+    startCountdownTimer(3600); // 3600 seconds = 1 hour
+
+    // Request browser notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }
+
+  function startCountdownTimer(totalSeconds) {
+    // Clear any existing interval
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    const circumference = 2 * Math.PI * 44; // r=44 → 276.46
+    const progressCircle = document.getElementById('countdownProgressCircle');
+    const displayEl = document.getElementById('countdownDisplay');
+    let remaining = totalSeconds;
+
+    function updateDisplay() {
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      if (displayEl) displayEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+      if (progressCircle) {
+        const offset = circumference * (1 - remaining / totalSeconds);
+        progressCircle.style.strokeDashoffset = offset;
+      }
+    }
+
+    updateDisplay();
+
+    countdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining < 0) remaining = 0;
+      updateDisplay();
+
+      if (remaining === 0) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        triggerCheckinPhase();
+      }
+    }, 1000);
+  }
+
+  function triggerCheckinPhase() {
+    const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+
+    // Hide countdown, show check-in prompt
+    document.getElementById('monitorPhase2').style.display = 'none';
+    document.getElementById('monitorPhase3').style.display = 'block';
+    document.getElementById('feelingOptions').style.display = 'flex';
+
+    // Personalize the check-in text
+    const checkinText = document.getElementById('monitorCheckinText');
+    if (checkinText) {
+      checkinText.textContent = `Time's up, ${firstName}! How are you feeling now compared to when you started?`;
+    }
+
+    // Update header
+    const heading = document.getElementById('monitorHeading');
+    const subheading = document.getElementById('monitorSubheading');
+    if (heading) heading.textContent = 'Check-In Time!';
+    if (subheading) subheading.textContent = 'Tell us how you\'re feeling after 1 hour';
+
+    // Send browser notification if page is open
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Homatt Health Check-In', {
+        body: `Time to check in on your ${monitoringSession.condition}. How are you feeling?`,
+        icon: '/icons/icon-192.png',
+      });
+    }
+
+    // Re-enable feeling buttons and wire them
     document.querySelectorAll('.sc-feeling-btn').forEach(b => {
       b.classList.remove('selected');
       b.disabled = false;
     });
-
-    showScreen('screenMonitor');
     wireMonitoringButtons();
   }
 
@@ -1207,6 +1369,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       newBtn.addEventListener('click', () => {
         const feeling = newBtn.dataset.feeling;
 
+        // Disable all feeling buttons once one is selected
         document.querySelectorAll('.sc-feeling-btn').forEach(b => {
           b.classList.remove('selected');
           b.disabled = true;
@@ -1216,6 +1379,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         monitoringSession.checkIns.push({
           feeling,
           time: new Date().toISOString(),
+          initialAction: monitoringSession.initialAction || '',
         });
 
         if (feeling === 'same') {
@@ -1488,15 +1652,26 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         });
       }
     } else if (feeling === 'worse') {
+      const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+      const condName = monitoringSession.condition || 'your condition';
       responseEl.innerHTML = `
         <div class="sc-monitor-msg worse">
           <span class="material-icons-outlined">emergency</span>
           <div>
-            <p class="sc-monitor-msg-title">Please seek medical attention</p>
-            <p>Your symptoms are getting worse. We strongly recommend visiting the nearest health facility as soon as possible. Don't wait - your health is important.</p>
+            <p class="sc-monitor-msg-title">${firstName}, please seek care now</p>
+            <p>Your ${condName} symptoms are getting worse after monitoring. Don't wait — visit the nearest health facility as soon as possible. Your health matters.</p>
           </div>
         </div>
-        <button class="btn sc-clinic-btn urgent" id="btnWorseClinic" style="margin-top:12px">
+        <div style="background:#FFEBEE;border:1px solid #EF9A9A;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;color:#B71C1C">
+          <strong>Warning signs that need immediate attention:</strong>
+          <ul style="margin:8px 0 0 16px;line-height:1.8">
+            <li>Difficulty breathing or chest pain</li>
+            <li>High fever (above 39°C) that won't come down</li>
+            <li>Severe vomiting or diarrhea</li>
+            <li>Loss of consciousness or extreme weakness</li>
+          </ul>
+        </div>
+        <button class="btn sc-clinic-btn urgent" id="btnWorseClinic" style="margin-top:14px">
           <span class="material-icons-outlined">local_hospital</span>
           Find Nearest Clinic Now
         </button>
@@ -1529,7 +1704,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       hours === 1 ? '1 hour' : `${hours} hours`;
 
     const nextTime = new Date();
-    nextTime.setHours(nextTime.getHours() + hours);
+    nextTime.setTime(nextTime.getTime() + hours * 3600000);
     monitoringSession.nextCheckIn = nextTime.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
@@ -1537,32 +1712,38 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    // Schedule in-page reminder using setTimeout (works while page is open)
+
+    // Show Phase 2 countdown again for the next hour
+    document.getElementById('monitorPhase3').style.display = 'none';
+    document.getElementById('monitorResponse').style.display = 'none';
+    document.getElementById('monitorTimer').style.display = 'none';
+    document.getElementById('feelingOptions').style.display = 'none';
+    document.getElementById('monitorPhase2').style.display = 'block';
+
+    const tips = getPreventionTipsForCondition(monitoringSession.condition, diagnosisData);
+    renderMonitorTipsCard('monitorCountdownTips', tips, monitoringSession.condition);
+
+    const reminderEl = document.getElementById('monitorActionReminder');
+    if (reminderEl && monitoringSession.initialAction) {
+      reminderEl.style.display = 'flex';
+      reminderEl.innerHTML = `
+        <span class="material-icons-outlined" style="font-size:18px;color:#1565C0;flex-shrink:0">check_circle</span>
+        <span><strong>Keep doing:</strong> ${monitoringSession.initialAction}</span>
+      `;
+    }
+
+    // Start countdown for next check-in
     const msUntil = nextTime - Date.now();
-    if (msUntil > 0 && msUntil < 2 * 3600000) { // only if within 2 hours
+    startCountdownTimer(Math.max(0, Math.round(msUntil / 1000)));
+
+    // Schedule in-page reminder using setTimeout (fallback if countdown misses)
+    if (msUntil > 0 && msUntil < 2 * 3600000) {
       setTimeout(() => {
-        // Show check-in if monitoring still active
         const m = JSON.parse(localStorage.getItem('homatt_monitoring') || 'null');
         if (!m) return;
-        // Send browser notification if possible
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Homatt-health Check-in', {
-            body: `Time to check in on your ${m.condition}. How are you feeling?`,
-            icon: '/icons/icon-192.png',
-          });
-        }
-        // Re-enable buttons for new check-in
-        document.querySelectorAll('.sc-feeling-btn').forEach(b => {
-          b.classList.remove('selected');
-          b.disabled = false;
-        });
-        document.getElementById('monitorResponse').style.display = 'none';
-        document.getElementById('monitorTimer').style.display = 'none';
         if (document.getElementById('screenMonitor').classList.contains('active')) {
-          document.querySelector('.sc-subheading') &&
-            (document.querySelector('#screenMonitor .sc-subheading').textContent = 'Time for your hourly check-in. How are you feeling now?');
+          triggerCheckinPhase();
         }
-        wireMonitoringButtons();
       }, msUntil);
     }
   }
