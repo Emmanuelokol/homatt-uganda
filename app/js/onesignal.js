@@ -32,14 +32,16 @@ const SCREEN_URLS = {
   'health-tracker':   'dashboard.html',
   'complete-payment': 'wallet.html',
   'recovery-check':   'dashboard.html',
+  'symptom-checkin':  'dashboard.html',
 };
 
 // ── Deep link navigation ──────────────────────────────────────
 function navigateToScreen(data) {
   if (!data) return;
-  const screen  = data.screen || data.type;
-  const id      = data.id;
+  const screen   = data.screen || data.type;
+  const id       = data.id;
   const clinicId = data.clinic_id;
+  const feeling  = data.feeling; // set when a notification action button is tapped
 
   let url = SCREEN_URLS[screen] || 'dashboard.html';
 
@@ -48,6 +50,7 @@ function navigateToScreen(data) {
   if (id)       params.set('notif_id', id);
   if (screen)   params.set('screen', screen);
   if (clinicId) params.set('clinic_id', clinicId);
+  if (feeling)  params.set('feeling', feeling);
 
   const qs = params.toString();
   window.location.href = qs ? `${url}?${qs}` : url;
@@ -150,7 +153,15 @@ function initOneSignal() {
     // 4. Handle notification tap — navigate to the correct screen
     OS.Notifications.addEventListener('click', (event) => {
       try {
-        const data = event?.notification?.additionalData || event?.data || {};
+        const data     = event?.notification?.additionalData || event?.data || {};
+        // action is set when a notification action button (Better/Same/Worse) is tapped
+        const actionId = event?.action || event?.result?.actionId || '';
+
+        if (actionId && actionId.startsWith('feeling_')) {
+          const feeling = actionId.replace('feeling_', ''); // better / same / worse
+          navigateToScreen({ screen: 'symptom-checkin', feeling });
+          return;
+        }
         navigateToScreen(data);
       } catch (e) {
         console.error('[OneSignal] click handler error:', e);

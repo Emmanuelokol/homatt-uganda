@@ -464,7 +464,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         title: `Active Monitoring: ${symLogs.condition}`,
         cause: `You reported ${symLogs.condition} and are being monitored every hour.`,
         prediction: 'Unresolved symptoms can worsen if left unmanaged.',
-        action: 'Log a check-in in the Symptom Checker. Take your temperature, drink water, and rest.',
+        action: 'How are you feeling right now? Tap a button below to log your check-in.',
+        type: 'symptom_checkin',
       });
     }
 
@@ -488,7 +489,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     const urgencyColors = { danger:'#FFEBEE', warning:'#FFF8E1', info:'#E3F2FD', good:'#E8F5E9' };
     const urgencyBorder = { danger:'#EF9A9A', warning:'#FFE082', info:'#90CAF9', good:'#A5D6A7' };
 
-    list.innerHTML = insights.map(ins => `
+    list.innerHTML = insights.map(ins => {
+      const checkinButtons = ins.type === 'symptom_checkin' ? `
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button onclick="window.handleSymptomCheckin('better')"
+            style="flex:1;padding:10px 6px;background:#E8F5E9;border:2px solid #4CAF50;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+            <span class="material-icons-outlined" style="font-size:16px">sentiment_very_satisfied</span>Better
+          </button>
+          <button onclick="window.handleSymptomCheckin('same')"
+            style="flex:1;padding:10px 6px;background:#FFF8E1;border:2px solid #FFC107;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+            <span class="material-icons-outlined" style="font-size:16px">sentiment_neutral</span>Same
+          </button>
+          <button onclick="window.handleSymptomCheckin('worse')"
+            style="flex:1;padding:10px 6px;background:#FFEBEE;border:2px solid #EF5350;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:4px;touch-action:manipulation">
+            <span class="material-icons-outlined" style="font-size:16px">sentiment_very_dissatisfied</span>Worse
+          </button>
+        </div>` : '';
+      return `
       <div style="background:${urgencyColors[ins.urgency]||'#F5F5F5'};border:1px solid ${urgencyBorder[ins.urgency]||'#E0E0E0'};border-radius:14px;padding:14px 16px">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <div style="width:36px;height:36px;border-radius:10px;background:${ins.color};display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -499,10 +516,129 @@ document.addEventListener('DOMContentLoaded', async () => {
         <div style="font-size:12px;color:#555;margin-bottom:6px"><strong>Why:</strong> ${ins.cause}</div>
         <div style="font-size:12px;color:#555;margin-bottom:6px"><strong>Risk:</strong> ${ins.prediction}</div>
         <div style="font-size:12px;font-weight:600;color:${ins.color}"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span> ${ins.action}</div>
-      </div>`).join('');
+        ${checkinButtons}
+      </div>`;
+    }).join('');
 
     section.style.display = 'block';
   }
+
+  // ── Symptom check-in handler (called from card buttons or push notification) ──
+  window.handleSymptomCheckin = function(feeling) {
+    const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+    if (!monSession) return;
+
+    monSession.checkIns = monSession.checkIns || [];
+    monSession.checkIns.push({ feeling, time: new Date().toISOString() });
+    if (feeling === 'same') {
+      monSession.symptomsSame = (monSession.symptomsSame || 0) + 1;
+    } else {
+      monSession.symptomsSame = 0;
+    }
+
+    const list    = document.getElementById('healthPredictionList');
+    const section = document.getElementById('healthPredictionSection');
+
+    if (feeling === 'better') {
+      localStorage.removeItem('homatt_monitoring');
+      if (section) section.style.display = 'block';
+      if (list) {
+        list.innerHTML = `
+          <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:14px;padding:20px 16px;text-align:center">
+            <span class="material-icons-outlined" style="font-size:40px;color:#2E7D32;display:block;margin-bottom:8px">health_and_safety</span>
+            <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:6px">Great! Glad you're feeling better</div>
+            <div style="font-size:13px;color:#388E3C;line-height:1.5">Monitoring ended. Keep resting and stay hydrated.</div>
+          </div>`;
+      }
+      // Save recovery to Supabase
+      if (supabase && session?.user?.id) {
+        supabase.from('symptom_monitoring_logs').upsert({
+          user_id: session.user.id,
+          condition: monSession.condition,
+          started_at: monSession.startedAt,
+          ended_at: new Date().toISOString(),
+          outcome: 'recovered',
+          check_ins: monSession.checkIns,
+          last_checkin_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,started_at' }).catch(() => {});
+      }
+      setTimeout(runHealthPredictions, 4000);
+    } else {
+      localStorage.setItem('homatt_monitoring', JSON.stringify(monSession));
+
+      // Update Supabase last_checkin_at
+      if (supabase && session?.user?.id) {
+        supabase.from('symptom_monitoring_logs').upsert({
+          user_id: session.user.id,
+          condition: monSession.condition,
+          started_at: monSession.startedAt,
+          outcome: 'active',
+          check_ins: monSession.checkIns,
+          last_checkin_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,started_at' }).catch(() => {});
+      }
+
+      if (feeling === 'worse' || monSession.symptomsSame >= 2) {
+        const banner = document.getElementById('clinicReferralBanner');
+        if (banner) {
+          banner.style.display = 'block';
+          document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        if (list) {
+          const escalMsg = feeling === 'worse'
+            ? 'Your symptoms are worsening — please visit a clinic now.'
+            : 'Symptoms are not improving after multiple check-ins. A clinic visit is strongly recommended.';
+          list.innerHTML = `
+            <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:14px;padding:14px 16px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div style="width:36px;height:36px;border-radius:10px;background:#D32F2F;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span class="material-icons-outlined" style="font-size:20px;color:#fff">local_hospital</span>
+                </div>
+                <div style="font-size:14px;font-weight:700;color:#B71C1C">Escalation Required</div>
+              </div>
+              <div style="font-size:13px;color:#C62828;font-weight:600">${escalMsg}</div>
+              <button onclick="window.location.href='symptom-checker.html'"
+                style="width:100%;margin-top:12px;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+                <span class="material-icons-outlined">local_hospital</span>Find Nearest Clinic
+              </button>
+            </div>`;
+        }
+      } else {
+        // First "same" — reassure + schedule next check-in
+        if (list) {
+          list.innerHTML = `
+            <div style="background:#FFF8E1;border:1.5px solid #FFE082;border-radius:14px;padding:14px 16px">
+              <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+                <div style="width:36px;height:36px;border-radius:10px;background:#F9A825;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                  <span class="material-icons-outlined" style="font-size:20px;color:#fff">schedule</span>
+                </div>
+                <div style="font-size:14px;font-weight:700;color:#E65100">Noted — monitoring continues</div>
+              </div>
+              <div style="font-size:13px;color:#795548;margin-bottom:8px">Your check-in has been recorded. Rest, drink water, and we'll remind you to check in again in 1 hour.</div>
+              <div style="font-size:12px;font-weight:600;color:#F57F17"><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span> Take your temperature, drink ORS/water, and rest.</div>
+            </div>`;
+        }
+      }
+    }
+  };
+
+  // Handle ?feeling= param from push notification tap (action button)
+  (function handleNotifFeelingParam() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const notifFeeling = urlParams.get('feeling');
+    if (notifFeeling && ['better', 'same', 'worse'].includes(notifFeeling)) {
+      // Wait for DOMContentLoaded + monitoring data load, then process
+      setTimeout(() => {
+        const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+        if (monSession?.condition && window.handleSymptomCheckin) {
+          window.handleSymptomCheckin(notifFeeling);
+          // Clean URL
+          const clean = window.location.pathname;
+          history.replaceState({}, '', clean);
+        }
+      }, 800);
+    }
+  })();
 
   runHealthPredictions();
 

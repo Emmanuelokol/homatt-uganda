@@ -1154,6 +1154,30 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
+    // Persist to Supabase so pg_cron can send hourly push reminders
+    try {
+      if (!window._symptomSupa) {
+        const _cfg = window.HOMATT_CONFIG || {};
+        if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+          window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+        }
+      }
+      if (window._symptomSupa) {
+        window._symptomSupa.auth.getSession().then(({ data }) => {
+          const userId = data?.session?.user?.id;
+          if (!userId) return;
+          window._symptomSupa.from('symptom_monitoring_logs').upsert({
+            user_id: userId,
+            condition: monitoringSession.condition,
+            started_at: monitoringSession.startedAt,
+            outcome: 'active',
+            check_ins: [],
+            last_checkin_at: monitoringSession.startedAt,
+          }, { onConflict: 'user_id,started_at' }).catch(() => {});
+        });
+      }
+    } catch (_e) { /* non-fatal */ }
+
     document.getElementById('monitorCondition').innerHTML = `
       <div class="sc-monitor-cond-card">
         <span class="material-icons-outlined">medical_information</span>
@@ -1438,14 +1462,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             if (window._symptomSupa) {
               const { data: _sd } = await window._symptomSupa.auth.getSession();
               const _sess = _sd?.session || null;
-              await window._symptomSupa.from('symptom_monitoring_logs').insert({
+              await window._symptomSupa.from('symptom_monitoring_logs').upsert({
                 user_id: _sess?.user?.id || null,
                 condition: monitoringSession.condition,
                 started_at: monitoringSession.startedAt,
-                outcome: 'monitoring',
+                outcome: 'active',
                 check_ins: monitoringSession.checkIns,
-                last_action: actionText || null,
-              });
+                last_checkin_at: new Date().toISOString(),
+              }, { onConflict: 'user_id,started_at' });
             }
           } catch(_e) { console.warn('[SC] check-in save failed:', _e.message); }
 

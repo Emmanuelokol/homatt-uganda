@@ -123,6 +123,10 @@ Deno.serve(async (req: Request) => {
   // portal key: used to identify which pref category to check
   // e.g. "appointment_reminders", "medicine_reminders", "promo_prevention_shop"
   const prefCategory = typeof body.pref_category === "string" ? body.pref_category : undefined;
+  // action_buttons: array of {id, text} for Android notification action buttons
+  const actionButtons = Array.isArray(body.buttons) && body.buttons.length > 0
+    ? (body.buttons as Array<{ id: string; text: string }>)
+    : undefined;
 
   if (!heading || !message) {
     return json({ error: "heading (or title) and message are required" }, 400);
@@ -178,6 +182,10 @@ Deno.serve(async (req: Request) => {
 
   if (data) {
     payload.data = data;
+  }
+
+  if (actionButtons) {
+    payload.action_buttons = actionButtons;
   }
 
   // ── Send to OneSignal ──
