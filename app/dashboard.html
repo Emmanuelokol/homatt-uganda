@@ -15,8 +15,7 @@
   <!-- OneSignal Web Push SDK -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <style>
-    /* Active screen toggling */
-    .app-screen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    /* Hide inactive screens — styles.css already handles overflow-y: auto */
     .app-screen:not(.active) { display: none; }
   </style>
 </head>
