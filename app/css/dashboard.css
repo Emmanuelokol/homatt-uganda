@@ -4,7 +4,7 @@
 
 /* Dashboard Header */
 .dash-header {
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
   padding: 16px 20px 20px;
   position: relative;
   overflow: hidden;
@@ -182,6 +182,7 @@
 /* Dashboard Content */
 .dash-content {
   padding: 16px 20px;
+  background: var(--background);
 }
 
 /* Hero Card - Symptom Checker */
@@ -463,11 +464,11 @@
   align-items: center;
   gap: 12px;
   padding: 14px 16px;
-  background: #FFF8E1;
+  background: rgba(255,143,0,0.1);
   border-radius: var(--radius-lg);
   margin-bottom: 20px;
   cursor: pointer;
-  border: 1px solid #FFE082;
+  border: 1px solid rgba(255,143,0,0.25);
   transition: all 0.2s ease;
 }
 
@@ -479,7 +480,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #FFF3E0;
+  background: rgba(255,143,0,0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -517,18 +518,18 @@
 }
 
 .alert-level.low {
-  background: #E8F5E9;
-  color: #2E7D32;
+  background: rgba(76,175,80,0.15);
+  color: #66BB6A;
 }
 
 .alert-level.medium {
-  background: #FFF3E0;
-  color: #E65100;
+  background: rgba(255,143,0,0.15);
+  color: #FFB74D;
 }
 
 .alert-level.high {
-  background: #FFEBEE;
-  color: #C62828;
+  background: rgba(239,83,80,0.15);
+  color: #EF5350;
 }
 
 .alert-detail {
@@ -625,6 +626,133 @@
 .reminder-dismiss:active {
   background: var(--error-bg);
   color: var(--error);
+}
+
+/* ── Rate Us feature icon ───────────────────────────────── */
+.feature-icon-wrap.rate-us {
+  background: linear-gradient(135deg, #FF8F00, #FFB74D);
+}
+
+/* ── Health Insights Section ────────────────────────────── */
+.insights-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.insight-empty {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border);
+  color: var(--text-hint);
+  font-size: 13px;
+}
+.insight-empty .material-icons-outlined {
+  font-size: 22px;
+  color: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Monitoring card */
+.monitoring-card {
+  background: rgba(239, 83, 80, 0.1);
+  border: 1px solid rgba(239, 83, 80, 0.25);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 4px;
+}
+.monitoring-card-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.monitoring-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: rgba(239,83,80,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.monitoring-icon .material-icons-outlined {
+  font-size: 24px;
+  color: #EF5350;
+}
+.monitoring-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+.monitoring-why, .monitoring-risk {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+.monitoring-checkin {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #EF5350;
+  margin: 12px 0 14px;
+  line-height: 1.4;
+}
+.monitoring-checkin .material-icons-outlined {
+  font-size: 16px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+.checkin-buttons {
+  display: flex;
+  gap: 8px;
+}
+.checkin-btn {
+  flex: 1;
+  padding: 10px 8px;
+  border-radius: 10px;
+  border: 1.5px solid;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.checkin-btn .material-icons-outlined { font-size: 17px; }
+.checkin-btn:active { transform: scale(0.95); }
+.checkin-btn.better  { border-color: #66BB6A; color: #66BB6A; }
+.checkin-btn.same    { border-color: #FFB74D; color: #FFB74D; }
+.checkin-btn.worse   { border-color: #EF5350; color: #EF5350; }
+.checkin-btn.better:active { background: rgba(102,187,106,0.15); }
+.checkin-btn.same:active   { background: rgba(255,180,77,0.15); }
+.checkin-btn.worse:active  { background: rgba(239,83,80,0.15); }
+
+.checkin-confirmed {
+  font-size: 13px;
+  color: var(--primary);
+  font-weight: 600;
+  padding: 10px;
+  background: var(--primary-surface);
+  border-radius: var(--radius-md);
+  text-align: center;
+  width: 100%;
 }
 
 /* Wallet Cards */

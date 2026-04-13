@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1B5E20">
+  <meta name="theme-color" content="#121212">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Homatt Health - Dashboard</title>
@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="css/dashboard.css">
   <link rel="stylesheet" href="css/shop.css">
   <style>
-    /* Hide inactive screens — styles.css already handles overflow-y: auto */
+    /* Hide inactive home screen when shop is active */
     .app-screen:not(.active) { display: none; }
   </style>
 </head>
@@ -29,8 +29,11 @@
       </div>
     </div>
 
-    <!-- App Content -->
+    <!-- ═══════════════════════════════════════════════════════
+         HOME SCREEN
+    ═══════════════════════════════════════════════════════ -->
     <div class="app-screen active" id="homeScreen">
+
       <!-- Dashboard Header -->
       <div class="dash-header">
         <div class="dash-header-top">
@@ -73,10 +76,10 @@
         </div>
       </div>
 
-      <!-- Dashboard Content -->
+      <!-- Dashboard Content (scrollable) -->
       <div class="dash-content">
 
-        <!-- Check My Health - Hero Card -->
+        <!-- Check My Health -->
         <div class="dash-hero-card" id="symptomChecker">
           <div class="hero-card-icon">
             <span class="material-icons-outlined">stethoscope</span>
@@ -124,7 +127,7 @@
           </button>
         </div>
 
-        <!-- Feature Grid Section -->
+        <!-- Health Trackers Feature Grid -->
         <div class="dash-section">
           <h3 class="section-title">Health Trackers</h3>
           <div class="feature-grid">
@@ -146,12 +149,25 @@
               </div>
               <span class="feature-label">Child Growth</span>
             </div>
-            <div class="feature-card" id="featureBP">
-              <div class="feature-icon-wrap bp">
-                <span class="material-icons-outlined">monitor_heart</span>
+            <div class="feature-card" id="featureRateUs">
+              <div class="feature-icon-wrap rate-us">
+                <span class="material-icons-outlined">star</span>
               </div>
-              <span class="feature-label">Blood Pressure</span>
+              <span class="feature-label">Rate Us</span>
             </div>
+          </div>
+        </div>
+
+        <!-- Health Insights Section -->
+        <div class="dash-section">
+          <div class="section-header">
+            <h3 class="insights-title section-title">
+              <span class="material-icons-outlined" style="color:var(--primary);font-size:20px">psychology</span>
+              Health Insights
+            </h3>
+          </div>
+          <div id="healthInsightsContainer">
+            <!-- Rendered by dashboard.js -->
           </div>
         </div>
 
@@ -216,51 +232,15 @@
           </div>
         </div>
 
-        <!-- Wallet Preview -->
-        <div class="dash-section">
-          <div class="section-header">
-            <h3 class="section-title">My Wallets</h3>
-            <button class="section-link">Manage</button>
-          </div>
-          <div class="wallet-cards">
-            <div class="wallet-card family-wallet">
-              <div class="wallet-header">
-                <span class="material-icons-outlined">account_balance_wallet</span>
-                <span class="wallet-name">Family Wallet</span>
-              </div>
-              <p class="wallet-balance">UGX <span id="familyBalance">0</span></p>
-              <div class="wallet-actions">
-                <button class="wallet-btn">
-                  <span class="material-icons-outlined" style="font-size:16px">add</span>
-                  Deposit
-                </button>
-              </div>
-            </div>
-            <div class="wallet-card care-wallet">
-              <div class="wallet-header">
-                <span class="material-icons-outlined">health_and_safety</span>
-                <span class="wallet-name">Care Wallet</span>
-              </div>
-              <p class="wallet-balance">UGX <span id="careBalance">0</span></p>
-              <div class="wallet-actions">
-                <button class="wallet-btn">
-                  <span class="material-icons-outlined" style="font-size:16px">add</span>
-                  Deposit
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bottom spacer for scroll -->
-        <div style="height: 16px;"></div>
+        <!-- Bottom spacer -->
+        <div style="height:16px;"></div>
       </div>
     </div><!-- end homeScreen -->
 
-    <!-- ═══════════════════════════════════════════════════════════════
+    <!-- ═══════════════════════════════════════════════════════
          PREVENTIVE SHOP SCREEN
-    ═══════════════════════════════════════════════════════════════ -->
-    <div class="shop-screen" id="shopScreen">
+    ═══════════════════════════════════════════════════════ -->
+    <div class="shop-screen" id="shopScreen" style="display:none">
 
       <!-- Shop Header -->
       <div class="shop-header">
@@ -307,7 +287,7 @@
         </div>
       </div>
 
-      <!-- ── Product Detail Overlay (bottom sheet) ── -->
+      <!-- Product Detail Bottom Sheet -->
       <div class="product-overlay" id="productOverlay">
         <div class="overlay-handle"></div>
         <div class="overlay-header">
@@ -324,8 +304,6 @@
           <div class="detail-price" id="detailPrice"></div>
           <div class="detail-cat-badge malaria" id="detailCatBadge"></div>
           <div class="detail-desc" id="detailDesc"></div>
-
-          <!-- Quantity -->
           <div class="qty-row">
             <span class="qty-label">Quantity</span>
             <div class="qty-controls">
@@ -334,21 +312,16 @@
               <button class="qty-btn" id="qtyIncrease">+</button>
             </div>
           </div>
-
-          <!-- Order Form -->
           <div class="order-form">
             <label class="form-label">Phone Number</label>
             <input class="form-input" id="orderPhone" type="tel" placeholder="e.g. 0701234567">
             <label class="form-label">Delivery Address / District</label>
             <input class="form-input" id="orderAddress" type="text" placeholder="e.g. Kampala, Nakasero">
           </div>
-
-          <!-- Total -->
           <div class="order-total-row">
             <span class="order-total-label">Total</span>
             <span class="order-total-value" id="orderTotalValue">UGX 0</span>
           </div>
-
           <button class="btn-order" id="btnPlaceOrder">
             <span class="material-icons-outlined">shopping_cart</span>
             Confirm Order
@@ -356,7 +329,7 @@
         </div>
       </div>
 
-      <!-- ── My Orders Overlay (slides in from right) ── -->
+      <!-- My Orders Slide-in Panel -->
       <div class="orders-overlay" id="ordersOverlay">
         <div class="orders-header">
           <button class="orders-back-btn" id="ordersBackBtn">
@@ -364,12 +337,10 @@
           </button>
           <div class="orders-header-title">My Orders</div>
         </div>
-        <div class="orders-list" id="myOrdersList">
-          <!-- Rendered by shop.js -->
-        </div>
+        <div class="orders-list" id="myOrdersList"></div>
       </div>
 
-      <!-- ── Order Success Overlay ── -->
+      <!-- Order Success Overlay -->
       <div class="order-success-backdrop" id="orderSuccessOverlay">
         <div class="order-success-card">
           <div class="success-check-wrap">
@@ -386,23 +357,19 @@
 
     </div><!-- end shopScreen -->
 
-    <!-- Bottom Navigation Bar -->
+    <!-- Bottom Navigation: Home · Family · Shop · Profile -->
     <div class="bottom-nav">
       <div class="nav-item active" id="navHome">
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
       </div>
-      <div class="nav-item" id="navShop">
-        <span class="material-icons-outlined">storefront</span>
-        <span class="nav-label">Shop</span>
-      </div>
       <div class="nav-item" id="navFamily">
         <span class="material-icons-outlined">family_restroom</span>
         <span class="nav-label">Family</span>
       </div>
-      <div class="nav-item" id="navWallet">
-        <span class="material-icons-outlined">account_balance_wallet</span>
-        <span class="nav-label">Wallet</span>
+      <div class="nav-item" id="navShop">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
       </div>
       <div class="nav-item" id="navProfile">
         <span class="material-icons-outlined">person</span>
