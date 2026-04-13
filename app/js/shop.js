@@ -78,20 +78,56 @@
     wireEvents();
   };
 
-  // ── OneSignal Push Setup ──────────────────────────────────────────────────
+  // ── OneSignal Push Setup (loaded lazily — never blocks DOMContentLoaded) ───
+  let oneSignalLoaded = false;
+
+  function loadOneSignalLazily(callback) {
+    // Skip if no real App ID configured
+    if (!ONESIGNAL_APP_ID || ONESIGNAL_APP_ID === 'YOUR_ONESIGNAL_APP_ID') return;
+
+    if (typeof OneSignal !== 'undefined') {
+      // Already on the page
+      if (callback) callback();
+      return;
+    }
+
+    if (document.getElementById('onesignal-sdk')) {
+      // Script already injected — wait for it
+      const check = setInterval(() => {
+        if (typeof OneSignal !== 'undefined') {
+          clearInterval(check);
+          if (callback) callback();
+        }
+      }, 200);
+      return;
+    }
+
+    // Inject SDK script asynchronously — no defer, no blocking
+    const script = document.createElement('script');
+    script.id  = 'onesignal-sdk';
+    script.src = 'https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js';
+    script.async = true;
+    script.onload = () => { if (callback) callback(); };
+    script.onerror = () => {}; // silently ignore if CDN unreachable
+    document.head.appendChild(script);
+  }
+
   function initOneSignalForUser() {
-    if (typeof OneSignal === 'undefined') return;
-    OneSignal.push(async () => {
-      OneSignal.init({ appId: ONESIGNAL_APP_ID, notifyButton: { enable: false } });
-      const isPushEnabled = await OneSignal.isPushNotificationsEnabled();
-      if (!isPushEnabled) {
-        // Ask for permission when on the shop tab
-        OneSignal.on('subscriptionChange', async (isSubscribed) => {
-          if (isSubscribed) await saveOneSignalPlayerId();
-        });
-      } else {
-        await saveOneSignalPlayerId();
-      }
+    loadOneSignalLazily(() => {
+      if (typeof OneSignal === 'undefined') return;
+      OneSignal.push(async () => {
+        try {
+          OneSignal.init({ appId: ONESIGNAL_APP_ID, notifyButton: { enable: false } });
+          const isPushEnabled = await OneSignal.isPushNotificationsEnabled();
+          if (!isPushEnabled) {
+            OneSignal.on('subscriptionChange', async (isSubscribed) => {
+              if (isSubscribed) await saveOneSignalPlayerId();
+            });
+          } else {
+            await saveOneSignalPlayerId();
+          }
+        } catch (_) {}
+      });
     });
   }
 
@@ -108,8 +144,12 @@
   }
 
   async function requestPushPermission() {
-    if (typeof OneSignal === 'undefined') return;
-    OneSignal.push(() => OneSignal.registerForPushNotifications());
+    loadOneSignalLazily(() => {
+      if (typeof OneSignal === 'undefined') return;
+      OneSignal.push(() => {
+        try { OneSignal.registerForPushNotifications(); } catch (_) {}
+      });
+    });
   }
 
   // ── Load Products ─────────────────────────────────────────────────────────
