@@ -11,6 +11,14 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
   <link rel="stylesheet" href="css/dashboard.css">
+  <link rel="stylesheet" href="css/shop.css">
+  <!-- OneSignal Web Push SDK -->
+  <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+  <style>
+    /* Active screen toggling */
+    .app-screen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+    .app-screen:not(.active) { display: none; }
+  </style>
 </head>
 <body>
   <div class="phone-frame">
@@ -25,7 +33,7 @@
     </div>
 
     <!-- App Content -->
-    <div class="app-screen">
+    <div class="app-screen active" id="homeScreen">
       <!-- Dashboard Header -->
       <div class="dash-header">
         <div class="dash-header-top">
@@ -250,13 +258,146 @@
         <!-- Bottom spacer for scroll -->
         <div style="height: 16px;"></div>
       </div>
-    </div>
+    </div><!-- end homeScreen -->
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         PREVENTIVE SHOP SCREEN
+    ═══════════════════════════════════════════════════════════════ -->
+    <div class="shop-screen" id="shopScreen">
+
+      <!-- Shop Header -->
+      <div class="shop-header">
+        <div class="shop-header-top">
+          <div class="shop-header-text">
+            <div class="shop-header-title">Preventive Shop</div>
+            <div class="shop-header-sub">Stay healthy before you get sick</div>
+          </div>
+          <button class="shop-orders-btn" id="shopOrdersBtn">
+            <span class="material-icons-outlined">receipt_long</span>
+            My Orders
+          </button>
+        </div>
+      </div>
+
+      <!-- Category Filter -->
+      <div class="shop-cats">
+        <div class="cat-chip active" data-cat="all">
+          <span class="material-icons-outlined">apps</span>
+          All Items
+        </div>
+        <div class="cat-chip" data-cat="malaria">
+          <span class="material-icons-outlined">bed</span>
+          Malaria
+        </div>
+        <div class="cat-chip" data-cat="hygiene">
+          <span class="material-icons-outlined">soap</span>
+          Hygiene
+        </div>
+        <div class="cat-chip" data-cat="nutrition">
+          <span class="material-icons-outlined">medication</span>
+          Nutrition
+        </div>
+        <div class="cat-chip" data-cat="protection">
+          <span class="material-icons-outlined">shield</span>
+          Protection
+        </div>
+      </div>
+
+      <!-- Products Grid -->
+      <div class="shop-products">
+        <div class="products-grid" id="shopProductsGrid">
+          <!-- Rendered by shop.js -->
+        </div>
+      </div>
+
+      <!-- ── Product Detail Overlay (bottom sheet) ── -->
+      <div class="product-overlay" id="productOverlay">
+        <div class="overlay-handle"></div>
+        <div class="overlay-header">
+          <button class="overlay-back" id="productOverlayBack">
+            <span class="material-icons-outlined">close</span>
+          </button>
+          <div class="overlay-title" id="overlayTitle">Product</div>
+        </div>
+        <div class="overlay-body">
+          <div class="detail-icon-wrap malaria" id="detailIcon">
+            <span class="material-icons-outlined" id="detailIconInner">health_and_safety</span>
+          </div>
+          <div class="detail-name" id="detailName"></div>
+          <div class="detail-price" id="detailPrice"></div>
+          <div class="detail-cat-badge malaria" id="detailCatBadge"></div>
+          <div class="detail-desc" id="detailDesc"></div>
+
+          <!-- Quantity -->
+          <div class="qty-row">
+            <span class="qty-label">Quantity</span>
+            <div class="qty-controls">
+              <button class="qty-btn" id="qtyDecrease">−</button>
+              <span class="qty-value" id="qtyValue">1</span>
+              <button class="qty-btn" id="qtyIncrease">+</button>
+            </div>
+          </div>
+
+          <!-- Order Form -->
+          <div class="order-form">
+            <label class="form-label">Phone Number</label>
+            <input class="form-input" id="orderPhone" type="tel" placeholder="e.g. 0701234567">
+            <label class="form-label">Delivery Address / District</label>
+            <input class="form-input" id="orderAddress" type="text" placeholder="e.g. Kampala, Nakasero">
+          </div>
+
+          <!-- Total -->
+          <div class="order-total-row">
+            <span class="order-total-label">Total</span>
+            <span class="order-total-value" id="orderTotalValue">UGX 0</span>
+          </div>
+
+          <button class="btn-order" id="btnPlaceOrder">
+            <span class="material-icons-outlined">shopping_cart</span>
+            Confirm Order
+          </button>
+        </div>
+      </div>
+
+      <!-- ── My Orders Overlay (slides in from right) ── -->
+      <div class="orders-overlay" id="ordersOverlay">
+        <div class="orders-header">
+          <button class="orders-back-btn" id="ordersBackBtn">
+            <span class="material-icons-outlined">arrow_back</span>
+          </button>
+          <div class="orders-header-title">My Orders</div>
+        </div>
+        <div class="orders-list" id="myOrdersList">
+          <!-- Rendered by shop.js -->
+        </div>
+      </div>
+
+      <!-- ── Order Success Overlay ── -->
+      <div class="order-success-backdrop" id="orderSuccessOverlay">
+        <div class="order-success-card">
+          <div class="success-check-wrap">
+            <span class="material-icons-outlined">check_circle</span>
+          </div>
+          <div class="success-title">Order Placed!</div>
+          <div class="success-sub" id="successSubText">
+            Your order for <strong id="successProductName"></strong> has been received.
+            We will contact you to confirm delivery soon.
+          </div>
+          <button class="btn-success-close" id="btnSuccessClose">View My Orders</button>
+        </div>
+      </div>
+
+    </div><!-- end shopScreen -->
 
     <!-- Bottom Navigation Bar -->
     <div class="bottom-nav">
-      <div class="nav-item active">
+      <div class="nav-item active" id="navHome">
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" id="navShop">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
       </div>
       <div class="nav-item" id="navFamily">
         <span class="material-icons-outlined">family_restroom</span>
@@ -275,6 +416,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="js/config.js"></script>
+  <script src="js/shop.js"></script>
   <script src="js/dashboard.js"></script>
 </body>
 </html>

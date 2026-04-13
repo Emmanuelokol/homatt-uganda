@@ -107,6 +107,11 @@
       <div class="nav-item" onclick="showPage('prescriptions',this)">
         <span class="material-icons-outlined">medication</span> Prescriptions
       </div>
+      <div class="nav-section-label">Shop</div>
+      <div class="nav-item" onclick="showPage('shop-orders',this)">
+        <span class="material-icons-outlined">storefront</span> Shop Orders
+        <span class="nav-badge" id="badgeShopOrders">0</span>
+      </div>
       <div class="nav-section-label">Compliance</div>
       <div class="nav-item" onclick="showPage('compliance',this)">
         <span class="material-icons-outlined">verified_user</span> Compliance
@@ -210,6 +215,14 @@
               <div class="stat-delta up">0 unverified drugs today</div>
             </div>
           </div>
+          <div class="stat-card">
+            <div class="stat-icon teal"><span class="material-icons-outlined">storefront</span></div>
+            <div class="stat-info">
+              <div class="stat-value" id="dashShopCount">6</div>
+              <div class="stat-label">Shop Orders Today</div>
+              <div class="stat-delta up" id="dashShopPending">↑ 2 pending</div>
+            </div>
+          </div>
         </div>
 
         <div class="grid-2">
@@ -262,6 +275,21 @@
             <div class="card-body" id="dashFlags"></div>
           </div>
         </div>
+
+        <!-- Recent Shop Orders -->
+        <div class="card mt-24">
+          <div class="card-header">
+            <div class="card-title"><span class="material-icons-outlined">storefront</span> Recent Shop Orders</div>
+            <button class="btn btn-ghost btn-sm" onclick="showPage('shop-orders',null)">View All</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Order ID</th><th>Product</th><th>Qty</th><th>Total</th><th>Address</th><th>Status</th><th>Action</th></tr></thead>
+              <tbody id="dashShopOrdersTable"></tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
 
       <!-- ─── BOOKINGS ─── -->
@@ -500,6 +528,43 @@
             <table>
               <thead><tr><th>Name</th><th>Phone</th><th>Plate</th><th>Deliveries</th><th>Rating</th><th>Status</th></tr></thead>
               <tbody id="ridersTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── SHOP ORDERS ─── -->
+      <div class="page" id="page-shop-orders">
+        <div class="section-header">
+          <div>
+            <div class="section-title">Preventive Shop Orders</div>
+            <div class="section-sub">Orders placed by users for preventive health products</div>
+          </div>
+          <div class="flex-center gap-8">
+            <div class="search-bar">
+              <span class="material-icons-outlined">search</span>
+              <input type="text" placeholder="Search by product or customer..." oninput="filterShopOrders(this.value)">
+            </div>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <span class="filter-chip active" onclick="filterShopByStatus('all',this)">All</span>
+          <span class="filter-chip" onclick="filterShopByStatus('pending',this)">Pending</span>
+          <span class="filter-chip" onclick="filterShopByStatus('processing',this)">Processing</span>
+          <span class="filter-chip" onclick="filterShopByStatus('shipped',this)">Shipped</span>
+          <span class="filter-chip" onclick="filterShopByStatus('delivered',this)">Delivered</span>
+          <span class="filter-chip" onclick="filterShopByStatus('completed',this)">Completed</span>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Order ID</th><th>Product</th><th>Qty</th><th>Total (UGX)</th>
+                  <th>Phone</th><th>Address</th><th>Status</th><th>Date</th><th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="shopOrdersTable"></tbody>
             </table>
           </div>
         </div>

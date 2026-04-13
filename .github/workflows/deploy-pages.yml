@@ -2,7 +2,7 @@ name: Deploy App to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: write
@@ -15,11 +15,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Write config.js with Supabase proxy URL
+      # Generates config.js at deploy time — keeps secrets out of the repo.
+      # ONESIGNAL_APP_ID goes here so the frontend SDK can initialise.
+      - name: Write config.js
         run: |
-          cat > app/js/config.js <<'EOF'
+          cat > app/js/config.js <<EOF
           window.HOMATT_CONFIG = {
-            API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+            API_PROXY_URL:     'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
+            ONESIGNAL_APP_ID:  '${{ secrets.ONESIGNAL_APP_ID }}',
           };
           EOF
 

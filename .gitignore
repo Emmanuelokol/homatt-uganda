@@ -7,3 +7,6 @@ app/js/config.js
 # Local environment variables (NEVER commit this)
 .env.local
 .env
+
+# Supabase CLI cache
+supabase/.temp/

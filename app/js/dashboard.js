@@ -13,6 +13,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
+  // Init Preventive Shop
+  if (window.initShop) window.initShop(supabase, session);
+
   // Load user data — prefer Supabase, fall back to localStorage cache
   let user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
   const { data: profile } = await supabase
@@ -143,5 +146,27 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
     // Phase 10: will navigate to quiz
+  });
+
+  // ====== Bottom Tab Navigation ======
+  function switchTab(screenId, navId) {
+    document.querySelectorAll('.app-screen, .shop-screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+    document.getElementById(navId).classList.add('active');
+  }
+
+  document.getElementById('navHome').addEventListener('click', () => switchTab('homeScreen', 'navHome'));
+  document.getElementById('navShop').addEventListener('click', () => switchTab('shopScreen', 'navShop'));
+
+  // Malaria alert deep-links to shop malaria category
+  document.getElementById('malariaAlert').addEventListener('click', () => {
+    switchTab('shopScreen', 'navShop');
+    if (window.shopSwitchToShop) {
+      document.querySelectorAll('.cat-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.cat === 'malaria');
+      });
+      // trigger re-render via global
+    }
   });
 });

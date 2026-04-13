@@ -1,10 +1,11 @@
-name: Deploy AI Proxy to Supabase
+name: Deploy Edge Functions & Run Migration
 
 on:
   push:
-    branches: [main]
+    branches: [master]
     paths:
-      - 'supabase/functions/**'   # Only runs when the Edge Function changes
+      - 'supabase/functions/**'
+      - 'supabase/migrations/**'
 
 jobs:
   deploy:
@@ -19,20 +20,47 @@ jobs:
         with:
           version: latest
 
-      - name: Set API keys as Supabase secrets
+      # ── Set all Supabase function secrets ───────────────────────────────
+      # These are stored as GitHub Secrets — never committed to the repo.
+      # ONESIGNAL_APP_ID, ONESIGNAL_REST_API_KEY, SUPABASE_SERVICE_ROLE_KEY
+      # are already added to Supabase by the project owner.
+      # We re-apply them here so they stay in sync on every deploy.
+      - name: Set Supabase secrets
         run: |
           supabase secrets set \
             GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
             OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            ONESIGNAL_APP_ID="${{ secrets.ONESIGNAL_APP_ID }}" \
+            ONESIGNAL_REST_API_KEY="${{ secrets.ONESIGNAL_REST_API_KEY }}" \
+            SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --project-ref kgkdiykzmqjougwzzewi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy Edge Function
+      # ── Deploy ai-proxy Edge Function ────────────────────────────────────
+      - name: Deploy ai-proxy function
         run: |
           supabase functions deploy ai-proxy \
             --project-ref kgkdiykzmqjougwzzewi \
             --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Deploy notify Edge Function ───────────────────────────────────────
+      - name: Deploy notify function
+        run: |
+          supabase functions deploy notify \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Run SQL Migrations ────────────────────────────────────────────────
+      # supabase db push applies any new migration files to the remote project.
+      - name: Run database migrations
+        run: |
+          supabase db push \
+            --project-ref kgkdiykzmqjougwzzewi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

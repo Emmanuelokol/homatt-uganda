@@ -1,0 +1,22 @@
+[api]
+port = 54321
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+port = 54323
+
+[inbucket]
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "https://emmanuelokol.github.io"
+
+[edge_runtime]
+enabled = true

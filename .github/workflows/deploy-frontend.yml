@@ -3,7 +3,7 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches:
-      - main
+      - master
       - 'claude/**'               # Also deploy from active fix branches
     paths:
       - 'app/**'                  # Run when app files change
@@ -30,6 +30,7 @@ jobs:
             API_PROXY_URL:     'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',
             SUPABASE_URL:      'https://kgkdiykzmqjougwzzewi.supabase.co',
             SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',
+            ONESIGNAL_APP_ID:  '${{ secrets.ONESIGNAL_APP_ID }}',
           };
           EOF
           # Strip leading whitespace added by YAML indentation
