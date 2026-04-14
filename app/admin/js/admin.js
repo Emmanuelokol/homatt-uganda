@@ -74,6 +74,9 @@ function buildAdminSidebar(activePage) {
     { label:'Marketplace', links:[
       { href:'marketplace.html', icon:'storefront',  id:'marketplace',  text:'Products & Shop' },
       { href:'marketplace.html#medicine-orders', icon:'medication', id:'med-orders', text:'Medicine Orders' }
+    ]},
+    { label:'System', links:[
+      { href:'notifications.html', icon:'notifications_active', id:'notifications', text:'Notifications' }
     ]}
   ];
 

@@ -1,10 +1,10 @@
-name: Deploy AI Proxy to Supabase
+name: Deploy Edge Functions to Supabase
 
 on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/**'   # Only runs when the Edge Function changes
+      - 'supabase/functions/**'   # Only runs when an Edge Function changes
 
 jobs:
   deploy:
@@ -19,19 +19,47 @@ jobs:
         with:
           version: latest
 
-      - name: Set API keys as Supabase secrets
+      # ── Set ALL required secrets on Supabase ──────────────────────────────
+      # NOTE: ONESIGNAL_APP_ID and ONESIGNAL_REST_API_KEY must be added as
+      # GitHub Secrets (repo → Settings → Secrets → Actions) for push
+      # notifications to work. The send-notification Edge Function reads them.
+      - name: Set Supabase secrets
         run: |
           supabase secrets set \
             GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
             OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
             GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            ONESIGNAL_APP_ID="${{ secrets.ONESIGNAL_APP_ID }}" \
+            ONESIGNAL_REST_API_KEY="${{ secrets.ONESIGNAL_REST_API_KEY }}" \
+            SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --project-ref kgkdiykzmqjougwzzewi
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy Edge Function
+      # ── Deploy ai-proxy ───────────────────────────────────────────────────
+      - name: Deploy ai-proxy function
         run: |
           supabase functions deploy ai-proxy \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Deploy send-notification ──────────────────────────────────────────
+      # Used by: symptom check-in reminders (pg_cron), booking confirmations,
+      # shop order updates, appointment reminders.
+      - name: Deploy send-notification function
+        run: |
+          supabase functions deploy send-notification \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Deploy relworx-payment ────────────────────────────────────────────
+      - name: Deploy relworx-payment function
+        run: |
+          supabase functions deploy relworx-payment \
             --project-ref kgkdiykzmqjougwzzewi \
             --no-verify-jwt
         env:

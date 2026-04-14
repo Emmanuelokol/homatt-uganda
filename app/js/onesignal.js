@@ -13,7 +13,11 @@
  *  5. Expose oneSignalLogin / oneSignalLogout helpers
  */
 
-const ONESIGNAL_APP_ID = 'eb88a928-4a93-4713-9bab-027fd1fbf181';
+// App ID is injected by CI into window.HOMATT_CONFIG.ONESIGNAL_APP_ID via config.js.
+// The hardcoded fallback is only used for local development; production always uses the secret.
+const ONESIGNAL_APP_ID =
+  (window.HOMATT_CONFIG && window.HOMATT_CONFIG.ONESIGNAL_APP_ID) ||
+  'eb88a928-4a93-4713-9bab-027fd1fbf181';
 
 // ── Screen → URL mapping ──────────────────────────────────────
 // Every push notification includes data.screen; map it to an app URL.
