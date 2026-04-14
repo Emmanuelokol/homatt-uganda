@@ -1253,6 +1253,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const now = new Date();
     monitoringSession.startedAt = now.toISOString();
     monitoringSession.countdownStartedAt = now.toISOString();
+    // nextCheckinAt tells dashboard.js when to show the banner; checkinPending=false hides it until then
+    monitoringSession.nextCheckinAt = new Date(now.getTime() + 3600000).toISOString(); // +1 hour
+    monitoringSession.checkinPending = false;
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
     // Persist to Supabase so pg_cron JOB 11 can send hourly push reminders
@@ -1357,6 +1360,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
   function triggerCheckinPhase() {
     const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+
+    // Mark check-in as pending so dashboard banner shows if user navigates away
+    const _ms = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+    if (_ms) { _ms.checkinPending = true; try { localStorage.setItem('homatt_monitoring', JSON.stringify(_ms)); } catch(e) {} }
 
     // Hide countdown, show check-in prompt
     document.getElementById('monitorPhase2').style.display = 'none';

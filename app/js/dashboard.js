@@ -514,127 +514,48 @@ document.addEventListener('DOMContentLoaded', async () => {
     section.style.display = 'block';
   }
 
-  // ── Symptom check-in handler (called from card buttons or push notification) ──
-  window.handleSymptomCheckin = function(feeling, btn) {
-    const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
-    if (!monSession) return;
+  // ─────────────────────────────────────────────────────────────────
+  // SYMPTOM MONITORING — banner only shown when check-in is actually due
+  // ─────────────────────────────────────────────────────────────────
 
-    // ── Instant press feedback: highlight tapped button, dim others immediately ──
-    if (btn) {
-      const row = btn.parentNode;
-      if (row) row.querySelectorAll('button').forEach(b => {
-        b.disabled = true;
-        b.style.transform = b === btn ? 'scale(0.91)' : 'scale(1)';
-        b.style.opacity   = b === btn ? '1' : '0.3';
-        b.style.transition = 'transform .12s ease, opacity .12s ease';
-      });
+  function _readMonSession() {
+    try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; }
+  }
+  function _saveMonSession(s) {
+    try { localStorage.setItem('homatt_monitoring', JSON.stringify(s)); } catch(e) {}
+  }
+  function _endMonSession(outcome, monSess, extra) {
+    localStorage.removeItem('homatt_monitoring');
+    if (supabase && session?.user?.id) {
+      supabase.from('symptom_monitoring_logs').upsert({
+        user_id: session.user.id,
+        condition: monSess.condition,
+        started_at: monSess.startedAt,
+        ended_at: new Date().toISOString(),
+        outcome,
+        check_ins: monSess.checkIns || [],
+        last_checkin_at: new Date().toISOString(),
+        ...(extra || {}),
+      }, { onConflict: 'user_id,started_at' }).catch(() => {});
     }
-
-    monSession.checkIns = monSession.checkIns || [];
-    monSession.checkIns.push({ feeling, time: new Date().toISOString() });
-    if (feeling === 'same') {
-      monSession.symptomsSame = (monSession.symptomsSame || 0) + 1;
-    } else {
-      monSession.symptomsSame = 0;
+  }
+  function _updateActiveMonSession(monSess) {
+    if (supabase && session?.user?.id) {
+      supabase.from('symptom_monitoring_logs').upsert({
+        user_id: session.user.id,
+        condition: monSess.condition,
+        started_at: monSess.startedAt,
+        outcome: 'active',
+        check_ins: monSess.checkIns || [],
+        last_checkin_at: new Date().toISOString(),
+        next_checkin_at: monSess.nextCheckinAt || null,
+      }, { onConflict: 'user_id,started_at' }).catch(() => {});
     }
+  }
 
-    const list    = document.getElementById('healthPredictionList');
-    const section = document.getElementById('healthPredictionSection');
-
-    // ── Smooth fade-swap helper ──
-    function swapList(newHtml) {
-      if (!list) return;
-      if (section) section.style.display = 'block';
-      list.style.transition = 'opacity .15s ease';
-      list.style.opacity = '0';
-      setTimeout(() => {
-        list.innerHTML = newHtml;
-        list.style.opacity = '1';
-      }, 150);
-    }
-
-    if (feeling === 'better') {
-      localStorage.removeItem('homatt_monitoring');
-      swapList(`
-        <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:14px;padding:20px 16px;text-align:center">
-          <span class="material-icons-outlined" style="font-size:40px;color:#2E7D32;display:block;margin-bottom:8px">health_and_safety</span>
-          <div style="font-size:15px;font-weight:700;color:#1B5E20;margin-bottom:6px">Great! Glad you're feeling better</div>
-          <div style="font-size:13px;color:#388E3C;line-height:1.5">Monitoring ended. Keep resting and stay hydrated.</div>
-        </div>`);
-      // Save recovery to Supabase (fire and forget — no blocking)
-      if (supabase && session?.user?.id) {
-        supabase.from('symptom_monitoring_logs').upsert({
-          user_id: session.user.id,
-          condition: monSession.condition,
-          started_at: monSession.startedAt,
-          ended_at: new Date().toISOString(),
-          outcome: 'recovered',
-          check_ins: monSession.checkIns,
-          last_checkin_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,started_at' }).catch(() => {});
-      }
-      setTimeout(runHealthPredictions, 4000);
-    } else {
-      localStorage.setItem('homatt_monitoring', JSON.stringify(monSession));
-
-      // Update Supabase (fire and forget — no blocking)
-      if (supabase && session?.user?.id) {
-        supabase.from('symptom_monitoring_logs').upsert({
-          user_id: session.user.id,
-          condition: monSession.condition,
-          started_at: monSession.startedAt,
-          outcome: 'active',
-          check_ins: monSession.checkIns,
-          last_checkin_at: new Date().toISOString(),
-        }, { onConflict: 'user_id,started_at' }).catch(() => {});
-      }
-
-      if (feeling === 'worse' || monSession.symptomsSame >= 2) {
-        const escalMsg = feeling === 'worse'
-          ? 'Your symptoms are worsening — please visit a clinic now.'
-          : 'Symptoms not improving after multiple check-ins. A clinic visit is strongly recommended.';
-        swapList(`
-          <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:14px;padding:14px 16px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <div style="width:36px;height:36px;border-radius:10px;background:#D32F2F;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <span class="material-icons-outlined" style="font-size:20px;color:#fff">local_hospital</span>
-              </div>
-              <div style="font-size:14px;font-weight:700;color:#B71C1C">Please see a clinic</div>
-            </div>
-            <div style="font-size:13px;color:#C62828;margin-bottom:12px">${escalMsg}</div>
-            <button onclick="window.location.href='symptom-checker.html'"
-              style="width:100%;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;-webkit-tap-highlight-color:transparent">
-              <span class="material-icons-outlined" style="font-size:18px">local_hospital</span>Find Nearest Clinic
-            </button>
-          </div>`);
-        const banner = document.getElementById('clinicReferralBanner');
-        if (banner) {
-          banner.style.display = 'block';
-          document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-      } else {
-        // First "same" — reassure, monitoring continues
-        swapList(`
-          <div style="background:#FFF8E1;border:1.5px solid #FFE082;border-radius:14px;padding:14px 16px">
-            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-              <div style="width:36px;height:36px;border-radius:10px;background:#F9A825;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <span class="material-icons-outlined" style="font-size:20px;color:#fff">schedule</span>
-              </div>
-              <div style="font-size:14px;font-weight:700;color:#E65100">Noted — still monitoring</div>
-            </div>
-            <div style="font-size:13px;color:#795548;margin-bottom:6px">Check-in recorded. Rest, drink water, and we'll remind you in 1 hour.</div>
-            <div style="font-size:12px;font-weight:600;color:#F57F17">
-              <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">tips_and_updates</span>
-              Take your temperature, drink ORS/water, and rest.
-            </div>
-          </div>`);
-      }
-    }
-  };
-
-  // ── Active Monitoring Banner (synced with symptom checker "Monitor my symptom") ──
+  // ── Banner visibility check — only show when check-in is due ──
   function checkActiveMonitoring() {
-    const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+    const monSession = _readMonSession();
     const banner = document.getElementById('activeMonitorBanner');
     if (!banner) return;
 
@@ -643,23 +564,44 @@ document.addEventListener('DOMContentLoaded', async () => {
       return;
     }
 
-    banner.style.display = 'block';
+    const now = Date.now();
 
+    // Auto-expire sessions older than 48 hours with no recent check-in — silent cleanup
+    const ageMs = monSession.startedAt ? now - new Date(monSession.startedAt).getTime() : 0;
+    const lastCheckinMs = monSession.checkIns?.length
+      ? now - new Date(monSession.checkIns[monSession.checkIns.length - 1].time).getTime()
+      : ageMs;
+    if (ageMs > 48 * 3600000 && lastCheckinMs > 24 * 3600000) {
+      _endMonSession('abandoned', monSession);
+      banner.style.display = 'none';
+      return;
+    }
+
+    const nextCheckinAt = monSession.nextCheckinAt
+      ? new Date(monSession.nextCheckinAt).getTime()
+      : 0; // 0 = due immediately (legacy sessions without nextCheckinAt)
+    const checkinPending = monSession.checkinPending === true;
+
+    // Hide the banner when not yet check-in time
+    if (!checkinPending && nextCheckinAt > 0 && now < nextCheckinAt) {
+      banner.style.display = 'none';
+      return;
+    }
+
+    // ── Populate header ──
     const condEl = document.getElementById('monitorBannerCondition');
     if (condEl) condEl.textContent = `Condition: ${monSession.condition}`;
 
     const timeEl = document.getElementById('monitorBannerTime');
     if (timeEl && monSession.startedAt) {
-      const diffMs = Date.now() - new Date(monSession.startedAt).getTime();
+      const diffMs = now - new Date(monSession.startedAt).getTime();
       const diffMins = Math.floor(diffMs / 60000);
-      if (diffMins < 1) {
-        timeEl.textContent = 'Just started';
-      } else if (diffMins < 60) {
-        timeEl.textContent = `Started ${diffMins} min ago`;
-      } else {
-        const hrs = Math.floor(diffMins / 60);
+      if (diffMins < 1)       timeEl.textContent = 'Just started';
+      else if (diffMins < 60) timeEl.textContent = `Started ${diffMins} min ago`;
+      else {
+        const hrs  = Math.floor(diffMins / 60);
         const mins = diffMins % 60;
-        timeEl.textContent = `Started ${hrs}h ${mins > 0 ? mins + 'm ' : ''}ago`;
+        timeEl.textContent = `Started ${hrs}h${mins > 0 ? ' ' + mins + 'm' : ''} ago`;
       }
     }
 
@@ -667,80 +609,246 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (checkinsEl) {
       const checkIns = monSession.checkIns || [];
       if (checkIns.length > 0) {
-        const last = checkIns[checkIns.length - 1];
-        const feelingLabel = { better: 'Better', same: 'Same', worse: 'Worse' }[last.feeling] || last.feeling;
-        checkinsEl.textContent = `Last: ${feelingLabel} at ${new Date(last.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        const last  = checkIns[checkIns.length - 1];
+        const label = { better:'Better', same:'Same', worse:'Worse' }[last.feeling] || last.feeling;
+        checkinsEl.textContent = `Last: ${label} at ${new Date(last.time).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}`;
       } else {
-        checkinsEl.textContent = 'No check-ins yet';
+        checkinsEl.textContent = 'Check-in #1';
       }
     }
 
-    // Scroll to top so banner is immediately visible when app opens from notification
+    // ── Render the question inside monitorBannerBody ──
+    _renderCheckinQuestion();
+
+    banner.style.display = 'block';
     document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  // Called when user taps a feeling button on the monitoring banner
+  // Renders the "How are you feeling?" buttons into monitorBannerBody
+  function _renderCheckinQuestion() {
+    const body = document.getElementById('monitorBannerBody');
+    if (!body) return;
+    // Replace only the inner content below the time/checkins row
+    // (time/checkins elements live as sibling divs inside monitorBannerBody)
+    const timeRow = body.querySelector('#monitorBannerTime')?.parentNode;
+
+    // Strip everything after the time row
+    const questionHtml = `
+      <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling right now?</div>
+      <div style="display:flex;gap:8px;margin-bottom:12px">
+        <button onclick="window.respondMonitorCheckin('better',this)"
+          style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+          😊<br>Better
+        </button>
+        <button onclick="window.respondMonitorCheckin('same',this)"
+          style="flex:1;padding:10px 6px;border:2px solid #FFC107;background:#FFF8E1;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+          😐<br>Same
+        </button>
+        <button onclick="window.respondMonitorCheckin('worse',this)"
+          style="flex:1;padding:10px 6px;border:2px solid #EF5350;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+          😔<br>Worse
+        </button>
+      </div>
+      <button onclick="window.location.href='symptom-checker.html'"
+        style="width:100%;padding:10px;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation">
+        <span class="material-icons-outlined" style="font-size:16px">stethoscope</span>
+        Open Symptom Checker for Full Details
+      </button>`;
+
+    // Replace monitorBannerBody entirely but preserve the time/checkins row header
+    body.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:12px;color:#9E9E9E" id="monitorBannerTime">${document.getElementById('monitorBannerTime')?.textContent || '—'}</div>
+        <div style="font-size:12px;color:#5F6368" id="monitorBannerCheckins">${document.getElementById('monitorBannerCheckins')?.textContent || ''}</div>
+      </div>
+      ${questionHtml}`;
+  }
+
+  // ── Banner check-in response handler ──
   window.respondMonitorCheckin = function(feeling, btn) {
-    // Instant press feedback on the banner buttons
     if (btn) {
       const row = btn.parentNode;
       if (row) row.querySelectorAll('button').forEach(b => {
         b.disabled = true;
         b.style.transform = b === btn ? 'scale(0.91)' : 'scale(1)';
-        b.style.opacity   = b === btn ? '1' : '0.3';
+        b.style.opacity   = b === btn ? '1'   : '0.3';
         b.style.transition = 'transform .12s ease, opacity .12s ease';
       });
     }
 
-    // Delegate to the main handler — it handles Supabase, localStorage, health insights
-    if (window.handleSymptomCheckin) window.handleSymptomCheckin(feeling);
+    const monSession = _readMonSession();
+    if (!monSession) return;
 
+    monSession.checkIns = monSession.checkIns || [];
+    monSession.checkIns.push({ feeling, time: new Date().toISOString() });
+    monSession.symptomsSame = feeling === 'same'
+      ? (monSession.symptomsSame || 0) + 1
+      : 0;
+    monSession.checkinPending = false;
+
+    const body   = document.getElementById('monitorBannerBody');
     const banner = document.getElementById('activeMonitorBanner');
-    if (feeling === 'better') {
-      // Smooth confirmation then fade out
-      if (banner) {
-        const body = banner.querySelector('div:last-child');
-        if (body) {
-          body.style.transition = 'opacity .15s ease';
-          body.style.opacity = '0';
-          setTimeout(() => {
-            body.innerHTML = `
-              <div style="text-align:center;padding:12px 0">
-                <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">health_and_safety</span>
-                <div style="font-size:14px;font-weight:700;color:#1B5E20;margin-bottom:4px">Glad you're feeling better!</div>
-                <div style="font-size:12px;color:#388E3C">Monitoring ended. Keep resting and stay hydrated.</div>
-              </div>`;
-            body.style.opacity = '1';
-          }, 150);
-        }
-        setTimeout(() => { banner.style.transition = 'opacity .3s ease'; banner.style.opacity = '0'; setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = ''; banner.style.transition = ''; }, 300); }, 2500);
-      }
-    } else if (feeling === 'worse') {
-      // Immediately hide banner — clinic referral shown by handleSymptomCheckin
-      if (banner) { banner.style.transition = 'opacity .2s ease'; banner.style.opacity = '0'; setTimeout(() => { banner.style.display = 'none'; banner.style.opacity = ''; banner.style.transition = ''; }, 200); }
-    } else {
-      // 'same' — refresh banner with updated check-in info
-      setTimeout(checkActiveMonitoring, 200);
+
+    function _swapBody(html) {
+      if (!body) return;
+      body.style.transition = 'opacity .15s ease';
+      body.style.opacity = '0';
+      setTimeout(() => { body.innerHTML = html; body.style.opacity = '1'; }, 150);
     }
+    function _fadeOutBanner(delayMs) {
+      setTimeout(() => {
+        if (!banner) return;
+        banner.style.transition = 'opacity .3s ease';
+        banner.style.opacity = '0';
+        setTimeout(() => {
+          banner.style.display = 'none';
+          banner.style.opacity = banner.style.transition = '';
+        }, 300);
+      }, delayMs);
+    }
+
+    // ── WORSE — go to clinic immediately ──
+    if (feeling === 'worse') {
+      _endMonSession('worse', monSession);
+      window.location.href = 'symptom-checker.html';
+      return;
+    }
+
+    // ── BETTER — ask follow-up then end monitoring ──
+    if (feeling === 'better') {
+      _swapBody(`
+        <div style="text-align:center;margin-bottom:14px">
+          <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">thumb_up</span>
+          <div style="font-size:14px;font-weight:700;color:#1B5E20">Great — you're feeling better!</div>
+          <div style="font-size:12px;color:#388E3C;margin-top:4px">Help others like you — what helped?</div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#212121;margin-bottom:8px">What did you do that helped?</div>
+        <textarea id="monitorFollowupInput" placeholder="e.g. I rested, drank water, took paracetamol…"
+          style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:13px;font-family:inherit;resize:none;height:80px;color:#212121;outline:none;background:#fff"></textarea>
+        <button onclick="window._submitBetterFollowup()"
+          style="width:100%;margin-top:10px;padding:12px;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
+          Save &amp; End Monitoring
+        </button>`);
+
+      window._submitBetterFollowup = function() {
+        const what = (document.getElementById('monitorFollowupInput')?.value || '').trim();
+        _endMonSession('recovered', monSession, { recovery_action: what });
+        _swapBody(`
+          <div style="text-align:center;padding:12px 0">
+            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32;display:block;margin-bottom:6px">health_and_safety</span>
+            <div style="font-size:14px;font-weight:700;color:#1B5E20;margin-bottom:4px">Glad you're feeling better!</div>
+            <div style="font-size:12px;color:#388E3C">Monitoring ended. Keep resting and stay hydrated.</div>
+          </div>`);
+        _fadeOutBanner(2500);
+        setTimeout(runHealthPredictions, 4000);
+      };
+      return;
+    }
+
+    // ── SAME (2nd time) — escalate to clinic ──
+    if (monSession.symptomsSame >= 2) {
+      _endMonSession('escalated', monSession);
+      _swapBody(`
+        <div style="font-size:13px;font-weight:700;color:#B71C1C;margin-bottom:6px">Symptoms not improving</div>
+        <div style="font-size:12px;color:#C62828;margin-bottom:12px">No improvement after multiple check-ins. Please visit a clinic now.</div>
+        <button onclick="window.location.href='symptom-checker.html'"
+          style="width:100%;padding:12px;background:#D32F2F;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation">
+          <span class="material-icons-outlined" style="font-size:18px">local_hospital</span>Find Nearest Clinic
+        </button>`);
+      const clinicBanner = document.getElementById('clinicReferralBanner');
+      if (clinicBanner) { clinicBanner.style.display = 'block'; document.querySelector('.app-screen')?.scrollTo({ top: 0, behavior: 'smooth' }); }
+      return;
+    }
+
+    // ── SAME (1st time) — ask what they're doing, then schedule next check-in ──
+    _saveMonSession(monSession); // persist updated checkIns before async
+
+    _swapBody(`
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <span class="material-icons-outlined" style="font-size:20px;color:#F57F17">sentiment_neutral</span>
+          <div style="font-size:14px;font-weight:700;color:#E65100">Still the same — noted.</div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:#212121;margin-bottom:8px">What are you doing to manage your symptoms?</div>
+        <textarea id="monitorSameInput" placeholder="e.g. resting, drinking water, took paracetamol…"
+          style="width:100%;box-sizing:border-box;padding:10px;border:1.5px solid #FFE082;border-radius:10px;font-size:13px;font-family:inherit;resize:none;height:70px;color:#212121;outline:none;background:#fff"></textarea>
+        <div style="font-size:12px;font-weight:600;color:#F57F17;margin-top:8px;display:flex;align-items:flex-start;gap:4px">
+          <span class="material-icons-outlined" style="font-size:14px;flex-shrink:0;margin-top:1px">tips_and_updates</span>
+          Keep resting, drink ORS/water, and check your temperature every 30 min.
+        </div>
+      </div>
+      <button onclick="window._submitSameFollowup()"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,#F57F17,#FFA000);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
+        I'll check back in 1 hour
+      </button>`);
+
+    window._submitSameFollowup = async function() {
+      const what = (document.getElementById('monitorSameInput')?.value || '').trim();
+      const ms = _readMonSession() || monSession;
+      ms.currentAction   = what;
+      ms.checkinPending  = false;
+      ms.nextCheckinAt   = new Date(Date.now() + 3600000).toISOString(); // +1 hour
+      _saveMonSession(ms);
+      _updateActiveMonSession(ms);
+
+      // Schedule push notification for 1 hour from now
+      if (supabase && session?.user?.id) {
+        try {
+          await supabase.functions.invoke('send-notification', {
+            body: {
+              userId: session.user.id,
+              title: 'Symptom Check-in',
+              message: `How are you feeling with your ${ms.condition}? Tap to respond.`,
+              data: { screen: 'symptom-checkin' },
+              scheduleAt: ms.nextCheckinAt,
+              buttons: [
+                { id: 'feeling_better', text: '😊 Better' },
+                { id: 'feeling_same',   text: '😐 Same'   },
+                { id: 'feeling_worse',  text: '😔 Worse'  },
+              ],
+            }
+          });
+        } catch(e) { console.warn('[Monitor] Schedule push failed:', e); }
+      }
+
+      _swapBody(`
+        <div style="text-align:center;padding:12px 0">
+          <span class="material-icons-outlined" style="font-size:36px;color:#F57F17;display:block;margin-bottom:6px">schedule</span>
+          <div style="font-size:14px;font-weight:700;color:#E65100;margin-bottom:4px">Got it — checking again in 1 hour</div>
+          <div style="font-size:12px;color:#795548">You'll get a push notification when it's time to check in.</div>
+        </div>`);
+      _fadeOutBanner(2500);
+    };
   };
 
-  // Handle ?feeling= param from push notification tap (action button)
-  // This runs when the user taps Better/Same/Worse on a push notification and the app opens
-  (function handleNotifFeelingParam() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const notifFeeling = urlParams.get('feeling');
-    if (notifFeeling && ['better', 'same', 'worse'].includes(notifFeeling)) {
-      // Show banner immediately so user sees context, then auto-process
-      checkActiveMonitoring();
-      setTimeout(() => {
-        const monSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
-        if (monSession?.condition && window.handleSymptomCheckin) {
-          window.respondMonitorCheckin(notifFeeling);
-          // Clean URL
-          const clean = window.location.pathname;
-          history.replaceState({}, '', clean);
-        }
-      }, 900);
+  // ── Handle push notification tap: ?feeling=better|same|worse or ?screen=symptom-checkin ──
+  (function handleNotifParam() {
+    const params     = new URLSearchParams(window.location.search);
+    const feeling    = params.get('feeling');
+    const screen     = params.get('screen');
+    const isCheckin  = screen === 'symptom-checkin' || screen === 'dashboard';
+
+    if (feeling && ['better', 'same', 'worse'].includes(feeling)) {
+      // Action button tapped in notification — mark pending so banner shows, then auto-respond
+      const ms = _readMonSession();
+      if (ms?.condition) {
+        ms.checkinPending = true;
+        _saveMonSession(ms);
+        checkActiveMonitoring();
+        setTimeout(() => {
+          if (_readMonSession()?.condition) window.respondMonitorCheckin(feeling);
+          history.replaceState({}, '', window.location.pathname);
+        }, 900);
+      }
+    } else if (isCheckin) {
+      // User tapped notification body (no action button) — show banner for them to respond
+      const ms = _readMonSession();
+      if (ms?.condition) {
+        ms.checkinPending = true;
+        _saveMonSession(ms);
+        checkActiveMonitoring();
+      }
+      history.replaceState({}, '', window.location.pathname);
     }
   })();
 
