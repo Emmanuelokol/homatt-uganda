@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'supabase/functions/**'   # Only runs when an Edge Function changes
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
 
 jobs:
   deploy:

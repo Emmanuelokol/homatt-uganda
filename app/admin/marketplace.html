@@ -1036,11 +1036,43 @@ window.updateMedOrderStatus = async function(id, status) {
   if (status === 'confirmed')  extra.confirmed_at  = new Date().toISOString();
   if (status === 'dispatched') extra.dispatched_at = new Date().toISOString();
   if (status === 'delivered')  extra.delivered_at  = new Date().toISOString();
+
+  // Fetch order BEFORE update so we have the user_id for the notification
+  const { data: order } = await adminDb
+    .from('pharmacy_orders')
+    .select('user_id, items')
+    .eq('id', id)
+    .maybeSingle();
+
   const { error } = await adminDb
     .from('pharmacy_orders')
     .update({ status, updated_at: new Date().toISOString(), ...extra })
     .eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
+
+  // Send push notification to the patient
+  if (order?.user_id) {
+    const notifMap = {
+      confirmed:  { title: 'Medicine Order Confirmed ✓',   message: 'Your medicine order has been confirmed and is being prepared for delivery.' },
+      preparing:  { title: 'Medicines Being Prepared',      message: 'Your order is being packed. We\'ll notify you when it\'s on the way.' },
+      dispatched: { title: 'Order On Its Way 🛵',           message: 'Your medicines have been dispatched. Expect delivery very soon!' },
+      delivered:  { title: 'Medicines Delivered ✓',         message: 'Your medicine order has been delivered. Take your doses on time and stay healthy!' },
+      cancelled:  { title: 'Order Cancelled',               message: 'Your medicine order was cancelled. Contact support if this is unexpected.' },
+    };
+    const notif = notifMap[status];
+    if (notif) {
+      adminDb.functions.invoke('send-notification', {
+        body: {
+          userId: order.user_id,
+          title:  notif.title,
+          message: notif.message,
+          data: { screen: 'medicine_order', id },
+          pref_category: 'medicine_reminders',
+        }
+      }).catch(() => {}); // fire-and-forget; toast already confirms the update
+    }
+  }
+
   await loadMedOrders();
   showAdminToast('Medicine order marked as ' + status, 'success');
 };

@@ -138,9 +138,9 @@ function initOneSignal() {
     // 3. Subscription observer — captures player ID whenever it changes
     OS.User.pushSubscription.addEventListener('change', (event) => {
       try {
-        const id = event?.current?.id || event?.to?.id;
+        const id = event?.current?.id || event?.to?.id || OS.User.pushSubscription.id;
         if (id) {
-          console.log('[OneSignal] player_id:', id);
+          console.log('[OneSignal] player_id (change):', id);
           savePlayerIdToSupabase(id);
         }
       } catch (e) {
@@ -148,11 +148,32 @@ function initOneSignal() {
       }
     });
 
-    // Also try to get the player ID immediately (may already be subscribed)
+    // Try immediately — for already-subscribed devices the change event won't fire
     try {
       const existingId = OS.User.pushSubscription.id;
-      if (existingId) savePlayerIdToSupabase(existingId);
+      if (existingId) {
+        console.log('[OneSignal] player_id (immediate):', existingId);
+        savePlayerIdToSupabase(existingId);
+      }
     } catch (_) {}
+
+    // Retry with backoff — pushSubscription.id may be null until the native SDK
+    // has finished registering, even if permission was already granted.
+    (function _retryPlayerIdCapture(attempt) {
+      if (attempt > 6) return; // max ~2 min total
+      const delay = Math.min(3000 * attempt, 30000); // 3s, 6s, 9s, 12s, 15s, 18s
+      setTimeout(() => {
+        try {
+          const id = OS.User.pushSubscription.id;
+          if (id) {
+            console.log('[OneSignal] player_id (retry ' + attempt + '):', id);
+            savePlayerIdToSupabase(id);
+          } else {
+            _retryPlayerIdCapture(attempt + 1);
+          }
+        } catch (_) { _retryPlayerIdCapture(attempt + 1); }
+      }, delay);
+    })(1);
 
     // 4. Handle notification tap — navigate to the correct screen
     OS.Notifications.addEventListener('click', (event) => {

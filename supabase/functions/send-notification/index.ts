@@ -172,10 +172,27 @@ Deno.serve(async (req: Request) => {
   };
 
   if (playerIds) {
-    // Direct player ID targeting (from pg_cron / webhooks)
+    // Direct player ID list (from pg_cron / webhooks)
     payload.include_player_ids = playerIds;
+  } else if (legacyUserId && supa) {
+    // Resolve the device push token from profiles — direct targeting is far more
+    // reliable than external_id aliases, which require OS.login() to have run.
+    const { data: playerProfile } = await supa
+      .from("profiles")
+      .select("onesignal_player_id")
+      .eq("id", legacyUserId)
+      .maybeSingle();
+
+    if (playerProfile?.onesignal_player_id) {
+      // Direct token targeting — works even if OS.login() never ran
+      payload.include_player_ids = [playerProfile.onesignal_player_id];
+    } else {
+      // Fallback: external_id aliasing (requires OS.login() to have been called)
+      payload.include_aliases = { external_id: [legacyUserId] };
+      payload.target_channel = "push";
+    }
   } else if (legacyUserId) {
-    // External ID targeting (from client code via OneSignal.login())
+    // No supa client available — use external_id aliasing as last resort
     payload.include_aliases = { external_id: [legacyUserId] };
     payload.target_channel = "push";
   }
