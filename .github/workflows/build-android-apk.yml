@@ -27,15 +27,27 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create app config.js with Supabase credentials
+      - name: Create app config.js with Supabase + OneSignal credentials
         run: |
           {
             echo "window.HOMATT_CONFIG = {"
             echo "  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',"
             echo "  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',"
             echo "  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',"
+            echo "  ONESIGNAL_APP_ID: '${{ secrets.ONESIGNAL_APP_ID }}',"
             echo "};"
           } > app/js/config.js
+
+      - name: Write google-services.json (required for FCM / push notifications)
+        if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' | base64 --decode > android/app/google-services.json
+
+      - name: Warn if google-services.json is missing
+        if: ${{ secrets.GOOGLE_SERVICES_JSON == '' }}
+        run: |
+          echo "::warning::GOOGLE_SERVICES_JSON secret is not set — push notifications will NOT work in this build."
+          echo "::warning::Get google-services.json from Firebase Console → Project Settings → Your Android app"
+          echo "::warning::Then base64-encode it and add as GOOGLE_SERVICES_JSON secret in GitHub."
 
       - name: Install npm dependencies
         run: npm install
