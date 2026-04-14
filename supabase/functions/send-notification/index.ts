@@ -1,4 +1,4 @@
-// v2 — resolves onesignal_player_id from profiles for reliable direct targeting
+// v3 — resolves onesignal_player_id from profiles for reliable direct targeting
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
