@@ -163,15 +163,15 @@
         </div>
 
         <!-- Check My Health - Hero Card -->
-        <div class="dash-hero-card" id="symptomChecker">
+        <div class="dash-hero-card" id="symptomChecker" onclick="window.location.href='symptom-checker.html'">
           <div class="hero-card-icon">
-            <span class="material-icons-outlined">stethoscope</span>
+            <span class="material-icons-outlined">medical_services</span>
           </div>
           <div class="hero-card-text">
             <h3>Check My Health</h3>
-            <p>Describe your symptoms and get guidance</p>
+            <p>Describe your symptoms — AI assessment + nearest clinics</p>
           </div>
-          <span class="material-icons-outlined hero-arrow">arrow_forward</span>
+          <span class="material-icons-outlined hero-arrow">arrow_forward_ios</span>
         </div>
 
         <!-- Daily Tip Card -->
@@ -210,20 +210,10 @@
           </button>
         </div>
 
-        <!-- Health Services -->
+        <!-- Quick Actions -->
         <div class="dash-section">
-          <h3 class="section-title">Health Services</h3>
+          <h3 class="section-title">Quick Actions</h3>
           <div style="display:flex;flex-direction:column;gap:10px">
-            <div onclick="window.location.href='symptom-checker.html'" style="cursor:pointer;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
-              <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
-                <span class="material-icons-outlined" style="font-size:26px;color:#fff">stethoscope</span>
-              </div>
-              <div style="flex:1">
-                <div style="font-size:14px;font-weight:700;color:#fff">Check Symptoms &amp; Book Clinic</div>
-                <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">AI assessment → nearest clinics with prices</div>
-              </div>
-              <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
-            </div>
             <div onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
               <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
                 <span class="material-icons-outlined" style="font-size:26px;color:#fff">local_pharmacy</span>
@@ -231,6 +221,16 @@
               <div style="flex:1">
                 <div style="font-size:14px;font-weight:700;color:#fff">Order Medicines</div>
                 <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">Home delivery to your door</div>
+              </div>
+              <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
+            </div>
+            <div onclick="window.location.href='shop.html'" style="cursor:pointer;background:linear-gradient(135deg,#E65100,#FF6D00);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+              <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px;color:#fff">storefront</span>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;color:#fff">Prevention Shop</div>
+                <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">Nets, ORS, vitamins &amp; health essentials</div>
               </div>
               <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
             </div>
