@@ -39,69 +39,72 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #2C2C2C;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
+  background: var(--background);
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  /* svh = stable viewport height — baseline before keyboard opens.
+     Capacitor "resize:body" works by setting body.style.height = viewportH - keyboardH. */
+  height: 100dvh;
+  height: 100svh;
 }
 
-/* Phone Frame */
+html {
+  height: 100%;
+  background: var(--background);
+}
+
+/* Phone Frame — mobile default: full screen, no decorative border */
 .phone-frame {
   width: 100%;
-  max-width: 393px;
-  height: 852px;
+  max-width: 100%;
+  height: 100%;
   background: var(--background);
-  border-radius: 40px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 0 0 4px #1a1a1a, 0 0 0 6px #333, var(--shadow-lg);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
-/* On actual mobile, remove the frame and status bar */
-@media (max-width: 430px) {
+/* Hide the fake status bar on real devices — the OS provides its own */
+.status-bar {
+  display: none !important;
+}
+
+/* ── Desktop preview only (≥ 600 px) ─────────────────────────────────────
+   Shows the phone-shaped canvas that makes the web preview look nice.
+   On actual Android devices this block never fires.                     */
+@media (min-width: 600px) {
   html {
-    height: 100%;
-    /* CRITICAL: When Capacitor's resize:body shrinks <body> height to push content
-       above the keyboard, the area below <body> inside the <html> element would
-       expose the WebView's native background (black). Setting background here
-       ensures a seamless colour fill and prevents the black gap. */
-    background: var(--background);
+    height: auto;
+    background: #2C2C2C;
   }
   body {
-    background: var(--background);
-    padding: 0;
-    align-items: flex-start;
-    /* Capacitor "resize:body" works by setting body.style.height = viewportH - keyboardH.
-       The global body { min-height:100vh } would override that inline resize and keep the
-       body full-height, so the phone-frame would never shrink for the keyboard.
-       Setting min-height:0 here lets Capacitor's inline resize take effect. */
-    min-height: 0;
-    height: 100dvh;
-    height: 100svh;        /* svh = stable viewport height — baseline before keyboard opens */
+    background: #2C2C2C;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    height: auto;
   }
   .phone-frame {
-    border-radius: 0;
-    box-shadow: none;
-    /* height:100% tracks body. When Capacitor shrinks body for the keyboard,
-       the frame shrinks too, so position:absolute; bottom:0 sheets rise above it. */
-    height: 100%;
-    max-width: 100%;
+    max-width: 393px;
+    height: 852px;
+    border-radius: 40px;
+    box-shadow: 0 0 0 4px #1a1a1a, 0 0 0 6px #333, var(--shadow-lg);
   }
-  /* Hide the fake status bar — phone already has one */
   .status-bar {
-    display: none !important;
+    display: flex !important;
   }
+}
 
+/* ── Keyboard handling (mobile only, < 600 px) ─────────────────────────── */
+@media (max-width: 599px) {
   /* When keyboard is open and a bottom-sheet is visible, force it to fill the
-     entire visible area (the shrunken phone-frame = viewport minus keyboard).
-     This prevents the "blank gray / freeze" state where the sheet was sized for
-     the full-height frame but the frame shrank under it, leaving content off-screen.
-     height:100% + max-height:100% gives the sheet a definite height so that
-     sheet-body (flex:1; overflow-y:auto) has room to scroll. */
+     entire visible area (the shrunken phone-frame = viewport minus keyboard). */
   body.keyboard-open .bottom-sheet.open {
     height: 100%;
     max-height: 100%;
@@ -1049,7 +1052,7 @@ body.keyboard-open .sheet-body {
 }
 
 /* Larger tap targets on mobile for old Android */
-@media (max-width: 430px) {
+@media (max-width: 599px) {
   .btn, .choice-btn, .tracker-tab {
     min-height: 48px;
   }
@@ -1083,12 +1086,15 @@ body.keyboard-open .sheet-body {
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
 }
 
-[data-theme="dark"] body {
-  background: #0A0A0A;
-}
-
-[data-theme="dark"] .phone-frame {
-  box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
+/* Dark body background only applies on desktop preview (≥ 600 px canvas).
+   On the actual device the phone-frame fills 100% so this never bleeds through. */
+@media (min-width: 600px) {
+  [data-theme="dark"] body {
+    background: #0A0A0A;
+  }
+  [data-theme="dark"] .phone-frame {
+    box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
+  }
 }
 
 [data-theme="dark"] .bottom-nav {
