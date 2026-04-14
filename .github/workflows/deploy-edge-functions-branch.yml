@@ -1,0 +1,62 @@
+name: Deploy Edge Functions (branch)
+
+# Deploys edge functions on every push to claude/* branches.
+# This complements the main-branch workflow and allows deploying
+# without waiting for a full merge to main.
+on:
+  push:
+    branches:
+      - 'claude/**'
+    paths:
+      - 'supabase/functions/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # ── Set ALL required secrets on Supabase ──────────────────────────────
+      - name: Set Supabase secrets
+        run: |
+          supabase secrets set \
+            GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
+            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            ONESIGNAL_APP_ID="${{ secrets.ONESIGNAL_APP_ID }}" \
+            ONESIGNAL_REST_API_KEY="${{ secrets.ONESIGNAL_REST_API_KEY }}" \
+            SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            --project-ref kgkdiykzmqjougwzzewi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy send-notification function
+        run: |
+          supabase functions deploy send-notification \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy ai-proxy function
+        run: |
+          supabase functions deploy ai-proxy \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy relworx-payment function
+        run: |
+          supabase functions deploy relworx-payment \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
