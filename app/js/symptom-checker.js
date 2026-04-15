@@ -2051,7 +2051,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     async function fetchClinics() {
       if (!supabase) return { data: null };
       let res = await supabase.from('clinics')
-        .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours, services, facilities, description, contact_person, whatsapp')
+        .select('id, name, district, county, city, parish, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours, services, facilities, description, contact_person, whatsapp')
         .eq('active', true)
         .limit(50);
       if (res.error && (res.error.message?.includes('schema cache') || res.error.message?.includes('column'))) {
@@ -2078,6 +2078,34 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const userLng = userCoords?.lng ?? null;
     const userDistrict = (user.district || user.location || '').toLowerCase();
 
+    // ── Reverse-geocode user GPS to get their subcounty/parish name ──
+    // Uses OpenStreetMap Nominatim (free, no API key).
+    // This lets us match clinics that entered their location as a place name
+    // even when the user has GPS but the clinic has no lat/lng.
+    let userGeoNames = { district: userDistrict, subcounty: '', county: '', parish: '' };
+    if (userLat !== null && userLng !== null) {
+      try {
+        const rgRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}&zoom=14&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } }
+        );
+        if (rgRes.ok) {
+          const rg = await rgRes.json();
+          const addr = rg.address || {};
+          // Uganda's Nominatim address breakdown:
+          //   village/town/suburb = subcounty or trading centre
+          //   county = county
+          //   state_district = district
+          userGeoNames = {
+            district:  (addr.state_district || addr.county || userDistrict || '').toLowerCase(),
+            county:    (addr.county || '').toLowerCase(),
+            subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || '').toLowerCase(),
+            parish:    (addr.neighbourhood || addr.hamlet || addr.isolated_dwelling || '').toLowerCase(),
+          };
+        }
+      } catch (_) { /* Nominatim unavailable — use profile district */ }
+    }
+
     // Build a map of clinic_id → matched condition fee
     const condFeeMap = {};
     if (feesResult?.data) {
@@ -2087,11 +2115,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
 
     const mockClinics = [
-      { id: 'mock-1', name: 'Mulago National Referral Hospital', district: 'Kampala', address: 'Mulago Hill Rd', latitude: 0.3476, longitude: 32.5739, consultation_fee: 20000 },
-      { id: 'mock-2', name: 'Kampala International Hospital', district: 'Kampala', address: 'Namuwongo', latitude: 0.3137, longitude: 32.5811, consultation_fee: 50000 },
-      { id: 'mock-3', name: 'Case Medical Centre', district: 'Kampala', address: 'Kololo', latitude: 0.3392, longitude: 32.5942, consultation_fee: 45000 },
-      { id: 'mock-4', name: 'Nsambya Hospital', district: 'Kampala', address: 'Nsambya', latitude: 0.2946, longitude: 32.5889, consultation_fee: 25000 },
-      { id: 'mock-5', name: 'Nakasero Hospital', district: 'Kampala', address: 'Nakasero', latitude: 0.3329, longitude: 32.5833, consultation_fee: 60000 },
+      { id: 'mock-1', name: 'Mulago National Referral Hospital', district: 'Kampala', city: 'Mulago', address: 'Mulago Hill Rd', latitude: 0.3476, longitude: 32.5739, consultation_fee: 20000 },
+      { id: 'mock-2', name: 'Kampala International Hospital',    district: 'Kampala', city: 'Namuwongo', address: 'Namuwongo', latitude: 0.3137, longitude: 32.5811, consultation_fee: 50000 },
+      { id: 'mock-3', name: 'Case Medical Centre',               district: 'Kampala', city: 'Kololo',    address: 'Kololo', latitude: 0.3392, longitude: 32.5942, consultation_fee: 45000 },
+      { id: 'mock-4', name: 'Nsambya Hospital',                  district: 'Kampala', city: 'Nsambya',   address: 'Nsambya', latitude: 0.2946, longitude: 32.5889, consultation_fee: 25000 },
+      { id: 'mock-5', name: 'Nakasero Hospital',                 district: 'Kampala', city: 'Nakasero',  address: 'Nakasero', latitude: 0.3329, longitude: 32.5833, consultation_fee: 60000 },
     ];
 
     // Prefer real clinics from the DB; fall back to mock data only when DB returned nothing
@@ -2100,23 +2128,45 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     // Store full clinic objects so the booking confirm step can access services/pricing
     let _cbClinics = clinics;
 
-    // Sort: if we have GPS, sort by distance; else sort by district match then name
-    if (userLat !== null && userLng !== null) {
-      clinics = clinics
-        .map(c => ({
-          ...c,
-          _distKm: (c.latitude && c.longitude)
-            ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
-            : 999,
-        }))
-        .sort((a, b) => a._distKm - b._distKm);
-    } else {
-      clinics = clinics.sort((a, b) => {
-        const aMatch = (a.district || '').toLowerCase() === userDistrict ? 0 : 1;
-        const bMatch = (b.district || '').toLowerCase() === userDistrict ? 0 : 1;
-        return aMatch - bMatch || (a.name || '').localeCompare(b.name || '');
-      });
+    // ── Uganda hierarchy location score for a clinic ──
+    // Scores how closely the clinic's place names match the user's location.
+    // Parish match = 100, Subcounty = 85, County = 65, District = 45, none = 0
+    function locationScore(c) {
+      const cDistrict  = (c.district  || '').toLowerCase();
+      const cCity      = (c.city      || '').toLowerCase(); // subcounty
+      const cCounty    = (c.county    || '').toLowerCase();
+      const cParish    = (c.parish    || '').toLowerCase();
+      const { district: uDist, subcounty: uSub, county: uCo, parish: uPar } = userGeoNames;
+
+      if (uPar  && cParish   && (cParish.includes(uPar)   || uPar.includes(cParish)))   return 100;
+      if (uSub  && cCity     && (cCity.includes(uSub)     || uSub.includes(cCity)))      return 85;
+      if (uSub  && cParish   && (cParish.includes(uSub)   || uSub.includes(cParish)))    return 80;
+      if (uCo   && cCounty   && (cCounty.includes(uCo)    || uCo.includes(cCounty)))     return 65;
+      if (uDist && cDistrict && (cDistrict === uDist || cDistrict.includes(uDist) || uDist.includes(cDistrict))) return 45;
+      return 0;
     }
+
+    // Sort priority:
+    //  1. GPS distance (km) when both user and clinic have coordinates
+    //  2. Uganda place-name hierarchy score (parish > subcounty > county > district)
+    //  3. Alphabetical name
+    clinics = clinics
+      .map(c => ({
+        ...c,
+        _distKm: (userLat !== null && userLng !== null && c.latitude && c.longitude)
+          ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
+          : null,
+        _locScore: locationScore(c),
+      }))
+      .sort((a, b) => {
+        // Clinics with GPS distance come first, sorted by km
+        if (a._distKm !== null && b._distKm !== null) return a._distKm - b._distKm;
+        if (a._distKm !== null) return -1; // a has GPS, b doesn't → a first
+        if (b._distKm !== null) return 1;
+        // Both without GPS coords — use place-name hierarchy score
+        if (b._locScore !== a._locScore) return b._locScore - a._locScore;
+        return (a.name || '').localeCompare(b.name || '');
+      });
 
     // Only show the nearest/most relevant (max 10)
     clinics = clinics.slice(0, 10);
@@ -2177,9 +2227,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         : (generalSvc && !clinic.consultation_fee)
           ? (generalSvc.type || 'General')
           : 'General consultation';
-      const distLabel = (clinic._distKm !== undefined && clinic._distKm < 900)
+      // Distance label: GPS km if available, else show subcounty/parish/district area name
+      const distLabel = (clinic._distKm !== null && clinic._distKm !== undefined)
         ? `${clinic._distKm < 1 ? Math.round(clinic._distKm * 1000) + ' m' : clinic._distKm.toFixed(1) + ' km'} away`
-        : (clinic.district ? clinic.district : '');
+        : [clinic.parish, clinic.city, clinic.district].filter(Boolean).join(', ');
 
       const openStatus = clinicOpenStatus(clinic.opening_hours);
       const openBadge = openStatus

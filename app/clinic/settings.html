@@ -136,27 +136,49 @@
         <div class="settings-card-title">
           <span class="material-icons-outlined">location_on</span> Location
         </div>
+        <div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
+          <span>Enter your clinic's location using Uganda's place names — district, subcounty, parish. We will automatically find your GPS position from these names so patients near you can find you first.</span>
+        </div>
         <div class="settings-grid">
           <div class="form-row">
-            <label>District</label>
-            <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Kampala">
+            <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bugiri, Kampala, Jinja</span></label>
+            <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Bugiri" autocomplete="off">
           </div>
           <div class="form-row">
-            <label>City / Subcounty</label>
-            <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Ntinda">
+            <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bukooli County</span></label>
+            <input type="text" id="sClinicCounty" class="form-input" placeholder="e.g. Bukooli County" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Butto, Ntinda, Naguru</span></label>
+            <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Butto" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">most specific area</span></label>
+            <input type="text" id="sClinicParish" class="form-input" placeholder="e.g. Butto Parish" autocomplete="off">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>Full Address</label>
-            <input type="text" id="sClinicAddress" class="form-input" placeholder="Plot number, street, landmarks">
+            <label>Full Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">plot, street, landmarks</span></label>
+            <input type="text" id="sClinicAddress" class="form-input" placeholder="e.g. Plot 12, opposite Butto Trading Centre">
           </div>
-          <div class="form-row">
-            <label>Latitude (GPS) <span style="font-weight:400;text-transform:none;letter-spacing:0">— from Google Maps</span></label>
-            <input type="number" id="sClinicLat" class="form-input" placeholder="e.g. 0.3476" step="0.0001">
-          </div>
-          <div class="form-row">
-            <label>Longitude (GPS)</label>
-            <input type="number" id="sClinicLng" class="form-input" placeholder="e.g. 32.5825" step="0.0001">
-          </div>
+        </div>
+
+        <!-- Auto-geocode button -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
+            style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:16px">my_location</span>
+            Find GPS from address
+          </button>
+          <span id="geocodeStatus" style="font-size:12px;color:#555"></span>
+        </div>
+
+        <!-- GPS coords stored silently — hidden from clinic staff -->
+        <input type="hidden" id="sClinicLat">
+        <input type="hidden" id="sClinicLng">
+        <div id="geocodeResult" style="display:none;margin-top:10px;background:#F1F8E9;border-radius:8px;padding:8px 12px;font-size:12px;color:#33691E;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px">gps_fixed</span>
+          <span id="geocodeResultText"></span>
         </div>
       </div>
 
@@ -448,6 +470,86 @@ window.toggleFacility = function(btn, name) {
   else { currentFacilities.splice(idx,1); btn.classList.remove('active'); }
 };
 
+/* ── Auto-geocode: convert Uganda place names → GPS coordinates ── */
+window.autoGeocodeLocation = async function() {
+  var btn    = document.getElementById('geocodeBtn');
+  var status = document.getElementById('geocodeStatus');
+  var result = document.getElementById('geocodeResult');
+  var resText= document.getElementById('geocodeResultText');
+
+  var parish   = (document.getElementById('sClinicParish').value   || '').trim();
+  var subcounty= (document.getElementById('sClinicCity').value      || '').trim();
+  var county   = (document.getElementById('sClinicCounty').value    || '').trim();
+  var district = (document.getElementById('sClinicDistrict').value  || '').trim();
+
+  if (!district && !subcounty && !parish) {
+    status.textContent = 'Please enter at least a District or Subcounty first.';
+    status.style.color = '#D32F2F';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.color = '#555';
+  status.textContent = 'Searching for location…';
+  result.style.display = 'none';
+
+  // Build search query from most-specific to least-specific
+  var parts = [parish, subcounty, county, district, 'Uganda'].filter(Boolean);
+  var query  = parts.join(', ');
+
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(query);
+    var resp = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } });
+    var data = await resp.json();
+
+    if (!data || !data.length) {
+      // Try a broader query (district + Uganda)
+      var broaderQuery = [subcounty || county, district, 'Uganda'].filter(Boolean).join(', ');
+      resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(broaderQuery), {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' }
+      });
+      data = await resp.json();
+    }
+
+    if (data && data.length) {
+      var best = data[0];
+      var lat = parseFloat(best.lat).toFixed(6);
+      var lng = parseFloat(best.lon).toFixed(6);
+      document.getElementById('sClinicLat').value = lat;
+      document.getElementById('sClinicLng').value = lng;
+
+      status.textContent = '';
+      resText.textContent = 'Found: ' + (best.display_name || query) + ' — GPS saved (' + parseFloat(lat).toFixed(4) + ', ' + parseFloat(lng).toFixed(4) + '). Patients near you will now find this clinic.';
+      result.style.display = 'flex';
+    } else {
+      status.style.color = '#E65100';
+      status.textContent = 'Could not find "' + query + '" on the map. Check spelling or try a broader area (district only).';
+    }
+  } catch(e) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Network error — check your internet connection and try again.';
+  }
+  btn.disabled = false;
+};
+
+// Auto-geocode whenever the district/subcounty/parish fields are filled and user leaves the field
+(function setupGeocodeTrigger() {
+  document.addEventListener('DOMContentLoaded', function() {
+    ['sClinicDistrict','sClinicCity','sClinicParish','sClinicCounty'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('blur', function() {
+          // Only auto-trigger if no coordinates yet
+          var lat = document.getElementById('sClinicLat').value;
+          if (!lat && document.getElementById('sClinicDistrict').value.trim()) {
+            window.autoGeocodeLocation();
+          }
+        });
+      }
+    });
+  });
+})();
+
 /* ── Hours ── */
 function buildHours(existing) {
   var el = document.getElementById('hoursContainer');
@@ -492,10 +594,21 @@ async function loadClinicProfile() {
   document.getElementById('sClinicEmail').value = c.email || '';
   document.getElementById('sClinicContact').value = c.contact_person || '';
   document.getElementById('sClinicDistrict').value = c.district || '';
-  document.getElementById('sClinicCity').value = c.city || '';
-  document.getElementById('sClinicAddress').value = c.address || '';
-  document.getElementById('sClinicLat').value = c.latitude || '';
-  document.getElementById('sClinicLng').value = c.longitude || '';
+  document.getElementById('sClinicCounty').value  = c.county   || '';
+  document.getElementById('sClinicCity').value    = c.city     || '';
+  document.getElementById('sClinicParish').value  = c.parish   || '';
+  document.getElementById('sClinicAddress').value = c.address  || '';
+  document.getElementById('sClinicLat').value     = c.latitude  || '';
+  document.getElementById('sClinicLng').value     = c.longitude || '';
+  // Show detected GPS badge if coordinates are already set
+  if (c.latitude && c.longitude) {
+    var res = document.getElementById('geocodeResult');
+    var txt = document.getElementById('geocodeResultText');
+    if (res && txt) {
+      txt.textContent = 'GPS position saved: ' + parseFloat(c.latitude).toFixed(4) + ', ' + parseFloat(c.longitude).toFixed(4) + ' — patients near you will find this clinic first.';
+      res.style.display = 'flex';
+    }
+  }
 
   // Specialties
   currentSpecs = c.specialties || [];
@@ -653,9 +766,11 @@ async function saveSettings() {
     email: document.getElementById('sClinicEmail').value.trim() || null,
     contact_person: document.getElementById('sClinicContact').value.trim() || null,
     district: document.getElementById('sClinicDistrict').value.trim() || null,
-    city: document.getElementById('sClinicCity').value.trim() || null,
-    address: document.getElementById('sClinicAddress').value.trim() || null,
-    latitude: parseFloat(document.getElementById('sClinicLat').value) || null,
+    county:   document.getElementById('sClinicCounty').value.trim()   || null,
+    city:     document.getElementById('sClinicCity').value.trim()     || null,
+    parish:   document.getElementById('sClinicParish').value.trim()   || null,
+    address:  document.getElementById('sClinicAddress').value.trim()  || null,
+    latitude:  parseFloat(document.getElementById('sClinicLat').value)  || null,
     longitude: parseFloat(document.getElementById('sClinicLng').value) || null,
     specialties: currentSpecs.length ? currentSpecs : null,
     facilities: currentFacilities.length ? currentFacilities : null,

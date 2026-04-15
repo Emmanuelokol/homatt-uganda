@@ -390,13 +390,29 @@ function generatePIN() {
 
 // Weighted clinic scoring: Location 35% + Quality 30% + Price 20% + Availability 10% + Condition 5%
 // distKm: GPS distance in km (null if GPS unavailable)
-function scoreClinic(c, userDistrict, aiCondition, distKm = null) {
+// geoNames: { district, county, subcounty, parish } from reverse-geocode
+function scoreClinic(c, userDistrict, aiCondition, distKm = null, geoNames = null) {
   const qualPct  = (c.quality_score || c.avg_rating * 20 || 75) / 100;
-  // Location score: GPS-based (preferred) or district text match fallback
+
+  // Location score: GPS distance (best) → Uganda hierarchy names → district text
   let distPct;
   if (distKm !== null) {
-    // GPS: 0 km = 100%, 5 km = 80%, 15 km = 50%, 30+ km = 20%
+    // GPS: 0 km = 100%, 5 km = 87%, 15 km = 60%, 30+ km = 20%
     distPct = Math.max(0.2, 1 - distKm / 37.5);
+  } else if (geoNames) {
+    // Uganda place-name hierarchy: parish > subcounty > county > district
+    const cParish = (c.parish  || '').toLowerCase();
+    const cCity   = (c.city    || '').toLowerCase(); // subcounty
+    const cCounty = (c.county  || '').toLowerCase();
+    const cDist   = (c.district|| '').toLowerCase();
+    const { parish: uPar, subcounty: uSub, county: uCo, district: uDist } = geoNames;
+
+    if (uPar  && cParish && (cParish.includes(uPar)   || uPar.includes(cParish)))   distPct = 1.0;
+    else if (uSub && cCity   && (cCity.includes(uSub)   || uSub.includes(cCity)))     distPct = 0.90;
+    else if (uSub && cParish && (cParish.includes(uSub) || uSub.includes(cParish)))   distPct = 0.85;
+    else if (uCo  && cCounty && (cCounty.includes(uCo)  || uCo.includes(cCounty)))    distPct = 0.70;
+    else if (uDist && cDist  && (cDist === uDist || cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.50;
+    else distPct = 0.2;
   } else {
     const cDist = (c.district||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
     const uDist = (userDistrict||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
@@ -404,6 +420,7 @@ function scoreClinic(c, userDistrict, aiCondition, distKm = null) {
     if (uDist && cDist === uDist) distPct = 1.0;
     else if (uDist && (cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.85;
   }
+
   const fee      = c.consultation_fee || 25000;
   const feePct   = Math.max(0.2, 1 - Math.max(0, fee - 10000) / 60000);
   const availPct = c.avg_wait_minutes ? Math.max(0.2, 1 - c.avg_wait_minutes / 120) : 0.85;
@@ -540,7 +557,7 @@ async function loadClinics() {
   if (supa) {
     // Fetch with full column list; fall back to safe subset if migration hasn't run
     let clinicRes = await supa.from('clinics')
-      .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified,latitude,longitude,opening_hours,services,facilities,description,accepts_online_slots')
+      .select('id,name,address,district,county,city,parish,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified,latitude,longitude,opening_hours,services,facilities,description,accepts_online_slots')
       .eq('active', true).order('quality_score', { ascending: false });
     if (clinicRes.error && (clinicRes.error.message?.includes('schema cache') || clinicRes.error.message?.includes('column'))) {
       clinicRes = await supa.from('clinics')
@@ -566,11 +583,32 @@ async function loadClinics() {
 
   if (!clinics.length) {
     clinics = [
-      { id:'c1', name:'Kampala Medical Centre',  address:'Plot 12, Kampala Road',       district:'Kampala', phone:'+256 41 234 567', quality_score:82, cure_rate:80, consultation_fee:20000 },
-      { id:'c2', name:'Ntinda Health Clinic',    address:'Ntinda Estate, Block B',       district:'Kampala', phone:'+256 41 345 678', quality_score:74, cure_rate:76, consultation_fee:15000 },
-      { id:'c3', name:'Mulago Community Clinic', address:'Mulago Hill, Kampala',         district:'Kampala', phone:'+256 41 456 789', quality_score:88, cure_rate:84, consultation_fee:10000 },
-      { id:'c4', name:'Nakawa Health Centre',    address:'Nakawa Industrial Area',       district:'Kampala', phone:'+256 41 567 890', quality_score:65, cure_rate:70, consultation_fee:12000 },
+      { id:'c1', name:'Kampala Medical Centre',  address:'Plot 12, Kampala Road', city:'Kampala Road', district:'Kampala', phone:'+256 41 234 567', quality_score:82, cure_rate:80, consultation_fee:20000 },
+      { id:'c2', name:'Ntinda Health Clinic',    address:'Ntinda Estate, Block B', city:'Ntinda', district:'Kampala', phone:'+256 41 345 678', quality_score:74, cure_rate:76, consultation_fee:15000 },
+      { id:'c3', name:'Mulago Community Clinic', address:'Mulago Hill, Kampala', city:'Mulago', district:'Kampala', phone:'+256 41 456 789', quality_score:88, cure_rate:84, consultation_fee:10000 },
+      { id:'c4', name:'Nakawa Health Centre',    address:'Nakawa Industrial Area', city:'Nakawa', district:'Kampala', phone:'+256 41 567 890', quality_score:65, cure_rate:70, consultation_fee:12000 },
     ];
+  }
+
+  // ── Reverse-geocode user GPS to get subcounty/parish name for hierarchy matching ──
+  let userGeoNames = { district: userDist.toLowerCase(), subcounty: '', county: '', parish: '' };
+  if (userCoords) {
+    try {
+      const rgRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userCoords.lat}&lon=${userCoords.lng}&zoom=14&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } }
+      );
+      if (rgRes.ok) {
+        const rg = await rgRes.json();
+        const addr = rg.address || {};
+        userGeoNames = {
+          district:  (addr.state_district || addr.county || userDist || '').toLowerCase(),
+          county:    (addr.county || '').toLowerCase(),
+          subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || '').toLowerCase(),
+          parish:    (addr.neighbourhood || addr.hamlet || '').toLowerCase(),
+        };
+      }
+    } catch (_) {}
   }
 
   // Helper: is clinic open right now?
@@ -614,11 +652,14 @@ async function loadClinics() {
         if (svcMatch?.fee) { matchedFee = svcMatch.fee; matchedCond = svcMatch.type; }
       }
 
-      return { ...c, distKm, score: scoreClinic(c, userDist, aiCond, distKm), condFees: fees, matchedFee, matchedCond };
+      return { ...c, distKm, score: scoreClinic(c, userDist, aiCond, distKm, userGeoNames), condFees: fees, matchedFee, matchedCond };
     })
     .sort((a, b) => {
-      // If GPS is available, primary sort = distance; secondary = score
+      // Primary: GPS distance (clinics with known distance come before text-only matches)
       if (a.distKm !== null && b.distKm !== null) return a.distKm - b.distKm || b.score - a.score;
+      if (a.distKm !== null) return -1;
+      if (b.distKm !== null) return 1;
+      // Both without GPS coords — use hierarchy score
       return b.score - a.score;
     });
 
@@ -672,7 +713,7 @@ async function loadClinics() {
         </div>
         <div class="clinic-card-meta">
           <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">location_on</span>
-          ${c.address ? c.address+', ' : ''}${c.district||'Kampala'}
+          ${[c.parish, c.city, c.district].filter(Boolean).join(', ') || (c.address || 'Uganda')}
         </div>
         <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
           ${feeLabel}
