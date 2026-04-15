@@ -2064,14 +2064,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       return res;
     }
 
-    const [userCoords, clinicsResult, feesResult] = await Promise.all([
+    const [userCoords, clinicsResult] = await Promise.all([
       getUserCoords(),
       fetchClinics(),
-      supabase && diagData.conditions[0]?.name
-        ? supabase.from('clinic_condition_fees')
-            .select('clinic_id, condition_name, fee, notes')
-            .ilike('condition_name', `%${diagData.conditions[0].name.split(' ')[0]}%`)
-        : Promise.resolve({ data: null }),
     ]);
 
     const userLat = userCoords?.lat ?? null;
@@ -2106,13 +2101,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       } catch (_) { /* Nominatim unavailable — use profile district */ }
     }
 
-    // Build a map of clinic_id → matched condition fee
-    const condFeeMap = {};
-    if (feesResult?.data) {
-      feesResult.data.forEach(row => {
-        if (!condFeeMap[row.clinic_id]) condFeeMap[row.clinic_id] = row;
-      });
-    }
+    // condFeeMap is built after clinics are sorted/sliced (needs real clinic IDs)
+    // { clinic_id: [{condition_name, fee, notes}, ...] }
+    let condFeeMap = {};
 
     const mockClinics = [
       { id: 'mock-1', name: 'Mulago National Referral Hospital', district: 'Kampala', city: 'Mulago', address: 'Mulago Hill Rd', latitude: 0.3476, longitude: 32.5739, consultation_fee: 20000 },
@@ -2172,6 +2163,41 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     clinics = clinics.slice(0, 10);
     _cbClinics = clinics; // keep sorted/sliced reference for booking step
 
+    // ── Fetch ALL condition fees for the top clinics (sequential — needs IDs first) ──
+    // Fetches every row from clinic_condition_fees for the returned clinics so that
+    // ALL AI conditions (not just the top one's first word) can be matched.
+    if (supabase) {
+      const realIds = clinics.filter(c => !String(c.id).startsWith('mock-')).map(c => c.id);
+      if (realIds.length) {
+        const feesRes = await supabase.from('clinic_condition_fees')
+          .select('clinic_id, condition_name, fee, notes')
+          .in('clinic_id', realIds);
+        if (feesRes?.data) {
+          feesRes.data.forEach(row => {
+            if (!condFeeMap[row.clinic_id]) condFeeMap[row.clinic_id] = [];
+            condFeeMap[row.clinic_id].push(row);
+          });
+        }
+      }
+    }
+
+    // Returns the best-matching fee row for a clinic given the AI conditions list,
+    // or null when no condition fee has been entered for this clinic.
+    function getBestFeeMatch(clinicId) {
+      const fees = condFeeMap[clinicId] || [];
+      if (!fees.length) return null;
+      for (const cond of (diagData.conditions || [])) {
+        // Split condition name into meaningful words (>3 chars) for fuzzy matching
+        const words = cond.name.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+        const match = fees.find(f => {
+          const fn = f.condition_name.toLowerCase();
+          return words.some(w => fn.includes(w));
+        });
+        if (match) return { ...match, _matchedCondition: cond.name };
+      }
+      return null;
+    }
+
     // ── Render clinic cards ──
     const cbLoading = document.getElementById('cbLoading');
     const cbList    = document.getElementById('cbClinicList');
@@ -2209,7 +2235,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
 
     clinics.forEach(clinic => {
-      const condFee = condFeeMap[clinic.id];
+      // Condition-specific fee: matched against ALL AI conditions, not just the first word
+      const condFee = getBestFeeMatch(clinic.id);
 
       // Fee priority: condition-specific (AI matched) > services list > general consultation fee
       const clinicServices = Array.isArray(clinic.services) ? clinic.services : [];
@@ -2222,8 +2249,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           : generalSvc?.fee
             ? `UGX ${Number(generalSvc.fee).toLocaleString()}`
             : 'Fee on visit';
+      // Show the matched condition name (e.g. "Malaria") or fall back to general label
       const feeNote = condFee
-        ? condFee.condition_name
+        ? (condFee._matchedCondition || condFee.condition_name)
         : (generalSvc && !clinic.consultation_fee)
           ? (generalSvc.type || 'General')
           : 'General consultation';
@@ -2289,13 +2317,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         const feeLabel   = btn.dataset.feeLabel;
         // Look up the full clinic object so the confirm step can show the services table
         const clinicObj  = _cbClinics.find(c => c.id === clinicId) || {};
-        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj);
+        // Pass all condition fees so the confirm step can render a per-diagnosis fee table
+        const clinicFees = condFeeMap[clinicId] || [];
+        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj, clinicFees);
       });
     });
   }
 
   // ── Show booking confirmation step (time select + confirm) ──
-  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj = {}) {
+  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj = {}, clinicFees = []) {
     const cbList    = document.getElementById('cbClinicList');
     const cbConfirm = document.getElementById('cbConfirmStep');
     if (cbList)    cbList.style.display    = 'none';
@@ -2304,9 +2334,38 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     const isMock = !clinicId || clinicId.startsWith('mock-');
 
-    // Build services / pricing table from clinic settings
+    // ── Per-diagnosis fee table ──
+    // For each AI condition show the fee this clinic has entered, or "Ask at reception".
+    const aiConditions = (diagData.conditions || []).slice(0, 5);
+    const diagFeeRows = aiConditions.map(cond => {
+      const words = cond.name.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const matched = clinicFees.find(f => {
+        const fn = f.condition_name.toLowerCase();
+        return words.some(w => fn.includes(w));
+      });
+      return { condName: cond.name, pct: cond.likelihood_percent, matched };
+    });
+    const anyDiagFee = diagFeeRows.some(r => r.matched);
+
+    const diagFeesHtml = anyDiagFee
+      ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
+           <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">FEES FOR YOUR CONDITIONS</div>
+           ${diagFeeRows.map(r => `
+             <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #F1F8E9">
+               <div style="font-size:12px;color:#333;max-width:65%">
+                 ${r.condName}
+                 ${r.pct ? `<span style="font-size:10px;color:#9E9E9E;margin-left:4px">${r.pct}%</span>` : ''}
+               </div>
+               <span style="font-size:12px;font-weight:700;color:${r.matched ? '#1B5E20' : '#9E9E9E'}">
+                 ${r.matched ? 'UGX ' + Number(r.matched.fee).toLocaleString() : 'Ask at reception'}
+               </span>
+             </div>`).join('')}
+         </div>`
+      : '';
+
+    // ── General services / pricing table from clinic settings ──
     const clinicServices = Array.isArray(clinicObj.services) ? clinicObj.services.filter(s => s.type && s.fee) : [];
-    const servicesHtml = clinicServices.length > 0
+    const servicesHtml = (!anyDiagFee && clinicServices.length > 0)
       ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
            <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">SERVICES &amp; FEES</div>
            ${clinicServices.map(s => `
@@ -2333,7 +2392,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
             ${addressLine}
             ${phoneLine}
-            <div style="font-size:12px;color:#555;margin-top:5px">Consultation fee: <strong>${feeLabel}</strong></div>
+            <div style="font-size:12px;color:#555;margin-top:5px">Estimated fee: <strong>${feeLabel}</strong></div>
+            ${diagFeesHtml}
             ${servicesHtml}
           </div>
         </div>
