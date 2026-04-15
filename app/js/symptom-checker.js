@@ -2045,14 +2045,28 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     document.getElementById('cbClose').addEventListener('click', () => modal.remove());
 
     // ── Fetch user location + clinics in parallel ──
+    // Safe clinic fetch: tries full column list first; if migration hasn't run yet
+    // (schema cache error), retries with just the stable columns so real clinics
+    // still appear instead of falling back to hard-coded mock data.
+    async function fetchClinics() {
+      if (!supabase) return { data: null };
+      let res = await supabase.from('clinics')
+        .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours, services, facilities, description, contact_person, whatsapp')
+        .eq('active', true)
+        .limit(50);
+      if (res.error && (res.error.message?.includes('schema cache') || res.error.message?.includes('column'))) {
+        // Migration not yet applied — retry without new columns so real clinics still show
+        res = await supabase.from('clinics')
+          .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, opening_hours')
+          .eq('active', true)
+          .limit(50);
+      }
+      return res;
+    }
+
     const [userCoords, clinicsResult, feesResult] = await Promise.all([
       getUserCoords(),
-      supabase
-        ? supabase.from('clinics')
-            .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours')
-            .eq('active', true)
-            .limit(50)
-        : Promise.resolve({ data: null }),
+      fetchClinics(),
       supabase && diagData.conditions[0]?.name
         ? supabase.from('clinic_condition_fees')
             .select('clinic_id, condition_name, fee, notes')
@@ -2080,7 +2094,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       { id: 'mock-5', name: 'Nakasero Hospital', district: 'Kampala', address: 'Nakasero', latitude: 0.3329, longitude: 32.5833, consultation_fee: 60000 },
     ];
 
+    // Prefer real clinics from the DB; fall back to mock data only when DB returned nothing
     let clinics = (clinicsResult?.data?.length) ? clinicsResult.data : mockClinics;
+
+    // Store full clinic objects so the booking confirm step can access services/pricing
+    let _cbClinics = clinics;
 
     // Sort: if we have GPS, sort by distance; else sort by district match then name
     if (userLat !== null && userLng !== null) {
@@ -2102,6 +2120,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     // Only show the nearest/most relevant (max 10)
     clinics = clinics.slice(0, 10);
+    _cbClinics = clinics; // keep sorted/sliced reference for booking step
 
     // ── Render clinic cards ──
     const cbLoading = document.getElementById('cbLoading');
@@ -2141,12 +2160,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     clinics.forEach(clinic => {
       const condFee = condFeeMap[clinic.id];
+
+      // Fee priority: condition-specific (AI matched) > services list > general consultation fee
+      const clinicServices = Array.isArray(clinic.services) ? clinic.services : [];
+      const generalSvc = clinicServices.find(s => /general|consult|opd/i.test(s.type || '')) || clinicServices[0];
+
       const feeDisplay = condFee
         ? `UGX ${Number(condFee.fee).toLocaleString()}`
         : clinic.consultation_fee
           ? `UGX ${Number(clinic.consultation_fee).toLocaleString()}`
-          : 'Fee on visit';
-      const feeNote = condFee ? condFee.condition_name : 'General consultation';
+          : generalSvc?.fee
+            ? `UGX ${Number(generalSvc.fee).toLocaleString()}`
+            : 'Fee on visit';
+      const feeNote = condFee
+        ? condFee.condition_name
+        : (generalSvc && !clinic.consultation_fee)
+          ? (generalSvc.type || 'General')
+          : 'General consultation';
       const distLabel = (clinic._distKm !== undefined && clinic._distKm < 900)
         ? `${clinic._distKm < 1 ? Math.round(clinic._distKm * 1000) + ' m' : clinic._distKm.toFixed(1) + ' km'} away`
         : (clinic.district ? clinic.district : '');
@@ -2206,13 +2236,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         const clinicId   = btn.dataset.clinicId;
         const clinicName = btn.dataset.clinicName;
         const feeLabel   = btn.dataset.feeLabel;
-        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel);
+        // Look up the full clinic object so the confirm step can show the services table
+        const clinicObj  = _cbClinics.find(c => c.id === clinicId) || {};
+        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj);
       });
     });
   }
 
   // ── Show booking confirmation step (time select + confirm) ──
-  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel) {
+  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj = {}) {
     const cbList    = document.getElementById('cbClinicList');
     const cbConfirm = document.getElementById('cbConfirmStep');
     if (cbList)    cbList.style.display    = 'none';
@@ -2221,16 +2253,38 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     const isMock = !clinicId || clinicId.startsWith('mock-');
 
+    // Build services / pricing table from clinic settings
+    const clinicServices = Array.isArray(clinicObj.services) ? clinicObj.services.filter(s => s.type && s.fee) : [];
+    const servicesHtml = clinicServices.length > 0
+      ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
+           <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">SERVICES &amp; FEES</div>
+           ${clinicServices.map(s => `
+             <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F1F8E9">
+               <span style="font-size:12px;color:#333">${s.type}</span>
+               <span style="font-size:12px;font-weight:700;color:#1B5E20">UGX ${Number(s.fee).toLocaleString()}</span>
+             </div>`).join('')}
+         </div>`
+      : '';
+
+    // Address / phone info for the confirm card
+    const addressLine = clinicObj.address ? `<div style="font-size:11px;color:#777;margin-top:2px;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:12px">place</span>${clinicObj.address}${clinicObj.city ? ', ' + clinicObj.city : ''}</div>` : '';
+    const phoneLine   = clinicObj.phone   ? `<a href="tel:${(clinicObj.phone).replace(/\s/g,'')}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;text-decoration:none;margin-top:3px"><span class="material-icons-outlined" style="font-size:12px">phone</span>${clinicObj.phone}</a>` : '';
+
     cbConfirm.innerHTML = `
       <button id="cbBack" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:#1B5E20;font-size:13px;font-weight:600;font-family:inherit;padding:0;margin-bottom:16px">
         <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back to clinics
       </button>
 
-      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
-        <span class="material-icons-outlined" style="font-size:24px;color:#1B5E20">local_hospital</span>
-        <div>
-          <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
-          <div style="font-size:12px;color:#555;margin-top:2px">Fee: <strong>${feeLabel}</strong></div>
+      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <span class="material-icons-outlined" style="font-size:24px;color:#1B5E20;margin-top:2px">local_hospital</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
+            ${addressLine}
+            ${phoneLine}
+            <div style="font-size:12px;color:#555;margin-top:5px">Consultation fee: <strong>${feeLabel}</strong></div>
+            ${servicesHtml}
+          </div>
         </div>
       </div>
 

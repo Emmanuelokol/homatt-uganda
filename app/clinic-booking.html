@@ -389,14 +389,21 @@ function generatePIN() {
 }
 
 // Weighted clinic scoring: Location 35% + Quality 30% + Price 20% + Availability 10% + Condition 5%
-function scoreClinic(c, userDistrict, aiCondition) {
+// distKm: GPS distance in km (null if GPS unavailable)
+function scoreClinic(c, userDistrict, aiCondition, distKm = null) {
   const qualPct  = (c.quality_score || c.avg_rating * 20 || 75) / 100;
-  // Stronger location weighting — clinics in same district score much higher
-  const cDist = (c.district||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
-  const uDist = (userDistrict||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
-  let distPct = 0.3; // different district
-  if (uDist && cDist === uDist) distPct = 1.0;
-  else if (uDist && (cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.85;
+  // Location score: GPS-based (preferred) or district text match fallback
+  let distPct;
+  if (distKm !== null) {
+    // GPS: 0 km = 100%, 5 km = 80%, 15 km = 50%, 30+ km = 20%
+    distPct = Math.max(0.2, 1 - distKm / 37.5);
+  } else {
+    const cDist = (c.district||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+    const uDist = (userDistrict||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+    distPct = 0.3;
+    if (uDist && cDist === uDist) distPct = 1.0;
+    else if (uDist && (cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.85;
+  }
   const fee      = c.consultation_fee || 25000;
   const feePct   = Math.max(0.2, 1 - Math.max(0, fee - 10000) / 60000);
   const availPct = c.avg_wait_minutes ? Math.max(0.2, 1 - c.avg_wait_minutes / 120) : 0.85;
@@ -512,13 +519,35 @@ async function loadClinics() {
   const aiCond    = triage.primary_condition || triage.topCondition || '';
   const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
 
+  // Get GPS in parallel with the DB fetch for nearest-clinic sorting
+  const userCoords = await new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null),
+      { timeout: 6000, maximumAge: 300000 }
+    );
+  });
+
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
   let clinics = [];
   let condFeesMap = {};   // { clinic_id: [{ condition_name, fee, notes }] }
   if (supa) {
-    const { data } = await supa.from('clinics')
-      .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified')
+    // Fetch with full column list; fall back to safe subset if migration hasn't run
+    let clinicRes = await supa.from('clinics')
+      .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified,latitude,longitude,opening_hours,services,facilities,description,accepts_online_slots')
       .eq('active', true).order('quality_score', { ascending: false });
-    clinics = data || [];
+    if (clinicRes.error && (clinicRes.error.message?.includes('schema cache') || clinicRes.error.message?.includes('column'))) {
+      clinicRes = await supa.from('clinics')
+        .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified')
+        .eq('active', true).order('quality_score', { ascending: false });
+    }
+    clinics = clinicRes.data || [];
 
     // Fetch condition-based fees for all active clinics in one query
     if (clinics.length) {
@@ -544,9 +573,28 @@ async function loadClinics() {
     ];
   }
 
-  // Score and rank all clinics by area match and quality
+  // Helper: is clinic open right now?
+  function clinicOpenNow(hours) {
+    if (!hours || typeof hours !== 'object') return null;
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const now = new Date(), dayName = days[now.getDay()], h = hours[dayName];
+    if (!h || h.closed) return { open: false, label: 'Closed today' };
+    if (!h.open || !h.close) return null;
+    const [oh,om] = h.open.split(':').map(Number), [ch,cm] = h.close.split(':').map(Number);
+    const nowMin = now.getHours()*60+now.getMinutes(), openMin = oh*60+om, closeMin = ch*60+cm;
+    if (nowMin >= openMin && nowMin < closeMin) return { open: true, label: `Open · closes ${h.close}` };
+    if (nowMin < openMin) return { open: false, label: `Opens ${h.open}` };
+    return { open: false, label: `Closed · opens ${h.open} tomorrow` };
+  }
+
+  // Score and rank all clinics — GPS distance replaces district-text matching when available
   const scored = clinics
     .map(c => {
+      // GPS distance (km), or null if either side has no coords
+      const distKm = (userCoords && c.latitude && c.longitude)
+        ? haversineKm(userCoords.lat, userCoords.lng, parseFloat(c.latitude), parseFloat(c.longitude))
+        : null;
+
       // Find matched condition fee for this clinic
       const fees = condFeesMap[c.id] || [];
       let matchedFee = null, matchedCond = null;
@@ -558,18 +606,57 @@ async function loadClinics() {
         });
         if (match) { matchedFee = match.fee; matchedCond = match.condition_name; }
       }
-      return { ...c, score: scoreClinic(c, userDist, aiCond), condFees: fees, matchedFee, matchedCond };
+
+      // Also check clinic.services for a matching service if no condFee matched
+      if (!matchedCond && aiCond && Array.isArray(c.services)) {
+        const aiLower = aiCond.toLowerCase();
+        const svcMatch = c.services.find(s => (s.type||'').toLowerCase().includes(aiLower) || aiLower.includes((s.type||'').toLowerCase()));
+        if (svcMatch?.fee) { matchedFee = svcMatch.fee; matchedCond = svcMatch.type; }
+      }
+
+      return { ...c, distKm, score: scoreClinic(c, userDist, aiCond, distKm), condFees: fees, matchedFee, matchedCond };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => {
+      // If GPS is available, primary sort = distance; secondary = score
+      if (a.distKm !== null && b.distKm !== null) return a.distKm - b.distKm || b.score - a.score;
+      return b.score - a.score;
+    });
 
   list.innerHTML = scored.map((c, idx) => {
-    const displayFee = c.matchedFee != null ? c.matchedFee : c.consultation_fee;
+    // Fee display: condition-matched (AI) > services > general consultation
+    const clinicSvcs = Array.isArray(c.services) ? c.services.filter(s => s.type && s.fee) : [];
+    const generalSvc = clinicSvcs.find(s => /general|consult|opd/i.test(s.type||'')) || clinicSvcs[0];
+    const displayFee = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || generalSvc?.fee);
     const feeLabel = c.matchedCond
       ? `<span class="clinic-fee-chip" title="Fee for ${c.matchedCond}">
            <span class="material-icons-outlined" style="font-size:11px;vertical-align:middle">health_and_safety</span>
            ${c.matchedCond}: ${fmtUGX(c.matchedFee)}
          </span>`
-      : (c.consultation_fee ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>` : '');
+      : c.consultation_fee
+        ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>`
+        : generalSvc?.fee
+          ? `<span class="clinic-fee-chip">General: ${fmtUGX(generalSvc.fee)}</span>`
+          : '';
+
+    // GPS distance label
+    const distLabel = c.distKm !== null
+      ? `<span style="font-size:10px;color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:11px;vertical-align:middle">gps_fixed</span>${c.distKm < 1 ? Math.round(c.distKm*1000)+'m' : c.distKm.toFixed(1)+'km'} away</span>`
+      : '';
+
+    // Opening hours badge
+    const openStatus = clinicOpenNow(c.opening_hours);
+    const openBadge = openStatus
+      ? `<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;background:${openStatus.open?'#E8F5E9':'#FAFAFA'};color:${openStatus.open?'#1B5E20':'#9E9E9E'};border:1px solid ${openStatus.open?'#A5D6A7':'#E0E0E0'}">${openStatus.label}</span>`
+      : '';
+
+    // Services mini-list (up to 3 lines)
+    const svcsHtml = clinicSvcs.length > 0
+      ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">
+           ${clinicSvcs.slice(0,3).map(s=>`<span style="font-size:10px;background:#FFF8E1;border:1px solid #FFE082;border-radius:5px;padding:1px 6px;color:#5D4037">${s.type} — ${fmtUGX(s.fee)}</span>`).join('')}
+           ${clinicSvcs.length>3?`<span style="font-size:10px;color:#9E9E9E">+${clinicSvcs.length-3} more</span>`:''}
+         </div>`
+      : '';
+
     const matchedFeeArg = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || 0);
     const matchedCondArg = (c.matchedCond || '').replace(/'/g,"\\'");
     return `
@@ -580,18 +667,21 @@ async function loadClinics() {
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <div class="clinic-card-name">${c.name}</div>
-          ${idx===0 ? '<span class="clinic-best-badge">BEST MATCH</span>' : ''}
+          ${idx===0 ? '<span class="clinic-best-badge">' + (userCoords && c.distKm !== null ? 'NEAREST' : 'BEST MATCH') + '</span>' : ''}
           ${c.matchedCond ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.5px">PRICE KNOWN</span>' : ''}
         </div>
         <div class="clinic-card-meta">
           <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">location_on</span>
           ${c.address ? c.address+', ' : ''}${c.district||'Kampala'}
         </div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
           ${feeLabel}
-          <span style="font-size:11px;color:var(--text-secondary)">Match: <strong>${c.score}%</strong></span>
+          ${distLabel}
+          ${openBadge}
+          ${!distLabel ? `<span style="font-size:11px;color:var(--text-secondary)">Match: <strong>${c.score}%</strong></span>` : ''}
           ${c.avg_wait_minutes ? `<span style="font-size:11px;color:var(--text-secondary)">~${c.avg_wait_minutes}m wait</span>` : ''}
         </div>
+        ${svcsHtml}
         <div class="clinic-score-bar">
           <div class="clinic-score-fill" style="width:${c.score}%"></div>
         </div>
@@ -606,12 +696,25 @@ async function loadClinics() {
     if (el) el._condFees = c.condFees || [];
   });
 
-  // Show AI context hint if from triage
-  const locationHint = userDist ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>` : '';
+  // Attach condFees + services data to each card element for use when clinic is selected
+  scored.forEach(c => {
+    const el = document.getElementById('clinic-' + c.id);
+    if (el) {
+      el._condFees = c.condFees || [];
+      el._services = Array.isArray(c.services) ? c.services : [];
+    }
+  });
+
+  // Show context hint: GPS / district + AI condition
+  const gpsHint = userCoords
+    ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> <strong>Sorted by GPS distance</strong>`
+    : userDist
+      ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>`
+      : '';
   const aiHint = aiCond ? `<span class="material-icons-outlined" style="font-size:14px;color:#1565C0;margin-left:8px">smart_toy</span> Ranked for <strong>${aiCond}</strong>` : '';
-  if (locationHint || aiHint) {
+  if (gpsHint || aiHint) {
     list.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
-      ${locationHint}${aiHint}
+      ${gpsHint}${aiHint}
     </div>` + list.innerHTML;
   }
 }
@@ -632,6 +735,8 @@ function selectClinic(id, name, score, fee, matchedFee, matchedCond) {
   if (clinicCard && clinicCard._condFees) {
     clinicCard._condFees.forEach(f => { booking.condFeesMap[f.condition_name.toLowerCase()] = f; });
   }
+  // Also store services from clinic settings for the confirm/summary screen
+  booking.clinicServices = (clinicCard && clinicCard._services) ? clinicCard._services : [];
   document.querySelectorAll('.clinic-card').forEach(c => c.classList.remove('selected'));
   document.getElementById('clinic-' + id)?.classList.add('selected');
   document.getElementById('step3Btn').disabled = false;
@@ -724,6 +829,20 @@ function renderConfirm() {
       </div>
       ${diagFeeRows}
       <div style="font-size:10px;color:#9AA0A6;margin-top:6px">Fees set by the clinic. Pay at facility after consultation.</div>
+    </div>` : ''}
+
+    ${(booking.clinicServices && booking.clinicServices.length > 0) ? `
+    <div style="background:#FFFDE7;border:1px solid #FFE082;border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#795548;margin-bottom:8px;display:flex;align-items:center;gap:4px">
+        <span class="material-icons-outlined" style="font-size:14px">receipt_long</span>
+        Services &amp; Fees at ${booking.clinicName || 'Clinic'}
+      </div>
+      ${booking.clinicServices.filter(s=>s.type&&s.fee).map(s => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF9C4;font-size:13px">
+          <span style="color:#333">${s.type}${s.notes ? '<br><span style="font-size:11px;color:#9E9E9E">'+s.notes+'</span>' : ''}</span>
+          <span style="font-weight:700;color:#1B5E20;white-space:nowrap;margin-left:12px">${fmtUGX(s.fee)}</span>
+        </div>`).join('')}
+      <div style="font-size:10px;color:#9AA0A6;margin-top:6px">Prices set by the clinic. If not listed here, ask at reception.</div>
     </div>` : ''}
 
     ${baseFee ? `
