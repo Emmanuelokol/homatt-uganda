@@ -25,7 +25,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
  */
 
 const ONESIGNAL_API_URL = "https://onesignal.com/api/v1/notifications";
-const DAILY_NOTIF_LIMIT = 3;
+const DAILY_NOTIF_LIMIT = 10;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -169,7 +169,9 @@ Deno.serve(async (req: Request) => {
     app_id: appId,
     headings: { en: heading },
     contents: { en: message },
-    android_channel_id: "homatt-health",
+    // android_channel_id is intentionally omitted so OneSignal uses its default
+    // channel — custom channel IDs must be pre-created in the OneSignal dashboard
+    // or the notification is silently dropped on Android 8+.
   };
 
   if (playerIds) {

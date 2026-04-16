@@ -446,7 +446,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
       let q = supa.from('bookings')
-        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,risk_score,status,created_at,ai_full_data,pin_token,pin_expires_at')
+        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,risk_score,status,created_at,ai_full_data,pin_token,pin_expires_at,patient_user_id')
         .gte('created_at', todayStart.toISOString())
         .order('created_at', { ascending: false });
       // Filter by clinic if logged in as real clinic staff; otherwise show all today's bookings
@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (supa) {
       try {
         const { data } = await supa.from('bookings')
-          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,ai_confidence,ai_full_data,notes,discount_applied,discount_pct,created_at')
+          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,ai_confidence,ai_full_data,notes,discount_applied,discount_pct,created_at,patient_user_id')
           .or(`pin_token.eq.${raw},booking_code.eq.${raw}`)
           .maybeSingle();
         found = data;
@@ -858,6 +858,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     const b = bookings.find(x => x.id === id);
     if (b) { b.status = 'in_progress'; renderQueue(); }
+
+    // Notify the patient that the doctor is ready for them
+    if (supa2 && b?.patient_user_id) {
+      supa2.functions.invoke('send-notification', {
+        body: {
+          userId:        b.patient_user_id,
+          title:         'Doctor is ready for you',
+          message:       `The doctor at ${session.clinicName || 'the clinic'} is ready to see ${b.patient_name}. Please go to the consultation room.`,
+          data:          { screen: 'appointment', id: b.id },
+          pref_category: 'appointment_reminders',
+        },
+      }).catch(() => {});
+    }
+
     openAttendModal(id);
   };
 
@@ -1126,6 +1140,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         updated_at:          new Date().toISOString(),
         clinic_diagnosis_id: diagRecord?.id || null,
       }).eq('id', b.id);
+
+      // ── Notify patient that consultation is complete ──
+      if (b.patient_user_id) {
+        const notifMsg = withPrescription && rxItems.length
+          ? `Your consultation at ${session.clinicName || 'the clinic'} is complete. A prescription has been sent${pharmacyId ? ' to the pharmacy' : ''}. Diagnosis: ${diagnosis}.`
+          : `Your consultation at ${session.clinicName || 'the clinic'} is complete. Diagnosis: ${diagnosis}.${followUp ? ` Follow-up in ${followUp} days.` : ''}`;
+        supa2.functions.invoke('send-notification', {
+          body: {
+            userId:        b.patient_user_id,
+            title:         'Consultation Complete',
+            message:       notifMsg,
+            data:          { screen: 'appointment', id: b.id },
+            pref_category: 'appointment_reminders',
+          },
+        }).catch(() => {});
+      }
 
       // ── Symptom cache: save confirmed diagnosis for future AI checks ──
       if (b.symptoms && diagnosis) {
