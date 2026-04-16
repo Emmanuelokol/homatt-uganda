@@ -29,7 +29,8 @@ const DAILY_NOTIF_LIMIT = 10;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
+  "Access-Control-Allow-Headers": "Authorization, Content-Type, apikey, x-client-info",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Content-Type": "application/json",
 };
 
