@@ -815,10 +815,8 @@ async function loadOrders() {
 }
 
 window.updateOrderStatus = async function(id, status) {
-  if (status === 'dispatched') {
-    await openDispatchModal(id);
-    return;
-  }
+  if (status === 'dispatched') { await openDispatchModal(id); return; }
+  console.log('[Homatt v5] updateOrderStatus', id, status);
   const extra = {};
   if (status === 'confirmed') extra.confirmed_at = new Date().toISOString();
   if (status === 'delivered') extra.delivered_at = new Date().toISOString();

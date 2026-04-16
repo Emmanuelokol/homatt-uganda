@@ -237,7 +237,11 @@ function oneSignalLogin(supabaseUserId) {
     if (!_oneSignalReady) initOneSignal();
     // Link this device to the Supabase user ID as the external_id
     OS.login(supabaseUserId);
-    console.log('[OneSignal] OS.login called for', supabaseUserId.slice(0, 8) + '…');
+    // Set a Data Tag — this is the most reliable targeting method.
+    // The edge function filters by tag uid=<userId> which works even before
+    // OS.login() has synced with OneSignal's servers.
+    OS.User.addTag('uid', supabaseUserId);
+    console.log('[OneSignal] OS.login + addTag(uid) called for', supabaseUserId.slice(0, 8) + '…');
     // Save player_id with backoff — subscription.id may not be available immediately
     const _trySave = (attempt) => {
       setTimeout(() => {
