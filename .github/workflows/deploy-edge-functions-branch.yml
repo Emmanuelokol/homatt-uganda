@@ -7,6 +7,7 @@ on:
       - 'claude/**'
     paths:
       - 'supabase/functions/**'
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
 
 env:
   SUPABASE_PROJECT_REF: kgkdiykzmqjougwzzewi
