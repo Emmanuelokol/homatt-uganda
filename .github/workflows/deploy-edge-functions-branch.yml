@@ -60,6 +60,21 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         continue-on-error: true   # Don't block deploy if secrets step has issues
 
+      # Allow GitHub Pages (and localhost for dev) to call edge functions.
+      # Without this the Supabase gateway returns 403 "Host not in allowlist"
+      # before CORS headers in the function code ever run.
+      - name: Configure Supabase Auth allowed origins
+        run: |
+          curl -s -X PATCH \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "site_url": "https://emmanuelokol.github.io",
+              "additional_redirect_urls": "https://emmanuelokol.github.io/**\nhttp://localhost:3000/**\nhttp://localhost:5173/**"
+            }' | jq '{site_url: .site_url, status: "auth config updated"}' || echo "::warning::Auth config update failed (non-fatal)"
+        continue-on-error: true
+
       - name: Deploy send-notification
         run: |
           supabase functions deploy send-notification \
