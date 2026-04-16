@@ -824,8 +824,32 @@ window.updateOrderStatus = async function(id, status) {
   if (status === 'delivered') extra.delivered_at = new Date().toISOString();
   const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
-  // Note: customer push notification on confirmation is handled server-side
-  // by the shop_order_confirmed_notify database trigger (reliable, no browser dependency).
+
+  // Notify the customer directly from the browser — no DB trigger needed
+  const orderObj = allOrders.find(o => o.id === id);
+  if (orderObj?.user_id) {
+    const notifMap = {
+      confirmed:  { title: 'Order Confirmed ✓',       message: 'Your shop order has been confirmed and is being prepared.' },
+      delivered:  { title: 'Order Delivered ✓',       message: 'Your order has been delivered. Thank you for shopping with Homatt!' },
+      cancelled:  { title: 'Order Cancelled',          message: 'Your shop order was cancelled. Contact support if this was unexpected.' },
+    };
+    const notif = notifMap[status];
+    if (notif) {
+      adminDb.functions.invoke('send-notification', {
+        body: {
+          userId:  orderObj.user_id,
+          title:   notif.title,
+          message: notif.message,
+          data:    { screen: 'shop_order', id },
+          pref_category: 'order_updates',
+        },
+      }).then(r => {
+        if (r?.error) console.warn('[Homatt] shop order notif error:', r.error);
+        else console.log('[Homatt] shop order notif sent, id:', r?.data?.notification_id);
+      }).catch(e => console.warn('[Homatt] shop order notif exception:', e?.message));
+    }
+  }
+
   await loadOrders();
   showAdminToast('Order marked as ' + status, 'success');
 };
@@ -898,6 +922,22 @@ async function openDispatchModal(orderId) {
       await adminDb.from('marketplace_orders').update({ status: 'confirmed', dispatched_at: null, updated_at: now }).eq('id', orderId);
       showAdminToast('Rider assignment failed: ' + rdErr.message, 'error');
       return;
+    }
+
+    // Notify the customer that their order is on the way
+    if (order?.user_id) {
+      adminDb.functions.invoke('send-notification', {
+        body: {
+          userId:  order.user_id,
+          title:   'Order On Its Way 🛵',
+          message: 'Your shop order has been dispatched and is on the way to you!',
+          data:    { screen: 'shop_order', id: orderId },
+          pref_category: 'order_updates',
+        },
+      }).then(r => {
+        if (r?.error) console.warn('[Homatt] dispatch notif error:', r.error);
+        else console.log('[Homatt] dispatch notif sent, id:', r?.data?.notification_id);
+      }).catch(e => console.warn('[Homatt] dispatch notif exception:', e?.message));
     }
 
     modal.style.display = 'none';
@@ -1069,7 +1109,10 @@ window.updateMedOrderStatus = async function(id, status) {
           data: { screen: 'medicine_order', id },
           pref_category: 'medicine_reminders',
         }
-      }).catch(() => {}); // fire-and-forget; toast already confirms the update
+      }).then(r => {
+        if (r?.error) console.warn('[Homatt] med order notif error:', r.error);
+        else console.log('[Homatt] med order notif sent, id:', r?.data?.notification_id);
+      }).catch(e => console.warn('[Homatt] med order notif exception:', e?.message));
     }
   }
 
