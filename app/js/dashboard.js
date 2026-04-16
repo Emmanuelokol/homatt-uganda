@@ -76,6 +76,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { console.warn('[Dashboard] Profile fetch failed:', e.message); }
   }
 
+  // Re-link OneSignal every dashboard load — handles the auto-login path where the user
+  // was already logged in and signin.html redirected immediately, bypassing oneSignalLogin().
+  // Delay ensures onesignal.js has had time to call initOneSignal() first.
+  if (session?.user?.id && typeof oneSignalLogin === 'function') {
+    setTimeout(() => oneSignalLogin(session.user.id), 1500);
+  }
+
   // Update status bar time
   function updateTime() {
     const now = new Date();

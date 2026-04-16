@@ -71,12 +71,18 @@ async function savePlayerIdToSupabase(playerId) {
     const { data: { session } } = await client.auth.getSession();
     if (!session?.user?.id) return;
 
-    await client
+    const { error: saveErr } = await client
       .from('profiles')
       .update({ onesignal_player_id: playerId })
       .eq('id', session.user.id);
 
-    console.log('[OneSignal] player_id saved to Supabase profiles');
+    if (saveErr) {
+      // Most common cause: onesignal_player_id column doesn't exist yet.
+      // Apply supabase/migrations/20260415_fix_missing_clinic_columns.sql in Supabase SQL Editor.
+      console.warn('[OneSignal] player_id save FAILED:', saveErr.message);
+    } else {
+      console.log('[OneSignal] player_id saved:', playerId.slice(0, 8) + '…');
+    }
   } catch (e) {
     console.warn('[OneSignal] could not save player_id:', e);
   }
@@ -116,10 +122,14 @@ function shouldShowPermBanner() {
 }
 
 // ── Core init ─────────────────────────────────────────────────
+let _oneSignalReady = false;
+
 function initOneSignal() {
   if (typeof window.plugins === 'undefined' || !window.plugins.OneSignal) {
     return; // Not running inside Capacitor — skip silently
   }
+  if (_oneSignalReady) return; // already initialised
+  _oneSignalReady = true;
 
   try {
     const OS = window.plugins.OneSignal;
@@ -219,14 +229,26 @@ function oneSignalLogin(supabaseUserId) {
   try {
     const OS = window.plugins?.OneSignal;
     if (!OS) return;
+    // Ensure SDK is initialised — critical when this is called from dashboard
+    // (auto-login bypasses signin.html so initOneSignal may not have run yet)
+    if (!_oneSignalReady) initOneSignal();
+    // Link this device to the Supabase user ID as the external_id
     OS.login(supabaseUserId);
-    // Capture player_id after login
-    setTimeout(() => {
-      try {
-        const id = OS.User.pushSubscription.id;
-        if (id) savePlayerIdToSupabase(id);
-      } catch (_) {}
-    }, 2000);
+    console.log('[OneSignal] OS.login called for', supabaseUserId.slice(0, 8) + '…');
+    // Save player_id with backoff — subscription.id may not be available immediately
+    const _trySave = (attempt) => {
+      setTimeout(() => {
+        try {
+          const id = OS.User.pushSubscription.id;
+          if (id) {
+            savePlayerIdToSupabase(id);
+          } else if (attempt < 5) {
+            _trySave(attempt + 1);
+          }
+        } catch (_) {}
+      }, 2000 * attempt);
+    };
+    _trySave(1);
   } catch (e) {
     console.error('[OneSignal] login error:', e);
   }
@@ -246,13 +268,17 @@ function oneSignalLogout() {
 }
 
 // ── Boot ──────────────────────────────────────────────────────
+// initOneSignal is safe to call multiple times — _oneSignalReady guard prevents re-init.
+// We try four triggers because in a Capacitor WebView the exact timing of deviceready
+// vs page-load events varies:
+//   1. deviceready — fires once when Capacitor bridge is ready (caught on the FIRST page)
+//   2. DOMContentLoaded — useful when onesignal.js loads mid-navigation
+//   3. setTimeout fallback — catches the case where readyState is already 'complete'
+//      and both event listeners have been missed (e.g. auto-login redirect path)
 if (typeof window !== 'undefined') {
-  document.addEventListener('deviceready', initOneSignal, false);
-  if (document.readyState === 'complete') {
-    setTimeout(() => {
-      if (typeof window.plugins !== 'undefined' && window.plugins.OneSignal) {
-        initOneSignal();
-      }
-    }, 500);
+  document.addEventListener('deviceready',       initOneSignal, false);
+  document.addEventListener('DOMContentLoaded',  initOneSignal, false);
+  if (document.readyState === 'interactive' || document.readyState === 'complete') {
+    setTimeout(initOneSignal, 500);
   }
 }
