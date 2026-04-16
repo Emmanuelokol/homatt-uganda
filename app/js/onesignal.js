@@ -76,12 +76,15 @@ async function savePlayerIdToSupabase(playerId) {
       .update({ onesignal_player_id: playerId })
       .eq('id', session.user.id);
 
+    // Always cache in localStorage as a fast local backup
+    localStorage.setItem('homatt_onesignal_player_id', playerId);
+
     if (saveErr) {
       // Most common cause: onesignal_player_id column doesn't exist yet.
       // Apply supabase/migrations/20260415_fix_missing_clinic_columns.sql in Supabase SQL Editor.
-      console.warn('[OneSignal] player_id save FAILED:', saveErr.message);
+      console.warn('[OneSignal] player_id DB save FAILED (cached in localStorage):', saveErr.message);
     } else {
-      console.log('[OneSignal] player_id saved:', playerId.slice(0, 8) + '…');
+      console.log('[OneSignal] player_id saved to profiles + localStorage:', playerId.slice(0, 8) + '…');
     }
   } catch (e) {
     console.warn('[OneSignal] could not save player_id:', e);

@@ -2509,12 +2509,16 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                         : selectedTime === 'today_afternoon' ? 'this afternoon'
                         : 'tomorrow morning';
         try {
+          // Include the locally-cached player_id so the edge function can target
+          // this device directly without requiring the DB column to exist yet.
+          const cachedPlayerId = localStorage.getItem('homatt_onesignal_player_id');
           await supabase.functions.invoke('send-notification', {
             body: {
-              userId:  session.user.id,
-              title:   'Booking Confirmed!',
-              message: `Your visit to ${clinicName} is confirmed for ${timeLabel}. Show code ${bookingCode} at reception.`,
-              data:    { screen: 'appointment', id: savedId || bookingCode },
+              userId:     session.user.id,
+              player_ids: cachedPlayerId ? [cachedPlayerId] : undefined,
+              title:      'Booking Confirmed!',
+              message:    `Your visit to ${clinicName} is confirmed for ${timeLabel}. Show code ${bookingCode} at reception.`,
+              data:        { screen: 'appointment', id: savedId || bookingCode },
             },
           });
         } catch (e) {

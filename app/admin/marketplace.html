@@ -825,33 +825,51 @@ window.updateOrderStatus = async function(id, status) {
   const { error } = await adminDb.from('marketplace_orders').update({ status, updated_at: new Date().toISOString(), ...extra }).eq('id', id);
   if (error) { showAdminToast('Update failed: ' + error.message, 'error'); return; }
 
-  // Notify the customer directly from the browser — no DB trigger needed
+  // Notify the customer — await so we can show the result in the toast
   const orderObj = allOrders.find(o => o.id === id);
   if (orderObj?.user_id) {
     const notifMap = {
-      confirmed:  { title: 'Order Confirmed ✓',       message: 'Your shop order has been confirmed and is being prepared.' },
-      delivered:  { title: 'Order Delivered ✓',       message: 'Your order has been delivered. Thank you for shopping with Homatt!' },
-      cancelled:  { title: 'Order Cancelled',          message: 'Your shop order was cancelled. Contact support if this was unexpected.' },
+      confirmed:  { title: 'Order Confirmed ✓',  message: 'Your shop order has been confirmed and is being prepared.' },
+      delivered:  { title: 'Order Delivered ✓',  message: 'Your order has been delivered. Thank you for shopping with Homatt!' },
+      cancelled:  { title: 'Order Cancelled',     message: 'Your shop order was cancelled. Contact support if this was unexpected.' },
     };
     const notif = notifMap[status];
     if (notif) {
-      adminDb.functions.invoke('send-notification', {
-        body: {
-          userId:  orderObj.user_id,
-          title:   notif.title,
-          message: notif.message,
-          data:    { screen: 'shop_order', id },
-          pref_category: 'order_updates',
-        },
-      }).then(r => {
-        if (r?.error) console.warn('[Homatt] shop order notif error:', r.error);
-        else console.log('[Homatt] shop order notif sent, id:', r?.data?.notification_id);
-      }).catch(e => console.warn('[Homatt] shop order notif exception:', e?.message));
+      try {
+        const { data: nr, error: ne } = await adminDb.functions.invoke('send-notification', {
+          body: {
+            userId:  orderObj.user_id,
+            title:   notif.title,
+            message: notif.message,
+            data:    { screen: 'shop_order', id },
+            pref_category: 'order_updates',
+          },
+        });
+        if (ne) {
+          showAdminToast('Order ' + status + ' — notif error: ' + (ne.message || JSON.stringify(ne)), 'error');
+        } else if (nr?.skipped) {
+          showAdminToast('Order ' + status + ' — notif skipped: ' + nr.reason, 'error');
+        } else if (nr?.success) {
+          const recip = nr.recipients ?? '?';
+          if (recip === 0) {
+            showAdminToast('Order ' + status + ' — notification sent but 0 recipients. Customer may need to reopen the app once.', 'error');
+          } else {
+            showAdminToast('Order ' + status + ' ✓ — notification delivered (' + recip + ' device)', 'success');
+          }
+        } else {
+          showAdminToast('Order ' + status + ' — unexpected notif response: ' + JSON.stringify(nr), 'error');
+        }
+      } catch(e) {
+        showAdminToast('Order ' + status + ' — notification exception: ' + e.message, 'error');
+      }
+    } else {
+      showAdminToast('Order marked as ' + status, 'success');
     }
+  } else {
+    showAdminToast('Order marked as ' + status + ' (no user ID — guest order, no notification sent)', 'success');
   }
 
   await loadOrders();
-  showAdminToast('Order marked as ' + status, 'success');
 };
 
 async function openDispatchModal(orderId) {
