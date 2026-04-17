@@ -126,6 +126,13 @@
     [data-theme="dark"] #bankDetailsBlock div { color:#93C5FD !important; }
     [data-theme="dark"] #momoStatusBar { background:#2D2500; border-color:#B45309; }
     [data-theme="dark"] .autoLocBtn-style { border-color:#4DB6AC !important; color:#4DB6AC !important; }
+    /* ── AI pre-fill banner ── */
+    .ai-prefill-banner {
+      display:none; background:#E8F5E9; border:1px solid #A5D6A7; border-radius:var(--radius-md);
+      padding:10px 14px; margin:8px 16px 0; font-size:12px; color:#2E7D32;
+      align-items:center; gap:8px;
+    }
+    .ai-prefill-banner.show { display:flex; }
   </style>
 </head>
 <body>
@@ -168,6 +175,14 @@
          ═══════════════════════════════════════════════ -->
     <div class="mo-step active" id="step1">
       <div class="mo-scroll">
+
+        <!-- AI pre-fill banner (shown when arriving from symptom checker) -->
+        <div class="ai-prefill-banner" id="aiBanner">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">auto_awesome</span>
+          <span id="aiBannerText">AI-recommended medicines added to your cart.</span>
+          <button type="button" onclick="this.parentElement.classList.remove('show')"
+            style="margin-left:auto;background:none;border:none;cursor:pointer;color:#2E7D32;font-size:18px;line-height:1;padding:0 2px">×</button>
+        </div>
 
         <!-- Instruction -->
         <div style="padding:10px 16px 4px">
@@ -1286,10 +1301,75 @@ function showSuccess() {
    PAGE INIT — runs on DOMContentLoaded
    ══════════════════════════════════════ */
 
+/* ── Capacitor WebView keyboard fix ─────────────────────────────────────────
+   When the virtual keyboard opens, the WebView viewport shrinks but CSS vh units
+   and overflow:hidden containers don't automatically reflow on all Android builds.
+   visualViewport.resize fires reliably and lets us clamp the frame height.       */
+(function() {
+  if (!window.visualViewport) return;
+  var frame = document.querySelector('.phone-frame');
+  if (!frame) return;
+  function adjustForKeyboard() {
+    var vvH = Math.round(window.visualViewport.height);
+    var docH = document.documentElement.clientHeight;
+    if (vvH < docH - 60) {
+      // Keyboard is open — shrink the frame to the still-visible area
+      frame.style.height = vvH + 'px';
+      // Scroll the focused input into view so the keyboard doesn't hide it
+      var focused = document.activeElement;
+      if (focused && (focused.tagName === 'INPUT' || focused.tagName === 'TEXTAREA')) {
+        setTimeout(function() {
+          focused.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+        }, 60);
+      }
+    } else {
+      frame.style.height = '';
+    }
+  }
+  window.visualViewport.addEventListener('resize', adjustForKeyboard);
+})();
+
 document.addEventListener('DOMContentLoaded', function() {
   // Set time
   var t = document.getElementById('statusTime');
   if (t) t.textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+  // ── Auto-fill AI-recommended medicines (arriving from symptom checker) ──
+  var aiMeds = [];
+  try { aiMeds = JSON.parse(localStorage.getItem('homatt_ai_medicines') || '[]'); } catch(e) {}
+  if (aiMeds.length) {
+    localStorage.removeItem('homatt_ai_medicines');
+    var added = [];
+    aiMeds.forEach(function(rec) {
+      var recLower = (rec.name || '').toLowerCase();
+      var firstWord = recLower.split(' ')[0];
+      if (!firstWord || firstWord === 'drink') return; // skip non-medicine items
+      // Search ALL_MEDS then every CAT_MEDS entry by first keyword
+      var found = ALL_MEDS.find(function(m) {
+        return m.n.toLowerCase().indexOf(firstWord) !== -1;
+      });
+      if (!found) {
+        Object.keys(CAT_MEDS).some(function(k) {
+          var m = CAT_MEDS[k].find(function(x) { return x.n.toLowerCase().indexOf(firstWord) !== -1; });
+          if (m) { found = m; return true; }
+        });
+      }
+      if (found) {
+        if (!cart[found.n]) cart[found.n] = { n:found.n, p:found.p, qty:0 };
+        cart[found.n].qty++;
+        added.push(found.n);
+      }
+    });
+    if (added.length) {
+      updateBadge();
+      var banner = document.getElementById('aiBanner');
+      var bannerText = document.getElementById('aiBannerText');
+      if (banner) {
+        banner.classList.add('show');
+        if (bannerText) bannerText.textContent = 'AI-recommended: ' + added.join(', ') + '. Review and adjust quantities below.';
+      }
+    }
+  }
 
   // Render category grid
   renderCatGrid();

@@ -1117,48 +1117,11 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     const orderBtn = document.getElementById('btnOrderMeds');
     if (orderBtn) {
-      orderBtn.addEventListener('click', async () => {
-        orderBtn.disabled = true;
-        orderBtn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;vertical-align:middle">hourglass_top</span> Adding to cart…';
-
-        try {
-          // Search marketplace for each AI-recommended medicine by first keyword
-          const medKeywords = otcItems.map(i => i.name.split(' ')[0]);
-          const orFilter = medKeywords.map(kw => `name.ilike.%${kw}%`).join(',');
-
-          const { data: found } = await supabase
-            .from('marketplace_items')
-            .select('id, name, price, unit, marketplace_categories(icon, color)')
-            .eq('available', true)
-            .or(orFilter);
-
-          // Merge found items into cart (localStorage)
-          let cart = [];
-          try { cart = JSON.parse(localStorage.getItem('homatt_cart') || '[]'); } catch (_) {}
-
-          if (found && found.length) {
-            found.forEach(item => {
-              const cat = Array.isArray(item.marketplace_categories)
-                ? item.marketplace_categories[0]
-                : item.marketplace_categories;
-              const existing = cart.find(c => c.id === item.id);
-              if (existing) {
-                existing.qty++;
-              } else {
-                cart.push({
-                  id: item.id, name: item.name, price: item.price,
-                  qty: 1, unit: item.unit || '',
-                  icon: cat?.icon || 'medication',
-                  color: cat?.color || '#388E3C',
-                });
-              }
-            });
-            localStorage.setItem('homatt_cart', JSON.stringify(cart));
-          }
-        } catch (_) { /* proceed to shop even on network error */ }
-
-        // open_cart=1 tells shop.js to open the cart sheet automatically
-        window.location.href = 'shop.html?open_cart=1';
+      orderBtn.addEventListener('click', () => {
+        // Pass AI recommendations to medicine-orders.html via localStorage so
+        // the pharmacy checkout pre-fills with the exact drugs shown to the user.
+        localStorage.setItem('homatt_ai_medicines', JSON.stringify(otcItems));
+        window.location.href = 'medicine-orders.html';
       });
     }
 
