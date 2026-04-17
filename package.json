@@ -21,6 +21,7 @@
     "@capacitor/network": "^6.0.4",
     "@capacitor/splash-screen": "^6.0.4",
     "@capacitor/status-bar": "^6.0.3",
+    "material-icons": "^1.13.14",
     "onesignal-cordova-plugin": "^5.3.4"
   },
   "devDependencies": {

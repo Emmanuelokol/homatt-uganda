@@ -170,6 +170,15 @@ Deno.serve(async (req: Request) => {
     app_id: appId,
     headings: { en: heading },
     contents: { en: message },
+    // TTL: keep the notification in FCM's queue for 3 days (259200 s) so it
+    // is delivered when the device comes back online.  OneSignal maps this to
+    // the FCM `time_to_live` field for Android and the APNs `expiration` for iOS.
+    // Without this the default is only 3 days, but being explicit ensures offline
+    // devices receive the notification when they reconnect.
+    ttl: 259200,
+    // priority 10 = high-priority FCM push — wakes the device from Doze Mode
+    // and is required for time-sensitive health alerts.
+    priority: 10,
     // android_channel_id is intentionally omitted so OneSignal uses its default
     // channel — custom channel IDs must be pre-created in the OneSignal dashboard
     // or the notification is silently dropped on Android 8+.
