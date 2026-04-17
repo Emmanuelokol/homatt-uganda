@@ -1091,22 +1091,27 @@ function loadPharmacies() {
   }
 
   if (supa) {
-    supa.from('pharmacies').select('id,name,address,district').eq('active',true).order('name')
+    supa.from('pharmacies').select('*').eq('active', true).order('name')
       .then(function(res) {
-        if (res.data && res.data.length) { renderPharms(res.data); return; }
-        renderPharms(MOCK_PHARMACIES);
+        if (res.error) {
+          console.error('[Homatt] loadPharmacies error:', res.error.code, res.error.message);
+        }
+        if (res.data && res.data.length) {
+          renderPharms(res.data);
+        } else {
+          document.getElementById('pharmList').innerHTML =
+            '<div style="text-align:center;padding:32px 12px;color:#666">' +
+              '<span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px;color:#9AA0A6">local_pharmacy</span>' +
+              '<p style="font-weight:600;margin:0 0 4px;color:#333">No pharmacies found</p>' +
+              '<p style="font-size:12px;margin:0">No active pharmacies registered yet.</p>' +
+            '</div>';
+        }
       })
-      .catch(function(){ renderPharms(MOCK_PHARMACIES); });
-  } else {
-    renderPharms(MOCK_PHARMACIES);
+      .catch(function(err) {
+        console.error('[Homatt] loadPharmacies catch:', err);
+      });
   }
 }
-
-var MOCK_PHARMACIES = [
-  { id:'p1', name:'Ntinda Health Pharmacy',        address:'Ntinda Estate',   district:'Kampala' },
-  { id:'p2', name:'City Chemist Nakasero',          address:'Nakasero Road',   district:'Kampala' },
-  { id:'p3', name:'Kampala Pharmacy Wandegeya',     address:'Wandegeya Market',district:'Kampala' },
-];
 
 function pickPharm(id, name) {
   order.pharmacyId   = id;

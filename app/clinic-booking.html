@@ -560,14 +560,12 @@ async function loadClinics() {
   let clinics = [];
   let condFeesMap = {};   // { clinic_id: [{ condition_name, fee, notes }] }
   if (supa) {
-    // Fetch with full column list; fall back to safe subset if migration hasn't run
-    let clinicRes = await supa.from('clinics')
-      .select('id,name,address,district,county,city,parish,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified,latitude,longitude,opening_hours,services,facilities,description,accepts_online_slots')
-      .eq('active', true).order('quality_score', { ascending: false });
-    if (clinicRes.error && (clinicRes.error.message?.includes('schema cache') || clinicRes.error.message?.includes('column'))) {
-      clinicRes = await supa.from('clinics')
-        .select('id,name,address,district,city,phone,specialties,quality_score,cure_rate,consultation_fee,condition_performance,avg_wait_minutes,avg_rating,verified')
-        .eq('active', true).order('quality_score', { ascending: false });
+    const clinicRes = await supa.from('clinics')
+      .select('*')
+      .eq('active', true)
+      .limit(300);
+    if (clinicRes.error) {
+      console.error('[Homatt] loadClinics error:', clinicRes.error.code, clinicRes.error.message);
     }
     clinics = clinicRes.data || [];
 
@@ -587,12 +585,13 @@ async function loadClinics() {
   }
 
   if (!clinics.length) {
-    clinics = [
-      { id:'c1', name:'Kampala Medical Centre',  address:'Plot 12, Kampala Road', city:'Kampala Road', district:'Kampala', phone:'+256 41 234 567', quality_score:82, cure_rate:80, consultation_fee:20000 },
-      { id:'c2', name:'Ntinda Health Clinic',    address:'Ntinda Estate, Block B', city:'Ntinda', district:'Kampala', phone:'+256 41 345 678', quality_score:74, cure_rate:76, consultation_fee:15000 },
-      { id:'c3', name:'Mulago Community Clinic', address:'Mulago Hill, Kampala', city:'Mulago', district:'Kampala', phone:'+256 41 456 789', quality_score:88, cure_rate:84, consultation_fee:10000 },
-      { id:'c4', name:'Nakawa Health Centre',    address:'Nakawa Industrial Area', city:'Nakawa', district:'Kampala', phone:'+256 41 567 890', quality_score:65, cure_rate:70, consultation_fee:12000 },
-    ];
+    document.getElementById('clinicsList').innerHTML =
+      '<div style="text-align:center;padding:36px 16px;color:#666">' +
+        '<span class="material-icons-outlined" style="font-size:44px;display:block;margin-bottom:10px;color:#9AA0A6">local_hospital</span>' +
+        '<p style="font-weight:600;margin:0 0 6px;color:#333">No clinics found</p>' +
+        '<p style="font-size:13px;margin:0">No active clinics are registered yet. Check back soon.</p>' +
+      '</div>';
+    return;
   }
 
   // ── Reverse-geocode user GPS to get subcounty/parish name for hierarchy matching ──

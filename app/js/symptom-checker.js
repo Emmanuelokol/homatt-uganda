@@ -2039,20 +2039,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     document.getElementById('cbClose').addEventListener('click', () => modal.remove());
 
     // ── Fetch user location + clinics in parallel ──
-    // Safe clinic fetch: tries full column list first; if migration hasn't run yet
-    // (schema cache error), retries with just the stable columns so real clinics
-    // still appear instead of falling back to hard-coded mock data.
     async function fetchClinics() {
-      if (!supabase) return { data: null };
-      let res = await supabase.from('clinics')
-        .select('id, name, district, county, city, parish, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours, services, facilities, description, contact_person, whatsapp')
+      if (!supabase) return { data: null, error: 'no_supabase' };
+      const res = await supabase.from('clinics')
+        .select('*')
         .eq('active', true)
-        .limit(200);
-      if (res.error && (res.error.message?.includes('schema cache') || res.error.message?.includes('column'))) {
-        res = await supabase.from('clinics')
-          .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, opening_hours')
-          .eq('active', true)
-          .limit(50);
+        .limit(300);
+      if (res.error) {
+        console.error('[Homatt] fetchClinics error:', res.error.code, res.error.message);
       }
       return res;
     }
@@ -2098,16 +2092,28 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     // { clinic_id: [{condition_name, fee, notes}, ...] }
     let condFeeMap = {};
 
-    const mockClinics = [
-      { id: 'mock-1', name: 'Mulago National Referral Hospital', district: 'Kampala', city: 'Mulago', address: 'Mulago Hill Rd', latitude: 0.3476, longitude: 32.5739, consultation_fee: 20000 },
-      { id: 'mock-2', name: 'Kampala International Hospital',    district: 'Kampala', city: 'Namuwongo', address: 'Namuwongo', latitude: 0.3137, longitude: 32.5811, consultation_fee: 50000 },
-      { id: 'mock-3', name: 'Case Medical Centre',               district: 'Kampala', city: 'Kololo',    address: 'Kololo', latitude: 0.3392, longitude: 32.5942, consultation_fee: 45000 },
-      { id: 'mock-4', name: 'Nsambya Hospital',                  district: 'Kampala', city: 'Nsambya',   address: 'Nsambya', latitude: 0.2946, longitude: 32.5889, consultation_fee: 25000 },
-      { id: 'mock-5', name: 'Nakasero Hospital',                 district: 'Kampala', city: 'Nakasero',  address: 'Nakasero', latitude: 0.3329, longitude: 32.5833, consultation_fee: 60000 },
-    ];
+    // If Supabase returned an error or no clinics, show a clear message rather than
+    // hiding real problems behind fake Kampala demo data.
+    if (clinicsResult.error || !clinicsResult.data?.length) {
+      document.getElementById('cbLoading').style.display = 'none';
+      document.getElementById('cbClinicList').style.display = 'block';
+      document.getElementById('cbClinicList').innerHTML = `
+        <div style="text-align:center;padding:32px 16px">
+          <span class="material-icons-outlined" style="font-size:44px;color:#9AA0A6;display:block;margin-bottom:12px">local_hospital</span>
+          <p style="font-size:15px;font-weight:600;color:#333;margin:0 0 6px">No clinics found</p>
+          <p style="font-size:13px;color:#666;margin:0 0 20px">
+            ${clinicsResult.error
+              ? 'Could not load clinics — please check your connection and try again.'
+              : 'No active clinics are registered in your area yet.'}
+          </p>
+          <a href="clinic-booking.html" style="display:inline-block;padding:12px 24px;background:#1B5E20;color:#fff;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none">
+            Open Full Clinic Booking
+          </a>
+        </div>`;
+      return;
+    }
 
-    // Prefer real clinics from the DB; fall back to mock data only when DB returned nothing
-    let clinics = (clinicsResult?.data?.length) ? clinicsResult.data : mockClinics;
+    let clinics = clinicsResult.data;
 
     // Store full clinic objects so the booking confirm step can access services/pricing
     let _cbClinics = clinics;
