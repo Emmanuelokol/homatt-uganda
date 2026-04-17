@@ -197,13 +197,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ====== Sheet Management ======
   const overlay = document.getElementById('sheetOverlay');
   const editSheet = document.getElementById('editProfileSheet');
-  const supportSheet = document.getElementById('contactSupportSheet');
-  const emergencySheet = document.getElementById('emergencySheet');
-  const termsSheet = document.getElementById('termsSheet');
-  const privacySheet = document.getElementById('privacySheet');
-  const faqSheet = document.getElementById('faqSheet');
 
   function openSheet(sheet) {
+    if (!sheet) return;
     overlay.classList.add('visible');
     sheet.classList.add('open');
   }
@@ -211,6 +207,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     overlay.classList.remove('visible');
     document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
   }
+
+  // Global entry point called from onclick attributes in HTML — avoids addEventListener
+  // race conditions in Capacitor WebView.
+  window.profileOpenSheet = function(id) {
+    const s = document.getElementById(id);
+    openSheet(s);
+    if (id === 'faqSheet')       populateFaq();
+    if (id === 'emergencySheet') populateEmergency();
+    if (id === 'termsSheet')     populateTerms();
+    if (id === 'privacySheet')   populatePrivacy();
+    if (id === 'contactSupportSheet') { /* content already in HTML */ }
+  };
 
   overlay.addEventListener('click', closeAllSheets);
   document.getElementById('editProfileBtn').addEventListener('click', () => openSheet(editSheet));
@@ -256,7 +264,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ====== Contact Support ======
-  document.getElementById('supportBtn').addEventListener('click', () => openSheet(supportSheet));
+  // (opened via onclick="profileOpenSheet('contactSupportSheet')" in HTML)
 
   document.getElementById('submitSupportBtn').addEventListener('click', async () => {
     const subject = document.getElementById('supportSubject').value.trim();
@@ -316,12 +324,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       <span class="material-icons-outlined">support_agent</span><div><div>Homatt Health Support</div><div style="font-size:11px;font-weight:400;opacity:.9">+256 708 520 466 — tap to call</div></div>
     </a>`;
 
-  document.getElementById('emergencyBtn').addEventListener('click', async () => {
-    openSheet(emergencySheet);
+  function populateEmergency() {
     const bodyEl = document.getElementById('emergencySheetBody');
-    // Show static content immediately — don't make user wait
     bodyEl.innerHTML = EMERGENCY_HTML;
-    // Try to load extra content from Supabase (non-blocking)
     if (supabase) {
       supabase.from('site_content').select('content').eq('key', 'emergency').maybeSingle()
         .then(({ data }) => {
@@ -333,7 +338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         }).catch(() => {});
     }
-  });
+  }
 
   // ====== Terms of Service ======
   const TERMS_STATIC = `Homatt Health Uganda — Terms of Service
@@ -363,23 +368,20 @@ These terms are governed by the laws of the Republic of Uganda.
 
 Contact: support@homatt.ug | +256 708 520 466`;
 
-  document.getElementById('termsBtn').addEventListener('click', async () => {
-    openSheet(termsSheet);
+  function populateTerms() {
     const bodyEl = document.getElementById('termsSheetBody');
     bodyEl.innerHTML = `<p style="font-size:13px;color:var(--text-secondary);line-height:1.9;white-space:pre-line">${TERMS_STATIC}</p>`;
-    // Try to fetch live version
     if (supabase) {
       supabase.from('site_content').select('title,content,updated_at').eq('key', 'terms').maybeSingle()
         .then(({ data }) => {
           if (data?.content) {
             const updatedDate = data.updated_at ? new Date(data.updated_at).toLocaleDateString('en-UG', {year:'numeric',month:'long',day:'numeric'}) : '';
-            bodyEl.innerHTML = `
-              <p style="font-size:11px;color:var(--text-hint);margin-bottom:14px">Last updated: ${updatedDate}</p>
+            bodyEl.innerHTML = `<p style="font-size:11px;color:var(--text-hint);margin-bottom:14px">Last updated: ${updatedDate}</p>
               <p style="font-size:13px;color:var(--text-secondary);line-height:1.9">${data.content}</p>`;
           }
         }).catch(() => {});
     }
-  });
+  }
 
   // ====== Privacy Policy ======
   const PRIVACY_STATIC = `Homatt Health Uganda — Privacy Policy
@@ -415,8 +417,7 @@ Users under 18 must have parental consent. Child growth tracking data is linked 
 Homatt Health Uganda Ltd
 support@homatt.ug | +256 708 520 466`;
 
-  document.getElementById('privacyBtn').addEventListener('click', async () => {
-    openSheet(privacySheet);
+  function populatePrivacy() {
     const bodyEl = document.getElementById('privacySheetBody');
     bodyEl.innerHTML = `<p style="font-size:13px;color:var(--text-secondary);line-height:1.9;white-space:pre-line">${PRIVACY_STATIC}</p>`;
     if (supabase) {
@@ -424,13 +425,12 @@ support@homatt.ug | +256 708 520 466`;
         .then(({ data }) => {
           if (data?.content) {
             const updatedDate = data.updated_at ? new Date(data.updated_at).toLocaleDateString('en-UG', {year:'numeric',month:'long',day:'numeric'}) : '';
-            bodyEl.innerHTML = `
-              <p style="font-size:11px;color:var(--text-hint);margin-bottom:14px">Last updated: ${updatedDate}</p>
+            bodyEl.innerHTML = `<p style="font-size:11px;color:var(--text-hint);margin-bottom:14px">Last updated: ${updatedDate}</p>
               <p style="font-size:13px;color:var(--text-secondary);line-height:1.9">${data.content}</p>`;
           }
         }).catch(() => {});
     }
-  });
+  }
 
   // ====== FAQ ======
   const FAQ_ITEMS = [
@@ -446,11 +446,11 @@ support@homatt.ug | +256 708 520 466`;
     { q: 'How do I contact support?', a: 'Go to Profile → Help & Support → Contact Support. You can call us on +256 708 520 466 or submit a support request form.' },
   ];
 
-  document.getElementById('faqBtn').addEventListener('click', () => {
-    openSheet(faqSheet);
+  function populateFaq() {
     const bodyEl = document.getElementById('faqSheetBody');
+    if (bodyEl.childElementCount > 0) return; // already populated
     bodyEl.innerHTML = FAQ_ITEMS.map((item, i) => `
-      <div style="border-bottom:1px solid var(--border);padding:12px 0" id="faqItem${i}">
+      <div style="border-bottom:1px solid var(--border);padding:12px 0">
         <button type="button" onclick="(function(el){var ans=el.nextElementSibling;var open=ans.style.display==='block';ans.style.display=open?'none':'block';el.querySelector('.faq-chev').textContent=open?'expand_more':'expand_less';})(this)"
           style="width:100%;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;background:none;border:none;padding:0;cursor:pointer;text-align:left;font-family:inherit;touch-action:manipulation">
           <span style="font-size:13px;font-weight:600;color:var(--text-primary);line-height:1.4">${item.q}</span>
@@ -458,7 +458,7 @@ support@homatt.ug | +256 708 520 466`;
         </button>
         <div style="display:none;font-size:13px;color:var(--text-secondary);line-height:1.7;padding-top:8px">${item.a}</div>
       </div>`).join('');
-  });
+  }
 
   // ====== Logout ======
   document.getElementById('logoutBtn').addEventListener('click', async () => {

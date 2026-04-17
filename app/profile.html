@@ -143,17 +143,17 @@
         <!-- Help & Support -->
         <div class="profile-section">
           <div class="profile-section-title">Help & Support</div>
-          <div class="settings-item" id="faqBtn">
+          <div class="settings-item" id="faqBtn" onclick="profileOpenSheet('faqSheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined">help_outline</span>
             <span class="settings-item-label">FAQ</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
-          <div class="settings-item" id="supportBtn" style="cursor:pointer">
+          <div class="settings-item" id="supportBtn" onclick="profileOpenSheet('contactSupportSheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined">contact_support</span>
             <span class="settings-item-label">Contact Support</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
-          <div class="settings-item" id="emergencyBtn" style="cursor:pointer">
+          <div class="settings-item" id="emergencyBtn" onclick="profileOpenSheet('emergencySheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined" style="color:#D32F2F">local_hospital</span>
             <span class="settings-item-label">Emergency Contacts</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
@@ -168,12 +168,12 @@
             <span class="settings-item-label">App Version</span>
             <span class="settings-value">1.0.0</span>
           </div>
-          <div class="settings-item" id="termsBtn" style="cursor:pointer">
+          <div class="settings-item" id="termsBtn" onclick="profileOpenSheet('termsSheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined">description</span>
             <span class="settings-item-label">Terms of Service</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
-          <div class="settings-item" id="privacyBtn" style="cursor:pointer">
+          <div class="settings-item" id="privacyBtn" onclick="profileOpenSheet('privacySheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined">privacy_tip</span>
             <span class="settings-item-label">Privacy Policy</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
