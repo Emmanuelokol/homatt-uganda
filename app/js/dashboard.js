@@ -111,47 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   avatarEl.addEventListener('click', () => { window.location.href = 'profile.html'; });
 
-  // ====== Daily Health Tips ======
-  const tips = [
-    'Drink at least 8 glasses of water daily. Staying hydrated helps your body fight infections and keeps your energy levels up.',
-    'Wash your hands with soap for at least 20 seconds before eating and after using the toilet to prevent disease.',
-    'Sleep 7-8 hours each night. Good rest strengthens your immune system and improves your mood.',
-    'Eat at least 5 servings of fruits and vegetables daily for essential vitamins and minerals.',
-    'Take a 30-minute walk every day. Regular exercise reduces the risk of heart disease and diabetes.',
-    'Use a mosquito net every night, especially during rainy season, to protect against malaria.',
-    'Limit sugar intake. Too much sugar increases the risk of diabetes and tooth decay.',
-    'Check your blood pressure regularly, even if you feel fine. Hypertension often has no symptoms.',
-    'Breastfeed exclusively for the first 6 months. Breast milk provides all the nutrients a baby needs.',
-    'Visit a health facility at least once a year for a general check-up, even when you feel healthy.',
-    'Apply sunscreen or cover up when in the sun for extended periods to protect your skin.',
-    'Reduce salt in your food. High sodium intake can lead to high blood pressure.',
-    'Practice deep breathing for 5 minutes daily to reduce stress and improve mental health.',
-    'Keep your home clean and free of standing water to prevent mosquito breeding.',
-  ];
-
-  let tipIndex = Math.floor(Math.random() * tips.length);
-  const tipText = document.getElementById('tipText');
-  tipText.textContent = tips[tipIndex];
-
-  document.getElementById('nextTip').addEventListener('click', () => {
-    tipIndex = (tipIndex + 1) % tips.length;
-    tipText.style.opacity = '0';
-    setTimeout(() => {
-      tipText.textContent = tips[tipIndex];
-      tipText.style.opacity = '1';
-    }, 200);
-  });
-
-  // ====== Reminder Dismiss ======
-  document.querySelectorAll('.reminder-dismiss').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const item = btn.closest('.reminder-item');
-      item.style.transform = 'translateX(100%)';
-      item.style.opacity = '0';
-      setTimeout(() => item.remove(), 300);
-    });
-  });
-
   // ====== Quiz Streak ======
   const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
   document.getElementById('streakCount').textContent = streak;
@@ -159,6 +118,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ====== Feature Cards Navigation ======
   document.getElementById('symptomChecker').addEventListener('click', () => {
     window.location.href = 'symptom-checker.html';
+  });
+
+  document.getElementById('featureMalaria').addEventListener('click', () => {
+    window.location.href = 'malaria-tracker.html';
   });
 
   document.getElementById('featureCycle').addEventListener('click', () => {

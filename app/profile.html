@@ -173,7 +173,7 @@
             <span class="settings-item-label">Terms of Service</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
-          <div class="settings-item">
+          <div class="settings-item" id="privacyBtn" style="cursor:pointer">
             <span class="material-icons-outlined">privacy_tip</span>
             <span class="settings-item-label">Privacy Policy</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
@@ -286,6 +286,32 @@
       <div class="sheet-body" id="termsSheetBody">
         <div style="text-align:center;padding:20px;color:var(--text-hint)">Loading...</div>
       </div>
+    </div>
+
+    <!-- Privacy Policy Sheet -->
+    <div class="bottom-sheet" id="privacySheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Privacy Policy</span>
+        <button class="sheet-close-btn" id="closePrivacySheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" id="privacySheetBody">
+        <div style="text-align:center;padding:20px;color:var(--text-hint)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- FAQ Sheet -->
+    <div class="bottom-sheet" id="faqSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">FAQ — Frequently Asked Questions</span>
+        <button class="sheet-close-btn" id="closeFaqSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body" id="faqSheetBody"></div>
     </div>
 
     <!-- Edit Profile Sheet -->
