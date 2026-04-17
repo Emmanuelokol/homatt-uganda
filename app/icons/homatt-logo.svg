@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#1B5E20"/>
+
+  <!-- Standing helper figure (right side) -->
+  <!-- Head -->
+  <circle cx="128" cy="42" r="12" fill="white"/>
+  <!-- Body torso leaning forward -->
+  <path d="M128 54 L116 90 L106 90 L118 52 Z" fill="white"/>
+  <!-- Right arm reaching down -->
+  <path d="M116 65 Q90 80 78 95 L82 99 Q94 86 120 70 Z" fill="white"/>
+  <!-- Left arm back -->
+  <path d="M122 62 L140 78 L137 82 L119 67 Z" fill="white"/>
+  <!-- Right leg -->
+  <path d="M109 90 L104 130 L112 130 L116 90 Z" fill="white"/>
+  <!-- Left leg -->
+  <path d="M118 90 L124 130 L132 130 L124 90 Z" fill="white"/>
+
+  <!-- Kneeling person being helped (left side) -->
+  <!-- Head -->
+  <circle cx="68" cy="88" r="11" fill="white"/>
+  <!-- Torso kneeling/leaning up -->
+  <path d="M68 99 L60 130 L75 130 L74 99 Z" fill="white"/>
+  <!-- Right arm reaching up toward helper -->
+  <path d="M72 102 Q78 95 80 95 L82 99 Q80 99 76 106 Z" fill="white"/>
+  <!-- Left arm down for support -->
+  <path d="M64 105 L54 120 L58 123 L67 108 Z" fill="white"/>
+  <!-- Kneeling leg (right) -->
+  <path d="M62 128 L58 152 L66 152 L70 128 Z" fill="white"/>
+  <!-- Kneeling leg (left) on ground -->
+  <path d="M70 128 L68 145 Q72 152 82 152 L82 145 Q74 145 76 128 Z" fill="white"/>
+
+  <!-- Ground line hint -->
+  <path d="M40 152 L160 152" stroke="rgba(255,255,255,0.3)" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Connecting hands -->
+  <circle cx="81" cy="97" r="5" fill="white"/>
+</svg>

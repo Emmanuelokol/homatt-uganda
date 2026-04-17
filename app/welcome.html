@@ -61,22 +61,20 @@
       z-index: 2;
     }
 
-    /* Brand mark — text only, no logo image */
     .brand-mark {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       margin-bottom: 32px;
       animation: fadeDown 0.8s ease;
     }
-    .brand-icon {
-      width: 60px; height: 60px;
-      border-radius: 20px;
-      background: linear-gradient(135deg, #2E7D32, #66BB6A);
-      display: flex; align-items: center; justify-content: center;
+    .brand-logo-img {
+      width: 68px; height: 68px;
+      border-radius: 22px;
       box-shadow: 0 8px 32px rgba(46,125,50,0.5);
+      display: block;
+      flex-shrink: 0;
     }
-    .brand-icon .material-icons-outlined { font-size: 32px; color: #fff; }
 
     .brand-name {
       font-size: 32px;
@@ -216,11 +214,8 @@
   <!-- Main content -->
   <div class="welcome-main">
 
-    <!-- Brand — name only, no image logo -->
     <div class="brand-mark">
-      <div class="brand-icon">
-        <span class="material-icons-outlined">health_and_safety</span>
-      </div>
+      <img src="icons/icon-192.png" alt="Homatt Health" class="brand-logo-img">
       <div class="brand-name">Homatt<span>-health</span></div>
     </div>
 
