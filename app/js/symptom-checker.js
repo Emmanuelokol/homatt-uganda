@@ -2084,9 +2084,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       let res = await supabase.from('clinics')
         .select('id, name, district, county, city, parish, address, latitude, longitude, phone, consultation_fee, specialties, accepts_online_slots, opening_hours, services, facilities, description, contact_person, whatsapp')
         .eq('active', true)
-        .limit(50);
+        .limit(200);
       if (res.error && (res.error.message?.includes('schema cache') || res.error.message?.includes('column'))) {
-        // Migration not yet applied — retry without new columns so real clinics still show
         res = await supabase.from('clinics')
           .select('id, name, district, city, address, latitude, longitude, phone, consultation_fee, specialties, opening_hours')
           .eq('active', true)
@@ -2150,49 +2149,100 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     // Store full clinic objects so the booking confirm step can access services/pricing
     let _cbClinics = clinics;
 
-    // ── Uganda hierarchy location score for a clinic ──
-    // Scores how closely the clinic's place names match the user's location.
-    // Parish match = 100, Subcounty = 85, County = 65, District = 45, none = 0
-    function locationScore(c) {
-      const cDistrict  = (c.district  || '').toLowerCase();
-      const cCity      = (c.city      || '').toLowerCase(); // subcounty
-      const cCounty    = (c.county    || '').toLowerCase();
-      const cParish    = (c.parish    || '').toLowerCase();
-      const { district: uDist, subcounty: uSub, county: uCo, parish: uPar } = userGeoNames;
+    // ── Attach GPS distance to every clinic ──
+    clinics = clinics.map(c => ({
+      ...c,
+      _distKm: (userLat !== null && userLng !== null && c.latitude && c.longitude)
+        ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
+        : null,
+    }));
 
-      if (uPar  && cParish   && (cParish.includes(uPar)   || uPar.includes(cParish)))   return 100;
-      if (uSub  && cCity     && (cCity.includes(uSub)     || uSub.includes(cCity)))      return 85;
-      if (uSub  && cParish   && (cParish.includes(uSub)   || uSub.includes(cParish)))    return 80;
-      if (uCo   && cCounty   && (cCounty.includes(uCo)    || uCo.includes(cCounty)))     return 65;
-      if (uDist && cDistrict && (cDistrict === uDist || cDistrict.includes(uDist) || uDist.includes(cDistrict))) return 45;
-      return 0;
+    // ── Tiered local-zone filter ──
+    // Tries increasingly wide zones; only falls back to the next tier when the
+    // current one has zero results.  This ensures a user in Butto never sees
+    // Kampala clinics unless there are literally none in Butto → Namave →
+    // Kiwanga (subcounty) → the district.
+    const { district: uDist, subcounty: uSub, county: uCo, parish: uPar } = userGeoNames;
+    const hasGps = userLat !== null && userLng !== null;
+
+    function nameMatch(a, b) {
+      if (!a || !b) return false;
+      return a.includes(b) || b.includes(a);
+    }
+    function clinicMatchesParish(c) {
+      const cp = (c.parish || '').toLowerCase();
+      const cc = (c.city   || '').toLowerCase();
+      return nameMatch(cp, uPar) || nameMatch(cc, uPar);
+    }
+    function clinicMatchesSubcounty(c) {
+      const cc = (c.city   || '').toLowerCase();
+      const cp = (c.parish || '').toLowerCase();
+      return nameMatch(cc, uSub) || nameMatch(cp, uSub);
+    }
+    function clinicMatchesCounty(c) {
+      return nameMatch((c.county || '').toLowerCase(), uCo);
+    }
+    function clinicMatchesDistrict(c) {
+      const cd = (c.district || '').toLowerCase();
+      return cd === uDist || nameMatch(cd, uDist);
     }
 
-    // Sort priority:
-    //  1. GPS distance (km) when both user and clinic have coordinates
-    //  2. Uganda place-name hierarchy score (parish > subcounty > county > district)
-    //  3. Alphabetical name
-    clinics = clinics
-      .map(c => ({
-        ...c,
-        _distKm: (userLat !== null && userLng !== null && c.latitude && c.longitude)
-          ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
-          : null,
-        _locScore: locationScore(c),
-      }))
-      .sort((a, b) => {
-        // Clinics with GPS distance come first, sorted by km
-        if (a._distKm !== null && b._distKm !== null) return a._distKm - b._distKm;
-        if (a._distKm !== null) return -1; // a has GPS, b doesn't → a first
-        if (b._distKm !== null) return 1;
-        // Both without GPS coords — use place-name hierarchy score
-        if (b._locScore !== a._locScore) return b._locScore - a._locScore;
-        return (a.name || '').localeCompare(b.name || '');
-      });
+    let locationLabel = '';
 
-    // Only show the nearest/most relevant (max 10)
+    function applyTieredFilter(all) {
+      // GPS tiers — used when user has coordinates
+      if (hasGps) {
+        const withDist = all.filter(c => c._distKm !== null);
+        const sorted   = [...withDist].sort((a, b) => a._distKm - b._distKm);
+
+        for (const [km, label] of [[10, `within 10 km`], [25, `within 25 km`], [60, `within 60 km`]]) {
+          const r = sorted.filter(c => c._distKm <= km);
+          if (r.length >= 1) { locationLabel = label; return r; }
+        }
+        // GPS clinics exist but all > 60 km; also check place-name clinics (no coords)
+        const noCoord = all.filter(c => c._distKm === null);
+
+        // Mix: any place-name matches in same district + nearest GPS results
+        if (uDist) {
+          const distMatch = noCoord.filter(clinicMatchesDistrict);
+          if (distMatch.length) {
+            locationLabel = uSub || uDist;
+            return [...sorted.slice(0, 5), ...distMatch];
+          }
+        }
+        locationLabel = 'nearest available';
+        return sorted;
+      }
+
+      // Place-name tiers — used when no GPS
+      const tiers = [
+        { fn: clinicMatchesParish,    label: uPar || '' },
+        { fn: clinicMatchesSubcounty, label: uSub || '' },
+        { fn: clinicMatchesCounty,    label: uCo  || '' },
+        { fn: clinicMatchesDistrict,  label: uDist || '' },
+      ];
+      for (const { fn, label } of tiers) {
+        if (!label) continue;
+        const r = all.filter(fn);
+        if (r.length >= 1) { locationLabel = label; return r; }
+      }
+      locationLabel = 'your area';
+      return all;
+    }
+
+    clinics = applyTieredFilter(clinics);
+
+    // Within the filtered set, sort by GPS distance first, then by place-name closeness
+    clinics.sort((a, b) => {
+      if (a._distKm !== null && b._distKm !== null) return a._distKm - b._distKm;
+      if (a._distKm !== null) return -1;
+      if (b._distKm !== null) return 1;
+      // Both without coords — alphabetical
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
     clinics = clinics.slice(0, 10);
-    _cbClinics = clinics; // keep sorted/sliced reference for booking step
+    _cbClinics = clinics;
 
     // ── Fetch ALL condition fees for the top clinics (sequential — needs IDs first) ──
     // Fetches every row from clinic_condition_fees for the returned clinics so that
@@ -2240,11 +2290,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       return;
     }
 
-    const locationLabel = userCoords
-      ? '<span style="font-size:11px;color:#2E7D32;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">gps_fixed</span>Sorted by GPS distance</span>'
-      : `<span style="font-size:11px;color:#888">Showing clinics in ${user.district || 'your area'}</span>`;
+    const zoneName = locationLabel
+      ? locationLabel.charAt(0).toUpperCase() + locationLabel.slice(1)
+      : (user.district || 'your area');
+    const locationBadge = hasGps
+      ? `<span style="font-size:11px;color:#2E7D32;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">gps_fixed</span>Clinics ${zoneName}</span>`
+      : `<span style="font-size:11px;color:#888">Clinics in ${zoneName}</span>`;
 
-    cbList.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${locationLabel}</div>`;
+    cbList.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${locationBadge}</div>`;
 
     // Helper: is clinic open right now?
     function clinicOpenStatus(hours) {
