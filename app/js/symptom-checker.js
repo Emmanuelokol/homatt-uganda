@@ -2161,24 +2161,40 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     let locationLabel = '';
 
     function applyTieredFilter(all) {
-      // GPS distance tiers — only used when at least one clinic has coordinates
+      const noCoord = all.filter(c => c._distKm === null);
+
       if (hasGps) {
         const withDist = all.filter(c => c._distKm !== null);
+
         if (withDist.length > 0) {
           const sorted = [...withDist].sort((a, b) => a._distKm - b._distKm);
-          for (const [km, label] of [[10, 'within 10 km'], [25, 'within 25 km'], [60, 'within 60 km']]) {
+
+          // Pick nearest GPS-coord clinics
+          let gpsClinics = sorted; // fallback: all GPS clinics sorted by distance
+          for (const [km, label] of [[10,'within 10 km'],[25,'within 25 km'],[60,'within 60 km']]) {
             const r = sorted.filter(c => c._distKm <= km);
-            if (r.length >= 1) { locationLabel = label; return r; }
+            if (r.length >= 1) { locationLabel = label; gpsClinics = r; break; }
           }
-          // All GPS clinics are > 60 km away — still return nearest rather than nothing
-          locationLabel = 'nearest available';
-          return sorted;
+          if (!locationLabel) locationLabel = 'nearest available';
+
+          // Always also include clinics without GPS coords that match the user's district/area
+          // so clinics registered without coordinates are never invisible
+          const localNoCoord = _textMatchLocal(noCoord);
+          return [...gpsClinics, ...localNoCoord];
         }
-        // No clinic has coordinates yet — fall through to text matching below
+        // No clinic has GPS coords at all — fall through to text matching
       }
 
-      // Text-based hierarchy: parish → subcounty → county → district
-      // Works whether or not GPS is available, using profile location + reverse-geocode
+      // Text-only path (no GPS or no GPS-coord clinics found)
+      const textResult = _textMatchLocal(all);
+      if (textResult !== all) return textResult;
+      locationLabel = 'your area';
+      return all;
+    }
+
+    // Returns the closest text-tier subset of `clinics` that has ≥1 result.
+    // Falls back to all clinics so nothing is ever hidden.
+    function _textMatchLocal(clinics) {
       const tiers = [
         { fn: clinicMatchesParish,    label: uPar  },
         { fn: clinicMatchesSubcounty, label: uSub  },
@@ -2187,12 +2203,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       ];
       for (const { fn, label } of tiers) {
         if (!label) continue;
-        const r = all.filter(fn);
-        if (r.length >= 1) { locationLabel = label; return r; }
+        const r = clinics.filter(fn);
+        if (r.length >= 1) { locationLabel = locationLabel || label; return r; }
       }
-      // Nothing matched — show all rather than nothing
-      locationLabel = 'your area';
-      return all;
+      return clinics; // nothing matched — return all passed in
     }
 
     clinics = applyTieredFilter(clinics);
