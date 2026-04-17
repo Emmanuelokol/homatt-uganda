@@ -138,24 +138,23 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="admin-form-group">
               <label>District *</label>
-              <input type="text" id="clinicDistrict" placeholder="e.g. Kampala">
+              <input type="text" id="clinicDistrict" placeholder="e.g. Mukono">
             </div>
             <div class="admin-form-group">
-              <label>City / Subcounty</label>
-              <input type="text" id="clinicCity" placeholder="e.g. Nakawa">
+              <label>County</label>
+              <input type="text" id="clinicCounty" placeholder="e.g. Mukono County">
+            </div>
+            <div class="admin-form-group">
+              <label>Subcounty / Town</label>
+              <input type="text" id="clinicCity" placeholder="e.g. Mukono Town">
+            </div>
+            <div class="admin-form-group">
+              <label>Parish / Village</label>
+              <input type="text" id="clinicParish" placeholder="e.g. Butto">
             </div>
             <div class="admin-form-group" style="grid-column:span 2">
               <label>Full Address</label>
               <input type="text" id="clinicAddress" placeholder="Plot number, street, area">
-            </div>
-            <div class="admin-form-group">
-              <label>Latitude (GPS)</label>
-              <input type="number" id="clinicLat" placeholder="e.g. 0.3476" step="0.0001">
-              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Use Google Maps to find exact coordinates</div>
-            </div>
-            <div class="admin-form-group">
-              <label>Longitude (GPS)</label>
-              <input type="number" id="clinicLng" placeholder="e.g. 32.5825" step="0.0001">
             </div>
           </div>
         </div>
@@ -325,11 +324,19 @@
         </div>
         <div class="admin-form-group">
           <label>District *</label>
-          <input type="text" id="caClinicDistrict" placeholder="e.g. Kampala">
+          <input type="text" id="caClinicDistrict" placeholder="e.g. Mukono">
         </div>
         <div class="admin-form-group">
-          <label>City / Area</label>
-          <input type="text" id="caClinicCity" placeholder="e.g. Ntinda">
+          <label>County</label>
+          <input type="text" id="caClinicCounty" placeholder="e.g. Mukono County">
+        </div>
+        <div class="admin-form-group">
+          <label>Subcounty / Town</label>
+          <input type="text" id="caClinicCity" placeholder="e.g. Mukono Town">
+        </div>
+        <div class="admin-form-group">
+          <label>Parish / Village</label>
+          <input type="text" id="caClinicParish" placeholder="e.g. Butto">
         </div>
         <div class="admin-form-group" style="grid-column:span 2">
           <label>Full Address</label>
@@ -608,10 +615,10 @@ function openModal(id) {
   document.getElementById('clinicContact').value = c?.contact_person || '';
   document.getElementById('clinicLicense').value = c?.license_number || '';
   document.getElementById('clinicDistrict').value = c?.district || '';
+  document.getElementById('clinicCounty').value = c?.county || '';
   document.getElementById('clinicCity').value = c?.city || '';
+  document.getElementById('clinicParish').value = c?.parish || '';
   document.getElementById('clinicAddress').value = c?.address || '';
-  document.getElementById('clinicLat').value = c?.latitude || '';
-  document.getElementById('clinicLng').value = c?.longitude || '';
   document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
   document.getElementById('clinicStatus').value = c?.status || 'approved';
   document.getElementById('clinicVerified').checked = c?.verified || false;
@@ -661,15 +668,15 @@ async function saveClinic() {
     name: name,
     description: document.getElementById('clinicDescription').value.trim() || null,
     district: document.getElementById('clinicDistrict').value.trim() || null,
-    city: document.getElementById('clinicCity').value.trim() || null,
+    county:   document.getElementById('clinicCounty').value.trim() || null,
+    city:     document.getElementById('clinicCity').value.trim() || null,
+    parish:   document.getElementById('clinicParish').value.trim() || null,
     address: document.getElementById('clinicAddress').value.trim() || null,
     phone: document.getElementById('clinicPhone').value.trim() || null,
     whatsapp: document.getElementById('clinicWhatsapp').value.trim() || null,
     email: document.getElementById('clinicEmail').value.trim() || null,
     contact_person: document.getElementById('clinicContact').value.trim() || null,
     license_number: document.getElementById('clinicLicense').value.trim() || null,
-    latitude: parseFloat(document.getElementById('clinicLat').value) || null,
-    longitude: parseFloat(document.getElementById('clinicLng').value) || null,
     commission_rate: Number(document.getElementById('clinicCommission').value) || 15,
     consultation_fee: Number(document.getElementById('clinicFeeGeneral').value) || null,
     status: document.getElementById('clinicStatus').value,
@@ -771,7 +778,7 @@ window.copyStaffCreds = function() {
 
 /* ── Create Clinic Account Modal ── */
 function openCreateClinicAccountModal() {
-  ['caClinicName','caClinicDistrict','caClinicCity','caClinicAddress','caClinicPhone','caClinicWhatsapp','caClinicContact','caClinicLicense','caClinicEmail','caClinicPassword'].forEach(function(id){
+  ['caClinicName','caClinicDistrict','caClinicCounty','caClinicCity','caClinicParish','caClinicAddress','caClinicPhone','caClinicWhatsapp','caClinicContact','caClinicLicense','caClinicEmail','caClinicPassword'].forEach(function(id){
     document.getElementById(id).value = '';
   });
   document.getElementById('caClinicFee').value = '';
@@ -792,7 +799,9 @@ var _lastClinicCredentials = '';
 async function submitCreateClinicAccount() {
   var name     = document.getElementById('caClinicName').value.trim();
   var district = document.getElementById('caClinicDistrict').value.trim();
+  var county   = document.getElementById('caClinicCounty').value.trim();
   var city     = document.getElementById('caClinicCity').value.trim();
+  var parish   = document.getElementById('caClinicParish').value.trim();
   var address  = document.getElementById('caClinicAddress').value.trim();
   var phone    = document.getElementById('caClinicPhone').value.trim();
   var whatsapp = document.getElementById('caClinicWhatsapp').value.trim();
@@ -844,7 +853,9 @@ async function submitCreateClinicAccount() {
     email: email, auth_user_id: authUserId,
     commission_rate: comm
   };
-  if (city) insertPayload.city = city;
+  if (county)  insertPayload.county  = county;
+  if (city)    insertPayload.city    = city;
+  if (parish)  insertPayload.parish  = parish;
   if (address) insertPayload.address = address;
   if (phone) insertPayload.phone = phone;
   if (whatsapp) insertPayload.whatsapp = whatsapp;
