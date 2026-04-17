@@ -1117,17 +1117,48 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     const orderBtn = document.getElementById('btnOrderMeds');
     if (orderBtn) {
-      orderBtn.addEventListener('click', () => {
-        // Map top condition name to a medicine-orders condition key
-        const cn = topCondName;
-        const condKey = cn.includes('malaria') ? 'malaria' :
-                        cn.includes('fever') || cn.includes('typhoid') ? 'fever' :
-                        cn.includes('pain') || cn.includes('headache') ? 'pain' :
-                        cn.includes('gastro') || cn.includes('diarrhea') || cn.includes('stomach') ? 'digestive' :
-                        cn.includes('respiratory') || cn.includes('cold') || cn.includes('flu') ? 'infection' :
-                        cn.includes('uti') || cn.includes('urinary') ? 'infection' :
-                        'other';
-        window.location.href = 'medicine-orders.html?condition=' + condKey;
+      orderBtn.addEventListener('click', async () => {
+        orderBtn.disabled = true;
+        orderBtn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;vertical-align:middle">hourglass_top</span> Adding to cart…';
+
+        try {
+          // Search marketplace for each AI-recommended medicine by first keyword
+          const medKeywords = otcItems.map(i => i.name.split(' ')[0]);
+          const orFilter = medKeywords.map(kw => `name.ilike.%${kw}%`).join(',');
+
+          const { data: found } = await supabase
+            .from('marketplace_items')
+            .select('id, name, price, unit, marketplace_categories(icon, color)')
+            .eq('available', true)
+            .or(orFilter);
+
+          // Merge found items into cart (localStorage)
+          let cart = [];
+          try { cart = JSON.parse(localStorage.getItem('homatt_cart') || '[]'); } catch (_) {}
+
+          if (found && found.length) {
+            found.forEach(item => {
+              const cat = Array.isArray(item.marketplace_categories)
+                ? item.marketplace_categories[0]
+                : item.marketplace_categories;
+              const existing = cart.find(c => c.id === item.id);
+              if (existing) {
+                existing.qty++;
+              } else {
+                cart.push({
+                  id: item.id, name: item.name, price: item.price,
+                  qty: 1, unit: item.unit || '',
+                  icon: cat?.icon || 'medication',
+                  color: cat?.color || '#388E3C',
+                });
+              }
+            });
+            localStorage.setItem('homatt_cart', JSON.stringify(cart));
+          }
+        } catch (_) { /* proceed to shop even on network error */ }
+
+        // open_cart=1 tells shop.js to open the cart sheet automatically
+        window.location.href = 'shop.html?open_cart=1';
       });
     }
 
@@ -2345,27 +2376,35 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       });
       return { condName: cond.name, pct: cond.likelihood_percent, matched };
     });
-    const anyDiagFee = diagFeeRows.some(r => r.matched);
+    // Consultation fee fallback — used when no condition-specific fee is set for a condition
+    const consultFee = clinicObj.consultation_fee ? Number(clinicObj.consultation_fee) : null;
 
-    const diagFeesHtml = anyDiagFee
+    // Always show the fee table so every condition has a visible price
+    const diagFeesHtml = aiConditions.length
       ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
            <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">FEES FOR YOUR CONDITIONS</div>
-           ${diagFeeRows.map(r => `
-             <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #F1F8E9">
-               <div style="font-size:12px;color:#333;max-width:65%">
-                 ${r.condName}
-                 ${r.pct ? `<span style="font-size:10px;color:#9E9E9E;margin-left:4px">${r.pct}%</span>` : ''}
-               </div>
-               <span style="font-size:12px;font-weight:700;color:${r.matched ? '#1B5E20' : '#9E9E9E'}">
-                 ${r.matched ? 'UGX ' + Number(r.matched.fee).toLocaleString() : 'Ask at reception'}
-               </span>
-             </div>`).join('')}
+           ${diagFeeRows.map(r => {
+             const feeAmt = r.matched ? Number(r.matched.fee) : consultFee;
+             const feeStr = feeAmt ? 'UGX ' + feeAmt.toLocaleString() : 'Ask at reception';
+             const tag    = (!r.matched && consultFee)
+               ? ' <span style="font-size:9px;color:#9E9E9E;font-weight:400">(consultation)</span>' : '';
+             return `
+               <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #F1F8E9">
+                 <div style="font-size:12px;color:#333;max-width:65%">
+                   ${r.condName}
+                   ${r.pct ? `<span style="font-size:10px;color:#9E9E9E;margin-left:4px">${r.pct}%</span>` : ''}
+                 </div>
+                 <span style="font-size:12px;font-weight:700;color:${feeAmt ? '#1B5E20' : '#9E9E9E'}">
+                   ${feeStr}${tag}
+                 </span>
+               </div>`;
+           }).join('')}
          </div>`
       : '';
 
-    // ── General services / pricing table from clinic settings ──
+    // ── General services / pricing table — shown only when AI produced no conditions ──
     const clinicServices = Array.isArray(clinicObj.services) ? clinicObj.services.filter(s => s.type && s.fee) : [];
-    const servicesHtml = (!anyDiagFee && clinicServices.length > 0)
+    const servicesHtml = (!aiConditions.length && clinicServices.length > 0)
       ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
            <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">SERVICES &amp; FEES</div>
            ${clinicServices.map(s => `

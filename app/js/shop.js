@@ -107,6 +107,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   updateCartBadge();
 
+  // Auto-open cart when arriving from symptom checker with pre-filled medicines
+  if (new URLSearchParams(window.location.search).get('open_cart') === '1' && cart.length) {
+    setTimeout(() => openCartSheet(), 900);
+  }
+
   // ====== Sheet Helpers ======
   const overlay = document.getElementById('sheetOverlay');
   const appScreen = document.querySelector('.app-screen');
