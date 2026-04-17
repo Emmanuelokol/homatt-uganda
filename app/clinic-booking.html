@@ -594,8 +594,14 @@ async function loadClinics() {
     return;
   }
 
-  // ── Reverse-geocode user GPS to get subcounty/parish name for hierarchy matching ──
-  let userGeoNames = { district: userDist.toLowerCase(), subcounty: '', county: '', parish: '' };
+  // ── Build user location names from profile, then override with GPS if available ──
+  const userProfile = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  let userGeoNames = {
+    district:  (userDist || userProfile.district  || '').toLowerCase(),
+    county:    (userProfile.county    || '').toLowerCase(),
+    subcounty: (userProfile.city      || '').toLowerCase(),
+    parish:    (userProfile.parish    || '').toLowerCase(),
+  };
   if (userCoords) {
     try {
       const rgRes = await fetch(
@@ -606,10 +612,10 @@ async function loadClinics() {
         const rg = await rgRes.json();
         const addr = rg.address || {};
         userGeoNames = {
-          district:  (addr.state_district || addr.county || userDist || '').toLowerCase(),
-          county:    (addr.county || '').toLowerCase(),
-          subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || '').toLowerCase(),
-          parish:    (addr.neighbourhood || addr.hamlet || '').toLowerCase(),
+          district:  (addr.state_district || addr.county || userGeoNames.district || '').toLowerCase(),
+          county:    (addr.county || userGeoNames.county || '').toLowerCase(),
+          subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || userGeoNames.subcounty || '').toLowerCase(),
+          parish:    (addr.neighbourhood || addr.hamlet || userGeoNames.parish || '').toLowerCase(),
         };
       }
     } catch (_) {}

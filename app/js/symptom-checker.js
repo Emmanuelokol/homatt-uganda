@@ -2060,11 +2060,17 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const userLng = userCoords?.lng ?? null;
     const userDistrict = (user.district || user.location || '').toLowerCase();
 
-    // ── Reverse-geocode user GPS to get their subcounty/parish name ──
-    // Uses OpenStreetMap Nominatim (free, no API key).
-    // This lets us match clinics that entered their location as a place name
-    // even when the user has GPS but the clinic has no lat/lng.
-    let userGeoNames = { district: userDistrict, subcounty: '', county: '', parish: '' };
+    // Build location context from user's saved profile — used for text matching
+    // when GPS is unavailable or clinics have no coordinates.
+    let userGeoNames = {
+      district:  (user.district  || '').toLowerCase(),
+      county:    (user.county    || '').toLowerCase(),
+      subcounty: (user.city      || user.subcounty || '').toLowerCase(),
+      parish:    (user.parish    || '').toLowerCase(),
+    };
+
+    // Override with GPS reverse-geocode when the device has a position — gives
+    // the most accurate subcounty/parish names even without clinic GPS coords.
     if (userLat !== null && userLng !== null) {
       try {
         const rgRes = await fetch(
@@ -2074,18 +2080,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         if (rgRes.ok) {
           const rg = await rgRes.json();
           const addr = rg.address || {};
-          // Uganda's Nominatim address breakdown:
-          //   village/town/suburb = subcounty or trading centre
-          //   county = county
-          //   state_district = district
           userGeoNames = {
-            district:  (addr.state_district || addr.county || userDistrict || '').toLowerCase(),
-            county:    (addr.county || '').toLowerCase(),
-            subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || '').toLowerCase(),
-            parish:    (addr.neighbourhood || addr.hamlet || addr.isolated_dwelling || '').toLowerCase(),
+            district:  (addr.state_district || addr.county || userGeoNames.district || '').toLowerCase(),
+            county:    (addr.county || userGeoNames.county || '').toLowerCase(),
+            subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || userGeoNames.subcounty || '').toLowerCase(),
+            parish:    (addr.neighbourhood || addr.hamlet || addr.isolated_dwelling || userGeoNames.parish || '').toLowerCase(),
           };
         }
-      } catch (_) { /* Nominatim unavailable — use profile district */ }
+      } catch (_) { /* Nominatim unavailable — keep profile location */ }
     }
 
     // condFeeMap is built after clinics are sorted/sliced (needs real clinic IDs)
@@ -2159,42 +2161,36 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     let locationLabel = '';
 
     function applyTieredFilter(all) {
-      // GPS tiers — used when user has coordinates
+      // GPS distance tiers — only used when at least one clinic has coordinates
       if (hasGps) {
         const withDist = all.filter(c => c._distKm !== null);
-        const sorted   = [...withDist].sort((a, b) => a._distKm - b._distKm);
-
-        for (const [km, label] of [[10, `within 10 km`], [25, `within 25 km`], [60, `within 60 km`]]) {
-          const r = sorted.filter(c => c._distKm <= km);
-          if (r.length >= 1) { locationLabel = label; return r; }
-        }
-        // GPS clinics exist but all > 60 km; also check place-name clinics (no coords)
-        const noCoord = all.filter(c => c._distKm === null);
-
-        // Mix: any place-name matches in same district + nearest GPS results
-        if (uDist) {
-          const distMatch = noCoord.filter(clinicMatchesDistrict);
-          if (distMatch.length) {
-            locationLabel = uSub || uDist;
-            return [...sorted.slice(0, 5), ...distMatch];
+        if (withDist.length > 0) {
+          const sorted = [...withDist].sort((a, b) => a._distKm - b._distKm);
+          for (const [km, label] of [[10, 'within 10 km'], [25, 'within 25 km'], [60, 'within 60 km']]) {
+            const r = sorted.filter(c => c._distKm <= km);
+            if (r.length >= 1) { locationLabel = label; return r; }
           }
+          // All GPS clinics are > 60 km away — still return nearest rather than nothing
+          locationLabel = 'nearest available';
+          return sorted;
         }
-        locationLabel = 'nearest available';
-        return sorted;
+        // No clinic has coordinates yet — fall through to text matching below
       }
 
-      // Place-name tiers — used when no GPS
+      // Text-based hierarchy: parish → subcounty → county → district
+      // Works whether or not GPS is available, using profile location + reverse-geocode
       const tiers = [
-        { fn: clinicMatchesParish,    label: uPar || '' },
-        { fn: clinicMatchesSubcounty, label: uSub || '' },
-        { fn: clinicMatchesCounty,    label: uCo  || '' },
-        { fn: clinicMatchesDistrict,  label: uDist || '' },
+        { fn: clinicMatchesParish,    label: uPar  },
+        { fn: clinicMatchesSubcounty, label: uSub  },
+        { fn: clinicMatchesCounty,    label: uCo   },
+        { fn: clinicMatchesDistrict,  label: uDist },
       ];
       for (const { fn, label } of tiers) {
         if (!label) continue;
         const r = all.filter(fn);
         if (r.length >= 1) { locationLabel = label; return r; }
       }
+      // Nothing matched — show all rather than nothing
       locationLabel = 'your area';
       return all;
     }

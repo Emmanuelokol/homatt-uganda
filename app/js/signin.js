@@ -135,15 +135,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (profile) {
       localStorage.setItem('homatt_user', JSON.stringify({
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        phone: profile.phone_number,
-        dob: profile.dob,
-        sex: profile.sex,
-        district: profile.district,
-        city: profile.city,
-        hasFamily: profile.has_family,
-        familySize: profile.family_size,
+        firstName:   profile.first_name,
+        lastName:    profile.last_name,
+        phone:       profile.phone_number,
+        dob:         profile.dob,
+        sex:         profile.sex,
+        district:    profile.district,
+        county:      profile.county,
+        city:        profile.city,
+        parish:      profile.parish,
+        hasFamily:   profile.has_family,
+        familySize:  profile.family_size,
         healthGoals: profile.health_goals,
       }));
       localStorage.setItem('homatt_session', JSON.stringify({

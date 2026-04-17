@@ -39,7 +39,12 @@ create policy "Anyone can read clinic condition fees"
   to anon, authenticated
   using (true);
 
--- 6. Verify — run this to confirm your two clinics are visible:
+-- 6. Add county and parish to profiles so user location is fully personalised
+alter table profiles
+  add column if not exists county text,
+  add column if not exists parish text;
+
+-- 7. Verify — run this to confirm your two clinics are visible:
 -- select id, name, district, city, county, parish, active, verified
 -- from clinics
 -- where active = true;
