@@ -111,10 +111,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   avatarEl.addEventListener('click', () => { window.location.href = 'profile.html'; });
 
-  // ====== Quiz Streak ======
-  const streak = parseInt(localStorage.getItem('homatt_quiz_streak') || '0');
-  document.getElementById('streakCount').textContent = streak;
-
   // ====== Feature Cards Navigation ======
   document.getElementById('symptomChecker').addEventListener('click', () => {
     window.location.href = 'symptom-checker.html';
@@ -142,10 +138,6 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('featureChildGrowth').addEventListener('click', () => {
     window.location.href = 'child-growth-tracker.html';
-  });
-
-  document.getElementById('dailyQuiz').querySelector('.quiz-start-btn').addEventListener('click', () => {
-    window.location.href = 'quiz.html';
   });
 
   // ====== Health Score Calculation ======
