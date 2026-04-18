@@ -2553,7 +2553,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         urgency_level:  diagData.clinic_urgency === 'urgent' ? 'high' : diagData.clinic_urgency === 'soon' ? 'medium' : 'normal',
         risk_score:     diagData.conditions[0]?.likelihood_percent || 50,
         clinic_id:      isMock ? null : clinicId,
-        preferred_time: selectedTime,
+        appointment_time: selectedTime,
         status:         'pending',
         pin_token:      pinToken,
         pin_expires_at: pinExpiry,

@@ -958,12 +958,12 @@ async function submitBooking() {
       appointmentAt = booking.appointmentDate + 'T' + (booking.appointmentTime || '09:00') + ':00';
     }
     const payload = {
-      patient_id:       authUserId,
+      patient_user_id:  authUserId,
       patient_name:     userCache.firstName ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ') : (session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : 'Patient'),
       patient_age:      userCache.age  || session.age  || null,
       patient_sex:      userCache.sex  || session.sex  || null,
       clinic_id:        isMockClinic ? null : booking.clinicId,
-      symptoms:         booking.symptoms ? [booking.symptoms] : null,
+      symptoms:         booking.symptoms || null,
       urgency_level:    booking.urgency,
       status:           'pending',
       booking_code:     bookingCode,
