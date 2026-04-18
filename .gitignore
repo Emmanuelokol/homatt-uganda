@@ -8,6 +8,9 @@
 .env.local
 .env
 
+# Supabase CLI temp files
+supabase/.temp/
+
 # Node / Capacitor build artifacts
 node_modules/
 android/.gradle/
