@@ -2211,12 +2211,20 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     clinics = applyTieredFilter(clinics);
 
-    // Within the filtered set, sort by GPS distance first, then by place-name closeness
+    // Sort order: GPS clinics <10 km → local no-GPS clinics (same district) → GPS clinics >10 km
+    // This ensures clinics registered without coordinates (but in the user's area) appear
+    // before far-away GPS clinics, not after them.
+    const NEAR_KM = 10;
     clinics.sort((a, b) => {
+      const aNear = a._distKm !== null && a._distKm <= NEAR_KM;
+      const bNear = b._distKm !== null && b._distKm <= NEAR_KM;
+      if (aNear && !bNear) return -1;
+      if (!aNear && bNear) return 1;
+      if (aNear && bNear) return a._distKm - b._distKm;
+      // Both non-near: no-GPS local clinics sort before distant GPS clinics
+      if (a._distKm === null && b._distKm !== null) return -1;
+      if (a._distKm !== null && b._distKm === null) return 1;
       if (a._distKm !== null && b._distKm !== null) return a._distKm - b._distKm;
-      if (a._distKm !== null) return -1;
-      if (b._distKm !== null) return 1;
-      // Both without coords — alphabetical
       return (a.name || '').localeCompare(b.name || '');
     });
 

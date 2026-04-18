@@ -665,11 +665,17 @@ async function loadClinics() {
       return { ...c, distKm, score: scoreClinic(c, userDist, aiCond, distKm, userGeoNames), condFees: fees, matchedFee, matchedCond };
     })
     .sort((a, b) => {
-      // Primary: GPS distance (clinics with known distance come before text-only matches)
+      // GPS clinics within 10 km first, then local no-GPS clinics, then distant GPS clinics
+      const NEAR = 10;
+      const aNear = a.distKm !== null && a.distKm <= NEAR;
+      const bNear = b.distKm !== null && b.distKm <= NEAR;
+      if (aNear && !bNear) return -1;
+      if (!aNear && bNear) return 1;
+      if (aNear && bNear) return a.distKm - b.distKm || b.score - a.score;
+      // Both non-near: local no-GPS clinics sort before distant GPS clinics
+      if (a.distKm === null && b.distKm !== null) return -1;
+      if (a.distKm !== null && b.distKm === null) return 1;
       if (a.distKm !== null && b.distKm !== null) return a.distKm - b.distKm || b.score - a.score;
-      if (a.distKm !== null) return -1;
-      if (b.distKm !== null) return 1;
-      // Both without GPS coords — use hierarchy score
       return b.score - a.score;
     });
 
