@@ -59,3 +59,13 @@ create policy "Clinics can read/update their bookings"
 -- Note: "Patients can read own bookings" policy is intentionally omitted here
 -- because patient_user_id may not be populated in older bookings.
 -- Patients access their bookings via localStorage (booking code + PIN).
+
+-- ============================================================
+-- Change symptoms from text[] to jsonb so both the currently
+-- deployed app (which sends plain strings) and future code
+-- (which sends arrays) both insert successfully.
+-- to_jsonb() converts existing {array,data} → ["array","data"]
+-- ============================================================
+ALTER TABLE bookings
+  ALTER COLUMN symptoms TYPE jsonb
+  USING to_jsonb(symptoms);
