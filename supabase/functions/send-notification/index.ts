@@ -137,6 +137,9 @@ Deno.serve(async (req: Request) => {
     return json({ error: "player_ids or userId is required" }, 400);
   }
 
+  // send_after: ISO datetime string to schedule delivery (e.g. monitoring reminder in 55 min)
+  const sendAfter = typeof body.send_after === "string" ? body.send_after : undefined;
+
   const appId = Deno.env.get("ONESIGNAL_APP_ID");
   const apiKey = Deno.env.get("ONESIGNAL_REST_API_KEY");
   if (!appId || !apiKey) {
@@ -218,6 +221,11 @@ Deno.serve(async (req: Request) => {
 
   if (actionButtons) {
     payload.action_buttons = actionButtons;
+  }
+
+  // Schedule delivery — OneSignal accepts ISO 8601 UTC datetime
+  if (sendAfter) {
+    payload.send_after = sendAfter;
   }
 
   // ── Send to OneSignal ──

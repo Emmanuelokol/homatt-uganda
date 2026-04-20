@@ -36,7 +36,7 @@ const SCREEN_URLS = {
   'health-tracker':   'dashboard.html',
   'complete-payment': 'wallet.html',
   'recovery-check':   'dashboard.html',
-  'symptom-checkin':  'dashboard.html',
+  'symptom-checkin':  'symptom-checker.html',
 };
 
 // ── Deep link navigation ──────────────────────────────────────

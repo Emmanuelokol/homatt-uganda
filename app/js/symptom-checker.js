@@ -1316,6 +1316,76 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
+
+    // Schedule a push notification for when the user is NOT in the app after 1 hour
+    // Uses send_after so OneSignal delivers it even if the app is backgrounded/closed
+    if (supabase && session?.user?.id) {
+      const sendAfterTime = new Date(Date.now() + 55 * 60 * 1000).toISOString();
+      supabase.functions.invoke('send-notification', {
+        body: {
+          userId:     session.user.id,
+          heading:    `${condName} Check-in`,
+          message:    `It's been 1 hour. How are you feeling? Tap to check in — Better, Same or Worse.`,
+          data:       { screen: 'symptom-checkin' },
+          buttons:    [
+            { id: 'feeling_better', text: 'Better' },
+            { id: 'feeling_same',   text: 'Same' },
+            { id: 'feeling_worse',  text: 'Worse' },
+          ],
+          send_after:  sendAfterTime,
+          pref_category: 'recovery_checkins',
+        },
+      }).then(({ data: r }) => {
+        if (r?.notification_id) {
+          monitoringSession._scheduledNotifId = r.notification_id;
+          localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+        }
+      }).catch(() => {});
+    }
+
+    // Wire the "Save & End Monitoring" button
+    document.getElementById('btnSaveEndMonitor')?.addEventListener('click', endMonitoringEarly);
+  }
+
+  async function endMonitoringEarly() {
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
+    // Cancel the scheduled push if we have the notification ID
+    if (monitoringSession?._scheduledNotifId && supabase) {
+      supabase.functions.invoke('cancel-notification', {
+        body: { notification_id: monitoringSession._scheduledNotifId },
+      }).catch(() => {});
+    }
+
+    // Save outcome to Supabase
+    if (window._symptomSupa && monitoringSession?.startedAt) {
+      const { data: authData } = await window._symptomSupa.auth.getSession().catch(() => ({ data: null }));
+      const userId = authData?.session?.user?.id;
+      if (userId) {
+        window._symptomSupa.from('symptom_monitoring_logs')
+          .update({ outcome: 'abandoned', ended_at: new Date().toISOString() })
+          .eq('user_id', userId).eq('outcome', 'active').catch(() => {});
+      }
+    }
+
+    localStorage.removeItem('homatt_monitoring');
+    monitoringSession = null;
+
+    // Show a brief confirmation then go back to results
+    const phase2 = document.getElementById('monitorPhase2');
+    if (phase2) {
+      phase2.innerHTML = `
+        <div style="text-align:center;padding:28px 16px">
+          <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32;display:block;margin-bottom:12px">check_circle</span>
+          <p style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 6px">Monitoring ended</p>
+          <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px">Your session has been saved. Stay well!</p>
+          <button onclick="window.location.href='dashboard.html'"
+            style="padding:12px 28px;background:#1B5E20;color:#fff;border:none;border-radius:10px;
+              font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+            Back to Dashboard
+          </button>
+        </div>`;
+    }
   }
 
   function startCountdownTimer(totalSeconds) {
@@ -2658,28 +2728,48 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   }
 
   // ====== Check for existing monitoring session ======
+  // Also handle notification tap: ?screen=symptom-checkin[&feeling=better|same|worse]
+  const _urlParams = new URLSearchParams(window.location.search);
+  const _notifScreen = _urlParams.get('screen');
+  const _notifFeeling = _urlParams.get('feeling'); // pre-selected from action button
   const existingMonitor = localStorage.getItem('homatt_monitoring');
+
   if (existingMonitor) {
-    const session = JSON.parse(existingMonitor);
-    if (session.nextCheckIn) {
-      const nextTime = new Date(session.nextCheckIn);
-      const now = new Date();
-      if (now >= nextTime) {
-        monitoringSession = session;
-        diagnosisData = { conditions: [{ name: session.condition }], overall_risk: session.risk };
-        document.getElementById('monitorCondition').innerHTML = `
-          <div class="sc-monitor-cond-card">
-            <span class="material-icons-outlined">medical_information</span>
-            <div>
-              <p class="sc-monitor-cond-name">Monitoring: ${session.condition}</p>
-              <p class="sc-monitor-cond-risk">Risk level: <strong class="${session.risk}">${session.risk}</strong></p>
-            </div>
+    const savedMs = JSON.parse(existingMonitor);
+    const isCheckinDue = savedMs.nextCheckIn && new Date() >= new Date(savedMs.nextCheckIn);
+    const openedFromNotif = _notifScreen === 'symptom-checkin';
+
+    if (isCheckinDue || openedFromNotif) {
+      monitoringSession = savedMs;
+      diagnosisData = { conditions: [{ name: savedMs.condition }], overall_risk: savedMs.risk };
+      document.getElementById('monitorCondition').innerHTML = `
+        <div class="sc-monitor-cond-card">
+          <span class="material-icons-outlined">medical_information</span>
+          <div>
+            <p class="sc-monitor-cond-name">Monitoring: ${savedMs.condition}</p>
+            <p class="sc-monitor-cond-risk">Risk level: <strong class="${savedMs.risk}">${savedMs.risk}</strong></p>
           </div>
-        `;
-        document.getElementById('monitorResponse').style.display = 'none';
-        document.getElementById('monitorTimer').style.display = 'none';
-        showScreen('screenMonitor');
-        wireMonitoringButtons();
+        </div>
+      `;
+      document.getElementById('monitorResponse').style.display = 'none';
+      document.getElementById('monitorTimer').style.display = 'none';
+      showScreen('screenMonitor');
+      wireMonitoringButtons();
+
+      // If the user tapped an action button in the notification, auto-trigger that feeling
+      if (_notifFeeling && ['better', 'same', 'worse'].includes(_notifFeeling)) {
+        // Short delay so the monitoring screen is fully rendered first
+        setTimeout(() => {
+          triggerCheckinPhase();
+          // Auto-click the correct feeling button
+          setTimeout(() => {
+            const btn = document.querySelector(`.sc-feeling-btn[data-feeling="${_notifFeeling}"]`);
+            if (btn) btn.click();
+          }, 300);
+        }, 400);
+      } else if (openedFromNotif) {
+        // Notification tap without action button — just show the check-in phase
+        setTimeout(() => triggerCheckinPhase(), 400);
       }
     }
   }
