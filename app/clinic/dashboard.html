@@ -444,12 +444,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (supa) {
     try {
-      // 7-day window so historical bookings remain visible
-      const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      // No date filter — show all bookings for this clinic so nothing is hidden by age
       let q = supa.from('bookings')
         .select('*')
-        .gte('created_at', windowStart.toISOString())
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(200);
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
       const { data, error } = await Promise.race([
         q,
@@ -461,17 +460,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
       bookings = data || [];
 
-      // Fallback: if no bookings found with clinic filter, fetch all recent bookings
-      // so we can show them (helps diagnose clinic_id mismatches)
+      // Fallback: if no bookings with clinic filter, show all bookings so we can
+      // diagnose whether the issue is clinic_id mismatch or truly no bookings
       if (!bookings.length && session.clinicId) {
         const { data: allData } = await supa.from('bookings')
           .select('*')
-          .gte('created_at', windowStart.toISOString())
           .order('created_at', { ascending: false })
           .limit(20);
         if (allData?.length) {
           bookings = allData;
-          showToast('Showing all recent bookings (clinic filter returned 0 results)', 'error');
+          showToast('⚠️ Showing all bookings — clinic filter returned 0. Check clinic ID linkage.', 'error');
         }
       }
     } catch(e) {
