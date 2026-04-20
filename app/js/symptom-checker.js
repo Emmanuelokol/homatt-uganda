@@ -2546,7 +2546,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         patient_user_id: session?.user?.id || null,
         patient_age:    selectedPatient?.age || null,
         patient_sex:    selectedPatient?.sex || null,
-        symptoms:       enteredSymptoms || null,
+        symptoms:       enteredSymptoms ? [enteredSymptoms] : null,
         ai_diagnosis:   diagData.conditions[0]?.name || null,
         conditions_json: diagData.conditions || [],
         ai_confidence:  diagData.conditions[0]?.likelihood_percent || null,

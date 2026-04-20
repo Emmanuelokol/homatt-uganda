@@ -963,7 +963,7 @@ async function submitBooking() {
       patient_age:      userCache.age  || session.age  || null,
       patient_sex:      userCache.sex  || session.sex  || null,
       clinic_id:        isMockClinic ? null : booking.clinicId,
-      symptoms:         booking.symptoms || null,
+      symptoms:         booking.symptoms ? [booking.symptoms] : null,
       urgency_level:    booking.urgency,
       status:           'pending',
       booking_code:     bookingCode,
