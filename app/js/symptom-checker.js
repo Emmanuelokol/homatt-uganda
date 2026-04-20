@@ -2553,7 +2553,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         urgency_level:  diagData.clinic_urgency === 'urgent' ? 'high' : diagData.clinic_urgency === 'soon' ? 'medium' : 'normal',
         risk_score:     diagData.conditions[0]?.likelihood_percent || 50,
         clinic_id:      isMock ? null : clinicId,
-        appointment_time: selectedTime,
+        preferred_time: selectedTime,
         status:         'pending',
         pin_token:      pinToken,
         pin_expires_at: pinExpiry,
@@ -2561,18 +2561,21 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
       let savedOk = false;
       let savedId  = null;
+      let insertErrMsg = null;
       if (supabase) {
         try {
           const { data: inserted, error: insertErr } = await supabase
             .from('bookings').insert(bookingRecord).select('id').single();
           if (insertErr) {
-            console.error('[Homatt] Booking insert error:', insertErr.message);
+            console.error('[Homatt] Booking insert error:', insertErr.message, insertErr.code);
+            insertErrMsg = insertErr.message;
           } else {
             savedOk = true;
             savedId  = inserted?.id || null;
           }
         } catch (e) {
           console.warn('[Homatt] Booking insert failed (offline?):', e.message);
+          insertErrMsg = e.message;
         }
       }
 
@@ -2614,7 +2617,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             <span class="material-icons-outlined" style="font-size:38px;color:#2E7D32">check_circle</span>
           </div>
           <h3 style="font-size:18px;font-weight:700;color:#111;margin:0 0 6px">Booking Confirmed!</h3>
-          <p style="font-size:13px;color:#666;margin:0 0 20px">A push notification has been sent to your device.</p>
+          <p style="font-size:13px;color:#666;margin:0 0 20px">${savedOk ? 'Your booking has been saved. The clinic will see it on their dashboard.' : 'Saved locally — please show this code at the clinic.'}</p>
+          ${!savedOk ? `<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:10px 14px;margin:-10px 0 16px;font-size:12px;color:#E65100;text-align:left"><strong>Note:</strong> Could not sync to server ${insertErrMsg ? '(' + insertErrMsg.slice(0,80) + ')' : '(offline?)'}. Your booking code is saved on this device — show it at reception.</div>` : ''}
 
           <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:14px">
             <p style="font-size:11px;color:#555;margin:0 0 5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Booking Code</p>

@@ -444,25 +444,39 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (supa) {
     try {
-      // Use last 48 h window so bookings made before midnight are still visible
-      const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000);
+      // 7-day window so historical bookings remain visible
+      const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       let q = supa.from('bookings')
         .select('*')
         .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false });
-      // Filter by clinic if logged in as real clinic staff; otherwise show all bookings
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
       const { data, error } = await Promise.race([
         q,
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
       ]);
       if (error) {
-        console.error('[Clinic] Bookings query failed:', error.message);
+        console.error('[Clinic] Bookings query failed:', error.message, error.code);
         showToast('Could not load bookings: ' + error.message, 'error');
       }
       bookings = data || [];
+
+      // Fallback: if no bookings found with clinic filter, fetch all recent bookings
+      // so we can show them (helps diagnose clinic_id mismatches)
+      if (!bookings.length && session.clinicId) {
+        const { data: allData } = await supa.from('bookings')
+          .select('*')
+          .gte('created_at', windowStart.toISOString())
+          .order('created_at', { ascending: false })
+          .limit(20);
+        if (allData?.length) {
+          bookings = allData;
+          showToast('Showing all recent bookings (clinic filter returned 0 results)', 'error');
+        }
+      }
     } catch(e) {
       console.error('[Clinic] Bookings fetch error:', e.message);
+      showToast('Error loading bookings: ' + e.message, 'error');
     }
   }
 
