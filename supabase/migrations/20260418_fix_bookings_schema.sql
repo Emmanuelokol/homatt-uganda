@@ -1,12 +1,13 @@
 -- ============================================================
--- Fix bookings table: add all columns that the patient app and
--- clinic portal rely on but that are missing from the original schema.
--- Also creates clinic_check_in_pins which stores patient PINs.
+-- Fix bookings table: add all columns the app relies on.
+-- Creates clinic_check_in_pins for patient PIN check-in.
 -- Safe to re-run — all statements are idempotent.
 -- ============================================================
 
 -- 1. Add every missing column to bookings
+--    (patient_user_id first so the RLS policy below can reference it)
 alter table bookings
+  add column if not exists patient_user_id   uuid references auth.users(id),
   add column if not exists notes              text,
   add column if not exists location_district  text,
   add column if not exists location_city      text,
@@ -43,30 +44,18 @@ create policy "Anyone can update check-in pins"
   on clinic_check_in_pins for update
   using (true);
 
--- 4. Ensure bookings RLS policies allow both patients and clinic staff
---    to insert/read correctly.
-
--- Patients: insert their own bookings (anon or authenticated)
+-- 4. Fix bookings RLS — clinic staff can read/update all bookings
 drop policy if exists "Patients can insert bookings" on bookings;
 create policy "Patients can insert bookings"
   on bookings for insert
   with check (true);
 
--- Patients: read their own bookings by patient_user_id
-drop policy if exists "Patients can read own bookings" on bookings;
-create policy "Patients can read own bookings"
-  on bookings for select
-  using (auth.uid() = patient_user_id);
-
--- Clinic staff: read and update all bookings (they filter by clinic_id in queries)
 drop policy if exists "Clinics can read/update their bookings" on bookings;
 create policy "Clinics can read/update their bookings"
   on bookings for all
   using (true)
   with check (true);
 
--- 5. Verify — after running, confirm columns exist:
--- select column_name, data_type
--- from information_schema.columns
--- where table_name = 'bookings'
--- order by ordinal_position;
+-- Note: "Patients can read own bookings" policy is intentionally omitted here
+-- because patient_user_id may not be populated in older bookings.
+-- Patients access their bookings via localStorage (booking code + PIN).

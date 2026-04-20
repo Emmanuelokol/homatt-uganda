@@ -444,19 +444,26 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (supa) {
     try {
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+      // Use last 48 h window so bookings made before midnight are still visible
+      const windowStart = new Date(Date.now() - 48 * 60 * 60 * 1000);
       let q = supa.from('bookings')
-        .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,ai_diagnosis,ai_confidence,urgency_level,risk_score,status,created_at,ai_full_data,pin_token,pin_expires_at,patient_user_id')
-        .gte('created_at', todayStart.toISOString())
+        .select('*')
+        .gte('created_at', windowStart.toISOString())
         .order('created_at', { ascending: false });
-      // Filter by clinic if logged in as real clinic staff; otherwise show all today's bookings
+      // Filter by clinic if logged in as real clinic staff; otherwise show all bookings
       if (session.clinicId) q = q.eq('clinic_id', session.clinicId);
-      const { data } = await Promise.race([
+      const { data, error } = await Promise.race([
         q,
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
       ]);
+      if (error) {
+        console.error('[Clinic] Bookings query failed:', error.message);
+        showToast('Could not load bookings: ' + error.message, 'error');
+      }
       bookings = data || [];
-    } catch(e) {}
+    } catch(e) {
+      console.error('[Clinic] Bookings fetch error:', e.message);
+    }
   }
 
   if (!bookings.length && session.demo) {
@@ -699,12 +706,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (supa) {
       try {
-        const { data } = await supa.from('bookings')
-          .select('id,booking_code,patient_name,patient_age,patient_sex,symptoms,urgency_level,status,pin_token,pin_expires_at,ai_diagnosis,ai_confidence,ai_full_data,notes,discount_applied,discount_pct,created_at,patient_user_id')
+        const { data, error: pinErr } = await supa.from('bookings')
+          .select('*')
           .or(`pin_token.eq.${raw},booking_code.eq.${raw}`)
           .maybeSingle();
+        if (pinErr) console.error('[Clinic] PIN lookup failed:', pinErr.message);
         found = data;
-      } catch(e) {}
+      } catch(e) { console.error('[Clinic] PIN lookup error:', e.message); }
     }
 
     // Fallback: search in already-loaded bookings array (covers demo/mock mode)
