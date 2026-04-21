@@ -40,8 +40,12 @@ ON CONFLICT (key) DO NOTHING;
 
 -- RLS: admin portal reads/writes via anon key
 ALTER TABLE app_config ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "app_config_read"   ON app_config FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "app_config_write"  ON app_config FOR ALL    USING (true) WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "app_config_read"  ON app_config FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "app_config_write" ON app_config FOR ALL USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- patient_health_followups: created in previous migration, ensure table exists
 -- (this file is safe to run independently or alongside 20260421_clinical_workflow_columns.sql)
@@ -59,8 +63,12 @@ CREATE TABLE IF NOT EXISTS patient_health_followups (
 );
 
 ALTER TABLE patient_health_followups ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "followup_insert" ON patient_health_followups FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "followup_select" ON patient_health_followups FOR SELECT USING (true);
+DO $$ BEGIN
+  CREATE POLICY "followup_insert" ON patient_health_followups FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "followup_select" ON patient_health_followups FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE INDEX IF NOT EXISTS idx_phf_diagnosis ON patient_health_followups (diagnosis_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_phf_patient   ON patient_health_followups (patient_user_id, created_at DESC);
