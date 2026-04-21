@@ -258,9 +258,114 @@
         </div>
       </div>
 
+      <!-- ===== PATIENT FOLLOW-UP TRACKER ===== -->
+      <div class="admin-table-wrap" id="followupTracker" style="margin-top:28px">
+        <div class="table-header" style="background:linear-gradient(135deg,#1A237E,#3949AB);border-radius:12px 12px 0 0;padding:16px 22px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:12px;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="color:#fff;font-size:22px">follow_the_signs</span>
+            </div>
+            <div>
+              <div style="font-size:16px;font-weight:700;color:#fff">Patient Follow-up Tracker</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.7);margin-top:2px">Patients treated in the last 30 days — monitor health progress and write clinical notes</div>
+            </div>
+          </div>
+          <button onclick="loadFollowupTracker()" style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fff;padding:7px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">refresh</span> Refresh
+          </button>
+        </div>
+        <div id="followupTrackerBody" style="padding:16px 22px">
+          <div style="text-align:center;color:#9AA0A6;padding:24px;font-size:13px">Loading follow-up data…</div>
+        </div>
+      </div>
+      <!-- ===== END FOLLOW-UP TRACKER ===== -->
+
     </div>
   </main>
 </div>
+
+<!-- ===== FOLLOW-UP NOTE MODAL ===== -->
+<div id="followupNoteModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1100;display:none;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;max-width:520px;width:100%;padding:0;box-shadow:0 20px 60px rgba(0,0,0,0.25)">
+    <div style="background:linear-gradient(135deg,#1A237E,#3949AB);padding:20px 24px;border-radius:16px 16px 0 0;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:15px;font-weight:700;color:#fff">Clinical Follow-up Note</div>
+        <div style="font-size:12px;color:rgba(255,255,255,0.8)" id="followupNotePatientName">Patient</div>
+      </div>
+      <button onclick="document.getElementById('followupNoteModal').style.display='none'"
+        style="background:rgba(255,255,255,0.2);border:none;color:#fff;width:34px;height:34px;border-radius:50%;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <div style="padding:22px 24px">
+      <input type="hidden" id="followupNoteDiagId">
+      <input type="hidden" id="followupNotePatientUserId">
+
+      <!-- Patient feeling update (can be set by clinic after phone call) -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">Patient Feeling (from call or visit)</label>
+        <div style="display:flex;gap:8px">
+          <button id="fnBetter" onclick="setFollowupFeeling('better')"
+            style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span class="material-icons-outlined" style="font-size:20px;color:#2E7D32">sentiment_very_satisfied</span>
+            Much Better
+          </button>
+          <button id="fnSame" onclick="setFollowupFeeling('same')"
+            style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span class="material-icons-outlined" style="font-size:20px;color:#F57F17">sentiment_neutral</span>
+            About the Same
+          </button>
+          <button id="fnWorse" onclick="setFollowupFeeling('worse')"
+            style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span class="material-icons-outlined" style="font-size:20px;color:#C62828">sentiment_very_dissatisfied</span>
+            Getting Worse
+          </button>
+        </div>
+      </div>
+
+      <!-- Clinical note -->
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Clinical Note *</label>
+        <textarea id="followupNoteText" rows="4" placeholder="e.g. Patient called back. Fever persisting. Advised to return to clinic immediately. Awaiting malaria repeat test…"
+          style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+
+      <!-- Medication taken checkbox -->
+      <div style="margin-bottom:16px;display:flex;align-items:center;gap:10px">
+        <input type="checkbox" id="followupMedTaken" style="width:18px;height:18px;cursor:pointer">
+        <label for="followupMedTaken" style="font-size:13px;font-weight:500;cursor:pointer">Patient confirmed they have been taking their medication</label>
+      </div>
+
+      <!-- Escalation (shown when feeling = worse) -->
+      <div id="followupEscalateBox" style="display:none;background:#FFEBEE;border:1px solid #EF9A9A;border-radius:10px;padding:14px;margin-bottom:16px">
+        <div style="font-size:13px;font-weight:700;color:#C62828;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">warning</span>
+          Patient is getting worse — Escalation Options
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px">Recommend Another Clinic</label>
+          <input id="escalateClinicName" type="text" placeholder="e.g. Mulago National Referral Hospital"
+            style="width:100%;padding:9px 12px;border:1.5px solid #EF9A9A;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+        <button onclick="sendEscalationNotif()"
+          style="width:100%;padding:10px;background:#C62828;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">local_hospital</span>
+          Send Urgent Referral to Patient
+        </button>
+      </div>
+
+      <div style="display:flex;gap:10px">
+        <button onclick="document.getElementById('followupNoteModal').style.display='none'"
+          style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">Cancel</button>
+        <button onclick="saveFollowupNote()"
+          style="flex:2;background:#1A237E;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">save</span> Save Follow-up Note
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- ===== END FOLLOW-UP NOTE MODAL ===== -->
 
 <!-- ===== CLINICIAN CONFIRMATION MODAL ===== -->
 <div id="attendModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;overflow-y:auto;padding:20px 0">
@@ -361,6 +466,30 @@
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Doctor's Clinical Findings</label>
         <textarea id="clinicalFindings" rows="3" placeholder="Physical examination findings, vital signs, notes…"
           style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+
+      <!-- Treatments administered at clinic during this visit -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">
+          <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle;margin-right:4px">medical_services</span>
+          Treatments Given at Clinic
+        </label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px" id="treatmentChips">
+          <button type="button" onclick="toggleTreatment('IV Drip')"          data-tx="IV Drip"          style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">IV Drip</button>
+          <button type="button" onclick="toggleTreatment('IM Injection')"      data-tx="IM Injection"      style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">IM Injection</button>
+          <button type="button" onclick="toggleTreatment('IV Injection')"      data-tx="IV Injection"      style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">IV Injection</button>
+          <button type="button" onclick="toggleTreatment('Wound Dressing')"    data-tx="Wound Dressing"    style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Wound Dressing</button>
+          <button type="button" onclick="toggleTreatment('Oral Rehydration')"  data-tx="Oral Rehydration"  style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Oral Rehydration</button>
+          <button type="button" onclick="toggleTreatment('Nebulization')"      data-tx="Nebulization"      style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Nebulization</button>
+          <button type="button" onclick="toggleTreatment('Blood Pressure Check')" data-tx="Blood Pressure Check" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">BP Check</button>
+          <button type="button" onclick="toggleTreatment('Blood Glucose Check')" data-tx="Blood Glucose Check" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Blood Glucose</button>
+          <button type="button" onclick="toggleTreatment('ECG')"               data-tx="ECG"               style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">ECG</button>
+          <button type="button" onclick="toggleTreatment('Suturing')"          data-tx="Suturing"          style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Suturing</button>
+          <button type="button" onclick="toggleTreatment('Oxygen Therapy')"    data-tx="Oxygen Therapy"    style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Oxygen Therapy</button>
+          <button type="button" onclick="toggleTreatment('Catheterization')"   data-tx="Catheterization"   style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff">Catheterization</button>
+        </div>
+        <textarea id="treatmentsGivenNotes" rows="2" placeholder="Additional procedure notes, vitals recorded, dosages given at clinic…"
+          style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
       </div>
       <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Lab Tests Ordered</label>
@@ -912,7 +1041,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const supa2 = supa;
   let activeBooking = null;
-  let selectedLabTests = [];
+  let selectedLabTests  = [];
+  let selectedTreatments = [];
   let aiMatchValue = null;
   let rxLineCount = 0;
 
@@ -1060,6 +1190,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('treatmentInput').value = '';
     document.getElementById('clinicalFindings').value = '';
     document.getElementById('patientInstructions').value = '';
+    document.getElementById('treatmentsGivenNotes').value = '';
+    selectedTreatments = [];
+    document.querySelectorAll('#treatmentChips button').forEach(b => {
+      b.style.background = '#fff'; b.style.borderColor = '#E0E0E0'; b.style.color = '#202124';
+    });
     // Default follow-up date = 7 days from now
     const defDate = new Date(); defDate.setDate(defDate.getDate() + 7);
     document.getElementById('followUpDate').value = defDate.toISOString().slice(0,10);
@@ -1157,6 +1292,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       btn.style.background  = active ? '#E8F5E9' : '#fff';
       btn.style.borderColor = active ? '#4CAF50' : '#E0E0E0';
       btn.style.color       = active ? '#1B5E20' : '#202124';
+    });
+  };
+
+  window.toggleTreatment = name => {
+    const idx = selectedTreatments.indexOf(name);
+    if (idx === -1) selectedTreatments.push(name); else selectedTreatments.splice(idx, 1);
+    document.querySelectorAll('#treatmentChips button').forEach(btn => {
+      const active = selectedTreatments.includes(btn.dataset.tx);
+      btn.style.background  = active ? '#FFF3E0' : '#fff';
+      btn.style.borderColor = active ? '#FF9800' : '#E0E0E0';
+      btn.style.color       = active ? '#E65100' : '#202124';
     });
   };
 
@@ -1264,7 +1410,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const severity           = document.getElementById('severitySelect').value;
     const treatment          = document.getElementById('treatmentInput').value.trim();
     const clinicalFindings   = document.getElementById('clinicalFindings').value.trim();
-    const patientInstructions= document.getElementById('patientInstructions').value.trim();
+    const patientInstructions = document.getElementById('patientInstructions').value.trim();
+    const treatmentsGivenNotes = document.getElementById('treatmentsGivenNotes').value.trim();
+    const treatmentsGiven = selectedTreatments.length || treatmentsGivenNotes
+      ? { procedures: selectedTreatments, notes: treatmentsGivenNotes || null }
+      : null;
 
     // Follow-up: specific date + time from pickers
     const followUpDateVal = document.getElementById('followUpDate').value;
@@ -1356,6 +1506,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         confirmed_conditions:    confirmedConditions.length ? confirmedConditions : null,
         patient_instructions:    patientInstructions || null,
         delivery_preference:     fulfillmentMode  || 'pickup',
+        treatments_given:        treatmentsGiven,
       }).select('id').single();
 
       if (diagErr) { alert('Save failed: ' + diagErr.message); return; }
@@ -1575,6 +1726,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(withPrescription ? `Prescription saved & reminders scheduled for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
   };
 
+  // ── Load follow-up tracker after queue renders ──
+  setTimeout(loadFollowupTracker, 800);
+
   // Recent bookings + scheduled appointments sidebar
   const apptItems = bookings.slice(0, 6).map(b => `
     <div class="appt-item">
@@ -1599,6 +1753,260 @@ document.addEventListener('DOMContentLoaded', async () => {
     (apptItems.length ? apptItems.join('') : '') +
     schedItems.join('') ||
     '<div style="padding:16px;color:#9AA0A6;font-size:13px">No bookings today</div>';
+
+  // ══════════════════════════════════════════════════════════════
+  // PATIENT FOLLOW-UP TRACKER
+  // Loads attended patients from the last 30 days and shows:
+  //  - Diagnosis, treatments given, prescription status
+  //  - Latest patient feeling response (Better/Same/Worse)
+  //  - Red alert if patient is getting worse
+  //  - "Write Note" button for clinic staff follow-up
+  // ══════════════════════════════════════════════════════════════
+
+  window.loadFollowupTracker = async () => {
+    const el = document.getElementById('followupTrackerBody');
+    if (!supa2 || !session?.clinicId) {
+      el.innerHTML = '<div style="padding:16px;color:#9AA0A6;font-size:13px">Sign in to a clinic to view follow-ups.</div>';
+      return;
+    }
+    el.innerHTML = '<div style="text-align:center;color:#9AA0A6;padding:24px;font-size:13px">Loading…</div>';
+
+    // Load clinic_diagnoses for this clinic from last 30 days
+    const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+    const { data: diagRows } = await supa2
+      .from('clinic_diagnoses')
+      .select('*')
+      .eq('clinic_id', session.clinicId)
+      .gte('created_at', cutoff)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (!diagRows || !diagRows.length) {
+      el.innerHTML = '<div style="padding:20px;color:#9AA0A6;font-size:13px;text-align:center">No attended patients in the last 30 days.</div>';
+      return;
+    }
+
+    // Load latest follow-up notes for all diagnosis IDs
+    const diagIds = diagRows.map(d => d.id);
+    const { data: noteRows } = await supa2
+      .from('patient_health_followups')
+      .select('*')
+      .in('diagnosis_id', diagIds)
+      .order('created_at', { ascending: false });
+
+    // Group latest note per diagnosis_id
+    const latestNote = {};
+    (noteRows || []).forEach(n => {
+      if (!latestNote[n.diagnosis_id]) latestNote[n.diagnosis_id] = n;
+    });
+
+    // Load bookings for patient names
+    const bookingIds = [...new Set(diagRows.map(d => d.booking_id).filter(Boolean))];
+    let bookingMap = {};
+    if (bookingIds.length) {
+      const { data: bRows } = await supa2
+        .from('bookings')
+        .select('id,patient_name,patient_user_id,symptoms')
+        .in('id', bookingIds);
+      (bRows || []).forEach(b => { bookingMap[b.id] = b; });
+    }
+
+    const feelingColor = { better: '#2E7D32', same: '#F57F17', worse: '#C62828' };
+    const feelingIcon  = { better: 'sentiment_very_satisfied', same: 'sentiment_neutral', worse: 'sentiment_very_dissatisfied' };
+    const feelingLabel = { better: 'Much Better', same: 'About the Same', worse: 'Getting Worse' };
+
+    el.innerHTML = diagRows.map(d => {
+      const bk      = bookingMap[d.booking_id] || {};
+      const note    = latestNote[d.id];
+      const feeling = note?.feeling;
+      const isWorse = feeling === 'worse';
+
+      const rxItems = Array.isArray(d.prescription_items) ? d.prescription_items : [];
+      const maxDays = rxItems.length ? Math.max(...rxItems.map(x => x.duration || 0)) : 0;
+      const prescEndDate = maxDays ? new Date(new Date(d.created_at).getTime() + maxDays * 86400000) : null;
+      const daysLeft = prescEndDate ? Math.max(0, Math.ceil((prescEndDate - new Date()) / 86400000)) : null;
+      const prescActive = daysLeft !== null && daysLeft > 0;
+
+      const txList = (() => {
+        if (!d.treatments_given) return '';
+        const procs = d.treatments_given.procedures || [];
+        return procs.length ? procs.join(', ') : '';
+      })();
+
+      const followUpStr = d.follow_up_at
+        ? new Date(d.follow_up_at).toLocaleDateString('en-UG', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
+        : (d.follow_up_days ? `in ${d.follow_up_days} days` : '—');
+
+      return `
+        <div style="border:2px solid ${isWorse ? '#EF9A9A' : '#E0E0E0'};border-radius:12px;padding:16px;margin-bottom:14px;
+            background:${isWorse ? '#FFF5F5' : '#fff'}">
+
+          ${isWorse ? `
+          <div style="background:#FFEBEE;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;font-size:13px;color:#C62828;font-weight:600">
+            <span class="material-icons-outlined" style="font-size:18px">warning</span>
+            Patient is getting WORSE — needs immediate follow-up or referral
+          </div>` : ''}
+
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:15px;font-weight:700;color:#202124">${bk.patient_name || 'Unknown Patient'}</div>
+              <div style="font-size:12px;color:#1B5E20;font-weight:600;margin-top:2px">${d.confirmed_diagnosis || d.ai_suggested_diagnosis || '—'}</div>
+              ${d.severity ? `<div style="font-size:11px;color:#5F6368;margin-top:2px">Severity: <strong>${d.severity}</strong></div>` : ''}
+            </div>
+
+            <!-- Feeling badge -->
+            ${feeling ? `
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;
+                background:${feelingColor[feeling]}15;border:1.5px solid ${feelingColor[feeling]}40">
+              <span class="material-icons-outlined" style="font-size:16px;color:${feelingColor[feeling]}">${feelingIcon[feeling]}</span>
+              <span style="font-size:12px;font-weight:700;color:${feelingColor[feeling]}">${feelingLabel[feeling]}</span>
+            </div>` : `
+            <div style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;background:#F5F5F5;border:1.5px solid #E0E0E0">
+              <span class="material-icons-outlined" style="font-size:16px;color:#9AA0A6">help_outline</span>
+              <span style="font-size:12px;color:#9AA0A6">No response yet</span>
+            </div>`}
+          </div>
+
+          <!-- Info grid -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px">
+            ${[
+              ['Treated', new Date(d.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short'})],
+              ['Return to clinic', followUpStr],
+              prescActive  ? ['Prescription', `${daysLeft} day${daysLeft===1?'':'s'} left`] : ['Prescription', prescEndDate ? 'Course complete' : '—'],
+              txList       ? ['Clinic treatments', txList] : null,
+              d.clinical_findings ? ['Clinical findings', d.clinical_findings.slice(0,60)+(d.clinical_findings.length>60?'…':'')] : null,
+            ].filter(Boolean).map(([k,v]) => `
+              <div>
+                <div style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">${k}</div>
+                <div style="font-size:12px;color:#202124;margin-top:2px">${v}</div>
+              </div>`).join('')}
+          </div>
+
+          <!-- Latest clinical note -->
+          ${note?.clinical_note ? `
+          <div style="background:#F8F9FA;border-radius:8px;padding:10px 12px;margin-top:12px;font-size:12px;color:#5F6368;border-left:3px solid #3949AB">
+            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:#3949AB">Latest Note — ${new Date(note.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short'})}</span>
+            <div style="margin-top:4px;color:#202124">${note.clinical_note}</div>
+            ${note.medication_taken ? '<div style="margin-top:4px;color:#2E7D32;font-weight:600;font-size:11px">✓ Medication confirmed taken</div>' : ''}
+          </div>` : ''}
+
+          <!-- Action buttons -->
+          <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+            <button onclick="openFollowupNote('${d.id}','${(bk.patient_name||'Patient').replace(/'/g,"\\'")}','${bk.patient_user_id||''}')"
+              style="padding:8px 16px;background:#1A237E;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:15px">edit_note</span>
+              Write Follow-up Note
+            </button>
+            ${isWorse ? `
+            <button onclick="openFollowupNote('${d.id}','${(bk.patient_name||'Patient').replace(/'/g,"\\'")}','${bk.patient_user_id||''}','escalate')"
+              style="padding:8px 16px;background:#C62828;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:15px">local_hospital</span>
+              Escalate / Refer
+            </button>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+  };
+
+  // ── Follow-up note modal helpers ──────────────────────────────
+  let _fnFeeling = null;
+  let _fnPatientUserId = null;
+
+  window.openFollowupNote = (diagId, patientName, patientUserId, mode) => {
+    _fnFeeling = null;
+    _fnPatientUserId = patientUserId || null;
+    document.getElementById('followupNoteDiagId').value     = diagId;
+    document.getElementById('followupNotePatientUserId').value = patientUserId || '';
+    document.getElementById('followupNotePatientName').textContent = patientName;
+    document.getElementById('followupNoteText').value        = '';
+    document.getElementById('followupMedTaken').checked      = false;
+    document.getElementById('followupEscalateBox').style.display = mode === 'escalate' ? 'block' : 'none';
+    document.getElementById('escalateClinicName').value      = '';
+    ['fnBetter','fnSame','fnWorse'].forEach(id => {
+      const btn = document.getElementById(id);
+      btn.style.border     = '2px solid #E0E0E0';
+      btn.style.background = '#fff';
+    });
+    document.getElementById('followupNoteModal').style.display = 'flex';
+  };
+
+  window.setFollowupFeeling = val => {
+    _fnFeeling = val;
+    const map = { better: 'fnBetter', same: 'fnSame', worse: 'fnWorse' };
+    const colors = { better: '#2E7D32', same: '#F57F17', worse: '#C62828' };
+    const bgs    = { better: '#E8F5E9', same: '#FFF3E0', worse: '#FFEBEE' };
+    Object.entries(map).forEach(([k, id]) => {
+      const btn = document.getElementById(id);
+      const active = k === val;
+      btn.style.border     = active ? `2px solid ${colors[k]}` : '2px solid #E0E0E0';
+      btn.style.background = active ? bgs[k] : '#fff';
+    });
+    // Show escalate box automatically when worse is selected
+    document.getElementById('followupEscalateBox').style.display = val === 'worse' ? 'block' : 'none';
+  };
+
+  window.saveFollowupNote = async () => {
+    const diagId     = document.getElementById('followupNoteDiagId').value;
+    const noteText   = document.getElementById('followupNoteText').value.trim();
+    const medTaken   = document.getElementById('followupMedTaken').checked;
+
+    if (!noteText) { alert('Please enter a clinical note before saving.'); return; }
+
+    const payload = {
+      diagnosis_id:    diagId,
+      clinic_id:       session.clinicId || null,
+      clinician_id:    session.userId   || null,
+      patient_user_id: _fnPatientUserId || null,
+      followup_type:   'clinical_note',
+      feeling:         _fnFeeling || null,
+      clinical_note:   noteText,
+      medication_taken: medTaken,
+      created_at:      new Date().toISOString(),
+    };
+
+    if (supa2) {
+      const { error } = await supa2.from('patient_health_followups').insert(payload);
+      if (error) { alert('Save failed: ' + error.message); return; }
+
+      // If feeling = worse, send urgent notification to admin/doctor
+      if (_fnFeeling === 'worse' && _fnPatientUserId) {
+        supa2.functions.invoke('send-notification', {
+          body: {
+            userId:  session.userId || _fnPatientUserId,
+            title:   'Patient Not Improving — Action Needed',
+            message: `Patient report: not improving after treatment. Clinician note: ${noteText.slice(0, 120)}`,
+            data:    { screen: 'dashboard' },
+            pref_category: 'appointment_reminders',
+          },
+        }).catch(() => {});
+      }
+    }
+
+    document.getElementById('followupNoteModal').style.display = 'none';
+    showToast('Follow-up note saved', 'success');
+    loadFollowupTracker(); // refresh the tracker
+  };
+
+  window.sendEscalationNotif = async () => {
+    const clinicName = document.getElementById('escalateClinicName').value.trim();
+    if (!clinicName) { alert('Please enter the clinic or hospital to refer to.'); return; }
+    if (!_fnPatientUserId) { alert('No patient linked — cannot send push notification.'); return; }
+
+    if (supa2) {
+      await supa2.functions.invoke('send-notification', {
+        body: {
+          userId:  _fnPatientUserId,
+          title:   'Urgent: Please Visit Another Clinic',
+          message: `Your condition needs further attention. Please go to ${clinicName} as soon as possible for specialist care.`,
+          data:    { screen: 'dashboard' },
+          pref_category: 'appointment_reminders',
+        },
+      });
+      showToast('Urgent referral notification sent to patient', 'success');
+      document.getElementById('escalateClinicName').value = '';
+    }
+  };
+
 });
 </script>
 
