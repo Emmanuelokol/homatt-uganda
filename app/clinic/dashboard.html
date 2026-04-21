@@ -290,10 +290,24 @@
       </div>
     </div>
 
-    <!-- STEP 1: Patient Info -->
+    <!-- STEP 1: Patient Info + ALL AI Conditions -->
     <div id="attendPane1" style="padding:20px 24px">
       <div id="patientInfoCard" style="background:#F8F9FA;border-radius:12px;padding:16px;margin-bottom:16px"></div>
-      <!-- AI Diagnosis card -->
+
+      <!-- All AI conditions — doctor confirms each -->
+      <div id="aiConditionsSection" style="display:none;margin-bottom:16px">
+        <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:15px">smart_toy</span>
+          AI Pre-Diagnosis — Review each condition
+        </div>
+        <div id="aiConditionCards" style="display:flex;flex-direction:column;gap:8px"></div>
+        <div style="font-size:11px;color:#777;margin-top:8px">
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">info</span>
+          Tick ✓ conditions that are correct. Your confirmed diagnoses carry to Step 2.
+        </div>
+      </div>
+
+      <!-- Fallback single-diagnosis (when conditions_json is empty) -->
       <div id="aiDiagCard" style="display:none;background:#E3F2FD;border:1px solid #90CAF9;border-radius:12px;padding:14px;margin-bottom:16px">
         <div style="font-size:11px;font-weight:700;color:#0D47A1;text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">smart_toy</span> AI Pre-Diagnosis
@@ -302,6 +316,7 @@
         <div id="aiDiagConf" style="font-size:12px;color:#1976D2;margin-top:4px"></div>
         <div id="aiDiagSymptoms" style="font-size:12px;color:#1976D2;margin-top:4px;opacity:.8"></div>
       </div>
+
       <!-- Token validity -->
       <div id="tokenCard" style="display:none;border-radius:12px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
         <span class="material-icons-outlined" style="font-size:20px" id="tokenIcon">verified</span>
@@ -317,20 +332,13 @@
 
     <!-- STEP 2: Diagnosis Form -->
     <div id="attendPane2" style="display:none;padding:20px 24px">
-      <div style="margin-bottom:14px">
-        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Did AI diagnosis match?</label>
-        <div style="display:flex;gap:8px">
-          <button id="aiMatchYes" onclick="setAIMatch('yes')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
-            ✓ Yes, Matches
-          </button>
-          <button id="aiMatchPartial" onclick="setAIMatch('partial')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
-            ~ Partial
-          </button>
-          <button id="aiMatchNo" onclick="setAIMatch('no')" style="flex:1;padding:10px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff">
-            ✗ Different
-          </button>
-        </div>
+
+      <!-- AI conditions confirmed in Step 1 (read-only summary) -->
+      <div id="confirmedCondsSummary" style="display:none;background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:12px;margin-bottom:14px">
+        <div style="font-size:11px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Conditions confirmed in Step 1</div>
+        <div id="confirmedCondsText" style="font-size:13px;color:#1B5E20;font-weight:600"></div>
       </div>
+
       <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Confirmed Diagnosis *</label>
         <input id="diagnosisInput" type="text" placeholder="e.g. Malaria (Plasmodium Falciparum)" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
@@ -350,6 +358,11 @@
         </select>
       </div>
       <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Doctor's Clinical Findings</label>
+        <textarea id="clinicalFindings" rows="3" placeholder="Physical examination findings, vital signs, notes…"
+          style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+      <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Lab Tests Ordered</label>
         <div style="display:flex;flex-wrap:wrap;gap:8px" id="labTestChips">
           <button type="button" onclick="toggleLabTest('Malaria RDT')" data-test="Malaria RDT" style="padding:6px 12px;border:1.5px solid #E0E0E0;border-radius:20px;font-size:12px;cursor:pointer;background:#fff;transition:all .2s">Malaria RDT</button>
@@ -367,10 +380,17 @@
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Treatment Plan</label>
         <textarea id="treatmentInput" placeholder="Describe the treatment plan…" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;min-height:80px;resize:vertical;box-sizing:border-box"></textarea>
       </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Follow-up in (days)</label>
-        <input id="followUpDays" type="number" value="7" min="1" max="90" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+
+      <!-- Follow-up: specific date + time -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Return to Clinic Date</label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input id="followUpDate" type="date" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          <input id="followUpTime" type="time" value="09:00" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:4px">Patient will receive a reminder push notification the day before and on the day.</div>
       </div>
+
       <div style="display:flex;gap:10px">
         <button onclick="goAttendStep(1)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
         <button onclick="goAttendStep(3)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">Issue Prescription →</button>
@@ -380,11 +400,35 @@
 
     <!-- STEP 3: E-Prescription Writer -->
     <div id="attendPane3" style="display:none;padding:20px 24px">
-      <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Add medications to the prescription. Each drug line will be sent to the pharmacy.</div>
+      <div style="font-size:13px;color:#5F6368;margin-bottom:14px">Add medications. Set exact intake times — the app will remind the patient daily.</div>
       <div id="rxLines"></div>
       <button onclick="addRxLine()" style="width:100%;padding:10px;border:2px dashed #4CAF50;border-radius:8px;font-size:13px;color:#1B5E20;font-weight:600;cursor:pointer;background:#F1F8E9;margin-bottom:16px">
-        + Add Drug
+        + Add Medication
       </button>
+
+      <!-- Patient instructions -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Patient Instructions</label>
+        <textarea id="patientInstructions" rows="3" placeholder="e.g. Take with food. Avoid alcohol. Complete the full course even if you feel better…"
+          style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"></textarea>
+      </div>
+
+      <!-- Delivery / pickup -->
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">Medication Fulfillment</label>
+        <div style="display:flex;gap:8px">
+          <button id="fulfillDelivery" onclick="setFulfillment('delivery')"
+            style="flex:1;padding:11px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;display:flex;align-items:center;justify-content:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">local_shipping</span> Deliver to Patient
+          </button>
+          <button id="fulfillPickup" onclick="setFulfillment('pickup')"
+            style="flex:1;padding:11px;border:2px solid #E0E0E0;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:#fff;display:flex;align-items:center;justify-content:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">store</span> Patient Picks Up
+          </button>
+        </div>
+        <div style="font-size:11px;color:#777;margin-top:6px">Patient will confirm their preference in the app.</div>
+      </div>
+
       <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#5F6368;text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">Route to Pharmacy</label>
         <select id="rxPharmacySelect" style="width:100%;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;font-family:inherit;outline:none">
@@ -394,7 +438,7 @@
       <div style="display:flex;gap:10px">
         <button onclick="goAttendStep(2)" style="flex:1;padding:12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">← Back</button>
         <button onclick="submitDiagnosis(true)" style="flex:2;background:#1B5E20;color:#fff;border:none;padding:12px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
-          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">send</span> Save & Send Rx
+          <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">send</span> Save &amp; Send Rx
         </button>
       </div>
     </div>
@@ -925,15 +969,74 @@ document.addEventListener('DOMContentLoaded', async () => {
           </div>`).join('')}
       </div>`;
 
-    // AI diagnosis card
+    // AI diagnosis card / All conditions
     const aiDiag = b.ai_diagnosis || aiData.primary_condition || aiData.topCondition;
-    if (aiDiag) {
+    const allConditions = (() => {
+      try {
+        const raw = b.conditions_json || aiData.ai_conditions || b.ai_full_data?.ai_conditions;
+        if (Array.isArray(raw) && raw.length) return raw;
+        if (typeof raw === 'string') return JSON.parse(raw);
+      } catch(_) {}
+      return null;
+    })();
+
+    if (allConditions && allConditions.length) {
+      // Show all AI conditions as confirm/reject cards
+      document.getElementById('aiConditionsSection').style.display = 'block';
+      document.getElementById('aiDiagCard').style.display = 'none';
+      const cardsEl = document.getElementById('aiConditionCards');
+      cardsEl.innerHTML = '';
+      allConditions.forEach((cond, idx) => {
+        const name = cond.name || cond.condition || '';
+        const pct  = cond.likelihood_percent || cond.confidence || 0;
+        const sev  = cond.severity || '';
+        const card = document.createElement('div');
+        card.id = `aiCond_${idx}`;
+        card.dataset.confirmed = idx === 0 ? 'true' : 'false'; // top condition pre-confirmed
+        card.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 12px;
+          border-radius:10px;border:2px solid ${idx===0?'#4CAF50':'#E0E0E0'};
+          background:${idx===0?'#F1F8E9':'#fff'};cursor:pointer;transition:all .2s`;
+        card.innerHTML = `
+          <span id="aiCondTick_${idx}" class="material-icons-outlined"
+            style="font-size:22px;color:${idx===0?'#2E7D32':'#BDBDBD'};flex-shrink:0">
+            ${idx===0?'check_circle':'radio_button_unchecked'}
+          </span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:700;color:#202124">${name}</div>
+            <div style="font-size:11px;color:#5F6368;margin-top:2px">
+              ${pct?pct+'% likelihood':''}${sev?' · '+sev:''}
+            </div>
+          </div>
+          <div style="font-size:11px;color:#fff;font-weight:700;padding:3px 8px;border-radius:12px;
+            background:${pct>=70?'#2E7D32':pct>=40?'#F57F17':'#C62828'};flex-shrink:0">
+            ${pct?pct+'%':'?'}
+          </div>`;
+        card.addEventListener('click', () => {
+          const confirmed = card.dataset.confirmed === 'true';
+          card.dataset.confirmed = String(!confirmed);
+          card.style.border = !confirmed ? '2px solid #4CAF50' : '2px solid #E0E0E0';
+          card.style.background = !confirmed ? '#F1F8E9' : '#fff';
+          const tick = document.getElementById(`aiCondTick_${idx}`);
+          tick.textContent = !confirmed ? 'check_circle' : 'radio_button_unchecked';
+          tick.style.color = !confirmed ? '#2E7D32' : '#BDBDBD';
+          // Auto-fill primary diagnosis from first confirmed condition
+          const firstConfirmed = allConditions.find((_, i) =>
+            document.getElementById(`aiCond_${i}`)?.dataset.confirmed === 'true');
+          if (firstConfirmed) document.getElementById('diagnosisInput').value = firstConfirmed.name || '';
+        });
+        cardsEl.appendChild(card);
+      });
+      // Pre-fill diagnosis from top condition
+      if (allConditions[0]) document.getElementById('diagnosisInput').value = allConditions[0].name || '';
+    } else if (aiDiag) {
+      document.getElementById('aiConditionsSection').style.display = 'none';
       document.getElementById('aiDiagCard').style.display = 'block';
       document.getElementById('aiDiagText').textContent = aiDiag;
       const conf = b.ai_confidence || aiData.confidence;
       document.getElementById('aiDiagConf').textContent = conf ? `Confidence: ${conf}%` : '';
       document.getElementById('aiDiagSymptoms').textContent = b.symptoms ? `Reported: ${b.symptoms.slice(0,80)}` : '';
     } else {
+      document.getElementById('aiConditionsSection').style.display = 'none';
       document.getElementById('aiDiagCard').style.display = 'none';
     }
 
@@ -952,14 +1055,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     } else { tokenCard.style.display = 'none'; }
 
     // Reset form fields
-    document.getElementById('diagnosisInput').value = aiDiag || '';
     document.getElementById('icd10Input').value = '';
     document.getElementById('severitySelect').value = '';
     document.getElementById('treatmentInput').value = '';
-    document.getElementById('followUpDays').value = '7';
+    document.getElementById('clinicalFindings').value = '';
+    document.getElementById('patientInstructions').value = '';
+    // Default follow-up date = 7 days from now
+    const defDate = new Date(); defDate.setDate(defDate.getDate() + 7);
+    document.getElementById('followUpDate').value = defDate.toISOString().slice(0,10);
+    document.getElementById('followUpTime').value = '09:00';
     document.querySelectorAll('#labTestChips button').forEach(b => {
       b.style.background = '#fff'; b.style.borderColor = '#E0E0E0'; b.style.color = '#202124';
     });
+    // Reset fulfillment buttons
+    setFulfillment('pickup');
     document.getElementById('rxLines').innerHTML = '';
     rxLineCount = 0;
     addRxLine();
@@ -995,6 +1104,38 @@ document.addEventListener('DOMContentLoaded', async () => {
       tab.style.color = i === n ? '#1B5E20' : '#9AA0A6';
       tab.style.borderBottom = i === n ? '2px solid #1B5E20' : '2px solid transparent';
     });
+    // When entering Step 2, populate confirmed-conditions summary from Step 1 cards
+    if (n === 2) {
+      const cards = document.querySelectorAll('#aiConditionCards > div');
+      const confirmed = Array.from(cards)
+        .filter(c => c.dataset.confirmed === 'true')
+        .map(c => c.querySelector('div > div:first-child')?.textContent?.trim())
+        .filter(Boolean);
+      const summaryEl = document.getElementById('confirmedCondsSummary');
+      if (confirmed.length) {
+        document.getElementById('confirmedCondsText').textContent = confirmed.join(' · ');
+        summaryEl.style.display = 'block';
+        // Auto-fill diagnosis with confirmed conditions joined
+        if (!document.getElementById('diagnosisInput').value) {
+          document.getElementById('diagnosisInput').value = confirmed[0];
+        }
+      } else {
+        summaryEl.style.display = 'none';
+      }
+    }
+  };
+
+  let fulfillmentMode = 'pickup';
+  window.setFulfillment = mode => {
+    fulfillmentMode = mode;
+    const btnD = document.getElementById('fulfillDelivery');
+    const btnP = document.getElementById('fulfillPickup');
+    if (!btnD || !btnP) return;
+    [btnD, btnP].forEach(b => { b.style.border = '2px solid #E0E0E0'; b.style.background = '#fff'; b.style.color = '#202124'; });
+    const active = mode === 'delivery' ? btnD : btnP;
+    active.style.border = '2px solid #1B5E20';
+    active.style.background = '#F1F8E9';
+    active.style.color = '#1B5E20';
   };
 
   window.setAIMatch = val => {
@@ -1030,14 +1171,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px">
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Drug Name *</label>
-          <input type="text" id="rxDrug${n}" placeholder="e.g. Artemether-Lumefantrine" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+          <input type="text" id="rxDrug${n}" placeholder="e.g. Artemether-Lumefantrine"
+            style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Strength</label>
-          <input type="text" id="rxStrength${n}" placeholder="e.g. 80/480mg" style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
+          <input type="text" id="rxStrength${n}" placeholder="e.g. 80/480mg"
+            style="width:100%;padding:8px 10px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;margin-top:4px">
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:8px">
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Route</label>
           <select id="rxRoute${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
@@ -1046,20 +1189,69 @@ document.addEventListener('DOMContentLoaded', async () => {
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Frequency</label>
-          <select id="rxFreq${n}" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
-            <option value="once_daily">Once daily</option><option value="twice_daily">Twice daily</option><option value="three_daily">3× daily</option><option value="four_daily">4× daily</option><option value="as_needed">As needed</option><option value="stat">Stat (once)</option>
+          <select id="rxFreq${n}" onchange="updateTimePickers(${n})"
+            style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px">
+            <option value="once_daily">Once daily</option>
+            <option value="twice_daily">Twice daily</option>
+            <option value="three_daily">3× daily</option>
+            <option value="four_daily">4× daily</option>
+            <option value="as_needed">As needed</option>
+            <option value="stat">Stat (once)</option>
           </select>
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Days</label>
-          <input type="number" id="rxDays${n}" value="5" min="1" max="365" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+          <input type="number" id="rxDays${n}" value="5" min="1" max="365"
+            style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
         </div>
         <div>
           <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Qty</label>
-          <input type="number" id="rxQty${n}" value="1" min="1" style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+          <input type="number" id="rxQty${n}" value="1" min="1"
+            style="width:100%;padding:8px 6px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none;margin-top:4px;box-sizing:border-box">
+        </div>
+      </div>
+      <!-- Intake time pickers (shown based on frequency) -->
+      <div id="rxTimes${n}" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px;color:#1B5E20">wb_sunny</span>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Morning</label>
+          <input type="time" id="rxTime1_${n}" value="07:00"
+            style="padding:5px 8px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none">
+        </div>
+        <div id="rxAfternoonWrap${n}" style="display:none;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px;color:#F57F17">light_mode</span>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Afternoon</label>
+          <input type="time" id="rxTime2_${n}" value="13:00"
+            style="padding:5px 8px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none">
+        </div>
+        <div id="rxEveningWrap${n}" style="display:none;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px;color:#7B1FA2">nights_stay</span>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Evening</label>
+          <input type="time" id="rxTime3_${n}" value="21:00"
+            style="padding:5px 8px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none">
+        </div>
+        <div id="rxNightWrap${n}" style="display:none;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px;color:#1565C0">bedtime</span>
+          <label style="font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase">Night</label>
+          <input type="time" id="rxTime4_${n}" value="23:00"
+            style="padding:5px 8px;border:1.5px solid #E0E0E0;border-radius:6px;font-size:12px;outline:none">
         </div>
       </div>`;
     document.getElementById('rxLines').appendChild(div);
+  };
+
+  window.updateTimePickers = n => {
+    const freq = document.getElementById('rxFreq' + n)?.value || 'once_daily';
+    const show = (id, visible) => {
+      const el = document.getElementById(id + n);
+      if (el) el.style.display = visible ? 'flex' : 'none';
+    };
+    show('rxAfternoonWrap', ['twice_daily','three_daily','four_daily'].includes(freq));
+    show('rxEveningWrap',   ['three_daily','four_daily'].includes(freq));
+    show('rxNightWrap',     freq === 'four_daily');
+    // Hide all time pickers for as_needed / stat
+    const timesEl = document.getElementById('rxTimes' + n);
+    if (timesEl) timesEl.style.display = ['as_needed','stat'].includes(freq) ? 'none' : 'flex';
   };
 
   window.submitDiagnosis = async withPrescription => {
@@ -1067,13 +1259,42 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!diagnosis) { alert('Please enter the confirmed diagnosis'); return; }
     if (!activeBooking) return;
 
-    const b           = activeBooking;
-    const icd10       = document.getElementById('icd10Input').value.trim();
-    const severity    = document.getElementById('severitySelect').value;
-    const treatment   = document.getElementById('treatmentInput').value.trim();
-    const followUp    = parseInt(document.getElementById('followUpDays').value) || 7;
+    const b                  = activeBooking;
+    const icd10              = document.getElementById('icd10Input').value.trim();
+    const severity           = document.getElementById('severitySelect').value;
+    const treatment          = document.getElementById('treatmentInput').value.trim();
+    const clinicalFindings   = document.getElementById('clinicalFindings').value.trim();
+    const patientInstructions= document.getElementById('patientInstructions').value.trim();
 
-    // Build prescription items
+    // Follow-up: specific date + time from pickers
+    const followUpDateVal = document.getElementById('followUpDate').value;
+    const followUpTimeVal = document.getElementById('followUpTime').value || '09:00';
+    const followUpAt = followUpDateVal
+      ? new Date(followUpDateVal + 'T' + followUpTimeVal + ':00').toISOString()
+      : null;
+    const followUpDays = followUpAt
+      ? Math.max(1, Math.round((new Date(followUpAt) - new Date()) / 86400000))
+      : 7;
+
+    // Confirmed conditions — read from original booking data + card toggle state
+    const rawConds = (() => {
+      try {
+        const raw = b.conditions_json;
+        if (Array.isArray(raw) && raw.length) return raw;
+        if (typeof raw === 'string') return JSON.parse(raw);
+      } catch(_) {}
+      return [];
+    })();
+    const confirmedConditions = rawConds
+      .filter((_, i) => document.getElementById('aiCond_' + i)?.dataset.confirmed === 'true')
+      .map(c => ({
+        name: c.name || c.condition || '',
+        likelihood_percent: c.likelihood_percent || c.confidence || 0,
+        severity: c.severity || '',
+      }))
+      .filter(c => c.name);
+
+    // Build prescription items with intake times per medication
     let rxItems = [];
     if (withPrescription) {
       for (let i = 1; i <= rxLineCount; i++) {
@@ -1081,13 +1302,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (!drug) continue;
         const name = drug.value.trim();
         if (!name) continue;
+        const freq  = document.getElementById('rxFreq' + i)?.value || 'once_daily';
+        const times = [];
+        if (!['as_needed','stat'].includes(freq)) {
+          const t1 = document.getElementById('rxTime1_' + i)?.value;
+          if (t1) times.push(t1);
+          if (['twice_daily','three_daily','four_daily'].includes(freq)) {
+            const t2 = document.getElementById('rxTime2_' + i)?.value;
+            if (t2) times.push(t2);
+          }
+          if (['three_daily','four_daily'].includes(freq)) {
+            const t3 = document.getElementById('rxTime3_' + i)?.value;
+            if (t3) times.push(t3);
+          }
+          if (freq === 'four_daily') {
+            const t4 = document.getElementById('rxTime4_' + i)?.value;
+            if (t4) times.push(t4);
+          }
+        }
         rxItems.push({
-          drug_name:  name,
-          strength:   document.getElementById('rxStrength' + i)?.value || '',
-          route:      document.getElementById('rxRoute'    + i)?.value || 'oral',
-          frequency:  document.getElementById('rxFreq'     + i)?.value || 'once_daily',
-          duration:   parseInt(document.getElementById('rxDays' + i)?.value) || 5,
-          qty:        parseInt(document.getElementById('rxQty'  + i)?.value) || 1,
+          drug_name:    name,
+          strength:     document.getElementById('rxStrength' + i)?.value || '',
+          route:        document.getElementById('rxRoute'    + i)?.value || 'oral',
+          frequency:    freq,
+          duration:     parseInt(document.getElementById('rxDays' + i)?.value) || 5,
+          qty:          parseInt(document.getElementById('rxQty'  + i)?.value) || 1,
+          intake_times: times,
         });
       }
     }
@@ -1095,65 +1335,124 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pharmacyId = document.getElementById('rxPharmacySelect').value || null;
 
     if (supa2) {
-      // Save clinic_diagnoses record
+      // ── Save clinic_diagnoses record ──
       const { data: diagRecord, error: diagErr } = await supa2.from('clinic_diagnoses').insert({
-        booking_id:           b.id,
-        clinic_id:            session.clinicId || null,
-        clinician_id:         session.userId   || null,
-        ai_suggested_diagnosis: b.ai_diagnosis || null,
-        ai_confidence:        b.ai_confidence  || null,
-        ai_match:             aiMatchValue === 'yes' ? true : aiMatchValue === 'no' ? false : null,
-        confirmed_diagnosis:  diagnosis,
-        icd10_code:           icd10   || null,
-        lab_tests_ordered:    selectedLabTests.length ? selectedLabTests : [],
-        severity:             severity || null,
-        treatment_plan:       treatment || null,
-        follow_up_days:       followUp,
-        prescription_items:   rxItems,
-        routed_pharmacy_id:   pharmacyId,
+        booking_id:              b.id,
+        clinic_id:               session.clinicId || null,
+        clinician_id:            session.userId   || null,
+        ai_suggested_diagnosis:  b.ai_diagnosis   || null,
+        ai_confidence:           b.ai_confidence  || null,
+        ai_match:                aiMatchValue === 'yes' ? true : aiMatchValue === 'no' ? false : null,
+        confirmed_diagnosis:     diagnosis,
+        icd10_code:              icd10            || null,
+        lab_tests_ordered:       selectedLabTests.length ? selectedLabTests : [],
+        severity:                severity         || null,
+        treatment_plan:          treatment        || null,
+        clinical_findings:       clinicalFindings || null,
+        follow_up_days:          followUpDays,
+        follow_up_at:            followUpAt,
+        prescription_items:      rxItems,
+        routed_pharmacy_id:      pharmacyId,
+        confirmed_conditions:    confirmedConditions.length ? confirmedConditions : null,
+        patient_instructions:    patientInstructions || null,
+        delivery_preference:     fulfillmentMode  || 'pickup',
       }).select('id').single();
 
       if (diagErr) { alert('Save failed: ' + diagErr.message); return; }
 
-      // If prescription, save to e_prescriptions + create pharmacy_order
+      // ── Prescription + pharmacy order ──
+      let rxRecord = null;
       if (withPrescription && rxItems.length && diagRecord) {
         const startDate = new Date().toISOString().split('T')[0];
         const maxDays   = Math.max(...rxItems.map(x => x.duration));
         const endDate   = new Date(Date.now() + maxDays * 86400000).toISOString().split('T')[0];
 
-        const { data: rxRecord } = await supa2.from('e_prescriptions').insert({
-          diagnosis_id:   diagRecord.id,
-          booking_id:     b.id,
-          patient_id:     b.patient_id || null,
-          clinic_id:      session.clinicId || null,
-          issued_by:      session.userId || null,
-          items:          rxItems,
-          status:         'active',
-          start_date:     startDate,
-          end_date:       endDate,
-          routed_to_pharmacy_id: pharmacyId || null,
-          notes:          treatment || null,
+        const { data: rxData } = await supa2.from('e_prescriptions').insert({
+          diagnosis_id:          diagRecord.id,
+          booking_id:            b.id,
+          patient_id:            b.patient_id    || null,
+          clinic_id:             session.clinicId || null,
+          issued_by:             session.userId   || null,
+          items:                 rxItems,
+          status:                'active',
+          start_date:            startDate,
+          end_date:              endDate,
+          routed_to_pharmacy_id: pharmacyId      || null,
+          notes:                 treatment        || null,
+          patient_instructions:  patientInstructions || null,
+          delivery_preference:   fulfillmentMode  || 'pickup',
         }).select('id').single();
+        rxRecord = rxData;
 
-        // Create pharmacy_order linked to prescription
         if (rxRecord && pharmacyId) {
           await supa2.from('pharmacy_orders').insert({
-            pharmacy_id:      pharmacyId,
-            patient_name:     b.patient_name,
-            patient_phone:    null,
-            items:            rxItems.map(x => ({ name: x.drug_name + (x.strength?' '+x.strength:''), qty: x.qty })),
-            status:           'incoming',
-            urgency:          b.urgency_level === 'high' ? 'urgent' : 'standard',
+            pharmacy_id:       pharmacyId,
+            patient_name:      b.patient_name,
+            patient_phone:     null,
+            items:             rxItems.map(x => ({ name: x.drug_name + (x.strength ? ' ' + x.strength : ''), qty: x.qty })),
+            status:            'incoming',
+            urgency:           b.urgency_level === 'high' ? 'urgent' : 'standard',
             e_prescription_id: rxRecord.id,
-            order_type:       'prescription',
-            delivery_address: 'Clinic Pickup',
-            total_cost:       0,
-            notes:            `E-Prescription from ${diagnosis}`,
+            order_type:        fulfillmentMode === 'delivery' ? 'prescription_delivery' : 'prescription',
+            delivery_address:  fulfillmentMode === 'delivery' ? 'Patient address — pending app confirmation' : 'Clinic Pickup',
+            total_cost:        0,
+            notes:             `E-Rx: ${diagnosis}${patientInstructions ? ' | ' + patientInstructions.slice(0, 100) : ''}`,
           });
+        }
+
+        // ── Daily medication reminder push notifications ──
+        // Schedule one notification per dose per day for the full course (max 14 days)
+        if (b.patient_user_id) {
+          const now = new Date();
+          for (const drug of rxItems) {
+            if (!drug.intake_times?.length) continue;
+            for (let day = 0; day < Math.min(drug.duration, 14); day++) {
+              for (const timeStr of drug.intake_times) {
+                const [hh, mm] = timeStr.split(':').map(Number);
+                const sendAt = new Date(now);
+                sendAt.setDate(sendAt.getDate() + day);
+                sendAt.setHours(hh, mm, 0, 0);
+                if (sendAt.getTime() < now.getTime() + 5 * 60000) continue; // skip past times
+                supa2.functions.invoke('send-notification', {
+                  body: {
+                    userId:        b.patient_user_id,
+                    title:         `Time to take ${drug.drug_name}`,
+                    message:       `${drug.drug_name}${drug.strength ? ' ' + drug.strength : ''} — ${drug.route}.${patientInstructions ? ' ' + patientInstructions.slice(0, 80) : ''}`.trim(),
+                    data:          { screen: 'prescription', id: rxRecord?.id || b.id },
+                    pref_category: 'medicine_reminders',
+                    send_after:    sendAt.toISOString(),
+                  },
+                }).catch(() => {});
+              }
+            }
+          }
+
+          // ── End-of-course follow-up check ──
+          const maxDaysFollowup = Math.max(...rxItems.map(x => x.duration));
+          const courseEndAt = new Date(now);
+          courseEndAt.setDate(courseEndAt.getDate() + maxDaysFollowup);
+          courseEndAt.setHours(10, 0, 0, 0);
+          if (courseEndAt > now) {
+            supa2.functions.invoke('send-notification', {
+              body: {
+                userId:        b.patient_user_id,
+                title:         'Medication Course Complete — How do you feel?',
+                message:       `Your ${maxDaysFollowup}-day course of ${rxItems.map(x => x.drug_name).join(', ')} is done. Open the app to tell us how you feel.`,
+                data:          { screen: 'dashboard', id: b.id },
+                pref_category: 'medicine_reminders',
+                send_after:    courseEndAt.toISOString(),
+                buttons: [
+                  { id: 'feeling_better', text: 'Much Better ✓' },
+                  { id: 'feeling_same',   text: 'About the Same' },
+                  { id: 'feeling_worse',  text: 'Getting Worse' },
+                ],
+              },
+            }).catch(() => {});
+          }
         }
       }
 
-      // Update booking status
+      // ── Update booking status ──
       await supa2.from('bookings').update({
         status:              'attended',
         attended_at:         new Date().toISOString(),
@@ -1161,11 +1460,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         clinic_diagnosis_id: diagRecord?.id || null,
       }).eq('id', b.id);
 
-      // ── Notify patient that consultation is complete ──
+      // ── Notify patient: consultation complete ──
       if (b.patient_user_id) {
         const notifMsg = withPrescription && rxItems.length
-          ? `Your consultation at ${session.clinicName || 'the clinic'} is complete. A prescription has been sent${pharmacyId ? ' to the pharmacy' : ''}. Diagnosis: ${diagnosis}.`
-          : `Your consultation at ${session.clinicName || 'the clinic'} is complete. Diagnosis: ${diagnosis}.${followUp ? ` Follow-up in ${followUp} days.` : ''}`;
+          ? `Your consultation at ${session.clinicName || 'the clinic'} is complete. Prescription ready${pharmacyId ? ' at pharmacy' : ''}. Diagnosis: ${diagnosis}.`
+          : `Your consultation at ${session.clinicName || 'the clinic'} is complete. Diagnosis: ${diagnosis}.${followUpAt ? ` Return to clinic: ${new Date(followUpAt).toLocaleDateString('en-UG')}.` : ''}`;
         supa2.functions.invoke('send-notification', {
           body: {
             userId:        b.patient_user_id,
@@ -1177,72 +1476,103 @@ document.addEventListener('DOMContentLoaded', async () => {
         }).catch(() => {});
       }
 
+      // ── Follow-up appointment reminders (day before + morning of) ──
+      if (b.patient_user_id && followUpAt) {
+        const fDate = new Date(followUpAt);
+        const now   = new Date();
+
+        const dayBefore = new Date(fDate);
+        dayBefore.setDate(dayBefore.getDate() - 1);
+        dayBefore.setHours(9, 0, 0, 0);
+        if (dayBefore > now) {
+          supa2.functions.invoke('send-notification', {
+            body: {
+              userId:        b.patient_user_id,
+              title:         'Clinic Visit Tomorrow',
+              message:       `Reminder: You have a follow-up at ${session.clinicName || 'the clinic'} tomorrow at ${followUpTimeVal}. Please attend.`,
+              data:          { screen: 'bookings', id: b.id },
+              pref_category: 'appointment_reminders',
+              send_after:    dayBefore.toISOString(),
+            },
+          }).catch(() => {});
+        }
+
+        const onDay = new Date(fDate);
+        onDay.setHours(7, 0, 0, 0);
+        if (onDay > now) {
+          supa2.functions.invoke('send-notification', {
+            body: {
+              userId:        b.patient_user_id,
+              title:         'Clinic Visit Today',
+              message:       `Your follow-up at ${session.clinicName || 'the clinic'} is today at ${followUpTimeVal}. We look forward to seeing you.`,
+              data:          { screen: 'bookings', id: b.id },
+              pref_category: 'appointment_reminders',
+              send_after:    onDay.toISOString(),
+            },
+          }).catch(() => {});
+        }
+      }
+
       // ── Symptom cache: save confirmed diagnosis for future AI checks ──
       if (b.symptoms && diagnosis) {
         try {
-          const sympKey = (b.symptoms || '').toLowerCase().trim().split(/\s+/).sort().slice(0,8).join(' ');
-          const cachePayload = {
-            symptoms_key: sympKey,
-            symptoms_text: b.symptoms,
+          const sympKey = (b.symptoms || '').toLowerCase().trim().split(/\s+/).sort().slice(0, 8).join(' ');
+          await supa2.from('symptom_cache').upsert({
+            symptoms_key:        sympKey,
+            symptoms_text:       b.symptoms,
             confirmed_diagnosis: diagnosis,
-            conditions_json: JSON.stringify([{
-              name: diagnosis,
-              likelihood_percent: 85,
+            conditions_json:     JSON.stringify(confirmedConditions.length ? confirmedConditions : [{
+              name: diagnosis, likelihood_percent: 85,
               severity: severity || 'medium',
               description: treatment || diagnosis + ' — clinician confirmed.',
               icd10: icd10 || null,
             }]),
-            ai_match: aiMatchValue,
-            source: 'clinician',
-            updated_at: new Date().toISOString(),
-          };
-          await supa2.from('symptom_cache')
-            .upsert(cachePayload, { onConflict: 'symptoms_key', ignoreDuplicates: false });
-        } catch(e) {}
+            ai_match:    aiMatchValue,
+            source:      'clinician',
+            updated_at:  new Date().toISOString(),
+          }, { onConflict: 'symptoms_key', ignoreDuplicates: false });
+        } catch(_) {}
       }
 
-      // ── Preventive recommendations after confirmed diagnosis ──
+      // ── Preventive recommendations ──
       const diagLower = diagnosis.toLowerCase();
       const PREVENTIVE = {
-        malaria:     { msg: 'Recommend to patient: Insecticide-treated mosquito net, mosquito repellent, and clearing stagnant water near home.', product: 'Mosquito Net' },
-        typhoid:     { msg: 'Recommend to patient: Boil drinking water, typhoid vaccine, and improved sanitation practices.', product: 'Water purification tablets' },
-        tuberculosis:{ msg: 'Recommend to patient: TB screening for household contacts, proper ventilation, and complete TB treatment course.', product: null },
-        hiv:         { msg: 'Recommend to patient: HIV counselling, partner testing, and consistent condom use.', product: null },
-        diabetes:    { msg: 'Recommend to patient: Blood glucose monitor, low-sugar diet, regular exercise, and foot care.', product: 'Blood glucose monitor' },
-        hypertension:{ msg: 'Recommend to patient: Home BP monitor, low-salt diet, regular exercise, and medication compliance.', product: 'Blood pressure monitor' },
-        cholera:     { msg: 'Recommend to patient: Oral rehydration salts, boiled water, cholera vaccine if available.', product: 'ORS sachets' },
+        malaria:      { msg: 'Recommend: Insecticide-treated mosquito net, repellent, clear stagnant water near home.', product: 'Mosquito Net' },
+        typhoid:      { msg: 'Recommend: Boil drinking water, typhoid vaccine, improved sanitation.', product: 'Water purification tablets' },
+        tuberculosis: { msg: 'Recommend: TB screening for household contacts, ventilation, complete TB treatment course.', product: null },
+        hiv:          { msg: 'Recommend: HIV counselling, partner testing, consistent condom use.', product: null },
+        diabetes:     { msg: 'Recommend: Blood glucose monitor, low-sugar diet, regular exercise, foot care.', product: 'Blood glucose monitor' },
+        hypertension: { msg: 'Recommend: Home BP monitor, low-salt diet, exercise, medication compliance.', product: 'Blood pressure monitor' },
+        cholera:      { msg: 'Recommend: Oral rehydration salts, boiled water, cholera vaccine if available.', product: 'ORS sachets' },
       };
       const matchedPrev = Object.entries(PREVENTIVE).find(([k]) => diagLower.includes(k));
       if (matchedPrev) {
         const [, info] = matchedPrev;
-        setTimeout(() => showToast('🛡️ Prevention: ' + info.msg, 'warning'), 2000);
-        if (supa2 && info.product && b.id) {
+        setTimeout(() => showToast('Prevention: ' + info.msg, 'warning'), 2000);
+        if (info.product) {
           try {
             await supa2.from('preventive_recommendations').insert({
-              booking_id: b.id,
-              diagnosis: diagnosis,
+              booking_id: b.id, diagnosis,
               recommended_product: info.product,
               recommendation_text: info.msg,
               sent_to_patient: false,
               created_at: new Date().toISOString(),
             });
-          } catch(e) {}
+          } catch(_) {}
         }
       }
 
-      // Update local state
       b.status = 'attended';
       document.getElementById('statWaiting').textContent   = bookings.filter(x => x.status === 'pending').length;
       document.getElementById('statCompleted').textContent = bookings.filter(x => x.status === 'attended' || x.status === 'completed').length;
     } else {
-      // Demo/offline mode — simulate the flow locally
       activeBooking.status = 'attended';
       b.status = 'attended';
     }
 
     renderQueue();
     closeAttendModal();
-    showToast(withPrescription ? `Diagnosis saved & prescription sent for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
+    showToast(withPrescription ? `Prescription saved & reminders scheduled for ${b.patient_name}` : `Consultation complete for ${b.patient_name}`, 'success');
   };
 
   // Recent bookings + scheduled appointments sidebar
