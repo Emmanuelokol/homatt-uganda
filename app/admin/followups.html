@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Follow-up Automation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .fu-card { background:#fff; border-radius:12px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+    .fu-card-title { font-size:15px; font-weight:700; color:#1E1E1E; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+    .fu-card-sub   { font-size:12px; color:#9AA0A6; margin-bottom:18px; }
+    .setting-row { display:flex; align-items:center; gap:14px; padding:13px 0; border-bottom:1px solid #F1F3F4; flex-wrap:wrap; }
+    .setting-row:last-child { border-bottom:none; padding-bottom:0; }
+    .setting-label { flex:1; min-width:200px; }
+    .setting-label-title { font-size:13px; font-weight:600; color:#202124; }
+    .setting-label-sub   { font-size:11px; color:#9AA0A6; margin-top:2px; }
+    .setting-control { display:flex; align-items:center; gap:8px; }
+    .fu-input { padding:8px 12px; border:1.5px solid #E0E0E0; border-radius:8px; font-size:13px; font-family:inherit; outline:none; width:80px; }
+    .fu-input:focus { border-color:#3949AB; }
+    .fu-input.wide { width:200px; }
+    .fu-toggle { position:relative; width:44px; height:24px; flex-shrink:0; }
+    .fu-toggle input { opacity:0; width:0; height:0; }
+    .fu-toggle-slider { position:absolute; inset:0; background:#E0E0E0; border-radius:24px; cursor:pointer; transition:.2s; }
+    .fu-toggle-slider:before { content:''; position:absolute; width:18px; height:18px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+    .fu-toggle input:checked + .fu-toggle-slider { background:#3949AB; }
+    .fu-toggle input:checked + .fu-toggle-slider:before { transform:translateX(20px); }
+    .fu-save-btn { background:#3949AB; color:#fff; border:none; border-radius:8px; padding:10px 20px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .fu-save-btn:hover { background:#1A237E; }
+
+    /* Metrics */
+    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:16px; margin-bottom:24px; }
+    .metric-card { background:#fff; border-radius:12px; padding:18px 20px; box-shadow:0 2px 8px rgba(0,0,0,.06); text-align:center; }
+    .metric-num  { font-size:30px; font-weight:700; }
+    .metric-lbl  { font-size:12px; color:#9AA0A6; margin-top:4px; }
+    .metric-card.green  .metric-num { color:#2E7D32; }
+    .metric-card.orange .metric-num { color:#E65100; }
+    .metric-card.red    .metric-num { color:#C62828; }
+    .metric-card.blue   .metric-num { color:#1565C0; }
+    .metric-card.purple .metric-num { color:#4A148C; }
+
+    /* Follow-up table */
+    .fu-table { width:100%; border-collapse:collapse; font-size:13px; }
+    .fu-table th { text-align:left; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:#9AA0A6; padding:8px 12px; border-bottom:2px solid #F1F3F4; }
+    .fu-table td { padding:12px 12px; border-bottom:1px solid #F8F9FA; vertical-align:top; }
+    .fu-table tr:last-child td { border-bottom:none; }
+    .fu-table tr:hover td { background:#FAFAFA; }
+    .feeling-pill { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; }
+    .feeling-pill.better { background:#E8F5E9; color:#2E7D32; }
+    .feeling-pill.same   { background:#FFF3E0; color:#E65100; }
+    .feeling-pill.worse  { background:#FFEBEE; color:#C62828; }
+    .feeling-pill.none   { background:#F1F3F4; color:#9AA0A6; }
+    .alert-row td { background:#FFF5F5 !important; }
+
+    /* Timeline */
+    .timeline { padding:0; margin:0; list-style:none; }
+    .tl-item { display:flex; gap:14px; padding-bottom:18px; position:relative; }
+    .tl-item:before { content:''; position:absolute; left:15px; top:30px; bottom:0; width:2px; background:#E0E0E0; }
+    .tl-item:last-child:before { display:none; }
+    .tl-dot { width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .tl-body { flex:1; padding-top:4px; }
+    .tl-title { font-size:13px; font-weight:600; color:#202124; }
+    .tl-sub   { font-size:11px; color:#9AA0A6; margin-top:2px; line-height:1.5; }
+    .tl-when  { font-size:11px; font-weight:600; color:#3949AB; background:#E8EAF6; padding:2px 8px; border-radius:10px; display:inline-block; margin-bottom:4px; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Follow-up Automation</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-page-content" style="padding:24px;max-width:1000px;margin:0 auto">
+
+      <!-- ── HOW IT WORKS BANNER ─────────────────────────────────── -->
+      <div style="background:linear-gradient(135deg,#1A237E,#3949AB);border-radius:14px;padding:22px 28px;margin-bottom:28px;color:#fff">
+        <div style="font-size:16px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+          <span class="material-icons-outlined">auto_awesome</span>
+          How Automated Follow-up Works
+        </div>
+        <div style="font-size:12px;opacity:.85;line-height:1.7;margin-bottom:16px">
+          When a doctor saves a consultation with a prescription, Homatt automatically schedules all follow-up push notifications.
+          No manual action needed. Everything below is configured once and runs forever.
+        </div>
+        <ul class="timeline">
+          <li class="tl-item">
+            <div class="tl-dot" style="background:rgba(255,255,255,0.2)"><span class="material-icons-outlined" style="font-size:16px">check_circle</span></div>
+            <div class="tl-body">
+              <div class="tl-when">Immediately</div>
+              <div class="tl-title" style="color:#fff">Consultation complete notification</div>
+              <div class="tl-sub">"Your consultation is complete. Prescription ready at [pharmacy]."</div>
+            </div>
+          </li>
+          <li class="tl-item">
+            <div class="tl-dot" style="background:rgba(255,255,255,0.2)"><span class="material-icons-outlined" style="font-size:16px">medication</span></div>
+            <div class="tl-body">
+              <div class="tl-when">Every dose time, every day of course</div>
+              <div class="tl-title" style="color:#fff">Medication reminders</div>
+              <div class="tl-sub">"Time to take Artemether-Lumefantrine 80/480mg — oral." at 07:00, 21:00 (doctor-set times)</div>
+            </div>
+          </li>
+          <li class="tl-item">
+            <div class="tl-dot" style="background:rgba(255,255,255,0.2)"><span class="material-icons-outlined" style="font-size:16px">sentiment_neutral</span></div>
+            <div class="tl-body">
+              <div class="tl-when">Day 3 (mid-course check-in)</div>
+              <div class="tl-title" style="color:#fff">How are you feeling? [Better] [Same] [Worse]</div>
+              <div class="tl-sub">Patient taps a button. Better → confirmed. Same → reminder. Worse → auto-escalate.</div>
+            </div>
+          </li>
+          <li class="tl-item">
+            <div class="tl-dot" style="background:rgba(255,255,255,0.2)"><span class="material-icons-outlined" style="font-size:16px">task_alt</span></div>
+            <div class="tl-body">
+              <div class="tl-when">End of medication course</div>
+              <div class="tl-title" style="color:#fff">Course complete check-in</div>
+              <div class="tl-sub">"Your [N]-day course is done. How do you feel?" Worse → urgent referral sent automatically.</div>
+            </div>
+          </li>
+          <li class="tl-item" style="padding-bottom:0">
+            <div class="tl-dot" style="background:rgba(255,255,255,0.2)"><span class="material-icons-outlined" style="font-size:16px">calendar_today</span></div>
+            <div class="tl-body">
+              <div class="tl-when">Day before + day of follow-up appointment</div>
+              <div class="tl-title" style="color:#fff">Return-to-clinic reminders</div>
+              <div class="tl-sub">"Clinic visit tomorrow at 09:00." and "Clinic visit today at 09:00."</div>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <!-- ── LIVE METRICS ────────────────────────────────────────── -->
+      <div style="font-size:14px;font-weight:700;color:#202124;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="color:#3949AB">bar_chart</span> Live Follow-up Metrics
+        <button onclick="loadMetrics()" style="margin-left:auto;background:#F1F3F4;border:none;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:4px">
+          <span class="material-icons-outlined" style="font-size:14px">refresh</span> Refresh
+        </button>
+      </div>
+      <div class="metrics-grid" id="metricsGrid">
+        <div class="metric-card blue">
+          <div class="metric-num" id="mActive">—</div>
+          <div class="metric-lbl">Active Follow-ups</div>
+        </div>
+        <div class="metric-card green">
+          <div class="metric-num" id="mBetter">—</div>
+          <div class="metric-lbl">Reported Better</div>
+        </div>
+        <div class="metric-card orange">
+          <div class="metric-num" id="mSame">—</div>
+          <div class="metric-lbl">No Change</div>
+        </div>
+        <div class="metric-card red">
+          <div class="metric-num" id="mWorse">—</div>
+          <div class="metric-lbl">Getting Worse ⚠</div>
+        </div>
+        <div class="metric-card purple">
+          <div class="metric-num" id="mNoResponse">—</div>
+          <div class="metric-lbl">No Response Yet</div>
+        </div>
+      </div>
+
+      <!-- ── NEEDS ATTENTION ─────────────────────────────────────── -->
+      <div id="attentionSection" style="display:none;margin-bottom:24px">
+        <div style="background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:16px 20px">
+          <div style="font-size:14px;font-weight:700;color:#C62828;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+            <span class="material-icons-outlined">warning</span>
+            Patients Reporting Worse — Immediate Attention Needed
+          </div>
+          <div id="attentionList"></div>
+        </div>
+      </div>
+
+      <!-- ── ACTIVE FOLLOW-UPS TABLE ─────────────────────────────── -->
+      <div class="fu-card">
+        <div class="fu-card-title">
+          <span class="material-icons-outlined" style="color:#3949AB">follow_the_signs</span>
+          All Active Follow-ups (last 30 days)
+        </div>
+        <div class="fu-card-sub">All patients who received a prescription and are currently in the follow-up window.</div>
+        <div style="overflow-x:auto">
+          <table class="fu-table">
+            <thead>
+              <tr>
+                <th>Patient</th>
+                <th>Diagnosis</th>
+                <th>Clinic</th>
+                <th>Rx Days Left</th>
+                <th>Return to Clinic</th>
+                <th>Last Feeling</th>
+                <th>Check-ins</th>
+              </tr>
+            </thead>
+            <tbody id="followupTableBody">
+              <tr><td colspan="7" style="text-align:center;color:#9AA0A6;padding:24px">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── FOLLOW-UP SETTINGS ──────────────────────────────────── -->
+      <div class="fu-card">
+        <div class="fu-card-title">
+          <span class="material-icons-outlined" style="color:#3949AB">tune</span>
+          Follow-up Automation Settings
+        </div>
+        <div class="fu-card-sub">
+          These rules apply globally to all clinics. Changes take effect for new consultations immediately.
+          Existing scheduled notifications cannot be cancelled once sent to OneSignal.
+        </div>
+
+        <!-- Enable / disable entire system -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Automated Follow-up Enabled</div>
+            <div class="setting-label-sub">Master switch — turn off to disable all automatic follow-up notifications</div>
+          </div>
+          <div class="setting-control">
+            <label class="fu-toggle">
+              <input type="checkbox" id="cfgEnabled" checked>
+              <span class="fu-toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Medication reminders -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Daily Medication Reminders</div>
+            <div class="setting-label-sub">Send "Time to take [Drug]" at doctor-prescribed times for every day of the course</div>
+          </div>
+          <div class="setting-control">
+            <label class="fu-toggle">
+              <input type="checkbox" id="cfgMedReminders" checked>
+              <span class="fu-toggle-slider"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Mid-course check-in day -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Mid-course Check-in Day</div>
+            <div class="setting-label-sub">Which day of the medication course to send the first "How are you feeling?" check-in</div>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfgMidDay" class="fu-input" value="3" min="1" max="10">
+            <span style="font-size:12px;color:#9AA0A6">days in</span>
+          </div>
+        </div>
+
+        <!-- Post-course check-in -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Post-course Check-in</div>
+            <div class="setting-label-sub">Days after the medication course ends to send the final recovery check-in</div>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfgPostDays" class="fu-input" value="1" min="0" max="7">
+            <span style="font-size:12px;color:#9AA0A6">days after</span>
+          </div>
+        </div>
+
+        <!-- Escalation threshold -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Auto-escalation Threshold</div>
+            <div class="setting-label-sub">How many "Getting Worse" responses before an automatic urgent referral notification is sent</div>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfgEscalateAt" class="fu-input" value="1" min="1" max="5">
+            <span style="font-size:12px;color:#9AA0A6">worse response(s)</span>
+          </div>
+        </div>
+
+        <!-- Default referral clinic -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Default Referral Hospital</div>
+            <div class="setting-label-sub">Sent to patients automatically when they keep reporting worse. Use the highest-level referral hospital.</div>
+          </div>
+          <div class="setting-control">
+            <input type="text" id="cfgReferralClinic" class="fu-input wide" value="Mulago National Referral Hospital" placeholder="e.g. Mulago National Referral Hospital">
+          </div>
+        </div>
+
+        <!-- Daily notification cap -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Daily Notification Cap (per patient)</div>
+            <div class="setting-label-sub">Maximum push notifications per patient per day — protects against notification overload</div>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfgDailyCap" class="fu-input" value="10" min="3" max="20">
+            <span style="font-size:12px;color:#9AA0A6">per day</span>
+          </div>
+        </div>
+
+        <!-- Appointment reminder timing -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <div class="setting-label-title">Return-to-clinic Reminders</div>
+            <div class="setting-label-sub">Send appointment reminders before the follow-up date the doctor set</div>
+          </div>
+          <div class="setting-control" style="flex-direction:column;align-items:flex-start;gap:6px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+              <input type="checkbox" id="cfgApptDayBefore" checked style="width:16px;height:16px">
+              Day before at 09:00
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+              <input type="checkbox" id="cfgApptDayOf" checked style="width:16px;height:16px">
+              Day of appointment at 07:00
+            </label>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;display:flex;align-items:center;gap:12px">
+          <button class="fu-save-btn" onclick="saveSettings()">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> Save Settings
+          </button>
+          <span id="saveSettingsMsg" style="font-size:12px;color:#2E7D32;display:none">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">check_circle</span> Saved
+          </span>
+        </div>
+      </div>
+
+      <!-- ── NOTIFICATION MESSAGE TEMPLATES ─────────────────────── -->
+      <div class="fu-card">
+        <div class="fu-card-title">
+          <span class="material-icons-outlined" style="color:#3949AB">edit_note</span>
+          Notification Message Templates
+        </div>
+        <div class="fu-card-sub">
+          Customize what patients receive. Use <code>{drug}</code>, <code>{clinic}</code>, <code>{days}</code> as placeholders.
+        </div>
+
+        <div style="margin-bottom:14px">
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px">Mid-course Check-in Message</label>
+          <textarea id="tmplMidCourse" rows="2"
+            style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"
+            >You are on day {days} of your {drug} course. How are you feeling so far?</textarea>
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px">End-of-course Check-in Message</label>
+          <textarea id="tmplEndCourse" rows="2"
+            style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"
+            >Your {days}-day course of {drug} is now complete. How are you feeling?</textarea>
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px">Auto-escalation Message (sent when patient keeps getting worse)</label>
+          <textarea id="tmplEscalate" rows="2"
+            style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"
+            >We are concerned about your health. Please visit {referral} as soon as possible for specialist care. Your health matters to us.</textarea>
+        </div>
+        <div style="margin-bottom:0">
+          <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px">"Feeling Same" Response Message</label>
+          <textarea id="tmplSameResponse" rows="2"
+            style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box"
+            >Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit {clinic}.</textarea>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:12px;align-items:center">
+          <button class="fu-save-btn" onclick="saveTemplates()">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> Save Templates
+          </button>
+          <span id="saveTmplMsg" style="font-size:12px;color:#2E7D32;display:none">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">check_circle</span> Saved
+          </span>
+        </div>
+      </div>
+
+    </div><!-- /admin-page-content -->
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+const SETTINGS_KEY = 'homatt_followup_settings';
+const TEMPLATES_KEY = 'homatt_followup_templates';
+
+let _supa = null;
+
+// ── Default settings ──────────────────────────────────────────
+const DEFAULT_SETTINGS = {
+  enabled:       true,
+  medReminders:  true,
+  midCourseDay:  3,
+  postCourseDays:1,
+  escalateAt:    1,
+  referralClinic:'Mulago National Referral Hospital',
+  dailyCap:      10,
+  apptDayBefore: true,
+  apptDayOf:     true,
+};
+
+const DEFAULT_TEMPLATES = {
+  midCourse:    'You are on day {days} of your {drug} course. How are you feeling so far?',
+  endCourse:    'Your {days}-day course of {drug} is now complete. How are you feeling?',
+  escalate:     'We are concerned about your health. Please visit {referral} as soon as possible for specialist care. Your health matters to us.',
+  sameResponse: 'Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit {clinic}.',
+};
+
+// ── Load settings into form ───────────────────────────────────
+function loadSettingsForm() {
+  const s = JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || DEFAULT_SETTINGS;
+  document.getElementById('cfgEnabled').checked      = s.enabled     ?? true;
+  document.getElementById('cfgMedReminders').checked = s.medReminders?? true;
+  document.getElementById('cfgMidDay').value          = s.midCourseDay ?? 3;
+  document.getElementById('cfgPostDays').value        = s.postCourseDays ?? 1;
+  document.getElementById('cfgEscalateAt').value      = s.escalateAt  ?? 1;
+  document.getElementById('cfgReferralClinic').value  = s.referralClinic || DEFAULT_SETTINGS.referralClinic;
+  document.getElementById('cfgDailyCap').value        = s.dailyCap    ?? 10;
+  document.getElementById('cfgApptDayBefore').checked = s.apptDayBefore ?? true;
+  document.getElementById('cfgApptDayOf').checked     = s.apptDayOf   ?? true;
+
+  const t = JSON.parse(localStorage.getItem(TEMPLATES_KEY) || 'null') || DEFAULT_TEMPLATES;
+  document.getElementById('tmplMidCourse').value    = t.midCourse    || DEFAULT_TEMPLATES.midCourse;
+  document.getElementById('tmplEndCourse').value    = t.endCourse    || DEFAULT_TEMPLATES.endCourse;
+  document.getElementById('tmplEscalate').value     = t.escalate     || DEFAULT_TEMPLATES.escalate;
+  document.getElementById('tmplSameResponse').value = t.sameResponse || DEFAULT_TEMPLATES.sameResponse;
+}
+
+window.saveSettings = async () => {
+  const s = {
+    enabled:       document.getElementById('cfgEnabled').checked,
+    medReminders:  document.getElementById('cfgMedReminders').checked,
+    midCourseDay:  parseInt(document.getElementById('cfgMidDay').value)    || 3,
+    postCourseDays:parseInt(document.getElementById('cfgPostDays').value)  || 1,
+    escalateAt:    parseInt(document.getElementById('cfgEscalateAt').value)|| 1,
+    referralClinic:document.getElementById('cfgReferralClinic').value.trim() || DEFAULT_SETTINGS.referralClinic,
+    dailyCap:      parseInt(document.getElementById('cfgDailyCap').value)  || 10,
+    apptDayBefore: document.getElementById('cfgApptDayBefore').checked,
+    apptDayOf:     document.getElementById('cfgApptDayOf').checked,
+  };
+  localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+
+  // Also persist to Supabase app_config so all admin sessions share the same settings
+  if (_supa) {
+    await _supa.from('app_config')
+      .upsert({ key: 'followup_rules', value: s, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .catch(() => {});
+  }
+
+  const msg = document.getElementById('saveSettingsMsg');
+  msg.style.display = 'inline-flex';
+  setTimeout(() => { msg.style.display = 'none'; }, 2500);
+};
+
+window.saveTemplates = async () => {
+  const t = {
+    midCourse:    document.getElementById('tmplMidCourse').value.trim()    || DEFAULT_TEMPLATES.midCourse,
+    endCourse:    document.getElementById('tmplEndCourse').value.trim()    || DEFAULT_TEMPLATES.endCourse,
+    escalate:     document.getElementById('tmplEscalate').value.trim()     || DEFAULT_TEMPLATES.escalate,
+    sameResponse: document.getElementById('tmplSameResponse').value.trim() || DEFAULT_TEMPLATES.sameResponse,
+  };
+  localStorage.setItem(TEMPLATES_KEY, JSON.stringify(t));
+
+  if (_supa) {
+    await _supa.from('app_config')
+      .upsert({ key: 'followup_templates', value: t, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      .catch(() => {});
+  }
+
+  const msg = document.getElementById('saveTmplMsg');
+  msg.style.display = 'inline-flex';
+  setTimeout(() => { msg.style.display = 'none'; }, 2500);
+};
+
+// ── Load metrics + follow-up table ───────────────────────────
+window.loadMetrics = async () => {
+  if (!_supa) return;
+
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+
+  // clinic_diagnoses with prescription_items from last 30 days
+  const { data: diags } = await _supa
+    .from('clinic_diagnoses')
+    .select('id,booking_id,clinic_id,confirmed_diagnosis,severity,prescription_items,follow_up_at,created_at')
+    .gte('created_at', cutoff)
+    .not('prescription_items', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (!diags || !diags.length) {
+    document.getElementById('mActive').textContent    = 0;
+    document.getElementById('mBetter').textContent    = 0;
+    document.getElementById('mSame').textContent      = 0;
+    document.getElementById('mWorse').textContent     = 0;
+    document.getElementById('mNoResponse').textContent= 0;
+    document.getElementById('followupTableBody').innerHTML =
+      '<tr><td colspan="7" style="text-align:center;color:#9AA0A6;padding:24px">No follow-up data in the last 30 days.</td></tr>';
+    return;
+  }
+
+  const diagIds = diags.map(d => d.id);
+
+  // Latest feeling per diagnosis
+  const { data: notes } = await _supa
+    .from('patient_health_followups')
+    .select('diagnosis_id,feeling,created_at')
+    .in('diagnosis_id', diagIds)
+    .order('created_at', { ascending: false });
+
+  const latestFeeling = {};
+  const feelingCounts = {};
+  (notes || []).forEach(n => {
+    if (!latestFeeling[n.diagnosis_id] && n.feeling) {
+      latestFeeling[n.diagnosis_id] = n.feeling;
+      feelingCounts[n.feeling] = (feelingCounts[n.feeling] || 0) + 1;
+    }
+  });
+
+  // Bookings for patient names + clinic names
+  const bookingIds = [...new Set(diags.map(d => d.booking_id).filter(Boolean))];
+  let bookingMap = {};
+  if (bookingIds.length) {
+    const { data: bRows } = await _supa
+      .from('bookings')
+      .select('id,patient_name')
+      .in('id', bookingIds);
+    (bRows || []).forEach(b => { bookingMap[b.id] = b; });
+  }
+
+  const clinicIds = [...new Set(diags.map(d => d.clinic_id).filter(Boolean))];
+  let clinicMap = {};
+  if (clinicIds.length) {
+    const { data: cRows } = await _supa
+      .from('clinics')
+      .select('id,name')
+      .in('id', clinicIds);
+    (cRows || []).forEach(c => { clinicMap[c.id] = c; });
+  }
+
+  const noResponse = diags.filter(d => !latestFeeling[d.id]).length;
+  document.getElementById('mActive').textContent     = diags.length;
+  document.getElementById('mBetter').textContent     = feelingCounts.better || 0;
+  document.getElementById('mSame').textContent       = feelingCounts.same   || 0;
+  document.getElementById('mWorse').textContent      = feelingCounts.worse  || 0;
+  document.getElementById('mNoResponse').textContent = noResponse;
+
+  // Attention section
+  const worseList = diags.filter(d => latestFeeling[d.id] === 'worse');
+  const attSec  = document.getElementById('attentionSection');
+  const attList = document.getElementById('attentionList');
+  if (worseList.length) {
+    attSec.style.display = 'block';
+    attList.innerHTML = worseList.map(d => {
+      const bk = bookingMap[d.booking_id] || {};
+      return `
+        <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #FFCDD2;flex-wrap:wrap">
+          <span class="material-icons-outlined" style="color:#C62828;font-size:20px">person</span>
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:700;color:#C62828">${bk.patient_name || 'Unknown'}</div>
+            <div style="font-size:11px;color:#E53935">${d.confirmed_diagnosis || '—'} · ${clinicMap[d.clinic_id]?.name || 'Clinic'}</div>
+          </div>
+          <div style="font-size:11px;color:#9AA0A6">${new Date(d.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short'})}</div>
+        </div>`;
+    }).join('');
+  } else {
+    attSec.style.display = 'none';
+  }
+
+  // Follow-up table
+  const tbody = document.getElementById('followupTableBody');
+  tbody.innerHTML = diags.map(d => {
+    const bk       = bookingMap[d.booking_id] || {};
+    const clinic   = clinicMap[d.clinic_id]   || {};
+    const rxItems  = Array.isArray(d.prescription_items) ? d.prescription_items : [];
+    const maxDays  = rxItems.length ? Math.max(...rxItems.map(x => x.duration || 0)) : 0;
+    const endDate  = maxDays ? new Date(new Date(d.created_at).getTime() + maxDays * 86400000) : null;
+    const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - new Date()) / 86400000)) : null;
+    const feeling  = latestFeeling[d.id];
+    const checkCount = (notes || []).filter(n => n.diagnosis_id === d.id && n.feeling).length;
+    const followUpStr = d.follow_up_at
+      ? new Date(d.follow_up_at).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'})
+      : '—';
+
+    const feelingPill = feeling
+      ? `<span class="feeling-pill ${feeling}">${
+          feeling==='better'?'✓ Better':feeling==='same'?'~ Same':'⚠ Worse'}</span>`
+      : `<span class="feeling-pill none">No response</span>`;
+
+    const rxStr = daysLeft !== null
+      ? (daysLeft > 0 ? `<span style="color:#1B5E20;font-weight:600">${daysLeft}d left</span>` : '<span style="color:#9AA0A6">Done</span>')
+      : '—';
+
+    return `<tr ${feeling==='worse'?'class="alert-row"':''}>
+      <td style="font-weight:600">${bk.patient_name || '—'}</td>
+      <td style="max-width:180px">${d.confirmed_diagnosis || '—'}${d.severity?`<br><span style="font-size:11px;color:#9AA0A6">${d.severity}</span>`:''}</td>
+      <td style="font-size:12px">${clinic.name || '—'}</td>
+      <td>${rxStr}</td>
+      <td style="font-size:12px">${followUpStr}</td>
+      <td>${feelingPill}</td>
+      <td style="font-size:12px;color:#9AA0A6">${checkCount} response${checkCount!==1?'s':''}</td>
+    </tr>`;
+  }).join('');
+};
+
+// ── Init ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  buildAdminSidebar('followups');
+  setupAdminLogout();
+
+  const cfg = window.HOMATT_CONFIG || {};
+  if (cfg.SUPABASE_URL && window.supabase) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'sb-homatt-admin-auth' }
+    });
+    const session = await requireAdminAuth(_supa);
+    if (session) {
+      document.getElementById('adminUserAvatar').textContent = (session.user.email || 'A')[0].toUpperCase();
+      document.getElementById('adminUserNameTop').textContent = session.user.email || 'Admin';
+
+      // Try to load saved settings from Supabase (synced across admin sessions)
+      const { data: cfgRow } = await _supa
+        .from('app_config')
+        .select('value')
+        .eq('key', 'followup_rules')
+        .maybeSingle();
+      if (cfgRow?.value) localStorage.setItem(SETTINGS_KEY, JSON.stringify(cfgRow.value));
+
+      const { data: tmplRow } = await _supa
+        .from('app_config')
+        .select('value')
+        .eq('key', 'followup_templates')
+        .maybeSingle();
+      if (tmplRow?.value) localStorage.setItem(TEMPLATES_KEY, JSON.stringify(tmplRow.value));
+    }
+  }
+
+  loadSettingsForm();
+  loadMetrics();
+});
+</script>
+</body>
+</html>

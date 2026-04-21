@@ -76,7 +76,8 @@ function buildAdminSidebar(activePage) {
       { href:'marketplace.html#medicine-orders', icon:'medication', id:'med-orders', text:'Medicine Orders' }
     ]},
     { label:'System', links:[
-      { href:'notifications.html', icon:'notifications_active', id:'notifications', text:'Notifications' }
+      { href:'notifications.html', icon:'notifications_active', id:'notifications', text:'Notifications' },
+      { href:'followups.html',     icon:'follow_the_signs',     id:'followups',     text:'Follow-up Automation' }
     ]}
   ];
 

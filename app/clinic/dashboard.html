@@ -1578,18 +1578,48 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
           }
 
-          // ── End-of-course follow-up check ──
+          // ── Mid-course check-in (day 3 by default, or first day if course < 3 days) ──
+          // Read admin-configured day from localStorage followup_settings
+          const _fuSettings = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_settings') || '{}'); } catch(_){return {};} })();
+          const midCourseDay = _fuSettings.midCourseDay || 3;
           const maxDaysFollowup = Math.max(...rxItems.map(x => x.duration));
+          if (maxDaysFollowup > midCourseDay) {
+            const midAt = new Date(now);
+            midAt.setDate(midAt.getDate() + midCourseDay);
+            midAt.setHours(10, 0, 0, 0);
+            if (midAt > now) {
+              const drugNames = rxItems.map(x => x.drug_name).join(', ');
+              supa2.functions.invoke('send-notification', {
+                body: {
+                  userId:        b.patient_user_id,
+                  title:         'Mid-course Check-in',
+                  message:       `You are on day ${midCourseDay} of your ${drugNames} course. How are you feeling so far?`,
+                  data:          { screen: 'prescription-checkin', id: b.id, checkin_type: 'mid_course' },
+                  pref_category: 'medicine_reminders',
+                  send_after:    midAt.toISOString(),
+                  buttons: [
+                    { id: 'feeling_better', text: 'Much Better ✓' },
+                    { id: 'feeling_same',   text: 'About the Same' },
+                    { id: 'feeling_worse',  text: 'Getting Worse' },
+                  ],
+                },
+              }).catch(() => {});
+            }
+          }
+
+          // ── End-of-course follow-up check ──
+          const postCourseDays = _fuSettings.postCourseDays ?? 1;
           const courseEndAt = new Date(now);
-          courseEndAt.setDate(courseEndAt.getDate() + maxDaysFollowup);
+          courseEndAt.setDate(courseEndAt.getDate() + maxDaysFollowup + postCourseDays);
           courseEndAt.setHours(10, 0, 0, 0);
           if (courseEndAt > now) {
+            const drugNames = rxItems.map(x => x.drug_name).join(', ');
             supa2.functions.invoke('send-notification', {
               body: {
                 userId:        b.patient_user_id,
                 title:         'Medication Course Complete — How do you feel?',
-                message:       `Your ${maxDaysFollowup}-day course of ${rxItems.map(x => x.drug_name).join(', ')} is done. Open the app to tell us how you feel.`,
-                data:          { screen: 'dashboard', id: b.id },
+                message:       `Your ${maxDaysFollowup}-day course of ${drugNames} is done. How are you feeling?`,
+                data:          { screen: 'prescription-checkin', id: b.id, checkin_type: 'end_of_course' },
                 pref_category: 'medicine_reminders',
                 send_after:    courseEndAt.toISOString(),
                 buttons: [

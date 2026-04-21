@@ -22,21 +22,22 @@ const ONESIGNAL_APP_ID =
 // ── Screen → URL mapping ──────────────────────────────────────
 // Every push notification includes data.screen; map it to an app URL.
 const SCREEN_URLS = {
-  home:               'dashboard.html',
-  dashboard:          'dashboard.html',
-  bookings:           'clinic-booking.html',
-  appointment:        'clinic-booking.html',
-  'book-followup':    'clinic-booking.html',
-  prescription:       'medicine-orders.html',
-  lab_result:         'clinic-booking.html',
-  orders:             'medicine-orders.html',
-  medicine_order:     'medicine-orders.html',
-  shop_order:         'shop.html',
-  'prevention-shop':  'shop.html',
-  'health-tracker':   'dashboard.html',
-  'complete-payment': 'wallet.html',
-  'recovery-check':   'dashboard.html',
-  'symptom-checkin':  'symptom-checker.html',
+  home:                   'dashboard.html',
+  dashboard:              'dashboard.html',
+  bookings:               'clinic-booking.html',
+  appointment:            'clinic-booking.html',
+  'book-followup':        'clinic-booking.html',
+  prescription:           'medicine-orders.html',
+  lab_result:             'clinic-booking.html',
+  orders:                 'medicine-orders.html',
+  medicine_order:         'medicine-orders.html',
+  shop_order:             'shop.html',
+  'prevention-shop':      'shop.html',
+  'health-tracker':       'dashboard.html',
+  'complete-payment':     'wallet.html',
+  'recovery-check':       'dashboard.html',
+  'symptom-checkin':      'symptom-checker.html',
+  'prescription-checkin': 'symptom-checker.html',
 };
 
 // ── Deep link navigation ──────────────────────────────────────
@@ -197,7 +198,9 @@ function initOneSignal() {
 
         if (actionId && actionId.startsWith('feeling_')) {
           const feeling = actionId.replace('feeling_', ''); // better / same / worse
-          navigateToScreen({ screen: 'symptom-checkin', feeling });
+          // Pass the notification data (contains booking id) alongside the feeling
+          // so symptom-checker.js can link the response back to the prescription.
+          navigateToScreen({ ...data, screen: 'prescription-checkin', feeling });
           return;
         }
         navigateToScreen(data);

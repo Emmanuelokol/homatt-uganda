@@ -2729,11 +2729,101 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
   // ====== Check for existing monitoring session ======
   // Also handle notification tap: ?screen=symptom-checkin[&feeling=better|same|worse]
-  const _urlParams = new URLSearchParams(window.location.search);
+  const _urlParams   = new URLSearchParams(window.location.search);
   const _notifScreen = _urlParams.get('screen');
-  const _notifFeeling = _urlParams.get('feeling'); // pre-selected from action button
+  const _notifFeeling= _urlParams.get('feeling');   // pre-selected from action button
+  const _notifId     = _urlParams.get('notif_id');  // booking ID passed from prescription check-in
   const existingMonitor = localStorage.getItem('homatt_monitoring');
 
+  // ── Prescription check-in (from medication reminder / course-end notification) ──
+  // Identified by screen=prescription-checkin OR (screen=symptom-checkin AND no monitoring session)
+  const isPrescriptionCheckin = _notifScreen === 'prescription-checkin' ||
+    (_notifScreen === 'symptom-checkin' && !existingMonitor && _notifFeeling);
+
+  if (isPrescriptionCheckin && _notifFeeling && ['better','same','worse'].includes(_notifFeeling)) {
+    // Show a lightweight prescription check-in response screen instead of full monitoring
+    showScreen('screenPatient'); // show something while we process
+    (async () => {
+      // Save feeling response to patient_health_followups
+      try {
+        const cfg = window.HOMATT_CONFIG || {};
+        if (cfg.SUPABASE_URL && window.supabase) {
+          const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+          const { data: { session } } = await client.auth.getSession();
+          if (session?.user?.id) {
+            // Find the active diagnosis for this booking/user
+            const diagQuery = _notifId
+              ? client.from('clinic_diagnoses').select('id').eq('booking_id', _notifId).maybeSingle()
+              : client.from('clinic_diagnoses')
+                  .select('id')
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+            const { data: diag } = await diagQuery;
+
+            await client.from('patient_health_followups').insert({
+              diagnosis_id:    diag?.id    || null,
+              patient_user_id: session.user.id,
+              followup_type:   'patient_feeling',
+              feeling:         _notifFeeling,
+              clinical_note:   `Patient tapped: ${_notifFeeling} (prescription check-in)`,
+              created_at:      new Date().toISOString(),
+            });
+
+            // If worse — auto-escalate: send urgent referral notification
+            if (_notifFeeling === 'worse') {
+              const _fuSettings = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_settings') || '{}'); } catch(_){return {};} })();
+              const referral = _fuSettings.referralClinic || 'Mulago National Referral Hospital';
+              const tmpl = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_templates') || '{}'); } catch(_){return {};} })();
+              const msg = (tmpl.escalate || 'We are concerned about your health. Please visit {referral} as soon as possible for specialist care.')
+                .replace('{referral}', referral);
+              await client.functions.invoke('send-notification', {
+                body: {
+                  userId:        session.user.id,
+                  title:         'Urgent: Please Seek Further Care',
+                  message:       msg,
+                  data:          { screen: 'bookings' },
+                  pref_category: 'appointment_reminders',
+                },
+              });
+            }
+          }
+        }
+      } catch(_) {}
+
+      // Show inline response card (replaces the patient list screen briefly)
+      const icons   = { better: 'sentiment_very_satisfied', same: 'sentiment_neutral', worse: 'sentiment_very_dissatisfied' };
+      const colors  = { better: '#2E7D32', same: '#E65100', worse: '#C62828' };
+      const bgs     = { better: '#E8F5E9', same: '#FFF3E0', worse: '#FFEBEE' };
+      const messages= {
+        better: 'Great to hear you are feeling better! Keep taking any remaining medication through the full course.',
+        same:   'Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit your clinic.',
+        worse:  'We are sorry you are not improving. An urgent message has been sent to you. Please seek care immediately.',
+      };
+
+      const patientList = document.getElementById('patientList');
+      if (patientList) {
+        patientList.innerHTML = `
+          <div style="text-align:center;padding:20px 10px">
+            <div style="width:64px;height:64px;border-radius:50%;background:${bgs[_notifFeeling]};
+              display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+              <span class="material-icons-outlined" style="font-size:32px;color:${colors[_notifFeeling]}">${icons[_notifFeeling]}</span>
+            </div>
+            <div style="font-size:16px;font-weight:700;color:${colors[_notifFeeling]};margin-bottom:8px">
+              ${_notifFeeling === 'better' ? 'Glad you are feeling better!' : _notifFeeling === 'same' ? 'Keep going!' : 'Your response has been recorded'}
+            </div>
+            <div style="font-size:13px;color:#5F6368;line-height:1.6;margin-bottom:20px">${messages[_notifFeeling]}</div>
+            <button onclick="window.location.href='dashboard.html'"
+              style="padding:12px 24px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+              Back to Home
+            </button>
+          </div>`;
+      }
+    })();
+    return; // skip normal monitoring restore
+  }
+
+  // ── Monitoring session restore (symptom checker 1-hour monitoring) ──
   if (existingMonitor) {
     const savedMs = JSON.parse(existingMonitor);
     const isCheckinDue = savedMs.nextCheckIn && new Date() >= new Date(savedMs.nextCheckIn);
@@ -2756,19 +2846,15 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       showScreen('screenMonitor');
       wireMonitoringButtons();
 
-      // If the user tapped an action button in the notification, auto-trigger that feeling
       if (_notifFeeling && ['better', 'same', 'worse'].includes(_notifFeeling)) {
-        // Short delay so the monitoring screen is fully rendered first
         setTimeout(() => {
           triggerCheckinPhase();
-          // Auto-click the correct feeling button
           setTimeout(() => {
             const btn = document.querySelector(`.sc-feeling-btn[data-feeling="${_notifFeeling}"]`);
             if (btn) btn.click();
           }, 300);
         }, 400);
       } else if (openedFromNotif) {
-        // Notification tap without action button — just show the check-in phase
         setTimeout(() => triggerCheckinPhase(), 400);
       }
     }
