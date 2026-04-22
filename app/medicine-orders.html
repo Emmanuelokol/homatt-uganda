@@ -170,19 +170,19 @@
       <div class="mo-prog-dot" id="mp4"></div>
     </div>
 
+    <!-- AI pre-fill banner (shown when arriving from symptom checker, visible across all steps) -->
+    <div class="ai-prefill-banner" id="aiBanner">
+      <span class="material-icons-outlined" id="aiBannerIcon" style="font-size:16px;flex-shrink:0">auto_awesome</span>
+      <span id="aiBannerText">AI-recommended medicines added to your cart.</span>
+      <button type="button" onclick="this.parentElement.classList.remove('show')"
+        style="margin-left:auto;background:none;border:none;cursor:pointer;color:inherit;font-size:18px;line-height:1;padding:0 2px">×</button>
+    </div>
+
     <!-- ═══════════════════════════════════════════════
          STEP 1 — Choose medicines by symptom category
          ═══════════════════════════════════════════════ -->
     <div class="mo-step active" id="step1">
       <div class="mo-scroll">
-
-        <!-- AI pre-fill banner (shown when arriving from symptom checker) -->
-        <div class="ai-prefill-banner" id="aiBanner">
-          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">auto_awesome</span>
-          <span id="aiBannerText">AI-recommended medicines added to your cart.</span>
-          <button type="button" onclick="this.parentElement.classList.remove('show')"
-            style="margin-left:auto;background:none;border:none;cursor:pointer;color:#2E7D32;font-size:18px;line-height:1;padding:0 2px">×</button>
-        </div>
 
         <!-- Instruction -->
         <div style="padding:10px 16px 4px">
@@ -1340,40 +1340,91 @@ document.addEventListener('DOMContentLoaded', function() {
   if (t) t.textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
 
   // ── Auto-fill AI-recommended medicines (arriving from symptom checker) ──
+  // Flow: check pharmacy_inventory stock → add in-stock drugs to cart → auto-advance to Step 2.
+  // If a recommended drug is out of stock the user is informed in the banner.
   var aiMeds = [];
   try { aiMeds = JSON.parse(localStorage.getItem('homatt_ai_medicines') || '[]'); } catch(e) {}
   if (aiMeds.length) {
     localStorage.removeItem('homatt_ai_medicines');
-    var added = [];
-    aiMeds.forEach(function(rec) {
-      var recLower = (rec.name || '').toLowerCase();
-      var firstWord = recLower.split(' ')[0];
-      if (!firstWord || firstWord === 'drink') return; // skip non-medicine items
-      // Search ALL_MEDS then every CAT_MEDS entry by first keyword
-      var found = ALL_MEDS.find(function(m) {
-        return m.n.toLowerCase().indexOf(firstWord) !== -1;
-      });
-      if (!found) {
-        Object.keys(CAT_MEDS).some(function(k) {
-          var m = CAT_MEDS[k].find(function(x) { return x.n.toLowerCase().indexOf(firstWord) !== -1; });
-          if (m) { found = m; return true; }
-        });
+    (async function prefillFromAi() {
+      // Wait briefly for Supabase CDN so we can run the stock check
+      var supa = null;
+      for (var i = 0; i < 10; i++) {
+        supa = (typeof getSupa === 'function') ? getSupa() : null;
+        if (supa) break;
+        await new Promise(function(r){ setTimeout(r, 200); });
       }
-      if (found) {
+      // Fetch names of all available medicines (any pharmacy with stock > 0)
+      var availableNames = null; // null = stock check unavailable; Set = list of in-stock names
+      if (supa) {
+        try {
+          var res = await supa.from('pharmacy_inventory')
+            .select('medicine_name,quantity,is_available')
+            .eq('is_available', true)
+            .gt('quantity', 0);
+          if (res && res.data) {
+            availableNames = new Set(res.data.map(function(r){ return (r.medicine_name || '').toLowerCase().trim(); }));
+          }
+        } catch(_) {}
+      }
+      var added = [];
+      var outOfStock = [];
+      aiMeds.forEach(function(rec) {
+        var recLower = (rec.name || '').toLowerCase();
+        var firstWord = recLower.split(' ')[0];
+        if (!firstWord || firstWord === 'drink') return; // skip non-medicine items
+        // Match recommendation to catalogue by first keyword
+        var found = ALL_MEDS.find(function(m) {
+          return m.n.toLowerCase().indexOf(firstWord) !== -1;
+        });
+        if (!found) {
+          Object.keys(CAT_MEDS).some(function(k) {
+            var m = CAT_MEDS[k].find(function(x) { return x.n.toLowerCase().indexOf(firstWord) !== -1; });
+            if (m) { found = m; return true; }
+          });
+        }
+        if (!found) return;
+        // Stock check (skipped if availableNames is null — e.g. offline / supa unavailable)
+        if (availableNames) {
+          var inStock = false;
+          availableNames.forEach(function(invName) {
+            if (invName.indexOf(firstWord) !== -1) inStock = true;
+          });
+          if (!inStock) { outOfStock.push(found.n); return; }
+        }
         if (!cart[found.n]) cart[found.n] = { n:found.n, p:found.p, qty:0 };
         cart[found.n].qty++;
         added.push(found.n);
-      }
-    });
-    if (added.length) {
+      });
       updateBadge();
-      var banner = document.getElementById('aiBanner');
+      var banner     = document.getElementById('aiBanner');
       var bannerText = document.getElementById('aiBannerText');
-      if (banner) {
+      var bannerIcon = document.getElementById('aiBannerIcon');
+      var parts = [];
+      if (added.length)      parts.push('Added to cart: ' + added.join(', ') + '.');
+      if (outOfStock.length) parts.push('Out of stock right now: ' + outOfStock.join(', ') + '. Please contact the pharmacy.');
+      if (banner && parts.length) {
         banner.classList.add('show');
-        if (bannerText) bannerText.textContent = 'AI-recommended: ' + added.join(', ') + '. Review and adjust quantities below.';
+        if (outOfStock.length && !added.length) {
+          // All recommendations unavailable — warning style, stay on step 1
+          banner.style.background   = '#FFEBEE';
+          banner.style.borderColor  = '#EF9A9A';
+          banner.style.color        = '#C62828';
+          if (bannerIcon) bannerIcon.textContent = 'report_problem';
+        } else if (outOfStock.length) {
+          // Partial — info/warn style
+          banner.style.background   = '#FFF3E0';
+          banner.style.borderColor  = '#FFB74D';
+          banner.style.color        = '#E65100';
+          if (bannerIcon) bannerIcon.textContent = 'info';
+        }
+        if (bannerText) bannerText.textContent = parts.join(' ');
       }
-    }
+      // Auto-advance to Step 2 (Delivery Details) when at least one AI drug is in cart
+      if (added.length) {
+        setTimeout(function(){ goStep(2); }, 400);
+      }
+    })();
   }
 
   // Render category grid
