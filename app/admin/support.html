@@ -178,7 +178,7 @@ async function loadTickets() {
   try {
     const fetchPromise = supabase
       .from('support_tickets')
-      .select('id,user_id,user_name,user_phone,subject,message,category,priority,status,admin_response,responded_at,responded_by,created_at,updated_at')
+      .select('id,user_id,user_name,subject,message,category,priority,status,created_at')
       .order('created_at', { ascending: false });
     const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     const result = await Promise.race([fetchPromise, timeoutPromise]);

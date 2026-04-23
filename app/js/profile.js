@@ -6,6 +6,40 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
+  // ====== Sheet Management — defined FIRST before any await so onclick attributes always work ======
+  const overlay  = document.getElementById('sheetOverlay');
+  const editSheet = document.getElementById('editProfileSheet');
+
+  function openSheet(sheet) {
+    if (!sheet) return;
+    if (overlay) overlay.classList.add('visible');
+    sheet.classList.add('open');
+  }
+  function closeAllSheets() {
+    if (overlay) overlay.classList.remove('visible');
+    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
+  }
+
+  window.profileOpenSheet = function(id) {
+    const s = document.getElementById(id);
+    openSheet(s);
+    if (id === 'faqSheet')       populateFaq();
+    if (id === 'emergencySheet') populateEmergency();
+    if (id === 'termsSheet')     populateTerms();
+    if (id === 'privacySheet')   populatePrivacy();
+    // contactSupportSheet and languageSheet: content already in HTML
+  };
+
+  if (overlay)    overlay.addEventListener('click', closeAllSheets);
+  document.getElementById('editProfileBtn')?.addEventListener('click', () => openSheet(editSheet));
+  document.getElementById('closeEditSheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closeSupportSheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closeEmergencySheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closeTermsSheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closePrivacySheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closeFaqSheet')?.addEventListener('click', closeAllSheets);
+  document.getElementById('closeLanguageSheet')?.addEventListener('click', closeAllSheets);
+
   // Auth check
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) { window.location.href = 'signin.html'; return; }
@@ -193,41 +227,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     localStorage.setItem('homatt_notif', notifOn ? 'on' : 'off');
     showToast(notifOn ? 'Reminders enabled' : 'Reminders disabled');
   });
-
-  // ====== Sheet Management ======
-  const overlay = document.getElementById('sheetOverlay');
-  const editSheet = document.getElementById('editProfileSheet');
-
-  function openSheet(sheet) {
-    if (!sheet) return;
-    overlay.classList.add('visible');
-    sheet.classList.add('open');
-  }
-  function closeAllSheets() {
-    overlay.classList.remove('visible');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-  }
-
-  // Global entry point called from onclick attributes in HTML — avoids addEventListener
-  // race conditions in Capacitor WebView.
-  window.profileOpenSheet = function(id) {
-    const s = document.getElementById(id);
-    openSheet(s);
-    if (id === 'faqSheet')       populateFaq();
-    if (id === 'emergencySheet') populateEmergency();
-    if (id === 'termsSheet')     populateTerms();
-    if (id === 'privacySheet')   populatePrivacy();
-    if (id === 'contactSupportSheet') { /* content already in HTML */ }
-  };
-
-  overlay.addEventListener('click', closeAllSheets);
-  document.getElementById('editProfileBtn').addEventListener('click', () => openSheet(editSheet));
-  document.getElementById('closeEditSheet').addEventListener('click', closeAllSheets);
-  document.getElementById('closeSupportSheet').addEventListener('click', closeAllSheets);
-  document.getElementById('closeEmergencySheet').addEventListener('click', closeAllSheets);
-  document.getElementById('closeTermsSheet').addEventListener('click', closeAllSheets);
-  document.getElementById('closePrivacySheet').addEventListener('click', closeAllSheets);
-  document.getElementById('closeFaqSheet').addEventListener('click', closeAllSheets);
 
   // ====== Edit Profile ======
   document.getElementById('saveProfileBtn').addEventListener('click', async () => {
@@ -459,6 +458,19 @@ support@homatt.ug | +256 708 520 466`;
         <div style="display:none;font-size:13px;color:var(--text-secondary);line-height:1.7;padding-top:8px">${item.a}</div>
       </div>`).join('');
   }
+
+  // ====== Language picker ======
+  window.selectLang = function(name) {
+    localStorage.setItem('homatt_lang', name);
+    const v = document.getElementById('langValue');
+    if (v) v.textContent = name;
+    closeAllSheets();
+    showToast('Language set to ' + name);
+  };
+  // Restore saved language display
+  const savedLang = localStorage.getItem('homatt_lang') || 'English';
+  const langValueEl = document.getElementById('langValue');
+  if (langValueEl) langValueEl.textContent = savedLang;
 
   // ====== Logout ======
   document.getElementById('logoutBtn').addEventListener('click', async () => {

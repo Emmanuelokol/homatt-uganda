@@ -163,14 +163,32 @@ async function loadRx() {
   if (demoSession?.demo || !supabase) { allRx = DEMO_RX; renderRx(); return; }
   try {
     const fetchPromise = supabase
-      .from('prescriptions')
-      .select('id,user_id,drug_name,manufacturer,dosage,drug_form,frequency,start_date,end_date,prescribing_doctor,admin_verified,created_at,profiles(first_name,last_name)')
+      .from('e_prescriptions')
+      .select('id,patient_id,items,status,start_date,end_date,notes,created_at,clinic_id,booking_id')
       .order('created_at', { ascending: false });
     const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
     const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
     if (error) throw error;
-    allRx = (data && data.length) ? data : DEMO_RX;
-    if (!data || !data.length) showAdminToast('No prescriptions yet — showing demo data', 'default');
+    // Normalise e_prescriptions rows to match DEMO_RX shape so renderRx() works unchanged
+    const normalised = (data || []).map(r => {
+      const firstItem = (r.items && r.items[0]) || {};
+      return {
+        id:                r.id,
+        user_id:           r.patient_id,
+        drug_name:         firstItem.name || firstItem.drug || 'See items',
+        dosage:            firstItem.dosage || firstItem.strength || '—',
+        drug_form:         firstItem.form || '—',
+        frequency:         firstItem.frequency || '—',
+        start_date:        r.start_date,
+        end_date:          r.end_date,
+        prescribing_doctor: null,
+        admin_verified:    r.status === 'dispensed',
+        profiles:          null,
+        created_at:        r.created_at,
+      };
+    });
+    allRx = normalised.length ? normalised : DEMO_RX;
+    if (!normalised.length) showAdminToast('No prescriptions yet — showing demo data', 'default');
   } catch(e) {
     console.error('loadRx failed:', e);
     allRx = DEMO_RX;
@@ -227,7 +245,8 @@ function renderRx() {
 
 async function verifyRx(rxId, verified) {
   if (!supabase) { showAdminToast('Demo mode — cannot update', 'default'); return; }
-  const { error } = await supabase.from('prescriptions').update({ admin_verified: verified }).eq('id', rxId);
+  // e_prescriptions uses 'status' not 'admin_verified'; map verified → 'dispensed' / 'active'
+  const { error } = await supabase.from('e_prescriptions').update({ status: verified ? 'dispensed' : 'active' }).eq('id', rxId);
   if (error) { showAdminToast('Failed to update', 'error'); return; }
   await loadRx();
   showAdminToast(verified ? 'Prescription verified!' : 'Verification removed', verified ? 'success' : 'default');

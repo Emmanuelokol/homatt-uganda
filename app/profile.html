@@ -127,10 +127,10 @@
             <span class="settings-item-label">Notification Settings</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
-          <div class="settings-item">
+          <div class="settings-item" id="langBtn" onclick="profileOpenSheet('languageSheet')" style="cursor:pointer;touch-action:manipulation">
             <span class="material-icons-outlined">language</span>
             <span class="settings-item-label">Language</span>
-            <span class="settings-value">English</span>
+            <span class="settings-value" id="langValue">English</span>
             <span class="material-icons-outlined settings-chevron">chevron_right</span>
           </div>
           <div class="settings-item">
@@ -299,6 +299,42 @@
       </div>
       <div class="sheet-body" id="privacySheetBody">
         <div style="text-align:center;padding:20px;color:var(--text-hint)">Loading...</div>
+      </div>
+    </div>
+
+    <!-- Language Sheet -->
+    <div class="bottom-sheet" id="languageSheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-header">
+        <span class="sheet-title">Language</span>
+        <button class="sheet-close-btn" id="closeLanguageSheet">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div class="sheet-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Select your preferred language. More languages are coming soon.</p>
+        <div id="langOptions">
+          <div class="settings-item" style="border-radius:12px;margin-bottom:8px;cursor:pointer;background:var(--primary-light,#E8F5E9)" onclick="selectLang('English','en')">
+            <span class="material-icons-outlined" style="color:#1B5E20">check_circle</span>
+            <span class="settings-item-label" style="font-weight:600;color:#1B5E20">English</span>
+            <span style="font-size:12px;color:#4CAF50">Active</span>
+          </div>
+          <div class="settings-item" style="border-radius:12px;margin-bottom:8px;opacity:.55">
+            <span class="material-icons-outlined" style="color:var(--text-hint)">radio_button_unchecked</span>
+            <span class="settings-item-label">Luganda</span>
+            <span style="font-size:11px;color:var(--text-hint)">Coming soon</span>
+          </div>
+          <div class="settings-item" style="border-radius:12px;margin-bottom:8px;opacity:.55">
+            <span class="material-icons-outlined" style="color:var(--text-hint)">radio_button_unchecked</span>
+            <span class="settings-item-label">Swahili</span>
+            <span style="font-size:11px;color:var(--text-hint)">Coming soon</span>
+          </div>
+          <div class="settings-item" style="border-radius:12px;opacity:.55">
+            <span class="material-icons-outlined" style="color:var(--text-hint)">radio_button_unchecked</span>
+            <span class="settings-item-label">Runyankole</span>
+            <span style="font-size:11px;color:var(--text-hint)">Coming soon</span>
+          </div>
+        </div>
       </div>
     </div>
 

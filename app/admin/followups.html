@@ -612,10 +612,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
       auth: { storageKey: 'sb-homatt-admin-auth' }
     });
-    const session = await requireAdminAuth(_supa);
+    const session = await requireAdmin();
     if (session) {
-      document.getElementById('adminUserAvatar').textContent = (session.user.email || 'A')[0].toUpperCase();
-      document.getElementById('adminUserNameTop').textContent = session.user.email || 'Admin';
+      const _adminDisplay = session.name || session.email || 'Admin';
+      document.getElementById('adminUserAvatar').textContent = _adminDisplay[0].toUpperCase();
+      document.getElementById('adminUserNameTop').textContent = _adminDisplay;
 
       // Try to load saved settings from Supabase (synced across admin sessions)
       const { data: cfgRow } = await _supa

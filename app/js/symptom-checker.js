@@ -2751,11 +2751,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
           const { data: { session } } = await client.auth.getSession();
           if (session?.user?.id) {
-            // Find the active diagnosis for this booking/user
+            // Find the active diagnosis for this booking/user (always filter by patient to avoid cross-patient matches)
             const diagQuery = _notifId
-              ? client.from('clinic_diagnoses').select('id').eq('booking_id', _notifId).maybeSingle()
+              ? client.from('clinic_diagnoses').select('id').eq('booking_id', _notifId).eq('patient_user_id', session.user.id).maybeSingle()
               : client.from('clinic_diagnoses')
                   .select('id')
+                  .eq('patient_user_id', session.user.id)
                   .order('created_at', { ascending: false })
                   .limit(1)
                   .maybeSingle();
@@ -2770,22 +2771,35 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
               created_at:      new Date().toISOString(),
             });
 
-            // If worse — auto-escalate: send urgent referral notification
+            // If worse — check escalation threshold before sending urgent notification
             if (_notifFeeling === 'worse') {
               const _fuSettings = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_settings') || '{}'); } catch(_){return {};} })();
-              const referral = _fuSettings.referralClinic || 'Mulago National Referral Hospital';
-              const tmpl = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_templates') || '{}'); } catch(_){return {};} })();
-              const msg = (tmpl.escalate || 'We are concerned about your health. Please visit {referral} as soon as possible for specialist care.')
-                .replace('{referral}', referral);
-              await client.functions.invoke('send-notification', {
-                body: {
-                  userId:        session.user.id,
-                  title:         'Urgent: Please Seek Further Care',
-                  message:       msg,
-                  data:          { screen: 'bookings' },
-                  pref_category: 'appointment_reminders',
-                },
-              });
+              const escalateAt  = _fuSettings.escalateAt  ?? 1; // default: escalate on first "worse"
+              const referral    = _fuSettings.referralClinic || 'Mulago National Referral Hospital';
+              const tmpl        = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_templates') || '{}'); } catch(_){return {};} })();
+
+              // Count previous "worse" responses for this patient (and this diagnosis if known)
+              let worseQuery = client.from('patient_health_followups')
+                .select('id', { count: 'exact', head: true })
+                .eq('patient_user_id', session.user.id)
+                .eq('feeling', 'worse');
+              if (diag?.id) worseQuery = worseQuery.eq('diagnosis_id', diag.id);
+              const { count: worseCount } = await worseQuery;
+
+              // Escalate only when the total "worse" count (including the one just inserted) reaches the threshold
+              if ((worseCount || 1) >= escalateAt) {
+                const msg = (tmpl.escalate || 'We are concerned about your health. Please visit {referral} as soon as possible for specialist care.')
+                  .replace('{referral}', referral);
+                await client.functions.invoke('send-notification', {
+                  body: {
+                    userId:        session.user.id,
+                    title:         'Urgent: Please Seek Further Care',
+                    message:       msg,
+                    data:          { screen: 'bookings' },
+                    pref_category: 'appointment_reminders',
+                  },
+                }).catch(() => {});
+              }
             }
           }
         }

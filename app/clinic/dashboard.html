@@ -1658,39 +1658,46 @@ document.addEventListener('DOMContentLoaded', async () => {
       }
 
       // ── Follow-up appointment reminders (day before + morning of) ──
+      // Controlled by admin settings: apptDayBefore and apptDayOf (default both true)
       if (b.patient_user_id && followUpAt) {
         const fDate = new Date(followUpAt);
         const now   = new Date();
+        const _cfgApptDayBefore = _fuSettings.apptDayBefore !== false; // default true
+        const _cfgApptDayOf     = _fuSettings.apptDayOf     !== false; // default true
 
-        const dayBefore = new Date(fDate);
-        dayBefore.setDate(dayBefore.getDate() - 1);
-        dayBefore.setHours(9, 0, 0, 0);
-        if (dayBefore > now) {
-          supa2.functions.invoke('send-notification', {
-            body: {
-              userId:        b.patient_user_id,
-              title:         'Clinic Visit Tomorrow',
-              message:       `Reminder: You have a follow-up at ${session.clinicName || 'the clinic'} tomorrow at ${followUpTimeVal}. Please attend.`,
-              data:          { screen: 'bookings', id: b.id },
-              pref_category: 'appointment_reminders',
-              send_after:    dayBefore.toISOString(),
-            },
-          }).catch(() => {});
+        if (_cfgApptDayBefore) {
+          const dayBefore = new Date(fDate);
+          dayBefore.setDate(dayBefore.getDate() - 1);
+          dayBefore.setHours(9, 0, 0, 0);
+          if (dayBefore > now) {
+            supa2.functions.invoke('send-notification', {
+              body: {
+                userId:        b.patient_user_id,
+                title:         'Clinic Visit Tomorrow',
+                message:       `Reminder: You have a follow-up at ${session.clinicName || 'the clinic'} tomorrow at ${followUpTimeVal}. Please attend.`,
+                data:          { screen: 'bookings', id: b.id },
+                pref_category: 'appointment_reminders',
+                send_after:    dayBefore.toISOString(),
+              },
+            }).catch(() => {});
+          }
         }
 
-        const onDay = new Date(fDate);
-        onDay.setHours(7, 0, 0, 0);
-        if (onDay > now) {
-          supa2.functions.invoke('send-notification', {
-            body: {
-              userId:        b.patient_user_id,
-              title:         'Clinic Visit Today',
-              message:       `Your follow-up at ${session.clinicName || 'the clinic'} is today at ${followUpTimeVal}. We look forward to seeing you.`,
-              data:          { screen: 'bookings', id: b.id },
-              pref_category: 'appointment_reminders',
-              send_after:    onDay.toISOString(),
-            },
-          }).catch(() => {});
+        if (_cfgApptDayOf) {
+          const onDay = new Date(fDate);
+          onDay.setHours(7, 0, 0, 0);
+          if (onDay > now) {
+            supa2.functions.invoke('send-notification', {
+              body: {
+                userId:        b.patient_user_id,
+                title:         'Clinic Visit Today',
+                message:       `Your follow-up at ${session.clinicName || 'the clinic'} is today at ${followUpTimeVal}. We look forward to seeing you.`,
+                data:          { screen: 'bookings', id: b.id },
+                pref_category: 'appointment_reminders',
+                send_after:    onDay.toISOString(),
+              },
+            }).catch(() => {});
+          }
         }
       }
 
