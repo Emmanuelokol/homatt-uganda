@@ -1553,6 +1553,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // ── Daily medication reminder push notifications ──
         // Schedule one notification per dose per day for the full course (max 14 days)
+        // Each dose reminder is followed 90 minutes later by a "how do you feel?" check-in.
         if (b.patient_user_id) {
           const now = new Date();
           for (const drug of rxItems) {
@@ -1560,6 +1561,8 @@ document.addEventListener('DOMContentLoaded', async () => {
             for (let day = 0; day < Math.min(drug.duration, 14); day++) {
               for (const timeStr of drug.intake_times) {
                 const [hh, mm] = timeStr.split(':').map(Number);
+
+                // 1 ── Medication reminder
                 const sendAt = new Date(now);
                 sendAt.setDate(sendAt.getDate() + day);
                 sendAt.setHours(hh, mm, 0, 0);
@@ -1572,6 +1575,24 @@ document.addEventListener('DOMContentLoaded', async () => {
                     data:          { screen: 'prescription', id: rxRecord?.id || b.id },
                     pref_category: 'medicine_reminders',
                     send_after:    sendAt.toISOString(),
+                  },
+                }).catch(() => {});
+
+                // 2 ── Post-dose feeling check-in (90 min after each dose)
+                const checkAt = new Date(sendAt.getTime() + 90 * 60000);
+                supa2.functions.invoke('send-notification', {
+                  body: {
+                    userId:        b.patient_user_id,
+                    title:         `How do you feel after ${drug.drug_name}?`,
+                    message:       `You took ${drug.drug_name} about 90 minutes ago. Are you feeling better, the same, or worse?`,
+                    data:          { screen: 'prescription-checkin', id: b.id, checkin_type: 'dose_checkin', drug: drug.drug_name },
+                    pref_category: 'medicine_reminders',
+                    send_after:    checkAt.toISOString(),
+                    buttons: [
+                      { id: 'feeling_better', text: 'Feeling Better ✓' },
+                      { id: 'feeling_same',   text: 'About the Same' },
+                      { id: 'feeling_worse',  text: 'Feeling Worse ✗' },
+                    ],
                   },
                 }).catch(() => {});
               }

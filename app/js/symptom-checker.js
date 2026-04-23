@@ -2729,10 +2729,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
   // ====== Check for existing monitoring session ======
   // Also handle notification tap: ?screen=symptom-checkin[&feeling=better|same|worse]
-  const _urlParams   = new URLSearchParams(window.location.search);
-  const _notifScreen = _urlParams.get('screen');
-  const _notifFeeling= _urlParams.get('feeling');   // pre-selected from action button
-  const _notifId     = _urlParams.get('notif_id');  // booking ID passed from prescription check-in
+  const _urlParams    = new URLSearchParams(window.location.search);
+  const _notifScreen  = _urlParams.get('screen');
+  const _notifFeeling = _urlParams.get('feeling');    // pre-selected from action button
+  const _notifId      = _urlParams.get('notif_id');   // booking ID passed from prescription check-in
+  const _checkinType  = _urlParams.get('checkin_type') || 'general'; // dose_checkin / mid_course / end_of_course
+  const _drugName     = _urlParams.get('drug') || '';
   const existingMonitor = localStorage.getItem('homatt_monitoring');
 
   // ── Prescription check-in (from medication reminder / course-end notification) ──
@@ -2765,9 +2767,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             await client.from('patient_health_followups').insert({
               diagnosis_id:    diag?.id    || null,
               patient_user_id: session.user.id,
-              followup_type:   'patient_feeling',
+              followup_type:   _checkinType === 'dose_checkin' ? 'dose_feeling' : 'patient_feeling',
               feeling:         _notifFeeling,
-              clinical_note:   `Patient tapped: ${_notifFeeling} (prescription check-in)`,
+              clinical_note:   `Patient tapped: ${_notifFeeling} (${_checkinType}${_drugName ? ' — ' + _drugName : ''})`,
               created_at:      new Date().toISOString(),
             });
 
@@ -2809,10 +2811,18 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       const icons   = { better: 'sentiment_very_satisfied', same: 'sentiment_neutral', worse: 'sentiment_very_dissatisfied' };
       const colors  = { better: '#2E7D32', same: '#E65100', worse: '#C62828' };
       const bgs     = { better: '#E8F5E9', same: '#FFF3E0', worse: '#FFEBEE' };
+      const isDose  = _checkinType === 'dose_checkin';
+      const drugCtx = _drugName ? ` after taking ${_drugName}` : '';
       const messages= {
-        better: 'Great to hear you are feeling better! Keep taking any remaining medication through the full course.',
-        same:   'Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit your clinic.',
-        worse:  'We are sorry you are not improving. An urgent message has been sent to you. Please seek care immediately.',
+        better: isDose
+          ? `Good to hear you feel better${drugCtx}! Keep taking your full course as prescribed.`
+          : 'Great to hear you are feeling better! Keep taking any remaining medication through the full course.',
+        same: isDose
+          ? `OK — some medicines take a few days to show full effect${drugCtx}. Keep taking as prescribed.`
+          : 'Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit your clinic.',
+        worse: isDose
+          ? `We are concerned you feel worse${drugCtx}. An urgent message has been sent. Please seek care today.`
+          : 'We are sorry you are not improving. An urgent message has been sent to you. Please seek care immediately.',
       };
 
       const patientList = document.getElementById('patientList');

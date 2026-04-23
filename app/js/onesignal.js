@@ -43,19 +43,23 @@ const SCREEN_URLS = {
 // ── Deep link navigation ──────────────────────────────────────
 function navigateToScreen(data) {
   if (!data) return;
-  const screen   = data.screen || data.type;
-  const id       = data.id;
-  const clinicId = data.clinic_id;
-  const feeling  = data.feeling; // set when a notification action button is tapped
+  const screen      = data.screen || data.type;
+  const id          = data.id;
+  const clinicId    = data.clinic_id;
+  const feeling     = data.feeling;      // set when a notification action button is tapped
+  const checkinType = data.checkin_type; // dose_checkin / mid_course / end_of_course
+  const drug        = data.drug;         // drug name for dose check-ins
 
   let url = SCREEN_URLS[screen] || 'dashboard.html';
 
   // Build query string
   const params = new URLSearchParams();
-  if (id)       params.set('notif_id', id);
-  if (screen)   params.set('screen', screen);
-  if (clinicId) params.set('clinic_id', clinicId);
-  if (feeling)  params.set('feeling', feeling);
+  if (id)          params.set('notif_id', id);
+  if (screen)      params.set('screen', screen);
+  if (clinicId)    params.set('clinic_id', clinicId);
+  if (feeling)     params.set('feeling', feeling);
+  if (checkinType) params.set('checkin_type', checkinType);
+  if (drug)        params.set('drug', drug);
 
   const qs = params.toString();
   window.location.href = qs ? `${url}?${qs}` : url;
