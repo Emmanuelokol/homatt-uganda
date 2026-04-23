@@ -182,6 +182,23 @@ Deno.serve(async (req: Request) => {
     // priority 10 = high-priority FCM push — wakes the device from Doze Mode
     // and is required for time-sensitive health alerts.
     priority: 10,
+    // ── Branding: make notifications visibly "Homatt Health" ──
+    // Small icon = white status-bar icon. MUST be pre-packaged in the APK as
+    // drawable/ic_stat_homatt (white silhouette on transparent bg). If missing,
+    // Android falls back to the app's launcher icon, which still shows "Homatt".
+    small_icon: "ic_stat_homatt",
+    // Large icon = coloured round icon shown in the notification drawer beside
+    // the title. A remote URL works out of the box without rebuilding the APK.
+    large_icon: "https://kgkdiykzmqjougwzzewi.supabase.co/storage/v1/object/public/public/homatt-notif-icon.png",
+    // Accent colour = the subtle tint next to the small icon (Homatt green).
+    android_accent_color: "FF1B5E20",
+    // Group key so multiple reminders collapse into a single "Homatt Health"
+    // stack in the notification drawer instead of spamming.
+    android_group: "homatt_health",
+    android_group_message: { en: "$[notif_count] new health updates from Homatt" },
+    // Android visibility: show full content on the lock screen so the user sees
+    // "Time to take your medication" without unlocking the phone.
+    visibility: 1,
     // android_channel_id is intentionally omitted so OneSignal uses its default
     // channel — custom channel IDs must be pre-created in the OneSignal dashboard
     // or the notification is silently dropped on Android 8+.

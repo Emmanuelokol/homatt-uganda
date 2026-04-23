@@ -2767,7 +2767,9 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             await client.from('patient_health_followups').insert({
               diagnosis_id:    diag?.id    || null,
               patient_user_id: session.user.id,
-              followup_type:   _checkinType === 'dose_checkin' ? 'dose_feeling' : 'patient_feeling',
+              followup_type:   _checkinType === 'dose_checkin' ? 'dose_feeling'
+                              : _checkinType === 'chronic_checkin' ? 'chronic_feeling'
+                              : 'patient_feeling',
               feeling:         _notifFeeling,
               clinical_note:   `Patient tapped: ${_notifFeeling} (${_checkinType}${_drugName ? ' — ' + _drugName : ''})`,
               created_at:      new Date().toISOString(),

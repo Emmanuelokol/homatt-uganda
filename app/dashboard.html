@@ -234,6 +234,32 @@
           </div>
         </div>
 
+        <!-- Chronic Condition Pathway Section -->
+        <div class="dash-section">
+          <div class="section-header" style="display:flex;align-items:center;justify-content:space-between">
+            <h3 class="section-title">
+              <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;color:#C62828">monitor_heart</span>
+              Chronic Conditions
+            </h3>
+            <a href="chronic-disease.html" style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:600">Manage →</a>
+          </div>
+          <div id="chronicConditionsContent">
+            <!-- Rendered dynamically: enrollment CTA if none, else list of active conditions -->
+            <div id="chronicEnrollCta" onclick="window.location.href='chronic-disease.html'"
+              style="cursor:pointer;touch-action:manipulation;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 12px rgba(27,94,32,0.25)">
+              <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px">favorite</span>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px">Enroll in a Condition Pathway</div>
+                <div style="font-size:12px;line-height:1.45;opacity:.95">Refill reminders, weekly check-ins &amp; tips for diabetes, blood pressure, asthma, HIV and more.</div>
+              </div>
+              <span class="material-icons-outlined" style="opacity:.8;flex-shrink:0">arrow_forward_ios</span>
+            </div>
+            <div id="chronicActiveList" style="display:none;flex-direction:column;gap:10px"></div>
+          </div>
+        </div>
+
         <!-- Health Prediction Section -->
         <div class="dash-section" id="healthPredictionSection" style="display:none">
           <div class="section-header">

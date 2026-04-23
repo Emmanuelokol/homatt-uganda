@@ -1,7 +1,8 @@
--- Feedback, Ratings, and Support Ticket extra columns
+-- Feedback, Ratings, and Support Ticket columns
 -- Run in Supabase SQL Editor — safe to run multiple times (idempotent)
+-- Handles pre-existing tables by adding missing columns with ALTER TABLE.
 
--- ── support_tickets: add missing columns ────────────────────────
+-- ── 1. support_tickets: add missing columns ────────────────────────
 ALTER TABLE support_tickets
   ADD COLUMN IF NOT EXISTS user_phone      text,
   ADD COLUMN IF NOT EXISTS admin_response  text,
@@ -9,7 +10,7 @@ ALTER TABLE support_tickets
   ADD COLUMN IF NOT EXISTS responded_by    text,
   ADD COLUMN IF NOT EXISTS updated_at      timestamptz DEFAULT now();
 
--- ── platform_feedback: user-submitted app feedback & ratings ────
+-- ── 2. platform_feedback: user-submitted app feedback & ratings ────
 CREATE TABLE IF NOT EXISTS platform_feedback (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   patient_id    uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -22,6 +23,17 @@ CREATE TABLE IF NOT EXISTS platform_feedback (
   updated_at    timestamptz NOT NULL DEFAULT now()
 );
 
+-- If the table already existed from an older partial run, ensure every column is present
+ALTER TABLE platform_feedback
+  ADD COLUMN IF NOT EXISTS patient_id    uuid,
+  ADD COLUMN IF NOT EXISTS overall_score int,
+  ADD COLUMN IF NOT EXISTS category      text DEFAULT 'general',
+  ADD COLUMN IF NOT EXISTS message       text,
+  ADD COLUMN IF NOT EXISTS contact_email text,
+  ADD COLUMN IF NOT EXISTS status        text DEFAULT 'new',
+  ADD COLUMN IF NOT EXISTS created_at    timestamptz DEFAULT now(),
+  ADD COLUMN IF NOT EXISTS updated_at    timestamptz DEFAULT now();
+
 ALTER TABLE platform_feedback ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN
   CREATE POLICY "platform_feedback_insert" ON platform_feedback FOR INSERT WITH CHECK (true);
@@ -33,20 +45,33 @@ DO $$ BEGIN
   CREATE POLICY "platform_feedback_update" ON platform_feedback FOR UPDATE USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- ── ratings: clinic / pharmacy / delivery ratings ───────────────
+-- ── 3. ratings: clinic / pharmacy / delivery ratings ───────────────
 CREATE TABLE IF NOT EXISTS ratings (
-  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  patient_id   uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
-  rating_type  text        NOT NULL DEFAULT 'clinic' CHECK (rating_type IN ('clinic','pharmacy','delivery')),
-  target_id    uuid,        -- clinic_id, pharmacy_id, or order_id depending on type
-  score        int         CHECK (score BETWEEN 1 AND 5),
-  score_speed  int         CHECK (score_speed BETWEEN 1 AND 5),
-  score_quality int        CHECK (score_quality BETWEEN 1 AND 5),
-  score_cost   int         CHECK (score_cost BETWEEN 1 AND 5),
-  score_comms  int         CHECK (score_comms BETWEEN 1 AND 5),
-  comment      text,
-  created_at   timestamptz NOT NULL DEFAULT now()
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  patient_id    uuid        REFERENCES auth.users(id) ON DELETE SET NULL,
+  rating_type   text        NOT NULL DEFAULT 'clinic',
+  target_id     uuid,
+  score         int,
+  score_speed   int,
+  score_quality int,
+  score_cost    int,
+  score_comms   int,
+  comment       text,
+  created_at    timestamptz NOT NULL DEFAULT now()
 );
+
+-- If ratings existed from an older run, fill in any missing columns
+ALTER TABLE ratings
+  ADD COLUMN IF NOT EXISTS patient_id    uuid,
+  ADD COLUMN IF NOT EXISTS rating_type   text DEFAULT 'clinic',
+  ADD COLUMN IF NOT EXISTS target_id     uuid,
+  ADD COLUMN IF NOT EXISTS score         int,
+  ADD COLUMN IF NOT EXISTS score_speed   int,
+  ADD COLUMN IF NOT EXISTS score_quality int,
+  ADD COLUMN IF NOT EXISTS score_cost    int,
+  ADD COLUMN IF NOT EXISTS score_comms   int,
+  ADD COLUMN IF NOT EXISTS comment       text,
+  ADD COLUMN IF NOT EXISTS created_at    timestamptz DEFAULT now();
 
 ALTER TABLE ratings ENABLE ROW LEVEL SECURITY;
 DO $$ BEGIN

@@ -877,4 +877,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   checkPendingCheckins();
   checkActiveMonitoring();
+
+  // ── Chronic conditions (show active enrolments or CTA) ──
+  (async function loadChronicConditions() {
+    const cta  = document.getElementById('chronicEnrollCta');
+    const list = document.getElementById('chronicActiveList');
+    if (!cta || !list || !supabase || !session?.user?.id) return;
+    try {
+      const { data: conds } = await supabase
+        .from('patient_conditions')
+        .select('id,condition,condition_label,medication_name,next_refill_at,status')
+        .eq('user_id', session.user.id)
+        .eq('status', 'active')
+        .order('enrolled_at', { ascending: false })
+        .limit(5);
+      if (!conds || !conds.length) return; // keep CTA visible
+
+      cta.style.display = 'none';
+      list.style.display = 'flex';
+      const fmt = (iso) => iso ? new Date(iso).toLocaleDateString('en-UG', { day:'numeric', month:'short' }) : '—';
+      const ICONS = { diabetes:'bloodtype', hypertension:'favorite', asthma:'air', heart_disease:'monitor_heart', hiv:'health_and_safety', tb:'masks', depression:'psychology', other:'medical_services' };
+      const COLORS = { diabetes:'#C62828', hypertension:'#D32F2F', asthma:'#1976D2', heart_disease:'#B71C1C', hiv:'#6A1B9A', tb:'#E65100', depression:'#5E35B1', other:'#37474F' };
+      list.innerHTML = conds.map(c => {
+        const icon  = ICONS[c.condition]  || 'medical_services';
+        const color = COLORS[c.condition] || '#37474F';
+        const due   = c.next_refill_at ? `Next refill: ${fmt(c.next_refill_at)}` : 'Refill schedule pending';
+        return `
+          <div onclick="window.location.href='chronic-disease.html?id=${c.id}'"
+            style="cursor:pointer;touch-action:manipulation;background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 6px rgba(0,0,0,0.04)">
+            <div style="width:42px;height:42px;border-radius:50%;background:${color}15;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <span class="material-icons-outlined" style="font-size:22px;color:${color}">${icon}</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:2px">${c.condition_label || c.condition}</div>
+              <div style="font-size:12px;color:var(--text-secondary)">${c.medication_name ? c.medication_name + ' — ' : ''}${due}</div>
+            </div>
+            <span class="material-icons-outlined" style="color:var(--text-hint);flex-shrink:0">chevron_right</span>
+          </div>`;
+      }).join('');
+    } catch(e) { /* table may not exist yet — keep CTA */ }
+  })();
 });
