@@ -135,16 +135,29 @@
           // If input is in the sticky footer area, it's already at the visible bottom —
           // no scrolling needed; the Capacitor body resize moves the whole sheet up.
         } else {
-          // Directly scroll .app-screen to bring the input into view.
-          // Use behavior:'instant' — scroll-behavior:smooth was removed from .app-screen
-          // CSS to prevent double-animation during Capacitor keyboard resize.
-          const scroller = el.closest('.app-screen') || document.querySelector('.app-screen');
+          // Find the actual scrollable ancestor of the focused input. Some pages (e.g.
+          // clinic-booking, medicine-orders) set overflow:hidden on .app-screen and use
+          // their own inner scroll container, so hard-coding .app-screen doesn't work.
+          const findScroller = (node) => {
+            let el = node.parentElement;
+            while (el && el !== document.body) {
+              const s = getComputedStyle(el);
+              const oy = s.overflowY;
+              if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
+              el = el.parentElement;
+            }
+            return document.querySelector('.app-screen');
+          };
+          const scroller = findScroller(el);
           if (scroller) {
             const elRect = el.getBoundingClientRect();
             const scrollerRect = scroller.getBoundingClientRect();
             const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
               - (scroller.clientHeight / 2) + (elRect.height / 2);
             scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+          } else {
+            // Last-resort: ask the browser itself
+            try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
           }
         }
       }, 450);

@@ -34,7 +34,9 @@ const SCREEN_URLS = {
   shop_order:             'shop.html',
   'prevention-shop':      'shop.html',
   'health-tracker':       'dashboard.html',
-  'complete-payment':     'wallet.html',
+  // 'complete-payment' screen removed — MTN/Airtel MoMo integration is not live yet,
+  // so any "please pay via mobile money" push would deep-link nowhere. Reinstate once
+  // the wallet top-up flow is wired through relworx-payment.
   'recovery-check':       'dashboard.html',
   'symptom-checkin':      'symptom-checker.html',
   'prescription-checkin': 'symptom-checker.html',

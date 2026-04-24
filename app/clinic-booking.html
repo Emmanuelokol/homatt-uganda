@@ -604,8 +604,10 @@ async function loadClinics() {
   };
   if (userCoords) {
     try {
+      // zoom=18 gives street-level detail; zoom=14 only returned neighbourhood/suburb.
+      // We want the user's actual road / area, not a generic city name.
       const rgRes = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userCoords.lat}&lon=${userCoords.lng}&zoom=14&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userCoords.lat}&lon=${userCoords.lng}&zoom=18&addressdetails=1`,
         { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } }
       );
       if (rgRes.ok) {
@@ -615,8 +617,21 @@ async function loadClinics() {
           district:  (addr.state_district || addr.county || userGeoNames.district || '').toLowerCase(),
           county:    (addr.county || userGeoNames.county || '').toLowerCase(),
           subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || userGeoNames.subcounty || '').toLowerCase(),
-          parish:    (addr.neighbourhood || addr.hamlet || userGeoNames.parish || '').toLowerCase(),
+          // Prefer the most specific thing Nominatim returned: road > neighbourhood > hamlet
+          parish:    (addr.road || addr.pedestrian || addr.residential || addr.neighbourhood || addr.quarter || addr.hamlet || userGeoNames.parish || '').toLowerCase(),
         };
+
+        // Expose a precise, human-readable "you are here" label for the UI header:
+        // "Kira Road, Kamwokya" rather than just "Kampala".
+        const preciseParts = [
+          addr.road || addr.pedestrian || addr.footway || addr.residential,
+          addr.neighbourhood || addr.quarter || addr.suburb || addr.village,
+          addr.city_district || addr.city || addr.town,
+        ].filter(Boolean);
+        window._homattPreciseLocation = preciseParts.length
+          ? preciseParts.slice(0, 2).join(', ')
+          : (rg.display_name || '').split(',').slice(0, 2).join(',').trim();
+        try { localStorage.setItem('homatt_precise_location', window._homattPreciseLocation || ''); } catch(_) {}
       }
     } catch (_) {}
   }
@@ -762,9 +777,12 @@ async function loadClinics() {
     }
   });
 
-  // Show context hint: GPS / district + AI condition
+  // Show context hint: precise location label / district + AI condition
+  const preciseLabel = window._homattPreciseLocation || '';
   const gpsHint = userCoords
-    ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> <strong>Sorted by GPS distance</strong>`
+    ? (preciseLabel
+        ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> Sorted by distance from <strong>${preciseLabel}</strong>`
+        : `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> <strong>Sorted by GPS distance</strong>`)
     : userDist
       ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>`
       : '';

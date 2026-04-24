@@ -1357,7 +1357,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       supabase.functions.invoke('send-notification', {
         body: {
           userId:     session.user.id,
-          heading:    `${condName} Check-in`,
+          title:      `${condName} Check-in`,
           message:    `It's been 1 hour. How are you feeling? Tap to check in — Better, Same or Worse.`,
           data:       { screen: 'symptom-checkin' },
           buttons:    [
@@ -2883,39 +2883,77 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   }
 
   // ── Monitoring session restore (symptom checker 1-hour monitoring) ──
-  if (existingMonitor) {
-    const savedMs = JSON.parse(existingMonitor);
-    const isCheckinDue = savedMs.nextCheckIn && new Date() >= new Date(savedMs.nextCheckIn);
-    const openedFromNotif = _notifScreen === 'symptom-checkin';
-
-    if (isCheckinDue || openedFromNotif) {
-      monitoringSession = savedMs;
-      diagnosisData = { conditions: [{ name: savedMs.condition }], overall_risk: savedMs.risk };
-      document.getElementById('monitorCondition').innerHTML = `
+  // Helper that shows the monitor screen with a given session and (optionally) jumps
+  // straight to the check-in phase. Used for both localStorage and Supabase restores.
+  const _showMonitorCheckin = (ms, preselectFeeling) => {
+    monitoringSession = ms;
+    diagnosisData = { conditions: [{ name: ms.condition }], overall_risk: ms.risk || 'medium' };
+    const condEl = document.getElementById('monitorCondition');
+    if (condEl) {
+      condEl.innerHTML = `
         <div class="sc-monitor-cond-card">
           <span class="material-icons-outlined">medical_information</span>
           <div>
-            <p class="sc-monitor-cond-name">Monitoring: ${savedMs.condition}</p>
-            <p class="sc-monitor-cond-risk">Risk level: <strong class="${savedMs.risk}">${savedMs.risk}</strong></p>
+            <p class="sc-monitor-cond-name">Monitoring: ${ms.condition}</p>
+            <p class="sc-monitor-cond-risk">Risk level: <strong class="${ms.risk || 'medium'}">${ms.risk || 'medium'}</strong></p>
           </div>
-        </div>
-      `;
-      document.getElementById('monitorResponse').style.display = 'none';
-      document.getElementById('monitorTimer').style.display = 'none';
-      showScreen('screenMonitor');
-      wireMonitoringButtons();
-
-      if (_notifFeeling && ['better', 'same', 'worse'].includes(_notifFeeling)) {
-        setTimeout(() => {
-          triggerCheckinPhase();
-          setTimeout(() => {
-            const btn = document.querySelector(`.sc-feeling-btn[data-feeling="${_notifFeeling}"]`);
-            if (btn) btn.click();
-          }, 300);
-        }, 400);
-      } else if (openedFromNotif) {
-        setTimeout(() => triggerCheckinPhase(), 400);
-      }
+        </div>`;
     }
+    const respEl = document.getElementById('monitorResponse');
+    const timerEl = document.getElementById('monitorTimer');
+    if (respEl) respEl.style.display = 'none';
+    if (timerEl) timerEl.style.display = 'none';
+    showScreen('screenMonitor');
+    wireMonitoringButtons();
+
+    if (preselectFeeling && ['better', 'same', 'worse'].includes(preselectFeeling)) {
+      setTimeout(() => {
+        triggerCheckinPhase();
+        setTimeout(() => {
+          const btn = document.querySelector(`.sc-feeling-btn[data-feeling="${preselectFeeling}"]`);
+          if (btn) btn.click();
+        }, 300);
+      }, 400);
+    } else {
+      setTimeout(() => triggerCheckinPhase(), 400);
+    }
+  };
+
+  const openedFromSymptomNotif = _notifScreen === 'symptom-checkin';
+
+  if (existingMonitor) {
+    const savedMs = JSON.parse(existingMonitor);
+    const isCheckinDue = savedMs.nextCheckIn && new Date() >= new Date(savedMs.nextCheckIn);
+    if (isCheckinDue || openedFromSymptomNotif) {
+      _showMonitorCheckin(savedMs, _notifFeeling);
+    }
+  } else if (openedFromSymptomNotif) {
+    // Notification tapped but localStorage was cleared (e.g. app reopened fresh).
+    // Try to recover the active monitoring session from Supabase so the tap still
+    // takes the user straight to the check-in screen instead of the empty patient list.
+    (async () => {
+      try {
+        const cfg = window.HOMATT_CONFIG || {};
+        if (!cfg.SUPABASE_URL || !window.supabase) return;
+        const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.user?.id) return;
+        const { data: log } = await client.from('symptom_monitoring_logs')
+          .select('*').eq('user_id', session.user.id).eq('outcome', 'active')
+          .order('started_at', { ascending: false }).limit(1).maybeSingle();
+        if (!log) return;
+        const restored = {
+          condition:    log.condition || 'your symptoms',
+          risk:         log.risk || 'medium',
+          startedAt:    log.started_at,
+          checkIns:     Array.isArray(log.check_ins) ? log.check_ins : [],
+          symptomsSame: Array.isArray(log.check_ins) ? log.check_ins.filter(c => c.feeling === 'same').length : 0,
+          initialAction: log.initial_action || '',
+          checkinPending: true,
+        };
+        try { localStorage.setItem('homatt_monitoring', JSON.stringify(restored)); } catch(_) {}
+        _showMonitorCheckin(restored, _notifFeeling);
+      } catch(_) {}
+    })();
   }
 });

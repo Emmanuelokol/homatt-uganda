@@ -759,17 +759,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   async function reverseGeocode(lat, lon) {
     try {
+      // zoom=18 returns the most specific Nominatim level (street/road + house number).
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=16&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
         { headers: { 'Accept-Language': 'en' } }
       );
       if (!res.ok) return null;
       const data = await res.json();
       const a = data.address || {};
+      const street = [a.house_number, a.road || a.pedestrian || a.footway || a.path || a.residential]
+        .filter(Boolean).join(' ');
       const parts = [
-        a.road || a.pedestrian || a.footway || a.path,
-        a.suburb || a.neighbourhood || a.quarter || a.village,
-        a.town || a.city || a.county || a.state_district
+        street,
+        a.neighbourhood || a.quarter || a.suburb || a.village,
+        a.city_district || a.town || a.city || a.county || a.state_district
       ].filter(Boolean);
       return parts.length ? parts.join(', ') : (data.display_name || '').split(',').slice(0, 3).join(',').trim();
     } catch(e) { return null; }

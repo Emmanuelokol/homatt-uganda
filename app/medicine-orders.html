@@ -782,17 +782,21 @@ function updateBadge() {
    ══════════════════════════════════════ */
 
 function reverseGeocode(lat, lon) {
+  // zoom=18 gives the most specific level Nominatim will return (building / road).
+  // house_number + road gives us a precise courier-friendly address like
+  // "Plot 12 Kira Road, Kamwokya, Kampala".
   return fetch(
-    'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon + '&zoom=16&addressdetails=1',
+    'https://nominatim.openstreetmap.org/reverse?format=json&lat=' + lat + '&lon=' + lon + '&zoom=18&addressdetails=1',
     { headers: { 'Accept-Language': 'en' } }
   ).then(function(r){ return r.ok ? r.json() : null; })
    .then(function(data) {
      if (!data) return null;
      var a = data.address || {};
+     var street = [a.house_number, a.road || a.pedestrian || a.footway || a.path || a.residential].filter(Boolean).join(' ');
      var parts = [
-       a.road || a.pedestrian || a.footway || a.path,
-       a.suburb || a.neighbourhood || a.quarter || a.village,
-       a.town || a.city || a.county || a.state_district
+       street,
+       a.neighbourhood || a.quarter || a.suburb || a.village,
+       a.city_district || a.town || a.city || a.county || a.state_district
      ].filter(Boolean);
      return parts.length ? parts.join(', ') : (data.display_name || '').split(',').slice(0,3).join(',').trim();
    })
