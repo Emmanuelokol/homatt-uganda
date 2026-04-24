@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — New Order</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <style>
+    .order-page { max-width: 720px; margin: 0 auto }
+    .order-step {
+      background: #fff; border-radius: 14px; padding: 20px 22px;
+      box-shadow: var(--shadow); margin-bottom: 16px;
+    }
+    .step-h {
+      font-size: 12px; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: .5px;
+      display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    }
+    .step-h-num {
+      width: 22px; height: 22px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700;
+    }
+
+    .field-label {
+      font-size: 13px; font-weight: 600; color: #424242;
+      display: block; margin-bottom: 6px;
+    }
+    .field-input {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 15px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+      background: #fff; box-sizing: border-box;
+    }
+    .field-input:focus { border-color: var(--primary) }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+    @media (max-width: 600px) { .field-row { grid-template-columns: 1fr } }
+
+    /* Patient pill (after lookup/registration) */
+    .patient-pill {
+      background: #E8F5E9; border: 1px solid #A5D6A7;
+      border-radius: 12px; padding: 12px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .patient-pill .avatar {
+      width: 38px; height: 38px; border-radius: 50%;
+      background: #66BB6A; color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .patient-pill .info { flex: 1; min-width: 0 }
+    .patient-pill .name { font-size: 14px; font-weight: 700; color: #1B5E20 }
+    .patient-pill .phone { font-size: 12px; color: #2E7D32 }
+    .patient-pill .badge {
+      font-size: 11px; font-weight: 700;
+      background: #fff; color: #2E7D32;
+      padding: 3px 8px; border-radius: 10px;
+    }
+    .patient-pill .change-btn {
+      background: none; border: none; color: #2E7D32;
+      cursor: pointer; padding: 4px; display: inline-flex; align-items: center;
+    }
+
+    /* Autocomplete */
+    .autocomplete-wrap { position: relative }
+    .autocomplete-menu {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 10px; margin-top: 4px;
+      max-height: 260px; overflow-y: auto;
+      box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+      z-index: 50; display: none;
+    }
+    .autocomplete-item {
+      padding: 10px 14px; cursor: pointer;
+      border-bottom: 1px solid #F5F5F5;
+      transition: background .1s;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active { background: #F0F7FF }
+    .autocomplete-item:last-child { border-bottom: none }
+    .ac-name { font-size: 14px; font-weight: 600; color: #212121 }
+    .ac-cat { font-size: 11px; color: #9AA0A6; text-transform: uppercase; letter-spacing: .3px }
+
+    /* Dosage chips */
+    .dosage-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px }
+    .dosage-chip {
+      padding: 8px 14px;
+      border: 1.5px solid var(--border); border-radius: 20px;
+      font-size: 13px; cursor: pointer; background: #fff;
+      transition: all .12s; font-family: inherit;
+    }
+    .dosage-chip:hover { border-color: var(--primary); background: #E3F2FD }
+    .dosage-chip.active {
+      background: var(--primary); border-color: var(--primary); color: #fff;
+    }
+
+    /* Delivery toggle */
+    .delivery-toggle { display: flex; gap: 10px }
+    .delivery-opt {
+      flex: 1; padding: 14px;
+      border: 1.5px solid var(--border); border-radius: 12px;
+      background: #fff; cursor: pointer;
+      display: flex; align-items: center; gap: 10px;
+      transition: all .12s;
+      font-family: inherit; font-size: 14px;
+    }
+    .delivery-opt:hover { border-color: var(--primary) }
+    .delivery-opt.active {
+      background: #E3F2FD; border-color: var(--primary); color: var(--primary-d);
+    }
+    .delivery-opt .material-icons-outlined { font-size: 22px }
+
+    /* Follow-up toggle row */
+    .followup-row {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; padding: 14px 16px;
+      background: #FFF8E1; border: 1px solid #FFE082;
+      border-radius: 12px;
+    }
+    .followup-text { flex: 1 }
+    .followup-title { font-size: 14px; font-weight: 700; color: #5D4037 }
+    .followup-desc { font-size: 12px; color: #6D4C41; margin-top: 2px }
+
+    .switch { position: relative; width: 50px; height: 28px; flex-shrink: 0 }
+    .switch input { opacity: 0; width: 0; height: 0 }
+    .switch-slider {
+      position: absolute; cursor: pointer; inset: 0;
+      background: #ccc; transition: .25s; border-radius: 28px;
+    }
+    .switch-slider::before {
+      content: ''; position: absolute;
+      height: 22px; width: 22px;
+      left: 3px; bottom: 3px;
+      background: white; transition: .25s; border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .switch input:checked + .switch-slider { background: var(--success) }
+    .switch input:checked + .switch-slider::before { transform: translateX(22px) }
+
+    .followup-preview {
+      margin-top: 10px; padding: 10px 12px;
+      background: #fff; border-radius: 10px;
+      font-size: 12px; color: #5F6368;
+    }
+    .followup-preview-row {
+      display: flex; align-items: center; gap: 8px; margin: 4px 0;
+    }
+
+    /* Submit button */
+    .submit-btn {
+      width: 100%; padding: 16px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 12px;
+      font-size: 16px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: background .15s;
+      font-family: inherit;
+    }
+    .submit-btn:hover { background: var(--primary-d) }
+    .submit-btn:disabled { opacity: .6; cursor: not-allowed }
+
+    .helper { font-size: 12px; color: #9AA0A6; margin-top: 6px }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link active"><span class="material-icons-outlined">add_circle</span> New Order</a>
+      <a href="patients.html" class="sidebar-link"><span class="material-icons-outlined">person_search</span> Patients</a>
+      <a href="settings.html" class="sidebar-link"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">
+        <a href="dashboard.html" style="color:#5F6368;text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:500">
+          <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
+        </a>
+        New Order
+      </div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+    <div class="order-page">
+
+      <!-- Step 1: Patient -->
+      <div class="order-step">
+        <div class="step-h"><span class="step-h-num">1</span> Patient</div>
+
+        <div id="patientSearchBlock">
+          <label class="field-label">Search by phone number</label>
+          <div class="autocomplete-wrap">
+            <input id="patientPhone" class="field-input" type="tel"
+              placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+            <div id="patientResults" class="autocomplete-menu"></div>
+          </div>
+          <div class="helper" id="patientHelper">Type a phone number to find an existing patient or register a new one.</div>
+        </div>
+
+        <div id="patientPillBlock" style="display:none">
+          <div class="patient-pill">
+            <div class="avatar" id="ppAvatar">?</div>
+            <div class="info">
+              <div class="name" id="ppName"></div>
+              <div class="phone" id="ppPhone"></div>
+            </div>
+            <span class="badge" id="ppBadge">On Homatt</span>
+            <button class="change-btn" id="ppChangeBtn" title="Change patient">
+              <span class="material-icons-outlined">edit</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 2: Drug -->
+      <div class="order-step">
+        <div class="step-h"><span class="step-h-num">2</span> Drug</div>
+        <div class="autocomplete-wrap">
+          <input id="drugInput" class="field-input"
+            placeholder="Type 'amox', 'coartem'…" autocomplete="off">
+          <div id="drugResults" class="autocomplete-menu"></div>
+        </div>
+        <div class="helper">Search the Uganda National Formulary.</div>
+      </div>
+
+      <!-- Step 3: Dosage + Duration + Delivery (collapsed into one card for speed) -->
+      <div class="order-step" id="step3" style="display:none">
+        <div class="step-h"><span class="step-h-num">3</span> Dosage, duration & delivery</div>
+
+        <label class="field-label">Dosage and frequency</label>
+        <div class="dosage-chips" id="dosageChips"></div>
+        <input id="dosageInput" class="field-input" placeholder="Custom dosage (e.g. 500mg three times daily)">
+
+        <div style="height:14px"></div>
+
+        <div class="field-row">
+          <div>
+            <label class="field-label">Duration (days)</label>
+            <input id="durationInput" class="field-input" type="number" min="1" max="180" value="5" inputmode="numeric">
+          </div>
+          <div>
+            <label class="field-label">Fulfilment</label>
+            <div class="delivery-toggle">
+              <button type="button" class="delivery-opt active" data-mode="delivery">
+                <span class="material-icons-outlined">local_shipping</span> Delivery
+              </button>
+              <button type="button" class="delivery-opt" data-mode="pickup">
+                <span class="material-icons-outlined">store</span> Pickup
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 4: Follow-up + Submit -->
+      <div class="order-step" id="step4" style="display:none">
+        <div class="step-h"><span class="step-h-num">4</span> Follow-up reminders</div>
+
+        <div class="followup-row">
+          <div class="followup-text">
+            <div class="followup-title">Send automated check-ins</div>
+            <div class="followup-desc">We'll text the patient at key points to confirm they're taking their medicine.</div>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="followupToggle" checked>
+            <span class="switch-slider"></span>
+          </label>
+        </div>
+
+        <div id="followupPreview" class="followup-preview"></div>
+
+        <div style="height:18px"></div>
+
+        <button id="submitBtn" class="submit-btn">
+          <span class="material-icons-outlined">send</span>
+          Send Order
+        </button>
+        <div class="helper" style="text-align:center;margin-top:10px">Routes to the nearest partner pharmacy automatically.</div>
+      </div>
+
+    </div>
+    </div>
+  </main>
+</div>
+
+<!-- Quick-register modal (when phone not found) -->
+<div id="registerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:24px 22px 28px;max-height:100dvh;overflow-y:auto">
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <span class="material-icons-outlined" style="color:var(--primary)">person_add</span>
+      Register Patient
+    </h3>
+    <p style="font-size:13px;color:#5F6368;margin-bottom:16px">No Homatt account found for this number. Register them now — they'll get an SMS to finish their profile later.</p>
+
+    <label class="field-label">Full name</label>
+    <input id="regName" class="field-input" placeholder="e.g. Nakato Brenda" autocomplete="off">
+
+    <div style="height:12px"></div>
+
+    <label class="field-label">Phone number</label>
+    <input id="regPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" inputmode="tel">
+
+    <div style="height:18px"></div>
+
+    <button id="registerBtn" class="submit-btn">
+      <span class="material-icons-outlined">check</span>
+      Register & Continue
+    </button>
+    <div style="height:8px"></div>
+    <button id="registerCancelBtn" style="width:100%;padding:14px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+  const session = requireClinic();
+  setupClinicLogout();
+
+  const supabase = _getClinicSupabase();
+
+  document.getElementById('clinicUserDate').textContent =
+    new Date().toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
+
+  // ── State ────────────────────────────────────────────────
+  const state = {
+    patient: null,            // { id, name, phone, isNew, registered }
+    drug: null,               // formulary row
+    dosage: '',
+    durationDays: 5,
+    deliveryMode: 'delivery',
+    followupEnabled: true,
+    formulary: [],
+  };
+
+  const FALLBACK_FORMULARY = [
+    { name: 'Amoxicillin 500mg',   default_dosage: '500mg three times daily', common_dosages: ['500mg three times daily','250mg three times daily'], default_days: 5, category: 'antibiotic' },
+    { name: 'Coartem 20/120mg',    default_dosage: '4 tabs twice daily',      common_dosages: ['4 tabs twice daily','3 tabs twice daily','2 tabs twice daily'], default_days: 3, category: 'antimalarial' },
+    { name: 'Paracetamol 500mg',   default_dosage: '1g four times daily',     common_dosages: ['1g four times daily','500mg four times daily'], default_days: 3, category: 'analgesic' },
+    { name: 'Metronidazole 400mg', default_dosage: '400mg three times daily', common_dosages: ['400mg three times daily','500mg three times daily'], default_days: 7, category: 'antibiotic' },
+    { name: 'ORS Sachet',          default_dosage: 'After each loose stool',  common_dosages: ['1 sachet after each loose stool'], default_days: 3, category: 'hydration' },
+    { name: 'Metformin 500mg',     default_dosage: '500mg twice daily',       common_dosages: ['500mg twice daily','500mg three times daily'], default_days: 30, category: 'chronic' },
+    { name: 'Amlodipine 5mg',      default_dosage: '5mg once daily',          common_dosages: ['5mg once daily','10mg once daily'], default_days: 30, category: 'chronic' },
+  ];
+
+  async function loadFormulary() {
+    if (!supabase) { state.formulary = FALLBACK_FORMULARY; return; }
+    try {
+      const { data, error } = await supabase
+        .from('formulary')
+        .select('name, generic_name, category, default_dosage, common_dosages, default_days')
+        .order('name');
+      state.formulary = (error || !data?.length) ? FALLBACK_FORMULARY : data;
+    } catch (e) { state.formulary = FALLBACK_FORMULARY; }
+  }
+  loadFormulary();
+
+  // ── Patient lookup by phone ───────────────────────────────
+  const phoneInput   = document.getElementById('patientPhone');
+  const patientMenu  = document.getElementById('patientResults');
+
+  function normalisePhone(raw) {
+    let p = String(raw || '').replace(/\D/g, '');
+    if (p.startsWith('256')) p = '0' + p.slice(3);
+    if (p.startsWith('7') && p.length === 9) p = '0' + p;
+    return p;
+  }
+
+  let phoneTimer;
+  phoneInput.addEventListener('input', () => {
+    clearTimeout(phoneTimer);
+    const q = normalisePhone(phoneInput.value);
+    if (q.length < 4) { patientMenu.style.display = 'none'; return; }
+    phoneTimer = setTimeout(() => searchPatients(q), 220);
+  });
+
+  async function searchPatients(q) {
+    if (!supabase) {
+      renderPatientMenu([], q);
+      return;
+    }
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, phone_number, phone')
+      .or(`phone_number.ilike.%${q}%,phone.ilike.%${q}%`)
+      .limit(6);
+    renderPatientMenu(data || [], q);
+  }
+
+  function renderPatientMenu(rows, q) {
+    if (!rows.length) {
+      patientMenu.innerHTML = `
+        <div class="autocomplete-item" id="registerPrompt" style="background:#FFF8E1">
+          <div class="ac-name" style="color:#E65100">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">person_add</span>
+            Register new patient with this number
+          </div>
+          <div class="ac-cat">${esc(q)}</div>
+        </div>`;
+      patientMenu.style.display = 'block';
+      document.getElementById('registerPrompt').onclick = () => openRegisterModal(q);
+      return;
+    }
+    patientMenu.innerHTML = rows.map(r => {
+      const name = ((r.first_name || '') + ' ' + (r.last_name || '')).trim() || 'Unnamed Patient';
+      const phone = r.phone_number || r.phone || '—';
+      return `<div class="autocomplete-item" data-id="${r.id}" data-name="${esc(name)}" data-phone="${esc(phone)}">
+        <div class="ac-name">${esc(name)}</div>
+        <div class="ac-cat">${esc(phone)}</div>
+      </div>`;
+    }).join('');
+    patientMenu.style.display = 'block';
+    patientMenu.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.onclick = () => selectPatient({
+        id: el.dataset.id,
+        name: el.dataset.name,
+        phone: el.dataset.phone,
+        registered: true,
+      });
+    });
+  }
+
+  function selectPatient(p) {
+    state.patient = p;
+    document.getElementById('patientSearchBlock').style.display = 'none';
+    document.getElementById('patientPillBlock').style.display = 'block';
+    document.getElementById('ppName').textContent  = p.name;
+    document.getElementById('ppPhone').textContent = p.phone;
+    document.getElementById('ppAvatar').textContent = (p.name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+    const badge = document.getElementById('ppBadge');
+    badge.textContent = p.registered ? 'On Homatt' : 'New — SMS sent';
+    badge.style.background = p.registered ? '#fff' : '#FFE0B2';
+    badge.style.color      = p.registered ? '#2E7D32' : '#E65100';
+    patientMenu.style.display = 'none';
+    document.getElementById('drugInput').focus();
+  }
+
+  document.getElementById('ppChangeBtn').onclick = () => {
+    state.patient = null;
+    phoneInput.value = '';
+    document.getElementById('patientSearchBlock').style.display = 'block';
+    document.getElementById('patientPillBlock').style.display = 'none';
+    phoneInput.focus();
+  };
+
+  // Click outside dismisses menu
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.autocomplete-wrap')) {
+      patientMenu.style.display = 'none';
+      document.getElementById('drugResults').style.display = 'none';
+    }
+  });
+
+  // ── Quick-register modal ─────────────────────────────────
+  const regModal      = document.getElementById('registerModal');
+  const regNameInput  = document.getElementById('regName');
+  const regPhoneInput = document.getElementById('regPhone');
+
+  function openRegisterModal(prefillPhone) {
+    regPhoneInput.value = prefillPhone || phoneInput.value;
+    regNameInput.value  = '';
+    regModal.style.display = 'flex';
+    setTimeout(() => regNameInput.focus(), 100);
+  }
+  document.getElementById('registerCancelBtn').onclick = () => regModal.style.display = 'none';
+
+  document.getElementById('registerBtn').onclick = async () => {
+    const name  = regNameInput.value.trim();
+    const phone = regPhoneInput.value.trim();
+    if (!name || !phone) { showToast('Name and phone are required', 'error'); return; }
+
+    // Insert a stub profile record (no auth user yet — patient completes via SMS link).
+    // We create a row in `clinic_unregistered_patients` (just a JSON column on clinic_orders is enough actually).
+    // Simpler: we just hold the name/phone in memory and let the order itself store them.
+    selectPatient({ id: null, name, phone, registered: false });
+    regModal.style.display = 'none';
+
+    // Fire an SMS invite (best-effort, don't block)
+    if (supabase) {
+      try {
+        await supabase.functions.invoke('send-sms-invite', {
+          body: { phone, name, clinicName: session?.clinicName || 'Clinic' }
+        });
+      } catch(e) { /* best-effort, no UX impact */ }
+    }
+    showToast('Patient added. SMS invite sent.', 'success');
+  };
+
+  // ── Drug autocomplete ────────────────────────────────────
+  const drugInput = document.getElementById('drugInput');
+  const drugMenu  = document.getElementById('drugResults');
+
+  drugInput.addEventListener('input', () => {
+    const q = drugInput.value.trim().toLowerCase();
+    if (!q) { drugMenu.style.display = 'none'; return; }
+    const matches = state.formulary.filter(d =>
+      d.name.toLowerCase().includes(q) || (d.generic_name || '').toLowerCase().includes(q)
+    ).slice(0, 8);
+    if (!matches.length) { drugMenu.style.display = 'none'; return; }
+    drugMenu.innerHTML = matches.map(d => `
+      <div class="autocomplete-item" data-name="${esc(d.name)}">
+        <div class="ac-name">${esc(d.name)}</div>
+        <div class="ac-cat">${esc(d.category || '')}</div>
+      </div>`).join('');
+    drugMenu.style.display = 'block';
+    drugMenu.querySelectorAll('.autocomplete-item').forEach(el => {
+      el.onclick = () => {
+        const drug = state.formulary.find(d => d.name === el.dataset.name);
+        selectDrug(drug);
+      };
+    });
+  });
+
+  function selectDrug(drug) {
+    state.drug = drug;
+    drugInput.value = drug.name;
+    drugMenu.style.display = 'none';
+
+    // Show step 3 with dosage chips
+    document.getElementById('step3').style.display = 'block';
+    const chips = document.getElementById('dosageChips');
+    const dosages = drug.common_dosages?.length ? drug.common_dosages : [drug.default_dosage].filter(Boolean);
+    chips.innerHTML = dosages.map((d, i) => `
+      <button type="button" class="dosage-chip ${i === 0 ? 'active' : ''}" data-dose="${esc(d)}">${esc(d)}</button>
+    `).join('');
+    chips.querySelectorAll('.dosage-chip').forEach(b => {
+      b.onclick = () => {
+        chips.querySelectorAll('.dosage-chip').forEach(x => x.classList.remove('active'));
+        b.classList.add('active');
+        state.dosage = b.dataset.dose;
+        document.getElementById('dosageInput').value = '';
+        updateFollowupPreview();
+      };
+    });
+    state.dosage = dosages[0] || '';
+    document.getElementById('durationInput').value = drug.default_days || 5;
+    state.durationDays = drug.default_days || 5;
+
+    // Show step 4
+    document.getElementById('step4').style.display = 'block';
+    updateFollowupPreview();
+
+    // Auto-scroll to step 3
+    setTimeout(() => {
+      document.getElementById('step3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  // Custom dosage clears chip selection
+  document.getElementById('dosageInput').addEventListener('input', (e) => {
+    const v = e.target.value.trim();
+    if (v) {
+      document.querySelectorAll('.dosage-chip').forEach(c => c.classList.remove('active'));
+      state.dosage = v;
+    }
+  });
+
+  document.getElementById('durationInput').addEventListener('input', (e) => {
+    state.durationDays = Math.max(1, parseInt(e.target.value, 10) || 1);
+    updateFollowupPreview();
+  });
+
+  // Delivery toggle
+  document.querySelectorAll('.delivery-opt').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.delivery-opt').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.deliveryMode = b.dataset.mode;
+    };
+  });
+
+  // Follow-up toggle
+  document.getElementById('followupToggle').addEventListener('change', (e) => {
+    state.followupEnabled = e.target.checked;
+    updateFollowupPreview();
+  });
+
+  function buildFollowupSchedule(days) {
+    if (days <= 3)  return [{ day: Math.max(1, Math.floor(days/2)), type:'check_in' }, { day: days, type:'course_complete' }];
+    if (days <= 7)  return [{ day: 3, type:'check_in' }, { day: Math.floor(days/2)+1, type:'check_in' }, { day: days, type:'course_complete' }];
+    if (days <= 14) return [{ day: 3, type:'check_in' }, { day: 7, type:'check_in' }, { day: days, type:'course_complete' }];
+    // Chronic ≥ 30: weekly check-ins + refill at day-(d-3)
+    const out = [];
+    for (let d = 7; d < days; d += 7) out.push({ day: d, type: 'check_in' });
+    out.push({ day: days - 3, type: 'refill' });
+    out.push({ day: days, type: 'course_complete' });
+    return out;
+  }
+
+  function updateFollowupPreview() {
+    const el = document.getElementById('followupPreview');
+    if (!state.followupEnabled) { el.innerHTML = '<em style="color:#9AA0A6">Reminders are off — patient will not be contacted.</em>'; return; }
+    const sched = buildFollowupSchedule(state.durationDays);
+    const labels = { check_in: 'Check-in: how are you feeling?', refill: 'Refill reminder', course_complete: 'Course complete: did you finish?' };
+    el.innerHTML = '<div style="font-weight:600;color:#5D4037;margin-bottom:6px">Schedule preview</div>' +
+      sched.map(s => `
+        <div class="followup-preview-row">
+          <span class="material-icons-outlined" style="font-size:14px;color:#FFA000">notifications</span>
+          <span>Day ${s.day} — ${labels[s.type]}</span>
+        </div>
+      `).join('');
+  }
+
+  // ── Submit ────────────────────────────────────────────────
+  document.getElementById('submitBtn').onclick = submitOrder;
+
+  async function submitOrder() {
+    if (!state.patient) { showToast('Add a patient first', 'error'); return; }
+    if (!state.drug)    { showToast('Select a drug', 'error'); return; }
+    const dosage = (document.getElementById('dosageInput').value.trim()) || state.dosage;
+    if (!dosage) { showToast('Enter a dosage', 'error'); return; }
+    if (!state.durationDays || state.durationDays < 1) { showToast('Enter duration in days', 'error'); return; }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Sending…';
+
+    if (!supabase || !session?.clinicId) {
+      showToast('Demo mode — order not saved. Connect a clinic to save.', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">send</span> Send Order';
+      return;
+    }
+
+    const sched = state.followupEnabled ? buildFollowupSchedule(state.durationDays) : [];
+
+    const { data: order, error } = await supabase.from('clinic_orders').insert({
+      clinic_id: session.clinicId,
+      issued_by: session.userId || null,
+      issued_by_name: session.staffName || null,
+      patient_id: state.patient.id || null,
+      patient_name: state.patient.name,
+      patient_phone: state.patient.phone,
+      drug_name: state.drug.name,
+      dosage: dosage,
+      duration_days: state.durationDays,
+      delivery_method: state.deliveryMode,
+      followup_enabled: state.followupEnabled,
+      followup_schedule: sched,
+      status: 'pending',
+    }).select().single();
+
+    if (error) {
+      showToast('Failed: ' + error.message, 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">send</span> Send Order';
+      return;
+    }
+
+    // Insert follow-up rows
+    if (sched.length) {
+      const rows = sched.map(s => ({
+        clinic_order_id: order.id,
+        scheduled_at: new Date(Date.now() + s.day * 24 * 3600 * 1000).toISOString(),
+        type: s.type,
+        message: s.type === 'refill'
+          ? `Time to refill your ${state.drug.name}.`
+          : s.type === 'course_complete'
+            ? `Did you finish the full course of ${state.drug.name}? Reply YES / NO.`
+            : `How are you feeling on ${state.drug.name}? Reply BETTER / SAME / WORSE.`,
+      }));
+      await supabase.from('clinic_followups').insert(rows);
+    }
+
+    showToast('Order sent — routing to nearest pharmacy', 'success');
+    setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+  }
+
+  function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Pre-fill from URL params (when navigated from patients.html)
+  (function preFillFromURL() {
+    const p = new URLSearchParams(window.location.search);
+    const name  = p.get('patient_name');
+    const phone = p.get('patient_phone');
+    const id    = p.get('patient_id');
+    if (name && phone) {
+      selectPatient({
+        id: id || null,
+        name,
+        phone,
+        registered: !!id,
+      });
+      setTimeout(() => drugInput.focus(), 250);
+      return;
+    }
+    setTimeout(() => phoneInput.focus(), 200);
+  })();
+</script>
+</body>
+</html>
