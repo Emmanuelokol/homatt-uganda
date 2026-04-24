@@ -387,7 +387,7 @@
         <div id="cartSummary"></div>
         <div style="background:#E0F2F1;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#00695C;display:flex;align-items:center;gap:8px;margin-top:10px">
           <span class="material-icons-outlined" style="font-size:16px">local_shipping</span>
-          Delivery fee: <strong>UGX 5,000</strong> · Est: <span id="etaText">2–4 hours</span>
+          Delivery fee: <strong id="deliveryFeeHint">UGX 5,000</strong> · Est: <span id="etaText">2–4 hours</span>
         </div>
 
         <div class="mo-label" style="margin-top:16px">Select a Pharmacy</div>
@@ -610,6 +610,7 @@ var order = {
   catId:'', isRx:false, rxDoctor:'', rxCode:''
 };
 var activeCat = null;   // currently selected category id
+var _deliveryFee = 5000; // default; overwritten by loadDeliverySettings()
 
 /* ── Lazy Supabase (CDN loads async) ── */
 var _supa = null;
@@ -620,6 +621,21 @@ function getSupa() {
     try { _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch(e) {}
   }
   return _supa;
+}
+
+/* ── Delivery settings from admin portal ── */
+function loadDeliverySettings() {
+  var supa = getSupa();
+  if (!supa) return;
+  supa.from('delivery_settings').select('base_fee, per_km_rate, min_fee').limit(1).single()
+    .then(function(res) {
+      if (res.data && typeof res.data.base_fee === 'number') {
+        _deliveryFee = Math.max(res.data.min_fee || 0, res.data.base_fee);
+        // Update the static hint line if already rendered
+        var hint = document.getElementById('deliveryFeeHint');
+        if (hint) hint.textContent = 'UGX ' + _deliveryFee.toLocaleString();
+      }
+    }).catch(function(){});
 }
 
 /* ══════════════════════════════════════
@@ -1037,7 +1053,7 @@ function renderCartSummary() {
   var items = Object.values(cart);
   var pText = (document.getElementById('prescriptionText') || {}).value || '';
   var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
-  var total = subtotal + 5000;
+  var total = subtotal + _deliveryFee;
   var el = document.getElementById('cartSummary');
   if (!el) return;
   el.innerHTML = '<div style="background:#F8F9FA;border-radius:var(--radius-md);padding:14px">'
@@ -1048,7 +1064,7 @@ function renderCartSummary() {
         + '</div>';
     }).join('')
     + (pText ? '<div class="cart-row"><span style="font-size:12px;color:var(--text-secondary);font-style:italic">Prescription: ' + pText.slice(0,60) + (pText.length>60?'…':'') + '</span></div>' : '')
-    + '<div class="cart-row"><span>Delivery fee</span><span>UGX 5,000</span></div>'
+    + '<div class="cart-row"><span>Delivery fee</span><span>UGX ' + _deliveryFee.toLocaleString() + '</span></div>'
     + '<div class="total-row"><span>Total</span><span style="color:#00695C">UGX ' + total.toLocaleString() + '</span></div>'
     + '</div>';
 }
@@ -1141,7 +1157,7 @@ function getPaymentLabel() {
 function renderFinalSummary() {
   var items = Object.values(cart);
   var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
-  var total = subtotal + 5000;
+  var total = subtotal + _deliveryFee;
   var cat = CATS.find(function(c){ return c.id === order.catId; });
   var rows = [
     ['Category', cat ? cat.emoji + ' ' + cat.name : 'General OTC'],
@@ -1239,7 +1255,7 @@ function _doSubmitOrder(sess) {
   var items = Object.values(cart);
   var pText = (document.getElementById('prescriptionText') || {}).value || '';
   var subtotal = items.reduce(function(s,m){ return s + m.qty * m.p; }, 0);
-  var total = subtotal + 5000;
+  var total = subtotal + _deliveryFee;
 
   var orderItems = items.map(function(m){ return { name:m.n, qty:m.qty, price:m.p }; });
   if (!orderItems.length && pText.trim()) orderItems.push({ name:pText, qty:1, price:0 });
@@ -1266,7 +1282,7 @@ function _doSubmitOrder(sess) {
       condition_tags:              order.catId || null,
       patient_symptom_description: cat ? cat.name + ' — ' + cat.desc : null,
       medication_cost:             subtotal,
-      delivery_cost:               5000,
+      delivery_cost:               _deliveryFee,
       total_cost:                  total,
       payment_method:              order.payment,
       payment_status:              (order.payment === 'pay_on_delivery') ? 'pending' : (order.payment === 'wallet' ? 'paid' : 'pending'),
@@ -1459,8 +1475,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if (banner) banner.style.display = 'flex';
   }
 
-  // Background: load real medicines from Supabase when CDN is ready
+  // Background: load real medicines and delivery settings from Supabase when CDN is ready
   window.addEventListener('load', function() {
+    loadDeliverySettings();
     var supa = getSupa();
     if (supa) {
       supa.from('medicine_catalog').select('name,retail_price').eq('is_active',true).order('name')
