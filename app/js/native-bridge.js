@@ -123,42 +123,36 @@
       setTimeout(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return;
-        const sheet = el.closest('.bottom-sheet');
-        if (sheet) {
-          // Input is inside a bottom-sheet. The sheet body can scroll if needed.
-          const sheetBody = sheet.querySelector('.sheet-body');
-          if (sheetBody && sheetBody.contains(el)) {
-            // behavior:'instant' — CSS scroll-behavior was removed from .app-screen
-            // so smooth would be fine here, but instant is safer during layout shifts.
-            el.scrollIntoView({ block: 'nearest', behavior: 'instant' });
+
+        // Find the actual scrollable ancestor of the focused input.
+        // This walks up the DOM looking for any element that is an overflow:auto/scroll
+        // container whose content overflows. This single function handles:
+        //   - .bottom-sheet/.sheet-body (symptom-checker, family, etc.)
+        //   - .cc-modal (chronic-disease)
+        //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
+        //   - .app-screen (default page scroll container)
+        const findScroller = (node) => {
+          let cur = node.parentElement;
+          while (cur && cur !== document.body) {
+            const s = getComputedStyle(cur);
+            const oy = s.overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
+            cur = cur.parentElement;
           }
-          // If input is in the sticky footer area, it's already at the visible bottom —
-          // no scrolling needed; the Capacitor body resize moves the whole sheet up.
+          return document.querySelector('.app-screen');
+        };
+
+        const scroller = findScroller(el);
+        if (scroller) {
+          const elRect = el.getBoundingClientRect();
+          const scrollerRect = scroller.getBoundingClientRect();
+          // Center the input within the visible scroller area
+          const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+            - (scroller.clientHeight / 2) + (elRect.height / 2);
+          scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
         } else {
-          // Find the actual scrollable ancestor of the focused input. Some pages (e.g.
-          // clinic-booking, medicine-orders) set overflow:hidden on .app-screen and use
-          // their own inner scroll container, so hard-coding .app-screen doesn't work.
-          const findScroller = (node) => {
-            let el = node.parentElement;
-            while (el && el !== document.body) {
-              const s = getComputedStyle(el);
-              const oy = s.overflowY;
-              if ((oy === 'auto' || oy === 'scroll') && el.scrollHeight > el.clientHeight) return el;
-              el = el.parentElement;
-            }
-            return document.querySelector('.app-screen');
-          };
-          const scroller = findScroller(el);
-          if (scroller) {
-            const elRect = el.getBoundingClientRect();
-            const scrollerRect = scroller.getBoundingClientRect();
-            const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
-              - (scroller.clientHeight / 2) + (elRect.height / 2);
-            scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
-          } else {
-            // Last-resort: ask the browser itself
-            try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
-          }
+          // Last-resort: ask the browser itself
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
         }
       }, 450);
     });
