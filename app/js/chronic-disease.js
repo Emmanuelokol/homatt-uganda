@@ -75,13 +75,6 @@ document.addEventListener('DOMContentLoaded', async () => {
       'Eat high-protein foods — eggs, beans, fish',
       'Return to the clinic every month for monitoring'
     ]},
-    { key:'depression',    label:'Depression / Anxiety', icon:'psychology',        color:'#5E35B1', default_refill_days:30, education_tips:[
-      'You are not alone — talk to someone you trust',
-      'Take your medication every day, even when you feel good',
-      'Go outside for 15 minutes of sunlight daily',
-      'Keep a simple daily routine',
-      'Call the Homatt support line if you feel hopeless'
-    ]},
     { key:'other',         label:'Other Chronic Condition', icon:'medical_services', color:'#37474F', default_refill_days:30, education_tips:[
       'Take medication exactly as prescribed',
       'Keep a health diary',

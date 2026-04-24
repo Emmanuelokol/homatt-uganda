@@ -133,6 +133,10 @@ html {
 /* App Screen */
 .app-screen {
   flex: 1;
+  /* min-height:0 is required for flexbox scroll containers.
+     Without it, the default min-height:auto lets this item grow to fit content,
+     which means overflow-y:auto never has a fixed height to scroll against. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;

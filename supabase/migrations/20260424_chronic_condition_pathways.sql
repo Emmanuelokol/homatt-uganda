@@ -12,7 +12,7 @@
 CREATE TABLE IF NOT EXISTS patient_conditions (
   id                 uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id            uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  condition          text        NOT NULL,  -- diabetes | hypertension | asthma | heart_disease | hiv | tb | depression | other
+  condition          text        NOT NULL,  -- diabetes | hypertension | asthma | heart_disease | hiv | tb | other
   condition_label    text,                   -- display label shown in UI
   diagnosed_at       date,                   -- optional: when they were first diagnosed
   medication_name    text,                   -- the chronic med they refill
@@ -77,8 +77,6 @@ INSERT INTO condition_catalog (key, label, icon, color, default_refill_days, edu
     '["Take your ARVs at the same time every day — never miss","Keep all clinic appointments for viral load checks","Eat a balanced diet to stay strong","Use condoms to protect yourself and your partner","Join a support group — you are not alone"]'::jsonb),
   ('tb',            'Tuberculosis (TB)',   'masks',             '#E65100', 30,
     '["Finish the FULL course of TB medication — even if you feel better","Cover your mouth when coughing","Sleep alone for the first 2 weeks of treatment","Eat high-protein foods — eggs, beans, fish","Return to the clinic every month for monitoring"]'::jsonb),
-  ('depression',    'Depression / Anxiety','psychology',        '#5E35B1', 30,
-    '["You are not alone — talk to someone you trust","Take your medication every day, even when you feel good","Go outside for 15 minutes of sunlight daily","Keep a simple daily routine","Call the Homatt support line if you feel hopeless"]'::jsonb),
   ('other',         'Other Chronic Condition','medical_services','#37474F', 30,
     '["Take medication exactly as prescribed","Keep a health diary","Attend all clinic follow-ups","Eat well and stay hydrated","Call us if something feels wrong"]'::jsonb)
 ON CONFLICT (key) DO UPDATE SET

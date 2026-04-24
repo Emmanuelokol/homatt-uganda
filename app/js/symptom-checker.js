@@ -946,14 +946,52 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const actionArea = document.getElementById('actionArea');
     actionArea.innerHTML = '';
 
-    // Consultation fee estimate based on condition
+    // Pricing transparency — early vs late detection cost data per condition
     const topCond = (data.conditions[0]?.name || '').toLowerCase();
-    const feeRange = topCond.includes('malaria') || topCond.includes('typhoid') ? 'UGX 20,000 – 35,000' :
-                     topCond.includes('uti') || topCond.includes('gastro') ? 'UGX 15,000 – 25,000' :
-                     topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory') ? 'UGX 10,000 – 20,000' :
-                     topCond.includes('headache') || topCond.includes('pain') ? 'UGX 10,000 – 20,000' :
-                     topCond.includes('diabetes') || topCond.includes('chronic') ? 'UGX 25,000 – 50,000' :
-                     'UGX 10,000 – 30,000';
+    const condLabel = data.conditions[0]?.name || 'this condition';
+    const pricingData = topCond.includes('malaria') || topCond.includes('typhoid')
+      ? { early: 'UGX 20,000 – 35,000', late: 'UGX 150,000 – 450,000', lateNote: 'hospitalisation, IV drugs, complications' }
+      : topCond.includes('uti') || topCond.includes('urinary')
+      ? { early: 'UGX 15,000 – 25,000', late: 'UGX 80,000 – 200,000', lateNote: 'kidney infection, surgery risk' }
+      : topCond.includes('gastro') || topCond.includes('diarrhea') || topCond.includes('stomach')
+      ? { early: 'UGX 15,000 – 25,000', late: 'UGX 100,000 – 300,000', lateNote: 'dehydration, IV fluids, admission' }
+      : topCond.includes('diabetes') || topCond.includes('chronic')
+      ? { early: 'UGX 25,000 – 50,000', late: 'UGX 300,000 – 1,000,000+', lateNote: 'complications: kidney, eyes, amputation' }
+      : topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory')
+      ? { early: 'UGX 10,000 – 20,000', late: 'UGX 60,000 – 150,000', lateNote: 'pneumonia, oxygen, admission' }
+      : topCond.includes('headache') || topCond.includes('pain')
+      ? { early: 'UGX 10,000 – 20,000', late: 'UGX 50,000 – 120,000', lateNote: 'specialist visits, advanced scans' }
+      : { early: 'UGX 10,000 – 30,000', late: 'UGX 80,000 – 400,000', lateNote: 'delayed complications, hospitalisation' };
+
+    // Pricing transparency card — shown whenever a clinic visit is suggested
+    const pricingCard = `
+      <div style="background:#fff;border:1.5px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:10px 14px;display:flex;align-items:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px;color:#fff">payments</span>
+          <span style="font-size:13px;font-weight:700;color:#fff">Early Detection Pricing</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="display:flex;gap:10px;margin-bottom:10px">
+            <div style="flex:1;background:#E8F5E9;border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Detect Early</div>
+              <div style="font-size:14px;font-weight:700;color:#1B5E20;line-height:1.3">${pricingData.early}</div>
+              <div style="font-size:10px;color:#4CAF50;margin-top:3px">consultation + test</div>
+            </div>
+            <div style="display:flex;align-items:center;flex-direction:column;justify-content:center;gap:4px;flex-shrink:0">
+              <span class="material-icons-outlined" style="font-size:20px;color:#BDBDBD">arrow_forward</span>
+              <span style="font-size:9px;color:#9E9E9E;font-weight:600">vs</span>
+            </div>
+            <div style="flex:1;background:#FFEBEE;border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Treat Late</div>
+              <div style="font-size:14px;font-weight:700;color:#B71C1C;line-height:1.3">${pricingData.late}</div>
+              <div style="font-size:10px;color:#EF9A9A;margin-top:3px">${pricingData.lateNote}</div>
+            </div>
+          </div>
+          <div style="background:#FFF8E1;border-left:3px solid #FFC107;border-radius:6px;padding:8px 10px;font-size:11.5px;color:#5D4037;line-height:1.55">
+            <strong>Prices shown are early consultation rates</strong> from our partner clinics — set to make detection affordable. What happens if you wait? ${condLabel} caught late costs <strong>5–15× more</strong> and carries far higher health risks. The best time to go is now.
+          </div>
+        </div>
+      </div>`;
 
     if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
       actionArea.innerHTML = `
@@ -961,10 +999,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">emergency</span>
           <p>Based on your symptoms, we strongly recommend visiting a health facility as soon as possible.</p>
         </div>
-        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
-          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
-        </div>
+        ${pricingCard}
         <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
           <span class="material-icons-outlined">local_hospital</span>
           Find Nearest Clinic
@@ -980,10 +1015,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">info</span>
           <p>${data.followup_message || 'Monitor your symptoms closely. If they persist or worsen, please visit a health facility.'}</p>
         </div>
-        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
-          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
-        </div>
+        ${pricingCard}
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
           Start Symptom Monitoring
@@ -999,6 +1031,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">check_circle</span>
           <p>${data.followup_message || 'Your symptoms appear mild. Follow the prevention tips above and monitor how you feel.'}</p>
         </div>
+        ${pricingCard}
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
           Monitor My Symptoms
