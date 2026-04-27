@@ -21,7 +21,14 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write             # required to push to gh-pages
+      contents: read              # read repo files
+      pages: write                # configure + deploy GitHub Pages
+      id-token: write             # required by actions/deploy-pages for OIDC
+
+    # Expose the deployed URL in the Actions summary
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout code
@@ -47,13 +54,14 @@ jobs:
       - name: Ensure .nojekyll exists (GitHub Pages must skip Jekyll for our /portals/ tree)
         run: touch app/.nojekyll
 
-      - name: Deploy app/ to GitHub Pages (gh-pages branch)
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Configure GitHub Pages (enables Pages + sets Actions as source — idempotent)
+        uses: actions/configure-pages@v5
+
+      - name: Upload app/ as Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./app
-          publish_branch: gh-pages
-          # Atomic, fully-replacing deploy — no stale files surviving from prior commits.
-          force_orphan: true
-          enable_jekyll: false
-          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }} (${{ github.sha }})'
+          path: ./app
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
