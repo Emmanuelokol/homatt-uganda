@@ -156,8 +156,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById(navId).classList.add('active');
   }
 
-  document.getElementById('navHome').addEventListener('click', () => switchTab('homeScreen', 'navHome'));
-  document.getElementById('navShop').addEventListener('click', () => switchTab('shopScreen', 'navShop'));
+  document.getElementById('navHome').addEventListener('click',    () => switchTab('homeScreen',   'navHome'));
+  document.getElementById('navShop').addEventListener('click',    () => switchTab('shopScreen',   'navShop'));
+  document.getElementById('navFamily').addEventListener('click',  () => switchTab('familyScreen', 'navFamily'));
+  document.getElementById('navWallet').addEventListener('click',  () => switchTab('walletScreen', 'navWallet'));
+  document.getElementById('navProfile').addEventListener('click', () => {
+    // Populate profile screen with cached user data
+    const cached = JSON.parse(localStorage.getItem('homatt_profile') || '{}');
+    if (cached.name)  document.getElementById('profileName').textContent  = cached.name;
+    if (cached.phone) document.getElementById('profilePhone').textContent = cached.phone;
+    switchTab('profileScreen', 'navProfile');
+  });
 
   // Malaria alert deep-links to shop malaria category
   document.getElementById('malariaAlert').addEventListener('click', () => {

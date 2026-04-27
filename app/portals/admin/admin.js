@@ -73,6 +73,47 @@ const DEMO = {
 
 // ── AUTH ────────────────────────────────────────────────────────────────────
 
+function showAuthTab(tab) {
+  document.getElementById('signinForm').style.display   = tab === 'signin'   ? 'block' : 'none';
+  document.getElementById('registerForm').style.display = tab === 'register' ? 'block' : 'none';
+  document.getElementById('tabSignIn').classList.toggle('active', tab === 'signin');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+}
+
+async function doRegister() {
+  const name     = document.getElementById('regName').value.trim();
+  const email    = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+  const err      = document.getElementById('registerError');
+  const success  = document.getElementById('registerSuccess');
+
+  err.classList.remove('visible');
+  success.style.display = 'none';
+
+  if (!name || !email || !password) {
+    err.textContent = 'Please fill in all fields.'; err.classList.add('visible'); return;
+  }
+  if (password.length < 6) {
+    err.textContent = 'Password must be at least 6 characters.'; err.classList.add('visible'); return;
+  }
+
+  const { data, error } = await sb.auth.signUp({
+    email, password,
+    options: { data: { full_name: name, role: 'admin' } },
+  });
+
+  if (error) { err.textContent = error.message; err.classList.add('visible'); return; }
+
+  // If Supabase email confirmation is disabled, log straight in
+  if (data.session) {
+    document.getElementById('sUserName').textContent = name.split(' ')[0];
+    document.getElementById('avatarBtn').textContent = name[0].toUpperCase();
+    launchApp(); return;
+  }
+
+  success.style.display = 'block';
+}
+
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass  = document.getElementById('loginPassword').value;

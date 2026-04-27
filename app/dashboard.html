@@ -389,6 +389,118 @@
 
     </div><!-- end shopScreen -->
 
+    <!-- Family Screen -->
+    <div class="app-screen" id="familyScreen">
+      <div class="dash-header" style="background:linear-gradient(135deg,#1565C0,#1976D2)">
+        <div class="dash-header-top">
+          <div class="dash-greeting">
+            <p class="dash-welcome">Manage</p>
+            <h1 class="dash-name">Family Health</h1>
+          </div>
+          <button class="dash-icon-btn" id="addFamilyBtn">
+            <span class="material-icons-outlined">person_add</span>
+          </button>
+        </div>
+      </div>
+      <div class="dash-content">
+        <div style="text-align:center;padding:48px 24px">
+          <span class="material-icons-outlined" style="font-size:64px;color:#1565C0;display:block;margin-bottom:16px">family_restroom</span>
+          <h3 style="font-size:18px;font-weight:700;margin-bottom:8px;color:#1a1a2e">Family Health Manager</h3>
+          <p style="font-size:13px;color:#888;line-height:1.6;max-width:280px;margin:0 auto 24px">Track health records, medications, and appointments for your whole family in one place.</p>
+          <button class="btn btn-next" style="background:#1565C0;border-color:#1565C0;width:100%;justify-content:center" onclick="alert('Family profiles coming soon!')">
+            <span class="material-icons-outlined">add</span> Add Family Member
+          </button>
+        </div>
+      </div>
+    </div><!-- end familyScreen -->
+
+    <!-- Wallet Screen -->
+    <div class="app-screen" id="walletScreen">
+      <div class="dash-header" style="background:linear-gradient(135deg,#4A148C,#6A1B9A)">
+        <div class="dash-header-top">
+          <div class="dash-greeting">
+            <p class="dash-welcome">Your</p>
+            <h1 class="dash-name">Health Wallet</h1>
+          </div>
+          <button class="dash-icon-btn">
+            <span class="material-icons-outlined">add_card</span>
+          </button>
+        </div>
+        <div class="health-score-card" style="background:rgba(255,255,255,0.15)">
+          <div class="health-score-left">
+            <p class="health-score-label">Available Balance</p>
+            <div class="health-score-value">
+              <span class="score-number" style="font-size:28px" id="walletBalance">0</span>
+              <span class="score-suffix"> UGX</span>
+            </div>
+            <p class="health-score-status">Top up via Mobile Money</p>
+          </div>
+          <div class="health-score-ring">
+            <span class="material-icons-outlined" style="font-size:48px;color:rgba(255,255,255,0.5)">account_balance_wallet</span>
+          </div>
+        </div>
+      </div>
+      <div class="dash-content">
+        <div style="padding:16px 0">
+          <h3 style="font-size:14px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">Recent Transactions</h3>
+          <div id="walletTxList">
+            <div style="text-align:center;padding:32px 24px;color:#bbb">
+              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">receipt_long</span>
+              <p style="font-size:13px">No transactions yet</p>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-next" style="width:100%;justify-content:center;background:#6A1B9A;border-color:#6A1B9A;margin-top:8px" onclick="alert('Mobile Money top-up coming soon!')">
+          <span class="material-icons-outlined">add</span> Top Up Wallet
+        </button>
+      </div>
+    </div><!-- end walletScreen -->
+
+    <!-- Profile Screen -->
+    <div class="app-screen" id="profileScreen">
+      <div class="dash-header" style="background:linear-gradient(135deg,#2E7D32,#388E3C)">
+        <div class="dash-header-top">
+          <div class="dash-greeting">
+            <p class="dash-welcome">Your</p>
+            <h1 class="dash-name">Profile</h1>
+          </div>
+          <button class="dash-icon-btn" onclick="if(confirm('Sign out?')){window.location.href='signin.html';}">
+            <span class="material-icons-outlined">logout</span>
+          </button>
+        </div>
+      </div>
+      <div class="dash-content">
+        <div style="text-align:center;padding:24px 0 20px">
+          <div style="width:72px;height:72px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+            <span class="material-icons-outlined" style="font-size:40px;color:#2E7D32">person</span>
+          </div>
+          <h3 id="profileName" style="font-size:18px;font-weight:700;margin-bottom:4px">User</h3>
+          <p id="profilePhone" style="font-size:13px;color:#888">—</p>
+        </div>
+        <div style="background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06)">
+          <div class="profile-row" style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid #f0f0f0;cursor:pointer">
+            <span class="material-icons-outlined" style="color:#2E7D32">notifications</span>
+            <span style="font-size:14px;font-weight:500">Notification Settings</span>
+            <span class="material-icons-outlined" style="margin-left:auto;color:#ccc;font-size:18px">chevron_right</span>
+          </div>
+          <div class="profile-row" style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid #f0f0f0;cursor:pointer">
+            <span class="material-icons-outlined" style="color:#2E7D32">language</span>
+            <span style="font-size:14px;font-weight:500">Language</span>
+            <span style="margin-left:auto;font-size:13px;color:#888">English</span>
+          </div>
+          <div class="profile-row" style="display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid #f0f0f0;cursor:pointer">
+            <span class="material-icons-outlined" style="color:#2E7D32">privacy_tip</span>
+            <span style="font-size:14px;font-weight:500">Privacy & Data</span>
+            <span class="material-icons-outlined" style="margin-left:auto;color:#ccc;font-size:18px">chevron_right</span>
+          </div>
+          <div class="profile-row" style="display:flex;align-items:center;gap:14px;padding:16px 20px;cursor:pointer" onclick="if(confirm('Sign out?')){window.location.href='signin.html';}">
+            <span class="material-icons-outlined" style="color:#E53935">logout</span>
+            <span style="font-size:14px;font-weight:500;color:#E53935">Sign Out</span>
+          </div>
+        </div>
+      </div>
+    </div><!-- end profileScreen -->
+
     <!-- Bottom Navigation Bar -->
     <div class="bottom-nav">
       <div class="nav-item active" id="navHome">
