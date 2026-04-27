@@ -32,20 +32,140 @@
     .ai-diag-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-blue); margin-bottom: 8px; }
     .ai-diag-name { font-size: 22px; font-weight: 800; color: var(--text-dark); }
     .ai-confidence { font-size: 13px; color: var(--accent-blue); margin-top: 4px; font-weight: 600; }
-    .drug-builder-row {
-      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 40px;
-      gap: 8px; align-items: center; margin-bottom: 8px;
-    }
     .remove-drug-btn {
-      width: 32px; height: 32px; border-radius: 50%; background: #FFEBEE;
+      width: 28px; height: 28px; border-radius: 50%; background: #FFEBEE;
       border: none; color: var(--accent-red); cursor: pointer;
       display: flex; align-items: center; justify-content: center;
     }
     .rx-preview {
       background: #F9F9F9; border: 1px solid var(--border);
-      border-radius: 10px; padding: 16px; font-size: 13px; white-space: pre-wrap;
-      font-family: 'Courier New', monospace; max-height: 300px; overflow-y: auto;
+      border-radius: 10px; padding: 16px; font-size: 12px; white-space: pre-wrap;
+      font-family: 'Courier New', monospace; max-height: 280px; overflow-y: auto;
     }
+
+    /* ── Wizard Steps ── */
+    .wiz-header { display: flex; flex-direction: column; gap: 8px; padding: 12px 0 4px; }
+    .wiz-top-row { display: flex; align-items: center; gap: 16px; }
+    .wiz-steps { display: flex; align-items: center; gap: 0; flex: 1; max-width: 480px; }
+    .wiz-dot {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--border); color: var(--text-light);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; flex-shrink: 0; transition: all 0.2s;
+    }
+    .wiz-dot.active { background: #1565C0; color: white; box-shadow: 0 0 0 4px rgba(21,101,192,0.15); }
+    .wiz-dot.done { background: var(--brand-primary); color: white; }
+    .wiz-line { flex: 1; height: 2px; background: var(--border); transition: background 0.2s; }
+    .wiz-line.done { background: var(--brand-primary); }
+    .wiz-step-labels {
+      display: flex; max-width: 540px; font-size: 10px; color: var(--text-light);
+      text-transform: uppercase; letter-spacing: 0.3px; padding-left: 30px;
+    }
+    .wiz-step-labels span { flex: 1; text-align: center; }
+    .wiz-step-labels span:first-child { text-align: left; }
+    .wiz-step-labels span:last-child { text-align: right; padding-right: 4px; }
+    .wiz-step { display: none; }
+    .wiz-step.active { display: block; }
+    .wiz-footer {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 0; margin-top: 12px; border-top: 1px solid var(--border);
+    }
+
+    /* ── 3 AI Diagnoses ── */
+    .ai-diag-option {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 14px; border: 2px solid var(--border); border-radius: 12px;
+      margin-bottom: 10px; cursor: pointer; transition: all 0.15s;
+    }
+    .ai-diag-option:hover { border-color: #90CAF9; background: #F8FBFF; }
+    .ai-diag-option.selected { border-color: #1565C0; background: #E3F2FD; }
+    .diag-rank {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700;
+    }
+    .rank-1 { background: #1565C0; color: white; }
+    .rank-2 { background: #BBDEFB; color: #1565C0; }
+    .rank-3 { background: #F5F5F5; color: var(--text-light); }
+    .diag-info { flex: 1; min-width: 0; }
+    .diag-name { font-size: 15px; font-weight: 700; color: var(--text-dark); }
+    .diag-meta { font-size: 12px; color: var(--accent-blue); margin-top: 2px; font-weight: 600; }
+    .diag-reasoning { font-size: 12px; color: var(--text-light); margin-top: 4px; font-style: italic; }
+    .diag-check { opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+    .diag-check.visible { opacity: 1; }
+
+    /* ── Patient Type Selector ── */
+    .type-selector { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0; }
+    .type-card {
+      border: 2px solid var(--border); border-radius: 16px; padding: 24px 16px;
+      cursor: pointer; text-align: center; transition: all 0.15s;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+    }
+    .type-card:hover { border-color: #90CAF9; box-shadow: var(--shadow-sm); }
+    .type-card.selected { border-color: #1565C0; background: #E3F2FD; }
+    .type-card .material-icons-outlined { font-size: 40px; }
+    .type-card-title { font-size: 16px; font-weight: 700; }
+    .type-card-sub { font-size: 12px; color: var(--text-light); }
+
+    /* ── Drug Builder Enhanced ── */
+    .drug-row {
+      background: #F8FAFF; border: 1px solid #BBDEFB; border-radius: 12px;
+      padding: 14px; margin-bottom: 12px;
+    }
+    .drug-row-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+    }
+    .drug-row-label { font-size: 13px; font-weight: 700; color: #1565C0; }
+    .time-slots { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+    .time-slot-item { display: flex; flex-direction: column; gap: 2px; }
+    .time-slot-input {
+      padding: 6px 8px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 13px; width: 95px;
+      font-family: inherit; color: var(--text-dark); background: white;
+    }
+    .time-slot-input:focus { outline: none; border-color: #1565C0; }
+
+    /* ── Radio + Toggle ── */
+    .radio-group { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+    .radio-option {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .radio-option:hover { border-color: #90CAF9; background: #F8FBFF; }
+    .radio-option input[type="radio"] { width: 16px; height: 16px; accent-color: #1565C0; }
+    .radio-option span { font-size: 13px; font-weight: 500; }
+
+    /* ── Clinic Hours Settings ── */
+    .hours-row {
+      display: flex; align-items: center; gap: 16px;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .hours-row:last-child { border-bottom: none; }
+    .hours-day { display: flex; align-items: center; gap: 12px; width: 150px; }
+    .hours-times { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .toggle-label { position: relative; display: inline-block; width: 36px; height: 20px; flex-shrink: 0; }
+    .toggle-label input { opacity: 0; width: 0; height: 0; }
+    .toggle-switch {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background: #ccc; border-radius: 20px; transition: 0.2s;
+    }
+    .toggle-switch::before {
+      position: absolute; content: ""; width: 14px; height: 14px;
+      left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.2s;
+    }
+    .toggle-label input:checked + .toggle-switch { background: #1565C0; }
+    .toggle-label input:checked + .toggle-switch::before { transform: translateX(16px); }
+    .pharmacy-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 12px 0; border-bottom: 1px solid var(--border);
+    }
+    .pharmacy-item:last-child { border-bottom: none; }
+    .alert { display: flex; align-items: flex-start; gap: 8px; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; }
+    .alert-info { background: #E3F2FD; color: #1565C0; }
+    .alert-success { background: var(--brand-pale); color: var(--brand-primary); }
+    .alert-warning { background: #FFF8E1; color: #E65100; }
+    .alert .material-icons-outlined { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
     .scan-success {
       background: var(--brand-pale); border: 2px solid var(--brand-primary);
       border-radius: 12px; padding: 24px; text-align: center;
@@ -123,6 +243,9 @@
       <div class="nav-item" onclick="showPage('profile',this)">
         <span class="material-icons-outlined">badge</span> My Profile
       </div>
+      <div class="nav-item" onclick="showPage('settings',this)">
+        <span class="material-icons-outlined">settings</span> Clinic Settings
+      </div>
     </nav>
     <div class="sidebar-footer">
       <button class="logout-btn" onclick="doLogout()">
@@ -169,110 +292,288 @@
 
         <div id="patientQueue"></div>
 
-        <!-- Patient Detail Panel (slides in) -->
+        <!-- Patient Detail Panel — 4-Step Wizard -->
         <div id="patientPanel" style="display:none">
-          <div class="section-header mt-24">
-            <div class="section-title">Patient Review</div>
-            <button class="btn btn-ghost btn-sm" onclick="closePatient()">← Back to Queue</button>
+
+          <!-- Wizard Header / Step Indicator -->
+          <div class="wiz-header">
+            <div class="wiz-top-row">
+              <button class="btn btn-ghost btn-sm" onclick="closePatient()">← Queue</button>
+              <div class="wiz-steps">
+                <div class="wiz-dot active" id="d1">1</div>
+                <div class="wiz-line" id="l12"></div>
+                <div class="wiz-dot" id="d2">2</div>
+                <div class="wiz-line" id="l23"></div>
+                <div class="wiz-dot" id="d3">3</div>
+                <div class="wiz-line" id="l34"></div>
+                <div class="wiz-dot" id="d4">4</div>
+              </div>
+            </div>
+            <div class="wiz-step-labels">
+              <span>AI Diagnoses</span>
+              <span>Confirm</span>
+              <span>Patient Type</span>
+              <span>Prescription</span>
+            </div>
           </div>
 
-          <div class="grid-2">
-            <div>
-              <!-- Patient Info -->
-              <div class="card" style="margin-bottom:16px">
-                <div class="card-header">
-                  <div class="card-title"><span class="material-icons-outlined">person</span> Patient Info</div>
-                  <span id="panelUrgencyBadge"></span>
-                </div>
-                <div class="card-body">
-                  <div class="form-row">
-                    <div><div class="form-label">Name</div><div class="fw-600" id="panelName">—</div></div>
-                    <div><div class="form-label">Age / Sex</div><div class="fw-600" id="panelAgeSex">—</div></div>
+          <!-- ── Step 1: AI Diagnoses ── -->
+          <div id="wiz1" class="wiz-step active">
+            <div class="grid-2 mt-16">
+              <div>
+                <div class="card" style="margin-bottom:16px">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">person</span> Patient Info</div>
+                    <span id="panelUrgencyBadge"></span>
                   </div>
-                  <div class="form-row mt-16">
-                    <div><div class="form-label">Booking Code</div><div id="panelCode" class="code-badge">—</div></div>
-                    <div><div class="form-label">Booked At</div><div class="text-sm text-muted" id="panelTime">—</div></div>
+                  <div class="card-body">
+                    <div class="form-row">
+                      <div><div class="form-label">Name</div><div class="fw-600" id="panelName">—</div></div>
+                      <div><div class="form-label">Age / Sex</div><div class="fw-600" id="panelAgeSex">—</div></div>
+                    </div>
+                    <div class="form-row mt-16">
+                      <div><div class="form-label">Booking Code</div><div id="panelCode" class="code-badge">—</div></div>
+                      <div><div class="form-label">Booked At</div><div class="text-sm text-muted" id="panelTime">—</div></div>
+                    </div>
+                    <div class="form-label mt-16">Reported Symptoms</div>
+                    <div id="panelSymptoms"></div>
                   </div>
                 </div>
               </div>
-
-              <!-- AI Diagnosis -->
-              <div class="card">
-                <div class="card-header">
-                  <div class="card-title"><span class="material-icons-outlined">psychology</span> AI Assessment</div>
-                  <span class="badge badge-info" style="background:#E3F2FD;color:#1565C0">AI Generated</span>
-                </div>
-                <div class="card-body">
-                  <div class="ai-diag-card">
-                    <div class="ai-diag-title">Primary Diagnosis</div>
-                    <div class="ai-diag-name" id="panelDiag">—</div>
-                    <div class="ai-confidence" id="panelConf">—</div>
+              <div>
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">psychology</span> AI Differential Diagnoses</div>
+                    <span class="badge badge-info" style="background:#E3F2FD;color:#1565C0">AI · Top 3</span>
                   </div>
-                  <div class="form-label">Reported Symptoms</div>
-                  <div id="panelSymptoms"></div>
-                  <div class="form-label mt-16">Risk Level</div>
-                  <div id="panelRisk"></div>
+                  <div class="card-body">
+                    <p class="text-sm text-muted" style="margin-bottom:12px">Tap to select the most likely diagnosis based on AI analysis. You can modify it after testing.</p>
+                    <div id="aiDiagList"></div>
+                  </div>
                 </div>
               </div>
             </div>
+            <div class="wiz-footer">
+              <button class="btn btn-ghost" onclick="closePatient()">Cancel</button>
+              <button class="btn btn-primary" onclick="goStep(2)" style="background:#1565C0">
+                Continue to Confirmation <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">arrow_forward</span>
+              </button>
+            </div>
+          </div>
 
-            <!-- Confirmation + Prescription Form -->
-            <div>
-              <div class="card">
-                <div class="card-header">
-                  <div class="card-title"><span class="material-icons-outlined">fact_check</span> Diagnosis Confirmation</div>
-                </div>
-                <div class="card-body">
-                  <div class="form-group">
-                    <label class="form-label">Doctor's Final Diagnosis</label>
-                    <input type="text" class="form-input" id="finalDiag" placeholder="Confirm or modify AI diagnosis">
+          <!-- ── Step 2: Confirm Diagnosis After Testing ── -->
+          <div id="wiz2" class="wiz-step">
+            <div class="grid-2 mt-16">
+              <div>
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">science</span> Selected AI Diagnosis</div>
                   </div>
-                  <div class="form-group">
-                    <label class="form-label">AI Diagnosis Confirmed?</label>
-                    <select class="form-select" id="aiConfirmed">
-                      <option value="yes">Yes — AI diagnosis confirmed</option>
-                      <option value="no">No — Modified (see reason below)</option>
-                    </select>
-                  </div>
-                  <div class="form-group" id="modReasonGroup" style="display:none">
-                    <label class="form-label">Reason for Modification</label>
-                    <textarea class="form-textarea" id="modReason" placeholder="Clinical finding that led to modified diagnosis..."></textarea>
-                  </div>
-
-                  <div class="divider"></div>
-                  <div class="section-title" style="margin-bottom:12px">E-Prescription</div>
-
-                  <div id="drugsBuilder">
-                    <!-- Drug rows added here -->
-                  </div>
-                  <button class="btn btn-ghost btn-sm" onclick="addDrugRow()">
-                    <span class="material-icons-outlined">add</span> Add Drug
-                  </button>
-
-                  <div class="divider"></div>
-                  <div class="form-row">
-                    <div class="form-group">
-                      <label class="form-label">Doctor Full Name</label>
-                      <input type="text" class="form-input" id="docName" value="Dr. Sarah Nakamya">
+                  <div class="card-body">
+                    <div class="ai-diag-card">
+                      <div class="ai-diag-title">AI Suggestion</div>
+                      <div class="ai-diag-name" id="selectedDiagName">—</div>
+                      <div class="ai-confidence" id="selectedDiagConf">—</div>
                     </div>
-                    <div class="form-group">
-                      <label class="form-label">License Number</label>
-                      <input type="text" class="form-input" id="docLicense" value="UMC-2024-00123">
+                    <div class="form-label">Risk Level</div>
+                    <div id="panelRisk2"></div>
+                    <div class="alert alert-info" style="margin-top:16px">
+                      <span class="material-icons-outlined">info</span>
+                      <div style="font-size:12px">Run lab tests, vitals, or physical examination — then confirm the actual diagnosis below.</div>
                     </div>
-                  </div>
-                  <div class="form-group">
-                    <label class="form-label">Special Instructions</label>
-                    <textarea class="form-textarea" id="specialInstr" placeholder="e.g. Take after meals, avoid sunlight..."></textarea>
-                  </div>
-
-                  <div class="modal-footer" style="padding:0;border:none;margin-top:16px">
-                    <button class="btn btn-ghost" onclick="closePatient()">Cancel</button>
-                    <button class="btn btn-primary" onclick="issuePrescription()" style="background:#1565C0">
-                      <span class="material-icons-outlined">create</span> Issue Prescription
-                    </button>
                   </div>
                 </div>
               </div>
+              <div>
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">fact_check</span> Confirmed Diagnosis (After Testing)</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="form-label">Real Illness / Confirmed Diagnosis</label>
+                      <input type="text" class="form-input" id="finalDiag" placeholder="Enter actual diagnosis after testing">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Was AI Diagnosis Correct?</label>
+                      <select class="form-select" id="aiConfirmed">
+                        <option value="yes">Yes — AI diagnosis confirmed</option>
+                        <option value="partial">Partially — modified after testing</option>
+                        <option value="no">No — different finding from tests</option>
+                      </select>
+                    </div>
+                    <div class="form-group" id="modReasonGroup" style="display:none">
+                      <label class="form-label">Clinical Findings / Test Results</label>
+                      <textarea class="form-textarea" id="modReason" placeholder="Lab results, examination findings..."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="wiz-footer">
+              <button class="btn btn-ghost" onclick="goStep(1)">← Back</button>
+              <button class="btn btn-primary" onclick="goStep(3)" style="background:#1565C0">
+                Continue to Patient Type <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Step 3: Patient Type ── -->
+          <div id="wiz3" class="wiz-step">
+            <div class="mt-16" style="max-width:680px;margin:24px auto 0">
+              <div class="card">
+                <div class="card-header">
+                  <div class="card-title"><span class="material-icons-outlined">badge</span> Is this an Inpatient or Outpatient?</div>
+                  <span class="badge" style="background:#E3F2FD;color:#1565C0" id="step3PatientName">—</span>
+                </div>
+                <div class="card-body">
+                  <div class="type-selector">
+                    <div class="type-card" id="typeOutpatient" onclick="selectType('outpatient')">
+                      <span class="material-icons-outlined" style="color:#43A047">directions_walk</span>
+                      <div class="type-card-title">Outpatient</div>
+                      <div class="type-card-sub">Treatment & discharge same day</div>
+                    </div>
+                    <div class="type-card" id="typeInpatient" onclick="selectType('inpatient')">
+                      <span class="material-icons-outlined" style="color:#1565C0">hotel</span>
+                      <div class="type-card-title">Inpatient</div>
+                      <div class="type-card-sub">Requires admission & monitoring</div>
+                    </div>
+                  </div>
+                  <div id="inpatientFields" style="display:none">
+                    <div class="divider"></div>
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Ward</label>
+                        <input type="text" class="form-input" id="wardName" placeholder="e.g. Medical Ward A">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Bed Number</label>
+                        <input type="text" class="form-input" id="bedNumber" placeholder="e.g. B-12">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Admission / Monitoring Notes</label>
+                      <textarea class="form-textarea" id="admissionNotes" placeholder="Vitals frequency, observation plan, dietary needs..."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="wiz-footer">
+              <button class="btn btn-ghost" onclick="goStep(2)">← Back</button>
+              <button class="btn btn-primary" onclick="goStep(4)" style="background:#1565C0">
+                Write Prescription <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">arrow_forward</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- ── Step 4: E-Prescription ── -->
+          <div id="wiz4" class="wiz-step">
+            <div class="grid-2 mt-16">
+              <div>
+                <div class="card" style="margin-bottom:16px">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">medication</span> Medications</div>
+                    <button class="btn btn-ghost btn-sm" onclick="addDrugRow()">
+                      <span class="material-icons-outlined">add</span> Add Drug
+                    </button>
+                  </div>
+                  <div class="card-body">
+                    <div id="drugsBuilder"></div>
+                    <p class="text-sm text-muted" style="margin-top:8px;font-size:11px">
+                      <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">alarm</span>
+                      The patient receives push reminders at the dose times you set above.
+                    </p>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">healing</span> Recovery Plan</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Expected to Feel Well By</label>
+                        <input type="date" class="form-input" id="recoveryDate">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">Follow-up Visit</label>
+                        <input type="date" class="form-input" id="followupDate">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Recovery Notes for Patient</label>
+                      <textarea class="form-textarea" id="recoveryNotes" placeholder="What to expect during recovery, warning signs..."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <div class="card" style="margin-bottom:16px">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">local_pharmacy</span> Pharmacy Routing</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="form-label">Where will the patient pick up medication?</label>
+                      <div class="radio-group">
+                        <label class="radio-option">
+                          <input type="radio" name="rxRoute" value="clinic" checked onchange="handleRxRoute(this)">
+                          <span>Available here at the clinic</span>
+                        </label>
+                        <label class="radio-option">
+                          <input type="radio" name="rxRoute" value="partner" onchange="handleRxRoute(this)">
+                          <span>Send e-prescription to partner pharmacy</span>
+                        </label>
+                      </div>
+                    </div>
+                    <div id="partnerPharmacyGroup" style="display:none">
+                      <div class="form-group">
+                        <label class="form-label">Select Partner Pharmacy</label>
+                        <select class="form-select" id="partnerPharmacy">
+                          <option value="">Choose pharmacy...</option>
+                          <option value="Kampala Central Pharmacy">Kampala Central Pharmacy</option>
+                          <option value="Mulago Hospital Pharmacy">Mulago Hospital Pharmacy</option>
+                          <option value="Nakasero Medical Pharmacy">Nakasero Medical Pharmacy</option>
+                          <option value="Homatt Partner Pharmacy">Homatt Partner Pharmacy</option>
+                        </select>
+                      </div>
+                      <div class="alert alert-info" style="font-size:12px">
+                        <span class="material-icons-outlined">notifications_active</span>
+                        <div>Patient will get a push notification to choose <strong>home delivery</strong> or <strong>self-pickup</strong>.</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-title"><span class="material-icons-outlined">create</span> Doctor Signature</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-row">
+                      <div class="form-group">
+                        <label class="form-label">Doctor Full Name</label>
+                        <input type="text" class="form-input" id="docName" value="Dr. Sarah Nakamya">
+                      </div>
+                      <div class="form-group">
+                        <label class="form-label">License Number</label>
+                        <input type="text" class="form-input" id="docLicense" value="UMC-2024-00123">
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Special Instructions for Patient</label>
+                      <textarea class="form-textarea" id="specialInstr" placeholder="Take after meals, avoid alcohol, rest..."></textarea>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="wiz-footer">
+              <button class="btn btn-ghost" onclick="goStep(3)">← Back</button>
+              <button class="btn btn-primary" onclick="issuePrescription()" style="background:#1565C0">
+                <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">send</span>
+                Issue Prescription &amp; Notify Patient
+              </button>
             </div>
           </div>
         </div>
@@ -328,6 +629,152 @@
         </div>
       </div>
 
+      <!-- ─── SETTINGS (Clinic Hours + Pharmacies) ─── -->
+      <div class="page" id="page-settings">
+        <div class="section-header">
+          <div class="section-title">Clinic Settings</div>
+          <div class="section-sub">Operating hours control whether the clinic appears in the patient mobile booking system.</div>
+        </div>
+        <div style="max-width:680px">
+          <div class="card" style="margin-bottom:16px">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">schedule</span> Operating Hours</div>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info">
+                <span class="material-icons-outlined">info</span>
+                <div style="font-size:12px">When the clinic is closed, patients <strong>will not see this clinic</strong> in the mobile app booking system.</div>
+              </div>
+
+              <div id="hoursGrid">
+                <!-- Mon-Sun rows generated below -->
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="dayMon" onchange="toggleDay('Mon')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Monday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeMon">
+                    <input type="time" class="form-input" id="openMon" value="08:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeMon" value="17:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="dayTue" onchange="toggleDay('Tue')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Tuesday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeTue">
+                    <input type="time" class="form-input" id="openTue" value="08:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeTue" value="17:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="dayWed" onchange="toggleDay('Wed')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Wednesday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeWed">
+                    <input type="time" class="form-input" id="openWed" value="08:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeWed" value="17:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="dayThu" onchange="toggleDay('Thu')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Thursday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeThu">
+                    <input type="time" class="form-input" id="openThu" value="08:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeThu" value="17:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="dayFri" onchange="toggleDay('Fri')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Friday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeFri">
+                    <input type="time" class="form-input" id="openFri" value="08:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeFri" value="17:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="daySat" onchange="toggleDay('Sat')" checked><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Saturday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeSat">
+                    <input type="time" class="form-input" id="openSat" value="09:00" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeSat" value="13:00" style="width:120px">
+                  </div>
+                </div>
+                <div class="hours-row">
+                  <div class="hours-day">
+                    <label class="toggle-label"><input type="checkbox" id="daySun" onchange="toggleDay('Sun')"><span class="toggle-switch"></span></label>
+                    <span class="fw-600">Sunday</span>
+                  </div>
+                  <div class="hours-times" id="hoursTimeSun" style="opacity:0.4">
+                    <input type="time" class="form-input" id="openSun" value="" style="width:120px">
+                    <span class="text-muted text-sm">to</span>
+                    <input type="time" class="form-input" id="closeSun" value="" style="width:120px">
+                  </div>
+                </div>
+              </div>
+
+              <div style="margin-top:20px;display:flex;align-items:center;gap:12px">
+                <button class="btn btn-primary" onclick="saveClinicHours()" style="background:#1565C0">
+                  <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">save</span> Save Hours
+                </button>
+                <span id="hoursSavedMsg" style="display:none;color:var(--brand-primary);font-size:13px;font-weight:600">✓ Saved — patient app updated</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><span class="material-icons-outlined">local_pharmacy</span> Partner Pharmacies</div>
+            </div>
+            <div class="card-body">
+              <p class="text-sm text-muted" style="margin-bottom:8px">Pharmacies that can receive e-prescriptions when a medication isn't available at this clinic.</p>
+              <div class="pharmacy-item">
+                <div>
+                  <div class="fw-600">Kampala Central Pharmacy</div>
+                  <div class="text-sm text-muted">+256 700 111 222 · Kampala City Centre</div>
+                </div>
+                <span class="badge badge-confirmed">Active</span>
+              </div>
+              <div class="pharmacy-item">
+                <div>
+                  <div class="fw-600">Mulago Hospital Pharmacy</div>
+                  <div class="text-sm text-muted">+256 700 333 444 · Mulago Hill</div>
+                </div>
+                <span class="badge badge-confirmed">Active</span>
+              </div>
+              <div class="pharmacy-item">
+                <div>
+                  <div class="fw-600">Nakasero Medical Pharmacy</div>
+                  <div class="text-sm text-muted">+256 700 555 666 · Nakasero</div>
+                </div>
+                <span class="badge badge-confirmed">Active</span>
+              </div>
+              <div class="pharmacy-item">
+                <div>
+                  <div class="fw-600">Homatt Partner Pharmacy</div>
+                  <div class="text-sm text-muted">Home delivery available · +256 700 000 123</div>
+                </div>
+                <span class="badge badge-confirmed">Active</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ─── PROFILE ─── -->
       <div class="page" id="page-profile">
         <div class="section-header"><div class="section-title">Doctor Profile</div></div>
@@ -366,8 +813,28 @@
     <div class="modal-body">
       <div class="alert alert-success">
         <span class="material-icons-outlined">check_circle</span>
-        <div>Prescription digitally signed and sent to pharmacy. Patient notified via SMS.</div>
+        <div><strong>Prescription digitally signed.</strong> Patient receives a push notification with the prescription details and dose schedule.</div>
       </div>
+
+      <div id="rxDeliverySection" style="display:none">
+        <div class="alert alert-info">
+          <span class="material-icons-outlined">local_shipping</span>
+          <div>
+            <strong>E-prescription sent</strong> to <span id="rxPharmacyName">Partner Pharmacy</span>.
+            Patient will get a push notification to choose <strong>home delivery</strong> or <strong>self-pickup</strong>.
+          </div>
+        </div>
+      </div>
+
+      <div class="alert alert-info">
+        <span class="material-icons-outlined">notifications_active</span>
+        <div style="font-size:12px">
+          <strong>Scheduled reminders:</strong>
+          <br>• Medication reminders at the dose times set by you
+          <br>• Health check-in 24 hours after issuing — directs the patient back to the app to report how they feel
+        </div>
+      </div>
+
       <div class="rx-preview" id="rxPreviewText"></div>
     </div>
     <div class="modal-footer">
