@@ -3,17 +3,25 @@ name: Deploy Frontend to GitHub Pages
 on:
   push:
     branches:
-      - master
-      - 'claude/**'               # Also deploy from active fix branches
+      - main                      # GitHub default branch
+      - master                    # legacy default branch
+      - 'claude/**'               # active fix / feature branches
     paths:
-      - 'app/**'                  # Run when app files change
+      - 'app/**'
       - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:              # allow manual re-deploy from the Actions tab
+
+# Avoid two concurrent deploys racing each other when multiple commits land
+# back-to-back. The newer commit wins; queued runs are cancelled.
+concurrency:
+  group: deploy-frontend-pages
+  cancel-in-progress: true
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write             # Required to push to gh-pages
+      contents: write             # required to push to gh-pages
 
     steps:
       - name: Checkout code
@@ -36,10 +44,16 @@ jobs:
           # Strip leading whitespace added by YAML indentation
           sed -i 's/^          //' app/js/config.js
 
+      - name: Ensure .nojekyll exists (GitHub Pages must skip Jekyll for our /portals/ tree)
+        run: touch app/.nojekyll
+
       - name: Deploy app/ to GitHub Pages (gh-pages branch)
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./app
           publish_branch: gh-pages
-          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }}'
+          # Atomic, fully-replacing deploy — no stale files surviving from prior commits.
+          force_orphan: true
+          enable_jekyll: false
+          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }} (${{ github.sha }})'

@@ -2,10 +2,18 @@ name: Deploy Edge Functions & Run Migration
 
 on:
   push:
-    branches: [master]
+    branches:
+      - main
+      - master
     paths:
       - 'supabase/functions/**'
       - 'supabase/migrations/**'
+  workflow_dispatch:              # allow manual re-run from the Actions tab
+
+# Don't let two runs try to push functions / migrations at the same time.
+concurrency:
+  group: deploy-edge-function
+  cancel-in-progress: false       # let the in-flight migration finish
 
 jobs:
   deploy:
