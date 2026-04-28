@@ -195,17 +195,23 @@
         <div class="dash-section">
           <h3 class="section-title">Health Trackers</h3>
           <div class="feature-grid">
+            <div class="feature-card" id="featureCycle" onclick="window.location.href='cycle-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap cycle-tracker">
+                <span class="material-icons-outlined">calendar_month</span>
+              </div>
+              <span class="feature-label">Cycle Tracker</span>
+            </div>
+            <div class="feature-card" id="featurePregnancy" onclick="window.location.href='pregnancy-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap" style="background:linear-gradient(135deg,#6A1B9A,#8E24AA)">
+                <span class="material-icons-outlined" style="color:#fff">pregnant_woman</span>
+              </div>
+              <span class="feature-label">Pregnancy</span>
+            </div>
             <div class="feature-card" id="featureMalaria" onclick="window.location.href='malaria-tracker.html'" style="cursor:pointer;touch-action:manipulation">
               <div class="feature-icon-wrap" style="background:#FFF9C4">
                 <span class="material-icons-outlined" style="color:#F57F17">pest_control</span>
               </div>
               <span class="feature-label">Malaria</span>
-            </div>
-            <div class="feature-card" id="featureCycle" onclick="window.location.href='cycle-tracker.html'" style="cursor:pointer;touch-action:manipulation">
-              <div class="feature-icon-wrap cycle-tracker">
-                <span class="material-icons-outlined">calendar_month</span>
-              </div>
-              <span class="feature-label">Cycle</span>
             </div>
             <div class="feature-card" id="featureMoodSleep" onclick="window.location.href='mood-sleep-tracker.html'" style="cursor:pointer;touch-action:manipulation">
               <div class="feature-icon-wrap mood-tracker">
@@ -282,13 +288,17 @@
         <span class="material-icons-outlined">home</span>
         <span class="nav-label">Home</span>
       </div>
+      <div class="nav-item" id="navShop" onclick="window.location.href='shop.html'" style="cursor:pointer">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
       <div class="nav-item" id="navFamily" onclick="window.location.href='family.html'" style="cursor:pointer">
         <span class="material-icons-outlined">family_restroom</span>
         <span class="nav-label">Family</span>
       </div>
-      <div class="nav-item" id="navShop" onclick="window.location.href='shop.html'" style="cursor:pointer">
-        <span class="material-icons-outlined">storefront</span>
-        <span class="nav-label">Shop</span>
+      <div class="nav-item" id="navWallet" onclick="window.location.href='wallet.html'" style="cursor:pointer">
+        <span class="material-icons-outlined">account_balance_wallet</span>
+        <span class="nav-label">Wallet</span>
       </div>
       <div class="nav-item" id="navProfile" onclick="window.location.href='profile.html'" style="cursor:pointer">
         <span class="material-icons-outlined">person</span>

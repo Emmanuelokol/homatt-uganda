@@ -48,13 +48,17 @@
       // 1. Let the current page handle it if it registered a custom handler
       if (window.HomattBackHandler && window.HomattBackHandler()) return;
 
-      // 2. Close any open sheet / modal
+      // 2. Close any open sheet / modal — also clears any stuck JS-injected overlay.
       const openSheet = document.querySelector('.bottom-sheet.open, .modal.open, .overlay.active');
       if (openSheet) {
         openSheet.classList.remove('open', 'active');
         document.querySelectorAll('.sheet-overlay').forEach(o => o.classList.remove('visible'));
+        _clearStuckOverlays();
         return;
       }
+
+      // Safety: even if no open sheet, remove any orphaned overlays before navigating.
+      _clearStuckOverlays();
 
       // 3. Default page navigation
       const mainPages = ['dashboard.html', 'signin.html', 'index.html'];
@@ -64,6 +68,21 @@
       } else {
         window.history.back();
       }
+    });
+  }
+
+  // Remove any JS-injected fixed overlays that may have been orphaned by interrupted
+  // navigation or by a hardware gesture dismissing a panel without running its close handler.
+  function _clearStuckOverlays() {
+    ['notifOverlay', 'notifPanel', '_rtaPanel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    // Also remove any anonymous fixed divs that cover the full screen (z-index > 500).
+    document.querySelectorAll('body > div[style*="position:fixed"], body > div[style*="position: fixed"]').forEach(el => {
+      const style = el.style;
+      const z = parseInt(style.zIndex || '0', 10);
+      if (z > 500 && !el.id.startsWith('_network')) el.remove();
     });
   }
 

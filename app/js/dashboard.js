@@ -306,8 +306,28 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (panel) {
       panel.style.transform = 'translateX(-50%) translateY(100%)';
       setTimeout(() => { panel.remove(); if (overlay) overlay.remove(); }, 320);
+    } else if (overlay) {
+      overlay.remove();
     }
   }
+
+  // Safety net: clear any stuck overlay on blur/focus, back-button navigation, and visibility change.
+  // If the user dismisses the notification panel via a swipe or hardware gesture, the overlay
+  // can occasionally get orphaned in the DOM and block all touch events.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const stuck = document.getElementById('notifOverlay');
+      if (stuck) stuck.remove();
+      const stuckPanel = document.getElementById('notifPanel');
+      if (stuckPanel) stuckPanel.remove();
+    }
+  });
+
+  // Also clear on page focus (device wakes up or user returns from another app).
+  window.addEventListener('focus', () => {
+    const stuck = document.getElementById('notifOverlay');
+    if (stuck) stuck.remove();
+  });
 
   // ====== Health Predictions from Tracker Data ======
   function runHealthPredictions() {
