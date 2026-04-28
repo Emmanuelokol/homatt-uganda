@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <title>Homatt Health</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(135deg, #1B5E20 0%, #2E7D32 100%);
+      height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; font-family: 'Inter', sans-serif;
+    }
+    .logo { text-align: center; color: white; }
+    .logo-icon {
+      width: 80px; height: 80px; background: rgba(255,255,255,0.2);
+      border-radius: 22px; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 20px; backdrop-filter: blur(10px);
+    }
+    .logo-icon svg { width: 44px; height: 44px; fill: white; }
+    .logo-name { font-size: 32px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo-sub  { font-size: 14px; opacity: 0.7; margin-top: 6px; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid rgba(255,255,255,0.3);
+      border-top-color: white; border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 40px auto 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/><path d="M11 6h2v2h-2zM11 16h2v2h-2z" style="fill:rgba(255,255,255,0.4)"/></svg>
+    </div>
+    <div class="logo-name">Homatt Health</div>
+    <div class="logo-sub">Uganda</div>
+  </div>
+  <div class="spinner"></div>
+
+  <script>
+    // Check for existing Supabase session, redirect accordingly
+    (function () {
+      const SESSION_KEY = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      const session = SESSION_KEY ? JSON.parse(localStorage.getItem(SESSION_KEY) || 'null') : null;
+      const dest = (session && session.access_token) ? 'dashboard.html' : 'signin.html';
+      window.location.replace(dest);
+    })();
+  </script>
+</body>
+</html>
