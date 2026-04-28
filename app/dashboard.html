@@ -15,9 +15,8 @@
   <!-- OneSignal Web Push SDK -->
   <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   <style>
-    /* Active screen toggling */
+    /* Screen toggling is handled via element.style.display in dashboard.js */
     .app-screen { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-    .app-screen:not(.active) { display: none; }
   </style>
 </head>
 <body>
@@ -390,7 +389,7 @@
     </div><!-- end shopScreen -->
 
     <!-- Family Screen -->
-    <div class="app-screen" id="familyScreen">
+    <div class="app-screen" id="familyScreen" style="display:none">
       <div class="dash-header" style="background:linear-gradient(135deg,#1565C0,#1976D2)">
         <div class="dash-header-top">
           <div class="dash-greeting">
@@ -415,7 +414,7 @@
     </div><!-- end familyScreen -->
 
     <!-- Wallet Screen -->
-    <div class="app-screen" id="walletScreen">
+    <div class="app-screen" id="walletScreen" style="display:none">
       <div class="dash-header" style="background:linear-gradient(135deg,#4A148C,#6A1B9A)">
         <div class="dash-header-top">
           <div class="dash-greeting">
@@ -457,7 +456,7 @@
     </div><!-- end walletScreen -->
 
     <!-- Profile Screen -->
-    <div class="app-screen" id="profileScreen">
+    <div class="app-screen" id="profileScreen" style="display:none">
       <div class="dash-header" style="background:linear-gradient(135deg,#2E7D32,#388E3C)">
         <div class="dash-header-top">
           <div class="dash-greeting">

@@ -149,9 +149,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ====== Bottom Tab Navigation ======
+  // Use inline style.display directly to guarantee override of any CSS specificity conflicts.
+  const APP_SCREENS = ['homeScreen', 'shopScreen', 'familyScreen', 'walletScreen', 'profileScreen'];
   function switchTab(screenId, navId) {
-    document.querySelectorAll('.app-screen, .shop-screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(screenId).classList.add('active');
+    APP_SCREENS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'none';
+    });
+    const target = document.getElementById(screenId);
+    if (target) target.style.display = 'flex';
     document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
     document.getElementById(navId).classList.add('active');
   }
