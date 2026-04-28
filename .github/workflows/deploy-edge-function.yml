@@ -15,6 +15,9 @@ concurrency:
   group: deploy-edge-function
   cancel-in-progress: false       # let the in-flight migration finish
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
