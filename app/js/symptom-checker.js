@@ -2314,6 +2314,28 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
     clinics = applyTieredFilter(clinics);
 
+    // Hide clinics that are closed RIGHT NOW (per their opening_hours setting),
+    // so the patient doesn't book a clinic that won't see them today.
+    // Clinics with no opening_hours configured are kept (treated as "always available").
+    function _isOpenNow(hours) {
+      if (!hours || typeof hours !== 'object') return true; // unconfigured → assume open
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const now = new Date();
+      const h = hours[days[now.getDay()]];
+      if (!h || h.closed) return false;
+      if (!h.open || !h.close) return true;
+      const [oh,om] = h.open.split(':').map(Number);
+      const [ch,cm] = h.close.split(':').map(Number);
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      return nowMin >= (oh*60+om) && nowMin < (ch*60+cm);
+    }
+    const beforeFilter = clinics.length;
+    clinics = clinics.filter(c => _isOpenNow(c.opening_hours));
+    if (beforeFilter && !clinics.length) {
+      // All filtered out — fall back to showing all so the user isn't left empty-handed
+      clinics = clinicsResult.data || [];
+    }
+
     // Sort order: GPS clinics <10 km → local no-GPS clinics (same district) → GPS clinics >10 km
     // This ensures clinics registered without coordinates (but in the user's area) appear
     // before far-away GPS clinics, not after them.
