@@ -154,12 +154,43 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99}
 .sidebar-overlay.active{display:block}
 
+/* ── Mobile bottom nav ── */
+.clinic-bottom-nav{
+  display:none;
+  position:fixed;bottom:0;left:0;right:0;
+  background:#0B1626;
+  border-top:1px solid rgba(255,255,255,0.1);
+  z-index:200;
+  padding:0;
+  padding-bottom:env(safe-area-inset-bottom,0);
+}
+.clinic-bottom-nav-inner{
+  display:flex;
+  align-items:stretch;
+}
+.cbn-link{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:9px 4px 8px;
+  color:rgba(255,255,255,0.55);
+  text-decoration:none;font-size:9.5px;font-weight:600;letter-spacing:.3px;
+  gap:2px;transition:color .15s;
+  -webkit-tap-highlight-color:transparent;
+}
+.cbn-link .material-icons-outlined{font-size:22px;display:block}
+.cbn-link.active{color:#42A5F5}
+.cbn-link.cbn-main{
+  background:#1565C0;color:#fff;border-radius:0;
+  font-weight:700;
+}
+.cbn-link.cbn-main .material-icons-outlined{font-size:26px}
+
 /* ── Responsive ── */
 @media(max-width:768px){
   .admin-sidebar{width:260px;transform:translateX(-100%);transition:transform .26s ease}
   .admin-sidebar.open{transform:translateX(0)}
-  .admin-main{margin-left:0}
-  .sidebar-hamburger{display:flex}
+  .admin-main{margin-left:0;padding-bottom:68px}
+  .sidebar-hamburger{display:none}
+  .clinic-bottom-nav{display:block}
   .admin-topbar{padding:10px 14px;gap:8px}
   .admin-topbar-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
   .admin-topbar-right{gap:6px;flex-shrink:0}
@@ -174,4 +205,5 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
   .admin-login-card{width:calc(100vw - 32px);padding:28px 20px}
   .admin-form-group input,.admin-form-group select,.admin-form-group textarea{font-size:16px!important}
   .content-row{grid-template-columns:1fr!important}
+  .admin-toast{bottom:80px}
 }
