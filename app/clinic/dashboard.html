@@ -327,11 +327,11 @@
     document.getElementById('ordersList').innerHTML = `
       <div class="empty-orders">
         <span class="material-icons-outlined">inbox</span>
-        <div style="font-size:15px;font-weight:600;color:#424242">No orders today yet</div>
-        <div style="font-size:13px;margin-top:4px">${msg || 'Post-consultation orders will appear here as you send them.'}</div>
+        <div style="font-size:15px;font-weight:600;color:#424242">No consultations today yet</div>
+        <div style="font-size:13px;margin-top:4px">${msg || 'Start a consultation — enter patient phone, AI diagnoses, confirm, add medications, send.'}</div>
         <a href="new-order.html" class="empty-orders-cta">
-          <span class="material-icons-outlined" style="font-size:16px">add</span>
-          Send First Order
+          <span class="material-icons-outlined" style="font-size:16px">medical_services</span>
+          Start First Consultation
         </a>
       </div>`;
   }
