@@ -158,29 +158,29 @@
       </div>
 
       <!-- Outcomes mini-stats -->
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(180px,1fr));margin-bottom:24px">
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
         <div class="stat-card">
-          <div class="stat-icon blue"><span class="material-icons-outlined">receipt_long</span></div>
-          <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Orders Today</div></div>
+          <div class="stat-icon blue"><span class="material-icons-outlined">medical_services</span></div>
+          <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Today</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon orange"><span class="material-icons-outlined">local_shipping</span></div>
-          <div><div class="stat-number" id="statDispatched">0</div><div class="stat-label">En Route</div></div>
+          <div class="stat-icon orange"><span class="material-icons-outlined">hotel</span></div>
+          <div><div class="stat-number" id="statDispatched">0</div><div class="stat-label">Inpatient</div></div>
         </div>
         <div class="stat-card">
-          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
-          <div><div class="stat-number" id="statDelivered">0</div><div class="stat-label">Delivered</div></div>
+          <div class="stat-icon green"><span class="material-icons-outlined">receipt_long</span></div>
+          <div><div class="stat-number" id="statDelivered">0</div><div class="stat-label">E-Prescription</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon teal"><span class="material-icons-outlined">verified</span></div>
-          <div><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Course Completed</div></div>
+          <div><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Courses Done</div></div>
         </div>
       </div>
 
-      <!-- Today's orders list -->
+      <!-- Today's consultations list -->
       <div class="admin-table-wrap" style="padding:0">
         <div class="table-header">
-          <div class="table-title">Today's Orders</div>
+          <div class="table-title">Today's Consultations</div>
           <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
         </div>
         <div id="ordersList" style="padding:16px">
@@ -248,7 +248,7 @@
   const d = new Date();
   document.getElementById('clinicUserDate').textContent = d.toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
 
-  // ── Load today's orders ───────────────────────────────────
+  // ── Load today's consultations ────────────────────────────
   async function loadTodayOrders() {
     const listEl = document.getElementById('ordersList');
     const clinicId = _clinicId || await resolveClinicId(supabase, session);
@@ -258,69 +258,96 @@
     }
 
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
-    const { data, error } = await supabase
-      .from('clinic_orders')
-      .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, delivery_method, status, course_completed, created_at, pharmacy_id')
+
+    // Load from clinic_diagnoses (new consultation wizard output)
+    const { data: dx, error: dxErr } = await supabase
+      .from('clinic_diagnoses')
+      .select('id, patient_name, patient_phone, confirmed_diagnosis, severity, patient_type, intake_schedule, expected_recovery, created_at, e_prescriptions(delivery_method, delivery_confirmed, status)')
       .eq('clinic_id', clinicId)
       .gte('created_at', startOfDay.toISOString())
       .order('created_at', { ascending: false });
 
-    if (error) {
-      listEl.innerHTML = `<div style="padding:20px;color:#C62828;text-align:center">Could not load orders: ${error.message}</div>`;
+    // Also load legacy clinic_orders (old wizard output)
+    const { data: legacyOrders } = await supabase
+      .from('clinic_orders')
+      .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, delivery_method, status, course_completed, created_at')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', startOfDay.toISOString())
+      .order('created_at', { ascending: false });
+
+    const consultations = dx || [];
+    const legacy = legacyOrders || [];
+
+    if (dxErr && !legacy.length) {
+      listEl.innerHTML = `<div style="padding:20px;color:#C62828;text-align:center">Could not load consultations: ${dxErr.message}</div>`;
       return;
     }
 
-    if (!data || !data.length) {
-      renderEmpty();
-      return;
-    }
+    if (!consultations.length && !legacy.length) { renderEmpty(); return; }
 
-    let todayCount = data.length;
-    let dispatched = 0, delivered = 0, completed = 0;
-    data.forEach(o => {
-      if (o.status === 'dispatched' || o.status === 'preparing') dispatched++;
-      if (o.status === 'delivered') delivered++;
-      if (o.course_completed) completed++;
+    // Stats from new consultations
+    let inpatient = 0, withPrescription = 0, completed = 0;
+    consultations.forEach(c => {
+      if (c.patient_type === 'inpatient') inpatient++;
+      if (c.e_prescriptions?.length) withPrescription++;
+      const meds = c.intake_schedule || [];
+      const maxDur = meds.length ? Math.max(...meds.map(m => m.duration_days || 0)) : 0;
+      const endDate = c.expected_recovery ? new Date(c.expected_recovery) : null;
+      if (endDate && endDate < new Date()) completed++;
     });
-    document.getElementById('statToday').textContent       = todayCount;
-    document.getElementById('statDispatched').textContent  = dispatched;
-    document.getElementById('statDelivered').textContent   = delivered;
-    document.getElementById('statCompleted').textContent   = completed;
 
-    listEl.innerHTML = data.map(o => {
-      const initials = (o.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
-      const t = new Date(o.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
-      const statusClass = {
-        pending: 'waiting', confirmed: 'in-progress', preparing: 'in-progress',
-        dispatched: 'in-progress', delivered: 'completed', completed: 'completed',
-        cancelled: 'urgent'
-      }[o.status] || 'normal';
-      const statusLabel = {
-        pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing',
-        dispatched: 'En Route', delivered: 'Delivered', completed: 'Delivered',
-        cancelled: 'Cancelled'
-      }[o.status] || o.status;
-      const tick = o.course_completed
-        ? '<span class="completion-tick" title="Course completed"><span class="material-icons-outlined" style="font-size:16px">check</span></span>'
-        : '<span class="completion-pending" title="Course not yet completed"><span class="material-icons-outlined" style="font-size:16px">schedule</span></span>';
-      return `
-        <div class="order-card">
-          <div class="order-avatar">${initials}</div>
-          <div class="order-info">
-            <div class="order-patient">${esc(o.patient_name)}</div>
-            <div class="order-drug">${esc(o.drug_name)} · ${esc(o.dosage)} · ${o.duration_days}d</div>
-            <div class="order-meta">
-              <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
-              <span><span class="material-icons-outlined" style="font-size:13px">${o.delivery_method === 'pickup' ? 'store' : 'local_shipping'}</span>${o.delivery_method === 'pickup' ? 'Pickup' : 'Delivery'}</span>
-              <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(o.patient_phone || '')}</span>
+    document.getElementById('statToday').textContent      = consultations.length + legacy.length;
+    document.getElementById('statDispatched').textContent = inpatient;
+    document.getElementById('statDelivered').textContent  = withPrescription;
+    document.getElementById('statCompleted').textContent  = completed;
+
+    listEl.innerHTML = [
+      ...consultations.map(c => {
+        const initials = (c.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+        const t = new Date(c.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
+        const meds = (c.intake_schedule || []).map(m => m.drug_name).filter(Boolean);
+        const medSummary = meds.length ? meds.slice(0,2).join(', ') + (meds.length > 2 ? ` +${meds.length-2}` : '') : 'No medications';
+        const typeLabel = c.patient_type === 'inpatient' ? '🏥 Inpatient' : 'Outpatient';
+        const rx = c.e_prescriptions?.[0];
+        const rxBadge = rx ? `<span><span class="material-icons-outlined" style="font-size:13px">receipt_long</span>E-Rx</span>` : '';
+        return `
+          <div class="order-card">
+            <div class="order-avatar">${initials}</div>
+            <div class="order-info">
+              <div class="order-patient">${esc(c.patient_name || c.patient_phone || 'Unknown')}</div>
+              <div class="order-drug">${esc(c.confirmed_diagnosis || 'Diagnosis pending')} · ${esc(medSummary)}</div>
+              <div class="order-meta">
+                <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
+                <span>${typeLabel}</span>
+                ${rxBadge}
+                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(c.patient_phone || '')}</span>
+              </div>
             </div>
-          </div>
-          <div class="order-right">
-            <div class="order-status"><span class="status-badge ${statusClass}">${statusLabel}</span></div>
-            ${tick}
-          </div>
-        </div>`;
-    }).join('');
+            <div class="order-right">
+              <div class="order-status"><span class="status-badge in-progress">${esc(c.severity || 'moderate')}</span></div>
+            </div>
+          </div>`;
+      }),
+      ...legacy.map(o => {
+        const initials = (o.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+        const t = new Date(o.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
+        return `
+          <div class="order-card">
+            <div class="order-avatar" style="background:#FFF3E0;color:#E65100">${initials}</div>
+            <div class="order-info">
+              <div class="order-patient">${esc(o.patient_name)}</div>
+              <div class="order-drug">${esc(o.drug_name)} · ${esc(o.dosage)} · ${o.duration_days}d</div>
+              <div class="order-meta">
+                <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
+                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(o.patient_phone || '')}</span>
+              </div>
+            </div>
+            <div class="order-right">
+              <div class="order-status"><span class="status-badge normal">${esc(o.status || 'pending')}</span></div>
+            </div>
+          </div>`;
+      }),
+    ].join('');
   }
 
   function renderEmpty(msg) {
