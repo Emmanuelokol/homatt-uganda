@@ -22,6 +22,8 @@
   const state = {
     step: 1,
     patient: null,         // {id, clinicPatientId, name, phone, registered}
+    bookingId: null,       // set when verified via booking code
+    bookingCode: null,
     aiDiagnoses: [],       // [{name, likelihood_percent, urgency}]
     aiSelectedIdx: -1,     // which AI diagnosis was selected
     aiSource: 'app',       // 'app' (from triage history) | 'clinic_input'
@@ -158,12 +160,18 @@
     document.getElementById('patientSearchBlock').style.display = 'none';
     document.getElementById('patientPillBlock').style.display = '';
     document.getElementById('ppName').textContent  = p.name;
-    document.getElementById('ppPhone').textContent = p.phone;
+    document.getElementById('ppPhone').textContent = p.phone || (p.fromBooking ? 'From booking ' + (state.bookingCode || '') : '');
     document.getElementById('ppAvatar').textContent = (p.name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
     const badge = document.getElementById('ppBadge');
-    badge.textContent = p.registered ? 'On Homatt' : 'Walk-in';
-    badge.style.background = p.registered ? '#fff' : '#FFE0B2';
-    badge.style.color = p.registered ? '#2E7D32' : '#E65100';
+    if (p.fromBooking) {
+      badge.textContent = '✓ Verified';
+      badge.style.background = '#E8F5E9';
+      badge.style.color = '#1B5E20';
+    } else {
+      badge.textContent = p.registered ? 'On Homatt' : 'Walk-in';
+      badge.style.background = p.registered ? '#fff' : '#FFE0B2';
+      badge.style.color = p.registered ? '#2E7D32' : '#E65100';
+    }
     patientMenu.style.display = 'none';
     document.getElementById('step1Next').disabled = false;
   }
@@ -238,24 +246,77 @@
     loadAiDiagnoses();
   };
 
-  // Pre-fill from URL params (when navigated from patients.html)
+  // Pre-fill from URL params (from patients.html or verified booking code)
   (function preFillFromURL() {
     const p = new URLSearchParams(window.location.search);
-    const name  = p.get('patient_name');
-    const phone = p.get('patient_phone');
-    const id    = p.get('patient_id');
-    const cpId  = p.get('clinic_patient_id');
-    if (name && phone) {
+    const name      = p.get('patient_name');
+    const phone     = p.get('patient_phone');
+    const id        = p.get('patient_id');
+    const cpId      = p.get('clinic_patient_id');
+    const bookingId = p.get('booking_id');
+    const bookingCode = p.get('booking_code');
+
+    if (bookingId) {
+      state.bookingId   = bookingId;
+      state.bookingCode = bookingCode || null;
+    }
+
+    if (name && (phone || bookingId)) {
       selectPatient({
         id: id || null,
         clinicPatientId: cpId || null,
-        name, phone,
+        name, phone: phone || '',
         registered: !!id,
+        fromBooking: !!bookingId,
       });
+
+      // If we came from a verified booking, advance straight to Step 2
+      // and load AI diagnoses from the booking record
+      if (bookingId) {
+        setTimeout(() => {
+          showStep(2);
+          loadAiDiagnosesFromBooking(bookingId);
+        }, 50);
+      }
       return;
     }
     setTimeout(() => phoneInput.focus(), 200);
   })();
+
+  // Pull conditions_json from the booking the patient already created in the app
+  async function loadAiDiagnosesFromBooking(bookingId) {
+    if (!supabase) return;
+    aiDxArea.innerHTML = `
+      <div style="text-align:center;padding:30px;color:#9AA0A6">
+        <span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:6px">hourglass_empty</span>
+        Loading diagnoses from patient's booking…
+      </div>`;
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('conditions_json, ai_diagnosis, ai_confidence, symptoms, urgency_level, created_at')
+      .eq('id', bookingId)
+      .maybeSingle();
+
+    if (booking?.conditions_json?.length) {
+      state.aiDiagnoses = booking.conditions_json.slice(0, 3);
+      state.aiSource = 'app';
+      state.enteredSymptoms = booking.symptoms || '';
+      renderAiCards({
+        created_at: booking.created_at,
+        clinic_urgency: booking.urgency_level === 'high' ? 'urgent' : 'soon',
+      });
+    } else if (booking?.ai_diagnosis) {
+      // Single diagnosis fallback
+      state.aiDiagnoses = [{
+        name: booking.ai_diagnosis,
+        likelihood_percent: booking.ai_confidence || 60,
+      }];
+      state.aiSource = 'app';
+      renderAiCards({ created_at: booking.created_at });
+    } else {
+      showManualEntry('Booking found, but no AI diagnoses recorded — enter symptoms below');
+    }
+  }
 
   // ════════════════════════════════════════════════════════════════
   // STEP 2: AI Diagnoses
@@ -800,6 +861,7 @@
     const dxPayload = {
       clinic_id: _clinicId,
       clinician_id: session?.userId || null,
+      booking_id: state.bookingId || null,
       patient_name: state.patient.name || null,
       patient_phone: state.patient.phone,
       clinic_patient_id: state.patient.clinicPatientId || null,
@@ -871,7 +933,21 @@
       } catch (e) { /* non-fatal; reminders won't fire but consultation is saved */ }
     }
 
-    // 4. If e-prescription, send delivery confirmation push to patient (best-effort)
+    // 4. Link booking → clinic_diagnosis and mark as attended
+    if (state.bookingId) {
+      try {
+        await supabase
+          .from('bookings')
+          .update({
+            status: 'attended',
+            attended_at: new Date().toISOString(),
+            clinic_diagnosis_id: dx.id,
+          })
+          .eq('id', state.bookingId);
+      } catch(e) { /* non-fatal */ }
+    }
+
+    // 5. If e-prescription, send delivery confirmation push to patient (best-effort)
     if (state.stockSource === 'pharmacy' && state.patient.id) {
       try {
         await supabase.functions.invoke('send-notification', {
