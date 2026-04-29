@@ -183,6 +183,20 @@
         </div>
       </div>
 
+      <!-- Pending bookings (patients who booked but haven't been seen) -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
+            Patients Coming In
+          </div>
+          <span id="pendingCount" style="font-size:13px;color:#E65100;font-weight:600"></span>
+        </div>
+        <div id="pendingBookingsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings…</div>
+        </div>
+      </div>
+
       <!-- Today's consultations list -->
       <div class="admin-table-wrap" style="padding:0">
         <div class="table-header">
@@ -270,7 +284,7 @@
   if (!_clinicId && supabase && !session?.demo) {
     resolveClinicId(supabase, session).then(id => {
       _clinicId = id;
-      if (id) loadTodayOrders(); // reload once we have the id
+      if (id) { loadTodayOrders(); loadPendingBookings(); }
     });
   }
 
@@ -544,10 +558,77 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // ── Load pending bookings (patients heading to this clinic) ─────
+  async function loadPendingBookings() {
+    const listEl = document.getElementById('pendingBookingsList');
+    const countEl = document.getElementById('pendingCount');
+    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+    if (!supabase || !clinicId) {
+      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No clinic linked.</div>';
+      countEl.textContent = '';
+      return;
+    }
+
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at')
+      .eq('clinic_id', clinicId)
+      .in('status', ['pending', 'confirmed'])
+      .gte('created_at', since)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (!bookings?.length) {
+      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No pending bookings. Patients who book in the app will show here.</div>';
+      countEl.textContent = '';
+      return;
+    }
+
+    countEl.textContent = `${bookings.length} waiting`;
+
+    listEl.innerHTML = bookings.map(b => {
+      const initials = (b.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+      const t = new Date(b.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
+      const urgent = b.urgency_level === 'high' ? 'urgent' : b.urgency_level === 'medium' ? 'in-progress' : 'normal';
+      const timeLabel = b.preferred_time === 'asap' ? 'ASAP'
+                      : b.preferred_time === 'today_afternoon' ? 'This afternoon'
+                      : b.preferred_time === 'tomorrow_morning' ? 'Tomorrow' : (b.preferred_time || '');
+      return `
+        <div class="order-card" style="margin:8px 16px;cursor:pointer" data-code="${esc(b.booking_code)}">
+          <div class="order-avatar" style="background:#FFF8E1;color:#E65100">${initials}</div>
+          <div class="order-info">
+            <div class="order-patient">${esc(b.patient_name || 'Unknown')}</div>
+            <div class="order-drug">${esc(b.ai_diagnosis || 'No AI diagnosis')} · Code <strong style="color:#1B5E20;letter-spacing:1px">${esc(b.booking_code)}</strong></div>
+            <div class="order-meta">
+              <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
+              <span>${esc(timeLabel)}</span>
+            </div>
+          </div>
+          <div class="order-right">
+            <div class="order-status"><span class="status-badge ${urgent}">${esc(b.urgency_level || 'normal')}</span></div>
+            <button style="margin-top:6px;background:#1565C0;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">
+              <span class="material-icons-outlined" style="font-size:12px;vertical-align:-2px">verified</span> Verify
+            </button>
+          </div>
+        </div>`;
+    }).join('');
+
+    listEl.querySelectorAll('[data-code]').forEach(el => {
+      el.onclick = () => {
+        vmCode.value = el.dataset.code;
+        openVerifyModal();
+        vmCode.value = el.dataset.code; // re-set after open clears it
+        setTimeout(() => vmPin.focus(), 120);
+      };
+    });
+  }
+
   loadTodayOrders();
+  loadPendingBookings();
 
   // Auto-refresh every 30 seconds
-  setInterval(loadTodayOrders, 30 * 1000);
+  setInterval(() => { loadTodayOrders(); loadPendingBookings(); }, 30 * 1000);
 </script>
 </body>
 </html>
