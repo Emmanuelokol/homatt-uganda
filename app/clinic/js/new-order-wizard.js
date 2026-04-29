@@ -889,6 +889,10 @@
     setTimeout(() => { window.location.href = 'dashboard.html'; }, 900);
   };
 
+  // Initialise: highlight step 1 pills and add first med row
+  showStep(1);
+  addMedication();
+
   window._wizState = state;
   window._showStep = showStep;
   window._wizEsc = esc;
