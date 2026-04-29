@@ -352,9 +352,15 @@
   document.getElementById('clinicUserDate').textContent =
     new Date().toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
 
+  // Resolve clinic_id (in case it wasn't in the stored session)
+  let _clinicId = session?.clinicId || null;
+  if (!_clinicId && supabase && !session?.demo) {
+    resolveClinicId(supabase, session).then(id => { _clinicId = id; });
+  }
+
   // ── State ────────────────────────────────────────────────
   const state = {
-    patient: null,            // { id, name, phone, isNew, registered }
+    patient: null,            // { id, clinicPatientId, name, phone, registered }
     drug: null,               // formulary row
     dosage: '',
     durationDays: 5,
@@ -499,11 +505,33 @@
     const phone = regPhoneInput.value.trim();
     if (!name || !phone) { showToast('Name and phone are required', 'error'); return; }
 
-    // Insert a stub profile record (no auth user yet — patient completes via SMS link).
-    // We create a row in `clinic_unregistered_patients` (just a JSON column on clinic_orders is enough actually).
-    // Simpler: we just hold the name/phone in memory and let the order itself store them.
-    selectPatient({ id: null, name, phone, registered: false });
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+
+    // Ensure we have the clinic ID
+    if (!_clinicId && supabase && !session?.demo) {
+      _clinicId = await resolveClinicId(supabase, session);
+    }
+
+    // Save the stub patient to clinic_patients in Supabase
+    let clinicPatientId = null;
+    if (supabase && _clinicId) {
+      try {
+        const { data: cp } = await supabase
+          .from('clinic_patients')
+          .upsert(
+            { clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null },
+            { onConflict: 'clinic_id,phone' }
+          )
+          .select('id')
+          .single();
+        if (cp) clinicPatientId = cp.id;
+      } catch (e) { /* non-fatal — order still saves name/phone */ }
+    }
+
+    selectPatient({ id: null, clinicPatientId, name, phone, registered: false });
     regModal.style.display = 'none';
+    btn.disabled = false;
 
     // Fire an SMS invite (best-effort, don't block)
     if (supabase) {
@@ -513,7 +541,7 @@
         });
       } catch(e) { /* best-effort, no UX impact */ }
     }
-    showToast('Patient added. SMS invite sent.', 'success');
+    showToast('Patient saved & SMS invite sent.', 'success');
   };
 
   // ── Drug autocomplete ────────────────────────────────────
@@ -645,7 +673,12 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Sending…';
 
-    if (!supabase || !session?.clinicId) {
+    // Resolve clinic_id one last time in case the async resolve hadn't finished
+    if (!_clinicId && supabase && !session?.demo) {
+      _clinicId = await resolveClinicId(supabase, session);
+    }
+
+    if (!supabase || !_clinicId) {
       showToast('Demo mode — order not saved. Connect a clinic to save.', 'error');
       btn.disabled = false;
       btn.innerHTML = '<span class="material-icons-outlined">send</span> Send Order';
@@ -655,10 +688,11 @@
     const sched = state.followupEnabled ? buildFollowupSchedule(state.durationDays) : [];
 
     const { data: order, error } = await supabase.from('clinic_orders').insert({
-      clinic_id: session.clinicId,
+      clinic_id: _clinicId,
       issued_by: session.userId || null,
       issued_by_name: session.staffName || null,
       patient_id: state.patient.id || null,
+      clinic_patient_id: state.patient.clinicPatientId || null,
       patient_name: state.patient.name,
       patient_phone: state.patient.phone,
       drug_name: state.drug.name,
@@ -701,12 +735,14 @@
   // Pre-fill from URL params (when navigated from patients.html)
   (function preFillFromURL() {
     const p = new URLSearchParams(window.location.search);
-    const name  = p.get('patient_name');
-    const phone = p.get('patient_phone');
-    const id    = p.get('patient_id');
+    const name            = p.get('patient_name');
+    const phone           = p.get('patient_phone');
+    const id              = p.get('patient_id');
+    const clinicPatientId = p.get('clinic_patient_id');
     if (name && phone) {
       selectPatient({
         id: id || null,
+        clinicPatientId: clinicPatientId || null,
         name,
         phone,
         registered: !!id,

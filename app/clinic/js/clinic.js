@@ -109,6 +109,41 @@ function setupClinicLogout() {
   });
 }
 
+/**
+ * Resolves the clinic_id for the logged-in staff member.
+ * If the session already has a clinicId, returns it immediately.
+ * Otherwise queries portal_users, updates the stored session, and returns it.
+ * Returns null for demo sessions or when no clinic is linked.
+ */
+async function resolveClinicId(supabase, session) {
+  if (!session || session.demo) return null;
+  if (session.clinicId) return session.clinicId;
+  if (!supabase) return null;
+
+  try {
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData?.session?.user) return null;
+
+    const { data: pu } = await supabase
+      .from('portal_users')
+      .select('clinic_id, clinics(name)')
+      .eq('auth_user_id', authData.session.user.id)
+      .eq('role', 'clinic_staff')
+      .eq('is_active', true)
+      .single();
+
+    if (pu?.clinic_id) {
+      const updated = Object.assign({}, session, {
+        clinicId: pu.clinic_id,
+        clinicName: pu.clinics?.name || session.clinicName || 'Clinic',
+      });
+      localStorage.setItem('clinic_session', JSON.stringify(updated));
+      return pu.clinic_id;
+    }
+  } catch (e) { /* network error — fail gracefully */ }
+  return null;
+}
+
 function showToast(msg, type = 'success') {
   let t = document.getElementById('clinicToast');
   if (!t) { t = document.createElement('div'); t.id = 'clinicToast'; t.className = 'admin-toast'; document.body.appendChild(t); }

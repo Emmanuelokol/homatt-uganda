@@ -203,6 +203,15 @@
 
   const supabase = _getClinicSupabase();
 
+  // Resolve clinic_id (handles case where session was stored before clinic_id was available)
+  let _clinicId = session?.clinicId || null;
+  if (!_clinicId && supabase && !session?.demo) {
+    resolveClinicId(supabase, session).then(id => {
+      _clinicId = id;
+      if (id) loadTodayOrders(); // reload once we have the id
+    });
+  }
+
   // ── Greeting ──────────────────────────────────────────────
   const h = new Date().getHours();
   const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
@@ -225,7 +234,8 @@
   // ── Load today's orders ───────────────────────────────────
   async function loadTodayOrders() {
     const listEl = document.getElementById('ordersList');
-    if (!supabase || !session?.clinicId) {
+    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+    if (!supabase || !clinicId) {
       renderEmpty('No clinic linked to your account yet.');
       return;
     }
@@ -234,7 +244,7 @@
     const { data, error } = await supabase
       .from('clinic_orders')
       .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, delivery_method, status, course_completed, created_at, pharmacy_id')
-      .eq('clinic_id', session.clinicId)
+      .eq('clinic_id', clinicId)
       .gte('created_at', startOfDay.toISOString())
       .order('created_at', { ascending: false });
 
