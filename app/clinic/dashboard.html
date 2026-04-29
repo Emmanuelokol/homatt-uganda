@@ -262,7 +262,7 @@
     // Load from clinic_diagnoses (new consultation wizard output)
     const { data: dx, error: dxErr } = await supabase
       .from('clinic_diagnoses')
-      .select('id, patient_phone, clinic_patient_id, confirmed_diagnosis, severity, patient_type, intake_schedule, expected_recovery, created_at, clinic_patients(full_name), e_prescriptions(delivery_method, delivery_confirmed, status)')
+      .select('id, patient_name, patient_phone, clinic_patient_id, confirmed_diagnosis, severity, patient_type, intake_schedule, expected_recovery, created_at, clinic_patients(full_name), e_prescriptions(delivery_method, delivery_confirmed, status)')
       .eq('clinic_id', clinicId)
       .gte('created_at', startOfDay.toISOString())
       .order('created_at', { ascending: false });
@@ -303,7 +303,7 @@
 
     listEl.innerHTML = [
       ...consultations.map(c => {
-        const patName = c.clinic_patients?.full_name || c.patient_phone || 'Unknown';
+        const patName = c.patient_name || c.clinic_patients?.full_name || c.patient_phone || 'Unknown';
         const initials = patName.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
         const t = new Date(c.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
         const meds = (c.intake_schedule || []).map(m => m.drug_name).filter(Boolean);

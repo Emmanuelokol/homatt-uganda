@@ -800,6 +800,7 @@
     const dxPayload = {
       clinic_id: _clinicId,
       clinician_id: session?.userId || null,
+      patient_name: state.patient.name || null,
       patient_phone: state.patient.phone,
       clinic_patient_id: state.patient.clinicPatientId || null,
       ai_diagnoses: state.aiDiagnoses,
