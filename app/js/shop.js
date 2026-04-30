@@ -660,7 +660,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm) : _deliverySettings.min_fee;
+    const curDeliveryFee = _nearestPharmacy ? calcDeliveryFee(_nearestPharmacy.distanceKm)
+                         : Math.max(_deliverySettings.min_fee, _deliverySettings.base_fee);
     document.getElementById('cartSubtotal').textContent = subtotal.toLocaleString();
     document.getElementById('cartDeliveryFee').textContent = curDeliveryFee.toLocaleString();
     document.getElementById('cartTotal').textContent = (subtotal + curDeliveryFee).toLocaleString();
@@ -726,9 +727,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function calcDeliveryFee(distanceKm) {
-    const { base_fee, per_km_rate, min_fee } = _deliverySettings;
-    const fee = base_fee + Math.round(distanceKm) * per_km_rate;
-    return Math.max(min_fee, Math.round(fee / 500) * 500);
+    // If the nearest pharmacy has its own flat delivery_fee, use that.
+    // Otherwise use base_fee as a flat charge — the per_km_rate is intentionally
+    // ignored here because distance-based pricing inflates costs unpredictably
+    // for customers far from the city centre.
+    if (_nearestPharmacy && _nearestPharmacy.delivery_fee > 0) {
+      return _nearestPharmacy.delivery_fee;
+    }
+    const { base_fee, min_fee } = _deliverySettings;
+    return Math.max(min_fee, base_fee);
   }
 
   async function findNearestPharmacy(userLat, userLon) {
