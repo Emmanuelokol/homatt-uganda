@@ -312,6 +312,7 @@
     setTimeout(() => vmCode.focus(), 100);
   }
   function closeVerifyModal() { vmModal.style.display = 'none'; }
+  window.openVerifyModal = openVerifyModal;
 
   document.getElementById('verifyCodeBtn').onclick = openVerifyModal;
   document.getElementById('vmCancelBtn').onclick   = closeVerifyModal;
@@ -439,68 +440,97 @@
   document.getElementById('clinicUserDate').textContent = d.toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
 
   // ── Load today's consultations ────────────────────────────
+  // Wraps a promise with a timeout so the UI never hangs forever
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout:'+label)), ms))
+    ]);
+  }
+
   async function loadTodayOrders() {
     const listEl = document.getElementById('ordersList');
-    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+    let clinicId = _clinicId;
+    if (!clinicId && supabase && !session?.demo) {
+      try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
+    }
     if (!supabase || !clinicId) {
-      renderEmpty('No clinic linked to your account yet.');
+      renderEmpty(session?.demo ? 'You are in demo mode — sign in with a real clinic account to see live consultations.' : 'No clinic linked to your account yet. Ask your admin to link your account in Settings.');
       return;
     }
 
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
 
-    // Load from clinic_diagnoses (new consultation wizard output)
-    const { data: dx, error: dxErr } = await supabase
-      .from('clinic_diagnoses')
-      .select('id, patient_name, patient_phone, clinic_patient_id, confirmed_diagnosis, severity, patient_type, intake_schedule, expected_recovery, created_at, clinic_patients(full_name), e_prescriptions(delivery_method, delivery_confirmed, status)')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', startOfDay.toISOString())
-      .order('created_at', { ascending: false });
+    // Load from clinic_diagnoses — use only safe columns (no joins to avoid breaking when migrations aren't applied)
+    let dx = [], dxErr = null;
+    try {
+      const res = await withTimeout(
+        supabase.from('clinic_diagnoses')
+          .select('id, confirmed_diagnosis, severity, created_at, patient_phone, patient_name, patient_type, intake_schedule, expected_recovery')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', startOfDay.toISOString())
+          .order('created_at', { ascending: false }),
+        6000, 'clinic_diagnoses'
+      );
+      dx = res.data || [];
+      dxErr = res.error;
+      // Retry with minimal columns if some columns don't exist (PGRST204 = column missing)
+      if (dxErr && /column .* does not exist|schema cache/i.test(dxErr.message || '')) {
+        const fallback = await withTimeout(
+          supabase.from('clinic_diagnoses')
+            .select('id, confirmed_diagnosis, severity, created_at')
+            .eq('clinic_id', clinicId)
+            .gte('created_at', startOfDay.toISOString())
+            .order('created_at', { ascending: false }),
+          6000, 'clinic_diagnoses_min'
+        );
+        dx = fallback.data || [];
+        dxErr = fallback.error;
+      }
+    } catch(e) { dxErr = e; }
 
-    // Also load legacy clinic_orders (old wizard output)
-    const { data: legacyOrders } = await supabase
-      .from('clinic_orders')
-      .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, delivery_method, status, course_completed, created_at')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', startOfDay.toISOString())
-      .order('created_at', { ascending: false });
+    // Also load legacy clinic_orders (might not exist — silently ignore errors)
+    let legacy = [];
+    try {
+      const res = await withTimeout(
+        supabase.from('clinic_orders')
+          .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, status, created_at')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', startOfDay.toISOString())
+          .order('created_at', { ascending: false }),
+        6000, 'clinic_orders'
+      );
+      legacy = res.data || [];
+    } catch(e) { /* ignore */ }
 
-    const consultations = dx || [];
-    const legacy = legacyOrders || [];
-
-    if (dxErr && !legacy.length) {
-      listEl.innerHTML = `<div style="padding:20px;color:#C62828;text-align:center">Could not load consultations: ${dxErr.message}</div>`;
+    if (dxErr && !legacy.length && !dx.length) {
+      listEl.innerHTML = `<div style="padding:20px;color:#C62828;text-align:center;font-size:13px">Could not load consultations: ${esc(dxErr.message || 'Unknown error')}<br><span style="color:#9AA0A6">Check that database migrations have been applied.</span></div>`;
       return;
     }
 
-    if (!consultations.length && !legacy.length) { renderEmpty(); return; }
+    if (!dx.length && !legacy.length) { renderEmpty(); return; }
 
-    // Stats from new consultations
-    let inpatient = 0, withPrescription = 0, completed = 0;
-    consultations.forEach(c => {
+    // Stats
+    let inpatient = 0, completed = 0;
+    dx.forEach(c => {
       if (c.patient_type === 'inpatient') inpatient++;
-      if (c.e_prescriptions?.length) withPrescription++;
-      const meds = c.intake_schedule || [];
-      const maxDur = meds.length ? Math.max(...meds.map(m => m.duration_days || 0)) : 0;
       const endDate = c.expected_recovery ? new Date(c.expected_recovery) : null;
       if (endDate && endDate < new Date()) completed++;
     });
 
-    document.getElementById('statToday').textContent      = consultations.length + legacy.length;
+    document.getElementById('statToday').textContent      = dx.length + legacy.length;
     document.getElementById('statDispatched').textContent = inpatient;
-    document.getElementById('statDelivered').textContent  = withPrescription;
+    document.getElementById('statDelivered').textContent  = dx.length;
     document.getElementById('statCompleted').textContent  = completed;
 
     listEl.innerHTML = [
-      ...consultations.map(c => {
-        const patName = c.patient_name || c.clinic_patients?.full_name || c.patient_phone || 'Unknown';
+      ...dx.map(c => {
+        const patName = c.patient_name || c.patient_phone || 'Patient';
         const initials = patName.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
         const t = new Date(c.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
         const meds = (c.intake_schedule || []).map(m => m.drug_name).filter(Boolean);
         const medSummary = meds.length ? meds.slice(0,2).join(', ') + (meds.length > 2 ? ` +${meds.length-2}` : '') : 'No medications';
         const typeLabel = c.patient_type === 'inpatient' ? 'Inpatient' : 'Outpatient';
-        const rx = c.e_prescriptions?.[0];
-        const rxBadge = rx ? `<span><span class="material-icons-outlined" style="font-size:13px">receipt_long</span>E-Rx</span>` : '';
         return `
           <div class="order-card">
             <div class="order-avatar">${initials}</div>
@@ -510,8 +540,7 @@
               <div class="order-meta">
                 <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
                 <span>${typeLabel}</span>
-                ${rxBadge}
-                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(c.patient_phone || '')}</span>
+                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(c.patient_phone || '—')}</span>
               </div>
             </div>
             <div class="order-right">
@@ -562,25 +591,59 @@
   async function loadPendingBookings() {
     const listEl = document.getElementById('pendingBookingsList');
     const countEl = document.getElementById('pendingCount');
-    const clinicId = _clinicId || await resolveClinicId(supabase, session);
-    if (!supabase || !clinicId) {
-      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No clinic linked.</div>';
+
+    let clinicId = _clinicId;
+    if (!clinicId && supabase && !session?.demo) {
+      try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
+    }
+
+    if (!supabase) {
+      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable. Refresh the page.</div>';
+      countEl.textContent = '';
+      return;
+    }
+    if (!clinicId) {
+      listEl.innerHTML = `
+        <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
+          ${session?.demo ? '<strong>Demo mode</strong> — bookings won’t show here.<br>Sign in with your real clinic account to see live bookings.' : '<strong>Your account isn’t linked to a clinic yet.</strong><br>Ask your admin to link you in <strong>portal_users</strong>.'}
+          <br><br>
+          <button onclick="openVerifyModal && openVerifyModal()" style="background:#1565C0;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            Verify a patient code anyway
+          </button>
+        </div>`;
       countEl.textContent = '';
       return;
     }
 
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-    const { data: bookings } = await supabase
-      .from('bookings')
-      .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at')
-      .eq('clinic_id', clinicId)
-      .in('status', ['pending', 'confirmed'])
-      .gte('created_at', since)
-      .order('created_at', { ascending: false })
-      .limit(10);
+    let bookings = [], bookingsErr = null;
+    try {
+      const res = await withTimeout(
+        supabase.from('bookings')
+          .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
+          .eq('clinic_id', clinicId)
+          .in('status', ['pending', 'confirmed'])
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
+          .limit(10),
+        6000, 'pending_bookings'
+      );
+      bookings = res.data || [];
+      bookingsErr = res.error;
+    } catch(e) { bookingsErr = e; }
 
-    if (!bookings?.length) {
-      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No pending bookings. Patients who book in the app will show here.</div>';
+    if (bookingsErr) {
+      listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#C62828;font-size:13px">Could not load bookings: ${esc(bookingsErr.message || 'error')}</div>`;
+      countEl.textContent = '';
+      return;
+    }
+
+    if (!bookings.length) {
+      listEl.innerHTML = `
+        <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
+          No pending bookings for your clinic.<br>
+          <span style="color:#BDBDBD;font-size:12px">Patients who book your clinic in the Homatt app will appear here. If a patient says they booked but you don’t see them, the booking may be assigned to a different clinic — verify their code below.</span>
+        </div>`;
       countEl.textContent = '';
       return;
     }
