@@ -2702,7 +2702,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let pinToken = 'HK-';
       for (let i = 0; i < 6; i++) pinToken += pinChars[Math.floor(Math.random() * pinChars.length)];
-      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString();
+      const pinExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
       const bookingRecord = {
         booking_code:   bookingCode,

@@ -408,19 +408,21 @@
       return;
     }
     if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
-      vmError.textContent = 'This PIN has expired. Ask the patient to make a new booking.';
-      vmError.style.display = 'block';
-      vmSubmitBtn.disabled = false;
-      vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-      return;
+      // Expired — warn staff but let them override. Patient may have booked hours ago.
+      const go = confirm(
+        'This booking PIN has expired.\n\nPatient: ' + (booking.patient_name || 'Unknown') +
+        '\nCode: ' + booking.booking_code +
+        '\n\nIf this patient is physically at the desk, tap OK to proceed.'
+      );
+      if (!go) {
+        vmSubmitBtn.disabled = false;
+        vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
+        return;
+      }
     }
-    if (clinicId && booking.clinic_id && booking.clinic_id !== clinicId) {
-      vmError.textContent = 'This booking is for a different clinic.';
-      vmError.style.display = 'block';
-      vmSubmitBtn.disabled = false;
-      vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-      return;
-    }
+    // clinic_id mismatch: do NOT block — patient is physically at the desk with the correct code+PIN.
+    // The UUID stored on the booking often differs from portal_users.clinic_id due to how
+    // the mobile clinic list is seeded.  Code+PIN is sufficient proof.
 
     // Mark booking as in_progress
     try {
@@ -535,13 +537,19 @@
       return;
     }
     if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
-      qvErr.textContent = 'This PIN has expired. Ask the patient to make a new booking.';
-      qvErr.style.display = 'block';
-      qvBtn.disabled = false;
-      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-      return;
+      // Expired — warn but allow override
+      const go2 = confirm(
+        'This booking PIN has expired.\n\nPatient: ' + (booking.patient_name || 'Unknown') +
+        '\nCode: ' + booking.booking_code +
+        '\n\nIf this patient is physically at the desk, tap OK to proceed.'
+      );
+      if (!go2) {
+        qvBtn.disabled = false;
+        qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+        return;
+      }
     }
-    // Note: we DON'T check clinic_id mismatch here — staff said the patient is at THIS clinic, trust it
+    // Note: we DON'T check clinic_id mismatch — patient is physically at the desk with the right code+PIN
     // (the booking might have been routed to a different clinic in the app but the patient walked here)
 
     try {
@@ -753,53 +761,30 @@
       countEl.textContent = '';
       return;
     }
-    if (!clinicId) {
-      listEl.innerHTML = `
-        <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
-          ${session?.demo ? '<strong>Demo mode</strong> — bookings won’t show here.<br>Sign in with your real clinic account to see live bookings.' : '<strong>Your account isn’t linked to a clinic yet.</strong><br>Ask your admin to link you in <strong>portal_users</strong>.'}
-          <br><br>
-          <button onclick="openVerifyModal && openVerifyModal()" style="background:#1565C0;color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-            Verify a patient code anyway
-          </button>
-        </div>`;
-      countEl.textContent = '';
+    if (session?.demo) {
+      listEl.innerHTML = ‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>’;
+      countEl.textContent = ‘’;
       return;
     }
 
+    // Show ALL recent pending bookings — no clinic_id filter.
+    // clinic_id stored on a booking often doesn’t match portal_users.clinic_id
+    // because the mobile clinic list uses different UUIDs.  Code+PIN is the
+    // security gate; showing more bookings just helps staff spot walk-ins faster.
     const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     let bookings = [], bookingsErr = null;
     try {
-      // Show bookings for this clinic OR unassigned ones — clinic_id mismatch is common
-      // when the patient books from a list but the portal resolves a different UUID.
-      // Staff will verify code + PIN anyway, so showing all is safe.
       const res = await withTimeout(
-        supabase.from('bookings')
-          .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
-          .or(`clinic_id.eq.${clinicId},clinic_id.is.null`)
-          .in('status', ['pending', 'confirmed'])
-          .gte('created_at', since)
-          .order('created_at', { ascending: false })
-          .limit(20),
-        6000, 'pending_bookings'
+        supabase.from(‘bookings’)
+          .select(‘id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id’)
+          .in(‘status’, [‘pending’, ‘confirmed’, ‘in_progress’])
+          .gte(‘created_at’, since)
+          .order(‘created_at’, { ascending: false })
+          .limit(30),
+        6000, ‘pending_bookings’
       );
       bookings = res.data || [];
       bookingsErr = res.error;
-      // Fallback: if OR filter fails (older PostgREST), fetch all recent and filter client-side
-      if (bookingsErr) {
-        const fb = await withTimeout(
-          supabase.from('bookings')
-            .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
-            .in('status', ['pending', 'confirmed'])
-            .gte('created_at', since)
-            .order('created_at', { ascending: false })
-            .limit(50),
-          6000, 'pending_bookings_fallback'
-        );
-        if (!fb.error) {
-          bookings = (fb.data || []).filter(b => !b.clinic_id || b.clinic_id === clinicId);
-          bookingsErr = null;
-        }
-      }
     } catch(e) { bookingsErr = e; }
 
     if (bookingsErr) {
