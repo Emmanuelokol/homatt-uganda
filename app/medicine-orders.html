@@ -126,6 +126,33 @@
     [data-theme="dark"] #bankDetailsBlock div { color:#93C5FD !important; }
     [data-theme="dark"] #momoStatusBar { background:#2D2500; border-color:#B45309; }
     [data-theme="dark"] .autoLocBtn-style { border-color:#4DB6AC !important; color:#4DB6AC !important; }
+    /* ── Chronic/expensive drug request card & modal ── */
+    .crx-card { background:linear-gradient(135deg,#4527A0,#7B1FA2); color:#fff; border-radius:14px; padding:14px 16px; margin:0 16px 12px; cursor:pointer; display:flex; align-items:center; gap:12px; touch-action:manipulation; -webkit-tap-highlight-color:transparent; }
+    .crx-card:active { opacity:.9; transform:scale(.99); }
+    .crx-card-icon { width:44px; height:44px; background:rgba(255,255,255,.18); border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .crx-card-title { font-size:13px; font-weight:700; margin-bottom:3px; }
+    .crx-card-sub { font-size:11px; opacity:.85; line-height:1.4; }
+    .crx-modal-bg { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center; z-index:998; }
+    .crx-modal-bg.open { display:flex; }
+    .crx-modal { background:var(--surface,#fff); border-radius:20px 20px 0 0; width:100%; max-width:640px; max-height:92dvh; max-height:92vh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 40px; }
+    .crx-modal-header { background:linear-gradient(135deg,#4527A0,#7B1FA2); color:#fff; padding:18px 20px 16px; border-radius:20px 20px 0 0; position:sticky; top:0; z-index:1; }
+    .crx-modal-header h3 { font-size:16px; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
+    .crx-modal-header p { font-size:11.5px; margin:0; opacity:.88; line-height:1.5; }
+    .crx-modal-body { padding:18px 20px 8px; }
+    .crx-field { margin-bottom:14px; }
+    .crx-label { font-size:12px; font-weight:600; color:var(--text-primary); display:block; margin-bottom:6px; }
+    .crx-req { color:#C62828; }
+    .crx-input { width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:10px; font-size:16px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary); box-sizing:border-box; min-height:48px; transition:border-color .2s; }
+    .crx-input:focus { border-color:#7B1FA2; }
+    .crx-btn-row { display:flex; gap:10px; margin:16px 20px 0; }
+    .crx-btn { flex:1; padding:14px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; border:none; touch-action:manipulation; display:flex; align-items:center; justify-content:center; gap:8px; }
+    .crx-btn.primary { background:linear-gradient(135deg,#4527A0,#7B1FA2); color:#fff; }
+    .crx-btn.secondary { background:var(--surface); color:var(--text-secondary); border:1.5px solid var(--border); }
+    .crx-btn:disabled { opacity:.6; cursor:not-allowed; }
+    .crx-info { background:#EDE7F6; border-left:3px solid #7B1FA2; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px; color:#4527A0; line-height:1.6; }
+    [data-theme="dark"] .crx-modal { background:#1B1F26; }
+    [data-theme="dark"] .crx-info { background:#2D1A3A; color:#CE93D8; }
+    [data-theme="dark"] .crx-input { background:#1B1F26; border-color:#2A2F38; }
     /* ── AI pre-fill banner ── */
     .ai-prefill-banner {
       display:none; background:#E8F5E9; border:1px solid #A5D6A7; border-radius:var(--radius-md);
@@ -213,6 +240,18 @@
           <div id="medsList">
             <!-- Rendered by JS immediately on page load -->
           </div>
+        </div>
+
+        <!-- Chronic / Expensive Drug Request card -->
+        <div class="crx-card" onclick="openChronicModal()" role="button">
+          <div class="crx-card-icon">
+            <span class="material-icons-outlined" style="font-size:24px">assignment</span>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="crx-card-title">Chronic & Prescription Drugs</div>
+            <div class="crx-card-sub">Insulin, BP meds, diabetes drugs, cancer drugs — we deliver monthly. Pharmacist reviews your request first.</div>
+          </div>
+          <span class="material-icons-outlined" style="font-size:20px;opacity:.8">chevron_right</span>
         </div>
 
         <!-- Prescription paste (secondary) -->
@@ -465,6 +504,133 @@
 
   </div><!-- end app-screen -->
 </div><!-- end phone-frame -->
+
+<!-- ═══════════════════════════════════════════════
+     CHRONIC / EXPENSIVE DRUG REQUEST MODAL
+     ═══════════════════════════════════════════════ -->
+<div class="crx-modal-bg" id="crxModalBg" onclick="if(event.target===this)closeChronicModal()">
+  <div class="crx-modal" id="crxModal">
+    <div class="crx-modal-header">
+      <h3><span class="material-icons-outlined">assignment</span> Request Prescription Drug</h3>
+      <p>For insulin, chronic BP / diabetes meds, cancer drugs, and other expensive medicines above UGX 20,000. A pharmacist reviews your request before delivery.</p>
+    </div>
+    <div class="crx-modal-body">
+
+      <div class="crx-info">
+        <strong>How it works:</strong> Fill in the form → our pharmacist calls you within 24 hours to confirm dosage and prescription → we deliver to your door on a date you agree.
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Drug / Medicine Name <span class="crx-req">*</span></label>
+        <input class="crx-input" id="crxDrugName" type="text" placeholder="e.g. Insulin Actrapid, Metformin 1000mg, Atorvastatin 40mg"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Strength / Dosage</label>
+        <input class="crx-input" id="crxDosage" type="text" placeholder="e.g. 500mg tablets, 10ml vial, 25mg/5ml syrup"
+          inputmode="text" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Condition it treats <span class="crx-req">*</span></label>
+        <select class="crx-input" id="crxCondition">
+          <option value="">Select condition…</option>
+          <option value="diabetes">Diabetes (Type 1 or 2)</option>
+          <option value="hypertension">High Blood Pressure (Hypertension)</option>
+          <option value="asthma">Asthma / Chronic Lung Disease</option>
+          <option value="epilepsy">Epilepsy / Seizures</option>
+          <option value="hiv">HIV / ARVs</option>
+          <option value="cancer">Cancer / Chemotherapy</option>
+          <option value="kidney">Kidney Disease</option>
+          <option value="heart">Heart Disease</option>
+          <option value="thyroid">Thyroid Disorder</option>
+          <option value="mental_health">Mental Health (Psychiatric)</option>
+          <option value="other">Other chronic condition</option>
+        </select>
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Monthly supply needed</label>
+        <select class="crx-input" id="crxMonths">
+          <option value="1">1 month supply</option>
+          <option value="2">2 months supply</option>
+          <option value="3" selected>3 months supply</option>
+          <option value="monthly_auto">Monthly auto-delivery (recurring)</option>
+        </select>
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Prescribing Doctor (if you have one)</label>
+        <input class="crx-input" id="crxDoctor" type="text" placeholder="e.g. Dr. Namutebi, Mulago Hospital"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Prescription / Booking Code (if you have one)</label>
+        <input class="crx-input" id="crxRxCode" type="text" placeholder="e.g. HO-4892 (leave blank if none)"
+          inputmode="text" autocomplete="off" style="text-transform:uppercase">
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Delivery Address <span class="crx-req">*</span></label>
+        <input class="crx-input" id="crxAddress" type="text" placeholder="e.g. Plot 12 Kira Road, Kamwokya, Kampala"
+          inputmode="text" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button type="button" onclick="autoFillAddress('crxAddress','crxLocBtn')" id="crxLocBtn"
+          style="margin-top:6px;display:flex;align-items:center;gap:5px;background:none;border:1.5px solid #7B1FA2;color:#7B1FA2;padding:9px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;width:100%;justify-content:center;touch-action:manipulation">
+          <span class="material-icons-outlined" style="font-size:15px">my_location</span>
+          Use my current location
+        </button>
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Phone Number <span class="crx-req">*</span></label>
+        <input class="crx-input" id="crxPhone" type="tel" placeholder="+256 7XX XXX XXX"
+          inputmode="tel" autocomplete="tel">
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Preferred Payment</label>
+        <select class="crx-input" id="crxPayment">
+          <option value="pay_on_delivery">Pay on Delivery (Cash)</option>
+          <option value="mtn_momo">MTN Mobile Money</option>
+          <option value="airtel_money">Airtel Money</option>
+          <option value="bank_transfer">Bank Transfer</option>
+        </select>
+      </div>
+
+      <div class="crx-field">
+        <label class="crx-label">Additional Notes</label>
+        <textarea class="crx-input" id="crxNotes" rows="2" placeholder="Any special instructions, brand preference, or extra info for the pharmacist…" style="min-height:68px;resize:vertical"></textarea>
+      </div>
+
+    </div><!-- end crx-modal-body -->
+
+    <div class="crx-btn-row">
+      <button class="crx-btn secondary" onclick="closeChronicModal()">Cancel</button>
+      <button class="crx-btn primary" id="crxSubmitBtn" onclick="submitChronicRequest()">
+        <span class="material-icons-outlined" style="font-size:18px">send</span> Send Request
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Chronic request success overlay -->
+<div id="crxSuccess" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:#fff;z-index:999;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center">
+  <div style="width:80px;height:80px;border-radius:50%;background:#EDE7F6;display:flex;align-items:center;justify-content:center;margin-bottom:18px">
+    <span class="material-icons-outlined" style="font-size:44px;color:#7B1FA2">check_circle</span>
+  </div>
+  <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#4527A0">Request Received!</div>
+  <div style="font-size:13px;color:#555;line-height:1.7;margin-bottom:24px">
+    Our pharmacist will call you within <strong>24 hours</strong> to confirm your medication, dosage, and delivery date.<br><br>
+    Reference: <strong id="crxRefCode" style="color:#7B1FA2;letter-spacing:1px">RX-XXXX</strong><br><br>
+    <span style="font-size:12px;color:#9AA0A6">Keep this reference number. Delivery fee is collected on arrival.</span>
+  </div>
+  <button class="crx-btn primary" style="max-width:280px;width:100%;margin-bottom:12px" onclick="window.location.href='dashboard.html'">
+    <span class="material-icons-outlined" style="font-size:18px">home</span> Back to Dashboard
+  </button>
+  <button onclick="crxReset()" style="background:none;border:none;color:#7B1FA2;font-size:13px;font-weight:600;cursor:pointer;padding:8px">Submit another request</button>
+</div>
 
 <!-- Supabase CDN — loaded async so it never blocks the UI -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async></script>
@@ -1475,6 +1641,138 @@ document.addEventListener('DOMContentLoaded', function() {
     var banner = document.getElementById('authBanner');
     if (banner) banner.style.display = 'flex';
   }
+
+  /* ══════════════════════════════════════
+     CHRONIC / EXPENSIVE DRUG REQUEST
+     ══════════════════════════════════════ */
+
+  function openChronicModal() {
+    // Pre-fill address and phone from session
+    var sess0 = {};
+    try { sess0 = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
+    var addrEl = document.getElementById('crxAddress');
+    var phoneEl = document.getElementById('crxPhone');
+    if (addrEl && !addrEl.value) {
+      if (sess0.district) addrEl.value = sess0.district + ', Uganda';
+    }
+    if (phoneEl && !phoneEl.value) {
+      phoneEl.value = sess0.phone_number || sess0.phone || '';
+    }
+    var bg = document.getElementById('crxModalBg');
+    if (bg) { bg.classList.add('open'); document.body.style.overflow = 'hidden'; }
+  }
+  window.openChronicModal = openChronicModal;
+
+  function closeChronicModal() {
+    var bg = document.getElementById('crxModalBg');
+    if (bg) { bg.classList.remove('open'); document.body.style.overflow = ''; }
+    if (document.activeElement) document.activeElement.blur();
+  }
+  window.closeChronicModal = closeChronicModal;
+
+  function crxReset() {
+    var success = document.getElementById('crxSuccess');
+    if (success) success.style.display = 'none';
+    ['crxDrugName','crxDosage','crxDoctor','crxRxCode','crxAddress','crxPhone','crxNotes'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    var cond = document.getElementById('crxCondition'); if (cond) cond.value = '';
+    var months = document.getElementById('crxMonths'); if (months) months.value = '3';
+    var pay = document.getElementById('crxPayment'); if (pay) pay.value = 'pay_on_delivery';
+    openChronicModal();
+  }
+  window.crxReset = crxReset;
+
+  function submitChronicRequest() {
+    var drugName  = (document.getElementById('crxDrugName')  || {}).value || '';
+    var dosage    = (document.getElementById('crxDosage')    || {}).value || '';
+    var condition = (document.getElementById('crxCondition') || {}).value || '';
+    var months    = (document.getElementById('crxMonths')    || {}).value || '1';
+    var doctor    = (document.getElementById('crxDoctor')    || {}).value || '';
+    var rxCode    = (document.getElementById('crxRxCode')    || {}).value || '';
+    var address   = (document.getElementById('crxAddress')   || {}).value || '';
+    var phone     = (document.getElementById('crxPhone')     || {}).value || '';
+    var payment   = (document.getElementById('crxPayment')   || {}).value || 'pay_on_delivery';
+    var notes     = (document.getElementById('crxNotes')     || {}).value || '';
+
+    if (!drugName.trim()) { alert('Please enter the drug name.'); document.getElementById('crxDrugName').focus(); return; }
+    if (!condition)        { alert('Please select the condition the drug treats.'); return; }
+    if (!address.trim())   { alert('Please enter your delivery address.'); document.getElementById('crxAddress').focus(); return; }
+    if (!phone.trim())     { alert('Please enter your phone number.'); document.getElementById('crxPhone').focus(); return; }
+
+    var btn = document.getElementById('crxSubmitBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Sending…'; }
+
+    var sess0 = {};
+    try { sess0 = JSON.parse(localStorage.getItem('homatt_session') || '{}'); } catch(e) {}
+    var supa = getSupa();
+
+    var refCode = 'RX-' + Math.random().toString(36).toUpperCase().slice(2,6);
+
+    function onSuccess() {
+      closeChronicModal();
+      var refEl = document.getElementById('crxRefCode');
+      if (refEl) refEl.textContent = refCode;
+      var success = document.getElementById('crxSuccess');
+      if (success) { success.style.display = 'flex'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">send</span> Send Request'; }
+    }
+
+    function onError(msg) {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">send</span> Send Request'; }
+      alert('Could not send request: ' + (msg || 'Please try again.'));
+    }
+
+    var conditionLabel = { diabetes:'Diabetes', hypertension:'High Blood Pressure', asthma:'Asthma', epilepsy:'Epilepsy', hiv:'HIV/ARVs', cancer:'Cancer', kidney:'Kidney Disease', heart:'Heart Disease', thyroid:'Thyroid', mental_health:'Mental Health', other:'Other' };
+
+    if (supa && sess0.userId) {
+      var payload = {
+        patient_id:                  sess0.userId,
+        patient_name:                sess0.first_name ? ((sess0.first_name||'') + ' ' + (sess0.last_name||'')).trim() : (sess0.name || 'Patient'),
+        patient_phone:               phone,
+        delivery_address:            address,
+        delivery_district:           sess0.district || null,
+        pharmacy_id:                 null,
+        items:                       [{ name: drugName + (dosage ? ' (' + dosage + ')' : ''), qty: 1, price: 0, months: months }],
+        urgency:                     'standard',
+        order_type:                  'chronic_request',
+        rx_doctor:                   doctor || null,
+        rx_booking_code:             rxCode || null,
+        condition_tags:              condition,
+        patient_symptom_description: (conditionLabel[condition] || condition) + ' — ' + months + ' month supply',
+        medication_cost:             0,
+        delivery_cost:               0,
+        total_cost:                  0,
+        payment_method:              payment,
+        payment_status:              'pending',
+        status:                      'pending_review',
+        notes:                       notes || null,
+      };
+      supa.from('pharmacy_orders').insert(payload)
+        .then(function(res) {
+          if (res.error) { onError(res.error.message); return; }
+          onSuccess();
+        })
+        .catch(function(e) { onError(e && e.message); });
+    } else {
+      // Offline / guest — still confirm
+      onSuccess();
+    }
+  }
+  window.submitChronicRequest = submitChronicRequest;
+
+  // Shrink crx modal when keyboard opens
+  (function() {
+    if (!window.visualViewport) return;
+    function _crxResize() {
+      var modal = document.getElementById('crxModal');
+      var bg = document.getElementById('crxModalBg');
+      if (!modal || !bg || !bg.classList.contains('open')) return;
+      var vh = Math.round(window.visualViewport.height);
+      modal.style.maxHeight = Math.round(vh * 0.95) + 'px';
+    }
+    window.visualViewport.addEventListener('resize', _crxResize);
+  })();
 
   // Background: load real medicines and delivery settings from Supabase when CDN is ready
   window.addEventListener('load', function() {

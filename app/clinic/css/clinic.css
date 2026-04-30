@@ -33,23 +33,29 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px}
 .sidebar-nav{padding:12px 0;flex:1}
 .sidebar-section-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:12px 20px 6px}
-.sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 20px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;transition:background .15s,color .15s;border-left:3px solid transparent}
+.sidebar-link{display:flex;align-items:center;gap:12px;padding:14px 20px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;transition:background .15s,color .15s;border-left:3px solid transparent;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:48px}
 .sidebar-link:hover{background:rgba(255,255,255,0.07);color:#fff}
 .sidebar-link.active{background:rgba(66,165,245,0.15);color:#42A5F5;border-left-color:#42A5F5}
 .sidebar-link .material-icons-outlined{font-size:20px}
 .sidebar-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.1)}
 .admin-badge{display:inline-flex;align-items:center;gap:6px;background:#42A5F522;color:#42A5F5;font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;margin-bottom:8px}
-.logout-sidebar-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s}
+.logout-sidebar-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
 .logout-sidebar-btn:hover{background:rgba(211,47,47,0.15);border-color:#D32F2F;color:#EF9A9A}
 
 /* ── Main ── */
-.admin-main{margin-left:240px;flex:1;display:flex;flex-direction:column}
+.admin-main{margin-left:240px;flex:1;display:flex;flex-direction:column;overflow-x:hidden}
 .admin-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
 .admin-topbar-title{font-size:18px;font-weight:700}
 .admin-topbar-right{display:flex;align-items:center;gap:14px}
 .admin-user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-lt)}
 .admin-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
-.admin-content{padding:28px;flex:1}
+.admin-content{padding:28px;flex:1;overflow-x:hidden}
+
+/* Global touch fix for all clinic portal interactive elements */
+button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order-card{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
 
 /* ── Login ── */
 .admin-login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0B1626 0%,#0D2137 100%)}
@@ -60,12 +66,12 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .admin-login-sub{font-size:13px;color:var(--text-lt);margin-top:4px}
 .login-field{margin-bottom:16px}
 .login-field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
-.login-field input{width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;outline:none;transition:border-color .2s}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;outline:none;transition:border-color .2s;min-height:48px;touch-action:manipulation}
 .login-field input:focus{border-color:var(--primary)}
-.login-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:12px;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s}
+.login-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s;min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .login-btn:hover{background:var(--primary-d)}
 .login-btn:disabled{opacity:.7;cursor:not-allowed}
-.demo-btn{width:100%;background:#F3F4F6;color:var(--text);border:1px solid var(--border);padding:11px;border-radius:8px;font-size:14px;font-weight:500;cursor:pointer;margin-top:10px;transition:background .2s}
+.demo-btn{width:100%;background:#F3F4F6;color:var(--text);border:1px solid var(--border);padding:13px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;margin-top:10px;transition:background .2s;min-height:48px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .demo-btn:hover{background:#E5E7EB}
 .login-error{background:#FFEBEE;color:#D32F2F;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:14px;display:none}
 .login-divider{text-align:center;color:var(--text-lt);font-size:12px;margin:14px 0;position:relative}
@@ -170,11 +176,16 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 }
 .cbn-link{
   flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:9px 4px 8px;
+  padding:10px 4px;
   color:rgba(255,255,255,0.55);
-  text-decoration:none;font-size:9.5px;font-weight:600;letter-spacing:.3px;
-  gap:2px;transition:color .15s;
+  text-decoration:none;font-size:10px;font-weight:600;letter-spacing:.3px;
+  gap:3px;transition:color .15s;
   -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  cursor:pointer;
+  min-height:56px;
+  user-select:none;
+  -webkit-user-select:none;
 }
 .cbn-link .material-icons-outlined{font-size:22px;display:block}
 .cbn-link.active{color:#42A5F5}

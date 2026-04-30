@@ -766,21 +766,40 @@
       return;
     }
 
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     let bookings = [], bookingsErr = null;
     try {
+      // Show bookings for this clinic OR unassigned ones — clinic_id mismatch is common
+      // when the patient books from a list but the portal resolves a different UUID.
+      // Staff will verify code + PIN anyway, so showing all is safe.
       const res = await withTimeout(
         supabase.from('bookings')
           .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
-          .eq('clinic_id', clinicId)
+          .or(`clinic_id.eq.${clinicId},clinic_id.is.null`)
           .in('status', ['pending', 'confirmed'])
           .gte('created_at', since)
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(20),
         6000, 'pending_bookings'
       );
       bookings = res.data || [];
       bookingsErr = res.error;
+      // Fallback: if OR filter fails (older PostgREST), fetch all recent and filter client-side
+      if (bookingsErr) {
+        const fb = await withTimeout(
+          supabase.from('bookings')
+            .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
+            .in('status', ['pending', 'confirmed'])
+            .gte('created_at', since)
+            .order('created_at', { ascending: false })
+            .limit(50),
+          6000, 'pending_bookings_fallback'
+        );
+        if (!fb.error) {
+          bookings = (fb.data || []).filter(b => !b.clinic_id || b.clinic_id === clinicId);
+          bookingsErr = null;
+        }
+      }
     } catch(e) { bookingsErr = e; }
 
     if (bookingsErr) {
@@ -792,10 +811,10 @@
     if (!bookings.length) {
       listEl.innerHTML = `
         <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
-          No pending bookings for your clinic.<br>
-          <span style="color:#BDBDBD;font-size:12px">Patients who book your clinic in the Homatt app will appear here. If a patient says they booked but you don’t see them, the booking may be assigned to a different clinic — verify their code below.</span>
+          No pending bookings in the last 48 hours.<br>
+          <span style="color:#BDBDBD;font-size:12px">When a patient books via the Homatt app, their name and code will appear here. Use the yellow panel above to verify a patient who is physically present.</span>
         </div>`;
-      countEl.textContent = '';
+      countEl.textContent = ‘’;
       return;
     }
 
