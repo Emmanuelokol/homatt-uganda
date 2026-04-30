@@ -609,12 +609,22 @@
 
   async function loadTodayOrders() {
     const listEl = document.getElementById('ordersList');
+    if (!listEl) return;
+
     let clinicId = _clinicId;
     if (!clinicId && supabase && !session?.demo) {
       try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
     }
-    if (!supabase || !clinicId) {
-      renderEmpty(session?.demo ? 'You are in demo mode — sign in with a real clinic account to see live consultations.' : 'No clinic linked to your account yet. Ask your admin to link your account in Settings.');
+    if (!supabase) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database unavailable — check internet.</div>';
+      return;
+    }
+    if (session?.demo) {
+      renderEmpty('You are in demo mode — sign in with your real clinic account.');
+      return;
+    }
+    if (!clinicId) {
+      renderEmpty('Your account is not linked to a clinic yet. Ask your admin to link you in portal_users.');
       return;
     }
 
@@ -748,29 +758,24 @@
 
   // ── Load pending bookings (patients heading to this clinic) ─────
   async function loadPendingBookings() {
-    const listEl = document.getElementById('pendingBookingsList');
-    const countEl = document.getElementById('pendingCount');
+    const listEl  = document.getElementById(‘pendingBookingsList’);
+    const countEl = document.getElementById(‘pendingCount’);
+    if (!listEl) return;
 
-    let clinicId = _clinicId;
-    if (!clinicId && supabase && !session?.demo) {
-      try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
-    }
+    function setMsg(html) { listEl.innerHTML = html; countEl.textContent = ‘’; }
 
     if (!supabase) {
-      listEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable. Refresh the page.</div>';
-      countEl.textContent = '';
+      setMsg(‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection.</div>’);
       return;
     }
     if (session?.demo) {
-      listEl.innerHTML = ‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>’;
-      countEl.textContent = ‘’;
+      setMsg(‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>’);
       return;
     }
 
-    // Show ALL recent pending bookings — no clinic_id filter.
-    // clinic_id stored on a booking often doesn’t match portal_users.clinic_id
-    // because the mobile clinic list uses different UUIDs.  Code+PIN is the
-    // security gate; showing more bookings just helps staff spot walk-ins faster.
+    // Show ALL recent bookings — no clinic_id filter needed.
+    // clinic_id on a booking often doesn’t match portal_users.clinic_id.
+    // Code+PIN verification is the security gate.
     const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     let bookings = [], bookingsErr = null;
     try {
@@ -781,25 +786,22 @@
           .gte(‘created_at’, since)
           .order(‘created_at’, { ascending: false })
           .limit(30),
-        6000, ‘pending_bookings’
+        7000, ‘pending_bookings’
       );
       bookings = res.data || [];
       bookingsErr = res.error;
     } catch(e) { bookingsErr = e; }
 
     if (bookingsErr) {
-      listEl.innerHTML = `<div style="text-align:center;padding:24px;color:#C62828;font-size:13px">Could not load bookings: ${esc(bookingsErr.message || 'error')}</div>`;
-      countEl.textContent = '';
+      setMsg(`<div style="text-align:center;padding:24px;color:#C62828;font-size:13px">Could not load bookings: ${esc((bookingsErr.message || bookingsErr.code || String(bookingsErr)).slice(0,200))}</div>`);
       return;
     }
 
     if (!bookings.length) {
-      listEl.innerHTML = `
-        <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
-          No pending bookings in the last 48 hours.<br>
-          <span style="color:#BDBDBD;font-size:12px">When a patient books via the Homatt app, their name and code will appear here. Use the yellow panel above to verify a patient who is physically present.</span>
-        </div>`;
-      countEl.textContent = ‘’;
+      setMsg(`<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
+        No pending bookings in the last 48 hours.<br>
+        <span style="color:#BDBDBD;font-size:12px">When a patient books via the Homatt app their name appears here. Use the yellow panel above to verify a patient at the desk.</span>
+      </div>`);
       return;
     }
 
@@ -844,6 +846,38 @@
 
   loadTodayOrders();
   loadPendingBookings();
+
+  // Hard failsafe: if Loading... text survives for 9 seconds, replace with a visible diagnostic
+  setTimeout(() => {
+    const orderEl = document.getElementById('ordersList');
+    const bookEl  = document.getElementById('pendingBookingsList');
+
+    if (orderEl && orderEl.innerHTML.includes('Loading')) {
+      const hasSupa = !!supabase;
+      const hasCid  = !!_clinicId;
+      orderEl.innerHTML = `
+        <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
+          <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
+          <strong>Could not load consultations.</strong><br>
+          DB connected: <b>${hasSupa ? 'Yes' : 'No — check config.js'}</b> &nbsp;|&nbsp;
+          Clinic ID: <b>${hasCid ? _clinicId.slice(0,8)+'…' : 'Not resolved'}</b><br>
+          <span style="color:#9AA0A6;font-size:12px">Refresh the page or check your internet connection.</span><br>
+          <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
+        </div>`;
+    }
+
+    if (bookEl && bookEl.innerHTML.includes('Loading')) {
+      const hasSupa = !!supabase;
+      bookEl.innerHTML = `
+        <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
+          <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
+          <strong>Could not load bookings.</strong><br>
+          DB connected: <b>${hasSupa ? 'Yes' : 'No — check config.js'}</b><br>
+          <span style="color:#9AA0A6;font-size:12px">Refresh the page or check your internet connection. You can still verify a patient using the yellow panel above.</span><br>
+          <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
+        </div>`;
+    }
+  }, 9000);
 
   // Auto-refresh every 30 seconds
   setInterval(() => { loadTodayOrders(); loadPendingBookings(); }, 30 * 1000);
