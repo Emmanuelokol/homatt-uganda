@@ -83,6 +83,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ====== Screen Navigation ======
   function showScreen(screenId) {
+    // Dismiss keyboard before switching screens — otherwise the keyboard
+    // from a textarea stays open even after the textarea is hidden.
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
     screens.forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     currentScreen = screenId;
@@ -2111,7 +2116,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                          diagData.overall_risk === 'medium' ? '#E65100' : '#1B5E20';
 
     modal.innerHTML = `
-      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;max-height:90vh;overflow-y:auto;box-sizing:border-box;display:flex;flex-direction:column">
+      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;max-height:85dvh;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;display:flex;flex-direction:column">
         <!-- Header -->
         <div style="background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 16px;position:sticky;top:0;z-index:2;border-bottom:1px solid #F0F0F0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2140,6 +2145,24 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.getElementById('cbClose').addEventListener('click', () => modal.remove());
+
+    // Resize cbInner to the visual viewport height when the keyboard opens,
+    // so the name input is never hidden behind the keyboard.
+    function _cbResizeToViewport() {
+      const cbInner = document.getElementById('cbInner');
+      if (!cbInner) return;
+      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      cbInner.style.maxHeight = Math.round(vh * 0.95) + 'px';
+    }
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', _cbResizeToViewport);
+    }
+    // Clean up listener when modal is removed
+    const _origRemove = modal.remove.bind(modal);
+    modal.remove = function() {
+      if (window.visualViewport) window.visualViewport.removeEventListener('resize', _cbResizeToViewport);
+      _origRemove();
+    };
 
     // ── Fetch user location + clinics in parallel ──
     async function fetchClinics() {

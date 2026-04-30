@@ -81,8 +81,8 @@
     .mo-field { margin-bottom:12px; }
     .mo-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:5px; }
     .mo-field input, .mo-field select, .mo-field textarea {
-      width:100%; padding:11px 14px; border:1.5px solid var(--border); border-radius:var(--radius-md);
-      font-size:14px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary); transition:border-color .2s; box-sizing:border-box;
+      width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:var(--radius-md);
+      font-size:16px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary); transition:border-color .2s; box-sizing:border-box; min-height:48px;
     }
     .mo-field input:focus, .mo-field select:focus, .mo-field textarea:focus { border-color:#00695C; }
     .mo-field textarea { resize:vertical; min-height:70px; }
@@ -196,8 +196,9 @@
         <!-- Search bar (secondary option: "I know the drug name") -->
         <div style="padding:4px 16px 8px">
           <input type="text" id="medSearch" placeholder="Or search by medicine name…"
+            inputmode="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
             oninput="onSearch()"
-            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box;transition:border-color .2s">
+            style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:16px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box;transition:border-color .2s;min-height:48px">
         </div>
 
         <!-- Rx warning (shown when Rx category selected) -->

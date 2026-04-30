@@ -111,6 +111,17 @@
   }
 
   // ─── KEYBOARD ────────────────────────────────────────────────────────────────
+  // Public helper: dismiss keyboard from anywhere in the app.
+  window.HomattDismissKeyboard = function() {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) {
+      a.blur();
+    }
+    if (isNative() && window.Capacitor.Plugins.Keyboard) {
+      window.Capacitor.Plugins.Keyboard.hide().catch(() => {});
+    }
+  };
+
   function initKeyboard() {
     // Tap outside any input/textarea/select → blur to dismiss keyboard.
     // Use touchend (not touchstart) so taps on buttons near inputs still fire correctly.
@@ -132,13 +143,9 @@
 
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open');
-      // Scroll focused element into view after keyboard finishes animating in.
-      // Skip inputs inside a bottom-sheet: with Capacitor "resize:body" the body shrinks
-      // and the sheet rises above the keyboard automatically — calling scrollIntoView here
-      // on a sticky-footer input (outside sheet-body's scroll container) would try to
-      // scroll the body which has overflow:hidden set by some pages, causing a visual jump.
-      // 450ms: Android keyboard animation is ~300ms; we wait until it fully settles
-      // before scrolling so our scroll doesn't compete with the resize animation.
+      // 550ms: Android keyboard animation is ~300ms; Capacitor resize:body needs another
+      // ~100ms to propagate after the animation ends. We wait until both settle before
+      // scrolling so our getBoundingClientRect reads the post-resize layout.
       setTimeout(() => {
         const el = document.activeElement;
         if (!el || el === document.body) return;
@@ -173,7 +180,7 @@
           // Last-resort: ask the browser itself
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
         }
-      }, 450);
+      }, 550);
     });
 
     // keyboardWillHide fires while keyboard is still animating away —
