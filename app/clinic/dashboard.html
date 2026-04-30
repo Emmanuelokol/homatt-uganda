@@ -96,7 +96,12 @@
       .home-cta { justify-content: center; padding: 14px 18px }
       .order-card { flex-wrap: wrap }
       .order-right { margin-left: auto }
+      /* Inline verify panel — stack vertically on mobile */
+      #qvGrid { grid-template-columns: 1fr !important }
+      #quickVerifyPanel { padding: 18px 16px 16px !important }
+      #quickVerifyPanel h2 { font-size: 16px !important }
     }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
   </style>
 </head>
 <body>
@@ -145,17 +150,44 @@
 
     <div class="admin-content">
 
+      <!-- BIG inline patient code entry — always visible, no modal -->
+      <div id="quickVerifyPanel" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
+          <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
+        </div>
+        <p style="font-size:13px;color:#5D4037;margin:0 0 16px;line-height:1.5">Patient shows you the <strong>Booking Code</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HO-928</span>) and <strong>PIN</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HK-AEK26W</span>) from their Homatt app.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end" id="qvGrid">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Booking Code</label>
+            <input id="qvCode" type="text" placeholder="HO-928" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:20px;font-weight:800;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">PIN</label>
+            <input id="qvPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:18px;font-weight:700;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <button id="qvSubmitBtn"
+              style="background:#1565C0;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;white-space:nowrap">
+              <span class="material-icons-outlined">arrow_forward</span>
+              Verify &amp; Start
+            </button>
+          </div>
+        </div>
+        <div id="qvError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+        <div id="qvSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+      </div>
+
       <!-- Hero with New Consultation CTA -->
       <div class="home-hero">
         <div>
           <h1 id="heroGreeting">Good morning</h1>
-          <p id="heroSubtitle">Patient arrived with a Homatt code? Verify it and start the consultation in seconds.</p>
+          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button id="verifyCodeBtn" class="home-cta" style="background:#FFC107;color:#1B5E20">
-            <span class="material-icons-outlined">qr_code_scanner</span>
-            Verify Booking Code
-          </button>
           <a href="new-order.html" class="home-cta">
             <span class="material-icons-outlined">medical_services</span>
             New Consultation
@@ -314,7 +346,8 @@
   function closeVerifyModal() { vmModal.style.display = 'none'; }
   window.openVerifyModal = openVerifyModal;
 
-  document.getElementById('verifyCodeBtn').onclick = openVerifyModal;
+  // verifyCodeBtn was removed (replaced by inline panel) — guard the old binding
+  document.getElementById('verifyCodeBtn')?.addEventListener('click', openVerifyModal);
   document.getElementById('vmCancelBtn').onclick   = closeVerifyModal;
   vmModal.addEventListener('click', e => {
     if (e.target === vmModal) closeVerifyModal();
@@ -425,6 +458,124 @@
   [vmCode, vmPin].forEach(el => el.addEventListener('keydown', e => {
     if (e.key === 'Enter') vmSubmitBtn.click();
   }));
+
+  // ── Inline quick-verify panel (always visible at top) ──────────
+  const qvCode = document.getElementById('qvCode');
+  const qvPin  = document.getElementById('qvPin');
+  const qvErr  = document.getElementById('qvError');
+  const qvOk   = document.getElementById('qvSuccess');
+  const qvBtn  = document.getElementById('qvSubmitBtn');
+
+  qvCode.addEventListener('input', () => {
+    let v = qvCode.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/, '');
+    qvCode.value = v;
+  });
+  qvPin.addEventListener('input', () => {
+    let v = qvPin.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/, '');
+    qvPin.value = v;
+  });
+  [qvCode, qvPin].forEach(el => el.addEventListener('keydown', e => {
+    if (e.key === 'Enter') qvBtn.click();
+  }));
+
+  qvBtn.onclick = async () => {
+    // Mirror values into the modal then run the same verification flow
+    qvErr.style.display = 'none';
+    qvOk.style.display = 'none';
+    const code = qvCode.value.trim().toUpperCase();
+    const pin  = qvPin.value.trim().toUpperCase();
+    if (!code || !pin) {
+      qvErr.textContent = 'Enter both the booking code and the PIN.';
+      qvErr.style.display = 'block';
+      return;
+    }
+    qvBtn.disabled = true;
+    qvBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">hourglass_empty</span> Verifying…';
+
+    if (!supabase) {
+      qvErr.textContent = 'Database unavailable. Try again or use New Consultation.';
+      qvErr.style.display = 'block';
+      qvBtn.disabled = false;
+      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+      return;
+    }
+
+    let booking, error;
+    try {
+      const res = await withTimeout(
+        supabase.from('bookings')
+          .select('id, booking_code, pin_token, pin_expires_at, patient_user_id, patient_name, patient_age, patient_sex, symptoms, ai_diagnosis, conditions_json, ai_confidence, urgency_level, clinic_id, status, preferred_time')
+          .eq('booking_code', code)
+          .maybeSingle(),
+        7000, 'verify_booking'
+      );
+      booking = res.data; error = res.error;
+    } catch(e) {
+      qvErr.textContent = 'Verification timed out. Check your internet and try again.';
+      qvErr.style.display = 'block';
+      qvBtn.disabled = false;
+      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+      return;
+    }
+
+    if (error || !booking) {
+      qvErr.textContent = 'No booking found for that code. Check it and try again.';
+      qvErr.style.display = 'block';
+      qvBtn.disabled = false;
+      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+      return;
+    }
+    if (booking.pin_token !== pin) {
+      qvErr.textContent = 'PIN does not match. Ask the patient to read it again.';
+      qvErr.style.display = 'block';
+      qvBtn.disabled = false;
+      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+      return;
+    }
+    if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
+      qvErr.textContent = 'This PIN has expired. Ask the patient to make a new booking.';
+      qvErr.style.display = 'block';
+      qvBtn.disabled = false;
+      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
+      return;
+    }
+    // Note: we DON'T check clinic_id mismatch here — staff said the patient is at THIS clinic, trust it
+    // (the booking might have been routed to a different clinic in the app but the patient walked here)
+
+    try {
+      await supabase.from('bookings')
+        .update({ status: 'in_progress', attended_at: new Date().toISOString() })
+        .eq('id', booking.id);
+    } catch(e) { /* non-fatal */ }
+
+    qvOk.innerHTML = `<strong>Verified!</strong> Patient: ${esc(booking.patient_name || 'Unknown')}. Opening consultation…`;
+    qvOk.style.display = 'block';
+
+    let phone = '';
+    if (booking.patient_user_id) {
+      try {
+        const { data: prof } = await withTimeout(
+          supabase.from('profiles')
+            .select('phone_number, phone')
+            .eq('id', booking.patient_user_id)
+            .maybeSingle(),
+          4000, 'profile'
+        );
+        phone = prof?.phone_number || prof?.phone || '';
+      } catch(e) { /* non-fatal */ }
+    }
+
+    const params = new URLSearchParams({
+      booking_id:    booking.id,
+      booking_code:  booking.booking_code,
+      patient_name:  booking.patient_name || '',
+      patient_phone: phone,
+      ...(booking.patient_user_id ? { patient_id: booking.patient_user_id } : {}),
+    });
+    setTimeout(() => { window.location.href = 'new-order.html?' + params.toString(); }, 600);
+  };
 
   // Live clock
   function tickClock() {
