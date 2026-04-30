@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Patients</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <style>
+    .search-wrap { max-width: 720px; margin: 0 auto }
+    .search-card {
+      background: #fff; border-radius: 14px;
+      padding: 18px 20px; box-shadow: var(--shadow);
+      margin-bottom: 16px;
+      display: flex; gap: 10px; align-items: center;
+    }
+    .search-input {
+      flex: 1; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 10px;
+      font-size: 15px; outline: none; font-family: inherit;
+    }
+    .search-input:focus { border-color: var(--primary) }
+    .add-btn {
+      padding: 12px 18px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-family: inherit; flex-shrink: 0;
+    }
+    .add-btn:hover { background: var(--primary-d) }
+
+    .patient-row {
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 12px; padding: 14px 16px;
+      margin-bottom: 10px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; transition: box-shadow .12s;
+    }
+    .patient-row:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.07) }
+    .pr-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: #E3F2FD; color: #1565C0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; flex-shrink: 0;
+    }
+    .pr-info { flex: 1; min-width: 0 }
+    .pr-name { font-size: 15px; font-weight: 700; color: #212121 }
+    .pr-meta { font-size: 12px; color: #5F6368; margin-top: 2px }
+    .pr-orders {
+      font-size: 12px; font-weight: 600;
+      background: #E8F5E9; color: #2E7D32;
+      padding: 4px 10px; border-radius: 12px;
+      flex-shrink: 0;
+    }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: var(--text-lt);
+    }
+    .empty-state .material-icons-outlined {
+      font-size: 56px; color: #CFD8DC; display: block; margin: 0 auto 14px;
+    }
+
+    /* Detail panel */
+    .detail-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      display: none; z-index: 200;
+    }
+    .detail-overlay.open { display: flex; align-items: center; justify-content: center; padding: 20px }
+    .detail-card {
+      background: #fff; border-radius: 16px; max-width: 720px; width: 100%;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .detail-header {
+      padding: 20px 22px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .detail-content { padding: 18px 22px }
+    .order-history-row {
+      display: flex; gap: 12px; padding: 12px 0;
+      border-bottom: 1px solid #F5F5F5;
+      font-size: 13px;
+    }
+    .order-history-row:last-child { border-bottom: none }
+    .ohr-date { color: #9AA0A6; min-width: 90px; flex-shrink: 0 }
+    .ohr-drug { flex: 1; font-weight: 500; color: #212121 }
+    .ohr-status { flex-shrink: 0 }
+
+    @media (max-width: 600px) {
+      .search-card { flex-direction: column; align-items: stretch }
+      .add-btn { width: 100% }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link"><span class="material-icons-outlined">medical_services</span> New Consultation</a>
+      <a href="patients.html" class="sidebar-link active"><span class="material-icons-outlined">person_search</span> Patients</a>
+      <a href="settings.html" class="sidebar-link"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Patients</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+    <div class="search-wrap">
+
+      <div class="search-card">
+        <span class="material-icons-outlined" style="color:#9AA0A6">search</span>
+        <input id="searchInput" class="search-input" type="text"
+          placeholder="Search by name or phone…" autocomplete="off">
+        <button class="add-btn" id="addBtn">
+          <span class="material-icons-outlined" style="font-size:18px">person_add</span>
+          Register
+        </button>
+      </div>
+
+      <div id="resultsList">
+        <div class="empty-state">
+          <span class="material-icons-outlined">person_search</span>
+          <div style="font-size:15px;font-weight:600;color:#424242">Search to find a patient</div>
+          <div style="font-size:13px;margin-top:4px">Type a name or phone number above. New patients can be registered in 30 seconds.</div>
+        </div>
+      </div>
+
+    </div>
+    </div>
+  </main>
+</div>
+
+<!-- Patient detail overlay -->
+<div class="detail-overlay" id="detailOverlay">
+  <div class="detail-card">
+    <div class="detail-header">
+      <div class="pr-avatar" id="dAvatar" style="width:52px;height:52px;font-size:17px"></div>
+      <div style="flex:1">
+        <div style="font-size:18px;font-weight:700" id="dName"></div>
+        <div style="font-size:13px;color:#5F6368" id="dPhone"></div>
+      </div>
+      <button id="dCloseBtn" style="background:none;border:none;cursor:pointer;color:#5F6368;display:flex;align-items:center">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <div class="detail-content">
+      <div style="display:flex;gap:10px;margin-bottom:18px">
+        <a id="dNewOrderBtn" href="#" class="add-btn" style="flex:1;justify-content:center">
+          <span class="material-icons-outlined" style="font-size:18px">add</span>
+          New Consultation
+        </a>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Order History</div>
+      <div id="dHistory">
+        <div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Quick-register modal -->
+<div id="registerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;padding:24px 22px 28px">
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <span class="material-icons-outlined" style="color:var(--primary)">person_add</span>
+      Register Patient
+    </h3>
+    <p style="font-size:13px;color:#5F6368;margin-bottom:16px">Just name and phone — they'll get an SMS to finish their profile later.</p>
+
+    <label style="font-size:13px;font-weight:600;color:#424242;display:block;margin-bottom:6px">Full name</label>
+    <input id="regName" style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box" placeholder="e.g. Nakato Brenda">
+
+    <div style="height:12px"></div>
+
+    <label style="font-size:13px;font-weight:600;color:#424242;display:block;margin-bottom:6px">Phone number</label>
+    <input id="regPhone" type="tel" inputmode="tel" style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box" placeholder="07XX XXX XXX">
+
+    <div style="height:18px"></div>
+
+    <button id="registerBtn" style="width:100%;padding:14px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span class="material-icons-outlined">check</span>
+      Register & Start Order
+    </button>
+    <div style="height:8px"></div>
+    <button id="registerCancelBtn" style="width:100%;padding:13px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<nav class="clinic-bottom-nav">
+  <div class="clinic-bottom-nav-inner">
+    <a href="dashboard.html" class="cbn-link">
+      <span class="material-icons-outlined">home</span>Home
+    </a>
+    <a href="new-order.html" class="cbn-link cbn-main">
+      <span class="material-icons-outlined">add_circle</span>New
+    </a>
+    <a href="patients.html" class="cbn-link active">
+      <span class="material-icons-outlined">people</span>Patients
+    </a>
+    <a href="settings.html" class="cbn-link">
+      <span class="material-icons-outlined">tune</span>Settings
+    </a>
+  </div>
+</nav>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic.js"></script>
+<script>
+  const session = requireClinic();
+  setupClinicLogout();
+  const supabase = _getClinicSupabase();
+
+  document.getElementById('clinicUserDate').textContent =
+    new Date().toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
+
+  // Resolve clinic_id
+  let _clinicId = session?.clinicId || null;
+  if (!_clinicId && supabase && !session?.demo) {
+    resolveClinicId(supabase, session).then(id => { _clinicId = id; });
+  }
+
+  const searchInput = document.getElementById('searchInput');
+  const resultsEl   = document.getElementById('resultsList');
+
+  function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  let searchTimer;
+  searchInput.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (q.length < 2) { renderEmpty(); return; }
+    searchTimer = setTimeout(() => runSearch(q), 220);
+  });
+
+  async function runSearch(q) {
+    if (!supabase) { renderEmpty('Database unavailable.'); return; }
+
+    const cleanPhone = q.replace(/\D/g, '');
+    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+
+    // Search Homatt-registered patients in profiles
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, phone_number, phone')
+      .or(`first_name.ilike.%${q}%,last_name.ilike.%${q}%,phone_number.ilike.%${cleanPhone || q}%,phone.ilike.%${cleanPhone || q}%`)
+      .limit(20);
+
+    // Search clinic_patients (stub patients registered at this clinic)
+    let clinicPatientRows = [];
+    if (clinicId) {
+      const cpFilter = `full_name.ilike.%${q}%${cleanPhone ? `,phone.ilike.%${cleanPhone}%` : ''}`;
+      const { data: cp } = await supabase
+        .from('clinic_patients')
+        .select('id, full_name, phone')
+        .eq('clinic_id', clinicId)
+        .or(cpFilter)
+        .limit(20);
+      clinicPatientRows = cp || [];
+    }
+
+    // Deduplicate: profiles take precedence; skip clinic_patient rows whose phone
+    // is already covered by a profile row.
+    const seenPhones = new Set((profiles || []).map(p => p.phone_number || p.phone).filter(Boolean));
+    const stubsFromClinic = clinicPatientRows.filter(cp => {
+      if (seenPhones.has(cp.phone)) return false;
+      seenPhones.add(cp.phone);
+      return true;
+    });
+
+    const list = [
+      ...(profiles || []).map(p => ({
+        id: p.id,
+        clinicPatientId: null,
+        name: ((p.first_name || '') + ' ' + (p.last_name || '')).trim() || 'Unnamed',
+        phone: p.phone_number || p.phone || '—',
+        registered: true,
+      })),
+      ...stubsFromClinic.map(cp => ({
+        id: null,
+        clinicPatientId: cp.id,
+        name: cp.full_name,
+        phone: cp.phone,
+        registered: false,
+      })),
+    ];
+
+    if (!list.length) { renderEmpty('No patients match. Try registering a new one.'); return; }
+
+    // Order counts (best effort)
+    const orderCounts = {};
+    if (clinicId) {
+      const { data: cnt } = await supabase
+        .from('clinic_orders')
+        .select('patient_id, clinic_patient_id, patient_phone')
+        .eq('clinic_id', clinicId);
+      (cnt || []).forEach(o => {
+        const k = o.patient_id || o.clinic_patient_id || o.patient_phone;
+        orderCounts[k] = (orderCounts[k] || 0) + 1;
+      });
+    }
+
+    resultsEl.innerHTML = list.map(p => {
+      const initials = (p.name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+      const k = p.id || p.clinicPatientId || p.phone;
+      const cnt = orderCounts[k] || 0;
+      const pendBadge = p.registered ? '' : ' <span style="font-size:11px;color:#E65100;background:#FFE0B2;padding:2px 6px;border-radius:8px;font-weight:600;margin-left:4px">Pending</span>';
+      return `<div class="patient-row"
+          data-id="${esc(p.id || '')}"
+          data-cid="${esc(p.clinicPatientId || '')}"
+          data-name="${esc(p.name)}"
+          data-phone="${esc(p.phone)}">
+        <div class="pr-avatar">${initials}</div>
+        <div class="pr-info">
+          <div class="pr-name">${esc(p.name)}${pendBadge}</div>
+          <div class="pr-meta">${esc(p.phone)}</div>
+        </div>
+        <div class="pr-orders">${cnt} order${cnt === 1 ? '' : 's'}</div>
+      </div>`;
+    }).join('');
+
+    resultsEl.querySelectorAll('.patient-row').forEach(el => {
+      el.onclick = () => openDetail({
+        id: el.dataset.id || null,
+        clinicPatientId: el.dataset.cid || null,
+        name: el.dataset.name,
+        phone: el.dataset.phone,
+      });
+    });
+  }
+
+  function renderEmpty(msg) {
+    resultsEl.innerHTML = `
+      <div class="empty-state">
+        <span class="material-icons-outlined">person_search</span>
+        <div style="font-size:15px;font-weight:600;color:#424242">${msg ? esc(msg) : 'Search to find a patient'}</div>
+        <div style="font-size:13px;margin-top:4px">${msg ? 'Try a different name or phone number.' : 'Type a name or phone number above. New patients can be registered in 30 seconds.'}</div>
+      </div>`;
+  }
+  renderEmpty();
+
+  // ── Detail overlay ───────────────────────────────────────
+  async function openDetail(p) {
+    document.getElementById('dName').textContent  = p.name;
+    document.getElementById('dPhone').textContent = p.phone;
+    document.getElementById('dAvatar').textContent = (p.name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
+    const newBtn = document.getElementById('dNewOrderBtn');
+    const params = new URLSearchParams({
+      patient_name: p.name,
+      patient_phone: p.phone,
+      ...(p.id ? { patient_id: p.id } : {}),
+      ...(p.clinicPatientId ? { clinic_patient_id: p.clinicPatientId } : {}),
+    });
+    newBtn.href = 'new-order.html?' + params.toString();
+
+    document.getElementById('detailOverlay').classList.add('open');
+    document.getElementById('dHistory').innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading…</div>';
+
+    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+    if (!supabase || !clinicId) return;
+
+    // Build OR filter: match by profile id, clinic_patient id, or phone
+    let orFilter = `patient_phone.eq.${p.phone}`;
+    if (p.id) orFilter += `,patient_id.eq.${p.id}`;
+    if (p.clinicPatientId) orFilter += `,clinic_patient_id.eq.${p.clinicPatientId}`;
+
+    const { data, error } = await supabase
+      .from('clinic_orders')
+      .select('id, drug_name, dosage, duration_days, status, course_completed, created_at, patient_id, patient_phone')
+      .eq('clinic_id', clinicId)
+      .or(orFilter)
+      .order('created_at', { ascending: false })
+      .limit(40);
+
+    const histEl = document.getElementById('dHistory');
+    if (error) { histEl.innerHTML = `<div style="color:#C62828">${esc(error.message)}</div>`; return; }
+    if (!data?.length) {
+      histEl.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">No prior orders for this patient.</div>';
+      return;
+    }
+    histEl.innerHTML = data.map(o => {
+      const dt = new Date(o.created_at).toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
+      const statusLabel = {
+        pending: 'Pending', confirmed: 'Confirmed', preparing: 'Preparing',
+        dispatched: 'En Route', delivered: 'Delivered', completed: 'Delivered', cancelled: 'Cancelled'
+      }[o.status] || o.status;
+      const statusClass = {
+        pending: 'waiting', confirmed: 'in-progress', preparing: 'in-progress',
+        dispatched: 'in-progress', delivered: 'completed', completed: 'completed', cancelled: 'urgent'
+      }[o.status] || 'normal';
+      const tick = o.course_completed
+        ? '<span style="color:#2E7D32;font-size:12px;margin-left:6px"><span class="material-icons-outlined" style="font-size:14px;vertical-align:-3px">verified</span> course done</span>'
+        : '';
+      return `<div class="order-history-row">
+        <span class="ohr-date">${dt}</span>
+        <span class="ohr-drug">${esc(o.drug_name)} · ${esc(o.dosage)} · ${o.duration_days}d${tick}</span>
+        <span class="ohr-status"><span class="status-badge ${statusClass}">${statusLabel}</span></span>
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('dCloseBtn').onclick = () =>
+    document.getElementById('detailOverlay').classList.remove('open');
+  document.getElementById('detailOverlay').addEventListener('click', (e) => {
+    if (e.target.id === 'detailOverlay') e.currentTarget.classList.remove('open');
+  });
+
+  // ── Register modal ───────────────────────────────────────
+  const regModal = document.getElementById('registerModal');
+  document.getElementById('addBtn').onclick = () => {
+    document.getElementById('regName').value  = '';
+    document.getElementById('regPhone').value = searchInput.value.replace(/[^0-9+]/g, '');
+    regModal.style.display = 'flex';
+    setTimeout(() => document.getElementById('regName').focus(), 100);
+  };
+  document.getElementById('registerCancelBtn').onclick = () => regModal.style.display = 'none';
+  document.getElementById('registerBtn').onclick = async () => {
+    const name  = document.getElementById('regName').value.trim();
+    const phone = document.getElementById('regPhone').value.trim();
+    if (!name || !phone) { showToast('Name and phone required', 'error'); return; }
+
+    const btn = document.getElementById('registerBtn');
+    btn.disabled = true;
+
+    const clinicId = _clinicId || await resolveClinicId(supabase, session);
+
+    // Save stub patient to Supabase before navigating
+    let clinicPatientId = null;
+    if (supabase && clinicId) {
+      try {
+        const { data: cp } = await supabase
+          .from('clinic_patients')
+          .upsert(
+            { clinic_id: clinicId, full_name: name, phone, registered_by: session?.userId || null },
+            { onConflict: 'clinic_id,phone' }
+          )
+          .select('id')
+          .single();
+        if (cp) clinicPatientId = cp.id;
+      } catch (e) { /* non-fatal */ }
+    }
+
+    // Fire SMS invite (best-effort)
+    if (supabase) {
+      try {
+        await supabase.functions.invoke('send-sms-invite', {
+          body: { phone, name, clinicName: session?.clinicName || 'Clinic' }
+        });
+      } catch(e) {}
+    }
+
+    const params = new URLSearchParams({ patient_name: name, patient_phone: phone });
+    if (clinicPatientId) params.set('clinic_patient_id', clinicPatientId);
+    window.location.href = 'new-order.html?' + params.toString();
+  };
+
+  searchInput.focus();
+</script>
+</body>
+</html>

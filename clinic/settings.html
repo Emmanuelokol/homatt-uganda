@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Clinic Settings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <style>
+    .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
+    .settings-card { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+    .settings-card-title { font-size:14px; font-weight:700; color:#1B5E20; display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #F0F0F0; }
+    .form-row { margin-bottom:14px; }
+    .form-row label { display:block; font-size:12px; font-weight:600; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+    .form-input { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; transition:border-color .2s; }
+    .form-input:focus { border-color:#1B5E20; }
+    .form-textarea { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; resize:vertical; transition:border-color .2s; }
+    .form-textarea:focus { border-color:#1B5E20; }
+
+    /* Chip tags */
+    .chip-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid #E0E0E0; border-radius:8px; padding:8px; min-height:44px; cursor:text; transition:border-color .2s; }
+    .chip-wrap:focus-within { border-color:#1B5E20; }
+    .chip { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:4px 11px; font-size:12px; font-weight:600; }
+    .chip-del { background:none; border:none; cursor:pointer; padding:0; color:#2E7D32; font-size:16px; line-height:1; }
+    .chip-input { border:none; outline:none; font-family:inherit; font-size:13px; min-width:150px; flex:1; background:transparent; }
+
+    /* Hours */
+    .hours-table { width:100%; }
+    .hours-row { display:grid; grid-template-columns:90px 1fr 1fr 70px; gap:8px; align-items:center; margin-bottom:8px; }
+    .hours-row .day { font-weight:600; font-size:13px; }
+    .hours-input { border:1px solid #E0E0E0; border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; width:100%; }
+    .closed-toggle { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; color:#D32F2F; }
+
+    /* Facilities */
+    .facilities-grid { display:flex; flex-wrap:wrap; gap:8px; }
+    .facility-btn { border:1.5px solid #E0E0E0; border-radius:10px; padding:6px 14px; font-size:12px; font-weight:500; cursor:pointer; background:#fff; font-family:inherit; color:#555; transition:all .15s; }
+    .facility-btn.active { border-color:#1B5E20; background:#E8F5E9; color:#1B5E20; font-weight:600; }
+
+    /* Fee table */
+    .fee-table { width:100%; border-collapse:collapse; }
+    .fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+    .fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; }
+    .fee-input { border:1px solid #E0E0E0; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:130px; text-align:right; }
+
+    /* Condition fee table */
+    .cond-fee-table { width:100%; border-collapse:collapse; }
+    .cond-fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+    .cond-fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
+    .cond-fee-empty { text-align:center; padding:24px; color:#9AA0A6; font-size:13px; }
+    .cond-badge { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
+    .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+
+    .save-btn { background:#1B5E20; color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .save-btn:active { background:#154d18; }
+    .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link"><span class="material-icons-outlined">medical_services</span> New Consultation</a>
+      <a href="patients.html" class="sidebar-link"><span class="material-icons-outlined">person_search</span> Patients</a>
+      <a href="settings.html" class="sidebar-link active"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Profile & Settings</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Basic Info -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_hospital</span> Clinic Basic Information
+        </div>
+        <div class="settings-grid">
+          <div class="form-row" style="grid-column:span 2">
+            <label>Clinic Name</label>
+            <input type="text" id="sClinicName" class="form-input" placeholder="e.g. Kampala Medical Centre">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>About This Clinic</label>
+            <textarea id="sClinicDesc" class="form-textarea" rows="3" placeholder="Brief description — specialties, history, what makes your clinic stand out..."></textarea>
+          </div>
+          <div class="form-row">
+            <label>Phone Number</label>
+            <input type="text" id="sClinicPhone" class="form-input" placeholder="+256 7XX XXX XXX">
+          </div>
+          <div class="form-row">
+            <label>WhatsApp Number</label>
+            <input type="text" id="sClinicWhatsapp" class="form-input" placeholder="+256 7XX XXX XXX">
+          </div>
+          <div class="form-row">
+            <label>Email Address</label>
+            <input type="email" id="sClinicEmail" class="form-input" placeholder="clinic@example.com">
+          </div>
+          <div class="form-row">
+            <label>Contact Person / Manager</label>
+            <input type="text" id="sClinicContact" class="form-input" placeholder="Dr. Name or Manager Name">
+          </div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">location_on</span> Location
+        </div>
+        <div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
+          <span>Enter your clinic's location using Uganda's place names — district, subcounty, parish. We will automatically find your GPS position from these names so patients near you can find you first.</span>
+        </div>
+        <div class="settings-grid">
+          <div class="form-row">
+            <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bugiri, Kampala, Jinja</span></label>
+            <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Bugiri" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bukooli County</span></label>
+            <input type="text" id="sClinicCounty" class="form-input" placeholder="e.g. Bukooli County" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Butto, Ntinda, Naguru</span></label>
+            <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Butto" autocomplete="off">
+          </div>
+          <div class="form-row">
+            <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">most specific area</span></label>
+            <input type="text" id="sClinicParish" class="form-input" placeholder="e.g. Butto Parish" autocomplete="off">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Full Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">plot, street, landmarks</span></label>
+            <input type="text" id="sClinicAddress" class="form-input" placeholder="e.g. Plot 12, opposite Butto Trading Centre">
+          </div>
+        </div>
+
+        <!-- Auto-geocode button -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
+            style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:16px">my_location</span>
+            Find GPS from address
+          </button>
+          <span id="geocodeStatus" style="font-size:12px;color:#555"></span>
+        </div>
+
+        <!-- GPS coords stored silently — hidden from clinic staff -->
+        <input type="hidden" id="sClinicLat">
+        <input type="hidden" id="sClinicLng">
+        <div id="geocodeResult" style="display:none;margin-top:10px;background:#F1F8E9;border-radius:8px;padding:8px 12px;font-size:12px;color:#33691E;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px">gps_fixed</span>
+          <span id="geocodeResultText"></span>
+        </div>
+      </div>
+
+      <!-- Conditions & Specialties -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">healing</span> Conditions Treated &amp; Specialties
+        </div>
+        <div class="form-row">
+          <label>Add conditions / diseases you treat (press Enter or comma after each)</label>
+          <div class="chip-wrap" id="specialtiesWrap" onclick="document.getElementById('specInput').focus()">
+            <input class="chip-input" id="specInput" placeholder="e.g. Malaria, Diabetes, Maternity, Hypertension…" onkeydown="addSpec(event)">
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:#9AA0A6">Suggested: Malaria, Typhoid, Diabetes, Hypertension, Maternity, Paediatrics, Skin, Eye, Dental, TB, HIV, Surgery</div>
+        </div>
+        <div style="margin-top:8px">
+          <div style="font-size:12px;font-weight:600;color:#5F6368;margin-bottom:8px">Quick add:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="suggestedSpecs"></div>
+        </div>
+      </div>
+
+      <!-- Condition-Based Fees -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_atm</span> Condition-Based Fees (UGX)
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Add the diseases / conditions you treat and what each costs. Patients will see this fee when their AI diagnosis matches a condition you offer — so they know exactly what to expect before arriving.</span>
+        </div>
+        <table class="cond-fee-table">
+          <thead><tr><th>Condition / Disease</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="condFeeTableBody">
+            <tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button onclick="addCondFeeRow()" style="background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
+          <button onclick="populateFromSpecialties()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
+          </button>
+        </div>
+      </div>
+
+      <!-- Appointment & Booking Settings -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">event_available</span> Appointment &amp; Booking Settings
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Configure how patients schedule appointments. These settings control slot duration, capacity, and advance booking window shown to patients on the booking page.</span>
+        </div>
+        <div class="settings-grid">
+          <div class="form-row">
+            <label>Appointment Slot Duration</label>
+            <select id="sSlotDuration" class="form-input">
+              <option value="15">15 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30" selected>30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Max Patients Per Slot</label>
+            <input type="number" id="sMaxPerSlot" class="form-input" min="1" max="50" value="3" placeholder="e.g. 3">
+          </div>
+          <div class="form-row">
+            <label>Buffer Between Slots (minutes)</label>
+            <input type="number" id="sSlotBuffer" class="form-input" min="0" max="30" value="0" placeholder="e.g. 5">
+          </div>
+          <div class="form-row">
+            <label>Advance Booking Window (days)</label>
+            <input type="number" id="sBookingWindow" class="form-input" min="1" max="90" value="14" placeholder="e.g. 14">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:#1B5E20" checked>
+            Accept online appointment bookings from patients
+          </label>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:#1B5E20">
+            Auto-confirm bookings (no manual review needed)
+          </label>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
+        </div>
+      </div>
+
+      <!-- Consultation Fees -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">payments</span> Consultation Fees &amp; Services (UGX)
+        </div>
+        <table class="fee-table">
+          <thead><tr><th>Service Type</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th></tr></thead>
+          <tbody id="feesTableBody"></tbody>
+        </table>
+        <button onclick="addFeeRow()" style="margin-top:12px;background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Custom Service</button>
+      </div>
+
+      <!-- Facilities -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">medical_services</span> Available Facilities &amp; Equipment
+        </div>
+        <div class="facilities-grid" id="facilitiesGrid"></div>
+      </div>
+
+      <!-- Opening Hours -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">schedule</span> Opening Hours
+        </div>
+        <div class="hours-row" style="margin-bottom:10px;font-size:11px;font-weight:700;color:#5F6368;text-transform:uppercase">
+          <div>Day</div><div>Opens</div><div>Closes</div><div>Closed?</div>
+        </div>
+        <div id="hoursContainer"></div>
+      </div>
+
+      <!-- Save -->
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:32px">
+        <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">
+          <span class="material-icons-outlined">save</span> Save Profile
+        </button>
+        <span id="saveMsg" style="font-size:13px;color:#9AA0A6"></span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<nav class="clinic-bottom-nav">
+  <div class="clinic-bottom-nav-inner">
+    <a href="dashboard.html" class="cbn-link">
+      <span class="material-icons-outlined">home</span>Home
+    </a>
+    <a href="new-order.html" class="cbn-link cbn-main">
+      <span class="material-icons-outlined">add_circle</span>New
+    </a>
+    <a href="patients.html" class="cbn-link">
+      <span class="material-icons-outlined">people</span>Patients
+    </a>
+    <a href="settings.html" class="cbn-link active">
+      <span class="material-icons-outlined">tune</span>Settings
+    </a>
+  </div>
+</nav>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
+<script src="../js/config.js" defer></script>
+<script src="js/clinic.js" defer></script>
+<script>
+var _clinicId = null;
+var _supa = null;
+var _sessionIsDemo = false;
+var currentSpecs = [];
+var currentFacilities = [];
+var condFeeData = [];      // { id (existing uuid|null), condition_name, fee, notes, _delete }
+var condFeeDbRows = [];    // original rows fetched from DB
+
+var DEFAULT_FEES = [
+  { type:'General Consultation', fee:'', notes:'Standard OPD visit' },
+  { type:'Specialist Consultation', fee:'', notes:'With a specialist doctor' },
+  { type:'Ante-natal / Maternity', fee:'', notes:'Antenatal care visit' },
+  { type:'Child / Paediatric', fee:'', notes:'Under 12 years' },
+  { type:'Emergency', fee:'', notes:'After-hours or urgent care' },
+  { type:'Lab Tests (Basic)', fee:'', notes:'Blood count, urine, etc.' },
+  { type:'X-ray', fee:'', notes:'Standard chest / limb' },
+  { type:'Ultrasound / Scan', fee:'', notes:'Abdominal or obstetric' },
+];
+
+var SUGGESTED_SPECS = ['Malaria','Typhoid','Diabetes','Hypertension','Maternity','Paediatrics','HIV / AIDS','Tuberculosis (TB)','Skin Conditions','Eye Care','Dental','Surgery','Orthopaedics','Cardiology','Gynaecology','Mental Health'];
+
+var FACILITIES_LIST = ['Laboratory','X-ray Machine','Ultrasound / Scanner','ICU / High Dependency','Maternity / Delivery Ward','Operating Theatre','In-patient Wards','Pharmacy','Dental Chair','Physiotherapy','Eye Clinic','Immunisation Room','Ambulance','Oxygen / Ventilator','Mortuary'];
+
+var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', async function() {
+  var session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+  document.getElementById('clinicUserDate').textContent = new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long'});
+
+  _clinicId = session.clinicId || null;
+  _sessionIsDemo = !!session.demo;
+
+  // Init Supabase
+  var cfg = window.HOMATT_CONFIG || {};
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
+  }
+
+  // If clinicId is missing but Supabase is available (non-demo), fetch it from portal_users
+  if (_supa && !_clinicId && !_sessionIsDemo) {
+    try {
+      var { data: authData } = await _supa.auth.getSession();
+      if (authData && authData.session && authData.session.user) {
+        var { data: pu } = await _supa
+          .from('portal_users')
+          .select('clinic_id, clinics(name)')
+          .eq('auth_user_id', authData.session.user.id)
+          .eq('role', 'clinic_staff')
+          .eq('is_active', true)
+          .single();
+        if (pu && pu.clinic_id) {
+          _clinicId = pu.clinic_id;
+          var updated = Object.assign({}, session, { clinicId: _clinicId, clinicName: (pu.clinics && pu.clinics.name) || session.clinicName });
+          localStorage.setItem('clinic_session', JSON.stringify(updated));
+        }
+      }
+    } catch(e) { /* silently ignore — will show proper message on save */ }
+  }
+
+  // Build UI sections
+  buildFeeTable(DEFAULT_FEES);
+  buildFacilities([]);
+  buildHours({});
+  buildSuggestedSpecs();
+
+  // Load existing data
+  if (_supa && _clinicId) {
+    await Promise.race([loadClinicProfile(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]).catch(() => {});
+    await Promise.race([loadCondFees(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]).catch(() => {});
+  }
+});
+
+function buildSuggestedSpecs() {
+  var el = document.getElementById('suggestedSpecs');
+  el.innerHTML = SUGGESTED_SPECS.map(function(s) {
+    return '<button onclick="addSpecVal(\'' + s + '\')" style="background:#F0F0F0;border:none;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">' + s + '</button>';
+  }).join('');
+}
+
+function addSpecVal(val) {
+  if (val && !currentSpecs.includes(val)) {
+    currentSpecs.push(val);
+    renderSpecChips();
+  }
+}
+
+function addSpec(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var val = e.target.value.trim().replace(/,$/,'');
+    addSpecVal(val);
+    e.target.value = '';
+  }
+}
+
+function renderSpecChips() {
+  var wrap = document.getElementById('specialtiesWrap');
+  var input = document.getElementById('specInput');
+  wrap.innerHTML = '';
+  currentSpecs.forEach(function(s, i) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = s + '<button class="chip-del" onclick="removeSpec(' + i + ')">×</button>';
+    wrap.appendChild(chip);
+  });
+  wrap.appendChild(input);
+}
+
+window.removeSpec = function(i) { currentSpecs.splice(i,1); renderSpecChips(); };
+
+/* ── Fees table ── */
+var feesData = [];
+function buildFeeTable(fees) {
+  feesData = fees.map(function(f){ return Object.assign({}, f); });
+  renderFeeTable();
+}
+function renderFeeTable() {
+  var tbody = document.getElementById('feesTableBody');
+  tbody.innerHTML = feesData.map(function(f, i) {
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + (f.type||'') + '" oninput="feesData[' + i + '].type=this.value" placeholder="Service name"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (f.fee||'') + '" oninput="feesData[' + i + '].fee=Number(this.value)" placeholder="Amount" min="0"></td>' +
+      '<td style="display:flex;align-items:center;gap:6px"><input class="fee-input" style="flex:1;min-width:80px" value="' + (f.notes||'') + '" oninput="feesData[' + i + '].notes=this.value" placeholder="e.g. Includes basic exam">' +
+        '<button onclick="removeFeeRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:#9AA0A6;padding:0;font-size:18px;line-height:1">×</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+window.addFeeRow = function() { feesData.push({type:'',fee:'',notes:''}); renderFeeTable(); };
+window.removeFeeRow = function(i) { feesData.splice(i,1); renderFeeTable(); };
+
+/* ── Facilities ── */
+function buildFacilities(existing) {
+  currentFacilities = existing || [];
+  var el = document.getElementById('facilitiesGrid');
+  el.innerHTML = FACILITIES_LIST.map(function(f) {
+    var active = currentFacilities.includes(f);
+    return '<button class="facility-btn' + (active?' active':'') + '" onclick="toggleFacility(this,\'' + f + '\')">' + f + '</button>';
+  }).join('');
+}
+window.toggleFacility = function(btn, name) {
+  var idx = currentFacilities.indexOf(name);
+  if (idx === -1) { currentFacilities.push(name); btn.classList.add('active'); }
+  else { currentFacilities.splice(idx,1); btn.classList.remove('active'); }
+};
+
+/* ── Auto-geocode: convert Uganda place names → GPS coordinates ── */
+window.autoGeocodeLocation = async function() {
+  var btn    = document.getElementById('geocodeBtn');
+  var status = document.getElementById('geocodeStatus');
+  var result = document.getElementById('geocodeResult');
+  var resText= document.getElementById('geocodeResultText');
+
+  var parish   = (document.getElementById('sClinicParish').value   || '').trim();
+  var subcounty= (document.getElementById('sClinicCity').value      || '').trim();
+  var county   = (document.getElementById('sClinicCounty').value    || '').trim();
+  var district = (document.getElementById('sClinicDistrict').value  || '').trim();
+
+  if (!district && !subcounty && !parish) {
+    status.textContent = 'Please enter at least a District or Subcounty first.';
+    status.style.color = '#D32F2F';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.color = '#555';
+  status.textContent = 'Searching for location…';
+  result.style.display = 'none';
+
+  // Build search query from most-specific to least-specific
+  var parts = [parish, subcounty, county, district, 'Uganda'].filter(Boolean);
+  var query  = parts.join(', ');
+
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(query);
+    var resp = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } });
+    var data = await resp.json();
+
+    if (!data || !data.length) {
+      // Try a broader query (district + Uganda)
+      var broaderQuery = [subcounty || county, district, 'Uganda'].filter(Boolean).join(', ');
+      resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(broaderQuery), {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' }
+      });
+      data = await resp.json();
+    }
+
+    if (data && data.length) {
+      var best = data[0];
+      var lat = parseFloat(best.lat).toFixed(6);
+      var lng = parseFloat(best.lon).toFixed(6);
+      document.getElementById('sClinicLat').value = lat;
+      document.getElementById('sClinicLng').value = lng;
+
+      status.textContent = '';
+      resText.textContent = 'Found: ' + (best.display_name || query) + ' — GPS saved (' + parseFloat(lat).toFixed(4) + ', ' + parseFloat(lng).toFixed(4) + '). Patients near you will now find this clinic.';
+      result.style.display = 'flex';
+    } else {
+      status.style.color = '#E65100';
+      status.textContent = 'Could not find "' + query + '" on the map. Check spelling or try a broader area (district only).';
+    }
+  } catch(e) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Network error — check your internet connection and try again.';
+  }
+  btn.disabled = false;
+};
+
+// Auto-geocode whenever the district/subcounty/parish fields are filled and user leaves the field
+(function setupGeocodeTrigger() {
+  document.addEventListener('DOMContentLoaded', function() {
+    ['sClinicDistrict','sClinicCity','sClinicParish','sClinicCounty'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('blur', function() {
+          // Only auto-trigger if no coordinates yet
+          var lat = document.getElementById('sClinicLat').value;
+          if (!lat && document.getElementById('sClinicDistrict').value.trim()) {
+            window.autoGeocodeLocation();
+          }
+        });
+      }
+    });
+  });
+})();
+
+/* ── Hours ── */
+function buildHours(existing) {
+  var el = document.getElementById('hoursContainer');
+  el.innerHTML = DAYS.map(function(day) {
+    var h = (existing||{})[day] || {};
+    var closed = h.closed === true;
+    return '<div class="hours-row">' +
+      '<div class="day">' + day.slice(0,3) + '</div>' +
+      '<input class="hours-input" type="time" id="hs-open-'+day+'" value="' + (h.open||'08:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<input class="hours-input" type="time" id="hs-close-'+day+'" value="' + (h.close||'17:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<label class="closed-toggle"><input type="checkbox" id="hs-closed-'+day+'" ' + (closed?'checked':'') + ' onchange="toggleDay(\'' + day + '\')" style="accent-color:#D32F2F"> Closed</label>' +
+    '</div>';
+  }).join('');
+}
+window.toggleDay = function(day) {
+  var cl = document.getElementById('hs-closed-'+day).checked;
+  document.getElementById('hs-open-'+day).disabled = cl;
+  document.getElementById('hs-close-'+day).disabled = cl;
+};
+function getHours() {
+  var r = {};
+  DAYS.forEach(function(d) {
+    r[d] = {
+      open: document.getElementById('hs-open-'+d)?.value || '08:00',
+      close: document.getElementById('hs-close-'+d)?.value || '17:00',
+      closed: document.getElementById('hs-closed-'+d)?.checked || false
+    };
+  });
+  return r;
+}
+
+/* ── Load clinic profile ── */
+async function loadClinicProfile() {
+  var res = await _supa.from('clinics').select('*').eq('id', _clinicId).single();
+  if (!res.data) return;
+  var c = res.data;
+
+  document.getElementById('sClinicName').value = c.name || '';
+  document.getElementById('sClinicDesc').value = c.description || '';
+  document.getElementById('sClinicPhone').value = c.phone || '';
+  document.getElementById('sClinicWhatsapp').value = c.whatsapp || '';
+  document.getElementById('sClinicEmail').value = c.email || '';
+  document.getElementById('sClinicContact').value = c.contact_person || '';
+  document.getElementById('sClinicDistrict').value = c.district || '';
+  document.getElementById('sClinicCounty').value  = c.county   || '';
+  document.getElementById('sClinicCity').value    = c.city     || '';
+  document.getElementById('sClinicParish').value  = c.parish   || '';
+  document.getElementById('sClinicAddress').value = c.address  || '';
+  document.getElementById('sClinicLat').value     = c.latitude  || '';
+  document.getElementById('sClinicLng').value     = c.longitude || '';
+  // Show detected GPS badge if coordinates are already set
+  if (c.latitude && c.longitude) {
+    var res = document.getElementById('geocodeResult');
+    var txt = document.getElementById('geocodeResultText');
+    if (res && txt) {
+      txt.textContent = 'GPS position saved: ' + parseFloat(c.latitude).toFixed(4) + ', ' + parseFloat(c.longitude).toFixed(4) + ' — patients near you will find this clinic first.';
+      res.style.display = 'flex';
+    }
+  }
+
+  // Specialties
+  currentSpecs = c.specialties || [];
+  renderSpecChips();
+
+  // Fees — merge with defaults
+  var existingFees = [];
+  if (c.consultation_fee) {
+    existingFees.push({ type:'General Consultation', fee: c.consultation_fee, notes:'Standard OPD visit' });
+  }
+  if (Array.isArray(c.services) && c.services.length) {
+    c.services.forEach(function(s) {
+      var found = existingFees.find(function(f){ return f.type.toLowerCase().includes(s.type); });
+      if (!found) existingFees.push({ type: capitalise(s.type), fee: s.fee, notes:'' });
+    });
+  }
+  if (existingFees.length) {
+    // Fill in remaining defaults without values
+    DEFAULT_FEES.forEach(function(d) {
+      if (!existingFees.find(function(e){ return e.type === d.type; })) {
+        existingFees.push(Object.assign({}, d));
+      }
+    });
+    buildFeeTable(existingFees);
+  }
+
+  // Facilities
+  buildFacilities(c.facilities || []);
+
+  // Hours
+  buildHours(c.opening_hours || {});
+
+  // Appointment settings
+  if (c.slot_duration_minutes) document.getElementById('sSlotDuration').value = String(c.slot_duration_minutes);
+  if (c.max_per_slot != null) document.getElementById('sMaxPerSlot').value = c.max_per_slot;
+  if (c.slot_buffer_minutes != null) document.getElementById('sSlotBuffer').value = c.slot_buffer_minutes;
+  if (c.booking_window_days != null) document.getElementById('sBookingWindow').value = c.booking_window_days;
+  if (c.accepts_online_slots != null) document.getElementById('sAcceptsOnlineSlots').checked = !!c.accepts_online_slots;
+  if (c.auto_confirm_slots != null) document.getElementById('sAutoConfirmSlots').checked = !!c.auto_confirm_slots;
+}
+
+function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : s; }
+
+/* ── Condition-Based Fees ── */
+async function loadCondFees() {
+  if (!_supa || !_clinicId) return;
+  var res = await _supa.from('clinic_condition_fees')
+    .select('id,condition_name,fee,notes')
+    .eq('clinic_id', _clinicId)
+    .order('created_at', { ascending: true });
+  condFeeDbRows = res.data || [];
+  condFeeData = condFeeDbRows.map(function(r) {
+    return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '', _delete: false };
+  });
+  renderCondFeeTable();
+}
+
+function renderCondFeeTable() {
+  var tbody = document.getElementById('condFeeTableBody');
+  var visible = condFeeData.filter(function(r){ return !r._delete; });
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = condFeeData.map(function(r, i) {
+    if (r._delete) return '';
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(r.condition_name) + '" oninput="condFeeData['+i+'].condition_name=this.value" placeholder="e.g. Malaria, Typhoid…"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (r.fee||'') + '" oninput="condFeeData['+i+'].fee=Number(this.value)" placeholder="Amount" min="0" style="width:130px"></td>' +
+      '<td><input class="fee-input" style="width:100%" value="' + escHtml(r.notes||'') + '" oninput="condFeeData['+i+'].notes=this.value" placeholder="e.g. Includes RDT test"></td>' +
+      '<td><button onclick="removeCondFee('+i+')" title="Remove" style="background:none;border:none;cursor:pointer;color:#D32F2F;font-size:18px;line-height:1;padding:0">×</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.addCondFeeRow = function() {
+  condFeeData.push({ id: null, condition_name: '', fee: '', notes: '', _delete: false });
+  renderCondFeeTable();
+  // Focus the new row's condition input
+  var rows = document.querySelectorAll('#condFeeTableBody tr');
+  var last = rows[rows.length - 1];
+  if (last) { var inp = last.querySelector('input'); if (inp) inp.focus(); }
+};
+
+window.removeCondFee = function(i) {
+  if (condFeeData[i].id) {
+    condFeeData[i]._delete = true; // mark for deletion from DB
+  } else {
+    condFeeData.splice(i, 1);
+  }
+  renderCondFeeTable();
+};
+
+window.populateFromSpecialties = function() {
+  var existing = condFeeData.filter(function(r){ return !r._delete; }).map(function(r){ return r.condition_name.toLowerCase(); });
+  var added = 0;
+  currentSpecs.forEach(function(spec) {
+    if (!existing.includes(spec.toLowerCase())) {
+      condFeeData.push({ id: null, condition_name: spec, fee: '', notes: '', _delete: false });
+      added++;
+    }
+  });
+  if (added) {
+    renderCondFeeTable();
+    showToast(added + ' condition(s) added from specialties', 'success');
+  } else {
+    showToast('All specialties already have fee entries', 'info');
+  }
+};
+
+async function saveCondFees() {
+  if (!_supa || !_clinicId) return;
+
+  // Delete marked rows
+  var toDelete = condFeeData.filter(function(r){ return r._delete && r.id; }).map(function(r){ return r.id; });
+  if (toDelete.length) {
+    await _supa.from('clinic_condition_fees').delete().in('id', toDelete);
+  }
+
+  // Upsert remaining rows that have a condition_name and fee
+  var toUpsert = condFeeData.filter(function(r){ return !r._delete && r.condition_name && (r.fee !== '' && r.fee !== null); }).map(function(r) {
+    var row = { clinic_id: _clinicId, condition_name: r.condition_name.trim(), fee: Number(r.fee), notes: r.notes || null, updated_at: new Date().toISOString() };
+    if (r.id) row.id = r.id;
+    return row;
+  });
+  if (toUpsert.length) {
+    await _supa.from('clinic_condition_fees').upsert(toUpsert, { onConflict: 'id' });
+  }
+}
+
+/* ── Save ── */
+async function saveSettings() {
+  var btn = document.getElementById('saveSettingsBtn');
+  var msg = document.getElementById('saveMsg');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  msg.textContent = '';
+
+  // Build services from fee table
+  var services = feesData.filter(function(f){ return f.type && f.fee; }).map(function(f) {
+    return { type: f.type, fee: Number(f.fee), notes: f.notes || '' };
+  });
+
+  var generalFee = feesData.find(function(f){ return f.type === 'General Consultation' && f.fee; });
+
+  var payload = {
+    name: document.getElementById('sClinicName').value.trim() || undefined,
+    description: document.getElementById('sClinicDesc').value.trim() || null,
+    phone: document.getElementById('sClinicPhone').value.trim() || null,
+    whatsapp: document.getElementById('sClinicWhatsapp').value.trim() || null,
+    email: document.getElementById('sClinicEmail').value.trim() || null,
+    contact_person: document.getElementById('sClinicContact').value.trim() || null,
+    district: document.getElementById('sClinicDistrict').value.trim() || null,
+    county:   document.getElementById('sClinicCounty').value.trim()   || null,
+    city:     document.getElementById('sClinicCity').value.trim()     || null,
+    parish:   document.getElementById('sClinicParish').value.trim()   || null,
+    address:  document.getElementById('sClinicAddress').value.trim()  || null,
+    latitude:  parseFloat(document.getElementById('sClinicLat').value)  || null,
+    longitude: parseFloat(document.getElementById('sClinicLng').value) || null,
+    specialties: currentSpecs.length ? currentSpecs : null,
+    facilities: currentFacilities.length ? currentFacilities : null,
+    services: services.length ? services : null,
+    consultation_fee: generalFee ? Number(generalFee.fee) : null,
+    opening_hours: getHours(),
+    slot_duration_minutes: parseInt(document.getElementById('sSlotDuration').value) || 30,
+    max_per_slot: parseInt(document.getElementById('sMaxPerSlot').value) || 3,
+    slot_buffer_minutes: parseInt(document.getElementById('sSlotBuffer').value) || 0,
+    booking_window_days: parseInt(document.getElementById('sBookingWindow').value) || 14,
+    accepts_online_slots: document.getElementById('sAcceptsOnlineSlots').checked,
+    auto_confirm_slots: document.getElementById('sAutoConfirmSlots').checked,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!_supa || !_clinicId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+    if (_sessionIsDemo) {
+      msg.textContent = 'Demo mode — changes are not saved to the database.';
+      showToast('Demo mode — not saved', 'info');
+    } else if (!_supa) {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Cannot reach server. Check your internet connection.';
+      showToast('Connection error', 'error');
+    } else {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Your staff account is not linked to a clinic. Contact the admin.';
+      showToast('Account not linked to a clinic', 'error');
+    }
+    return;
+  }
+
+  var { error } = await _supa.from('clinics').update(payload).eq('id', _clinicId);
+
+  if (!error) {
+    await saveCondFees();
+    // Reload condition fees to get fresh IDs from DB
+    await loadCondFees();
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+
+  if (error) {
+    msg.textContent = 'Error: ' + error.message;
+    showToast('Save failed: ' + error.message, 'error');
+    return;
+  }
+
+  msg.textContent = 'Saved ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+  showToast('Clinic profile updated!', 'success');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <title>Homatt Health — Chronic Conditions</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <style>
+    .cc-page        { padding:16px 16px 100px; max-width:640px; margin:0 auto }
+    .cc-hero        { background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:16px;padding:18px 20px;margin-bottom:16px;box-shadow:0 4px 14px rgba(27,94,32,0.25) }
+    .cc-hero h2     { font-size:16px;font-weight:700;margin:0 0 6px;display:flex;align-items:center;gap:8px }
+    .cc-hero p      { font-size:12.5px;line-height:1.55;margin:0;opacity:.95 }
+    .cc-section     { margin-bottom:20px }
+    .cc-section-h   { font-size:12px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px;padding:0 4px }
+    .cc-card        { background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:10px;display:flex;align-items:center;gap:14px;cursor:pointer;touch-action:manipulation;transition:transform .12s ease,box-shadow .12s ease;-webkit-tap-highlight-color:transparent }
+    .cc-card:active { transform:scale(.98);box-shadow:0 4px 10px rgba(0,0,0,.08) }
+    .cc-card-icon   { width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0 }
+    .cc-card-icon .material-icons-outlined { font-size:24px }
+    .cc-card-title  { font-size:14px;font-weight:700;color:var(--text-primary);margin-bottom:3px }
+    .cc-card-desc   { font-size:12px;color:var(--text-secondary);line-height:1.45 }
+    .cc-chip        { font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;background:#E8F5E9;color:#1B5E20;display:inline-block;margin-left:6px }
+    .cc-modal-bg    { position:fixed;top:0;left:0;right:0;bottom:0;height:100dvh;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:999 }
+    .cc-modal-bg.open{ display:flex }
+    .cc-modal       { background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:640px;max-height:100dvh;overflow-y:auto;padding:22px 20px 28px;-webkit-overflow-scrolling:touch }
+    /* When the Android keyboard is open, the Capacitor resize:body shrinks body height
+       but 100dvh alone is not enough on some WebView versions. Force the modal to
+       never exceed the current viewport so inputs + buttons remain reachable. */
+    body.keyboard-open .cc-modal-bg { height:100%; align-items:flex-start }
+    body.keyboard-open .cc-modal    { max-height:100%; border-radius:0 }
+    .cc-modal h3    { font-size:16px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px }
+    .cc-field       { margin-bottom:14px }
+    .cc-label       { font-size:12px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:6px }
+    .cc-input       { width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box }
+    .cc-btn         { width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent }
+    .cc-btn:disabled{ opacity:.6;cursor:not-allowed }
+    .cc-btn.outline { background:#fff;color:#C62828;border:1.5px solid #EF9A9A }
+    .cc-tip         { background:#FFF8E1;border-left:4px solid #FFC107;border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:13px;color:#5D4037;line-height:1.6 }
+    .cc-empty       { text-align:center;padding:30px 20px;color:var(--text-hint);font-size:13px }
+    [data-theme="dark"] .cc-card { background:#1B1F26;border-color:#2A2F38 }
+    [data-theme="dark"] .cc-modal{ background:#1B1F26 }
+    [data-theme="dark"] .cc-tip  { background:#2D2100;color:#FFE082;border-left-color:#FFC107 }
+  </style>
+</head>
+<body>
+<script>(function(){var t=localStorage.getItem('homatt_theme');if(t==='dark')document.documentElement.setAttribute('data-theme','dark');})()</script>
+
+<div class="phone-frame">
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+      <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+      <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="page-header" style="background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;padding:16px;display:flex;align-items:center;gap:12px">
+    <button onclick="history.back()" style="background:rgba(255,255,255,.2);border:none;width:36px;height:36px;border-radius:50%;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <span class="material-icons-outlined">arrow_back</span>
+    </button>
+    <div>
+      <div style="font-size:16px;font-weight:700">Chronic Conditions</div>
+      <div style="font-size:11px;opacity:.85">Your personalized care pathway</div>
+    </div>
+  </div>
+
+  <div class="app-screen">
+  <div class="cc-page">
+    <div class="cc-hero">
+      <h2><span class="material-icons-outlined">favorite</span> Dedicated Care for Chronic Patients</h2>
+      <p>Enroll in a condition pathway to get automated refill reminders, weekly check-ins, and tips made for your condition — right in your pocket.</p>
+    </div>
+
+    <!-- Active enrollments -->
+    <div class="cc-section">
+      <div class="cc-section-h">Your Active Conditions</div>
+      <div id="activeList"></div>
+      <div id="activeEmpty" class="cc-empty" style="display:none">You are not enrolled in any pathway yet.</div>
+    </div>
+
+    <!-- Available conditions to enroll in -->
+    <div class="cc-section">
+      <div class="cc-section-h">Enroll in a Pathway</div>
+      <div id="catalogList"></div>
+    </div>
+  </div>
+  </div><!-- end .app-screen -->
+
+  <!-- Enroll Modal -->
+  <div class="cc-modal-bg" id="enrollModal">
+    <div class="cc-modal">
+      <h3 id="enrollTitle"><span class="material-icons-outlined" id="enrollIcon">medical_services</span> <span id="enrollLabel">Enroll</span></h3>
+      <p style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin:0 0 14px">We will send you reminders to take and refill your medication, plus weekly check-ins asking how you feel. You can unenroll anytime.</p>
+
+      <div class="cc-field">
+        <label class="cc-label">Medication name</label>
+        <input type="text" class="cc-input" id="medName" placeholder="e.g. Metformin 500mg">
+      </div>
+      <div class="cc-field">
+        <label class="cc-label">Refill every (days)</label>
+        <select class="cc-input" id="refillDays">
+          <option value="7">Every week (7 days)</option>
+          <option value="14">Every 2 weeks (14 days)</option>
+          <option value="30" selected>Every month (30 days)</option>
+          <option value="60">Every 2 months (60 days)</option>
+          <option value="90">Every 3 months (90 days)</option>
+        </select>
+      </div>
+      <div class="cc-field">
+        <label class="cc-label">Check-in frequency</label>
+        <select class="cc-input" id="checkinFreq">
+          <option value="daily">Daily</option>
+          <option value="weekly" selected>Weekly</option>
+          <option value="biweekly">Every 2 weeks</option>
+          <option value="monthly">Monthly</option>
+        </select>
+      </div>
+
+      <button class="cc-btn" id="enrollBtn"><span class="material-icons-outlined">check_circle</span> Enroll Me</button>
+      <div style="height:8px"></div>
+      <button class="cc-btn outline" onclick="closeEnrollModal()" style="background:transparent;color:var(--text-secondary);border:1.5px solid var(--border)">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Detail Modal (tips + unenroll) -->
+  <div class="cc-modal-bg" id="detailModal">
+    <div class="cc-modal">
+      <h3 id="detailTitle"></h3>
+      <div id="detailMeta" style="font-size:12.5px;color:var(--text-secondary);line-height:1.55;margin-bottom:14px"></div>
+      <div style="font-size:12px;font-weight:700;color:var(--text-primary);margin:12px 0 8px">Tips for you</div>
+      <div id="detailTips"></div>
+      <div style="height:12px"></div>
+      <button class="cc-btn outline" id="unenrollBtn"><span class="material-icons-outlined">close</span> Unenroll from this pathway</button>
+      <div style="height:8px"></div>
+      <button class="cc-btn" onclick="closeDetailModal()" style="background:transparent;color:var(--text-secondary);border:1.5px solid var(--border)">Close</button>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="tracker-toast" id="ccToast"></div>
+
+  <!-- Bottom Navigation Bar -->
+  <div class="bottom-nav">
+    <div class="nav-item" onclick="window.location.href='dashboard.html'" style="cursor:pointer">
+      <span class="material-icons-outlined">home</span>
+      <span class="nav-label">Home</span>
+    </div>
+    <div class="nav-item" onclick="window.location.href='family.html'" style="cursor:pointer">
+      <span class="material-icons-outlined">family_restroom</span>
+      <span class="nav-label">Family</span>
+    </div>
+    <div class="nav-item" onclick="window.location.href='shop.html'" style="cursor:pointer">
+      <span class="material-icons-outlined">storefront</span>
+      <span class="nav-label">Shop</span>
+    </div>
+    <div class="nav-item" onclick="window.location.href='profile.html'" style="cursor:pointer">
+      <span class="material-icons-outlined">person</span>
+      <span class="nav-label">Profile</span>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/chronic-disease.js"></script>
+</body>
+</html>

@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Notifications</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+  <style>
+    .notif-check-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 0; border-bottom: 1px solid #F1F3F4;
+    }
+    .notif-check-row:last-child { border-bottom: none; }
+    .check-icon { width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .check-icon.pass  { background: #E8F5E9; color: #2E7D32; }
+    .check-icon.fail  { background: #FFEBEE; color: #C62828; }
+    .check-icon.warn  { background: #FFF8E1; color: #F9A825; }
+    .check-icon.idle  { background: #F1F3F4; color: #9AA0A6; }
+    .check-label { font-size: 13px; font-weight: 600; color: #1E1E1E; }
+    .check-sub   { font-size: 12px; color: #9AA0A6; margin-top: 2px; }
+    .test-card { background:#fff; border-radius:12px; padding:20px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+    .test-card-title { font-size:15px; font-weight:700; color:#1E1E1E; margin-bottom:4px; display:flex; align-items:center; gap:8px; }
+    .test-card-sub   { font-size:12px; color:#9AA0A6; margin-bottom:16px; }
+    .test-btn { background:#1B5E20; color:#fff; border:none; border-radius:8px; padding:10px 18px;
+      font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+    .test-btn:disabled { opacity:.5; cursor:not-allowed; }
+    .test-btn.danger { background:#C62828; }
+    .result-box { background:#F8F9FA; border-radius:8px; padding:12px 14px; margin-top:12px;
+      font-size:12px; font-family:monospace; white-space:pre-wrap; word-break:break-all;
+      max-height:180px; overflow-y:auto; display:none; }
+    .result-box.visible { display:block; }
+    .result-box.success { background:#E8F5E9; color:#1B5E20; }
+    .result-box.error   { background:#FFEBEE; color:#C62828; }
+    .step-num { width:24px; height:24px; border-radius:50%; background:#1B5E20; color:#fff;
+      font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .setup-step { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-bottom:1px solid #F1F3F4; }
+    .setup-step:last-child { border-bottom:none; }
+    .setup-step-body { flex:1; }
+    .setup-step-title { font-size:13px; font-weight:600; color:#1E1E1E; margin-bottom:4px; }
+    .setup-step-desc  { font-size:12px; color:#5F6368; line-height:1.5; }
+    code { background:#F1F3F4; border-radius:4px; padding:1px 5px; font-family:monospace; font-size:11px; }
+    .badge-ok  { background:#E8F5E9; color:#1B5E20; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .badge-err { background:#FFEBEE; color:#C62828; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+    .badge-unk { background:#F1F3F4; color:#9AA0A6; font-size:11px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Notifications</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-page-content" style="padding:24px;max-width:860px;margin:0 auto">
+
+      <!-- ── DIAGNOSTIC CARD ─────────────────────────────────── -->
+      <div class="test-card">
+        <div class="test-card-title">
+          <span class="material-icons-outlined">checklist</span> Configuration Diagnostics
+        </div>
+        <div class="test-card-sub">Checks that OneSignal is fully wired up end-to-end.</div>
+        <div id="diagList">
+          <div class="notif-check-row">
+            <div class="check-icon idle" id="chk-fn-icon"><span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span></div>
+            <div>
+              <div class="check-label">Edge Function reachable</div>
+              <div class="check-sub" id="chk-fn-sub">Checking <code>send-notification</code>…</div>
+            </div>
+            <span class="badge-unk" id="chk-fn-badge">Checking</span>
+          </div>
+          <div class="notif-check-row">
+            <div class="check-icon idle" id="chk-id-icon"><span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span></div>
+            <div>
+              <div class="check-label">OneSignal App ID configured</div>
+              <div class="check-sub" id="chk-id-sub">Reading from HOMATT_CONFIG…</div>
+            </div>
+            <span class="badge-unk" id="chk-id-badge">Checking</span>
+          </div>
+          <div class="notif-check-row">
+            <div class="check-icon idle" id="chk-player-icon"><span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span></div>
+            <div>
+              <div class="check-label">Your device has a push token (player_id)</div>
+              <div class="check-sub" id="chk-player-sub">Looking up your profile…</div>
+            </div>
+            <span class="badge-unk" id="chk-player-badge">Checking</span>
+          </div>
+        </div>
+        <button class="test-btn" id="btnRunDiag" onclick="runDiagnostics()" style="margin-top:16px">
+          <span class="material-icons-outlined" style="font-size:16px">refresh</span> Re-run Diagnostics
+        </button>
+      </div>
+
+      <!-- ── SEND TEST NOTIFICATION ─────────────────────────── -->
+      <div class="test-card">
+        <div class="test-card-title">
+          <span class="material-icons-outlined">send</span> Send Test Push Notification
+        </div>
+        <div class="test-card-sub">
+          Sends a real push notification to your own device right now.
+          Your device must have the Homatt app installed and push notifications allowed.
+        </div>
+        <button class="test-btn" id="btnSendTest" onclick="sendTestNotification()">
+          <span class="material-icons-outlined" style="font-size:16px">notifications_active</span> Send Test Notification to My Device
+        </button>
+        <div class="result-box" id="testResult"></div>
+      </div>
+
+      <!-- ── SETUP GUIDE ────────────────────────────────────── -->
+      <div class="test-card">
+        <div class="test-card-title">
+          <span class="material-icons-outlined">help_outline</span> Setup Checklist
+        </div>
+        <div class="test-card-sub">
+          Follow these steps if push notifications are not working.
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">1</div>
+          <div class="setup-step-body">
+            <div class="setup-step-title">Create a OneSignal app</div>
+            <div class="setup-step-desc">
+              Go to <strong>app.onesignal.com</strong> → <em>New App/Website</em> → choose <em>Mobile App</em> → follow the Android FCM setup.
+              Copy your <strong>App ID</strong> and <strong>REST API Key</strong> from <em>Settings → Keys &amp; IDs</em>.
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">2</div>
+          <div class="setup-step-body">
+            <div class="setup-step-title">Add secrets to Supabase</div>
+            <div class="setup-step-desc">
+              Supabase Dashboard → your project → <em>Edge Functions → Manage secrets</em>.<br>
+              Add these two secrets:<br>
+              <code>ONESIGNAL_APP_ID</code> = your OneSignal App ID<br>
+              <code>ONESIGNAL_REST_API_KEY</code> = your REST API Key
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">3</div>
+          <div class="setup-step-body">
+            <div class="setup-step-title">Add the same App ID to GitHub Secrets</div>
+            <div class="setup-step-desc">
+              GitHub repo → <em>Settings → Secrets → Actions</em>.<br>
+              Add secret: <code>ONESIGNAL_APP_ID</code> = your OneSignal App ID.<br>
+              This lets CI inject the App ID into the mobile app's <code>config.js</code> at build time.
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">4</div>
+          <div class="setup-step-body">
+            <div class="setup-step-title">Deploy the Edge Function</div>
+            <div class="setup-step-desc">
+              Push any change to <code>supabase/functions/</code> on the <code>main</code> branch.
+              The CI workflow will deploy <code>send-notification</code> automatically.
+              Or run manually: <code>supabase functions deploy send-notification --project-ref kgkdiykzmqjougwzzewi</code>
+            </div>
+          </div>
+        </div>
+
+        <div class="setup-step">
+          <div class="step-num">5</div>
+          <div class="setup-step-body">
+            <div class="setup-step-title">Open the app and allow notifications</div>
+            <div class="setup-step-desc">
+              Launch the Homatt Android app and accept the push notification permission when it appears.
+              Then sign in — the app registers your device token and saves it to your profile.
+              Once saved, use the "Send Test Notification" button above to verify end-to-end delivery.
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+const SEND_NOTIF_URL = (window.HOMATT_CONFIG?.SUPABASE_URL || 'https://kgkdiykzmqjougwzzewi.supabase.co')
+  + '/functions/v1/send-notification';
+
+let _adminSession = null;
+let _adminUserId  = null;
+
+async function init() {
+  buildAdminSidebar('notifications');
+  setupAdminLogout();
+  _adminSession = await requireAdmin();
+  _adminUserId  = _adminSession?.userId || null;
+  await runDiagnostics();
+}
+
+// ── Diagnostics ───────────────────────────────────────────────
+async function runDiagnostics() {
+  document.getElementById('btnRunDiag').disabled = true;
+
+  // Check 1: App ID configured
+  const appId = window.HOMATT_CONFIG?.ONESIGNAL_APP_ID || '';
+  const idOk  = appId && appId !== 'YOUR_ONESIGNAL_APP_ID' && appId.length > 10;
+  setCheck('id', idOk ? 'pass' : 'fail',
+    idOk ? `App ID: ${appId.slice(0,8)}…` : 'Not configured — add ONESIGNAL_APP_ID to GitHub Secrets and Supabase Secrets',
+    idOk ? 'ok' : 'err');
+
+  // Check 2: Edge Function reachable (OPTIONS ping)
+  try {
+    const r = await fetch(SEND_NOTIF_URL, { method: 'OPTIONS' });
+    setCheck('fn', r.ok || r.status === 204 ? 'pass' : 'warn',
+      r.ok || r.status === 204 ? 'Function is deployed and reachable' : `HTTP ${r.status} — function may not be deployed`,
+      r.ok || r.status === 204 ? 'ok' : 'err');
+  } catch(e) {
+    setCheck('fn', 'fail', 'Cannot reach function — check if it is deployed', 'err');
+  }
+
+  // Check 3: Player ID in profile
+  if (_adminUserId) {
+    try {
+      const supa = adminSupa();
+      const { data } = await supa.from('profiles')
+        .select('onesignal_player_id')
+        .eq('id', _adminUserId)
+        .single();
+      const pid = data?.onesignal_player_id;
+      if (pid) {
+        setCheck('player', 'pass', `Token saved: ${pid.slice(0,12)}…`, 'ok');
+      } else {
+        setCheck('player', 'warn',
+          'No push token found — open the mobile app and allow notifications, then sign in', 'unk');
+      }
+    } catch(e) {
+      setCheck('player', 'warn', 'Could not check profile: ' + e.message, 'unk');
+    }
+  } else {
+    setCheck('player', 'idle', 'Sign in to check', 'unk');
+  }
+
+  document.getElementById('btnRunDiag').disabled = false;
+}
+
+function setCheck(key, iconClass, subText, badgeClass) {
+  const icon  = document.getElementById(`chk-${key}-icon`);
+  const sub   = document.getElementById(`chk-${key}-sub`);
+  const badge = document.getElementById(`chk-${key}-badge`);
+  if (!icon || !sub || !badge) return;
+
+  const icons = { pass:'check_circle', fail:'cancel', warn:'warning', idle:'hourglass_empty' };
+  icon.className = `check-icon ${iconClass}`;
+  icon.innerHTML = `<span class="material-icons-outlined" style="font-size:18px">${icons[iconClass]||'help'}</span>`;
+  sub.textContent = subText;
+
+  const badgeLabels = { ok:'OK', err:'ERROR', unk:'CHECK' };
+  badge.className = `badge-${badgeClass}`;
+  badge.textContent = badgeLabels[badgeClass] || badgeClass.toUpperCase();
+}
+
+// ── Send test notification ──────────────────────────────────────
+async function sendTestNotification() {
+  const btn = document.getElementById('btnSendTest');
+  const box = document.getElementById('testResult');
+  btn.disabled = true;
+  box.className = 'result-box visible';
+  box.textContent = 'Sending…';
+
+  if (!_adminUserId) {
+    box.className = 'result-box visible error';
+    box.textContent = 'Not signed in — please sign in with a real admin account (not demo mode).';
+    btn.disabled = false;
+    return;
+  }
+
+  try {
+    const supa = adminSupa();
+    const { data, error } = await supa.functions.invoke('send-notification', {
+      body: {
+        userId:  _adminUserId,
+        title:   'Test Notification',
+        message: 'Push notifications are working! This is a test from the Homatt Admin Portal.',
+        data:    { screen: 'dashboard' },
+      },
+    });
+
+    if (error) {
+      box.className = 'result-box visible error';
+      box.textContent = 'Error: ' + (error.message || JSON.stringify(error));
+    } else if (data?.skipped) {
+      box.className = 'result-box visible error';
+      box.textContent = 'Skipped: ' + data.reason +
+        '\n\nIf reason is "daily_limit_reached", wait until tomorrow or increase the limit in send-notification/index.ts.' +
+        '\nIf reason is "notification_preference_disabled", enable recovery_checkins in the notification_preferences column.';
+    } else if (data?.success) {
+      box.className = 'result-box visible success';
+      box.textContent = 'Sent! OneSignal notification_id: ' + data.notification_id +
+        '\nRecipients: ' + (data.recipients ?? 'unknown') +
+        '\n\nCheck your phone — the notification should appear within a few seconds.';
+    } else {
+      box.className = 'result-box visible';
+      box.textContent = JSON.stringify(data, null, 2);
+    }
+  } catch(e) {
+    box.className = 'result-box visible error';
+    box.textContent = 'Exception: ' + e.message;
+  }
+
+  btn.disabled = false;
+}
+
+init();
+</script>
+</body>
+</html>
