@@ -961,12 +961,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ====== Search ======
-  document.getElementById('shopSearch').addEventListener('input', () => {
-    const term     = document.getElementById('shopSearch').value.toLowerCase();
+  const shopSearchEl = document.getElementById('shopSearch');
+  shopSearchEl.addEventListener('input', () => {
+    const term     = shopSearchEl.value.toLowerCase();
     const filtered = term
       ? items.filter(i => i.name.toLowerCase().includes(term) || (i.description || '').toLowerCase().includes(term))
       : items;
     renderItems(filtered);
+  });
+  // When search is focused, scroll the search bar to the top so the keyboard
+  // doesn't cover it. We do this BEFORE the keyboard opens (on touchstart)
+  // to avoid the conflict with the native-bridge keyboardWillShow handler.
+  shopSearchEl.addEventListener('focus', () => {
+    setTimeout(() => {
+      const scroller = document.querySelector('.app-screen');
+      if (scroller) scroller.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 100);
   });
 
   // ====== My Orders ======

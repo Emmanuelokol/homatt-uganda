@@ -35,7 +35,7 @@
     .cc-modal h3    { font-size:16px;font-weight:700;margin:0 0 10px;display:flex;align-items:center;gap:8px }
     .cc-field       { margin-bottom:14px }
     .cc-label       { font-size:12px;font-weight:600;color:var(--text-primary);display:block;margin-bottom:6px }
-    .cc-input       { width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box }
+    .cc-input       { width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box;min-height:48px }
     .cc-btn         { width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;touch-action:manipulation;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent }
     .cc-btn:disabled{ opacity:.6;cursor:not-allowed }
     .cc-btn.outline { background:#fff;color:#C62828;border:1.5px solid #EF9A9A }
@@ -101,7 +101,8 @@
 
       <div class="cc-field">
         <label class="cc-label">Medication name</label>
-        <input type="text" class="cc-input" id="medName" placeholder="e.g. Metformin 500mg">
+        <input type="text" class="cc-input" id="medName" placeholder="e.g. Metformin 500mg"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
       </div>
       <div class="cc-field">
         <label class="cc-label">Refill every (days)</label>

@@ -2606,7 +2606,8 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       <div style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
         <input id="cbPatientName" type="text" value="${selectedPatient?.name || ''}"
-          style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"
+          style="width:100%;padding:14px;border:1.5px solid #DDD;border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff;min-height:50px"
           placeholder="Patient name" />
       </div>
 
@@ -2631,6 +2632,21 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       cbConfirm.innerHTML = '';
       document.getElementById('cbClinicList').style.display = 'block';
     });
+
+    // Scroll the name input into view when keyboard opens (before the global handler fires)
+    const cbNameInp = document.getElementById('cbPatientName');
+    if (cbNameInp) {
+      cbNameInp.addEventListener('focus', () => {
+        setTimeout(() => {
+          const scroller = document.querySelector('.app-screen');
+          if (!scroller) return;
+          const elRect = cbNameInp.getBoundingClientRect();
+          const scrRect = scroller.getBoundingClientRect();
+          const target = scroller.scrollTop + elRect.top - scrRect.top - 80;
+          scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }, 320);
+      });
+    }
 
     let selectedTime = 'asap';
     document.querySelectorAll('.cb-time-btn').forEach(btn => {
