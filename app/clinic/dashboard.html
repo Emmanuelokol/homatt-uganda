@@ -758,35 +758,35 @@
 
   // ── Load pending bookings (patients heading to this clinic) ─────
   async function loadPendingBookings() {
-    const listEl  = document.getElementById(‘pendingBookingsList’);
-    const countEl = document.getElementById(‘pendingCount’);
+    const listEl  = document.getElementById('pendingBookingsList');
+    const countEl = document.getElementById('pendingCount');
     if (!listEl) return;
 
-    function setMsg(html) { listEl.innerHTML = html; countEl.textContent = ‘’; }
+    function setMsg(html) { listEl.innerHTML = html; countEl.textContent = ''; }
 
     if (!supabase) {
-      setMsg(‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection.</div>’);
+      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection.</div>');
       return;
     }
     if (session?.demo) {
-      setMsg(‘<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>’);
+      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>');
       return;
     }
 
     // Show ALL recent bookings — no clinic_id filter needed.
-    // clinic_id on a booking often doesn’t match portal_users.clinic_id.
+    // clinic_id on a booking often doesn't match portal_users.clinic_id.
     // Code+PIN verification is the security gate.
     const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
     let bookings = [], bookingsErr = null;
     try {
       const res = await withTimeout(
-        supabase.from(‘bookings’)
-          .select(‘id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id’)
-          .in(‘status’, [‘pending’, ‘confirmed’, ‘in_progress’])
-          .gte(‘created_at’, since)
-          .order(‘created_at’, { ascending: false })
+        supabase.from('bookings')
+          .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
+          .in('status', ['pending', 'confirmed', 'in_progress'])
+          .gte('created_at', since)
+          .order('created_at', { ascending: false })
           .limit(30),
-        7000, ‘pending_bookings’
+        7000, 'pending_bookings'
       );
       bookings = res.data || [];
       bookingsErr = res.error;
