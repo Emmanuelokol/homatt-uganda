@@ -303,8 +303,8 @@
 <div id="clinicToast" class="admin-toast"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="../js/config.js"></script>
-<script src="js/clinic.js"></script>
+<script src="../js/config.js?v=20260502"></script>
+<script src="js/clinic.js?v=20260502"></script>
 <script>
   const session = requireClinic();
   setupClinicLogout();
@@ -847,40 +847,45 @@
   loadTodayOrders();
   loadPendingBookings();
 
-  // Hard failsafe: if Loading... text survives for 9 seconds, replace with a visible diagnostic
+  // Hard failsafe: replace persistent "Loading..." with a diagnostic after 5 s
   setTimeout(() => {
     const orderEl = document.getElementById('ordersList');
     const bookEl  = document.getElementById('pendingBookingsList');
+    const hasSupa = !!supabase;
+    const hasCid  = !!_clinicId;
+    const ver     = '20260502';
 
     if (orderEl && orderEl.innerHTML.includes('Loading')) {
-      const hasSupa = !!supabase;
-      const hasCid  = !!_clinicId;
       orderEl.innerHTML = `
         <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
           <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
           <strong>Could not load consultations.</strong><br>
-          DB connected: <b>${hasSupa ? 'Yes' : 'No — check config.js'}</b> &nbsp;|&nbsp;
-          Clinic ID: <b>${hasCid ? _clinicId.slice(0,8)+'…' : 'Not resolved'}</b><br>
-          <span style="color:#9AA0A6;font-size:12px">Refresh the page or check your internet connection.</span><br>
+          DB: <b>${hasSupa ? 'OK' : 'No — check config.js'}</b> &nbsp;|&nbsp;
+          Clinic ID: <b>${hasCid ? _clinicId.slice(0,8)+'…' : 'Not resolved'}</b>
+          &nbsp;|&nbsp; v${ver}<br>
+          <span style="color:#9AA0A6;font-size:12px">Check your internet or ask admin to link your account in portal_users.</span><br>
           <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
         </div>`;
     }
 
     if (bookEl && bookEl.innerHTML.includes('Loading')) {
-      const hasSupa = !!supabase;
       bookEl.innerHTML = `
         <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
           <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
           <strong>Could not load bookings.</strong><br>
-          DB connected: <b>${hasSupa ? 'Yes' : 'No — check config.js'}</b><br>
-          <span style="color:#9AA0A6;font-size:12px">Refresh the page or check your internet connection. You can still verify a patient using the yellow panel above.</span><br>
+          DB: <b>${hasSupa ? 'OK' : 'No — check config.js'}</b>
+          &nbsp;|&nbsp; v${ver}<br>
+          <span style="color:#9AA0A6;font-size:12px">Check your internet. You can still verify a patient using the yellow panel above.</span><br>
           <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
         </div>`;
     }
-  }, 9000);
+  }, 5000);
 
   // Auto-refresh every 30 seconds
   setInterval(() => { loadTodayOrders(); loadPendingBookings(); }, 30 * 1000);
+
+  // Stamp build version in console so we can verify the correct code is live
+  console.log('[Homatt] Dashboard v20260502 loaded — supabase:', !!supabase, '| clinicId:', _clinicId || 'pending');
 </script>
 </body>
 </html>
