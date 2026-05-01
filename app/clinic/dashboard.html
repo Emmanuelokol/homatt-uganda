@@ -3,7 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
   <title>Homatt Health — Clinic Home</title>
+  <script>
+    /* Force-clear any service worker that might be caching an old broken version */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        if (regs.length) Promise.all(regs.map(r => r.unregister())).then(() => {
+          if (!sessionStorage.getItem('_swCleared')) {
+            sessionStorage.setItem('_swCleared', '1');
+            location.reload();
+          }
+        });
+      });
+      if (window.caches) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/clinic.css">
@@ -225,7 +242,7 @@
           <span id="pendingCount" style="font-size:13px;color:#E65100;font-weight:600"></span>
         </div>
         <div id="pendingBookingsList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings…</div>
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings… <small style="opacity:.5">[v20260502]</small></div>
         </div>
       </div>
 
@@ -236,7 +253,7 @@
           <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
         </div>
         <div id="ordersList" style="padding:16px">
-          <div style="text-align:center;padding:40px;color:#9AA0A6">Loading…</div>
+          <div style="text-align:center;padding:40px;color:#9AA0A6">Loading… <small style="opacity:.5">[v20260502]</small></div>
         </div>
       </div>
 
@@ -611,12 +628,14 @@
     const listEl = document.getElementById('ordersList');
     if (!listEl) return;
 
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Resolving clinic… <small style="opacity:.5">[v20260502]</small></div>';
+
     let clinicId = _clinicId;
     if (!clinicId && supabase && !session?.demo) {
       try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
     }
     if (!supabase) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database unavailable — check internet.</div>';
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database unavailable — check internet. <small>[v20260502]</small></div>';
       return;
     }
     if (session?.demo) {
@@ -627,6 +646,8 @@
       renderEmpty('Your account is not linked to a clinic yet. Ask your admin to link you in portal_users.');
       return;
     }
+
+    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Fetching consultations… <small style="opacity:.5">[v20260502]</small></div>';
 
     const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
 
@@ -764,14 +785,19 @@
 
     function setMsg(html) { listEl.innerHTML = html; countEl.textContent = ''; }
 
+    // Immediate progress feedback so we never appear stuck on "Loading…"
+    setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Connecting to database… <small style="opacity:.5">[v20260502]</small></div>');
+
     if (!supabase) {
-      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection.</div>');
+      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection. <small>[v20260502]</small></div>');
       return;
     }
     if (session?.demo) {
-      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings.</div>');
+      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings. <small>[v20260502]</small></div>');
       return;
     }
+
+    setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Fetching bookings… <small style="opacity:.5">[v20260502]</small></div>');
 
     // Show ALL recent bookings — no clinic_id filter needed.
     // clinic_id on a booking often doesn't match portal_users.clinic_id.
