@@ -323,595 +323,185 @@
 <script src="../js/config.js?v=20260502"></script>
 <script src="js/clinic.js?v=20260502"></script>
 <script>
-  const session = requireClinic();
+  // ─── Catch any JS error and show it on-screen so we can debug ───
+  window.onerror = function(msg, src, line) {
+    var el = document.getElementById('pendingBookingsList');
+    if (el) el.innerHTML = '<div style="background:#D32F2F;color:#fff;padding:12px;border-radius:8px;font-size:12px">JS error line '+line+': '+msg+'</div>';
+  };
+
+  var session = requireClinic();
   setupClinicLogout();
+  var supabase = _getClinicSupabase();
 
-  const supabase = _getClinicSupabase();
+  // Greeting
+  var h = new Date().getHours();
+  var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  var hgEl = document.getElementById('heroGreeting');
+  if (hgEl) hgEl.textContent = greet + (session && session.staffName ? ', ' + session.staffName.split(' ')[0] : '');
 
-  // Resolve clinic_id (handles case where session was stored before clinic_id was available)
-  let _clinicId = session?.clinicId || null;
-  if (!_clinicId && supabase && !session?.demo) {
-    resolveClinicId(supabase, session).then(id => {
-      _clinicId = id;
-      if (id) { loadTodayOrders(); loadPendingBookings(); }
-    });
-  }
-
-  // ── Greeting ──────────────────────────────────────────────
-  const h = new Date().getHours();
-  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
-  document.getElementById('heroGreeting').textContent =
-    greet + (session?.staffName ? ', ' + session.staffName.split(' ')[0] : '');
-
-  // ── Verify Booking Code ───────────────────────────────────
-  const vmModal     = document.getElementById('verifyModal');
-  const vmCode      = document.getElementById('vmCode');
-  const vmPin       = document.getElementById('vmPin');
-  const vmError     = document.getElementById('vmError');
-  const vmSuccess   = document.getElementById('vmSuccess');
-  const vmSubmitBtn = document.getElementById('vmSubmitBtn');
-
-  function openVerifyModal() {
-    vmCode.value = ''; vmPin.value = '';
-    vmError.style.display = 'none';
-    vmSuccess.style.display = 'none';
-    vmSubmitBtn.disabled = false;
-    vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-    vmModal.style.display = 'flex';
-    setTimeout(() => vmCode.focus(), 100);
-  }
-  function closeVerifyModal() { vmModal.style.display = 'none'; }
-  window.openVerifyModal = openVerifyModal;
-
-  // verifyCodeBtn was removed (replaced by inline panel) — guard the old binding
-  document.getElementById('verifyCodeBtn')?.addEventListener('click', openVerifyModal);
-  document.getElementById('vmCancelBtn').onclick   = closeVerifyModal;
-  vmModal.addEventListener('click', e => {
-    if (e.target === vmModal) closeVerifyModal();
-  });
-
-  // Auto-uppercase + auto-prefix
-  vmCode.addEventListener('input', () => {
-    let v = vmCode.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/, '');
-    vmCode.value = v;
-  });
-  vmPin.addEventListener('input', () => {
-    let v = vmPin.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/, '');
-    vmPin.value = v;
-  });
-
-  vmSubmitBtn.onclick = async () => {
-    const code = vmCode.value.trim().toUpperCase();
-    const pin  = vmPin.value.trim().toUpperCase();
-    vmError.style.display = 'none';
-    vmSuccess.style.display = 'none';
-
-    if (!code || !pin) {
-      vmError.textContent = 'Enter both the booking code and the PIN.';
-      vmError.style.display = 'block';
-      return;
-    }
-    if (!supabase) {
-      vmError.textContent = 'Database unavailable. Use New Consultation instead.';
-      vmError.style.display = 'block';
-      return;
-    }
-
-    vmSubmitBtn.disabled = true;
-    vmSubmitBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">hourglass_empty</span> Verifying…';
-
-    const clinicId = _clinicId || await resolveClinicId(supabase, session);
-
-    const { data: booking, error } = await supabase
-      .from('bookings')
-      .select('id, booking_code, pin_token, pin_expires_at, patient_user_id, patient_name, patient_age, patient_sex, symptoms, ai_diagnosis, conditions_json, ai_confidence, urgency_level, clinic_id, status, preferred_time')
-      .eq('booking_code', code)
-      .maybeSingle();
-
-    if (error || !booking) {
-      vmError.textContent = 'No booking found for that code. Please check it and try again.';
-      vmError.style.display = 'block';
-      vmSubmitBtn.disabled = false;
-      vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-      return;
-    }
-    if (booking.pin_token !== pin) {
-      vmError.textContent = 'PIN does not match. Ask the patient to read it again from their app.';
-      vmError.style.display = 'block';
-      vmSubmitBtn.disabled = false;
-      vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-      return;
-    }
-    if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
-      // Expired — warn staff but let them override. Patient may have booked hours ago.
-      const go = confirm(
-        'This booking PIN has expired.\n\nPatient: ' + (booking.patient_name || 'Unknown') +
-        '\nCode: ' + booking.booking_code +
-        '\n\nIf this patient is physically at the desk, tap OK to proceed.'
-      );
-      if (!go) {
-        vmSubmitBtn.disabled = false;
-        vmSubmitBtn.innerHTML = '<span class="material-icons-outlined">verified</span> Verify & Start Consultation';
-        return;
-      }
-    }
-    // clinic_id mismatch: do NOT block — patient is physically at the desk with the correct code+PIN.
-    // The UUID stored on the booking often differs from portal_users.clinic_id due to how
-    // the mobile clinic list is seeded.  Code+PIN is sufficient proof.
-
-    // Mark booking as in_progress
-    try {
-      await supabase
-        .from('bookings')
-        .update({ status: 'in_progress', attended_at: new Date().toISOString() })
-        .eq('id', booking.id);
-    } catch(e) { /* non-fatal */ }
-
-    vmSuccess.innerHTML = `<strong>Verified!</strong> Patient: ${esc(booking.patient_name || 'Unknown')}. Opening consultation…`;
-    vmSuccess.style.display = 'block';
-
-    // Look up patient phone from profiles
-    let phone = '';
-    if (booking.patient_user_id) {
-      const { data: prof } = await supabase
-        .from('profiles')
-        .select('phone_number, phone')
-        .eq('id', booking.patient_user_id)
-        .maybeSingle();
-      phone = prof?.phone_number || prof?.phone || '';
-    }
-
-    const params = new URLSearchParams({
-      booking_id:    booking.id,
-      booking_code:  booking.booking_code,
-      patient_name:  booking.patient_name || '',
-      patient_phone: phone,
-      ...(booking.patient_user_id ? { patient_id: booking.patient_user_id } : {}),
-    });
-    setTimeout(() => { window.location.href = 'new-order.html?' + params.toString(); }, 700);
-  };
-
-  // Allow Enter to submit
-  [vmCode, vmPin].forEach(el => el.addEventListener('keydown', e => {
-    if (e.key === 'Enter') vmSubmitBtn.click();
-  }));
-
-  // ── Inline quick-verify panel (always visible at top) ──────────
-  const qvCode = document.getElementById('qvCode');
-  const qvPin  = document.getElementById('qvPin');
-  const qvErr  = document.getElementById('qvError');
-  const qvOk   = document.getElementById('qvSuccess');
-  const qvBtn  = document.getElementById('qvSubmitBtn');
-
-  qvCode.addEventListener('input', () => {
-    let v = qvCode.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/, '');
-    qvCode.value = v;
-  });
-  qvPin.addEventListener('input', () => {
-    let v = qvPin.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
-    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/, '');
-    qvPin.value = v;
-  });
-  [qvCode, qvPin].forEach(el => el.addEventListener('keydown', e => {
-    if (e.key === 'Enter') qvBtn.click();
-  }));
-
-  qvBtn.onclick = async () => {
-    // Mirror values into the modal then run the same verification flow
-    qvErr.style.display = 'none';
-    qvOk.style.display = 'none';
-    const code = qvCode.value.trim().toUpperCase();
-    const pin  = qvPin.value.trim().toUpperCase();
-    if (!code || !pin) {
-      qvErr.textContent = 'Enter both the booking code and the PIN.';
-      qvErr.style.display = 'block';
-      return;
-    }
-    qvBtn.disabled = true;
-    qvBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">hourglass_empty</span> Verifying…';
-
-    if (!supabase) {
-      qvErr.textContent = 'Database unavailable. Try again or use New Consultation.';
-      qvErr.style.display = 'block';
-      qvBtn.disabled = false;
-      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-      return;
-    }
-
-    let booking, error;
-    try {
-      const res = await withTimeout(
-        supabase.from('bookings')
-          .select('id, booking_code, pin_token, pin_expires_at, patient_user_id, patient_name, patient_age, patient_sex, symptoms, ai_diagnosis, conditions_json, ai_confidence, urgency_level, clinic_id, status, preferred_time')
-          .eq('booking_code', code)
-          .maybeSingle(),
-        7000, 'verify_booking'
-      );
-      booking = res.data; error = res.error;
-    } catch(e) {
-      qvErr.textContent = 'Verification timed out. Check your internet and try again.';
-      qvErr.style.display = 'block';
-      qvBtn.disabled = false;
-      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-      return;
-    }
-
-    if (error || !booking) {
-      qvErr.textContent = 'No booking found for that code. Check it and try again.';
-      qvErr.style.display = 'block';
-      qvBtn.disabled = false;
-      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-      return;
-    }
-    if (booking.pin_token !== pin) {
-      qvErr.textContent = 'PIN does not match. Ask the patient to read it again.';
-      qvErr.style.display = 'block';
-      qvBtn.disabled = false;
-      qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-      return;
-    }
-    if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
-      // Expired — warn but allow override
-      const go2 = confirm(
-        'This booking PIN has expired.\n\nPatient: ' + (booking.patient_name || 'Unknown') +
-        '\nCode: ' + booking.booking_code +
-        '\n\nIf this patient is physically at the desk, tap OK to proceed.'
-      );
-      if (!go2) {
-        qvBtn.disabled = false;
-        qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify & Start';
-        return;
-      }
-    }
-    // Note: we DON'T check clinic_id mismatch — patient is physically at the desk with the right code+PIN
-    // (the booking might have been routed to a different clinic in the app but the patient walked here)
-
-    try {
-      await supabase.from('bookings')
-        .update({ status: 'in_progress', attended_at: new Date().toISOString() })
-        .eq('id', booking.id);
-    } catch(e) { /* non-fatal */ }
-
-    qvOk.innerHTML = `<strong>Verified!</strong> Patient: ${esc(booking.patient_name || 'Unknown')}. Opening consultation…`;
-    qvOk.style.display = 'block';
-
-    let phone = '';
-    if (booking.patient_user_id) {
-      try {
-        const { data: prof } = await withTimeout(
-          supabase.from('profiles')
-            .select('phone_number, phone')
-            .eq('id', booking.patient_user_id)
-            .maybeSingle(),
-          4000, 'profile'
-        );
-        phone = prof?.phone_number || prof?.phone || '';
-      } catch(e) { /* non-fatal */ }
-    }
-
-    const params = new URLSearchParams({
-      booking_id:    booking.id,
-      booking_code:  booking.booking_code,
-      patient_name:  booking.patient_name || '',
-      patient_phone: phone,
-      ...(booking.patient_user_id ? { patient_id: booking.patient_user_id } : {}),
-    });
-    setTimeout(() => { window.location.href = 'new-order.html?' + params.toString(); }, 600);
-  };
-
-  // Live clock
+  // Clock
   function tickClock() {
-    const d = new Date();
-    document.getElementById('liveClock').textContent = d.toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
-    document.getElementById('todayDate').textContent = d.toLocaleDateString('en-UG', { weekday:'long', day:'numeric', month:'long' });
+    var d = new Date();
+    var cl = document.getElementById('liveClock');
+    var td = document.getElementById('todayDate');
+    var ud = document.getElementById('clinicUserDate');
+    if (cl) cl.textContent = d.toLocaleTimeString('en-UG', {hour:'2-digit',minute:'2-digit'});
+    if (td) td.textContent = d.toLocaleDateString('en-UG', {weekday:'long',day:'numeric',month:'long'});
+    if (ud) ud.textContent = d.toLocaleDateString('en-UG', {day:'numeric',month:'short',year:'numeric'});
   }
   tickClock();
-  setInterval(tickClock, 60 * 1000);
+  setInterval(tickClock, 60000);
 
-  // User date in sidebar
-  const d = new Date();
-  document.getElementById('clinicUserDate').textContent = d.toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
-
-  // ── Load today's consultations ────────────────────────────
-  // Wraps a promise with a timeout so the UI never hangs forever
-  function withTimeout(promise, ms, label) {
-    return Promise.race([
-      promise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout:'+label)), ms))
-    ]);
+  // ── HTML escape helper ──
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
-  async function loadTodayOrders() {
-    const listEl = document.getElementById('ordersList');
-    if (!listEl) return;
+  // ── Verify panel ──
+  var qvCode = document.getElementById('qvCode');
+  var qvPin  = document.getElementById('qvPin');
+  var qvErr  = document.getElementById('qvError');
+  var qvOk   = document.getElementById('qvSuccess');
+  var qvBtn  = document.getElementById('qvSubmitBtn');
 
-    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Resolving clinic… <small style="opacity:.5">[v20260502]</small></div>';
+  if (qvCode) qvCode.addEventListener('input', function() {
+    var v = qvCode.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/,'');
+    qvCode.value = v;
+  });
+  if (qvPin) qvPin.addEventListener('input', function() {
+    var v = qvPin.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/,'');
+    qvPin.value = v;
+  });
+  if (qvCode && qvPin && qvBtn) {
+    [qvCode, qvPin].forEach(function(el) {
+      el.addEventListener('keydown', function(e) { if (e.key === 'Enter') qvBtn.click(); });
+    });
+  }
 
-    let clinicId = _clinicId;
-    if (!clinicId && supabase && !session?.demo) {
-      try { clinicId = await withTimeout(resolveClinicId(supabase, session), 5000, 'resolveClinic'); } catch(e) { clinicId = null; }
+  if (qvBtn) qvBtn.onclick = async function() {
+    if (!qvErr || !qvOk) return;
+    qvErr.style.display = 'none'; qvOk.style.display = 'none';
+    var code = (qvCode ? qvCode.value : '').trim().toUpperCase();
+    var pin  = (qvPin  ? qvPin.value  : '').trim().toUpperCase();
+    if (!code || !pin) { qvErr.textContent = 'Enter both the booking code and PIN.'; qvErr.style.display = 'block'; return; }
+    if (!supabase)     { qvErr.textContent = 'Database unavailable.'; qvErr.style.display = 'block'; return; }
+    qvBtn.disabled = true;
+    qvBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:16px">hourglass_empty</span> Verifying…';
+    try {
+      var res = await supabase.from('bookings').select('id,booking_code,pin_token,pin_expires_at,patient_user_id,patient_name,ai_diagnosis,urgency_level,clinic_id,status').eq('booking_code', code).maybeSingle();
+      var booking = res.data, err = res.error;
+      if (err || !booking) { qvErr.textContent = 'No booking found for that code.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_token !== pin) { qvErr.textContent = 'PIN does not match.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
+        if (!confirm('PIN has expired. Patient: ' + (booking.patient_name||'Unknown') + '\n\nIf they are at the desk, tap OK to proceed.')) {
+          qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return;
+        }
+      }
+      try { await supabase.from('bookings').update({status:'in_progress',attended_at:new Date().toISOString()}).eq('id', booking.id); } catch(e2) {}
+      qvOk.innerHTML = '<strong>Verified!</strong> Patient: ' + esc(booking.patient_name||'Unknown') + '. Opening consultation…';
+      qvOk.style.display = 'block';
+      var phone = '';
+      if (booking.patient_user_id) {
+        try { var pr = await supabase.from('profiles').select('phone_number,phone').eq('id', booking.patient_user_id).maybeSingle(); phone = (pr.data && (pr.data.phone_number||pr.data.phone)) || ''; } catch(e3) {}
+      }
+      var params = new URLSearchParams({booking_id:booking.id,booking_code:booking.booking_code,patient_name:booking.patient_name||'',patient_phone:phone});
+      if (booking.patient_user_id) params.set('patient_id', booking.patient_user_id);
+      setTimeout(function() { window.location.href = 'new-order.html?' + params.toString(); }, 600);
+    } catch(e4) {
+      qvErr.textContent = 'Error: ' + e4.message; qvErr.style.display = 'block';
+      qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start';
     }
-    if (!supabase) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database unavailable — check internet. <small>[v20260502]</small></div>';
-      return;
-    }
-    if (session?.demo) {
-      renderEmpty('You are in demo mode — sign in with your real clinic account.');
-      return;
+  };
+
+  // ── Load pending bookings ──
+  async function loadBookings() {
+    var el = document.getElementById('pendingBookingsList');
+    var ct = document.getElementById('pendingCount');
+    if (!el) return;
+    function msg(html) { el.innerHTML = html; if (ct) ct.textContent = ''; }
+    if (!supabase) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
+    if (session && session.demo) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
+    msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Loading…</div>');
+    try {
+      var since = new Date(Date.now() - 48*3600000).toISOString();
+      var res = await supabase.from('bookings').select('id,booking_code,patient_name,ai_diagnosis,urgency_level,preferred_time,status,created_at').in('status',['pending','confirmed','in_progress']).gte('created_at', since).order('created_at',{ascending:false}).limit(30);
+      if (res.error) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'); return; }
+      var rows = res.data || [];
+      if (!rows.length) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>'); return; }
+      if (ct) ct.textContent = rows.length + ' waiting';
+      el.innerHTML = rows.map(function(b) {
+        var ini = (b.patient_name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t   = new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        var urg = b.urgency_level==='high'?'urgent':b.urgency_level==='medium'?'in-progress':'normal';
+        return '<div class="order-card" style="margin:8px 16px;cursor:pointer" data-code="'+esc(b.booking_code)+'">'
+          +'<div class="order-avatar" style="background:#FFF8E1;color:#E65100">'+ini+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(b.patient_name||'Unknown')+'</div>'
+            +'<div class="order-drug">'+esc(b.ai_diagnosis||'—')+' · Code <strong style="color:#1B5E20;letter-spacing:1px">'+esc(b.booking_code)+'</strong></div>'
+            +'<div class="order-meta"><span>'+t+'</span></div>'
+          +'</div>'
+          +'<div class="order-right"><span class="status-badge '+urg+'">'+esc(b.urgency_level||'normal')+'</span></div>'
+          +'</div>';
+      }).join('');
+      el.querySelectorAll('[data-code]').forEach(function(card) {
+        card.onclick = function() {
+          var c = card.dataset.code;
+          if (qvCode) { qvCode.value = c; if (qvPin) qvPin.focus(); }
+        };
+      });
+    } catch(e) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading bookings: ' + esc(e.message) + '</div>'); }
+  }
+
+  // ── Load today's consultations ──
+  async function loadConsultations() {
+    var el = document.getElementById('ordersList');
+    if (!el) return;
+    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see consultations.</div>'; return; }
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Loading…</div>';
+    // Resolve clinic_id
+    var clinicId = (session && session.clinicId) || null;
+    if (!clinicId) {
+      try {
+        var pu = await supabase.auth.getSession();
+        var uid = pu && pu.data && pu.data.session && pu.data.session.user && pu.data.session.user.id;
+        if (uid) {
+          var pr2 = await supabase.from('portal_users').select('clinic_id').eq('auth_user_id', uid).eq('is_active', true).maybeSingle();
+          clinicId = pr2.data && pr2.data.clinic_id;
+        }
+      } catch(e) {}
     }
     if (!clinicId) {
-      renderEmpty('Your account is not linked to a clinic yet. Ask your admin to link you in portal_users.');
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
       return;
     }
-
-    listEl.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Fetching consultations… <small style="opacity:.5">[v20260502]</small></div>';
-
-    const startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
-
-    // Load from clinic_diagnoses — use only safe columns (no joins to avoid breaking when migrations aren't applied)
-    let dx = [], dxErr = null;
     try {
-      const res = await withTimeout(
-        supabase.from('clinic_diagnoses')
-          .select('id, confirmed_diagnosis, severity, created_at, patient_phone, patient_name, patient_type, intake_schedule, expected_recovery')
-          .eq('clinic_id', clinicId)
-          .gte('created_at', startOfDay.toISOString())
-          .order('created_at', { ascending: false }),
-        6000, 'clinic_diagnoses'
-      );
-      dx = res.data || [];
-      dxErr = res.error;
-      // Retry with minimal columns if some columns don't exist (PGRST204 = column missing)
-      if (dxErr && /column .* does not exist|schema cache/i.test(dxErr.message || '')) {
-        const fallback = await withTimeout(
-          supabase.from('clinic_diagnoses')
-            .select('id, confirmed_diagnosis, severity, created_at')
-            .eq('clinic_id', clinicId)
-            .gte('created_at', startOfDay.toISOString())
-            .order('created_at', { ascending: false }),
-          6000, 'clinic_diagnoses_min'
-        );
-        dx = fallback.data || [];
-        dxErr = fallback.error;
-      }
-    } catch(e) { dxErr = e; }
-
-    // Also load legacy clinic_orders (might not exist — silently ignore errors)
-    let legacy = [];
-    try {
-      const res = await withTimeout(
-        supabase.from('clinic_orders')
-          .select('id, patient_name, patient_phone, drug_name, dosage, duration_days, status, created_at')
-          .eq('clinic_id', clinicId)
-          .gte('created_at', startOfDay.toISOString())
-          .order('created_at', { ascending: false }),
-        6000, 'clinic_orders'
-      );
-      legacy = res.data || [];
-    } catch(e) { /* ignore */ }
-
-    if (dxErr && !legacy.length && !dx.length) {
-      listEl.innerHTML = `<div style="padding:20px;color:#C62828;text-align:center;font-size:13px">Could not load consultations: ${esc(dxErr.message || 'Unknown error')}<br><span style="color:#9AA0A6">Check that database migrations have been applied.</span></div>`;
-      return;
-    }
-
-    if (!dx.length && !legacy.length) { renderEmpty(); return; }
-
-    // Stats
-    let inpatient = 0, completed = 0;
-    dx.forEach(c => {
-      if (c.patient_type === 'inpatient') inpatient++;
-      const endDate = c.expected_recovery ? new Date(c.expected_recovery) : null;
-      if (endDate && endDate < new Date()) completed++;
-    });
-
-    document.getElementById('statToday').textContent      = dx.length + legacy.length;
-    document.getElementById('statDispatched').textContent = inpatient;
-    document.getElementById('statDelivered').textContent  = dx.length;
-    document.getElementById('statCompleted').textContent  = completed;
-
-    listEl.innerHTML = [
-      ...dx.map(c => {
-        const patName = c.patient_name || c.patient_phone || 'Patient';
-        const initials = patName.split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
-        const t = new Date(c.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
-        const meds = (c.intake_schedule || []).map(m => m.drug_name).filter(Boolean);
-        const medSummary = meds.length ? meds.slice(0,2).join(', ') + (meds.length > 2 ? ` +${meds.length-2}` : '') : 'No medications';
-        const typeLabel = c.patient_type === 'inpatient' ? 'Inpatient' : 'Outpatient';
-        return `
-          <div class="order-card">
-            <div class="order-avatar">${initials}</div>
-            <div class="order-info">
-              <div class="order-patient">${esc(patName)}</div>
-              <div class="order-drug">${esc(c.confirmed_diagnosis || 'Diagnosis pending')} · ${esc(medSummary)}</div>
-              <div class="order-meta">
-                <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
-                <span>${typeLabel}</span>
-                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(c.patient_phone || '—')}</span>
-              </div>
-            </div>
-            <div class="order-right">
-              <div class="order-status"><span class="status-badge in-progress">${esc(c.severity || 'moderate')}</span></div>
-            </div>
-          </div>`;
-      }),
-      ...legacy.map(o => {
-        const initials = (o.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
-        const t = new Date(o.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
-        return `
-          <div class="order-card">
-            <div class="order-avatar" style="background:#FFF3E0;color:#E65100">${initials}</div>
-            <div class="order-info">
-              <div class="order-patient">${esc(o.patient_name)}</div>
-              <div class="order-drug">${esc(o.drug_name)} · ${esc(o.dosage)} · ${o.duration_days}d</div>
-              <div class="order-meta">
-                <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
-                <span><span class="material-icons-outlined" style="font-size:13px">phone</span>${esc(o.patient_phone || '')}</span>
-              </div>
-            </div>
-            <div class="order-right">
-              <div class="order-status"><span class="status-badge normal">${esc(o.status || 'pending')}</span></div>
-            </div>
-          </div>`;
-      }),
-    ].join('');
+      var start = new Date(); start.setHours(0,0,0,0);
+      var res2 = await supabase.from('clinic_diagnoses').select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type').eq('clinic_id', clinicId).gte('created_at', start.toISOString()).order('created_at',{ascending:false});
+      var rows2 = (res2.data || []);
+      var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
+      if (!rows2.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No consultations today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>'; return; }
+      el.innerHTML = rows2.map(function(c) {
+        var ini2 = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t2   = new Date(c.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        return '<div class="order-card">'
+          +'<div class="order-avatar">'+ini2+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+'</div>'
+            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+t2+'</span>'+(c.patient_phone?'<span>'+esc(c.patient_phone)+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right"><span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span></div>'
+          +'</div>';
+      }).join('');
+    } catch(e2) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e2.message) + '</div>'; }
   }
 
-  function renderEmpty(msg) {
-    document.getElementById('ordersList').innerHTML = `
-      <div class="empty-orders">
-        <span class="material-icons-outlined">inbox</span>
-        <div style="font-size:15px;font-weight:600;color:#424242">No consultations today yet</div>
-        <div style="font-size:13px;margin-top:4px">${msg || 'Start a consultation — enter patient phone, AI diagnoses, confirm, add medications, send.'}</div>
-        <a href="new-order.html" class="empty-orders-cta">
-          <span class="material-icons-outlined" style="font-size:16px">medical_services</span>
-          Start First Consultation
-        </a>
-      </div>`;
-  }
-
-  function esc(s) {
-    return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // ── Load pending bookings (patients heading to this clinic) ─────
-  async function loadPendingBookings() {
-    const listEl  = document.getElementById('pendingBookingsList');
-    const countEl = document.getElementById('pendingCount');
-    if (!listEl) return;
-
-    function setMsg(html) { listEl.innerHTML = html; countEl.textContent = ''; }
-
-    // Immediate progress feedback so we never appear stuck on "Loading…"
-    setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Connecting to database… <small style="opacity:.5">[v20260502]</small></div>');
-
-    if (!supabase) {
-      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Database unavailable — check internet connection. <small>[v20260502]</small></div>');
-      return;
-    }
-    if (session?.demo) {
-      setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px"><strong>Demo mode</strong> — sign in with your real clinic account to see live bookings. <small>[v20260502]</small></div>');
-      return;
-    }
-
-    setMsg('<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Fetching bookings… <small style="opacity:.5">[v20260502]</small></div>');
-
-    // Show ALL recent bookings — no clinic_id filter needed.
-    // clinic_id on a booking often doesn't match portal_users.clinic_id.
-    // Code+PIN verification is the security gate.
-    const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    let bookings = [], bookingsErr = null;
-    try {
-      const res = await withTimeout(
-        supabase.from('bookings')
-          .select('id, booking_code, patient_name, ai_diagnosis, urgency_level, preferred_time, status, created_at, clinic_id')
-          .in('status', ['pending', 'confirmed', 'in_progress'])
-          .gte('created_at', since)
-          .order('created_at', { ascending: false })
-          .limit(30),
-        7000, 'pending_bookings'
-      );
-      bookings = res.data || [];
-      bookingsErr = res.error;
-    } catch(e) { bookingsErr = e; }
-
-    if (bookingsErr) {
-      setMsg(`<div style="text-align:center;padding:24px;color:#C62828;font-size:13px">Could not load bookings: ${esc((bookingsErr.message || bookingsErr.code || String(bookingsErr)).slice(0,200))}</div>`);
-      return;
-    }
-
-    if (!bookings.length) {
-      setMsg(`<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">
-        No pending bookings in the last 48 hours.<br>
-        <span style="color:#BDBDBD;font-size:12px">When a patient books via the Homatt app their name appears here. Use the yellow panel above to verify a patient at the desk.</span>
-      </div>`);
-      return;
-    }
-
-    countEl.textContent = `${bookings.length} waiting`;
-
-    listEl.innerHTML = bookings.map(b => {
-      const initials = (b.patient_name || '?').split(' ').map(x => x[0]).slice(0,2).join('').toUpperCase();
-      const t = new Date(b.created_at).toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' });
-      const urgent = b.urgency_level === 'high' ? 'urgent' : b.urgency_level === 'medium' ? 'in-progress' : 'normal';
-      const timeLabel = b.preferred_time === 'asap' ? 'ASAP'
-                      : b.preferred_time === 'today_afternoon' ? 'This afternoon'
-                      : b.preferred_time === 'tomorrow_morning' ? 'Tomorrow' : (b.preferred_time || '');
-      return `
-        <div class="order-card" style="margin:8px 16px;cursor:pointer" data-code="${esc(b.booking_code)}">
-          <div class="order-avatar" style="background:#FFF8E1;color:#E65100">${initials}</div>
-          <div class="order-info">
-            <div class="order-patient">${esc(b.patient_name || 'Unknown')}</div>
-            <div class="order-drug">${esc(b.ai_diagnosis || 'No AI diagnosis')} · Code <strong style="color:#1B5E20;letter-spacing:1px">${esc(b.booking_code)}</strong></div>
-            <div class="order-meta">
-              <span><span class="material-icons-outlined" style="font-size:13px">schedule</span>${t}</span>
-              <span>${esc(timeLabel)}</span>
-            </div>
-          </div>
-          <div class="order-right">
-            <div class="order-status"><span class="status-badge ${urgent}">${esc(b.urgency_level || 'normal')}</span></div>
-            <button style="margin-top:6px;background:#1565C0;color:#fff;border:none;padding:6px 12px;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">
-              <span class="material-icons-outlined" style="font-size:12px;vertical-align:-2px">verified</span> Verify
-            </button>
-          </div>
-        </div>`;
-    }).join('');
-
-    listEl.querySelectorAll('[data-code]').forEach(el => {
-      el.onclick = () => {
-        vmCode.value = el.dataset.code;
-        openVerifyModal();
-        vmCode.value = el.dataset.code; // re-set after open clears it
-        setTimeout(() => vmPin.focus(), 120);
-      };
-    });
-  }
-
-  loadTodayOrders();
-  loadPendingBookings();
-
-  // Hard failsafe: replace persistent "Loading..." with a diagnostic after 5 s
-  setTimeout(() => {
-    const orderEl = document.getElementById('ordersList');
-    const bookEl  = document.getElementById('pendingBookingsList');
-    const hasSupa = !!supabase;
-    const hasCid  = !!_clinicId;
-    const ver     = '20260502';
-
-    if (orderEl && orderEl.innerHTML.includes('Loading')) {
-      orderEl.innerHTML = `
-        <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
-          <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
-          <strong>Could not load consultations.</strong><br>
-          DB: <b>${hasSupa ? 'OK' : 'No — check config.js'}</b> &nbsp;|&nbsp;
-          Clinic ID: <b>${hasCid ? _clinicId.slice(0,8)+'…' : 'Not resolved'}</b>
-          &nbsp;|&nbsp; v${ver}<br>
-          <span style="color:#9AA0A6;font-size:12px">Check your internet or ask admin to link your account in portal_users.</span><br>
-          <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
-        </div>`;
-    }
-
-    if (bookEl && bookEl.innerHTML.includes('Loading')) {
-      bookEl.innerHTML = `
-        <div style="padding:20px 16px;text-align:center;color:#C62828;font-size:13px;line-height:1.8">
-          <span class="material-icons-outlined" style="font-size:32px;color:#EF9A9A;display:block;margin-bottom:8px">error_outline</span>
-          <strong>Could not load bookings.</strong><br>
-          DB: <b>${hasSupa ? 'OK' : 'No — check config.js'}</b>
-          &nbsp;|&nbsp; v${ver}<br>
-          <span style="color:#9AA0A6;font-size:12px">Check your internet. You can still verify a patient using the yellow panel above.</span><br>
-          <button onclick="location.reload()" style="margin-top:10px;background:#1565C0;color:#fff;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Retry</button>
-        </div>`;
-    }
-  }, 5000);
-
-  // Auto-refresh every 30 seconds
-  setInterval(() => { loadTodayOrders(); loadPendingBookings(); }, 30 * 1000);
-
-  // Stamp build version in console so we can verify the correct code is live
-  console.log('[Homatt] Dashboard v20260502 loaded — supabase:', !!supabase, '| clinicId:', _clinicId || 'pending');
+  loadBookings();
+  loadConsultations();
+  setInterval(function() { loadBookings(); loadConsultations(); }, 30000);
 </script>
 </body>
 </html>
