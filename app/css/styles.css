@@ -3,6 +3,19 @@
    Android Material Design Inspired
    ============================ */
 
+/* Page-entry animation — fades and slides the phone-frame in when a new
+   page loads. navTo() fades OUT before navigating; this fades IN on arrival.
+   Skip the animation when the user prefers reduced motion. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .phone-frame {
+    animation: page-enter 0.18s ease both;
+  }
+}
+
 :root {
   --primary: #1B5E20;
   --primary-light: #4CAF50;
@@ -856,11 +869,18 @@ input, textarea, select {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px 0;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 4px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  /* Hardware-accelerated to stay crisp during page scroll */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: auto;
 }
 
 .nav-item {
@@ -871,7 +891,18 @@ input, textarea, select {
   padding: 4px 16px;
   color: var(--text-hint);
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 12px;
+  min-width: 56px;
+}
+
+.nav-item:active {
+  transform: scale(0.88);
+  color: var(--primary);
 }
 
 .nav-item.active {

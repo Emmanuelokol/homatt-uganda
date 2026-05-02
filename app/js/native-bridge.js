@@ -471,6 +471,22 @@
     });
   }
 
+  // ─── SMOOTH NAVIGATION ──────────────────────────────────────────────────────
+  // navTo(url) — fades the page out before navigating so there's no white
+  // flash between bottom-nav tabs.  Falls back to an instant redirect if the
+  // frame element isn't found or animation preference is reduced.
+  window.navTo = function(url) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.location.href = url;
+      return;
+    }
+    const frame = document.querySelector('.phone-frame');
+    if (!frame) { window.location.href = url; return; }
+    frame.style.transition = 'opacity 0.12s ease';
+    frame.style.opacity = '0';
+    setTimeout(() => { window.location.href = url; }, 120);
+  };
+
   // Wait for Capacitor bridge to be ready
   if (window.Capacitor) {
     init();
