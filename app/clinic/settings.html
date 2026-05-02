@@ -55,6 +55,59 @@
     .save-btn { background:#1B5E20; color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
     .save-btn:active { background:#154d18; }
     .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
+
+    /* ── Mobile: stack fee-table rows vertically so service names fit ── */
+    @media(max-width:600px){
+      .fee-table, .fee-table tbody, .fee-table tr, .fee-table td { display:block; width:100%; }
+      .fee-table thead { display:none; }
+      .fee-table tr {
+        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .fee-table td {
+        padding:8px 0 0; border:none; font-size:13px;
+        display:flex; flex-direction:column; gap:5px;
+      }
+      .fee-table td:first-child { padding-top:0; }
+      .fee-table td::before {
+        content:attr(data-label); color:#5F6368; font-size:11px;
+        font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      }
+      .fee-table td:nth-child(1)::before { content:"Service Type"; }
+      .fee-table td:nth-child(2)::before { content:"Fee (UGX)"; }
+      .fee-table td:nth-child(3)::before { content:"Notes"; }
+      .fee-input { width:100% !important; max-width:100% !important; text-align:left !important; min-height:42px; font-size:15px; box-sizing:border-box; }
+
+      .cond-fee-table, .cond-fee-table tbody, .cond-fee-table tr, .cond-fee-table td { display:block; width:100%; }
+      .cond-fee-table thead { display:none; }
+      .cond-fee-table tr {
+        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .cond-fee-table td {
+        padding:8px 0 0; border:none; font-size:13px;
+        display:flex; flex-direction:column; gap:5px;
+      }
+      .cond-fee-table td:first-child { padding-top:0; }
+      .cond-fee-table td::before {
+        color:#5F6368; font-size:11px;
+        font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      }
+      .cond-fee-table td:nth-child(1)::before { content:"Condition"; }
+      .cond-fee-table td:nth-child(2)::before { content:"Fee (UGX)"; }
+      .cond-fee-table td:nth-child(3)::before { content:"Notes"; }
+      .cond-fee-table td:nth-child(4)::before { content:""; }
+
+      /* Hours row: stack day on its own row, then opens/closes side-by-side */
+      .hours-row {
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .hours-row > div:nth-child(1) { grid-column:1 / -1; font-weight:700; color:#1B5E20; font-size:14px; }
+      .hours-row > div:nth-child(4) { grid-column:1 / -1; }
+    }
   </style>
 </head>
 <body>

@@ -124,15 +124,18 @@
 
   function initKeyboard() {
     // Tap outside any input/textarea/select → blur to dismiss keyboard.
-    // Use touchend (not touchstart) so taps on buttons near inputs still fire correctly.
+    // Walk UP the DOM to detect interactive ancestors — without this, tapping
+    // an icon <span> inside a bottom-nav <a> looked non-interactive, blurred
+    // the focused input, and the resulting layout reflow ate the click —
+    // forcing the user to tap twice or thrice for nav/buttons to register.
     document.addEventListener('touchend', (e) => {
-      const tag = e.target && e.target.tagName;
-      const interactiveTags = ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A', 'LABEL'];
-      if (!interactiveTags.includes(tag)) {
-        const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-          active.blur();
-        }
+      const interactive = e.target && e.target.closest && e.target.closest(
+        'input, textarea, select, button, a, label, [onclick], [role="button"], .cbn-link, .nav-item, .sidebar-link'
+      );
+      if (interactive) return;
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        active.blur();
       }
     }, { passive: true });
 
