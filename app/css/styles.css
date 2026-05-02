@@ -43,8 +43,8 @@ body {
   padding: 0;
   margin: 0;
   min-height: 0;
-  /* svh = stable viewport height — baseline before keyboard opens.
-     Capacitor "resize:body" works by setting body.style.height = viewportH - keyboardH. */
+  /* adjustResize shrinks the WebView window when the keyboard opens; dvh/svh
+     both track window.innerHeight in a Capacitor app (no browser chrome). */
   height: 100dvh;
   height: 100svh;
 }
@@ -102,19 +102,16 @@ html {
 }
 
 /* ── Keyboard handling (mobile only, < 600 px) ─────────────────────────── */
+/* windowSoftInputMode=adjustResize: the WebView viewport shrinks when the
+   keyboard opens. max-height values using vh/dvh are relative to the INITIAL
+   viewport, so modals can overflow the visible area when the keyboard is open.
+   These rules cap them to 100% of the (now-smaller) body height instead. */
 @media (max-width: 599px) {
-  /* When keyboard is open and a bottom-sheet is visible, force it to fill the
-     entire visible area (the shrunken phone-frame = viewport minus keyboard). */
   body.keyboard-open .bottom-sheet.open {
     height: 100%;
     max-height: 100%;
   }
 
-  /* Generic: any fixed-position full-screen modal overlay should never exceed
-     the current body height when keyboard is open. Capacitor resize:body
-     shrinks the body, but max-height:XXvh on inner modals uses the initial
-     viewport — which leaves modals taller than the visible area, cutting off
-     their top (the inputs!) when align-items:flex-end pins them to bottom. */
   body.keyboard-open .modal-overlay,
   body.keyboard-open .cc-modal-bg,
   body.keyboard-open [class*="modal-bg"].open,

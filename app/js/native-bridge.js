@@ -183,44 +183,13 @@
       }, 550);
     });
 
-    // keyboardWillHide fires while keyboard is still animating away —
-    // only remove the class; do NOT touch body.style.height here since
-    // Capacitor's own resize:body handler runs at the same time and will
-    // restore it. Touching height here races with Capacitor and can leave
-    // a corrupted layout or flash of black space.
     Keyboard.addListener('keyboardWillHide', () => {
       document.body.classList.remove('keyboard-open');
     });
 
-    // keyboardDidHide fires after the keyboard has fully dismissed AND
-    // Capacitor has already restored body height. We use this to force
-    // the WebView to repaint so any leftover black gap is cleared.
     Keyboard.addListener('keyboardDidHide', () => {
-      // Clear any residual inline height that Capacitor may have left behind
-      // on devices where the restore event fires slightly before the style is reset.
-      if (document.body.style.height) {
-        document.body.style.height = '';
-      }
       document.body.classList.remove('keyboard-open');
-      // Trigger a layout recalculation so the viewport/body fills the screen again.
-      window.dispatchEvent(new Event('resize'));
     });
-
-    // Fallback: visualViewport.resize fires when the visible area changes (keyboard
-    // open/close). On some Android builds Capacitor's keyboardDidHide event is
-    // unreliable — this ensures the body height is always restored when the keyboard
-    // is no longer covering the screen, preventing the persistent black-area bug.
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', () => {
-        // gap > 50px → keyboard is likely open; gap ≤ 50px → keyboard is gone.
-        const gap = window.innerHeight - Math.round(window.visualViewport.height);
-        if (gap <= 50 && document.body.style.height) {
-          document.body.style.height = '';
-          document.body.classList.remove('keyboard-open');
-          window.dispatchEvent(new Event('resize'));
-        }
-      });
-    }
   }
 
   // ─── NETWORK STATUS ─────────────────────────────────────────────────────────

@@ -47,7 +47,7 @@
             android:theme="@style/AppTheme.NoActionBarLaunch"
             android:launchMode="singleTask"
             android:exported="true"
-            android:windowSoftInputMode="adjustNothing">
+            android:windowSoftInputMode="adjustResize">
 
             <!-- App launcher intent -->
             <intent-filter>
