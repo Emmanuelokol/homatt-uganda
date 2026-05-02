@@ -933,29 +933,48 @@
       } catch (e) { /* non-fatal; reminders won't fire but consultation is saved */ }
     }
 
-    // 4. Link booking → clinic_diagnosis and mark as attended
-    if (state.bookingId) {
-      try {
+    // 4. Mark booking as attended — works even when bookingId wasn't in URL params
+    try {
+      const now = new Date().toISOString();
+      if (state.bookingId) {
+        // Came via verify flow — update the specific booking
         await supabase
           .from('bookings')
-          .update({
-            status: 'attended',
-            attended_at: new Date().toISOString(),
-            clinic_diagnosis_id: dx.id,
-          })
+          .update({ status: 'attended', attended_at: now, clinic_diagnosis_id: dx.id })
           .eq('id', state.bookingId);
-      } catch(e) { /* non-fatal */ }
-    }
+      } else if (state.patient && state.patient.id) {
+        // Manual patient entry — find any active booking for this patient today and close it
+        const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+        await supabase
+          .from('bookings')
+          .update({ status: 'attended', attended_at: now, clinic_diagnosis_id: dx.id })
+          .eq('patient_user_id', state.patient.id)
+          .in('status', ['pending', 'confirmed', 'in_progress'])
+          .gte('created_at', since);
+      }
+    } catch(e) { /* non-fatal */ }
 
-    // 5. If e-prescription, send delivery confirmation push to patient (best-effort)
-    if (state.stockSource === 'pharmacy' && state.patient.id) {
+    // 5. Post-consultation push to patient (best-effort)
+    if (state.patient && state.patient.id) {
       try {
+        let title, message;
+        if (state.stockSource === 'pharmacy') {
+          title   = 'Prescription Ready';
+          message = 'Your prescription has been sent to a partner pharmacy. Tap to choose delivery or pickup.';
+        } else if (state.stockSource === 'clinic') {
+          title   = 'Consultation Complete';
+          message = 'Your consultation is done. Please collect your prescription at the clinic pharmacy.';
+        } else {
+          title   = 'Consultation Complete';
+          message = 'Your consultation is done. Follow the advice from your doctor and take care.';
+        }
         await supabase.functions.invoke('send-notification', {
           body: {
-            userId: state.patient.id,
-            title: 'Prescription Ready',
-            message: 'Your prescription has been sent to a partner pharmacy. Tap to choose delivery or pickup.',
-            data: { screen: 'prescription', id: dx.id }
+            userId:  state.patient.id,
+            title,
+            message,
+            data: { screen: 'prescription', id: dx.id },
+            pref_category: 'appointment_reminders',
           }
         });
       } catch(e) {}
