@@ -43,10 +43,12 @@ body {
   padding: 0;
   margin: 0;
   min-height: 0;
-  /* adjustResize shrinks the WebView window when the keyboard opens; dvh/svh
-     both track window.innerHeight in a Capacitor app (no browser chrome). */
+  /* Use dvh (dynamic viewport height) so the body shrinks when the keyboard
+     opens. svh (stable) would NOT shrink — last rule wins, so the previous
+     declaration "height:100svh" was overriding 100dvh and breaking
+     adjustResize keyboard handling.  Fallback to 100% for older WebView. */
+  height: 100%;
   height: 100dvh;
-  height: 100svh;
 }
 
 html {
