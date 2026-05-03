@@ -64,7 +64,9 @@ function navigateToScreen(data) {
   if (drug)        params.set('drug', drug);
 
   const qs = params.toString();
-  window.location.href = qs ? `${url}?${qs}` : url;
+  const dest = qs ? `${url}?${qs}` : url;
+  // Use navTo() for fade transition if available; fall back to direct href
+  (window.navTo || function(u) { window.location.href = u; })(dest);
 }
 
 // ── Save player ID to Supabase profiles ───────────────────────
@@ -104,7 +106,7 @@ function showPermissionDeniedBanner() {
   const banner = document.createElement('div');
   banner.id = '_onesignalBanner';
   banner.style.cssText = [
-    'position:fixed', 'bottom:72px', 'left:12px', 'right:12px',
+    'position:fixed', 'bottom:20px', 'left:12px', 'right:12px',
     'background:#1565C0', 'color:#fff', 'border-radius:12px',
     'padding:12px 16px', 'display:flex', 'align-items:center',
     'gap:10px', 'z-index:9999', 'box-shadow:0 4px 16px rgba(0,0,0,0.3)',
@@ -147,13 +149,23 @@ function initOneSignal() {
     // 1. Initialise
     OS.initialize(ONESIGNAL_APP_ID);
 
-    // 2. Request permission and handle response
-    OS.Notifications.requestPermission(true).then((granted) => {
-      if (!granted && shouldShowPermBanner()) {
-        // Short delay so the page has finished rendering
-        setTimeout(showPermissionDeniedBanner, 1500);
-      }
-    }).catch(() => {});
+    // 2. Request permission — guarded by sessionStorage so we only prompt once
+    //    per app session (prevents the permission dialog from popping on every
+    //    page navigation since onesignal.js is loaded on multiple pages).
+    const _permKey = '_os_perm_asked';
+    if (!sessionStorage.getItem(_permKey)) {
+      sessionStorage.setItem(_permKey, '1');
+      OS.Notifications.requestPermission(true).then((granted) => {
+        if (!granted && shouldShowPermBanner()) {
+          setTimeout(showPermissionDeniedBanner, 1500);
+        }
+      }).catch(() => {});
+    } else {
+      // Already asked — just check if we should show the banner
+      OS.Notifications.hasPermission().then((has) => {
+        if (!has && shouldShowPermBanner()) setTimeout(showPermissionDeniedBanner, 1500);
+      }).catch(() => {});
+    }
 
     // 3. Subscription observer — captures player ID whenever it changes
     OS.User.pushSubscription.addEventListener('change', (event) => {

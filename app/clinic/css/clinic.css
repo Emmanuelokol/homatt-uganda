@@ -248,6 +248,16 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
   #qvGrid > div:last-child button{width:100%;justify-content:center}
 }
 
+/* ── Keyboard-open handling for clinic portal modals ── */
+/* adjustResize shrinks the WebView viewport; dvh/vh values on modal content   */
+/* may not update on older WebViews — cap with 100% instead.                   */
+body.keyboard-open #verifyModal { align-items:flex-start !important }
+body.keyboard-open #verifyModal > div { max-height:100% !important; border-radius:0 !important; overflow-y:auto }
+body.keyboard-open #registerModal { align-items:flex-start !important }
+body.keyboard-open #registerModal > div { max-height:100% !important; border-radius:0 !important; overflow-y:auto }
+/* Also add a 16px font-size floor on all clinic inputs to prevent iOS/Android zoom on focus */
+.field-input,.admin-form-group input,.admin-form-group select,.admin-form-group textarea { font-size:16px !important }
+
 /* Touch active feedback (all screens, but most useful on touch) */
 .btn-admin:active,.home-cta:active,.cbn-link:active,.order-card:active{transform:scale(0.98)}
 .cbn-link{transition:color .15s,background .15s,transform .1s}

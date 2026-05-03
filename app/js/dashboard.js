@@ -782,7 +782,8 @@ document.addEventListener('DOMContentLoaded', async () => {
               title: 'Symptom Check-in',
               message: `How are you feeling with your ${ms.condition}? Tap to respond.`,
               data: { screen: 'symptom-checkin' },
-              scheduleAt: ms.nextCheckinAt,
+              send_after: ms.nextCheckinAt,
+              pref_category: 'medicine_reminders',
               buttons: [
                 { id: 'feeling_better', text: '😊 Better' },
                 { id: 'feeling_same',   text: '😐 Same'   },
