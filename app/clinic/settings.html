@@ -8,8 +8,6 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/clinic.css">
   <style>
-    /* No bottom nav on this page — remove the extra padding that clinic.css adds for it */
-    @media(max-width:768px){ .admin-main{ padding-bottom:24px !important; } }
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
     .settings-card { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
@@ -190,19 +188,19 @@
           <span>Enter your clinic's location using Uganda's place names — district, subcounty, parish. We will automatically find your GPS position from these names so patients near you can find you first.</span>
         </div>
         <div class="settings-grid">
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bugiri, Kampala, Jinja</span></label>
             <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Bugiri" autocomplete="off">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bukooli County</span></label>
             <input type="text" id="sClinicCounty" class="form-input" placeholder="e.g. Bukooli County" autocomplete="off">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Butto, Ntinda, Naguru</span></label>
             <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Butto" autocomplete="off">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">most specific area</span></label>
             <input type="text" id="sClinicParish" class="form-input" placeholder="e.g. Butto Parish" autocomplete="off">
           </div>
