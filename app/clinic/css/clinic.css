@@ -157,7 +157,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 /* ── Mobile hamburger ── */
 .sidebar-hamburger{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:none;border:none;cursor:pointer;color:var(--text);border-radius:8px;flex-shrink:0}
 .sidebar-hamburger .material-icons-outlined{font-size:24px}
-.sidebar-overlay{display:none;position:fixed;inset:0;bottom:56px;background:rgba(0,0,0,0.45);z-index:99}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99}
 .sidebar-overlay.active{display:block}
 
 /* ── Mobile bottom nav — DISABLED ──
@@ -199,7 +199,10 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
   .admin-sidebar.open{transform:translateX(0)}
   .admin-main{margin-left:0;padding-bottom:24px}
   .sidebar-hamburger{display:flex}   /* hamburger is the ONLY nav on mobile */
-  .admin-topbar{padding:10px 14px;gap:8px}
+  /* Fix sticky: overflow-x:hidden on admin-main breaks position:sticky in Android WebView.
+     Use fixed positioning on mobile so the topbar always stays visible when scrolling. */
+  .admin-topbar{position:fixed;top:0;left:0;right:0;z-index:101;padding:10px 14px;gap:8px}
+  .admin-content{padding-top:70px}   /* compensate for 60px fixed topbar */
   .admin-topbar-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
   .admin-topbar-right{gap:6px;flex-shrink:0}
   .admin-topbar-right input[type="text"]{display:none}

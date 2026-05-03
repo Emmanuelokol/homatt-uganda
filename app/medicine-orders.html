@@ -135,6 +135,10 @@
     .crx-modal-bg { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.55); display:none; align-items:flex-end; justify-content:center; z-index:998; }
     .crx-modal-bg.open { display:flex; }
     .crx-modal { background:var(--surface,#fff); border-radius:20px 20px 0 0; width:100%; max-width:640px; max-height:92vh; max-height:92dvh; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 0 40px; }
+    /* When the Android keyboard is open, dvh values may not update reliably in WebView.
+       Pin the modal to the top and use 100% so it always fits the visible area. */
+    body.keyboard-open .crx-modal-bg { align-items:flex-start; height:100% }
+    body.keyboard-open .crx-modal    { max-height:100%; border-radius:0; padding-bottom:20px }
     .crx-modal-header { background:linear-gradient(135deg,#4527A0,#7B1FA2); color:#fff; padding:18px 20px 16px; border-radius:20px 20px 0 0; position:sticky; top:0; z-index:1; }
     .crx-modal-header h3 { font-size:16px; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
     .crx-modal-header p { font-size:11.5px; margin:0; opacity:.88; line-height:1.5; }
