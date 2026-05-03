@@ -8,6 +8,8 @@
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/clinic.css">
   <style>
+    /* No bottom nav on this page — remove the extra padding that clinic.css adds for it */
+    @media(max-width:768px){ .admin-main{ padding-bottom:24px !important; } }
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
     .settings-card { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
@@ -159,19 +161,19 @@
             <label>About This Clinic</label>
             <textarea id="sClinicDesc" class="form-textarea" rows="3" placeholder="Brief description — specialties, history, what makes your clinic stand out..."></textarea>
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>Phone Number</label>
             <input type="text" id="sClinicPhone" class="form-input" placeholder="+256 7XX XXX XXX">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>WhatsApp Number</label>
             <input type="text" id="sClinicWhatsapp" class="form-input" placeholder="+256 7XX XXX XXX">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>Email Address</label>
             <input type="email" id="sClinicEmail" class="form-input" placeholder="clinic@example.com">
           </div>
-          <div class="form-row">
+          <div class="form-row" style="grid-column:span 2">
             <label>Contact Person / Manager</label>
             <input type="text" id="sClinicContact" class="form-input" placeholder="Dr. Name or Manager Name">
           </div>
@@ -362,22 +364,6 @@
   </main>
 </div>
 
-<nav class="clinic-bottom-nav">
-  <div class="clinic-bottom-nav-inner">
-    <a href="dashboard.html" class="cbn-link">
-      <span class="material-icons-outlined">home</span>Home
-    </a>
-    <a href="new-order.html" class="cbn-link cbn-main">
-      <span class="material-icons-outlined">add_circle</span>New
-    </a>
-    <a href="patients.html" class="cbn-link">
-      <span class="material-icons-outlined">people</span>Patients
-    </a>
-    <a href="settings.html" class="cbn-link active">
-      <span class="material-icons-outlined">tune</span>Settings
-    </a>
-  </div>
-</nav>
 
 <div id="clinicToast" class="admin-toast"></div>
 
