@@ -40,8 +40,61 @@
     pharmacyId: null,
     patientNotes: '',
     formulary: [],
+    feeConsult: 0,
+    feeLab: 0,
+    feeMeds: 0,
+    paymentStatus: 'paid',
   };
   window._wizState = state; // expose for debug
+
+  // ── Default lab-test prices (UGX) ───────────────────────────────
+  const LAB_PRICES = {
+    'Malaria RDT': 5000, 'Blood Slide': 10000, 'CBC': 15000,
+    'Urinalysis': 10000, 'Stool': 10000, 'Widal': 15000,
+    'HIV Test': 5000, 'Pregnancy Test': 5000, 'Blood Sugar': 5000,
+    'BP': 2000,
+  };
+
+  // ── Fee helpers ──────────────────────────────────────────────────
+  function recalcFees() {
+    const c = parseFloat(document.getElementById('feeConsult')?.value) || 0;
+    const l = parseFloat(document.getElementById('feeLab')?.value)    || 0;
+    const m = parseFloat(document.getElementById('feeMeds')?.value)   || 0;
+    state.feeConsult = c; state.feeLab = l; state.feeMeds = m;
+    const total = c + l + m;
+    const el = document.getElementById('feeTotal');
+    if (el) el.textContent = total.toLocaleString('en-UG');
+  }
+
+  function autoFillLabFee() {
+    const total = state.labTests.reduce((s, t) => s + (LAB_PRICES[t] || 0), 0);
+    const el = document.getElementById('feeLab');
+    if (el && !parseFloat(el.value)) { el.value = total || ''; recalcFees(); }
+  }
+
+  function initFeeCard() {
+    ['feeConsult','feeLab','feeMeds'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', recalcFees);
+    });
+    document.querySelectorAll('.pay-chip').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.pay-chip').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state.paymentStatus = btn.dataset.pay;
+      });
+    });
+    // Pre-fill consultation fee from clinic settings
+    if (supabase && _clinicId) {
+      supabase.from('clinics').select('consultation_fee').eq('id', _clinicId).maybeSingle()
+        .then(({ data }) => {
+          if (data?.consultation_fee) {
+            const el = document.getElementById('feeConsult');
+            if (el && !parseFloat(el.value)) { el.value = data.consultation_fee; recalcFees(); }
+          }
+        }).catch(() => {});
+    }
+  }
 
   // ── Step navigation ─────────────────────────────────────────────
   function showStep(n) {
@@ -56,6 +109,7 @@
       else if (i === n) p.classList.add('current');
     });
     if (n === 5) renderReview();
+    if (n === 3) { initFeeCard(); autoFillLabFee(); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -485,13 +539,14 @@
     };
   });
 
-  // Lab test chips
+  // Lab test chips — also auto-fill lab fee when tests are selected
   document.querySelectorAll('#labChips .lab-chip').forEach(b => {
     b.onclick = () => {
       b.classList.toggle('active');
       const lab = b.dataset.lab;
       const i = state.labTests.indexOf(lab);
       if (i === -1) state.labTests.push(lab); else state.labTests.splice(i,1);
+      autoFillLabFee();
     };
   });
 
@@ -759,6 +814,14 @@
       <div class="lbl">Source</div>
       <div class="val">${state.stockSource === 'clinic' ? 'Clinic stock' : 'E-prescription → partner pharmacy'}</div>
       ${state.patientNotes ? `<div class="lbl">Instructions</div><div class="val">${esc(state.patientNotes)}</div>` : ''}
+      <div class="lbl">Fees</div>
+      <div class="val">
+        Consult: UGX ${(state.feeConsult||0).toLocaleString()} &nbsp;|&nbsp;
+        Lab: UGX ${(state.feeLab||0).toLocaleString()} &nbsp;|&nbsp;
+        Meds: UGX ${(state.feeMeds||0).toLocaleString()}<br>
+        <strong>Total: UGX ${((state.feeConsult||0)+(state.feeLab||0)+(state.feeMeds||0)).toLocaleString()}</strong>
+        &nbsp;—&nbsp;${({'paid':'✓ Paid','pending':'⏳ Pending','credit':'📋 Credit','waived':'🤝 Waived'})[state.paymentStatus]||'Pending'}
+      </div>
     `;
 
     // Reminder schedule preview
@@ -884,6 +947,11 @@
       expected_recovery: state.expectedRecovery || null,
       prescription_items: items,
       intake_schedule: items,
+      consultation_fee_ugx: state.feeConsult || 0,
+      lab_fee_ugx:          state.feeLab    || 0,
+      meds_fee_ugx:         state.feeMeds   || 0,
+      total_charged_ugx:    (state.feeConsult + state.feeLab + state.feeMeds) || 0,
+      payment_status:       state.paymentStatus || 'pending',
     };
     if (state.patient.id) dxPayload.clinician_id = session?.userId || null;
 

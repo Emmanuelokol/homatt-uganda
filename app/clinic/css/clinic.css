@@ -249,12 +249,13 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 }
 
 /* ── Keyboard-open handling for clinic portal modals ── */
-/* adjustResize shrinks the WebView viewport; dvh/vh values on modal content   */
-/* may not update on older WebViews — cap with 100% instead.                   */
-body.keyboard-open #verifyModal { align-items:flex-start !important }
-body.keyboard-open #verifyModal > div { max-height:100% !important; border-radius:0 !important; overflow-y:auto }
-body.keyboard-open #registerModal { align-items:flex-start !important }
-body.keyboard-open #registerModal > div { max-height:100% !important; border-radius:0 !important; overflow-y:auto }
+/* adjustResize shrinks the WebView viewport above the keyboard, so modals with
+   position:fixed + align-items:flex-end naturally sit just above the keyboard.
+   Only override max-height so older WebViews where dvh doesn't update still work.
+   Do NOT change align-items — that causes a black gap (modal jumps to top,
+   leaving the dark modal background visible below). */
+body.keyboard-open #verifyModal > div   { max-height:100% !important; overflow-y:auto }
+body.keyboard-open #registerModal > div { max-height:100% !important; overflow-y:auto }
 /* Also add a 16px font-size floor on all clinic inputs to prevent iOS/Android zoom on focus */
 .field-input,.admin-form-group input,.admin-form-group select,.admin-form-group textarea { font-size:16px !important }
 

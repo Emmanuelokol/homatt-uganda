@@ -255,6 +255,14 @@
       border-radius: 10px; padding: 14px 16px;
       font-size: 13px; color: #5D4037; line-height: 1.55;
     }
+    /* Fee chips */
+    .pay-chip {
+      padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+      background: var(--surface); color: var(--text-lt); font-size: 13px; font-weight: 600;
+      cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+      transition: all .15s;
+    }
+    .pay-chip.active { background: #E8F5E9; color: #1B5E20; border-color: #A5D6A7; }
   </style>
 </head>
 <body>
@@ -446,6 +454,53 @@
           <div id="wardField" style="display:none;margin-top:12px">
             <label class="field-label">Ward / Bed</label>
             <input id="wardInput" class="field-input" placeholder="e.g. General Ward — Bed 3">
+          </div>
+        </div>
+
+        <!-- ── Fees & Charges ── -->
+        <div class="wiz-card" id="feesCard">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <span class="material-icons-outlined" style="color:var(--primary);font-size:20px">payments</span>
+            <span style="font-size:14px;font-weight:700;color:var(--text)">Fees &amp; Charges</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center">
+            <label class="field-label" style="margin:0">Consultation fee</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
+              <input id="feeConsult" class="field-input" type="number" min="0" step="500"
+                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
+            </div>
+
+            <label class="field-label" style="margin:0">Lab / Tests fee</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
+              <input id="feeLab" class="field-input" type="number" min="0" step="500"
+                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
+            </div>
+
+            <label class="field-label" style="margin:0">Medications fee</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
+              <input id="feeMeds" class="field-input" type="number" min="0" step="500"
+                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
+            </div>
+
+            <div style="border-top:1px solid var(--border);padding-top:8px;font-size:13px;font-weight:700;color:var(--text)">Total charged</div>
+            <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;align-items:center;gap:4px">
+              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
+              <span id="feeTotal" style="font-size:15px;font-weight:800;color:var(--primary);min-width:110px;text-align:right">0</span>
+            </div>
+          </div>
+
+          <div style="margin-top:14px">
+            <label class="field-label">Payment status</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="pay-chip active" data-pay="paid">✓ Paid</button>
+              <button class="pay-chip" data-pay="pending">⏳ Pending</button>
+              <button class="pay-chip" data-pay="credit">📋 Credit</button>
+              <button class="pay-chip" data-pay="waived">🤝 Waived</button>
+            </div>
           </div>
         </div>
 
