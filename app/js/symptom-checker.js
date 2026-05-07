@@ -2116,7 +2116,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
                          diagData.overall_risk === 'medium' ? '#E65100' : '#1B5E20';
 
     modal.innerHTML = `
-      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;max-height:85dvh;max-height:85vh;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;display:flex;flex-direction:column">
+      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;min-height:62%;max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;display:flex;flex-direction:column">
         <!-- Header -->
         <div style="background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 16px;position:sticky;top:0;z-index:2;border-bottom:1px solid #F0F0F0">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2137,32 +2137,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         <!-- Clinic list -->
         <div id="cbClinicList" style="display:none;padding:12px 16px 24px"></div>
 
-        <!-- Booking confirm step -->
-        <div id="cbConfirmStep" style="display:none;padding:20px 16px 28px"></div>
+        <!-- Booking confirm step — padding-bottom gives room to scroll above keyboard -->
+        <div id="cbConfirmStep" style="display:none;padding:20px 16px 120px"></div>
       </div>
     `;
 
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
     document.getElementById('cbClose').addEventListener('click', () => modal.remove());
-
-    // Resize cbInner to the visual viewport height when the keyboard opens,
-    // so the name input is never hidden behind the keyboard.
-    function _cbResizeToViewport() {
-      const cbInner = document.getElementById('cbInner');
-      if (!cbInner) return;
-      const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
-      cbInner.style.maxHeight = Math.round(vh * 0.95) + 'px';
-    }
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', _cbResizeToViewport);
-    }
-    // Clean up listener when modal is removed
-    const _origRemove = modal.remove.bind(modal);
-    modal.remove = function() {
-      if (window.visualViewport) window.visualViewport.removeEventListener('resize', _cbResizeToViewport);
-      _origRemove();
-    };
 
     // ── Fetch user location + clinics in parallel ──
     async function fetchClinics() {
@@ -2656,18 +2638,19 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       document.getElementById('cbClinicList').style.display = 'block';
     });
 
-    // Scroll the name input into view when keyboard opens (before the global handler fires)
+    // Scroll the name input into view when keyboard opens.
+    // #cbInner is the actual scrollable container (not .app-screen which is outside the modal).
     const cbNameInp = document.getElementById('cbPatientName');
     if (cbNameInp) {
       cbNameInp.addEventListener('focus', () => {
         setTimeout(() => {
-          const scroller = document.querySelector('.app-screen');
-          if (!scroller) return;
+          const inner = document.getElementById('cbInner');
+          if (!inner) return;
           const elRect = cbNameInp.getBoundingClientRect();
-          const scrRect = scroller.getBoundingClientRect();
-          const target = scroller.scrollTop + elRect.top - scrRect.top - 80;
-          scroller.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-        }, 320);
+          const innerRect = inner.getBoundingClientRect();
+          const target = inner.scrollTop + elRect.top - innerRect.top - (inner.clientHeight / 2) + (elRect.height / 2);
+          inner.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }, 380);
       });
     }
 
