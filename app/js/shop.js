@@ -883,7 +883,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dc) [userLat, userLon] = dc;
       }
 
-      let pharmacyId = null, deliveryFee = _deliverySettings.min_fee;
+      // Default fee must match what renderCartContents() displayed (Math.max covers base_fee > min_fee)
+      let pharmacyId = null, deliveryFee = Math.max(_deliverySettings.min_fee, _deliverySettings.base_fee);
       if (userLat && userLon) {
         try {
           const nearest = await findNearestPharmacy(userLat, userLon);

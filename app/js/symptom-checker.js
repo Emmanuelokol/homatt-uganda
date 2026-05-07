@@ -2480,10 +2480,13 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
       const card = document.createElement('div');
       card.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
+      const photoHtml = clinic.front_photo_url
+        ? `<img src="${clinic.front_photo_url}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover;display:block" onerror="this.outerHTML='<span class=\\'material-icons-outlined\\'style=\\'font-size:22px;color:#1B5E20\\'>local_hospital</span>'">`
+        : `<span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">local_hospital</span>`;
       card.innerHTML = `
         <div style="display:flex;align-items:flex-start;gap:10px">
-          <div style="width:40px;height:40px;border-radius:10px;background:#E8F5E9;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">local_hospital</span>
+          <div style="width:40px;height:40px;border-radius:10px;background:#E8F5E9;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+            ${photoHtml}
           </div>
           <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${clinic.name}</div>

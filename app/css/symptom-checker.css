@@ -205,8 +205,21 @@
 
 .sc-textarea:focus {
   border-color: var(--primary);
-  background: white;
+  background: var(--surface);
   box-shadow: 0 0 0 3px rgba(27, 94, 32, 0.1);
+}
+
+[data-theme="dark"] .sc-textarea,
+[data-theme="dark"] .sc-textarea:focus {
+  background: #2C2C2C !important;
+  color: #E8EAED !important;
+  -webkit-text-fill-color: #E8EAED !important;
+  border-color: #555 !important;
+  caret-color: #66BB6A;
+}
+[data-theme="dark"] .sc-textarea::placeholder {
+  color: #6E7478 !important;
+  opacity: 1;
 }
 
 .sc-textarea::placeholder {

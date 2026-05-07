@@ -1847,7 +1847,20 @@
   flex-shrink: 0;
   padding: 10px 20px 16px;
   border-top: 1px solid var(--border);
-  background: white;
+  background: var(--surface);
+}
+#cartDeliveryAddress {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text-primary);
+  outline: none;
+  margin-bottom: 8px;
+  box-sizing: border-box;
 }
 
 /* Reduce bottom padding in cart's scrollable body — footer provides the visual boundary */
