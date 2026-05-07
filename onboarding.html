@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="manifest" href="manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Tell us about you</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { height:100%; background:#0A1628; font-family:'Inter',sans-serif; }
+    .phone-frame {
+      max-width:390px; min-height:100vh; margin:0 auto;
+      display:flex; flex-direction:column;
+      background:#0A1628; position:relative;
+    }
+    .status-bar {
+      display:flex; justify-content:space-between; align-items:center;
+      padding:10px 20px 6px; flex-shrink:0;
+    }
+    .status-time { font-size:14px; font-weight:700; color:rgba(255,255,255,0.9); }
+    .status-icons { display:flex; gap:6px; }
+    .status-icons .material-icons-outlined { font-size:16px; color:rgba(255,255,255,0.9); }
+
+    .onboard-screen {
+      flex:1; overflow-y:auto; padding:20px 20px 48px;
+    }
+
+    /* Header */
+    .onboard-header { margin-bottom:28px; }
+    .onboard-icon {
+      width:52px; height:52px; border-radius:16px;
+      background:linear-gradient(135deg,#2E7D32,#66BB6A);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 8px 24px rgba(46,125,50,0.4);
+      margin-bottom:16px;
+    }
+    .onboard-icon .material-icons-outlined { font-size:26px; color:#fff; }
+    .onboard-title { font-size:24px; font-weight:800; color:#fff; margin-bottom:6px; }
+    .onboard-subtitle { font-size:14px; color:rgba(255,255,255,0.55); line-height:1.5; }
+
+    /* Section */
+    .section {
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.09);
+      border-radius:18px; padding:20px; margin-bottom:16px;
+    }
+    .section-title {
+      display:flex; align-items:center; gap:8px;
+      font-size:13px; font-weight:700; color:rgba(255,255,255,0.5);
+      text-transform:uppercase; letter-spacing:0.6px; margin-bottom:16px;
+    }
+    .section-title .material-icons-outlined { font-size:16px; color:#4CAF50; }
+
+    /* Form elements */
+    .form-group { margin-bottom:14px; }
+    .form-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    .form-label {
+      display:block; font-size:11px; font-weight:600;
+      color:rgba(255,255,255,0.5); text-transform:uppercase;
+      letter-spacing:0.4px; margin-bottom:7px;
+    }
+    .input-wrap { position:relative; }
+    .input-wrap > .material-icons-outlined {
+      position:absolute; left:12px; top:50%; transform:translateY(-50%);
+      font-size:17px; color:rgba(255,255,255,0.35); pointer-events:none;
+    }
+    .form-input, .form-select {
+      width:100%; padding:12px 12px 12px 38px;
+      background:rgba(255,255,255,0.07);
+      border:1.5px solid rgba(255,255,255,0.1);
+      border-radius:11px; font-size:14px; color:#fff;
+      font-family:'Inter',sans-serif; transition:border-color 0.2s;
+      -webkit-appearance:none; appearance:none;
+    }
+    .form-input:focus, .form-select:focus {
+      outline:none; border-color:#4CAF50;
+      background:rgba(255,255,255,0.1);
+    }
+    .form-input::placeholder { color:rgba(255,255,255,0.25); }
+    .form-select option { background:#1a2a3a; color:#fff; }
+
+    /* no-icon inputs */
+    .form-input.no-icon, .form-select.no-icon { padding-left:12px; }
+
+    /* Sex selector */
+    .sex-options { display:flex; gap:8px; }
+    .sex-btn {
+      flex:1; padding:11px 8px; border-radius:10px;
+      border:1.5px solid rgba(255,255,255,0.12);
+      background:rgba(255,255,255,0.05);
+      color:rgba(255,255,255,0.6); font-size:13px; font-weight:600;
+      cursor:pointer; transition:all 0.2s; text-align:center;
+      font-family:'Inter',sans-serif;
+    }
+    .sex-btn:hover { border-color:rgba(76,175,80,0.4); }
+    .sex-btn.selected {
+      border-color:#4CAF50; background:rgba(76,175,80,0.15); color:#66BB6A;
+    }
+
+    /* Family toggle */
+    .family-toggle-row {
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .family-toggle-label {
+      font-size:14px; font-weight:500; color:rgba(255,255,255,0.8);
+    }
+    .family-toggle-label small {
+      display:block; font-size:12px; color:rgba(255,255,255,0.4); font-weight:400;
+    }
+    .toggle-switch {
+      width:52px; height:28px; border-radius:14px;
+      background:rgba(255,255,255,0.1);
+      border:1.5px solid rgba(255,255,255,0.12);
+      cursor:pointer; position:relative;
+      transition:background 0.25s, border-color 0.25s;
+      flex-shrink:0;
+    }
+    .toggle-switch::after {
+      content:''; position:absolute;
+      width:20px; height:20px; border-radius:50%;
+      background:#fff; top:3px; left:3px;
+      transition:transform 0.25s;
+      box-shadow:0 1px 4px rgba(0,0,0,0.3);
+    }
+    .toggle-switch.on {
+      background:rgba(76,175,80,0.35); border-color:#4CAF50;
+    }
+    .toggle-switch.on::after { transform:translateX(24px); }
+
+    .family-size-row {
+      display:none; align-items:center; justify-content:space-between;
+      margin-top:14px; background:rgba(255,255,255,0.05);
+      border-radius:10px; padding:12px 14px;
+    }
+    .family-size-row.visible { display:flex; }
+    .family-size-label { font-size:13px; color:rgba(255,255,255,0.6); }
+    .size-counter { display:flex; align-items:center; gap:14px; }
+    .counter-btn {
+      width:30px; height:30px; border-radius:50%;
+      border:1.5px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.07);
+      color:#fff; font-size:18px; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      line-height:1; font-family:'Inter',sans-serif;
+      transition:background 0.15s;
+    }
+    .counter-btn:hover { background:rgba(255,255,255,0.12); }
+    .counter-value { font-size:18px; font-weight:700; color:#fff; min-width:20px; text-align:center; }
+
+    /* Health goals */
+    .goals-grid { display:flex; flex-wrap:wrap; gap:8px; }
+    .goal-chip {
+      display:flex; align-items:center; gap:6px;
+      padding:8px 14px; border-radius:20px;
+      border:1.5px solid rgba(255,255,255,0.1);
+      background:rgba(255,255,255,0.05);
+      color:rgba(255,255,255,0.6); font-size:12px; font-weight:500;
+      cursor:pointer; transition:all 0.2s;
+      font-family:'Inter',sans-serif;
+    }
+    .goal-chip .material-icons-outlined { font-size:14px; }
+    .goal-chip:hover { border-color:rgba(76,175,80,0.4); }
+    .goal-chip.selected {
+      border-color:#4CAF50; background:rgba(76,175,80,0.15); color:#66BB6A;
+    }
+    .goal-chip.selected .material-icons-outlined { color:#66BB6A; }
+
+    /* Error */
+    .form-error {
+      background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3);
+      border-radius:10px; padding:12px 14px;
+      font-size:13px; color:#FCA5A5; margin-bottom:16px; display:none;
+    }
+
+    /* Required badge */
+    .req { color:#EF9A9A; margin-left:3px; }
+
+    /* Submit */
+    .submit-area { padding-top:8px; }
+    .btn-submit {
+      width:100%; padding:17px;
+      background:linear-gradient(135deg,#2E7D32,#43A047);
+      color:#fff; border:none; border-radius:16px;
+      font-size:16px; font-weight:700; cursor:pointer;
+      font-family:'Inter',sans-serif;
+      box-shadow:0 8px 24px rgba(46,125,50,0.4);
+      transition:transform 0.15s, box-shadow 0.15s;
+      touch-action:manipulation;
+      display:flex; align-items:center; justify-content:center; gap:10px;
+    }
+    .btn-submit:active { transform:scale(0.97); box-shadow:0 4px 12px rgba(46,125,50,0.3); }
+    .btn-submit:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
+    .btn-submit .material-icons-outlined { font-size:20px; }
+
+    .optional-note {
+      text-align:center; margin-top:16px;
+      font-size:12px; color:rgba(255,255,255,0.3);
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined">signal_cellular_alt</span>
+      <span class="material-icons-outlined">wifi</span>
+      <span class="material-icons-outlined">battery_full</span>
+    </div>
+  </div>
+
+  <div class="onboard-screen">
+
+    <div class="onboard-header">
+      <div class="onboard-icon">
+        <span class="material-icons-outlined">waving_hand</span>
+      </div>
+      <div class="onboard-title">Tell us about you</div>
+      <div class="onboard-subtitle">This helps us personalise your health experience. You only need to do this once.</div>
+    </div>
+
+    <form id="onboardingForm" novalidate>
+
+      <!-- Your Name -->
+      <div class="section">
+        <div class="section-title">
+          <span class="material-icons-outlined">person</span>
+          Your Name
+        </div>
+        <div class="form-row">
+          <div>
+            <label class="form-label" for="firstName">First Name <span class="req">*</span></label>
+            <div class="input-wrap">
+              <span class="material-icons-outlined">badge</span>
+              <input class="form-input" type="text" id="firstName" placeholder="e.g. Sarah" autocomplete="given-name">
+            </div>
+          </div>
+          <div>
+            <label class="form-label" for="lastName">Last Name</label>
+            <div class="input-wrap">
+              <span class="material-icons-outlined">badge</span>
+              <input class="form-input" type="text" id="lastName" placeholder="e.g. Nakato" autocomplete="family-name">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="phone">Phone Number</label>
+          <div class="input-wrap">
+            <span class="material-icons-outlined">phone</span>
+            <input class="form-input" type="tel" id="phone" placeholder="e.g. 0701234567" autocomplete="tel" inputmode="tel">
+          </div>
+        </div>
+      </div>
+
+      <!-- Personal Details -->
+      <div class="section">
+        <div class="section-title">
+          <span class="material-icons-outlined">info</span>
+          Personal Details
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="dob">Date of Birth</label>
+          <div class="input-wrap">
+            <span class="material-icons-outlined">cake</span>
+            <input class="form-input" type="date" id="dob" autocomplete="bday">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Sex</label>
+          <div class="sex-options">
+            <button type="button" class="sex-btn" data-value="Male">Male</button>
+            <button type="button" class="sex-btn" data-value="Female">Female</button>
+            <button type="button" class="sex-btn" data-value="Other">Other</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="section">
+        <div class="section-title">
+          <span class="material-icons-outlined">location_on</span>
+          Your Location
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="district">District</label>
+          <div class="input-wrap">
+            <span class="material-icons-outlined">map</span>
+            <select class="form-select" id="district">
+              <option value="">Select your district</option>
+              <option value="kampala">Kampala</option>
+              <option value="wakiso">Wakiso</option>
+              <option value="mukono">Mukono</option>
+              <option value="jinja">Jinja</option>
+              <option value="mbarara">Mbarara</option>
+              <option value="gulu">Gulu</option>
+              <option value="lira">Lira</option>
+              <option value="mbale">Mbale</option>
+              <option value="masaka">Masaka</option>
+              <option value="fort_portal">Fort Portal</option>
+              <option value="soroti">Soroti</option>
+              <option value="arua">Arua</option>
+              <option value="kabale">Kabale</option>
+              <option value="hoima">Hoima</option>
+              <option value="entebbe">Entebbe</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="city">Town / Area</label>
+          <div class="input-wrap">
+            <span class="material-icons-outlined">location_city</span>
+            <input class="form-input" type="text" id="city" placeholder="e.g. Ntinda, Muyenga…">
+          </div>
+        </div>
+      </div>
+
+      <!-- Family -->
+      <div class="section">
+        <div class="section-title">
+          <span class="material-icons-outlined">family_restroom</span>
+          Family
+        </div>
+
+        <div class="family-toggle-row">
+          <div class="family-toggle-label">
+            Do you have a family?
+            <small>Enables family health tracking</small>
+          </div>
+          <div class="toggle-switch" id="familyToggle" role="switch" aria-checked="false"></div>
+        </div>
+
+        <div class="family-size-row" id="familySizeRow">
+          <span class="family-size-label">How many members?</span>
+          <div class="size-counter">
+            <button type="button" class="counter-btn" id="decreaseSize">−</button>
+            <span class="counter-value" id="familySizeDisplay">2</span>
+            <button type="button" class="counter-btn" id="increaseSize">+</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Health Goals -->
+      <div class="section">
+        <div class="section-title">
+          <span class="material-icons-outlined">flag</span>
+          Health Goals <span style="font-size:11px;margin-left:6px;color:rgba(255,255,255,0.3);text-transform:none;font-weight:400;letter-spacing:0">(optional)</span>
+        </div>
+        <div class="goals-grid">
+          <button type="button" class="goal-chip" data-goal="weight">
+            <span class="material-icons-outlined">monitor_weight</span>
+            Weight
+          </button>
+          <button type="button" class="goal-chip" data-goal="fitness">
+            <span class="material-icons-outlined">directions_run</span>
+            Fitness
+          </button>
+          <button type="button" class="goal-chip" data-goal="maternal">
+            <span class="material-icons-outlined">pregnant_woman</span>
+            Maternal
+          </button>
+          <button type="button" class="goal-chip" data-goal="child_health">
+            <span class="material-icons-outlined">child_care</span>
+            Child Health
+          </button>
+          <button type="button" class="goal-chip" data-goal="mental_health">
+            <span class="material-icons-outlined">psychology</span>
+            Mental Health
+          </button>
+          <button type="button" class="goal-chip" data-goal="nutrition">
+            <span class="material-icons-outlined">restaurant</span>
+            Nutrition
+          </button>
+          <button type="button" class="goal-chip" data-goal="chronic">
+            <span class="material-icons-outlined">medication</span>
+            Chronic Care
+          </button>
+          <button type="button" class="goal-chip" data-goal="preventive">
+            <span class="material-icons-outlined">health_and_safety</span>
+            Preventive
+          </button>
+        </div>
+      </div>
+
+      <!-- Error + Submit -->
+      <div class="form-error" id="formError"></div>
+
+      <div class="submit-area">
+        <button type="submit" class="btn-submit" id="submitBtn">
+          <span class="material-icons-outlined">arrow_forward</span>
+          Go to My Dashboard
+        </button>
+        <p class="optional-note">You can update these details anytime from your profile</p>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/onboarding.js"></script>
+<script src="js/onesignal.js"></script>
+<script src="js/native-bridge.js"></script>
+</body>
+</html>

@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <!-- App Content -->
+    <div class="app-screen">
+      <!-- Dashboard Header -->
+      <div class="dash-header">
+        <div class="dash-header-top">
+          <div class="dash-greeting">
+            <p class="dash-welcome">Good morning,</p>
+            <h1 class="dash-name" id="userName">User</h1>
+          </div>
+          <div class="dash-header-actions">
+            <button class="dash-icon-btn" id="notifBtn">
+              <span class="material-icons-outlined">notifications</span>
+              <span class="notif-badge">3</span>
+            </button>
+            <div class="dash-avatar" id="userAvatar">
+              <span class="material-icons-outlined">person</span>
+            </div>
+          </div>
+        </div>
+        <!-- Health Score Card -->
+        <div class="health-score-card">
+          <div class="health-score-left">
+            <p class="health-score-label">Your Health Score</p>
+            <div class="health-score-value">
+              <span class="score-number" id="healthScore">78</span>
+              <span class="score-suffix">/100</span>
+            </div>
+            <p class="health-score-status">
+              <span class="material-icons-outlined" style="font-size:14px">trending_up</span>
+              Good - Keep it up!
+            </p>
+          </div>
+          <div class="health-score-ring">
+            <svg viewBox="0 0 80 80" class="score-svg">
+              <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6"/>
+              <circle cx="40" cy="40" r="34" fill="none" stroke="white" stroke-width="6"
+                      stroke-dasharray="213.6" stroke-dashoffset="47" stroke-linecap="round"
+                      transform="rotate(-90 40 40)"/>
+            </svg>
+            <span class="score-ring-label">78%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dashboard Content -->
+      <div class="dash-content">
+
+        <!-- ── Medication Check-in Banner (shown when a dose check-in is due) ── -->
+        <div id="medCheckinBanner" style="display:none;margin-bottom:16px;border-radius:16px;overflow:hidden;box-shadow:0 4px 16px rgba(0,0,0,0.12)">
+          <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:14px 16px 10px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+              <span class="material-icons-outlined" style="font-size:22px;color:#fff">medication</span>
+              <span style="font-size:15px;font-weight:700;color:#fff">Medication Check-in Due</span>
+            </div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.85)" id="checkinMedName">—</div>
+          </div>
+          <div style="background:#fff;padding:14px 16px">
+            <div style="font-size:13px;font-weight:600;color:#1B5E20;margin-bottom:4px" id="checkinDosage"></div>
+            <div id="checkinInstructions" style="font-size:12px;color:#5F6368;margin-bottom:12px"></div>
+            <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling after this dose?</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button onclick="respondCheckin('well')" style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit">
+                😊<br>Feeling Well
+              </button>
+              <button onclick="respondCheckin('better')" style="flex:1;padding:10px 6px;border:2px solid #FF9800;background:#FFF3E0;border-radius:10px;font-size:12px;font-weight:700;color:#E65100;cursor:pointer;font-family:inherit">
+                😐<br>Getting Better
+              </button>
+              <button onclick="respondCheckin('worse')" style="flex:1;padding:10px 6px;border:2px solid #F44336;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit">
+                😔<br>Feeling Worse
+              </button>
+            </div>
+            <div id="checkinWarnings" style="display:none;font-size:11px;color:#E65100;background:#FFF3E0;border-radius:6px;padding:7px 10px;margin-bottom:10px"></div>
+          </div>
+        </div>
+
+        <!-- ── Clinic Referral Card (shown when user reports feeling worse) ── -->
+        <div id="clinicReferralBanner" style="display:none;margin-bottom:16px;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:16px;padding:16px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <span class="material-icons-outlined" style="font-size:24px;color:#C62828">local_hospital</span>
+            <div>
+              <div style="font-size:14px;font-weight:700;color:#B71C1C">Please Visit a Clinic</div>
+              <div style="font-size:12px;color:#C62828">Your condition may need medical attention</div>
+            </div>
+          </div>
+          <div style="font-size:12px;color:#5F6368;margin-bottom:12px">
+            You reported feeling worse after your last dose. Our records have been flagged and we strongly recommend you see a doctor as soon as possible.
+          </div>
+          <button onclick="window.location.href='symptom-checker.html'" style="width:100%;padding:12px;background:#C62828;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+            <span class="material-icons-outlined" style="font-size:16px">stethoscope</span>
+            Check Symptoms &amp; Find Clinic
+          </button>
+        </div>
+
+        <!-- ── Active Symptom Monitoring Banner (synced with symptom checker "Monitor my symptom") ── -->
+        <div id="activeMonitorBanner" style="display:none;margin-bottom:16px;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(183,28,28,0.18)">
+          <div style="background:linear-gradient(135deg,#880E4F,#C62828);padding:14px 16px 12px">
+            <div style="display:flex;align-items:center;gap:10px">
+              <span class="material-icons-outlined" style="font-size:22px;color:#fff">monitor_heart</span>
+              <div style="flex:1">
+                <div style="font-size:15px;font-weight:700;color:#fff">Symptom Monitoring Active</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.85);margin-top:2px" id="monitorBannerCondition">—</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0">
+                <div style="width:8px;height:8px;border-radius:50%;background:#69F0AE"></div>
+                <span style="font-size:10px;color:#69F0AE;font-weight:700;letter-spacing:.5px">LIVE</span>
+              </div>
+            </div>
+          </div>
+          <div style="background:#fff;padding:14px 16px" id="monitorBannerBody">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <div style="font-size:12px;color:#9E9E9E" id="monitorBannerTime">—</div>
+              <div style="font-size:12px;color:#5F6368" id="monitorBannerCheckins">No check-ins yet</div>
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#212121;margin-bottom:10px">How are you feeling right now?</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px">
+              <button onclick="window.respondMonitorCheckin('better',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #4CAF50;background:#E8F5E9;border-radius:10px;font-size:12px;font-weight:700;color:#2E7D32;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+                😊<br>Better
+              </button>
+              <button onclick="window.respondMonitorCheckin('same',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #FFC107;background:#FFF8E1;border-radius:10px;font-size:12px;font-weight:700;color:#F57F17;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+                😐<br>Same
+              </button>
+              <button onclick="window.respondMonitorCheckin('worse',this)"
+                style="flex:1;padding:10px 6px;border:2px solid #EF5350;background:#FFEBEE;border-radius:10px;font-size:12px;font-weight:700;color:#C62828;cursor:pointer;font-family:inherit;touch-action:manipulation;transition:transform .12s ease,opacity .12s ease;-webkit-tap-highlight-color:transparent;user-select:none">
+                😔<br>Worse
+              </button>
+            </div>
+            <button onclick="window.location.href='symptom-checker.html'"
+              style="width:100%;padding:10px;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border:none;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;touch-action:manipulation">
+              <span class="material-icons-outlined" style="font-size:16px">stethoscope</span>
+              Open Symptom Checker for Full Details
+            </button>
+          </div>
+        </div>
+
+        <!-- Check My Health - Hero Card -->
+        <div class="dash-hero-card" id="symptomChecker" onclick="window.location.href='symptom-checker.html'" style="cursor:pointer;touch-action:manipulation">
+          <div class="hero-card-icon">
+            <span class="material-icons-outlined">medical_services</span>
+          </div>
+          <div class="hero-card-text">
+            <h3>Check My Health</h3>
+            <p>Describe your symptoms — AI assessment + nearest clinics</p>
+          </div>
+          <span class="material-icons-outlined hero-arrow">arrow_forward_ios</span>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="dash-section">
+          <h3 class="section-title">Quick Actions</h3>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div onclick="window.location.href='medicine-orders.html'" style="cursor:pointer;background:linear-gradient(135deg,#00695C,#00897B);color:#fff;border-radius:14px;padding:16px;display:flex;align-items:center;gap:14px">
+              <div style="width:48px;height:48px;border-radius:12px;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px;color:#fff">local_pharmacy</span>
+              </div>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:700;color:#fff">Order Medicines</div>
+                <div style="font-size:12px;opacity:.85;color:#fff;margin-top:2px">Home delivery to your door</div>
+              </div>
+              <span class="material-icons-outlined" style="color:rgba(255,255,255,0.7);font-size:20px">arrow_forward_ios</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Health Trackers -->
+        <div class="dash-section">
+          <h3 class="section-title">Health Trackers</h3>
+          <div class="feature-grid">
+            <div class="feature-card" id="featureCycle" onclick="window.location.href='cycle-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap cycle-tracker">
+                <span class="material-icons-outlined">calendar_month</span>
+              </div>
+              <span class="feature-label">Cycle Tracker</span>
+            </div>
+<div class="feature-card" id="featureMalaria" onclick="window.location.href='malaria-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap" style="background:#FFF9C4">
+                <span class="material-icons-outlined" style="color:#F57F17">pest_control</span>
+              </div>
+              <span class="feature-label">Malaria</span>
+            </div>
+            <div class="feature-card" id="featureMoodSleep" onclick="window.location.href='mood-sleep-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap mood-tracker">
+                <span class="material-icons-outlined">bedtime</span>
+              </div>
+              <span class="feature-label">Mood & Sleep</span>
+            </div>
+            <div class="feature-card" id="featurePain" onclick="window.location.href='pain-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap pain-tracker">
+                <span class="material-icons-outlined">healing</span>
+              </div>
+              <span class="feature-label">Pain</span>
+            </div>
+            <div class="feature-card" id="featureDigestive" onclick="window.location.href='digestive-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap digestive-tracker">
+                <span class="material-icons-outlined">restaurant</span>
+              </div>
+              <span class="feature-label">Digestive</span>
+            </div>
+            <div class="feature-card" id="featureChildGrowth" onclick="window.location.href='child-growth-tracker.html'" style="cursor:pointer;touch-action:manipulation">
+              <div class="feature-icon-wrap" style="background:#E3F2FD">
+                <span class="material-icons-outlined" style="color:#1976D2">child_care</span>
+              </div>
+              <span class="feature-label">Child Growth</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chronic Condition Pathway Section -->
+        <div class="dash-section">
+          <div class="section-header" style="display:flex;align-items:center;justify-content:space-between">
+            <h3 class="section-title">
+              <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;color:#C62828">monitor_heart</span>
+              Chronic Conditions
+            </h3>
+            <a href="chronic-disease.html" style="font-size:12px;color:var(--primary);text-decoration:none;font-weight:600">Manage →</a>
+          </div>
+          <div id="chronicConditionsContent">
+            <!-- Rendered dynamically: enrollment CTA if none, else list of active conditions -->
+            <div id="chronicEnrollCta" onclick="window.location.href='chronic-disease.html'"
+              style="cursor:pointer;touch-action:manipulation;background:linear-gradient(135deg,#1B5E20,#2E7D32);color:#fff;border-radius:14px;padding:16px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 4px 12px rgba(27,94,32,0.25)">
+              <div style="width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                <span class="material-icons-outlined" style="font-size:26px">favorite</span>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:700;margin-bottom:4px">Enroll in a Condition Pathway</div>
+                <div style="font-size:12px;line-height:1.45;opacity:.95">Refill reminders, weekly check-ins &amp; tips for diabetes, blood pressure, asthma, HIV and more.</div>
+              </div>
+              <span class="material-icons-outlined" style="opacity:.8;flex-shrink:0">arrow_forward_ios</span>
+            </div>
+            <div id="chronicActiveList" style="display:none;flex-direction:column;gap:10px"></div>
+          </div>
+        </div>
+
+        <!-- Health Prediction Section -->
+        <div class="dash-section" id="healthPredictionSection" style="display:none">
+          <div class="section-header">
+            <h3 class="section-title">
+              <span class="material-icons-outlined" style="font-size:18px;vertical-align:middle;margin-right:4px;color:var(--primary)">psychology</span>
+              Health Insights
+            </h3>
+          </div>
+          <div id="healthPredictionList" style="display:flex;flex-direction:column;gap:12px"></div>
+        </div>
+
+        <!-- Bottom spacer for scroll -->
+        <div style="height: 16px;"></div>
+      </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+      <div class="nav-item active">
+        <span class="material-icons-outlined">home</span>
+        <span class="nav-label">Home</span>
+      </div>
+      <div class="nav-item" id="navFamily" onclick="navTo('family.html')" style="cursor:pointer">
+        <span class="material-icons-outlined">family_restroom</span>
+        <span class="nav-label">Family</span>
+      </div>
+      <div class="nav-item" id="navShop" onclick="navTo('shop.html')" style="cursor:pointer">
+        <span class="material-icons-outlined">storefront</span>
+        <span class="nav-label">Shop</span>
+      </div>
+      <div class="nav-item" id="navProfile" onclick="navTo('profile.html')" style="cursor:pointer">
+        <span class="material-icons-outlined">person</span>
+        <span class="nav-label">Profile</span>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/onesignal.js"></script>
+  <script src="js/native-bridge.js"></script>
+  <script src="js/realtime-alerts.js"></script>
+  <script>
+  (function () {
+    const cfg = window.HOMATT_CONFIG || {};
+    if (!cfg.SUPABASE_URL || !window.supabase) return;
+    const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    client.auth.getSession().then(function(res) {
+      var userId = res?.data?.session?.user?.id;
+      if (!userId) return;
+      if (typeof initRealtimeAlerts === 'function') {
+        initRealtimeAlerts({ client: client, portal: 'patient', entityId: userId });
+      }
+    });
+  })();
+  </script>
+</body>
+</html>

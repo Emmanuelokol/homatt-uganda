@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Health — Clinic Home</title>
+  <script>
+    /* Force-clear any service worker that might be caching an old broken version */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        if (regs.length) Promise.all(regs.map(r => r.unregister())).then(() => {
+          if (!sessionStorage.getItem('_swCleared')) {
+            sessionStorage.setItem('_swCleared', '1');
+            location.reload();
+          }
+        });
+      });
+      if (window.caches) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <link rel="prefetch" href="new-order.html">
+  <link rel="prefetch" href="patients.html">
+  <link rel="prefetch" href="settings.html">
+  <style>
+    /* Home-specific polish */
+    .home-hero {
+      background: linear-gradient(135deg, #0B1626 0%, #1565C0 100%);
+      color: #fff;
+      padding: 28px 28px 24px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px; flex-wrap: wrap;
+    }
+    .home-hero h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px }
+    .home-hero p  { font-size: 14px; opacity: .85 }
+    .home-cta {
+      background: #fff; color: #0D47A1;
+      padding: 14px 26px; border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      border: none; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      transition: transform .12s ease, box-shadow .12s ease;
+      text-decoration: none;
+    }
+    .home-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.22) }
+    .home-cta .material-icons-outlined { font-size: 22px }
+
+    .order-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 16px;
+      transition: box-shadow .15s;
+    }
+    .order-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08) }
+    .order-avatar {
+      width: 46px; height: 46px; border-radius: 50%;
+      background: #E3F2FD; color: #1565C0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .order-info { flex: 1; min-width: 0 }
+    .order-patient { font-size: 15px; font-weight: 700; margin-bottom: 3px }
+    .order-drug { font-size: 13px; color: var(--text-lt); margin-bottom: 4px }
+    .order-meta { font-size: 12px; color: #9AA0A6; display: flex; gap: 10px; flex-wrap: wrap }
+    .order-meta span { display: inline-flex; align-items: center; gap: 3px }
+    .order-right { text-align: right; flex-shrink: 0 }
+    .order-status { margin-bottom: 6px }
+    .completion-tick {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #E8F5E9; color: #2E7D32;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .completion-pending {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #F5F5F5; color: #9AA0A6;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .empty-orders {
+      text-align: center; padding: 50px 20px;
+      color: var(--text-lt);
+    }
+    .empty-orders .material-icons-outlined {
+      font-size: 56px; color: #CFD8DC; display: block; margin: 0 auto 14px;
+    }
+    .empty-orders-cta {
+      margin-top: 18px;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 22px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      text-decoration: none;
+    }
+
+    @media (max-width: 600px) {
+      .home-hero { padding: 22px 20px; flex-direction: column; align-items: stretch }
+      .home-hero h1 { font-size: 19px }
+      .home-cta { justify-content: center; padding: 14px 18px }
+      .order-card { flex-wrap: wrap }
+      .order-right { margin-left: auto }
+      /* Inline verify panel — stack vertically on mobile */
+      #qvGrid { grid-template-columns: 1fr !important }
+      #quickVerifyPanel { padding: 18px 16px 16px !important }
+      #quickVerifyPanel h2 { font-size: 16px !important }
+    }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar (4-item simplified) -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">home</span> Home
+      </a>
+      <a href="new-order.html" class="sidebar-link">
+        <span class="material-icons-outlined">medical_services</span> New Consultation
+      </a>
+      <a href="patients.html" class="sidebar-link">
+        <span class="material-icons-outlined">person_search</span> Patients
+      </a>
+      <a href="settings.html" class="sidebar-link">
+        <span class="material-icons-outlined">tune</span> Clinic Profile
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Home</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- BIG inline patient code entry — always visible, no modal -->
+      <div id="quickVerifyPanel" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
+          <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
+        </div>
+        <p style="font-size:13px;color:#5D4037;margin:0 0 16px;line-height:1.5">Patient shows you the <strong>Booking Code</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HO-928</span>) and <strong>PIN</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HK-AEK26W</span>) from their Homatt app.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end" id="qvGrid">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Booking Code</label>
+            <input id="qvCode" type="text" placeholder="HO-928" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:20px;font-weight:800;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">PIN</label>
+            <input id="qvPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:18px;font-weight:700;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <button id="qvSubmitBtn"
+              style="background:#1565C0;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;white-space:nowrap">
+              <span class="material-icons-outlined">arrow_forward</span>
+              Verify &amp; Start
+            </button>
+          </div>
+        </div>
+        <div id="qvError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+        <div id="qvSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+      </div>
+
+      <!-- Hero with New Consultation CTA -->
+      <div class="home-hero">
+        <div>
+          <h1 id="heroGreeting">Good morning</h1>
+          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="new-order.html" class="home-cta">
+            <span class="material-icons-outlined">medical_services</span>
+            New Consultation
+          </a>
+        </div>
+      </div>
+
+      <!-- Outcomes mini-stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(160px,1fr));margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">medical_services</span></div>
+          <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Today</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">hotel</span></div>
+          <div><div class="stat-number" id="statDispatched">0</div><div class="stat-label">Inpatient</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">receipt_long</span></div>
+          <div><div class="stat-number" id="statDelivered">0</div><div class="stat-label">E-Prescription</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">verified</span></div>
+          <div><div class="stat-number" id="statCompleted">0</div><div class="stat-label">Courses Done</div></div>
+        </div>
+      </div>
+
+      <!-- Pending bookings (patients who booked but haven't been seen) -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
+            Patients Coming In
+          </div>
+          <span id="pendingCount" style="font-size:13px;color:#E65100;font-weight:600"></span>
+        </div>
+        <div id="pendingBookingsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings… <small style="opacity:.5">[v20260502]</small></div>
+        </div>
+      </div>
+
+      <!-- Today's consultations list -->
+      <div class="admin-table-wrap" style="padding:0">
+        <div class="table-header">
+          <div class="table-title">Today's Consultations</div>
+          <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
+        </div>
+        <div id="ordersList" style="padding:16px">
+          <div style="text-align:center;padding:40px;color:#9AA0A6">Loading… <small style="opacity:.5">[v20260502]</small></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Verify Booking Code Modal -->
+<div id="verifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:26px 24px 28px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="material-icons-outlined" style="color:#1565C0;font-size:26px">qr_code_scanner</span>
+      <h3 style="font-size:18px;font-weight:700;margin:0">Verify Patient</h3>
+    </div>
+    <p style="font-size:13px;color:#5F6368;margin:0 0 18px;line-height:1.5">
+      Patient should show you their <strong>Booking Code</strong> (e.g. HO-928) and <strong>PIN</strong> (e.g. HK-AEK26W) from the Homatt app.
+    </p>
+
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Booking Code</label>
+    <input id="vmCode" type="text" placeholder="HO-928" autocomplete="off"
+      style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center">
+
+    <div style="height:14px"></div>
+
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">PIN</label>
+    <input id="vmPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
+      style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center">
+
+    <div id="vmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+    <div id="vmSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+
+    <div style="height:18px"></div>
+
+    <button id="vmSubmitBtn"
+      style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span class="material-icons-outlined">verified</span>
+      Verify &amp; Start Consultation
+    </button>
+    <div style="height:8px"></div>
+    <button id="vmCancelBtn"
+      style="width:100%;padding:13px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js?v=20260502"></script>
+<script src="js/clinic.js?v=20260502"></script>
+<script>
+  // ─── Catch any JS error and show it on-screen so we can debug ───
+  window.onerror = function(msg, src, line) {
+    var el = document.getElementById('pendingBookingsList');
+    if (el) el.innerHTML = '<div style="background:#D32F2F;color:#fff;padding:12px;border-radius:8px;font-size:12px">JS error line '+line+': '+msg+'</div>';
+  };
+
+  var session = requireClinic();
+  setupClinicLogout();
+  var supabase = _getClinicSupabase();
+
+  // Greeting
+  var h = new Date().getHours();
+  var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  var hgEl = document.getElementById('heroGreeting');
+  if (hgEl) hgEl.textContent = greet + (session && session.staffName ? ', ' + session.staffName.split(' ')[0] : '');
+
+  // Clock
+  function tickClock() {
+    var d = new Date();
+    var cl = document.getElementById('liveClock');
+    var td = document.getElementById('todayDate');
+    var ud = document.getElementById('clinicUserDate');
+    if (cl) cl.textContent = d.toLocaleTimeString('en-UG', {hour:'2-digit',minute:'2-digit'});
+    if (td) td.textContent = d.toLocaleDateString('en-UG', {weekday:'long',day:'numeric',month:'long'});
+    if (ud) ud.textContent = d.toLocaleDateString('en-UG', {day:'numeric',month:'short',year:'numeric'});
+  }
+  tickClock();
+  setInterval(tickClock, 60000);
+
+  // ── HTML escape helper ──
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Verify panel ──
+  var qvCode = document.getElementById('qvCode');
+  var qvPin  = document.getElementById('qvPin');
+  var qvErr  = document.getElementById('qvError');
+  var qvOk   = document.getElementById('qvSuccess');
+  var qvBtn  = document.getElementById('qvSubmitBtn');
+
+  if (qvCode) qvCode.addEventListener('input', function() {
+    var v = qvCode.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/,'');
+    qvCode.value = v;
+  });
+  if (qvPin) qvPin.addEventListener('input', function() {
+    var v = qvPin.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/,'');
+    qvPin.value = v;
+  });
+  if (qvCode && qvPin && qvBtn) {
+    [qvCode, qvPin].forEach(function(el) {
+      el.addEventListener('keydown', function(e) { if (e.key === 'Enter') qvBtn.click(); });
+    });
+  }
+
+  if (qvBtn) qvBtn.onclick = async function() {
+    if (!qvErr || !qvOk) return;
+    qvErr.style.display = 'none'; qvOk.style.display = 'none';
+    var code = (qvCode ? qvCode.value : '').trim().toUpperCase();
+    var pin  = (qvPin  ? qvPin.value  : '').trim().toUpperCase();
+    if (!code || !pin) { qvErr.textContent = 'Enter both the booking code and PIN.'; qvErr.style.display = 'block'; return; }
+    if (!supabase)     { qvErr.textContent = 'Database unavailable.'; qvErr.style.display = 'block'; return; }
+    qvBtn.disabled = true;
+    qvBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:16px">hourglass_empty</span> Verifying…';
+    try {
+      var res = await supabase.from('bookings').select('id,booking_code,pin_token,pin_expires_at,patient_user_id,patient_name,ai_diagnosis,urgency_level,clinic_id,status').eq('booking_code', code).maybeSingle();
+      var booking = res.data, err = res.error;
+      if (err || !booking) { qvErr.textContent = 'No booking found for that code.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_token !== pin) { qvErr.textContent = 'PIN does not match.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
+        if (!confirm('PIN has expired. Patient: ' + (booking.patient_name||'Unknown') + '\n\nIf they are at the desk, tap OK to proceed.')) {
+          qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return;
+        }
+      }
+      try { await supabase.from('bookings').update({status:'in_progress',attended_at:new Date().toISOString()}).eq('id', booking.id); } catch(e2) {}
+      qvOk.innerHTML = '<strong>Verified!</strong> Patient: ' + esc(booking.patient_name||'Unknown') + '. Opening consultation…';
+      qvOk.style.display = 'block';
+      var phone = '';
+      if (booking.patient_user_id) {
+        try { var pr = await supabase.from('profiles').select('phone_number,phone').eq('id', booking.patient_user_id).maybeSingle(); phone = (pr.data && (pr.data.phone_number||pr.data.phone)) || ''; } catch(e3) {}
+      }
+      var params = new URLSearchParams({booking_id:booking.id,booking_code:booking.booking_code,patient_name:booking.patient_name||'',patient_phone:phone});
+      if (booking.patient_user_id) params.set('patient_id', booking.patient_user_id);
+      setTimeout(function() { window.location.href = 'new-order.html?' + params.toString(); }, 600);
+    } catch(e4) {
+      qvErr.textContent = 'Error: ' + e4.message; qvErr.style.display = 'block';
+      qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start';
+    }
+  };
+
+  // ── Load pending bookings ──
+  async function loadBookings() {
+    var el = document.getElementById('pendingBookingsList');
+    var ct = document.getElementById('pendingCount');
+    if (!el) return;
+    function msg(html) { el.innerHTML = html; if (ct) ct.textContent = ''; }
+    if (!supabase) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
+    if (session && session.demo) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
+    msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Loading…</div>');
+    try {
+      var since = new Date(Date.now() - 48*3600000).toISOString();
+      var res = await supabase.from('bookings').select('id,booking_code,patient_name,ai_diagnosis,urgency_level,preferred_time,status,created_at').in('status',['pending','confirmed','in_progress']).gte('created_at', since).order('created_at',{ascending:false}).limit(30);
+      if (res.error) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'); return; }
+      var rows = res.data || [];
+      if (!rows.length) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>'); return; }
+      if (ct) ct.textContent = rows.length + ' waiting';
+      el.innerHTML = rows.map(function(b) {
+        var ini = (b.patient_name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t   = new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        var urg = b.urgency_level==='high'?'urgent':b.urgency_level==='medium'?'in-progress':'normal';
+        return '<div class="order-card" style="margin:8px 16px;cursor:pointer" data-code="'+esc(b.booking_code)+'">'
+          +'<div class="order-avatar" style="background:#FFF8E1;color:#E65100">'+ini+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(b.patient_name||'Unknown')+'</div>'
+            +'<div class="order-drug">'+esc(b.ai_diagnosis||'—')+' · Code <strong style="color:#1B5E20;letter-spacing:1px">'+esc(b.booking_code)+'</strong></div>'
+            +'<div class="order-meta"><span>'+t+'</span></div>'
+          +'</div>'
+          +'<div class="order-right"><span class="status-badge '+urg+'">'+esc(b.urgency_level||'normal')+'</span></div>'
+          +'</div>';
+      }).join('');
+      el.querySelectorAll('[data-code]').forEach(function(card) {
+        card.onclick = function() {
+          var c = card.dataset.code;
+          if (qvCode) { qvCode.value = c; if (qvPin) qvPin.focus(); }
+        };
+      });
+    } catch(e) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading bookings: ' + esc(e.message) + '</div>'); }
+  }
+
+  // ── Load today's consultations ──
+  async function loadConsultations() {
+    var el = document.getElementById('ordersList');
+    if (!el) return;
+    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see consultations.</div>'; return; }
+    el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6">Loading…</div>';
+    // Resolve clinic_id
+    var clinicId = (session && session.clinicId) || null;
+    if (!clinicId) {
+      try {
+        var pu = await supabase.auth.getSession();
+        var uid = pu && pu.data && pu.data.session && pu.data.session.user && pu.data.session.user.id;
+        if (uid) {
+          var pr2 = await supabase.from('portal_users').select('clinic_id').eq('auth_user_id', uid).eq('is_active', true).maybeSingle();
+          clinicId = pr2.data && pr2.data.clinic_id;
+        }
+      } catch(e) {}
+    }
+    if (!clinicId) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
+      return;
+    }
+    try {
+      var start = new Date(); start.setHours(0,0,0,0);
+      var res2 = await supabase.from('clinic_diagnoses').select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type').eq('clinic_id', clinicId).gte('created_at', start.toISOString()).order('created_at',{ascending:false});
+      var rows2 = (res2.data || []);
+      var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
+      if (!rows2.length) { el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No consultations today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>'; return; }
+      el.innerHTML = rows2.map(function(c) {
+        var ini2 = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t2   = new Date(c.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        return '<div class="order-card">'
+          +'<div class="order-avatar">'+ini2+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+'</div>'
+            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+t2+'</span>'+(c.patient_phone?'<span>'+esc(c.patient_phone)+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right"><span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span></div>'
+          +'</div>';
+      }).join('');
+    } catch(e2) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e2.message) + '</div>'; }
+  }
+
+  loadBookings();
+  loadConsultations();
+  setInterval(function() { loadBookings(); loadConsultations(); }, 30000);
+</script>
+<script src="../js/native-bridge.js"></script>
+</body>
+</html>

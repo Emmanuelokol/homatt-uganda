@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Pharmacy — Drug Inventory</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/pharmacy.css">
+  <style>
+    /* ── Drug type filter toggle ── */
+    .drug-type-filter { display:flex; gap:6px; align-items:center; }
+    .dtf-btn {
+      padding:6px 16px; border-radius:20px; border:1.5px solid #DADCE0;
+      font-size:12px; font-weight:600; cursor:pointer; font-family:inherit;
+      background:#fff; color:#5F6368; transition:all .18s;
+    }
+    .dtf-btn.active { background:#00695C; color:#fff; border-color:#00695C; }
+    .dtf-btn.rx-active { background:#7B1FA2; color:#fff; border-color:#7B1FA2; }
+    /* ── Form panel (slide-in at top of content) ── */
+    .inv-form-panel {
+      display:none; background:#fff; border:1.5px solid #DADCE0;
+      border-radius:12px; padding:20px 24px 16px; margin-bottom:20px;
+      box-shadow:0 2px 12px rgba(0,0,0,.07);
+    }
+    .inv-form-panel.open { display:block; }
+    .inv-form-title {
+      font-size:15px; font-weight:700; color:#1A1A1A; margin-bottom:16px;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .inv-form-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;
+    }
+    @media(max-width:640px){ .inv-form-grid { grid-template-columns:1fr; } }
+    .inv-form-group { display:flex; flex-direction:column; gap:5px; }
+    .inv-form-group label { font-size:12px; font-weight:600; color:#5F6368; }
+    .inv-form-group input,
+    .inv-form-group select,
+    .inv-form-group textarea {
+      padding:9px 12px; border:1.5px solid #DADCE0; border-radius:8px;
+      font-size:13px; font-family:inherit; outline:none; transition:border-color .2s;
+    }
+    .inv-form-group input:focus,
+    .inv-form-group select:focus,
+    .inv-form-group textarea:focus { border-color:#00695C; }
+    .inv-form-group textarea { resize:vertical; min-height:60px; }
+    .inv-form-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+    /* ── Drug type badge ── */
+    .drug-badge {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:3px 8px; border-radius:20px; font-size:11px; font-weight:700; letter-spacing:.3px;
+    }
+    .drug-badge.otc { background:#E0F2F1; color:#00695C; }
+    .drug-badge.rx  { background:#F3E5F5; color:#7B1FA2; }
+    /* ── Out-of-stock btn ── */
+    .btn-oos {
+      padding:5px 10px; border-radius:6px; border:1.5px solid #FFCDD2;
+      background:#FFF8F8; color:#D32F2F; font-size:12px; font-weight:600;
+      cursor:pointer; font-family:inherit; transition:all .18s;
+    }
+    .btn-oos:hover { background:#FFEBEE; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Drug Inventory</div>
+      <div class="admin-topbar-right">
+        <button class="btn-admin primary sm" onclick="openAddPanel()">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> Add Drug
+        </button>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="pharmacyUserAvatar">P</div>
+          <span id="pharmacyUserNameTop">Pharmacist</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Stats row -->
+      <div class="stats-grid" style="margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">inventory_2</span></div>
+          <div><div class="stat-number" id="statTotal">—</div><div class="stat-label">Total Drugs</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+          <div><div class="stat-number" id="statInStock">—</div><div class="stat-label">Well Stocked</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">warning</span></div>
+          <div><div class="stat-number" id="statLow">—</div><div class="stat-label">Low Stock</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon red"><span class="material-icons-outlined">remove_circle</span></div>
+          <div><div class="stat-number" id="statOut">—</div><div class="stat-label">Out of Stock</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">event_busy</span></div>
+          <div><div class="stat-number" id="statExpiring">—</div><div class="stat-label">Expiring ≤30 days</div></div>
+        </div>
+      </div>
+      <!-- Expiry warning banner -->
+      <div id="expiryBanner" style="display:none;background:#FFF3E0;border-left:4px solid #E65100;border-radius:8px;padding:12px 18px;margin-bottom:16px;font-size:13px;color:#BF360C">
+        <strong><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">event_busy</span>
+        Expiry alert:</strong> <span id="expiryBannerMsg"></span>
+      </div>
+
+      <!-- Low / out-of-stock alert banner -->
+      <div id="lowBanner" style="display:none;background:#FFEBEE;border-left:4px solid #D32F2F;border-radius:8px;padding:12px 18px;margin-bottom:20px;font-size:13px;color:#B71C1C">
+        <strong><span class="material-icons-outlined" style="font-size:15px;vertical-align:middle">error</span>
+        Critical stock alert:</strong> <span id="lowBannerMsg"></span>
+      </div>
+
+      <!-- Add / Edit form panel -->
+      <div class="inv-form-panel" id="invFormPanel">
+        <div class="inv-form-title">
+          <span id="formPanelTitle">Add New Drug</span>
+          <button class="btn-admin secondary sm" onclick="closeFormPanel()" style="font-size:12px">
+            <span class="material-icons-outlined" style="font-size:14px">close</span> Cancel
+          </button>
+        </div>
+        <div class="inv-form-grid">
+          <div class="inv-form-group" style="grid-column:span 2">
+            <label>Medicine Name *</label>
+            <input type="text" id="fldName" placeholder="e.g. Amoxicillin 500mg">
+          </div>
+          <div class="inv-form-group">
+            <label>Drug Type *</label>
+            <select id="fldDrugType">
+              <option value="otc">OTC — Over the Counter</option>
+              <option value="rx">Rx — Prescription Only</option>
+            </select>
+          </div>
+          <div class="inv-form-group">
+            <label>Category</label>
+            <select id="fldCategory">
+              <option value="">— Select category —</option>
+              <option value="antibiotic">Antibiotic</option>
+              <option value="analgesic">Analgesic / Pain Relief</option>
+              <option value="antimalarial">Antimalarial</option>
+              <option value="antifungal">Antifungal</option>
+              <option value="antiparasitic">Antiparasitic</option>
+              <option value="cardiovascular">Cardiovascular</option>
+              <option value="diabetes">Diabetes</option>
+              <option value="gastrointestinal">Gastrointestinal</option>
+              <option value="maternal">Maternal / Reproductive</option>
+              <option value="respiratory">Respiratory</option>
+              <option value="dermatology">Dermatology</option>
+              <option value="vitamins">Vitamins / Supplements</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="inv-form-group">
+            <label>Retail / Selling Price (UGX) *</label>
+            <input type="number" id="fldPrice" min="0" placeholder="e.g. 3200">
+          </div>
+          <div class="inv-form-group">
+            <label>Purchase / Cost Price (UGX)</label>
+            <input type="number" id="fldCostPrice" min="0" placeholder="e.g. 2400">
+          </div>
+          <div class="inv-form-group">
+            <label>Quantity in Stock *</label>
+            <input type="number" id="fldQty" min="0" placeholder="0">
+          </div>
+          <div class="inv-form-group">
+            <label>Reorder Threshold (alert level)</label>
+            <input type="number" id="fldThreshold" min="0" placeholder="20">
+          </div>
+          <div class="inv-form-group">
+            <label>Expiry Date</label>
+            <input type="date" id="fldExpiry">
+          </div>
+          <div class="inv-form-group">
+            <label>Batch / Lot Number</label>
+            <input type="text" id="fldBatch" placeholder="e.g. BT-2024-0891">
+          </div>
+          <div class="inv-form-group" style="grid-column:span 2">
+            <label>Supplier / Manufacturer</label>
+            <input type="text" id="fldSupplier" placeholder="e.g. Cipla Uganda, UNHCR, NMS">
+          </div>
+          <div class="inv-form-group" style="grid-column:span 2">
+            <label>Storage Notes (optional)</label>
+            <textarea id="fldNotes" placeholder="e.g. Keep refrigerated, store below 25°C, away from direct sunlight…"></textarea>
+          </div>
+        </div>
+        <div class="inv-form-actions">
+          <button class="btn-admin secondary" onclick="closeFormPanel()">Cancel</button>
+          <button class="btn-admin primary" id="saveDrugBtn" onclick="saveDrug()">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> <span id="saveBtnLabel">Add Drug</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Inventory table -->
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">Medicine Inventory</div>
+          <div class="table-filter" style="gap:8px;flex-wrap:wrap">
+            <!-- OTC / Rx toggle -->
+            <div class="drug-type-filter">
+              <button class="dtf-btn active" id="dtfAll"  onclick="setDrugFilter('')">All</button>
+              <button class="dtf-btn"        id="dtfOtc"  onclick="setDrugFilter('otc')">OTC Only</button>
+              <button class="dtf-btn rx-active" id="dtfRx" onclick="setDrugFilter('rx')" style="background:#fff;color:#7B1FA2;border-color:#CE93D8">Rx Only</button>
+            </div>
+            <select id="filterStock" style="font-size:13px;padding:6px 10px;border:1.5px solid #DADCE0;border-radius:8px">
+              <option value="">All Stock Levels</option>
+              <option value="ok">Well Stocked</option>
+              <option value="low">Low Stock</option>
+              <option value="out">Out of Stock</option>
+            </select>
+            <input type="text" id="searchDrug" placeholder="Search drug name…"
+              style="width:200px;font-size:13px;padding:6px 12px;border:1.5px solid #DADCE0;border-radius:8px;font-family:inherit;outline:none">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Drug Name</th>
+              <th>Type</th>
+              <th>Category</th>
+              <th>Stock Level</th>
+              <th>Qty</th>
+              <th>Sell Price</th>
+              <th>Cost Price</th>
+              <th>Expiry</th>
+              <th>Supplier</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="inventoryBody">
+            <tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/pharmacy.js"></script>
+<script>
+let allInventory = [];
+let editingId    = null;
+let _session     = null;
+let activeDrugFilter = '';  // '', 'otc', 'rx'
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', async () => {
+  buildPharmacySidebar('inventory');
+  _session = requirePharmacy();
+  if (!_session) return;
+  setupPharmacyLogout();
+
+  const supa = initPharmacySupabase();
+  window._pharmSupa = supa;
+
+  if (supa && _session.pharmacyId) {
+    try {
+      await Promise.race([
+        loadLive(supa, _session.pharmacyId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      allInventory = MOCK_INVENTORY.map(i => ({
+        ...i,
+        drug_type: i.drug_type || 'otc',
+        category:  i.category  || '',
+        notes:     i.notes     || '',
+        is_available: i.is_available !== undefined ? i.is_available : true,
+      }));
+      renderInventory();
+    }
+  } else {
+    allInventory = MOCK_INVENTORY.map(i => ({
+      ...i,
+      drug_type: i.drug_type || 'otc',
+      category:  i.category  || '',
+      notes:     i.notes     || '',
+      is_available: i.is_available !== undefined ? i.is_available : true,
+    }));
+    renderInventory();
+  }
+
+  document.getElementById('filterStock').addEventListener('change', renderInventory);
+  document.getElementById('searchDrug').addEventListener('input', renderInventory);
+});
+
+/* ── Live data ── */
+async function loadLive(supa, pharmacyId) {
+  const { data, error } = await supa
+    .from('pharmacy_inventory')
+    .select('*')
+    .eq('pharmacy_id', pharmacyId)
+    .order('medicine_name');
+  if (error) { showToast('Load error: ' + error.message, 'error'); }
+  allInventory = data && data.length ? data : MOCK_INVENTORY.map(i => ({
+    ...i, drug_type:'otc', category:'', notes:'', is_available:true
+  }));
+  renderInventory();
+}
+
+/* ── Stock status helpers ── */
+function stockStatus(item) {
+  if (!item.is_available || item.quantity === 0) return 'out';
+  if (item.quantity <= (item.reorder_threshold || 20)) return 'low';
+  return 'ok';
+}
+
+/* ── Drug type filter ── */
+window.setDrugFilter = function(type) {
+  activeDrugFilter = type;
+  document.getElementById('dtfAll').classList.toggle('active', type === '');
+  document.getElementById('dtfOtc').classList.toggle('active', type === 'otc');
+  // Rx button uses a different active class
+  const rxBtn = document.getElementById('dtfRx');
+  if (type === 'rx') {
+    rxBtn.style.background = '#7B1FA2';
+    rxBtn.style.color = '#fff';
+  } else {
+    rxBtn.style.background = '#fff';
+    rxBtn.style.color = '#7B1FA2';
+  }
+  renderInventory();
+};
+
+/* ── Render table ── */
+function renderInventory() {
+  const stockFilter = document.getElementById('filterStock').value;
+  const q = document.getElementById('searchDrug').value.toLowerCase().trim();
+
+  const filtered = allInventory.filter(i => {
+    const st = stockStatus(i);
+    const matchType  = !activeDrugFilter || (i.drug_type || 'otc') === activeDrugFilter;
+    const matchStock = !stockFilter || st === stockFilter;
+    const matchQ     = !q || (i.medicine_name || '').toLowerCase().includes(q);
+    return matchType && matchStock && matchQ;
+  });
+
+  // Stats (over full list, ignore filters)
+  const now = new Date();
+  const total = allInventory.length;
+  const okCount      = allInventory.filter(i => stockStatus(i) === 'ok').length;
+  const lowCount     = allInventory.filter(i => stockStatus(i) === 'low').length;
+  const outItems     = allInventory.filter(i => stockStatus(i) === 'out');
+  const expiringItems= allInventory.filter(i => {
+    if (!i.expiry_date) return false;
+    const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+    return d <= 30;
+  });
+
+  document.getElementById('statTotal').textContent    = total;
+  document.getElementById('statInStock').textContent  = okCount;
+  document.getElementById('statLow').textContent      = lowCount;
+  document.getElementById('statOut').textContent      = outItems.length;
+  document.getElementById('statExpiring').textContent = expiringItems.length;
+
+  if (outItems.length) {
+    document.getElementById('lowBanner').style.display = 'block';
+    document.getElementById('lowBannerMsg').textContent =
+      outItems.map(i => i.medicine_name).join(', ') + ' — out of stock';
+  } else {
+    document.getElementById('lowBanner').style.display = 'none';
+  }
+
+  if (expiringItems.length) {
+    document.getElementById('expiryBanner').style.display = 'block';
+    document.getElementById('expiryBannerMsg').textContent =
+      expiringItems.map(i => {
+        const d = Math.ceil((new Date(i.expiry_date) - now) / 86400000);
+        return `${i.medicine_name} (${d < 0 ? 'EXPIRED' : d + 'd left'})`;
+      }).join(', ');
+  } else {
+    document.getElementById('expiryBanner').style.display = 'none';
+  }
+
+  const tbody = document.getElementById('inventoryBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:32px;color:#9AA0A6">No drugs found</td></tr>';
+    return;
+  }
+
+  const today = new Date();
+  tbody.innerHTML = filtered.map(i => {
+    const threshold = i.reorder_threshold || 20;
+    const st = stockStatus(i);
+    const pct = st === 'out' ? 0 : Math.min(100, Math.round(i.quantity / (threshold * 3) * 100));
+    const barClass   = st === 'out' ? 'low' : st === 'low' ? 'medium' : 'high';
+    const badgeClass = st === 'out' ? 'rejected' : st === 'low' ? 'incoming' : 'completed';
+    const badgeText  = st === 'out' ? 'Out of stock' : st === 'low' ? 'Low stock' : 'In stock';
+    const typeLabel  = (i.drug_type || 'otc') === 'rx' ? 'Rx' : 'OTC';
+    const typeCls    = (i.drug_type || 'otc') === 'rx' ? 'rx' : 'otc';
+    const catLabel   = i.category ? i.category.charAt(0).toUpperCase() + i.category.slice(1) : '—';
+    const isOos      = !i.is_available || i.quantity === 0;
+    // Expiry display with warning colours
+    let expiryHtml = '—';
+    if (i.expiry_date) {
+      const exp = new Date(i.expiry_date);
+      const daysLeft = Math.ceil((exp - today) / 86400000);
+      const expStr = exp.toLocaleDateString('en-UG', {day:'numeric',month:'short',year:'numeric'});
+      if (daysLeft < 0)       expiryHtml = `<span style="color:#D32F2F;font-weight:700;font-size:12px">EXPIRED<br><small>${expStr}</small></span>`;
+      else if (daysLeft <= 30) expiryHtml = `<span style="color:#E65100;font-weight:700;font-size:12px">${daysLeft}d left<br><small>${expStr}</small></span>`;
+      else                     expiryHtml = `<span style="font-size:12px;color:#5F6368">${expStr}</span>`;
+    }
+    return `
+    <tr>
+      <td>
+        <div style="font-weight:600;font-size:13px">${i.medicine_name || '—'}</div>
+        ${i.batch_number ? `<div style="font-size:11px;color:#9AA0A6">Batch: ${i.batch_number}</div>` : ''}
+      </td>
+      <td><span class="drug-badge ${typeCls}">${typeLabel}</span></td>
+      <td style="font-size:12px;color:#5F6368">${catLabel}</td>
+      <td style="min-width:110px">
+        <div class="stock-bar-wrap">
+          <div class="stock-bar"><div class="stock-fill ${barClass}" style="width:${pct}%"></div></div>
+        </div>
+      </td>
+      <td><span style="font-size:14px;font-weight:700;color:${st==='out'?'#D32F2F':st==='low'?'#E65100':'#2E7D32'}">${i.quantity}</span></td>
+      <td style="font-size:12px">${i.retail_price ? formatUGX(i.retail_price) : '—'}</td>
+      <td style="font-size:12px;color:#5F6368">${i.cost_price ? formatUGX(i.cost_price) : '—'}</td>
+      <td>${expiryHtml}</td>
+      <td style="font-size:12px;color:#5F6368;max-width:110px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${i.supplier || '—'}</td>
+      <td><span class="status-badge ${badgeClass}">${badgeText}</span></td>
+      <td style="white-space:nowrap">
+        <button class="btn-admin secondary sm" onclick="openEditPanel('${i.id}')" title="Edit">
+          <span class="material-icons-outlined" style="font-size:14px">edit</span>
+        </button>
+        ${!isOos ? `<button class="btn-oos" onclick="markOutOfStock('${i.id}')" title="Mark out of stock" style="margin-left:4px">
+          <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">remove_circle</span> OOS
+        </button>` : `<button class="btn-admin secondary sm" onclick="markBackInStock('${i.id}')" title="Mark back in stock" style="margin-left:4px;font-size:11px">
+          <span class="material-icons-outlined" style="font-size:12px">add_circle</span> Restock
+        </button>`}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── Form panel helpers ── */
+function resetFormFields() {
+  document.getElementById('fldName').value      = '';
+  document.getElementById('fldDrugType').value  = 'otc';
+  document.getElementById('fldCategory').value  = '';
+  document.getElementById('fldPrice').value     = '';
+  document.getElementById('fldCostPrice').value = '';
+  document.getElementById('fldQty').value       = '';
+  document.getElementById('fldThreshold').value = '20';
+  document.getElementById('fldExpiry').value    = '';
+  document.getElementById('fldBatch').value     = '';
+  document.getElementById('fldSupplier').value  = '';
+  document.getElementById('fldNotes').value     = '';
+}
+
+window.openAddPanel = function() {
+  editingId = null;
+  resetFormFields();
+  document.getElementById('formPanelTitle').textContent = 'Add New Drug';
+  document.getElementById('saveBtnLabel').textContent   = 'Add Drug';
+  document.getElementById('invFormPanel').classList.add('open');
+  document.getElementById('fldName').focus();
+  document.getElementById('invFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+window.openEditPanel = function(id) {
+  const item = allInventory.find(i => String(i.id) === String(id));
+  if (!item) return;
+  editingId = item.id;
+  document.getElementById('fldName').value      = item.medicine_name || '';
+  document.getElementById('fldDrugType').value  = item.drug_type || 'otc';
+  document.getElementById('fldCategory').value  = item.category || '';
+  document.getElementById('fldPrice').value     = item.retail_price || '';
+  document.getElementById('fldCostPrice').value = item.cost_price || '';
+  document.getElementById('fldQty').value       = item.quantity || 0;
+  document.getElementById('fldThreshold').value = item.reorder_threshold || 20;
+  document.getElementById('fldExpiry').value    = item.expiry_date ? item.expiry_date.split('T')[0] : '';
+  document.getElementById('fldBatch').value     = item.batch_number || '';
+  document.getElementById('fldSupplier').value  = item.supplier || '';
+  document.getElementById('fldNotes').value     = item.notes || '';
+  document.getElementById('formPanelTitle').textContent = 'Edit Drug: ' + item.medicine_name;
+  document.getElementById('saveBtnLabel').textContent   = 'Save Changes';
+  document.getElementById('invFormPanel').classList.add('open');
+  document.getElementById('invFormPanel').scrollIntoView({ behavior:'smooth', block:'start' });
+};
+
+window.closeFormPanel = function() {
+  document.getElementById('invFormPanel').classList.remove('open');
+  editingId = null;
+};
+
+/* ── Save drug (add or edit) ── */
+window.saveDrug = async function() {
+  const medicine_name     = document.getElementById('fldName').value.trim();
+  const drug_type         = document.getElementById('fldDrugType').value;
+  const category          = document.getElementById('fldCategory').value;
+  const retail_price      = parseFloat(document.getElementById('fldPrice').value) || null;
+  const cost_price        = parseFloat(document.getElementById('fldCostPrice').value) || null;
+  const quantity          = parseInt(document.getElementById('fldQty').value) || 0;
+  const reorder_threshold = parseInt(document.getElementById('fldThreshold').value) || 20;
+  const expiry_date       = document.getElementById('fldExpiry').value || null;
+  const batch_number      = document.getElementById('fldBatch').value.trim() || null;
+  const supplier          = document.getElementById('fldSupplier').value.trim() || null;
+  const notes             = document.getElementById('fldNotes').value.trim();
+
+  if (!medicine_name) { showToast('Medicine name is required', 'error'); document.getElementById('fldName').focus(); return; }
+
+  const btn = document.getElementById('saveDrugBtn');
+  btn.disabled = true;
+
+  const payload = { medicine_name, drug_type, category, retail_price, cost_price, quantity, reorder_threshold, expiry_date, batch_number, supplier, notes, is_available: quantity > 0 };
+
+  if (window._pharmSupa && _session?.pharmacyId) {
+    payload.pharmacy_id = _session.pharmacyId;
+    let error;
+    if (editingId) {
+      ({ error } = await window._pharmSupa.from('pharmacy_inventory').update(payload).eq('id', editingId));
+    } else {
+      ({ error } = await window._pharmSupa.from('pharmacy_inventory').insert(payload));
+    }
+    if (error) { showToast('Save failed: ' + error.message, 'error'); btn.disabled = false; return; }
+    await loadLive(window._pharmSupa, _session.pharmacyId);
+  } else {
+    // Mock mode
+    if (editingId) {
+      const idx = allInventory.findIndex(i => String(i.id) === String(editingId));
+      if (idx >= 0) allInventory[idx] = { ...allInventory[idx], ...payload };
+    } else {
+      allInventory.push({ id: 'inv-' + Date.now(), ...payload });
+    }
+    renderInventory();
+  }
+
+  btn.disabled = false;
+  closeFormPanel();
+  showToast(editingId ? 'Drug updated!' : 'Drug added to inventory!', 'success');
+};
+
+/* ── Mark out of stock ── */
+window.markOutOfStock = async function(id) {
+  const item = allInventory.find(i => String(i.id) === String(id));
+  if (!item) return;
+  if (!confirm(`Mark "${item.medicine_name}" as out of stock?`)) return;
+
+  if (window._pharmSupa && _session?.pharmacyId) {
+    const { error } = await window._pharmSupa
+      .from('pharmacy_inventory')
+      .update({ is_available: false, quantity: 0 })
+      .eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+    await loadLive(window._pharmSupa, _session.pharmacyId);
+  } else {
+    const idx = allInventory.findIndex(i => String(i.id) === String(id));
+    if (idx >= 0) { allInventory[idx].is_available = false; allInventory[idx].quantity = 0; }
+    renderInventory();
+  }
+  showToast(`${item.medicine_name} marked out of stock`, 'warning');
+};
+
+/* ── Mark back in stock ── */
+window.markBackInStock = async function(id) {
+  const item = allInventory.find(i => String(i.id) === String(id));
+  if (!item) return;
+  const newQty = parseInt(prompt(`Restocking "${item.medicine_name}" — enter new quantity:`, '50') || '0');
+  if (isNaN(newQty) || newQty < 0) return;
+
+  if (window._pharmSupa && _session?.pharmacyId) {
+    const { error } = await window._pharmSupa
+      .from('pharmacy_inventory')
+      .update({ is_available: true, quantity: newQty })
+      .eq('id', id);
+    if (error) { showToast('Failed: ' + error.message, 'error'); return; }
+    await loadLive(window._pharmSupa, _session.pharmacyId);
+  } else {
+    const idx = allInventory.findIndex(i => String(i.id) === String(id));
+    if (idx >= 0) { allInventory[idx].is_available = true; allInventory[idx].quantity = newQty; }
+    renderInventory();
+  }
+  showToast(`${item.medicine_name} restocked (qty: ${newQty})`, 'success');
+};
+</script>
+</body>
+</html>

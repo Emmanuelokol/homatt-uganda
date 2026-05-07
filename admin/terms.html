@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Terms &amp; Content</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Terms &amp; Site Content</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <p style="color:#5F6368;font-size:13px;margin-bottom:20px">
+        Edit the terms, privacy policy, and other site content shown to users in the mobile app.
+      </p>
+
+      <!-- Terms of Service -->
+      <div class="content-card">
+        <div class="content-card-header">
+          <div class="content-card-icon" style="background:#E3F2FD;color:#1565C0">
+            <span class="material-icons-outlined">description</span>
+          </div>
+          <div>
+            <div style="font-weight:700">Terms of Service</div>
+            <div class="content-last-updated" id="termsUpdated">Loading...</div>
+          </div>
+        </div>
+        <div class="content-card-body">
+          <div class="admin-form-group">
+            <label>Title</label>
+            <input type="text" id="termsTitle" placeholder="Terms of Service">
+          </div>
+          <div class="admin-form-group">
+            <label>Content (plain text)</label>
+            <textarea id="termsContent" style="min-height:200px" placeholder="Enter the full terms of service..."></textarea>
+          </div>
+          <button class="btn-admin primary" id="saveTermsBtn">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> Save Terms
+          </button>
+        </div>
+      </div>
+
+      <!-- Privacy Policy -->
+      <div class="content-card">
+        <div class="content-card-header">
+          <div class="content-card-icon" style="background:#E8F5E9;color:#2E7D32">
+            <span class="material-icons-outlined">privacy_tip</span>
+          </div>
+          <div>
+            <div style="font-weight:700">Privacy Policy</div>
+            <div class="content-last-updated" id="privacyUpdated">Loading...</div>
+          </div>
+        </div>
+        <div class="content-card-body">
+          <div class="admin-form-group">
+            <label>Content (plain text)</label>
+            <textarea id="privacyContent" style="min-height:200px" placeholder="Enter the privacy policy..."></textarea>
+          </div>
+          <button class="btn-admin primary" id="savePrivacyBtn">
+            <span class="material-icons-outlined" style="font-size:16px">save</span> Save Privacy Policy
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+const DEMO_TERMS = `Terms of Service — Homatt Health Uganda
+
+1. ACCEPTANCE OF TERMS
+By using the Homatt Health application, you agree to these Terms of Service.
+
+2. SERVICES
+Homatt Health provides telemedicine, clinic booking, pharmacy delivery, and health monitoring services in Uganda.
+
+3. MEDICAL DISCLAIMER
+Services on this platform do not replace professional medical advice. Always consult a qualified healthcare provider for medical decisions.
+
+4. USER OBLIGATIONS
+You agree to provide accurate health information and not misuse the platform.
+
+5. PRIVACY
+Your personal health data is protected under our Privacy Policy and applicable Ugandan data protection laws.
+
+6. PAYMENTS
+All payments are processed securely. Refunds are processed within 24–48 hours for eligible cancellations.
+
+7. CONTACT
+For support, contact: support@homatt.ug | +256 800 000 000`;
+
+const DEMO_PRIVACY = `Privacy Policy — Homatt Health Uganda
+
+We collect health information, location data, and contact details to provide our services.
+
+DATA COLLECTED: Name, phone, symptoms, booking history, and location (for delivery).
+
+DATA USE: We use your data to match you with clinics, process bookings, deliver medicines, and improve care quality.
+
+DATA SHARING: We share data only with your consented healthcare providers. We never sell your data.
+
+SECURITY: All data is encrypted and stored securely on Supabase (EU-Central region).
+
+YOUR RIGHTS: You may request data deletion at any time by contacting support@homatt.ug.
+
+Last updated: ${new Date().toLocaleDateString('en-UG', {year:'numeric',month:'long',day:'numeric'})}`;
+
+let supabase = null;
+document.addEventListener('DOMContentLoaded', async () => {
+  // Pre-populate with demo content immediately so the page is never stuck
+  document.getElementById('termsTitle').value = 'Terms of Service';
+  document.getElementById('termsContent').value = DEMO_TERMS;
+  document.getElementById('privacyContent').value = DEMO_PRIVACY;
+  document.getElementById('termsUpdated').textContent = 'Demo content — loading live data…';
+  document.getElementById('privacyUpdated').textContent = 'Demo content — loading live data…';
+
+  buildAdminSidebar('terms');
+  const session = await requireAdmin();
+  if (!session) return;
+  supabase = adminSupa();
+  setupAdminLogout();
+
+  // Load content with timeout fallback
+  if (supabase) {
+    try {
+      const fetchPromise = supabase.from('site_content').select('*').in('key', ['terms', 'privacy']);
+      const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+      const { data: contents, error } = await Promise.race([fetchPromise, timeoutPromise]);
+      if (!error) {
+        (contents || []).forEach(c => {
+          if (c.key === 'terms') {
+            document.getElementById('termsTitle').value = c.title || '';
+            document.getElementById('termsContent').value = c.content || '';
+            document.getElementById('termsUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
+          } else if (c.key === 'privacy') {
+            document.getElementById('privacyContent').value = c.content || '';
+            document.getElementById('privacyUpdated').textContent = 'Last updated: ' + formatDate(c.updated_at);
+          }
+        });
+      }
+    } catch(e) {
+      console.error('Failed to load site content:', e);
+    }
+  }
+
+  // Save terms
+  document.getElementById('saveTermsBtn').addEventListener('click', async () => {
+    const title = document.getElementById('termsTitle').value.trim();
+    const content = document.getElementById('termsContent').value.trim();
+    if (!content) { showAdminToast('Content cannot be empty', 'error'); return; }
+
+    const btn = document.getElementById('saveTermsBtn');
+    btn.disabled = true;
+
+    if (!supabase) { btn.disabled = false; showAdminToast('Demo mode — cannot save content', 'default'); return; }
+    const adminName = (document.getElementById('adminUserName') || {}).textContent || 'Admin';
+    const { error } = await supabase.from('site_content').upsert({
+      key: 'terms', title: title || 'Terms of Service', content,
+      updated_at: new Date().toISOString(), updated_by: adminName
+    });
+
+    btn.disabled = false;
+    if (error) { showAdminToast('Failed to save: ' + error.message, 'error'); return; }
+    document.getElementById('termsUpdated').textContent = 'Last updated: just now';
+    showAdminToast('Terms of Service saved!', 'success');
+  });
+
+  // Save privacy
+  document.getElementById('savePrivacyBtn').addEventListener('click', async () => {
+    const content = document.getElementById('privacyContent').value.trim();
+    if (!content) { showAdminToast('Content cannot be empty', 'error'); return; }
+
+    const btn = document.getElementById('savePrivacyBtn');
+    btn.disabled = true;
+
+    if (!supabase) { btn.disabled = false; showAdminToast('Demo mode — cannot save content', 'default'); return; }
+    const adminName = (document.getElementById('adminUserName') || {}).textContent || 'Admin';
+    const { error } = await supabase.from('site_content').upsert({
+      key: 'privacy', title: 'Privacy Policy', content,
+      updated_at: new Date().toISOString(), updated_by: adminName
+    });
+
+    btn.disabled = false;
+    if (error) { showAdminToast('Failed to save: ' + error.message, 'error'); return; }
+    document.getElementById('privacyUpdated').textContent = 'Last updated: just now';
+    showAdminToast('Privacy Policy saved!', 'success');
+  });
+});
+</script>
+</body>
+</html>
