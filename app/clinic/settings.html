@@ -210,22 +210,70 @@
           </div>
         </div>
 
-        <!-- Auto-geocode button -->
-        <div style="margin-top:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <!-- Auto-geocode + GPS buttons -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
             style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
             <span class="material-icons-outlined" style="font-size:16px">my_location</span>
             Find GPS from address
           </button>
+          <button type="button" id="useCurrentLocBtn" onclick="useCurrentLocation()"
+            style="display:flex;align-items:center;gap:6px;background:#1565C0;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:16px">gps_fixed</span>
+            Use my current location
+          </button>
           <span id="geocodeStatus" style="font-size:12px;color:#555"></span>
         </div>
+        <div style="margin-top:8px;font-size:11px;color:#5F6368;line-height:1.5">
+          <strong>Tip:</strong> Stand in front of your clinic, then tap <em>Use my current location</em> for the most accurate position. This is the location patients will see when navigating to your clinic.
+        </div>
 
-        <!-- GPS coords stored silently — hidden from clinic staff -->
-        <input type="hidden" id="sClinicLat">
-        <input type="hidden" id="sClinicLng">
+        <!-- Visible GPS readout so the clinician can verify -->
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-row" style="margin:0">
+            <label style="font-size:11px">Latitude</label>
+            <input type="text" id="sClinicLat" class="form-input" placeholder="e.g. 0.347596" inputmode="decimal" autocomplete="off">
+          </div>
+          <div class="form-row" style="margin:0">
+            <label style="font-size:11px">Longitude</label>
+            <input type="text" id="sClinicLng" class="form-input" placeholder="e.g. 32.582520" inputmode="decimal" autocomplete="off">
+          </div>
+        </div>
         <div id="geocodeResult" style="display:none;margin-top:10px;background:#F1F8E9;border-radius:8px;padding:8px 12px;font-size:12px;color:#33691E;display:flex;align-items:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:14px">gps_fixed</span>
           <span id="geocodeResultText"></span>
+        </div>
+      </div>
+
+      <!-- Front Photo -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">photo_camera</span> Clinic Front Photo
+        </div>
+        <div style="background:#E3F2FD;border-radius:8px;padding:10px 14px;font-size:12px;color:#0D47A1;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
+          <span>Upload a clear photo of the front of your clinic. Patients will see this picture when they're choosing where to book — it helps them recognise the building and trust your clinic.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div id="photoPreview" style="width:100%;max-width:320px;aspect-ratio:16/9;border:2px dashed #BDBDBD;border-radius:12px;background:#FAFAFA url() center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#9E9E9E;font-size:13px;text-align:center;padding:8px;overflow:hidden">
+            <span id="photoPlaceholder" style="display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:36px;color:#BDBDBD">add_photo_alternate</span>
+              No photo uploaded yet
+            </span>
+          </div>
+          <input type="file" id="frontPhotoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
+          <input type="hidden" id="sFrontPhotoUrl">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <button type="button" onclick="document.getElementById('frontPhotoInput').click()"
+              style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              <span class="material-icons-outlined" style="font-size:16px">upload</span>
+              <span id="photoUploadLabel">Upload photo</span>
+            </button>
+            <button type="button" id="removePhotoBtn" onclick="removePhoto()" style="display:none;background:none;color:#D32F2F;border:1.5px solid #D32F2F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              Remove
+            </button>
+          </div>
+          <div id="photoStatus" style="font-size:12px;color:#555;text-align:center;min-height:16px"></div>
         </div>
       </div>
 
@@ -518,6 +566,106 @@ window.toggleFacility = function(btn, name) {
   else { currentFacilities.splice(idx,1); btn.classList.remove('active'); }
 };
 
+/* ── Use current GPS location ── */
+window.useCurrentLocation = function() {
+  var btn    = document.getElementById('useCurrentLocBtn');
+  var status = document.getElementById('geocodeStatus');
+  var result = document.getElementById('geocodeResult');
+  var resText= document.getElementById('geocodeResultText');
+
+  if (!navigator.geolocation) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'GPS not available on this device.';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.color = '#555';
+  status.textContent = 'Getting your GPS position…';
+  result.style.display = 'none';
+
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude.toFixed(6);
+    var lng = pos.coords.longitude.toFixed(6);
+    document.getElementById('sClinicLat').value = lat;
+    document.getElementById('sClinicLng').value = lng;
+    status.textContent = '';
+    resText.textContent = 'Captured your current location: ' + parseFloat(lat).toFixed(4) + ', ' + parseFloat(lng).toFixed(4) + ' (accuracy ±' + Math.round(pos.coords.accuracy) + 'm). Save the profile to apply.';
+    result.style.display = 'flex';
+    btn.disabled = false;
+  }, function(err) {
+    btn.disabled = false;
+    status.style.color = '#D32F2F';
+    if (err.code === 1) {
+      status.textContent = 'Location permission denied. Enable it in your browser/app settings to use this feature.';
+    } else if (err.code === 2) {
+      status.textContent = 'Position unavailable. Make sure GPS is on and you are outdoors or near a window.';
+    } else {
+      status.textContent = 'Could not get GPS — ' + (err.message || 'try again.');
+    }
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+};
+
+/* ── Photo upload to Supabase storage ── */
+window.handlePhotoUpload = async function(ev) {
+  var file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  var status = document.getElementById('photoStatus');
+  var preview = document.getElementById('photoPreview');
+  var placeholder = document.getElementById('photoPlaceholder');
+  var label = document.getElementById('photoUploadLabel');
+  var hidden = document.getElementById('sFrontPhotoUrl');
+  var removeBtn = document.getElementById('removePhotoBtn');
+
+  if (!_supa || !_clinicId) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Sign in linked to a clinic before uploading.';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Image too large — please pick one under 5 MB.';
+    return;
+  }
+
+  status.style.color = '#555';
+  status.textContent = 'Uploading photo…';
+  label.textContent = 'Uploading…';
+
+  try {
+    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    var path = _clinicId + '/front-' + Date.now() + '.' + ext;
+    var up = await _supa.storage.from('clinic-photos').upload(path, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (up.error) throw up.error;
+    var publicUrl = _supa.storage.from('clinic-photos').getPublicUrl(path).data.publicUrl;
+    hidden.value = publicUrl;
+    preview.style.backgroundImage = "url('" + publicUrl + "')";
+    if (placeholder) placeholder.style.display = 'none';
+    removeBtn.style.display = 'inline-flex';
+    label.textContent = 'Replace photo';
+    status.style.color = '#33691E';
+    status.textContent = 'Photo uploaded — remember to save your profile.';
+  } catch (e) {
+    label.textContent = 'Upload photo';
+    status.style.color = '#D32F2F';
+    status.textContent = 'Upload failed: ' + (e.message || e);
+  }
+};
+
+window.removePhoto = function() {
+  document.getElementById('sFrontPhotoUrl').value = '';
+  document.getElementById('photoPreview').style.backgroundImage = '';
+  var ph = document.getElementById('photoPlaceholder'); if (ph) ph.style.display = 'flex';
+  document.getElementById('removePhotoBtn').style.display = 'none';
+  document.getElementById('photoUploadLabel').textContent = 'Upload photo';
+  document.getElementById('photoStatus').textContent = 'Photo removed — save the profile to apply.';
+  document.getElementById('photoStatus').style.color = '#555';
+};
+
 /* ── Auto-geocode: convert Uganda place names → GPS coordinates ── */
 window.autoGeocodeLocation = async function() {
   var btn    = document.getElementById('geocodeBtn');
@@ -648,6 +796,16 @@ async function loadClinicProfile() {
   document.getElementById('sClinicAddress').value = c.address  || '';
   document.getElementById('sClinicLat').value     = c.latitude  || '';
   document.getElementById('sClinicLng').value     = c.longitude || '';
+
+  // Front photo
+  if (c.front_photo_url) {
+    document.getElementById('sFrontPhotoUrl').value = c.front_photo_url;
+    document.getElementById('photoPreview').style.backgroundImage = "url('" + c.front_photo_url + "')";
+    var ph = document.getElementById('photoPlaceholder'); if (ph) ph.style.display = 'none';
+    document.getElementById('removePhotoBtn').style.display = 'inline-flex';
+    document.getElementById('photoUploadLabel').textContent = 'Replace photo';
+  }
+
   // Show detected GPS badge if coordinates are already set
   if (c.latitude && c.longitude) {
     var res = document.getElementById('geocodeResult');
@@ -820,6 +978,7 @@ async function saveSettings() {
     address:  document.getElementById('sClinicAddress').value.trim()  || null,
     latitude:  parseFloat(document.getElementById('sClinicLat').value)  || null,
     longitude: parseFloat(document.getElementById('sClinicLng').value) || null,
+    front_photo_url: document.getElementById('sFrontPhotoUrl').value.trim() || null,
     specialties: currentSpecs.length ? currentSpecs : null,
     facilities: currentFacilities.length ? currentFacilities : null,
     services: services.length ? services : null,

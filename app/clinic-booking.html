@@ -35,12 +35,13 @@
     .cb-field input:focus, .cb-field select:focus, .cb-field textarea:focus { border-color:var(--primary); }
     .cb-field textarea { resize:vertical; min-height:80px; }
     .clinic-card {
-      background:#fff; border-radius:var(--radius-md); padding:14px 16px;
+      background:var(--surface); border-radius:var(--radius-md); padding:14px 16px;
       margin-bottom:10px; border:2px solid var(--border); cursor:pointer; transition:all .2s;
       display:flex; align-items:center; gap:14px;
     }
     .clinic-card:active, .clinic-card.selected { border-color:var(--primary); background:var(--primary-surface); }
-    .clinic-card-icon { width:44px; height:44px; border-radius:12px; background:var(--primary-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .clinic-card-icon { width:56px; height:56px; border-radius:12px; background:var(--primary-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; }
+    .clinic-card-photo { width:100%; height:100%; object-fit:cover; display:block; }
     .clinic-card-name { font-size:14px; font-weight:600; color:var(--text-primary); }
     .clinic-card-meta { font-size:12px; color:var(--text-secondary); margin-top:2px; }
     .urgency-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
@@ -184,11 +185,11 @@
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
               <div class="cb-field" style="margin-bottom:0">
                 <label style="font-size:12px;font-weight:600;color:#2E7D32">Date <span style="color:#D32F2F">*</span></label>
-                <input type="date" id="apptDate" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text-primary);outline:none">
+                <input type="date" id="apptDate" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text-primary);outline:none">
               </div>
               <div class="cb-field" style="margin-bottom:0">
                 <label style="font-size:12px;font-weight:600;color:#2E7D32">Time <span style="color:#D32F2F">*</span></label>
-                <input type="time" id="apptTime" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:#fff;color:var(--text-primary);outline:none">
+                <input type="time" id="apptTime" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text-primary);outline:none">
               </div>
             </div>
             <div style="font-size:11px;color:#2E7D32;margin-top:6px;display:flex;align-items:center;gap:4px">
@@ -731,10 +732,13 @@ async function loadClinics() {
 
     const matchedFeeArg = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || 0);
     const matchedCondArg = (c.matchedCond || '').replace(/'/g,"\\'");
+    const photoHtml = c.front_photo_url
+      ? `<img class="clinic-card-photo" src="${c.front_photo_url}" alt="${(c.name||'Clinic').replace(/"/g,'&quot;')}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'material-icons-outlined',textContent:'local_hospital',style:'color:var(--primary);font-size:24px'}))">`
+      : `<span class="material-icons-outlined" style="color:var(--primary);font-size:24px">local_hospital</span>`;
     return `
     <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0},${matchedFeeArg},'${matchedCondArg}')">
       <div class="clinic-card-icon">
-        <span class="material-icons-outlined" style="color:var(--primary);font-size:24px">local_hospital</span>
+        ${photoHtml}
       </div>
       <div style="flex:1;min-width:0">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">

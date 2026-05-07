@@ -1181,26 +1181,44 @@ body.keyboard-open .sheet-body {
   background: #1E1E1E;
 }
 
-/* Global dark mode: ensure ALL inputs, selects and textareas are readable */
-[data-theme="dark"] input,
+/* Global dark mode: ensure ALL inputs, selects and textareas are readable.
+   !important is needed because many pages set inline `background:#fff` which
+   would otherwise leave white text on a white field (invisible in dark mode). */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
-  background: #2C2C2C;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: #555;
+  background: #2C2C2C !important;
+  color: #E8EAED !important;
+  -webkit-text-fill-color: #E8EAED !important;
+  border-color: #555 !important;
+  caret-color: #66BB6A;
 }
-[data-theme="dark"] input:focus,
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
 [data-theme="dark"] select:focus,
 [data-theme="dark"] textarea:focus {
-  background: #3a3a3a;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
+  background: #3a3a3a !important;
+  color: #E8EAED !important;
+  -webkit-text-fill-color: #E8EAED !important;
 }
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder {
-  color: #6E7478;
+  color: #6E7478 !important;
   opacity: 1;
+}
+/* Date/time pickers use the OS calendar widget — invert its icon for dark mode */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.4);
+}
+/* Autofill background overrides (Chromium WebView keeps a yellow background) */
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #2C2C2C inset !important;
+  -webkit-text-fill-color: #E8EAED !important;
+  caret-color: #66BB6A;
 }
 
 /* Dark mode input fields — clearly visible white text on dark bg */
