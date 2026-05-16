@@ -339,6 +339,14 @@
 
     // Data already attached from booking code lookup
     if (patient._profilePreloaded) {
+      // Still fetch active meds (booking-code path doesn't include them)
+      try {
+        const { data: meds } = await supabase.rpc('get_patient_active_meds', {
+          p_phone:   patient.phone || null,
+          p_user_id: patient.id    || null,
+        });
+        patient._activeMeds = meds || [];
+      } catch(e) {}
       renderProfileCard(card, patient, null);
       fetchVisitHistory(patient, card);
       return;
@@ -350,6 +358,16 @@
     if (!supabase) { card.innerHTML = ''; card.style.display = 'none'; return; }
 
     let medProfile = null;
+    let activeMeds = [];
+
+    // Active medications across the network (drug-interaction safety check)
+    try {
+      const { data: meds } = await supabase.rpc('get_patient_active_meds', {
+        p_phone:   patient.phone || null,
+        p_user_id: patient.id    || null,
+      });
+      activeMeds = meds || [];
+    } catch(e) {}
 
     if (patient.clinicPatientId) {
       try {
@@ -380,7 +398,7 @@
       } catch(e) {}
     }
 
-    const merged = { ...patient, ...(medProfile || {}) };
+    const merged = { ...patient, ...(medProfile || {}), _activeMeds: activeMeds };
     renderProfileCard(card, merged, null);
     fetchVisitHistory(merged, card);
   }
@@ -430,7 +448,28 @@
 
     let html = '<div style="border-top:1px solid #F0F0F0;margin-top:6px;padding-top:12px">';
 
-    // ── Safety banners (top priority) ──
+    // ── Safety banners (top priority — drug interactions first) ──
+    const activeMeds = patient._activeMeds || [];
+    if (activeMeds.length) {
+      const medList = activeMeds.slice(0, 5).map(m => {
+        const items = Array.isArray(m.items) ? m.items : [];
+        const names = items.slice(0, 3).map(it => it.drug_name || it.name || it.drug || '').filter(Boolean);
+        const fromClinic = m.clinic_name ? ' <span style="opacity:.7">(' + esc(m.clinic_name) + ')</span>' : '';
+        const pickup = m.picked_up_at
+          ? ''
+          : ' <span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:1px 6px;border-radius:8px;font-weight:700">NOT PICKED UP</span>';
+        return `<div style="margin-top:4px;font-weight:600;line-height:1.4">${esc(names.join(', ') || 'Active prescription')}${fromClinic}${pickup}</div>`;
+      }).join('');
+      const more = activeMeds.length > 5 ? `<div style="font-size:11px;opacity:.7;margin-top:4px">+${activeMeds.length - 5} more</div>` : '';
+      html += `<div class="pp-alert" style="background:#FFEBEE;color:#B71C1C;border-left:4px solid #C62828;flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px">medication</span>
+          <strong>CURRENT MEDS — check for interactions</strong>
+        </div>
+        ${medList}${more}
+      </div>`;
+    }
+
     if (notNone(allergies)) {
       html += `<div class="pp-alert allergy">
         <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">warning</span>
