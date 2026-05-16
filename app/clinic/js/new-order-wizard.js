@@ -228,13 +228,23 @@
     }
     patientMenu.style.display = 'none';
     document.getElementById('step1Next').disabled = false;
+    // Hide booking code block whichever tab was active
+    document.getElementById('bookingCodeBlock').style.display = 'none';
+    // Load returning patient profile
+    loadPatientProfile(p);
   }
 
   document.getElementById('ppChangeBtn').onclick = () => {
     state.patient = null;
     phoneInput.value = '';
+    // Reset to phone tab
     document.getElementById('patientSearchBlock').style.display = '';
+    document.getElementById('bookingCodeBlock').style.display = 'none';
+    document.getElementById('lookupTabPhone').classList.add('active');
+    document.getElementById('lookupTabCode').classList.remove('active');
     document.getElementById('patientPillBlock').style.display = 'none';
+    const card = document.getElementById('patientProfileCard');
+    if (card) { card.style.display = 'none'; card.innerHTML = ''; }
     document.getElementById('step1Next').disabled = true;
     phoneInput.focus();
   };
@@ -242,6 +252,396 @@
   document.addEventListener('click', e => {
     if (!e.target.closest('.autocomplete-wrap')) patientMenu.style.display = 'none';
   });
+
+  // ════════════════════════════════════════════════════════════════
+  // RETURNING PATIENT — lookup tabs, booking code, profile card
+  // ════════════════════════════════════════════════════════════════
+
+  // Tab switching
+  document.getElementById('lookupTabPhone').onclick = () => {
+    document.getElementById('lookupTabPhone').classList.add('active');
+    document.getElementById('lookupTabCode').classList.remove('active');
+    document.getElementById('patientSearchBlock').style.display = '';
+    document.getElementById('bookingCodeBlock').style.display = 'none';
+  };
+  document.getElementById('lookupTabCode').onclick = () => {
+    document.getElementById('lookupTabCode').classList.add('active');
+    document.getElementById('lookupTabPhone').classList.remove('active');
+    document.getElementById('bookingCodeBlock').style.display = '';
+    document.getElementById('patientSearchBlock').style.display = 'none';
+    document.getElementById('codeError').style.display = 'none';
+    setTimeout(() => document.getElementById('bookingCodeInput').focus(), 80);
+  };
+
+  // Booking code auto-format + Enter key
+  const bookingCodeInput = document.getElementById('bookingCodeInput');
+  if (bookingCodeInput) {
+    bookingCodeInput.addEventListener('input', () => {
+      let v = bookingCodeInput.value.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/, '');
+      bookingCodeInput.value = v;
+    });
+    bookingCodeInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('lookupCodeBtn').click();
+    });
+  }
+
+  // Booking code lookup
+  document.getElementById('lookupCodeBtn').onclick = async () => {
+    const code = (bookingCodeInput?.value || '').trim().toUpperCase();
+    const errEl = document.getElementById('codeError');
+    errEl.style.display = 'none';
+    if (!code || !code.startsWith('HO')) {
+      errEl.textContent = 'Enter a valid code starting with HO- (e.g. HO-928)';
+      errEl.style.display = 'block'; return;
+    }
+    if (!supabase) { errEl.textContent = 'Database unavailable'; errEl.style.display = 'block'; return; }
+
+    const btn = document.getElementById('lookupCodeBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Looking up…';
+
+    try {
+      const { data, error } = await supabase.rpc('lookup_by_booking_code', { p_code: code });
+      if (error) throw error;
+      if (!data || !data.length) {
+        errEl.textContent = 'No booking found for ' + code; errEl.style.display = 'block';
+      } else {
+        const row = data[0];
+        state.bookingId   = row.booking_id;
+        state.bookingCode = code;
+        selectPatient({
+          id: row.patient_user_id || null,
+          clinicPatientId: null,
+          name: row.full_name || row.patient_name || 'Patient',
+          phone: row.phone || '',
+          registered: !!row.patient_user_id,
+          fromBooking: true,
+          allergies:             row.allergies,
+          chronic_conditions:    row.chronic_conditions,
+          blood_group:           row.blood_group,
+          medical_notes:         row.medical_notes,
+          consent_share_history: row.consent_share_history,
+          _profilePreloaded: true,
+        });
+      }
+    } catch(e) {
+      errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient';
+  };
+
+  // ── Load returning patient profile ───────────────────────────
+  async function loadPatientProfile(patient) {
+    const card = document.getElementById('patientProfileCard');
+    if (!card) return;
+
+    // Data already attached from booking code lookup
+    if (patient._profilePreloaded) {
+      renderProfileCard(card, patient, null);
+      fetchVisitHistory(patient, card);
+      return;
+    }
+
+    card.innerHTML = '<div style="padding:10px;color:#9AA0A6;font-size:13px;text-align:center">Loading medical history…</div>';
+    card.style.display = '';
+
+    if (!supabase) { card.innerHTML = ''; card.style.display = 'none'; return; }
+
+    let medProfile = null;
+
+    if (patient.clinicPatientId) {
+      try {
+        const { data } = await supabase.from('clinic_patients')
+          .select('allergies,chronic_conditions,blood_group,medical_notes,consent_share_history,consent_recorded_at,is_child,parent_phone,date_of_birth,sex')
+          .eq('id', patient.clinicPatientId).maybeSingle();
+        medProfile = data;
+      } catch(e) {}
+    } else if (patient.id) {
+      try {
+        const { data } = await supabase.from('profiles')
+          .select('allergies,chronic_conditions,blood_group,medical_notes,consent_share_history,consent_recorded_at')
+          .eq('id', patient.id).maybeSingle();
+        medProfile = data;
+      } catch(e) {}
+    } else if (patient.phone) {
+      try {
+        const { data } = await supabase.rpc('lookup_returning_patient', {
+          p_phone: patient.phone,
+          p_name_query: patient.name || null
+        });
+        if (data && data.length) {
+          medProfile = data[0];
+          if (!patient.clinicPatientId && medProfile.clinic_patient_id) {
+            state.patient.clinicPatientId = medProfile.clinic_patient_id;
+          }
+        }
+      } catch(e) {}
+    }
+
+    const merged = { ...patient, ...(medProfile || {}) };
+    renderProfileCard(card, merged, null);
+    fetchVisitHistory(merged, card);
+  }
+
+  // ── Fetch visit history (own clinic, or cross-clinic if consented) ──
+  async function fetchVisitHistory(patient, card) {
+    if (!supabase || !card) return;
+    const consent = patient.consent_share_history;
+    const phone   = patient.phone || patient.parent_phone || '';
+    const name    = patient.name || '';
+
+    try {
+      let query = supabase.from('patient_full_history')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (consent && phone) {
+        query = query.eq('patient_phone', phone);
+      } else if (consent && name) {
+        query = query.ilike('patient_name', '%' + name + '%');
+      } else {
+        // Own clinic only
+        if (!_clinicId) { renderProfileCard(card, patient, []); return; }
+        query = query.eq('clinic_id', _clinicId);
+        if (phone) query = query.eq('patient_phone', phone);
+        else if (name) query = query.ilike('patient_name', '%' + name + '%');
+      }
+
+      const { data } = await query;
+      renderProfileCard(card, patient, data || []);
+    } catch(e) {
+      renderProfileCard(card, patient, []);
+    }
+  }
+
+  // ── Render the profile card (safety banners + visit history) ────
+  function renderProfileCard(card, patient, history) {
+    if (!card) return;
+    card.style.display = '';
+
+    const allergies = patient.allergies || [];
+    const chronic   = patient.chronic_conditions || [];
+    const blood     = patient.blood_group || '';
+    const consent   = patient.consent_share_history;
+    const notNone   = arr => arr.length && !(arr.length === 1 && arr[0].toLowerCase() === 'none');
+
+    let html = '<div style="border-top:1px solid #F0F0F0;margin-top:6px;padding-top:12px">';
+
+    // ── Safety banners (top priority) ──
+    if (notNone(allergies)) {
+      html += `<div class="pp-alert allergy">
+        <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">warning</span>
+        <div><strong>ALLERGY:</strong> ${esc(allergies.join(' · '))}</div>
+      </div>`;
+    }
+    if (notNone(chronic)) {
+      html += `<div class="pp-alert chronic">
+        <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">monitor_heart</span>
+        <div><strong>CHRONIC:</strong> ${esc(chronic.join(' · '))}</div>
+      </div>`;
+    }
+    if (blood && blood !== 'Unknown') {
+      html += `<div class="pp-alert blood">
+        <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">water_drop</span>
+        <div><strong>Blood Group:</strong> ${esc(blood)}</div>
+      </div>`;
+    }
+    if (patient.medical_notes) {
+      html += `<div class="pp-alert notes">
+        <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0">sticky_note_2</span>
+        <div>${esc(patient.medical_notes)}</div>
+      </div>`;
+    }
+
+    // ── Intake prompt / edit button ──
+    const hasIntake = notNone(allergies) || notNone(chronic) || (blood && blood !== 'Unknown');
+    const canEdit   = patient.clinicPatientId || patient.id;
+    if (!hasIntake && canEdit) {
+      html += `<div style="background:#FFF8E1;border:1px dashed #FFC107;border-radius:10px;padding:10px 14px;font-size:12px;color:#5D4037;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="font-size:16px;color:#F57C00;flex-shrink:0">assignment_late</span>
+        <span>No medical intake on file for this patient.</span>
+        <button id="openIntakeBtn" style="margin-left:auto;padding:6px 12px;background:#F57C00;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Record intake</button>
+      </div>`;
+    } else if (hasIntake && canEdit) {
+      html += `<div style="text-align:right;margin-bottom:8px">
+        <button id="openIntakeBtn" style="padding:5px 12px;background:none;border:1px solid #E0E0E0;border-radius:8px;font-size:11px;color:#5F6368;cursor:pointer;font-family:inherit">
+          <span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">edit</span> Edit intake
+        </button>
+      </div>`;
+    }
+
+    // ── Visit history ──
+    if (history === null) {
+      html += '<div style="color:#9AA0A6;text-align:center;font-size:13px;padding:8px 0">Loading visit history…</div>';
+    } else if (!history.length) {
+      html += `<div style="color:#9AA0A6;font-size:13px;padding:8px 0;text-align:center">
+        <span class="material-icons-outlined" style="font-size:24px;display:block;margin-bottom:4px;color:#E0E0E0">history</span>
+        No previous visits recorded.
+      </div>`;
+    } else {
+      // Consent gate notice
+      if (!consent) {
+        html += `<div style="background:#E3F2FD;border-radius:10px;padding:10px 14px;font-size:12px;color:#0D47A1;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">lock</span>
+          <span style="flex:1">Showing <strong>this clinic's records only</strong>. Patient hasn't consented to cross-clinic sharing.</span>
+          <button id="requestConsentBtn" style="padding:6px 12px;background:#1565C0;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Request consent</button>
+        </div>`;
+      } else {
+        html += `<div style="background:#E8F5E9;border-radius:10px;padding:8px 12px;font-size:12px;color:#1B5E20;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">verified</span>
+          Patient consented — showing records from all clinics.
+        </div>`;
+      }
+
+      // Missed appointments count
+      const missed = history.filter(h => h.missed).length;
+      if (missed) {
+        html += `<div style="background:#FFEBEE;border-radius:8px;padding:8px 12px;font-size:12px;color:#C62828;margin-bottom:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:16px">event_busy</span>
+          <strong>${missed} missed appointment${missed !== 1 ? 's' : ''}</strong> on record
+        </div>`;
+      }
+
+      html += '<div class="pp-section-title">Visit History</div>';
+      history.slice(0, 3).forEach((h, i) => {
+        const d       = new Date(h.created_at);
+        const dateStr = d.toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' });
+        const meds    = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
+        const noShow  = h.missed;
+        html += `<div class="pp-row">
+          <span class="pp-row-label" style="font-size:12px">${i === 0 ? 'Last visit' : dateStr}</span>
+          <span class="pp-row-value" style="font-size:12px">
+            ${i === 0 ? '<strong>' + esc(dateStr) + '</strong> · ' : ''}${esc(h.clinic_name || 'This clinic')}
+            <br><span style="color:#5F6368">${esc(h.confirmed_diagnosis || 'Pending')}${noShow ? ' <span style="color:#C62828;font-weight:700"> · No-show</span>' : ''}</span>
+            ${meds ? `<br><span style="color:#1565C0">${meds} med${meds !== 1 ? 's' : ''} prescribed</span>` : ''}
+          </span>
+        </div>`;
+      });
+      if (history.length > 3) {
+        html += `<div style="text-align:center;font-size:12px;color:#9AA0A6;padding-top:6px">${history.length - 3} more visit${history.length - 3 !== 1 ? 's' : ''} on record</div>`;
+      }
+    }
+
+    html += '</div>';
+    card.innerHTML = html;
+
+    // Wire buttons
+    const intakeBtn = card.querySelector('#openIntakeBtn');
+    if (intakeBtn) intakeBtn.onclick = () => openIntakeModal(state.patient);
+
+    const consentBtn = card.querySelector('#requestConsentBtn');
+    if (consentBtn) consentBtn.onclick = () => requestConsent(state.patient);
+  }
+
+  // ── Request consent ──────────────────────────────────────────
+  async function requestConsent(patient) {
+    if (!supabase) return;
+    if (!confirm('Ask the patient verbally:\n\n"Do you consent to sharing your medical history with other Homatt-network clinics for safer care?"\n\nOnce they agree, tap OK to record their consent.')) return;
+    try {
+      await supabase.rpc('record_patient_consent', {
+        p_phone: patient.phone || null,
+        p_clinic_patient_id: patient.clinicPatientId || null,
+      });
+      state.patient.consent_share_history = true;
+      showToast('Consent recorded', 'success');
+      loadPatientProfile(state.patient);
+    } catch(e) {
+      showToast('Error recording consent: ' + e.message, 'error');
+    }
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // INTAKE MODAL (first-visit: allergies, chronic, blood group)
+  // ════════════════════════════════════════════════════════════════
+  let _selectedBloodGroup = '';
+
+  document.querySelectorAll('.bg-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bg-chip').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _selectedBloodGroup = btn.dataset.bg;
+    });
+  });
+
+  function openIntakeModal(patient) {
+    const modal = document.getElementById('intakeModal');
+    if (!modal || !patient) return;
+    document.getElementById('intakeAllergies').value = (patient.allergies || []).join(', ');
+    document.getElementById('intakeChronic').value   = (patient.chronic_conditions || []).join(', ');
+    document.getElementById('intakeNotes').value     = patient.medical_notes || '';
+    _selectedBloodGroup = patient.blood_group || '';
+    document.querySelectorAll('.bg-chip').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.bg === _selectedBloodGroup);
+    });
+    modal.style.display = 'flex';
+    setTimeout(() => document.getElementById('intakeAllergies').focus(), 120);
+  }
+
+  document.getElementById('intakeCancelBtn').onclick = () => {
+    document.getElementById('intakeModal').style.display = 'none';
+  };
+  document.getElementById('intakeSkipBtn').onclick = () => {
+    document.getElementById('intakeModal').style.display = 'none';
+  };
+
+  document.getElementById('intakeSaveBtn').onclick = async () => {
+    const patient = state.patient;
+    if (!supabase) { showToast('Database unavailable', 'error'); return; }
+
+    const allergiesRaw = document.getElementById('intakeAllergies').value.trim();
+    const chronicRaw   = document.getElementById('intakeChronic').value.trim();
+    const notes        = document.getElementById('intakeNotes').value.trim();
+    const blood        = _selectedBloodGroup;
+
+    const allergiesArr = allergiesRaw ? allergiesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const chronicArr   = chronicRaw   ? chronicRaw.split(',').map(s => s.trim()).filter(Boolean)   : [];
+
+    // Ensure patient is saved as clinic_patient before writing intake
+    if (!patient.clinicPatientId && !patient.id) {
+      showToast('Register the patient first before saving intake', 'error'); return;
+    }
+
+    const btn = document.getElementById('intakeSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+      if (patient.clinicPatientId) {
+        await supabase.rpc('save_patient_intake', {
+          p_clinic_patient_id: patient.clinicPatientId,
+          p_allergies:  allergiesArr,
+          p_chronic:    chronicArr,
+          p_blood_group: blood || null,
+          p_medical_notes: notes || null,
+        });
+      } else if (patient.id) {
+        await supabase.from('profiles').update({
+          allergies:          allergiesArr,
+          chronic_conditions: chronicArr,
+          blood_group:        blood || null,
+          medical_notes:      notes || null,
+        }).eq('id', patient.id);
+      }
+
+      // Update local state
+      Object.assign(state.patient, {
+        allergies:          allergiesArr,
+        chronic_conditions: chronicArr,
+        blood_group:        blood || null,
+        medical_notes:      notes || null,
+        _profilePreloaded:  true,
+      });
+
+      document.getElementById('intakeModal').style.display = 'none';
+      showToast('Intake saved', 'success');
+      loadPatientProfile(state.patient);
+    } catch(e) {
+      showToast('Error: ' + e.message, 'error');
+    }
+    btn.disabled = false; btn.textContent = 'Save Intake Information';
+  };
 
   // ── Quick-register modal ───────────────────────────────────────
   const regModal = document.getElementById('registerModal');
