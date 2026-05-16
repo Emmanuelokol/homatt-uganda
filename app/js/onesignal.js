@@ -38,6 +38,7 @@ const SCREEN_URLS = {
   // so any "please pay via mobile money" push would deep-link nowhere. Reinstate once
   // the wallet top-up flow is wired through relworx-payment.
   'recovery-check':       'dashboard.html',
+  recovery_feedback:      'recovery-feedback.html',
   'symptom-checkin':      'symptom-checker.html',
   'prescription-checkin': 'symptom-checker.html',
 };
@@ -62,6 +63,10 @@ function navigateToScreen(data) {
   if (feeling)     params.set('feeling', feeling);
   if (checkinType) params.set('checkin_type', checkinType);
   if (drug)        params.set('drug', drug);
+  // Recovery-feedback payload (from discharge-notify)
+  if (data.diagnosis_id) params.set('diagnosis_id', data.diagnosis_id);
+  if (data.clinic_name)  params.set('clinic_name',  data.clinic_name);
+  if (data.amount_ugx)   params.set('amount_ugx',   String(data.amount_ugx));
 
   const qs = params.toString();
   const dest = qs ? `${url}?${qs}` : url;

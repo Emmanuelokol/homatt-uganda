@@ -250,7 +250,20 @@
         </div>
       </div>
 
-      <!-- Today's consultations list -->
+      <!-- Active treatments — open cases that have not been discharged yet -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
+            Active Treatments
+          </div>
+          <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
+        </div>
+        <div id="activeTreatmentsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
       <!-- Today's consultations list -->
       <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
         <div class="table-header">
@@ -287,6 +300,29 @@
 
     </div>
   </main>
+
+  <!-- Discharge confirmation modal -->
+  <div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">task_alt</span>
+        <h3 style="font-size:17px;font-weight:700;margin:0">Discharge Patient</h3>
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin:0 0 14px;line-height:1.5">
+        Marking <strong id="dischargePatientName">this patient</strong> as discharged will move them off the active list and notify them with their treatment summary.
+      </p>
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Discharge notes (optional)</label>
+      <textarea id="dischargeNotes" rows="2" placeholder="e.g. Patient stable, no follow-up needed."
+        style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:14px"></textarea>
+      <div id="dischargeError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
+      <div style="display:flex;gap:10px">
+        <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Patient History Detail Modal -->
   <div id="histModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
@@ -725,17 +761,137 @@
   var histModal = document.getElementById('histModal');
   if (histModal) histModal.addEventListener('click', function(e){ if(e.target===histModal) histModal.style.display='none'; });
 
+  // ── Active treatments (open cases, all dates) ──
+  async function loadActiveTreatments() {
+    var el = document.getElementById('activeTreatmentsList');
+    var ct = document.getElementById('activeCount');
+    if (!el) return;
+    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
+
+    try {
+      var res = await supabase.from('clinic_diagnoses')
+        .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status,follow_up_days,prescription_items')
+        .eq('clinic_id', clinicId)
+        .is('discharged_at', null)
+        .order('created_at', {ascending:false})
+        .limit(50);
+      if (res.error) throw res.error;
+      var rows = res.data || [];
+      if (ct) ct.textContent = rows.length ? rows.length + ' open' : '';
+      if (!rows.length) {
+        el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!</div>';
+        return;
+      }
+      el.innerHTML = rows.map(function(c) {
+        var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var d   = new Date(c.created_at);
+        var ageMs = Date.now() - d.getTime();
+        var ageDays = Math.floor(ageMs / 86400000);
+        var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
+        var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
+        var fee = c.total_charged_ugx ? 'UGX ' + Number(c.total_charged_ugx).toLocaleString('en-UG') : '';
+        var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
+        return '<div class="order-card" style="margin:8px 16px" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
+          +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+followDue+'</div>'
+            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(fee?'<span>'+fee+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
+            +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
+            +'<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
+          +'</div>'
+          +'</div>';
+      }).join('');
+
+      el.querySelectorAll('.order-card').forEach(function(card) {
+        var btn = card.querySelector('.discharge-btn');
+        if (btn) btn.onclick = function(ev) {
+          ev.stopPropagation();
+          openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
+        };
+      });
+    } catch(e) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ── Discharge flow ──
+  var _dischargeContext = { diagnosisId: null, cardEl: null };
+
+  function openDischargeModal(diagnosisId, patientName, cardEl) {
+    _dischargeContext = { diagnosisId: diagnosisId, cardEl: cardEl };
+    var modal = document.getElementById('dischargeModal');
+    document.getElementById('dischargePatientName').textContent = patientName || 'this patient';
+    document.getElementById('dischargeNotes').value = '';
+    document.getElementById('dischargeError').style.display = 'none';
+    if (modal) modal.style.display = 'flex';
+  }
+  document.getElementById('dischargeCancelBtn').onclick = function() {
+    document.getElementById('dischargeModal').style.display = 'none';
+  };
+  document.getElementById('dischargeConfirmBtn').onclick = async function() {
+    var btn = this;
+    var errEl = document.getElementById('dischargeError');
+    errEl.style.display = 'none';
+    var notes = document.getElementById('dischargeNotes').value.trim();
+    if (!_dischargeContext.diagnosisId) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Discharging…';
+    try {
+      var r = await supabase.rpc('discharge_patient', {
+        p_diagnosis_id: _dischargeContext.diagnosisId,
+        p_notes: notes || null,
+      });
+      if (r.error) throw r.error;
+
+      // Notify the patient (fire-and-forget — don't block discharge UI)
+      try {
+        await supabase.functions.invoke('discharge-notify', {
+          body: { diagnosisId: _dischargeContext.diagnosisId },
+        });
+      } catch(e) { /* notification failures are non-blocking */ }
+
+      // Animate card out
+      var cardEl = _dischargeContext.cardEl;
+      if (cardEl) {
+        cardEl.style.transition = 'opacity .3s,transform .3s';
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'translateX(60px)';
+        setTimeout(function() { cardEl.remove(); loadActiveTreatments(); loadRevenue(); }, 320);
+      } else {
+        loadActiveTreatments();
+        loadRevenue();
+      }
+      document.getElementById('dischargeModal').style.display = 'none';
+    } catch(e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify';
+  };
+
+  // Close on backdrop click
+  var dm = document.getElementById('dischargeModal');
+  if (dm) dm.addEventListener('click', function(e){ if(e.target===dm) dm.style.display='none'; });
+
   // ── Initial load ──
   async function loadAll() {
     await resolveClinicId();
     loadBookings();
+    loadActiveTreatments();
     loadConsultations();
     loadRevenue();
   }
   loadAll();
 
   // ── Auto-refresh every 30 s ──
-  setInterval(function() { loadBookings(); loadConsultations(); loadRevenue(); }, 30000);
+  setInterval(function() { loadBookings(); loadActiveTreatments(); loadConsultations(); loadRevenue(); }, 30000);
 
   // ── Supabase Realtime ──
   async function setupRealtime() {
@@ -746,7 +902,7 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
         function() { loadBookings(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadConsultations(); loadRevenue(); })
+        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); })
       .subscribe();
   }
   setupRealtime();
