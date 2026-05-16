@@ -34,12 +34,14 @@
     ward: '',
     labTests: [],
     labResults: '',
-    medications: [],       // [{drug, dosage, timesPerDay, intakeTimes:[], durationDays}]
+    medications: [],       // [{drug, dosage, timesPerDay, intakeTimes:[], durationDays, inventoryItemId, qtyToDeduct}]
+    materialsUsed: [],     // [{item_id, item_name, unit, qty}] — non-drug consumables used
     expectedRecovery: '',
     stockSource: 'clinic', // 'clinic' | 'pharmacy'
     pharmacyId: null,
     patientNotes: '',
     formulary: [],
+    clinicInventory: [],   // [{id, item_name, item_type, unit, quantity, is_low_stock}]
     feeConsult: 0,
     feeLab: 0,
     feeMeds: 0,
@@ -1043,7 +1045,19 @@
       state.formulary = data?.length ? data : FALLBACK_FORMULARY;
     } catch(e) { state.formulary = FALLBACK_FORMULARY; }
   }
+
+  async function loadClinicInventory() {
+    if (!supabase) return;
+    try {
+      const clinicId = await resolveClinicId(supabase, session);
+      if (!clinicId) return;
+      const { data } = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
+      state.clinicInventory = data || [];
+    } catch(e) { /* non-fatal */ }
+  }
+
   loadFormulary();
+  loadClinicInventory();
 
   // Default time slots based on times-per-day
   const DEFAULT_TIMES = {
@@ -1059,6 +1073,8 @@
       timesPerDay: 2,
       intakeTimes: [...DEFAULT_TIMES[2]],
       durationDays: 5,
+      inventoryItemId: null,
+      qtyToDeduct: 0,
     });
     renderMeds();
   }
@@ -1083,6 +1099,14 @@
             value="${esc(m.drug)}" placeholder="Type 'amox', 'coartem'…" autocomplete="off">
           <div class="autocomplete-menu drug-menu" data-idx="${i}"></div>
         </div>
+        ${m.inventoryItemId ? (() => {
+          const inv = state.clinicInventory.find(x => x.id === m.inventoryItemId);
+          const stockBg = inv?.is_critical ? '#FFEBEE' : inv?.is_low_stock ? '#FFF3E0' : '#E8F5E9';
+          const stockClr = inv?.is_critical ? '#C62828' : inv?.is_low_stock ? '#E65100' : '#1B5E20';
+          const stockTxt = inv ? `${inv.quantity} ${inv.unit} in stock` : 'In clinic stock';
+          return `<div style="font-size:11px;color:${stockClr};background:${stockBg};padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px">
+            <span class="material-icons-outlined" style="font-size:12px">inventory_2</span>${esc(stockTxt)}</div>`;
+        })() : ''}
 
         <div style="height:10px"></div>
         <div class="field-row">
@@ -1096,6 +1120,12 @@
             <input class="field-input days-input" data-idx="${i}"
               type="number" min="1" max="180" value="${m.durationDays}">
           </div>
+          ${m.inventoryItemId ? `<div>
+            <label class="field-label">Units used (${esc(state.clinicInventory.find(x=>x.id===m.inventoryItemId)?.unit||'units')})</label>
+            <input class="field-input qty-deduct-input" data-idx="${i}"
+              type="number" min="0" step="1" value="${m.qtyToDeduct||''}" placeholder="0"
+              style="border-color:#00897B">
+          </div>` : ''}
         </div>
 
         <div style="height:10px"></div>
@@ -1149,31 +1179,96 @@
         state.medications[i].intakeTimes[j] = e.target.value;
       });
     });
+    ct.querySelectorAll('.qty-deduct-input').forEach(input => {
+      input.addEventListener('input', e => {
+        const i = parseInt(input.dataset.idx,10);
+        state.medications[i].qtyToDeduct = parseFloat(e.target.value) || 0;
+      });
+    });
   }
 
   function onDrugInput(e, idx) {
     const q = e.target.value.trim().toLowerCase();
     state.medications[idx].drug = e.target.value;
+    // Clear inventory link when user changes drug name
+    state.medications[idx].inventoryItemId = null;
+    state.medications[idx].qtyToDeduct     = 0;
     const menu = document.querySelector(`.drug-menu[data-idx="${idx}"]`);
     if (!q) { menu.style.display = 'none'; return; }
-    const matches = state.formulary.filter(d =>
+
+    // Inventory items (medicines in clinic stock) — shown first with stock badge
+    const invMatches = state.clinicInventory.filter(inv =>
+      inv.item_type === 'medicine' &&
+      inv.item_name.toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    // Formulary fallback
+    const formMatches = state.formulary.filter(d =>
       d.name.toLowerCase().includes(q) || (d.generic_name||'').toLowerCase().includes(q)
-    ).slice(0, 8);
-    if (!matches.length) { menu.style.display = 'none'; return; }
-    menu.innerHTML = matches.map(d => `
+    ).slice(0, 6);
+
+    if (!invMatches.length && !formMatches.length) { menu.style.display = 'none'; return; }
+
+    const invHtml = invMatches.map(inv => {
+      const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : '#E8F5E9';
+      const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : '#1B5E20';
+      return `<div class="autocomplete-item" data-inv-id="${esc(inv.id)}" data-inv-name="${esc(inv.item_name)}"
+                   style="border-left:3px solid #00897B">
+        <div class="ac-name" style="display:flex;align-items:center;gap:6px">
+          ${esc(inv.item_name)}
+          <span style="font-size:10px;background:${stockBg};color:${stockClr};padding:1px 6px;border-radius:10px;font-weight:700">${inv.quantity} ${esc(inv.unit)}</span>
+        </div>
+        <div class="ac-cat" style="color:#00897B">From clinic stock</div>
+      </div>`;
+    }).join('');
+
+    const formHtml = formMatches.map(d => `
       <div class="autocomplete-item" data-name="${esc(d.name)}">
         <div class="ac-name">${esc(d.name)}</div>
         <div class="ac-cat">${esc(d.default_dosage || '')}</div>
       </div>
     `).join('');
+
+    menu.innerHTML = (invMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#00897B;text-transform:uppercase;letter-spacing:.4px;background:#F1F8E9">Clinic Stock</div>${invHtml}` : '')
+      + (formMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;background:#FAFAFA">Formulary</div>${formHtml}` : '');
     menu.style.display = 'block';
-    menu.querySelectorAll('.autocomplete-item').forEach(el => {
+
+    // Inventory item selection
+    menu.querySelectorAll('[data-inv-id]').forEach(el => {
+      el.onclick = () => {
+        const inv = state.clinicInventory.find(x => x.id === el.dataset.invId);
+        if (!inv) return;
+        state.medications[idx].drug            = inv.item_name;
+        state.medications[idx].inventoryItemId = inv.id;
+        state.medications[idx].qtyToDeduct     = 1;
+        // Try to match formulary for dosage/duration defaults
+        const fMatch = state.formulary.find(d => d.name.toLowerCase() === inv.item_name.toLowerCase());
+        if (fMatch) {
+          state.medications[idx].dosage       = fMatch.default_dosage || state.medications[idx].dosage;
+          state.medications[idx].durationDays = fMatch.default_days   || state.medications[idx].durationDays;
+        }
+        menu.style.display = 'none';
+        autoSetExpectedRecovery();
+        renderMeds();
+      };
+    });
+
+    // Formulary item selection
+    menu.querySelectorAll('[data-name]').forEach(el => {
       el.onclick = () => {
         const drug = state.formulary.find(d => d.name === el.dataset.name);
         if (!drug) return;
-        state.medications[idx].drug = drug.name;
-        state.medications[idx].dosage = drug.default_dosage || state.medications[idx].dosage;
-        state.medications[idx].durationDays = drug.default_days || state.medications[idx].durationDays;
+        state.medications[idx].drug            = drug.name;
+        state.medications[idx].dosage          = drug.default_dosage || state.medications[idx].dosage;
+        state.medications[idx].durationDays    = drug.default_days   || state.medications[idx].durationDays;
+        // Auto-link to inventory if exact name match exists
+        const invLink = state.clinicInventory.find(x =>
+          x.item_type === 'medicine' && x.item_name.toLowerCase() === drug.name.toLowerCase()
+        );
+        if (invLink) {
+          state.medications[idx].inventoryItemId = invLink.id;
+          state.medications[idx].qtyToDeduct     = 1;
+        }
         menu.style.display = 'none';
         autoSetExpectedRecovery();
         renderMeds();
@@ -1199,6 +1294,96 @@
   });
 
   document.getElementById('addMedBtn').onclick = addMedication;
+
+  // ════════════════════════════════════════════════════════════════
+  // Materials & Consumables
+  // ════════════════════════════════════════════════════════════════
+  function renderMaterials() {
+    const ct    = document.getElementById('materialsContainer');
+    const hint  = document.getElementById('materialsEmptyHint');
+    if (!ct) return;
+    if (!state.materialsUsed.length) { if (hint) hint.style.display = 'block'; ct.innerHTML = ''; return; }
+    if (hint) hint.style.display = 'none';
+    ct.innerHTML = state.materialsUsed.map((m, i) => {
+      const inv = state.clinicInventory.find(x => x.id === m.item_id);
+      const stockTxt = inv ? ` (${inv.quantity} ${inv.unit} in stock)` : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F5F5">
+        <span style="flex:1;font-size:13px;font-weight:600;color:#202124">${esc(m.item_name)}${esc(stockTxt)}</span>
+        <input type="number" min="1" step="1" value="${m.qty||1}"
+          style="width:60px;padding:5px 8px;border:1.5px solid #00897B;border-radius:8px;font-size:13px;text-align:center;font-family:inherit;outline:none"
+          data-mat-idx="${i}" class="mat-qty-input">
+        <span style="font-size:12px;color:#9AA0A6">${esc(m.unit||'units')}</span>
+        <button class="mat-del-btn" data-idx="${i}" style="background:none;border:none;cursor:pointer;padding:2px">
+          <span class="material-icons-outlined" style="font-size:18px;color:#9AA0A6">delete_outline</span>
+        </button>
+      </div>`;
+    }).join('');
+    ct.querySelectorAll('.mat-qty-input').forEach(inp => {
+      inp.addEventListener('input', e => {
+        const i = parseInt(inp.dataset.matIdx, 10);
+        state.materialsUsed[i].qty = parseFloat(e.target.value) || 1;
+      });
+    });
+    ct.querySelectorAll('.mat-del-btn').forEach(btn => {
+      btn.onclick = () => {
+        state.materialsUsed.splice(parseInt(btn.dataset.idx,10), 1);
+        renderMaterials();
+      };
+    });
+  }
+
+  function showMaterialPicker() {
+    // Filter to non-medicine inventory items
+    const options = state.clinicInventory.filter(x => x.item_type !== 'medicine' && x.is_active !== false);
+    if (!options.length) {
+      showToast('No materials/consumables in clinic stock yet. Add them in the Stock Tracker on the dashboard.', 'error');
+      return;
+    }
+    // Simple pick list in a bottom sheet style
+    const existing = document.getElementById('matPickerSheet');
+    if (existing) existing.remove();
+
+    const sheet = document.createElement('div');
+    sheet.id = 'matPickerSheet';
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:800;display:flex;align-items:flex-end;justify-content:center';
+    sheet.innerHTML = `<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:70vh;overflow-y:auto;padding:20px">
+      <div style="font-weight:700;font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="color:#00897B">inventory_2</span> Select Material / Consumable
+      </div>
+      ${options.map(inv => {
+        const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : '#E8F5E9';
+        const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : '#1B5E20';
+        return `<div class="mat-picker-item" data-id="${esc(inv.id)}" data-name="${esc(inv.item_name)}" data-unit="${esc(inv.unit||'units')}"
+                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid #E8EAED;border-radius:10px;margin-bottom:8px;cursor:pointer">
+          <div>
+            <div style="font-size:13px;font-weight:600">${esc(inv.item_name)}</div>
+            <div style="font-size:11px;color:#9AA0A6">${esc(inv.item_type)}</div>
+          </div>
+          <span style="font-size:11px;background:${stockBg};color:${stockClr};padding:2px 8px;border-radius:10px;font-weight:700">${inv.quantity} ${esc(inv.unit)}</span>
+        </div>`;
+      }).join('')}
+      <button onclick="document.getElementById('matPickerSheet').remove()"
+        style="width:100%;padding:12px;margin-top:8px;background:#F5F5F5;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+    </div>`;
+    document.body.appendChild(sheet);
+
+    sheet.querySelectorAll('.mat-picker-item').forEach(el => {
+      el.onclick = () => {
+        const alreadyIdx = state.materialsUsed.findIndex(m => m.item_id === el.dataset.id);
+        if (alreadyIdx >= 0) {
+          state.materialsUsed[alreadyIdx].qty++;
+        } else {
+          state.materialsUsed.push({ item_id: el.dataset.id, item_name: el.dataset.name, unit: el.dataset.unit, qty: 1 });
+        }
+        sheet.remove();
+        renderMaterials();
+      };
+    });
+    sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
+  }
+
+  const addMaterialBtn = document.getElementById('addMaterialBtn');
+  if (addMaterialBtn) addMaterialBtn.onclick = showMaterialPicker;
 
   // Stock toggle
   document.querySelectorAll('.stock-opt').forEach(b => {
@@ -1405,6 +1590,36 @@
       btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">send</span> Send Prescription & Start Follow-up';
       return;
     }
+
+    // 1b. Auto-deduct clinic inventory (fire-and-forget — non-blocking)
+    try {
+      const invItems = [
+        // Medications linked to inventory
+        ...state.medications
+          .filter(m => m.inventoryItemId && m.qtyToDeduct > 0)
+          .map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
+        // Materials explicitly selected
+        ...state.materialsUsed
+          .filter(m => m.item_id && m.qty > 0)
+          .map(m => ({ item_id: m.item_id, qty: m.qty })),
+      ];
+      if (invItems.length) {
+        supabase.rpc('deduct_inventory', {
+          p_clinic_id:    _clinicId,
+          p_diagnosis_id: dx.id,
+          p_booking_id:   state.bookingId || null,
+          p_items:        invItems,
+        }).then(({ data: dResult }) => {
+          // Warn if any items went low-stock
+          const low = dResult?.low_stock;
+          if (Array.isArray(low) && low.length) {
+            low.forEach(item => {
+              showToast(`⚠ Low stock: ${item.item_name} — ${item.quantity} left`, 'error');
+            });
+          }
+        }).catch(() => {});
+      }
+    } catch(e) { /* inventory deduction is non-blocking */ }
 
     // 2. Insert e_prescription if there are meds
     if (items.length) {

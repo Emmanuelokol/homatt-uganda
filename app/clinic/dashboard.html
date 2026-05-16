@@ -236,6 +236,16 @@
         </div>
       </div>
 
+      <!-- Low-stock alert banner (hidden until stock loads) -->
+      <div id="lowStockBanner" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
+          <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
+          <span id="lowStockCount" style="background:#C62828;color:#fff;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:700"></span>
+        </div>
+        <div id="lowStockList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
       <!-- Pending bookings (patients who booked but haven't been seen) -->
       <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
         <div class="table-header">
@@ -296,6 +306,58 @@
             Enter a name or phone number to view a patient's full history.
           </div>
         </div>
+      </div>
+
+      <!-- Stock Tracker -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
+            Stock Tracker
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button onclick="openAddStockModal()" style="font-size:12px;padding:6px 14px;background:#00897B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:15px">add</span> Add Item
+            </button>
+          </div>
+        </div>
+        <div id="stockList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+        </div>
+      </div>
+
+      <!-- Financial Overview -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#7B1FA2">analytics</span>
+            Financial Overview
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="fin-tab active" data-period="day"   onclick="setFinPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #7B1FA2;background:#7B1FA2;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
+            <button class="fin-tab"        data-period="week"  onclick="setFinPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px">
+          <div style="background:#F3E5F5;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#7B1FA2;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Patients</div>
+            <div id="finPatients" style="font-size:22px;font-weight:700;color:#4A148C">—</div>
+          </div>
+          <div style="background:#E8F5E9;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Revenue (UGX)</div>
+            <div id="finRevenue" style="font-size:18px;font-weight:700;color:#1B5E20">—</div>
+          </div>
+          <div style="background:#E3F2FD;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stock Used (UGX)</div>
+            <div id="finStockCost" style="font-size:18px;font-weight:700;color:#1565C0">—</div>
+          </div>
+          <div style="background:#FFF8E1;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#E65100;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Net Margin (UGX)</div>
+            <div id="finMargin" style="font-size:18px;font-weight:700;color:#E65100">—</div>
+          </div>
+        </div>
+        <div id="finTopItems" style="padding:0 16px 16px"></div>
       </div>
 
     </div>
@@ -378,6 +440,82 @@
       style="width:100%;padding:13px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
       Cancel
     </button>
+  </div>
+</div>
+
+<!-- Add / Edit Stock Item Modal -->
+<div id="stockItemModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">inventory_2</span>
+      <h3 id="stockModalTitle" style="font-size:17px;font-weight:700;margin:0">Add Stock Item</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="grid-column:1/-1">
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Item Name *</label>
+        <input id="siName" type="text" placeholder="e.g. Amoxicillin 500mg" autocomplete="off"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Type *</label>
+        <select id="siType" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+          <option value="medicine">Medicine</option>
+          <option value="material">Material</option>
+          <option value="consumable">Consumable</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
+        <input id="siUnit" type="text" placeholder="tabs / ml / pieces" value="tabs"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Opening Stock *</label>
+        <input id="siQty" type="number" min="0" step="1" placeholder="0"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Min Threshold</label>
+        <input id="siThreshold" type="number" min="0" step="1" placeholder="5"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit Cost (UGX)</label>
+        <input id="siCost" type="number" min="0" step="100" placeholder="0"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('stockItemModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restock Modal -->
+<div id="restockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">add_shopping_cart</span>
+      <div>
+        <h3 style="font-size:17px;font-weight:700;margin:0" id="restockItemName">Restock</h3>
+        <div id="restockCurrentQty" style="font-size:12px;color:#9AA0A6;margin-top:2px"></div>
+      </div>
+    </div>
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Quantity to Add *</label>
+    <input id="restockQty" type="number" min="1" step="1" placeholder="Enter quantity"
+      style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes (optional)</label>
+    <input id="restockNotes" type="text" placeholder="e.g. Supplier delivery" autocomplete="off"
+      style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <div id="restockError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('restockModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button id="restockSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock
+      </button>
+    </div>
   </div>
 </div>
 
@@ -887,11 +1025,16 @@
     loadActiveTreatments();
     loadConsultations();
     loadRevenue();
+    loadInventory();
+    loadFinancial(_finPeriod);
   }
   loadAll();
 
-  // ── Auto-refresh every 30 s ──
-  setInterval(function() { loadBookings(); loadActiveTreatments(); loadConsultations(); loadRevenue(); }, 30000);
+  // ── Auto-refresh every 60 s ──
+  setInterval(function() {
+    loadBookings(); loadActiveTreatments(); loadConsultations(); loadRevenue();
+    loadInventory(); loadFinancial(_finPeriod);
+  }, 60000);
 
   // ── Supabase Realtime ──
   async function setupRealtime() {
@@ -902,10 +1045,273 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
         function() { loadBookings(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); })
+        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadInventory(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory_txns', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadInventory(); loadFinancial(_finPeriod); })
       .subscribe();
   }
   setupRealtime();
+
+  // ═══════════════════════════════════════════════════════
+  // INVENTORY & STOCK TRACKER
+  // ═══════════════════════════════════════════════════════
+
+  async function loadInventory() {
+    var listEl   = document.getElementById('stockList');
+    var banner   = document.getElementById('lowStockBanner');
+    var bList    = document.getElementById('lowStockList');
+    var bCount   = document.getElementById('lowStockCount');
+    if (!listEl || !supabase) return;
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      return;
+    }
+
+    try {
+      var res = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
+      if (res.error) throw res.error;
+      var items = res.data || [];
+
+      // Banner
+      var lowItems = items.filter(function(i){ return i.is_low_stock; });
+      if (lowItems.length) {
+        if (bCount) bCount.textContent = lowItems.length + ' item' + (lowItems.length !== 1 ? 's' : '');
+        if (bList) bList.innerHTML = lowItems.map(function(i) {
+          var bg = i.is_critical ? '#C62828' : '#E65100';
+          return '<span style="background:'+bg+';color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:4px">'
+            +'<span class="material-icons-outlined" style="font-size:12px">'+(i.is_critical?'block':'warning')+'</span>'
+            +esc(i.item_name)+' — '+i.quantity+' '+esc(i.unit)+'</span>';
+        }).join('');
+        if (banner) { banner.style.display = 'block'; }
+      } else {
+        if (banner) banner.style.display = 'none';
+      }
+
+      if (!items.length) {
+        listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">'
+          +'<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:8px">inventory_2</span>'
+          +'No stock items yet. Add your medicines and materials to start tracking.'
+          +'</div>';
+        return;
+      }
+
+      // Group by type
+      var groups = { medicine: [], material: [], consumable: [] };
+      items.forEach(function(i){ (groups[i.item_type] || groups.consumable).push(i); });
+
+      var html = '';
+      ['medicine','material','consumable'].forEach(function(type) {
+        if (!groups[type].length) return;
+        var label = { medicine:'Medicines', material:'Materials', consumable:'Consumables' }[type];
+        html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
+        groups[type].forEach(function(item) {
+          var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
+          var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
+          var badge = item.is_critical
+            ? '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">OUT OF STOCK</span>'
+            : item.is_low_stock
+            ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
+            : '';
+          var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
+          html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
+              +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+'</div>'
+              +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
+                +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
+              +'</div>'
+            +'</div>'
+            +'<div style="display:flex;gap:6px;flex-shrink:0">'
+              +'<button onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')" '
+                +'style="font-size:11px;padding:5px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">+ Restock</button>'
+            +'</div>'
+          +'</div>';
+        });
+      });
+      listEl.innerHTML = html;
+    } catch(e) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading stock: ' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ── Add Stock Item Modal ──
+  function openAddStockModal() {
+    ['siName','siUnit','siQty','siThreshold','siCost'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    var su = document.getElementById('siUnit'); if (su) su.value = 'tabs';
+    var se = document.getElementById('stockItemError'); if (se) se.style.display='none';
+    document.getElementById('stockModalTitle').textContent = 'Add Stock Item';
+    document.getElementById('stockItemModal').style.display = 'flex';
+  }
+
+  document.getElementById('stockItemModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('stockItemSaveBtn').onclick = async function() {
+    var btn  = this;
+    var errEl = document.getElementById('stockItemError');
+    errEl.style.display = 'none';
+    var name  = (document.getElementById('siName').value||'').trim();
+    var type  = document.getElementById('siType').value;
+    var unit  = (document.getElementById('siUnit').value||'tabs').trim();
+    var qty   = parseFloat(document.getElementById('siQty').value) || 0;
+    var thres = parseFloat(document.getElementById('siThreshold').value) || 5;
+    var cost  = parseFloat(document.getElementById('siCost').value) || null;
+    if (!name) { errEl.textContent = 'Item name is required.'; errEl.style.display = 'block'; return; }
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { errEl.textContent = 'Account not linked to a clinic.'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var r = await supabase.from('clinic_inventory').insert({
+        clinic_id: clinicId, item_name: name, item_type: type,
+        unit: unit, quantity: qty, min_threshold: thres,
+        reorder_level: thres * 2, unit_cost_ugx: cost,
+      });
+      if (r.error) throw r.error;
+      document.getElementById('stockItemModal').style.display = 'none';
+      loadInventory();
+    } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    btn.disabled = false; btn.textContent = 'Save Item';
+  };
+
+  // ── Restock Modal ──
+  var _restockItemId = null;
+
+  function openRestockModal(itemId, itemName, currentQty, unit) {
+    _restockItemId = itemId;
+    document.getElementById('restockItemName').textContent = itemName;
+    document.getElementById('restockCurrentQty').textContent = 'Current stock: ' + currentQty + ' ' + unit;
+    document.getElementById('restockQty').value = '';
+    document.getElementById('restockNotes').value = '';
+    var re = document.getElementById('restockError'); if (re) re.style.display = 'none';
+    document.getElementById('restockModal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('restockQty').focus(); }, 80);
+  }
+
+  document.getElementById('restockModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('restockSaveBtn').onclick = async function() {
+    var btn   = this;
+    var errEl = document.getElementById('restockError');
+    errEl.style.display = 'none';
+    var qty   = parseFloat(document.getElementById('restockQty').value);
+    var notes = (document.getElementById('restockNotes').value||'').trim();
+    if (!qty || qty <= 0) { errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !_restockItemId) return;
+    btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
+    try {
+      var r = await supabase.rpc('adjust_inventory', {
+        p_clinic_id:    clinicId,
+        p_inventory_id: _restockItemId,
+        p_qty_change:   qty,
+        p_txn_type:     'addition',
+        p_notes:        notes || null,
+      });
+      if (r.error) throw r.error;
+      document.getElementById('restockModal').style.display = 'none';
+      loadInventory();
+    } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock';
+  };
+
+  // ═══════════════════════════════════════════════════════
+  // FINANCIAL OVERVIEW
+  // ═══════════════════════════════════════════════════════
+
+  var _finPeriod = 'day';
+
+  function setFinPeriod(period) {
+    _finPeriod = period;
+    document.querySelectorAll('.fin-tab').forEach(function(btn) {
+      var active = btn.dataset.period === period;
+      btn.style.background  = active ? '#7B1FA2' : 'transparent';
+      btn.style.color       = active ? '#fff'    : '#424242';
+      btn.style.borderColor = active ? '#7B1FA2' : '#E0E0E0';
+    });
+    loadFinancial(period);
+  }
+
+  async function loadFinancial(period) {
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) return;
+
+    var now   = new Date();
+    var start;
+    if (period === 'day') {
+      start = new Date(now); start.setHours(0,0,0,0);
+    } else if (period === 'week') {
+      start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    try {
+      var [dxRes, txnRes] = await Promise.all([
+        supabase.from('clinic_diagnoses')
+          .select('total_charged_ugx,payment_status')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
+        supabase.from('clinic_inventory_txns')
+          .select('quantity_change,unit_cost_ugx,inventory_id')
+          .eq('clinic_id', clinicId)
+          .eq('txn_type', 'deduction')
+          .gte('created_at', start.toISOString()),
+      ]);
+
+      var rows = dxRes.data || [];
+      var txns = txnRes.data || [];
+
+      var patients = rows.length;
+      var revenue  = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
+      var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
+      var margin   = revenue - stockCost;
+
+      var pEl  = document.getElementById('finPatients');
+      var rEl  = document.getElementById('finRevenue');
+      var scEl = document.getElementById('finStockCost');
+      var mEl  = document.getElementById('finMargin');
+      if (pEl)  pEl.textContent  = patients;
+      if (rEl)  rEl.textContent  = fmtUGX(revenue);
+      if (scEl) scEl.textContent = fmtUGX(stockCost);
+      if (mEl) {
+        mEl.textContent  = fmtUGX(margin);
+        mEl.style.color  = margin < 0 ? '#C62828' : '#E65100';
+      }
+
+      // Top items used
+      var usage = {};
+      txns.forEach(function(t){ usage[t.inventory_id] = (usage[t.inventory_id]||0) + Math.abs(t.quantity_change); });
+      var topIds = Object.keys(usage).sort(function(a,b){ return usage[b]-usage[a]; }).slice(0,5);
+      var tiEl = document.getElementById('finTopItems');
+      if (tiEl && topIds.length) {
+        var invRes = await supabase.from('clinic_inventory').select('id,item_name,unit').in('id', topIds);
+        var invMap = {};
+        (invRes.data||[]).forEach(function(i){ invMap[i.id]=i; });
+        tiEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Top Items Used</div>'
+          + topIds.map(function(id) {
+              var item = invMap[id] || { item_name: id.slice(0,8)+'…', unit:'units' };
+              return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:13px">'
+                +'<span>'+esc(item.item_name)+'</span>'
+                +'<span style="font-weight:700;color:#424242">'+usage[id]+' '+esc(item.unit)+'</span>'
+              +'</div>';
+          }).join('');
+      } else if (tiEl) {
+        tiEl.innerHTML = '';
+      }
+    } catch(e) {
+      console.warn('Financial overview error:', e.message);
+    }
+  }
 </script>
 <script src="../js/native-bridge.js"></script>
 </body>
