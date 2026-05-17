@@ -29,12 +29,25 @@ create table if not exists public.clinic_inventory (
 );
 
 -- Ensure all columns exist in case the table was created by a previous partial run
+-- (or by an older/different schema). All adds are safe nullable defaults.
 alter table public.clinic_inventory
-  add column if not exists is_active       boolean not null default true,
+  add column if not exists item_name       text,
+  add column if not exists item_type       text,
+  add column if not exists unit            text          default 'units',
+  add column if not exists quantity        numeric(12,2) default 0,
+  add column if not exists min_threshold   numeric(12,2) default 5,
+  add column if not exists reorder_level   numeric(12,2) default 10,
   add column if not exists unit_cost_ugx   numeric(12,2),
-  add column if not exists min_threshold   numeric(12,2) not null default 5,
-  add column if not exists reorder_level   numeric(12,2) not null default 10,
-  add column if not exists updated_at      timestamptz default now();
+  add column if not exists is_active       boolean       default true,
+  add column if not exists created_at      timestamptz   default now(),
+  add column if not exists updated_at      timestamptz   default now();
+
+-- Backfill any NULLs from older schema rows so partial indexes can be built
+update public.clinic_inventory set is_active     = true   where is_active     is null;
+update public.clinic_inventory set unit          = 'units' where unit         is null;
+update public.clinic_inventory set quantity      = 0      where quantity      is null;
+update public.clinic_inventory set min_threshold = 5      where min_threshold is null;
+update public.clinic_inventory set reorder_level = 10     where reorder_level is null;
 
 create unique index if not exists idx_clinic_inventory_name
   on public.clinic_inventory (clinic_id, lower(item_name))
