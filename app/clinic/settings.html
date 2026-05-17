@@ -633,22 +633,37 @@ window.handlePhotoUpload = async function(ev) {
   label.textContent = 'Uploading…';
 
   try {
+    // Always upload to the same fixed path so it overwrites the previous photo
     var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
-    var path = _clinicId + '/front-' + Date.now() + '.' + ext;
+    var path = _clinicId + '/front.' + ext;
     var up = await _supa.storage.from('clinic-photos').upload(path, file, {
       cacheControl: '3600',
       upsert: true,
       contentType: file.type || 'image/jpeg',
     });
     if (up.error) throw up.error;
+
+    // Bust the CDN cache with a version param so the browser fetches the new image
     var publicUrl = _supa.storage.from('clinic-photos').getPublicUrl(path).data.publicUrl;
+    var versionedUrl = publicUrl + '?v=' + Date.now();
+
     hidden.value = publicUrl;
-    preview.style.backgroundImage = "url('" + publicUrl + "')";
+    preview.style.backgroundImage = "url('" + versionedUrl + "')";
     if (placeholder) placeholder.style.display = 'none';
     removeBtn.style.display = 'inline-flex';
     label.textContent = 'Replace photo';
-    status.style.color = '#33691E';
-    status.textContent = 'Photo uploaded — remember to save your profile.';
+    status.style.color = '#555';
+    status.textContent = 'Saving photo…';
+
+    // Auto-save the URL to the database immediately — no need to click "Save Profile"
+    var saveRes = await _supa.from('clinics').update({ front_photo_url: publicUrl }).eq('id', _clinicId);
+    if (saveRes.error) {
+      status.style.color = '#E65100';
+      status.textContent = 'Photo uploaded but could not save link (' + saveRes.error.message + '). Please click Save Profile.';
+    } else {
+      status.style.color = '#33691E';
+      status.textContent = '✓ Photo saved successfully.';
+    }
   } catch (e) {
     label.textContent = 'Upload photo';
     status.style.color = '#D32F2F';
@@ -800,7 +815,9 @@ async function loadClinicProfile() {
   // Front photo
   if (c.front_photo_url) {
     document.getElementById('sFrontPhotoUrl').value = c.front_photo_url;
-    document.getElementById('photoPreview').style.backgroundImage = "url('" + c.front_photo_url + "')";
+    // Add a cache-bust param so the browser always fetches the latest version
+    var displayUrl = c.front_photo_url + (c.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (c.updated_at ? new Date(c.updated_at).getTime() : Date.now());
+    document.getElementById('photoPreview').style.backgroundImage = "url('" + displayUrl + "')";
     var ph = document.getElementById('photoPlaceholder'); if (ph) ph.style.display = 'none';
     document.getElementById('removePhotoBtn').style.display = 'inline-flex';
     document.getElementById('photoUploadLabel').textContent = 'Replace photo';

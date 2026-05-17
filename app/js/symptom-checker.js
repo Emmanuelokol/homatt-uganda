@@ -2480,8 +2480,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
 
       const card = document.createElement('div');
       card.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
-      const photoHtml = clinic.front_photo_url
-        ? `<img src="${clinic.front_photo_url}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover;display:block" onerror="this.outerHTML='<span class=\\'material-icons-outlined\\'style=\\'font-size:22px;color:#1B5E20\\'>local_hospital</span>'">`
+      // Add cache-bust so the mobile app always fetches the latest clinic photo
+      const photoSrc = clinic.front_photo_url
+        ? clinic.front_photo_url + (clinic.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinic.updated_at ? new Date(clinic.updated_at).getTime() : '')
+        : null;
+      const photoHtml = photoSrc
+        ? `<img src="${photoSrc}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover;display:block" onerror="this.outerHTML='<span class=\\'material-icons-outlined\\'style=\\'font-size:22px;color:#1B5E20\\'>local_hospital</span>'">`
         : `<span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">local_hospital</span>`;
       card.innerHTML = `
         <div style="display:flex;align-items:flex-start;gap:10px">

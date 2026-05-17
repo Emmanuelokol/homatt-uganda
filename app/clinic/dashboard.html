@@ -909,43 +909,74 @@
     var clinicId = await resolveClinicId();
     if (!clinicId) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
 
-    try {
-      var res = await supabase.from('clinic_diagnoses')
+    var migrationNeeded = false;
+
+    // Try with discharged_at filter first; fall back if column doesn't exist yet
+    var rows = null;
+    var tryWithFilter = await supabase.from('clinic_diagnoses')
+      .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status,follow_up_days,prescription_items')
+      .eq('clinic_id', clinicId)
+      .is('discharged_at', null)
+      .order('created_at', {ascending:false})
+      .limit(50);
+
+    if (tryWithFilter.error && tryWithFilter.error.message && tryWithFilter.error.message.includes('discharged_at')) {
+      // Column missing — apply migration. Fall back to recent 14-day diagnoses.
+      migrationNeeded = true;
+      var fallback = await supabase.from('clinic_diagnoses')
         .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status,follow_up_days,prescription_items')
         .eq('clinic_id', clinicId)
-        .is('discharged_at', null)
+        .gte('created_at', new Date(Date.now() - 14*86400000).toISOString())
         .order('created_at', {ascending:false})
         .limit(50);
-      if (res.error) throw res.error;
-      var rows = res.data || [];
-      if (ct) ct.textContent = rows.length ? rows.length + ' open' : '';
-      if (!rows.length) {
-        el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!</div>';
-        return;
-      }
-      el.innerHTML = rows.map(function(c) {
-        var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
-        var d   = new Date(c.created_at);
-        var ageMs = Date.now() - d.getTime();
-        var ageDays = Math.floor(ageMs / 86400000);
-        var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
-        var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
-        var fee = c.total_charged_ugx ? 'UGX ' + Number(c.total_charged_ugx).toLocaleString('en-UG') : '';
-        var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
-        return '<div class="order-card" style="margin:8px 16px" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
-          +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
-          +'<div class="order-info">'
-            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+followDue+'</div>'
-            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
-            +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(fee?'<span>'+fee+'</span>':'')+'</div>'
-          +'</div>'
-          +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
-            +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
-            +'<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
-          +'</div>'
-          +'</div>';
-      }).join('');
+      rows = fallback.error ? [] : (fallback.data || []);
+    } else if (tryWithFilter.error) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(tryWithFilter.error.message) + '</div>';
+      return;
+    } else {
+      rows = tryWithFilter.data || [];
+    }
 
+    if (ct) ct.textContent = rows.length ? rows.length + ' open' : '';
+
+    var notice = migrationNeeded
+      ? '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;margin:8px 16px;font-size:12px;color:#5D4037;display:flex;align-items:center;gap:8px">'
+          +'<span class="material-icons-outlined" style="font-size:18px;color:#F9A825">info</span>'
+          +'<span><strong>Migration needed:</strong> Run <code>20260516_patch_discharged_at.sql</code> in Supabase SQL Editor to enable discharge tracking. Showing last 14 days for now.</span>'
+        +'</div>'
+      : '';
+
+    if (!rows.length) {
+      el.innerHTML = notice + '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!</div>';
+      return;
+    }
+    el.innerHTML = notice + rows.map(function(c) {
+      var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+      var d   = new Date(c.created_at);
+      var ageMs = Date.now() - d.getTime();
+      var ageDays = Math.floor(ageMs / 86400000);
+      var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
+      var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
+      var fee = c.total_charged_ugx ? 'UGX ' + Number(c.total_charged_ugx).toLocaleString('en-UG') : '';
+      var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
+      var dischargeBtn = !migrationNeeded
+        ? '<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
+        : '';
+      return '<div class="order-card" style="margin:8px 16px" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
+        +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
+        +'<div class="order-info">'
+          +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+followDue+'</div>'
+          +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+          +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(fee?'<span>'+fee+'</span>':'')+'</div>'
+        +'</div>'
+        +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
+          +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
+          +dischargeBtn
+        +'</div>'
+        +'</div>';
+    }).join('');
+
+    if (!migrationNeeded) {
       el.querySelectorAll('.order-card').forEach(function(card) {
         var btn = card.querySelector('.discharge-btn');
         if (btn) btn.onclick = function(ev) {
@@ -953,8 +984,6 @@
           openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
         };
       });
-    } catch(e) {
-      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e.message) + '</div>';
     }
   }
 
@@ -1072,9 +1101,38 @@
     }
 
     try {
+      // Try the RPC first; fall back to direct table query if migration not yet applied
       var res = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
-      if (res.error) throw res.error;
-      var items = res.data || [];
+      var items;
+      if (res.error && (res.error.message.includes('get_clinic_stock') || res.error.message.includes('Could not find the function') || res.error.message.includes('clinic_inventory'))) {
+        // Migration not applied yet — direct table query with client-side flag computation
+        var direct = await supabase
+          .from('clinic_inventory')
+          .select('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx')
+          .eq('clinic_id', clinicId)
+          .eq('is_active', true)
+          .order('item_name');
+        if (direct.error) {
+          // clinic_inventory table itself doesn't exist yet
+          listEl.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 16px;margin:12px 16px;font-size:13px;color:#5D4037;display:flex;align-items:flex-start;gap:10px">'
+            +'<span class="material-icons-outlined" style="font-size:20px;color:#F9A825;flex-shrink:0">info</span>'
+            +'<div><strong>Apply migrations to enable Stock Tracker.</strong><br>Run both files in Supabase SQL Editor:<br>'
+            +'<code style="font-size:11px">20260516_patch_discharged_at.sql</code><br>'
+            +'<code style="font-size:11px">20260516_clinic_inventory.sql</code></div>'
+            +'</div>';
+          return;
+        }
+        items = (direct.data || []).map(function(i) {
+          return Object.assign({}, i, {
+            is_low_stock: Number(i.quantity) <= Number(i.min_threshold),
+            is_critical:  Number(i.quantity) === 0,
+          });
+        });
+      } else if (res.error) {
+        throw res.error;
+      } else {
+        items = res.data || [];
+      }
 
       // Banner
       var lowItems = items.filter(function(i){ return i.is_low_stock; });
