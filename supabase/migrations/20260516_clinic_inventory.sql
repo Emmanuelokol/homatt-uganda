@@ -28,6 +28,14 @@ create table if not exists public.clinic_inventory (
   constraint clinic_inventory_qty_positive check (quantity >= 0)
 );
 
+-- Ensure all columns exist in case the table was created by a previous partial run
+alter table public.clinic_inventory
+  add column if not exists is_active       boolean not null default true,
+  add column if not exists unit_cost_ugx   numeric(12,2),
+  add column if not exists min_threshold   numeric(12,2) not null default 5,
+  add column if not exists reorder_level   numeric(12,2) not null default 10,
+  add column if not exists updated_at      timestamptz default now();
+
 create unique index if not exists idx_clinic_inventory_name
   on public.clinic_inventory (clinic_id, lower(item_name))
   where is_active = true;
