@@ -58,7 +58,11 @@ Deno.serve(async (req) => {
     .eq("id", diagnosisId)
     .maybeSingle();
 
-  if (!dx) return json({ error: "Diagnosis not found" }, 404);
+  if (!dx) return json({
+    ok: false, delivered: false,
+    reason: "diagnosis_not_found",
+    message: "Diagnosis not found — payment was recorded but push receipt skipped.",
+  });
 
   let clinicName = "the clinic";
   if (dx.clinic_id) {

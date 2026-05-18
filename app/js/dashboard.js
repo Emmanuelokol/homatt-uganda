@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   try {
     if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
       supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+      window._supabaseClient = supabase; // expose for onesignal.js player_id save
       const { data } = await supabase.auth.getSession();
       session = data?.session || null;
     }

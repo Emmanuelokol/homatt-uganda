@@ -1403,17 +1403,26 @@
           },
         });
         if (nr.error) {
-          var errMsg = (nr.error.message || '').toLowerCase();
-          if (errMsg.indexOf('not found') !== -1 || errMsg.indexOf('failed to send') !== -1 || errMsg.indexOf('404') !== -1) {
-            notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. (Push receipt not yet deployed — deploy payment-notify edge function to send phone receipts.)';
+          // Distinguish relay 404 (function not deployed) from function-level errors.
+          // nr.error.context is the raw Response object in supabase-js v2.
+          var httpStatus = nr.error.context && nr.error.context.status ? nr.error.context.status : 0;
+          var errLow = (nr.error.message || '').toLowerCase();
+          var isNotDeployed = httpStatus === 404 ||
+            (errLow.indexOf('function') !== -1 && errLow.indexOf('not found') !== -1) ||
+            errLow.indexOf('relay_error') !== -1;
+          if (isNotDeployed) {
+            notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. (Push receipt not yet deployed — deploy payment-notify edge function.)';
           } else {
-            notifyMsg = 'Payment saved. Push failed: ' + (nr.error.message || 'unknown');
+            notifyMsg = 'Payment saved. Push failed: ' + (nr.error.message || 'unknown error');
           }
           notifyKind = 'warning';
-          console.warn('[payment-notify] error', nr.error);
+          console.warn('[payment-notify] HTTP ' + httpStatus + ' error:', nr.error.message);
         } else {
           var nd = nr.data || {};
-          if (nd.delivered) {
+          if (nd.ok === false) {
+            notifyMsg = 'Payment recorded. ' + (nd.message || 'Push notification skipped.');
+            notifyKind = 'warning';
+          } else if (nd.delivered) {
             notifyMsg = data.fully_paid
               ? 'Bill fully paid. Receipt sent to patient.'
               : 'Payment recorded. Receipt sent to patient.';

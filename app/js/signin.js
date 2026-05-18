@@ -158,6 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
     }
 
+    // Expose authenticated client globally so onesignal.js can save the player_id
+    window._supabaseClient = supabase;
     // Link this user's push token to their Supabase UUID for targeted notifications
     if (typeof oneSignalLogin === 'function') oneSignalLogin(data.user.id);
 

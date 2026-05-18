@@ -81,17 +81,19 @@ async function savePlayerIdToSupabase(playerId) {
     const cfg = window.HOMATT_CONFIG || {};
     if (!cfg.SUPABASE_URL || !window.supabase) return;
 
-    const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+    // Prefer a global authenticated client set by dashboard.js / signin.js.
+    // Fall back to creating a fresh client (reads session from localStorage).
+    const client = window._supabaseClient || window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
     const { data: { session } } = await client.auth.getSession();
     if (!session?.user?.id) return;
+
+    // Always cache in localStorage as a fast local backup
+    localStorage.setItem('homatt_onesignal_player_id', playerId);
 
     const { error: saveErr } = await client
       .from('profiles')
       .update({ onesignal_player_id: playerId })
       .eq('id', session.user.id);
-
-    // Always cache in localStorage as a fast local backup
-    localStorage.setItem('homatt_onesignal_player_id', playerId);
 
     if (saveErr) {
       // Most common cause: onesignal_player_id column doesn't exist yet.
