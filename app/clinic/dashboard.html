@@ -990,6 +990,27 @@
   // ── Discharge flow ──
   var _dischargeContext = { diagnosisId: null, cardEl: null };
 
+  // Toast for discharge notification result (also reused by payment recording)
+  function showDischargeToast(msg, kind) {
+    var bg = '#1B5E20', icon = 'check_circle';
+    if (kind === 'warning') { bg = '#E65100'; icon = 'warning'; }
+    if (kind === 'error')   { bg = '#C62828'; icon = 'error';   }
+    var t = document.createElement('div');
+    t.style.cssText =
+      'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9999;'+
+      'background:'+bg+';color:#fff;padding:12px 18px;border-radius:24px;font-size:13px;'+
+      'font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;'+
+      'display:flex;align-items:center;gap:8px;font-family:inherit;line-height:1.4;'+
+      'opacity:0;transition:opacity .25s,transform .25s';
+    t.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">'+icon+'</span><span>'+msg+'</span>';
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(-4px)'; });
+    setTimeout(function(){
+      t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(0)';
+      setTimeout(function(){ t.remove(); }, 280);
+    }, 4200);
+  }
+
   function openDischargeModal(diagnosisId, patientName, cardEl) {
     _dischargeContext = { diagnosisId: diagnosisId, cardEl: cardEl };
     var modal = document.getElementById('dischargeModal');
@@ -1016,12 +1037,41 @@
       });
       if (r.error) throw r.error;
 
-      // Notify the patient (fire-and-forget — don't block discharge UI)
+      // Notify the patient — surface result so clinic knows what happened
+      var notifyMsg = '';
+      var notifyKind = 'success';   // success | warning | error
       try {
-        await supabase.functions.invoke('discharge-notify', {
+        var nr = await supabase.functions.invoke('discharge-notify', {
           body: { diagnosisId: _dischargeContext.diagnosisId },
         });
-      } catch(e) { /* notification failures are non-blocking */ }
+        if (nr.error) {
+          notifyMsg = 'Discharge saved, but push notification failed: ' + (nr.error.message || 'unknown error');
+          notifyKind = 'warning';
+          console.warn('[discharge-notify] error', nr.error);
+        } else {
+          var d = nr.data || {};
+          if (d.delivered) {
+            notifyMsg = 'Patient notified on their phone.';
+          } else if (d.reason === 'patient_not_on_homatt') {
+            notifyMsg = 'Discharged. Patient is not on the Homatt app — no push sent.';
+            notifyKind = 'warning';
+          } else if (d.reason === 'daily_limit_reached') {
+            notifyMsg = 'Discharged. Patient has hit today’s notification limit.';
+            notifyKind = 'warning';
+          } else if (d.message) {
+            notifyMsg = 'Discharged. ' + d.message;
+            notifyKind = 'warning';
+          } else {
+            notifyMsg = 'Discharged successfully.';
+          }
+          console.log('[discharge-notify] result', d);
+        }
+      } catch(e) {
+        notifyMsg = 'Discharge saved, but push notification call failed: ' + (e.message || e);
+        notifyKind = 'warning';
+        console.warn('[discharge-notify] threw', e);
+      }
+      showDischargeToast(notifyMsg, notifyKind);
 
       // Animate card out
       var cardEl = _dischargeContext.cardEl;
