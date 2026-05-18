@@ -656,10 +656,17 @@ window.handlePhotoUpload = async function(ev) {
     status.textContent = 'Saving photo…';
 
     // Auto-save the URL to the database immediately — no need to click "Save Profile"
-    var saveRes = await _supa.from('clinics').update({ front_photo_url: publicUrl }).eq('id', _clinicId);
+    var saveRes = await _supa
+      .from('clinics')
+      .update({ front_photo_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq('id', _clinicId)
+      .select('id, front_photo_url');
     if (saveRes.error) {
       status.style.color = '#E65100';
       status.textContent = 'Photo uploaded but could not save link (' + saveRes.error.message + '). Please click Save Profile.';
+    } else if (!saveRes.data || saveRes.data.length === 0) {
+      status.style.color = '#E65100';
+      status.textContent = 'Photo uploaded but permission denied. Run migration 20260518_fix_clinic_settings_rls.sql then click Save Profile.';
     } else {
       status.style.color = '#33691E';
       status.textContent = '✓ Photo saved successfully.';
@@ -795,7 +802,15 @@ function getHours() {
 /* ── Load clinic profile ── */
 async function loadClinicProfile() {
   var res = await _supa.from('clinics').select('*').eq('id', _clinicId).single();
-  if (!res.data) return;
+  if (res.error) {
+    console.error('[settings] loadClinicProfile error:', res.error);
+    showToast('Could not load clinic data: ' + res.error.message, 'error');
+    return;
+  }
+  if (!res.data) {
+    showToast('Clinic record not found. Contact support.', 'error');
+    return;
+  }
   var c = res.data;
 
   document.getElementById('sClinicName').value = c.name || '';
@@ -1028,7 +1043,13 @@ async function saveSettings() {
     return;
   }
 
-  var { error } = await _supa.from('clinics').update(payload).eq('id', _clinicId);
+  // Use .select() so PostgREST returns the updated row — this is the ONLY reliable
+  // way to detect a "silent RLS rejection" (0 rows updated, no error returned).
+  var { data: savedRows, error } = await _supa
+    .from('clinics')
+    .update(payload)
+    .eq('id', _clinicId)
+    .select('id, name, front_photo_url, latitude, longitude, address, updated_at');
 
   if (!error) {
     await saveCondFees();
@@ -1040,11 +1061,27 @@ async function saveSettings() {
   btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
 
   if (error) {
+    msg.style.color = '#D32F2F';
     msg.textContent = 'Error: ' + error.message;
     showToast('Save failed: ' + error.message, 'error');
     return;
   }
 
+  // Detect silent RLS rejection: update returned success but no rows were affected
+  if (!savedRows || savedRows.length === 0) {
+    msg.style.color = '#D32F2F';
+    msg.textContent = 'Save blocked — your account may not have write permission. Run migration 20260518_fix_clinic_settings_rls.sql in Supabase SQL Editor.';
+    showToast('Permission denied — run the latest migration', 'error');
+    return;
+  }
+
+  // Confirm photo URL was persisted — update hidden field from DB response
+  var saved = savedRows[0];
+  if (saved.front_photo_url) {
+    document.getElementById('sFrontPhotoUrl').value = saved.front_photo_url;
+  }
+
+  msg.style.color = '#33691E';
   msg.textContent = 'Saved ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
   showToast('Clinic profile updated!', 'success');
 }

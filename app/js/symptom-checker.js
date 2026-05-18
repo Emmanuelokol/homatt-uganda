@@ -2479,39 +2479,44 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         : '';
 
       const card = document.createElement('div');
-      card.style.cssText = 'background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
-      // Add cache-bust so the mobile app always fetches the latest clinic photo
+      card.style.cssText = 'background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
+      // Cache-bust so the mobile app always fetches the latest clinic photo
       const photoSrc = clinic.front_photo_url
-        ? clinic.front_photo_url + (clinic.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinic.updated_at ? new Date(clinic.updated_at).getTime() : '')
+        ? clinic.front_photo_url + (clinic.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinic.updated_at ? new Date(clinic.updated_at).getTime() : Date.now())
         : null;
-      const photoHtml = photoSrc
-        ? `<img src="${photoSrc}" alt="" style="width:40px;height:40px;border-radius:10px;object-fit:cover;display:block" onerror="this.outerHTML='<span class=\\'material-icons-outlined\\'style=\\'font-size:22px;color:#1B5E20\\'>local_hospital</span>'">`
-        : `<span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">local_hospital</span>`;
+      // Full-width banner when a photo exists; plain header without
+      const photoBanner = photoSrc
+        ? `<div style="width:100%;height:130px;background:#E8F5E9 url('${photoSrc}') center/cover no-repeat;position:relative">
+             <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));border-radius:0"></div>
+           </div>`
+        : `<div style="width:100%;height:44px;background:linear-gradient(135deg,#E8F5E9,#C8E6C9);display:flex;align-items:center;padding:0 14px;gap:8px">
+             <span class="material-icons-outlined" style="color:#1B5E20;font-size:20px">local_hospital</span>
+           </div>`;
       card.innerHTML = `
-        <div style="display:flex;align-items:flex-start;gap:10px">
-          <div style="width:40px;height:40px;border-radius:10px;background:#E8F5E9;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
-            ${photoHtml}
-          </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:14px;font-weight:700;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${clinic.name}</div>
-            <div style="font-size:11px;color:#888;margin-top:2px;display:flex;align-items:center;gap:4px">
-              <span class="material-icons-outlined" style="font-size:12px">place</span>
-              ${distLabel}${distLabel && clinic.address ? ' · ' : ''}${clinic.address || ''}
-            </div>
-            ${phoneLink}
-            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:7px">
-              <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:4px 10px;font-size:12px;color:#795548;font-weight:600">
-                <span style="font-size:10px;color:#9E9E9E;font-weight:400">${feeNote}: </span>${feeDisplay}
+        ${photoBanner}
+        <div style="padding:12px 14px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#111">${clinic.name}</div>
+              <div style="font-size:11px;color:#888;margin-top:2px;display:flex;align-items:center;gap:3px">
+                <span class="material-icons-outlined" style="font-size:12px">place</span>
+                ${distLabel}${distLabel && clinic.address ? ' · ' : ''}${clinic.address || ''}
               </div>
-              ${openBadge}
-              ${onlineBadge}
+              ${phoneLink}
             </div>
-            ${specChips}
+            <button class="cb-book-btn" data-clinic-id="${clinic.id}" data-clinic-name="${clinic.name.replace(/"/g, '&quot;')}" data-fee="${condFee?.fee || clinic.consultation_fee || 0}" data-fee-label="${feeDisplay}"
+              style="flex-shrink:0;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;align-self:flex-start">
+              Book
+            </button>
           </div>
-          <button class="cb-book-btn" data-clinic-id="${clinic.id}" data-clinic-name="${clinic.name.replace(/"/g, '&quot;')}" data-fee="${condFee?.fee || clinic.consultation_fee || 0}" data-fee-label="${feeDisplay}"
-            style="flex-shrink:0;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;align-self:center">
-            Book
-          </button>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px">
+            <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:4px 10px;font-size:12px;color:#795548;font-weight:600">
+              <span style="font-size:10px;color:#9E9E9E;font-weight:400">${feeNote}: </span>${feeDisplay}
+            </div>
+            ${openBadge}
+            ${onlineBadge}
+          </div>
+          ${specChips}
         </div>
       `;
       cbList.appendChild(card);
@@ -2596,14 +2601,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const addressLine = clinicObj.address ? `<div style="font-size:11px;color:#777;margin-top:2px;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:12px">place</span>${clinicObj.address}${clinicObj.city ? ', ' + clinicObj.city : ''}</div>` : '';
     const phoneLine   = clinicObj.phone   ? `<a href="tel:${(clinicObj.phone).replace(/\s/g,'')}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;text-decoration:none;margin-top:3px"><span class="material-icons-outlined" style="font-size:12px">phone</span>${clinicObj.phone}</a>` : '';
 
+    // Clinic photo banner for the confirm card
+    const confirmPhotoSrc = clinicObj.front_photo_url
+      ? clinicObj.front_photo_url + (clinicObj.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinicObj.updated_at ? new Date(clinicObj.updated_at).getTime() : Date.now())
+      : null;
+    const confirmPhotoBanner = confirmPhotoSrc
+      ? `<div style="width:100%;height:110px;background:#E8F5E9 url('${confirmPhotoSrc}') center/cover no-repeat;border-radius:12px 12px 0 0;margin:-12px -14px 10px;width:calc(100% + 28px)"></div>`
+      : '';
+
     cbConfirm.innerHTML = `
       <button id="cbBack" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:#1B5E20;font-size:13px;font-weight:600;font-family:inherit;padding:0;margin-bottom:16px">
         <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back to clinics
       </button>
 
-      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px">
+      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px;overflow:hidden">
+        ${confirmPhotoBanner}
         <div style="display:flex;align-items:flex-start;gap:10px">
-          <span class="material-icons-outlined" style="font-size:24px;color:#1B5E20;margin-top:2px">local_hospital</span>
+          ${confirmPhotoSrc ? '' : '<span class="material-icons-outlined" style="font-size:24px;color:#1B5E20;margin-top:2px;flex-shrink:0">local_hospital</span>'}
           <div style="flex:1;min-width:0">
             <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
             ${addressLine}
