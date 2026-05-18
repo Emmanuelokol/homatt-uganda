@@ -274,6 +274,23 @@
         </div>
       </div>
 
+      <!-- Pending Payments / Outstanding Balances -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
+            Pending Payments
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span id="pendingPaymentsTotal" style="font-size:13px;color:#E65100;font-weight:700"></span>
+            <span id="pendingPaymentsCount" style="font-size:11px;color:#fff;background:#E65100;padding:2px 9px;border-radius:20px;font-weight:700"></span>
+          </div>
+        </div>
+        <div id="pendingPaymentsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
       <!-- Today's consultations list -->
       <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
         <div class="table-header">
@@ -381,6 +398,71 @@
         <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
         <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record Payment Modal -->
+  <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:92vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span class="material-icons-outlined" style="color:#E65100;font-size:26px">payments</span>
+        <h3 style="font-size:17px;font-weight:700;margin:0">Record Payment</h3>
+      </div>
+      <div style="background:#FFF8E1;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:#5F6368">
+        <div><strong id="pmPatientName" style="color:#202124">Patient</strong></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span>Total bill</span><span id="pmTotal" style="font-weight:700;color:#202124">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span>Paid so far</span><span id="pmPaid" style="font-weight:700;color:#1B5E20">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #E0E0E0;margin-top:6px">
+          <span style="font-weight:600">Balance due</span><span id="pmBalance" style="font-weight:700;color:#C62828">—</span>
+        </div>
+      </div>
+
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Amount Received (UGX) *</label>
+      <input id="pmAmount" type="number" min="0" step="500" placeholder="0"
+        style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px">
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+        <button type="button" onclick="setPmQuickAmount('half')"
+          style="font-size:12px;padding:6px 12px;background:#F5F5F5;border:1px solid var(--border);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Half</button>
+        <button type="button" onclick="setPmQuickAmount('full')"
+          style="font-size:12px;padding:6px 12px;background:#E8F5E9;border:1px solid #A5D6A7;color:#1B5E20;border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Full Balance</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Method *</label>
+          <select id="pmMethod" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+            <option value="cash">Cash</option>
+            <option value="mobile_money">Mobile Money</option>
+            <option value="bank">Bank</option>
+            <option value="card">Card</option>
+            <option value="insurance">Insurance</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Reference</label>
+          <input id="pmRef" type="text" placeholder="MoMo TXN ID, etc."
+            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes</label>
+      <textarea id="pmNotes" rows="2" placeholder="e.g. First installment, will clear next week."
+        style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px;resize:vertical"></textarea>
+
+      <div id="pmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button id="pmCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="pmSaveBtn" style="flex:2;padding:12px;background:#E65100;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">payments</span>
+          Record Payment
         </button>
       </div>
     </div>
@@ -1097,11 +1179,295 @@
   var dm = document.getElementById('dischargeModal');
   if (dm) dm.addEventListener('click', function(e){ if(e.target===dm) dm.style.display='none'; });
 
+  // ═══════════════════════════════════════════════════════
+  // PENDING PAYMENTS / INSTALLMENTS
+  // ═══════════════════════════════════════════════════════
+
+  var _paymentContext = { diagnosisId: null, total: 0, paid: 0, balance: 0, patientName: '' };
+
+  function timeAgo(iso) {
+    if (!iso) return '';
+    var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60)+'m ago';
+    if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+    var days = Math.floor(diff/86400);
+    if (days < 7) return days+'d ago';
+    return new Date(iso).toLocaleDateString('en-UG', { day:'numeric', month:'short' });
+  }
+
+  async function loadPendingPayments() {
+    var listEl  = document.getElementById('pendingPaymentsList');
+    var totalEl = document.getElementById('pendingPaymentsTotal');
+    var countEl = document.getElementById('pendingPaymentsCount');
+    if (!listEl || !supabase) return;
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      return;
+    }
+
+    // Try the RPC first; fall back to a direct query if not deployed yet
+    var rows = [];
+    var res = await supabase.rpc('get_pending_payments', { p_clinic_id: clinicId });
+    if (res.error && (res.error.message||'').toLowerCase().indexOf('could not find the function') !== -1) {
+      var fallback = await supabase
+        .from('clinic_diagnoses')
+        .select('id,patient_name,patient_phone,confirmed_diagnosis,total_charged_ugx,amount_paid,payment_status,created_at')
+        .eq('clinic_id', clinicId)
+        .in('payment_status', ['pending','partial','credit'])
+        .order('created_at', { ascending: false });
+      if (fallback.error) {
+        listEl.innerHTML =
+          '<div style="padding:20px;margin:8px 14px;background:#FFF8E1;border:1.5px solid #FFE082;border-radius:10px;color:#5D4037;font-size:13px;line-height:1.55">'
+          +'<strong>Migration needed:</strong> Run <code style="font-size:11px">20260518_clinic_payments.sql</code> in Supabase SQL Editor to enable installment tracking.'
+          +'</div>';
+        if (totalEl) totalEl.textContent = '';
+        if (countEl) countEl.textContent = '';
+        return;
+      }
+      rows = (fallback.data || []).map(function(d){
+        var bal = Math.max(0, (Number(d.total_charged_ugx)||0) - (Number(d.amount_paid)||0));
+        return {
+          id: d.id, patient_name: d.patient_name, patient_phone: d.patient_phone,
+          confirmed_diagnosis: d.confirmed_diagnosis,
+          total_charged_ugx: d.total_charged_ugx, amount_paid: d.amount_paid || 0,
+          balance_ugx: bal, payment_status: d.payment_status,
+          created_at: d.created_at, last_payment_at: null,
+        };
+      }).filter(function(d){ return d.balance_ugx > 0; });
+    } else if (res.error) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading payments: '+esc(res.error.message)+'</div>';
+      return;
+    } else {
+      rows = res.data || [];
+    }
+
+    if (!rows.length) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
+      if (totalEl) totalEl.textContent = '';
+      if (countEl) countEl.textContent = '0';
+      return;
+    }
+
+    var totalOut = rows.reduce(function(s,r){ return s + (Number(r.balance_ugx)||0); }, 0);
+    if (totalEl) totalEl.textContent = 'UGX ' + fmtUGX(totalOut) + ' outstanding';
+    if (countEl) countEl.textContent = String(rows.length);
+
+    listEl.innerHTML = rows.map(function(r){
+      var statusBadge = r.payment_status === 'partial'
+        ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PARTIAL</span>'
+        : r.payment_status === 'credit'
+          ? '<span style="background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">CREDIT</span>'
+          : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">UNPAID</span>';
+      var ageDays = (Date.now() - new Date(r.created_at).getTime()) / 86400000;
+      var ageBg = ageDays > 7 ? '#FFEBEE' : ageDays > 2 ? '#FFF3E0' : '#F5F5F5';
+      var ageColor = ageDays > 7 ? '#C62828' : ageDays > 2 ? '#E65100' : '#5F6368';
+      var lastPay = r.last_payment_at ? 'Last paid '+timeAgo(r.last_payment_at) : 'No payments yet';
+      var pct = r.total_charged_ugx > 0 ? Math.min(100, Math.round((r.amount_paid / r.total_charged_ugx) * 100)) : 0;
+      return ''
+        +'<div style="padding:12px 16px;border-bottom:1px solid #F1F3F4">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:14px;font-weight:700;color:#202124">'+esc(r.patient_name || 'Walk-in')+' '+statusBadge+'</div>'
+              +'<div style="font-size:12px;color:#5F6368;margin-top:2px">'+esc(r.confirmed_diagnosis || 'No diagnosis recorded')+'</div>'
+              +(r.patient_phone ? '<div style="font-size:11px;color:#9AA0A6;margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
+            +'</div>'
+            +'<div style="text-align:right;flex-shrink:0">'
+              +'<div style="font-size:15px;font-weight:700;color:#C62828">UGX '+fmtUGX(r.balance_ugx)+'</div>'
+              +'<div style="font-size:10px;color:'+ageColor+';background:'+ageBg+';padding:2px 7px;border-radius:10px;display:inline-block;margin-top:2px">'+timeAgo(r.created_at)+'</div>'
+            +'</div>'
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:#5F6368;margin-bottom:4px">'
+            +'<span>Paid UGX '+fmtUGX(r.amount_paid)+' / '+fmtUGX(r.total_charged_ugx)+'</span>'
+            +'<span>'+esc(lastPay)+'</span>'
+          +'</div>'
+          +'<div style="height:5px;background:#F1F3F4;border-radius:3px;overflow:hidden;margin-bottom:8px">'
+            +'<div style="width:'+pct+'%;height:100%;background:#1B5E20;transition:width .3s"></div>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px">'
+            +'<button class="record-pay-btn" data-id="'+esc(r.id)+'" data-name="'+esc(r.patient_name||'Patient')+'" data-total="'+(r.total_charged_ugx||0)+'" data-paid="'+(r.amount_paid||0)+'" data-balance="'+(r.balance_ugx||0)+'" '
+              +'style="flex:2;font-size:12px;padding:7px 12px;background:#E65100;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px">'
+              +'<span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
+            +'<button class="view-pay-history-btn" data-id="'+esc(r.id)+'" data-name="'+esc(r.patient_name||'Patient')+'" '
+              +'style="flex:1;font-size:12px;padding:7px 10px;background:transparent;color:#5F6368;border:1.5px solid #E0E0E0;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit">History</button>'
+          +'</div>'
+        +'</div>';
+    }).join('');
+
+    // Wire up buttons
+    listEl.querySelectorAll('.record-pay-btn').forEach(function(b){
+      b.onclick = function() {
+        openPaymentModal(
+          b.getAttribute('data-id'),
+          b.getAttribute('data-name'),
+          Number(b.getAttribute('data-total')),
+          Number(b.getAttribute('data-paid')),
+          Number(b.getAttribute('data-balance'))
+        );
+      };
+    });
+    listEl.querySelectorAll('.view-pay-history-btn').forEach(function(b){
+      b.onclick = function() {
+        showPaymentHistory(b.getAttribute('data-id'), b.getAttribute('data-name'));
+      };
+    });
+  }
+
+  function openPaymentModal(diagnosisId, patientName, total, paid, balance) {
+    _paymentContext = {
+      diagnosisId: diagnosisId, patientName: patientName,
+      total: total, paid: paid, balance: balance,
+    };
+    document.getElementById('pmPatientName').textContent = patientName;
+    document.getElementById('pmTotal').textContent   = 'UGX ' + fmtUGX(total);
+    document.getElementById('pmPaid').textContent    = 'UGX ' + fmtUGX(paid);
+    document.getElementById('pmBalance').textContent = 'UGX ' + fmtUGX(balance);
+    document.getElementById('pmAmount').value = '';
+    document.getElementById('pmRef').value    = '';
+    document.getElementById('pmNotes').value  = '';
+    document.getElementById('pmMethod').value = 'cash';
+    document.getElementById('pmError').style.display = 'none';
+    document.getElementById('paymentModal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('pmAmount').focus(); }, 50);
+  }
+
+  window.setPmQuickAmount = function(kind) {
+    var input = document.getElementById('pmAmount');
+    if (kind === 'full') input.value = _paymentContext.balance;
+    if (kind === 'half') input.value = Math.round(_paymentContext.balance / 2);
+  };
+
+  document.getElementById('pmCancelBtn').onclick = function() {
+    document.getElementById('paymentModal').style.display = 'none';
+  };
+  document.getElementById('paymentModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('pmSaveBtn').onclick = async function() {
+    var btn   = this;
+    var errEl = document.getElementById('pmError');
+    errEl.style.display = 'none';
+
+    var amount = parseFloat(document.getElementById('pmAmount').value);
+    var method = document.getElementById('pmMethod').value || 'cash';
+    var ref    = (document.getElementById('pmRef').value||'').trim() || null;
+    var notes  = (document.getElementById('pmNotes').value||'').trim() || null;
+
+    if (!amount || amount <= 0) {
+      errEl.textContent = 'Enter an amount greater than 0.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (amount > _paymentContext.balance) {
+      var over = amount - _paymentContext.balance;
+      if (!confirm('This is UGX '+fmtUGX(over)+' more than the balance. Continue and overpay?')) return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
+
+    try {
+      var r = await supabase.rpc('record_payment', {
+        p_diagnosis_id: _paymentContext.diagnosisId,
+        p_amount:       amount,
+        p_method:       method,
+        p_reference:    ref,
+        p_notes:        notes,
+      });
+      if (r.error) throw r.error;
+      var data = r.data || {};
+      if (data.ok === false) throw new Error(data.error || 'Failed to record payment');
+
+      // Push receipt to patient (fire-and-forget but surface result)
+      var notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' recorded.';
+      var notifyKind = 'success';
+      try {
+        var nr = await supabase.functions.invoke('payment-notify', {
+          body: {
+            diagnosisId:    _paymentContext.diagnosisId,
+            amountReceived: amount,
+            balance:        Number(data.balance) || 0,
+            fullyPaid:      Boolean(data.fully_paid),
+            method:         method,
+          },
+        });
+        if (nr.error) {
+          notifyMsg = 'Payment saved; receipt push failed.';
+          notifyKind = 'warning';
+        } else {
+          var nd = nr.data || {};
+          if (nd.delivered) {
+            notifyMsg = data.fully_paid
+              ? 'Bill fully paid. Receipt sent to patient.'
+              : 'Payment recorded. Receipt sent to patient.';
+          } else if (nd.reason === 'patient_not_on_homatt') {
+            notifyMsg = 'Payment recorded. Patient is not on the Homatt app — no push sent.';
+            notifyKind = 'warning';
+          } else {
+            notifyMsg = 'Payment recorded. ' + (nd.message || '');
+            notifyKind = nd.delivered ? 'success' : 'warning';
+          }
+        }
+      } catch(e) {
+        notifyMsg = 'Payment saved; push notification call failed.';
+        notifyKind = 'warning';
+      }
+      showDischargeToast(notifyMsg, notifyKind);
+
+      document.getElementById('paymentModal').style.display = 'none';
+      loadPendingPayments();
+      loadRevenue();
+      loadFinancial(_finPeriod);
+    } catch(e) {
+      errEl.textContent = 'Error: ' + (e.message || e);
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">payments</span> Record Payment';
+  };
+
+  async function showPaymentHistory(diagnosisId, patientName) {
+    var r = await supabase
+      .from('clinic_payments')
+      .select('amount_ugx,method,reference,notes,created_at')
+      .eq('diagnosis_id', diagnosisId)
+      .order('created_at', { ascending: false });
+    if (r.error) {
+      alert('Error loading history: ' + r.error.message);
+      return;
+    }
+    var rows = r.data || [];
+    var modal = document.getElementById('histModal');
+    document.getElementById('histModalName').textContent = patientName;
+    document.getElementById('histModalMeta').textContent = 'Payment history';
+    var body = document.getElementById('histModalBody');
+    if (!rows.length) {
+      body.innerHTML = '<div style="text-align:center;padding:40px;color:#9AA0A6;font-size:13px">No payments recorded yet.</div>';
+    } else {
+      body.innerHTML = rows.map(function(p){
+        var d = new Date(p.created_at);
+        return '<div style="padding:12px 0;border-bottom:1px solid #F1F3F4">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div style="font-size:14px;font-weight:700;color:#1B5E20">UGX '+fmtUGX(p.amount_ugx)+'</div>'
+          +'<div style="font-size:11px;color:#9AA0A6">'+d.toLocaleString('en-UG')+'</div>'
+          +'</div>'
+          +'<div style="font-size:12px;color:#5F6368;margin-top:2px">Method: '+esc(p.method||'')+(p.reference?' • Ref: '+esc(p.reference):'')+'</div>'
+          +(p.notes ? '<div style="font-size:12px;color:#5F6368;margin-top:4px;font-style:italic">"'+esc(p.notes)+'"</div>' : '')
+          +'</div>';
+      }).join('');
+    }
+    if (modal) modal.style.display = 'flex';
+  }
+
   // ── Initial load ──
   async function loadAll() {
     await resolveClinicId();
     loadBookings();
     loadActiveTreatments();
+    loadPendingPayments();
     loadConsultations();
     loadRevenue();
     loadInventory();
@@ -1111,7 +1477,8 @@
 
   // ── Auto-refresh every 60 s ──
   setInterval(function() {
-    loadBookings(); loadActiveTreatments(); loadConsultations(); loadRevenue();
+    loadBookings(); loadActiveTreatments(); loadPendingPayments();
+    loadConsultations(); loadRevenue();
     loadInventory(); loadFinancial(_finPeriod);
   }, 60000);
 
@@ -1124,7 +1491,9 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
         function() { loadBookings(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); })
+        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); loadPendingPayments(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_payments', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadPendingPayments(); loadRevenue(); loadFinancial(_finPeriod); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory', filter: 'clinic_id=eq.' + clinicId },
         function() { loadInventory(); loadFinancial(_finPeriod); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory_txns', filter: 'clinic_id=eq.' + clinicId },
