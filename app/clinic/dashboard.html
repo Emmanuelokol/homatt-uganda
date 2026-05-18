@@ -356,14 +356,22 @@
             <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px">
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:16px">
           <div style="background:#F3E5F5;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#7B1FA2;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Patients</div>
             <div id="finPatients" style="font-size:22px;font-weight:700;color:#4A148C">—</div>
           </div>
           <div style="background:#E8F5E9;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Revenue (UGX)</div>
+            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Billed (UGX)</div>
             <div id="finRevenue" style="font-size:18px;font-weight:700;color:#1B5E20">—</div>
+          </div>
+          <div style="background:#E0F2F1;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#00695C;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Collected (UGX)</div>
+            <div id="finCollected" style="font-size:18px;font-weight:700;color:#00695C">—</div>
+          </div>
+          <div style="background:#FFEBEE;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#C62828;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Outstanding (UGX)</div>
+            <div id="finOutstanding" style="font-size:18px;font-weight:700;color:#C62828">—</div>
           </div>
           <div style="background:#E3F2FD;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stock Used (UGX)</div>
@@ -1395,8 +1403,14 @@
           },
         });
         if (nr.error) {
-          notifyMsg = 'Payment saved; receipt push failed.';
+          var errMsg = (nr.error.message || '').toLowerCase();
+          if (errMsg.indexOf('not found') !== -1 || errMsg.indexOf('failed to send') !== -1 || errMsg.indexOf('404') !== -1) {
+            notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. (Push receipt not yet deployed — deploy payment-notify edge function to send phone receipts.)';
+          } else {
+            notifyMsg = 'Payment saved. Push failed: ' + (nr.error.message || 'unknown');
+          }
           notifyKind = 'warning';
+          console.warn('[payment-notify] error', nr.error);
         } else {
           var nd = nr.data || {};
           if (nd.delivered) {
@@ -1733,9 +1747,9 @@
     }
 
     try {
-      var [dxRes, txnRes] = await Promise.all([
+      var [dxRes, txnRes, payRes] = await Promise.all([
         supabase.from('clinic_diagnoses')
-          .select('total_charged_ugx,payment_status')
+          .select('id,total_charged_ugx,amount_paid,payment_status')
           .eq('clinic_id', clinicId)
           .gte('created_at', start.toISOString()),
         supabase.from('clinic_inventory_txns')
@@ -1743,22 +1757,38 @@
           .eq('clinic_id', clinicId)
           .eq('txn_type', 'deduction')
           .gte('created_at', start.toISOString()),
+        supabase.from('clinic_payments')
+          .select('amount_ugx,created_at')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
       ]);
 
       var rows = dxRes.data || [];
       var txns = txnRes.data || [];
+      var pays = payRes.data || [];
 
-      var patients = rows.length;
-      var revenue  = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
+      var patients  = rows.length;
+      var billed    = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
+      // Collected = payments received in this period (real cash in hand)
+      // Falls back to amount_paid on diagnoses if clinic_payments table missing
+      var collected = pays.length
+        ? pays.reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
+        : rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0);
+      var outstanding = Math.max(0, billed - rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0));
       var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
-      var margin   = revenue - stockCost;
+      // Margin uses Collected (real income) minus stock cost so it reflects actual cash position
+      var margin    = collected - stockCost;
 
       var pEl  = document.getElementById('finPatients');
       var rEl  = document.getElementById('finRevenue');
+      var cEl  = document.getElementById('finCollected');
+      var oEl  = document.getElementById('finOutstanding');
       var scEl = document.getElementById('finStockCost');
       var mEl  = document.getElementById('finMargin');
       if (pEl)  pEl.textContent  = patients;
-      if (rEl)  rEl.textContent  = fmtUGX(revenue);
+      if (rEl)  rEl.textContent  = fmtUGX(billed);
+      if (cEl)  cEl.textContent  = fmtUGX(collected);
+      if (oEl)  oEl.textContent  = fmtUGX(outstanding);
       if (scEl) scEl.textContent = fmtUGX(stockCost);
       if (mEl) {
         mEl.textContent  = fmtUGX(margin);
