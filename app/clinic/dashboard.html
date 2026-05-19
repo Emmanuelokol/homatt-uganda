@@ -496,6 +496,13 @@
         </button>
       </div>
       <div id="histModalBody" style="overflow-y:auto;padding:20px 24px;flex:1">Loading…</div>
+      <div id="histModalFooter" style="display:none;padding:14px 24px 16px;border-top:1px solid #E8EAED;flex-shrink:0">
+        <button id="histModalNewVisitBtn"
+          style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px">add_circle</span>
+          Record New Visit
+        </button>
+      </div>
     </div>
   </div>
 </div>
@@ -1038,6 +1045,17 @@
       var paid    = Number(current.amount_paid) || 0;
       var balance = Math.max(0, total - paid);
       openPaymentModal(current.id, current.patient_name || 'Patient', total, paid, balance);
+    };
+
+    // Show "Record New Visit" footer — lets clinician start a fresh consultation for this patient
+    var footer = document.getElementById('histModalFooter');
+    var newVisitBtn = document.getElementById('histModalNewVisitBtn');
+    if (footer) footer.style.display = 'block';
+    if (newVisitBtn) newVisitBtn.onclick = function() {
+      var params = new URLSearchParams();
+      if (current.patient_name)  params.set('patient_name',  current.patient_name);
+      if (current.patient_phone) params.set('patient_phone', current.patient_phone);
+      window.location.href = 'new-order.html?' + params.toString();
     };
   }
 
@@ -1686,6 +1704,8 @@
     var modal = document.getElementById('histModal');
     document.getElementById('histModalName').textContent = patientName;
     document.getElementById('histModalMeta').textContent = 'Payment history';
+    var footer = document.getElementById('histModalFooter');
+    if (footer) footer.style.display = 'none';
     var body = document.getElementById('histModalBody');
     if (!rows.length) {
       body.innerHTML = '<div style="text-align:center;padding:40px;color:#9AA0A6;font-size:13px">No payments recorded yet.</div>';
