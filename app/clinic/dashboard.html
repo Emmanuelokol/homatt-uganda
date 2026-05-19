@@ -269,6 +269,12 @@
           </div>
           <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
         </div>
+        <div style="padding:8px 16px 4px;position:relative">
+          <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+          <input id="activeSearch" type="text" placeholder="Search by patient name or code…"
+            style="width:100%;padding:9px 12px 9px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#111;outline:none;box-sizing:border-box"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
         <div id="activeTreatmentsList" style="padding:8px 0">
           <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
         </div>
@@ -989,7 +995,157 @@
   var histModal = document.getElementById('histModal');
   if (histModal) histModal.addEventListener('click', function(e){ if(e.target===histModal) histModal.style.display='none'; });
 
+  // ── Active patient detail (tapped from Active Treatments list) ──
+  // Opens histModal with current visit on top showing medications + balance,
+  // and past visits for the same patient_phone below as history.
+  async function openActivePatientDetail(diagnosisId) {
+    var modal  = document.getElementById('histModal');
+    var nameEl = document.getElementById('histModalName');
+    var metaEl = document.getElementById('histModalMeta');
+    var bodyEl = document.getElementById('histModalBody');
+    if (!modal || !bodyEl) return;
+
+    var current = _activeRows.find(function(r){ return r.id === diagnosisId; });
+    if (!current) return;
+
+    var code = patientCodeFor(current);
+    if (nameEl) nameEl.textContent = current.patient_name || current.patient_phone || 'Patient';
+    if (metaEl) metaEl.textContent = (current.patient_phone ? current.patient_phone + ' · ' : '') + (code ? 'Code ' + code : '');
+    modal.style.display = 'flex';
+    bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6">Loading patient record…</div>';
+
+    // Fetch past visits for the same patient (by phone). Exclude the current one.
+    var history = [];
+    if (current.patient_phone && supabase) {
+      var clinicId = await resolveClinicId();
+      var hr = await supabase.from('clinic_diagnoses')
+        .select('id,confirmed_diagnosis,severity,created_at,total_charged_ugx,amount_paid,payment_status,prescription_items,patient_type')
+        .eq('clinic_id', clinicId)
+        .eq('patient_phone', current.patient_phone)
+        .neq('id', current.id)
+        .order('created_at', {ascending:false})
+        .limit(20);
+      history = hr.error ? [] : (hr.data || []);
+    }
+
+    bodyEl.innerHTML = renderPatientDetailBody(current, history);
+
+    // Wire the "Record Payment" shortcut button inside the modal
+    var payBtn = bodyEl.querySelector('[data-action="record-payment"]');
+    if (payBtn) payBtn.onclick = function() {
+      modal.style.display = 'none';
+      var total   = Number(current.total_charged_ugx) || 0;
+      var paid    = Number(current.amount_paid) || 0;
+      var balance = Math.max(0, total - paid);
+      openPaymentModal(current.id, current.patient_name || 'Patient', total, paid, balance);
+    };
+  }
+
+  function renderMedsList(items) {
+    if (!Array.isArray(items) || !items.length) {
+      return '<div style="font-size:12px;color:#9AA0A6;font-style:italic">No medications recorded for this visit.</div>';
+    }
+    return items.map(function(m) {
+      var name = m.drug_name || m.name || 'Medication';
+      var dose = m.strength || m.dosage || '';
+      var freq = (m.frequency || '').replace('_daily','/day').replace(/_/g,' ');
+      var dur  = m.duration ? (m.duration + ' day' + (m.duration!==1?'s':'')) : '';
+      var sub  = [dose, freq, dur].filter(Boolean).join(' · ');
+      return '<div style="display:flex;gap:10px;padding:8px 10px;background:#F5F7F5;border-radius:8px;margin-bottom:6px;align-items:center">'
+        +'<span class="material-icons-outlined" style="font-size:18px;color:#1B5E20">medication</span>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:600;color:#111">'+esc(name)+'</div>'
+          +(sub ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">'+esc(sub)+'</div>' : '')
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+
+  function renderPatientDetailBody(current, history) {
+    var d = new Date(current.created_at);
+    var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    var timeStr = d.toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+    var total   = Number(current.total_charged_ugx) || 0;
+    var paid    = Number(current.amount_paid) || 0;
+    var balance = Math.max(0, total - paid);
+    var status  = current.payment_status || (balance > 0 ? 'pending' : 'paid');
+
+    var balanceBlock = total > 0
+      ? '<div style="background:'+(balance>0?'#FFF3E0':'#E8F5E9')+';border:1px solid '+(balance>0?'#FFB74D':'#A5D6A7')+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+            +'<div>'
+              +'<div style="font-size:11px;color:'+(balance>0?'#E65100':'#1B5E20')+';font-weight:700;letter-spacing:.5px;text-transform:uppercase">'+(balance>0?'Outstanding Balance':'Bill Settled')+'</div>'
+              +'<div style="font-size:20px;font-weight:800;color:'+(balance>0?'#E65100':'#1B5E20')+';margin-top:2px">UGX '+fmtUGX(balance>0?balance:total)+'</div>'
+              +'<div style="font-size:11px;color:#5F6368;margin-top:4px">Total billed UGX '+fmtUGX(total)+' · Paid UGX '+fmtUGX(paid)+'</div>'
+            +'</div>'
+            +(balance>0
+              ? '<button data-action="record-payment" style="background:#E65100;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap"><span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
+              : '<span style="background:#1B5E20;color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700">PAID</span>')
+          +'</div>'
+        +'</div>'
+      : '';
+
+    var currentBlock =
+      '<div style="border:2px solid #1565C0;border-radius:12px;padding:14px 16px;margin-bottom:18px;background:#fff">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+          +'<div>'
+            +'<div style="font-size:11px;color:#1565C0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Active Visit</div>'
+            +'<div style="font-size:14px;font-weight:700;margin-top:2px">'+esc(dateStr)+' at '+esc(timeStr)+'</div>'
+          +'</div>'
+          +'<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700">'+esc((current.severity||'moderate').toUpperCase())+'</span>'
+        +'</div>'
+        +'<div style="font-size:13px;color:#424242;margin-bottom:10px"><strong>Diagnosis:</strong> '+esc(current.confirmed_diagnosis||'Pending')+'</div>'
+        +(current.patient_type ? '<div style="font-size:12px;color:#9AA0A6;margin-bottom:10px">Patient type: '+esc(current.patient_type)+'</div>' : '')
+        +balanceBlock
+        +'<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Current Medications</div>'
+        +renderMedsList(current.prescription_items)
+      +'</div>';
+
+    var historyBlock = '';
+    if (history.length) {
+      historyBlock =
+        '<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Previous Visits ('+history.length+')</div>'
+        + history.map(function(h, i) {
+          var hd = new Date(h.created_at);
+          var hDate = hd.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+          var hPaid = h.payment_status === 'paid'
+            ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+            : (h.payment_status === 'waived'
+              ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
+              : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>');
+          var hFee = h.total_charged_ugx ? 'UGX ' + fmtUGX(h.total_charged_ugx) : '';
+          var hMeds = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
+          return '<div style="border:1px solid #E8EAED;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'
+              +'<div style="font-weight:700;font-size:13px">'+esc(hDate)+'</div>'
+              +(hFee?'<div style="font-size:12px;color:#5F6368">'+esc(hFee)+' '+hPaid+'</div>':'')
+            +'</div>'
+            +'<div style="font-size:12px;color:#424242">'+esc(h.confirmed_diagnosis||'Pending')+(hMeds?' · '+hMeds+' med'+(hMeds!==1?'s':''):'')+'</div>'
+          +'</div>';
+        }).join('');
+    } else {
+      historyBlock = '<div style="font-size:12px;color:#9AA0A6;text-align:center;padding:8px;font-style:italic">No previous visits at this clinic.</div>';
+    }
+
+    return currentBlock + historyBlock;
+  }
+
   // ── Active treatments (open cases, all dates) ──
+  // Build a short, human-readable code so staff can call out / look up a patient quickly.
+  // Prefer the Homatt booking code (the patient already knows it); fall back to a
+  // clinic-generated code derived from the diagnosis UUID so walk-ins still have one.
+  function patientCodeFor(c) {
+    if (c && c.bookings && c.bookings.booking_code) return c.bookings.booking_code;
+    if (c && c.booking && c.booking.booking_code)   return c.booking.booking_code;
+    if (c && c._booking_code)                       return c._booking_code;
+    if (c && c.id) return 'CLN-' + String(c.id).replace(/-/g,'').slice(0,6).toUpperCase();
+    return '';
+  }
+
+  // Cache the loaded active treatments so the search box can filter without re-querying.
+  var _activeRows = [];
+  var _activeMigrationNeeded = false;
+
   async function loadActiveTreatments() {
     var el = document.getElementById('activeTreatmentsList');
     var ct = document.getElementById('activeCount');
@@ -999,12 +1155,13 @@
     var clinicId = await resolveClinicId();
     if (!clinicId) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
 
-    var migrationNeeded = false;
+    _activeMigrationNeeded = false;
 
     // Try with discharged_at filter first; fall back if column doesn't exist yet
     var rows = null;
+    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,prescription_items,booking_id';
     var tryWithFilter = await supabase.from('clinic_diagnoses')
-      .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status,follow_up_days,prescription_items')
+      .select(SEL)
       .eq('clinic_id', clinicId)
       .is('discharged_at', null)
       .order('created_at', {ascending:false})
@@ -1012,9 +1169,9 @@
 
     if (tryWithFilter.error && tryWithFilter.error.message && tryWithFilter.error.message.includes('discharged_at')) {
       // Column missing — apply migration. Fall back to recent 14-day diagnoses.
-      migrationNeeded = true;
+      _activeMigrationNeeded = true;
       var fallback = await supabase.from('clinic_diagnoses')
-        .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status,follow_up_days,prescription_items')
+        .select(SEL)
         .eq('clinic_id', clinicId)
         .gte('created_at', new Date(Date.now() - 14*86400000).toISOString())
         .order('created_at', {ascending:false})
@@ -1027,9 +1184,43 @@
       rows = tryWithFilter.data || [];
     }
 
-    if (ct) ct.textContent = rows.length ? rows.length + ' open' : '';
+    // Resolve booking_code for rows that have a booking_id (one batched query).
+    var bookingIds = rows.map(function(r){ return r.booking_id; }).filter(Boolean);
+    if (bookingIds.length) {
+      try {
+        var bres = await supabase.from('bookings').select('id,booking_code').in('id', bookingIds);
+        var codeById = {};
+        (bres.data || []).forEach(function(b){ codeById[b.id] = b.booking_code; });
+        rows.forEach(function(r){ if (r.booking_id && codeById[r.booking_id]) r._booking_code = codeById[r.booking_id]; });
+      } catch(_) { /* non-fatal — fall back to CLN-XXX code */ }
+    }
 
-    var notice = migrationNeeded
+    _activeRows = rows;
+    renderActiveTreatments();
+  }
+
+  function renderActiveTreatments() {
+    var el = document.getElementById('activeTreatmentsList');
+    var ct = document.getElementById('activeCount');
+    if (!el) return;
+
+    var q = (document.getElementById('activeSearch')||{}).value || '';
+    q = q.trim().toLowerCase();
+    var rows = q
+      ? _activeRows.filter(function(c) {
+          var name = (c.patient_name || '').toLowerCase();
+          var phone = (c.patient_phone || '').toLowerCase();
+          var code = patientCodeFor(c).toLowerCase();
+          var dx = (c.confirmed_diagnosis || '').toLowerCase();
+          return name.indexOf(q) !== -1 || phone.indexOf(q) !== -1 || code.indexOf(q) !== -1 || dx.indexOf(q) !== -1;
+        })
+      : _activeRows.slice();
+
+    if (ct) ct.textContent = _activeRows.length
+      ? (q ? rows.length + ' / ' + _activeRows.length + ' open' : _activeRows.length + ' open')
+      : '';
+
+    var notice = _activeMigrationNeeded
       ? '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;margin:8px 16px;font-size:12px;color:#5D4037;display:flex;align-items:center;gap:8px">'
           +'<span class="material-icons-outlined" style="font-size:18px;color:#F9A825">info</span>'
           +'<span><strong>Migration needed:</strong> Run <code>20260516_patch_discharged_at.sql</code> in Supabase SQL Editor to enable discharge tracking. Showing last 14 days for now.</span>'
@@ -1037,9 +1228,13 @@
       : '';
 
     if (!rows.length) {
-      el.innerHTML = notice + '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!</div>';
+      var emptyMsg = q
+        ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#BDBDBD">search_off</span>No patient matches "'+esc(q)+'".'
+        : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!';
+      el.innerHTML = notice + '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
       return;
     }
+
     el.innerHTML = notice + rows.map(function(c) {
       var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
       var d   = new Date(c.created_at);
@@ -1047,17 +1242,28 @@
       var ageDays = Math.floor(ageMs / 86400000);
       var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
       var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
-      var fee = c.total_charged_ugx ? 'UGX ' + Number(c.total_charged_ugx).toLocaleString('en-UG') : '';
+      var total = Number(c.total_charged_ugx) || 0;
+      var paid  = Number(c.amount_paid) || 0;
+      var balance = Math.max(0, total - paid);
+      var feeBadge = total
+        ? (balance > 0
+            ? '<span style="color:#C62828;font-weight:700">UGX '+fmtUGX(balance)+' due</span>'
+            : '<span style="color:#1B5E20;font-weight:700">Paid</span>')
+        : '';
       var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
-      var dischargeBtn = !migrationNeeded
+      var code = patientCodeFor(c);
+      var codeBadge = code
+        ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.4px;font-family:monospace">'+esc(code)+'</span>'
+        : '';
+      var dischargeBtn = !_activeMigrationNeeded
         ? '<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
         : '';
-      return '<div class="order-card" style="margin:8px 16px" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
+      return '<div class="order-card active-tap" style="margin:8px 16px;cursor:pointer" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
         +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
         +'<div class="order-info">'
-          +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+followDue+'</div>'
+          +'<div class="order-patient" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+esc(c.patient_name||c.patient_phone||'Patient')+codeBadge+followDue+'</div>'
           +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
-          +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(fee?'<span>'+fee+'</span>':'')+'</div>'
+          +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(feeBadge?'<span>'+feeBadge+'</span>':'')+'</div>'
         +'</div>'
         +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
           +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
@@ -1066,16 +1272,30 @@
         +'</div>';
     }).join('');
 
-    if (!migrationNeeded) {
-      el.querySelectorAll('.order-card').forEach(function(card) {
-        var btn = card.querySelector('.discharge-btn');
-        if (btn) btn.onclick = function(ev) {
-          ev.stopPropagation();
-          openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
-        };
-      });
-    }
+    // Wire up: tapping a card opens the patient detail; the inner Discharge
+    // button must not bubble up and trigger the detail modal too.
+    el.querySelectorAll('.order-card.active-tap').forEach(function(card) {
+      card.onclick = function() {
+        openActivePatientDetail(card.dataset.diagnosisId);
+      };
+      var btn = card.querySelector('.discharge-btn');
+      if (btn) btn.onclick = function(ev) {
+        ev.stopPropagation();
+        openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
+      };
+    });
   }
+
+  // Live filter as the user types in the active-treatments search box
+  (function wireActiveSearch(){
+    var inp = document.getElementById('activeSearch');
+    if (!inp) return;
+    var t = null;
+    inp.addEventListener('input', function() {
+      clearTimeout(t);
+      t = setTimeout(renderActiveTreatments, 120);
+    });
+  })();
 
   // ── Discharge flow ──
   var _dischargeContext = { diagnosisId: null, cardEl: null };
