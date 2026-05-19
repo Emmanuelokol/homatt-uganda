@@ -498,9 +498,9 @@
       <div id="histModalBody" style="overflow-y:auto;padding:20px 24px;flex:1">Loading…</div>
       <div id="histModalFooter" style="display:none;padding:14px 24px 16px;border-top:1px solid #E8EAED;flex-shrink:0">
         <button id="histModalNewVisitBtn"
-          style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
-          <span class="material-icons-outlined" style="font-size:18px">add_circle</span>
-          Record New Visit
+          style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px">post_add</span>
+          Record Follow-up Visit
         </button>
       </div>
     </div>
@@ -1035,27 +1035,39 @@
       history = hr.error ? [] : (hr.data || []);
     }
 
+    // Stash so the follow-up form can return to the detail view on cancel
+    _activeDetailContext = { current: current, history: history };
+    renderActiveDetailView();
+
+    // Show "Record Follow-up" footer — appends to the existing case (not a new diagnosis)
+    var footer = document.getElementById('histModalFooter');
+    var followupBtn = document.getElementById('histModalNewVisitBtn');
+    if (footer) footer.style.display = 'block';
+    if (followupBtn) followupBtn.onclick = showFollowupForm;
+  }
+
+  // Patient detail context — used by the follow-up form to return to the detail view
+  var _activeDetailContext = { current: null, history: [] };
+
+  function renderActiveDetailView() {
+    var bodyEl = document.getElementById('histModalBody');
+    var footer = document.getElementById('histModalFooter');
+    var current = _activeDetailContext.current;
+    var history = _activeDetailContext.history || [];
+    if (!bodyEl || !current) return;
+
     bodyEl.innerHTML = renderPatientDetailBody(current, history);
+    if (footer) footer.style.display = 'block';
 
     // Wire the "Record Payment" shortcut button inside the modal
     var payBtn = bodyEl.querySelector('[data-action="record-payment"]');
     if (payBtn) payBtn.onclick = function() {
-      modal.style.display = 'none';
+      var modal = document.getElementById('histModal');
+      if (modal) modal.style.display = 'none';
       var total   = Number(current.total_charged_ugx) || 0;
       var paid    = Number(current.amount_paid) || 0;
       var balance = Math.max(0, total - paid);
       openPaymentModal(current.id, current.patient_name || 'Patient', total, paid, balance);
-    };
-
-    // Show "Record New Visit" footer — lets clinician start a fresh consultation for this patient
-    var footer = document.getElementById('histModalFooter');
-    var newVisitBtn = document.getElementById('histModalNewVisitBtn');
-    if (footer) footer.style.display = 'block';
-    if (newVisitBtn) newVisitBtn.onclick = function() {
-      var params = new URLSearchParams();
-      if (current.patient_name)  params.set('patient_name',  current.patient_name);
-      if (current.patient_phone) params.set('patient_phone', current.patient_phone);
-      window.location.href = 'new-order.html?' + params.toString();
     };
   }
 
@@ -1148,6 +1160,201 @@
     return currentBlock + historyBlock;
   }
 
+  // ── Follow-up visit form ────────────────────────────────
+  // Updates the existing clinic_diagnoses row in place — appends new meds,
+  // adds to the bill, optionally records a payment. Does NOT create a new case.
+  function followupMedRowHTML(i) {
+    return ''
+    + '<div class="fu-med-row" data-idx="'+i+'" style="border:1px solid #E8EAED;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        + '<div style="font-size:11px;font-weight:700;color:#1565C0;letter-spacing:.5px;text-transform:uppercase">Medication '+(i+1)+'</div>'
+        + (i > 0 ? '<button type="button" class="fu-med-remove" style="background:transparent;border:none;color:#C62828;font-size:12px;cursor:pointer;font-family:inherit;padding:2px 6px">Remove</button>' : '')
+      + '</div>'
+      + '<input class="fu-med-name field-input" placeholder="Drug name e.g. Amoxicillin" style="width:100%;margin-bottom:6px">'
+      + '<div style="display:flex;gap:6px;margin-bottom:6px">'
+        + '<input class="fu-med-strength field-input" placeholder="Strength e.g. 500mg" style="flex:1">'
+        + '<select class="fu-med-freq field-input" style="flex:1">'
+          + '<option value="1">1× daily</option>'
+          + '<option value="2" selected>2× daily</option>'
+          + '<option value="3">3× daily</option>'
+          + '<option value="4">4× daily</option>'
+        + '</select>'
+      + '</div>'
+      + '<input class="fu-med-days field-input" type="number" min="1" value="5" placeholder="Duration (days)" style="width:100%">'
+    + '</div>';
+  }
+
+  function showFollowupForm() {
+    var bodyEl = document.getElementById('histModalBody');
+    var footer = document.getElementById('histModalFooter');
+    var current = _activeDetailContext.current;
+    if (!bodyEl || !current) return;
+    if (footer) footer.style.display = 'none';
+
+    var total   = Number(current.total_charged_ugx) || 0;
+    var paid    = Number(current.amount_paid) || 0;
+    var balance = Math.max(0, total - paid);
+
+    bodyEl.innerHTML = ''
+      + '<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#0D47A1">'
+        + '<strong>Follow-up visit</strong> — adds to the existing case for <strong>'+esc(current.patient_name||'this patient')+'</strong>. No new diagnosis created.'
+      + '</div>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Add medications (optional)</div>'
+      + '<div id="fuMedsContainer">' + followupMedRowHTML(0) + '</div>'
+      + '<button type="button" id="fuAddMedBtn" style="width:100%;padding:10px;background:#F5F7F5;color:#1565C0;border:1px dashed #90CAF9;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:6px">'
+        + '<span class="material-icons-outlined" style="font-size:16px">add</span> Add another medication'
+      + '</button>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Additional charge (optional)</div>'
+      + '<input id="fuExtraCharge" class="field-input" type="number" min="0" step="500" placeholder="e.g. 10000" style="width:100%;margin-bottom:6px">'
+      + '<div style="font-size:11px;color:#9AA0A6;margin-bottom:16px">Adds to the bill. Current total: UGX '+fmtUGX(total)+(balance>0?' · Balance UGX '+fmtUGX(balance):'')+'</div>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Payment now (optional)</div>'
+      + '<input id="fuPaymentAmount" class="field-input" type="number" min="0" step="500" placeholder="Amount patient is paying today" style="width:100%;margin-bottom:6px">'
+      + '<select id="fuPaymentMethod" class="field-input" style="width:100%;margin-bottom:16px">'
+        + '<option value="cash">Cash</option>'
+        + '<option value="mobile_money">Mobile money</option>'
+        + '<option value="card">Card</option>'
+        + '<option value="insurance">Insurance</option>'
+      + '</select>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Visit notes (optional)</div>'
+      + '<textarea id="fuNotes" class="field-input" rows="2" placeholder="What happened in this visit — e.g. patient feeling better, BP rechecked, refilled meds…" style="width:100%;margin-bottom:18px"></textarea>'
+
+      + '<div id="fuError" style="display:none;background:#FFEBEE;color:#C62828;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px"></div>'
+
+      + '<div style="display:flex;gap:8px">'
+        + '<button id="fuCancelBtn" type="button" style="flex:1;padding:13px;background:#F5F5F5;color:#5F6368;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
+        + '<button id="fuSaveBtn" type="button" style="flex:2;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+          + '<span class="material-icons-outlined" style="font-size:18px">save</span> Save Follow-up'
+        + '</button>'
+      + '</div>';
+
+    // Wire add-row / remove-row buttons
+    document.getElementById('fuAddMedBtn').onclick = function() {
+      var ctr = document.getElementById('fuMedsContainer');
+      var idx = ctr.querySelectorAll('.fu-med-row').length;
+      ctr.insertAdjacentHTML('beforeend', followupMedRowHTML(idx));
+      wireFollowupRemoveButtons();
+    };
+    wireFollowupRemoveButtons();
+
+    document.getElementById('fuCancelBtn').onclick = renderActiveDetailView;
+    document.getElementById('fuSaveBtn').onclick   = saveFollowupVisit;
+  }
+
+  function wireFollowupRemoveButtons() {
+    document.querySelectorAll('.fu-med-remove').forEach(function(btn) {
+      btn.onclick = function() {
+        var row = btn.closest('.fu-med-row');
+        if (row) row.remove();
+      };
+    });
+  }
+
+  // Default intake times by frequency — patient receives push reminders at these slots
+  function defaultIntakeTimes(timesPerDay) {
+    switch (Number(timesPerDay)) {
+      case 1: return ['08:00'];
+      case 2: return ['08:00','20:00'];
+      case 3: return ['08:00','14:00','20:00'];
+      case 4: return ['08:00','12:00','16:00','20:00'];
+      default: return ['08:00'];
+    }
+  }
+
+  async function saveFollowupVisit() {
+    var current = _activeDetailContext.current;
+    var errEl = document.getElementById('fuError');
+    var btn   = document.getElementById('fuSaveBtn');
+    if (!current || !supabase) return;
+    errEl.style.display = 'none';
+
+    // Collect new medications
+    var newMeds = [];
+    document.querySelectorAll('#fuMedsContainer .fu-med-row').forEach(function(row) {
+      var name = (row.querySelector('.fu-med-name').value || '').trim();
+      if (!name) return;
+      var freq = Number(row.querySelector('.fu-med-freq').value) || 1;
+      newMeds.push({
+        drug_name:    name,
+        strength:     (row.querySelector('.fu-med-strength').value || '').trim(),
+        frequency:    freq + 'x_daily',
+        duration:     Number(row.querySelector('.fu-med-days').value) || 0,
+        intake_times: defaultIntakeTimes(freq),
+        added_at:     new Date().toISOString(),
+      });
+    });
+
+    var extraCharge = parseFloat(document.getElementById('fuExtraCharge').value) || 0;
+    var paymentAmt  = parseFloat(document.getElementById('fuPaymentAmount').value) || 0;
+    var paymentMtd  = document.getElementById('fuPaymentMethod').value || 'cash';
+    var notes       = (document.getElementById('fuNotes').value || '').trim();
+
+    if (!newMeds.length && extraCharge <= 0 && paymentAmt <= 0 && !notes) {
+      errEl.textContent = 'Add at least one medication, a charge, a payment, or a note.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Saving…';
+
+    try {
+      // Build updated row payload
+      var update = {};
+      var existingMeds = Array.isArray(current.prescription_items) ? current.prescription_items.slice() : [];
+      if (newMeds.length) {
+        update.prescription_items = existingMeds.concat(newMeds);
+      }
+      if (extraCharge > 0) {
+        update.total_charged_ugx = (Number(current.total_charged_ugx) || 0) + extraCharge;
+      }
+      if (notes) {
+        var stamp = new Date().toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        var prev = current.clinical_findings || '';
+        update.clinical_findings = (prev ? prev + '\n\n' : '') + '[Follow-up · ' + stamp + ']\n' + notes;
+      }
+
+      if (Object.keys(update).length) {
+        var ur = await supabase.from('clinic_diagnoses')
+          .update(update).eq('id', current.id).select().single();
+        if (ur.error) throw ur.error;
+        // Refresh local context with the returned row so the detail view shows new totals
+        Object.assign(current, ur.data || {});
+      }
+
+      // Optional payment — uses the same RPC the existing payment modal uses
+      if (paymentAmt > 0) {
+        var pr = await supabase.rpc('record_payment', {
+          p_diagnosis_id: current.id,
+          p_amount:       paymentAmt,
+          p_method:       paymentMtd,
+          p_reference:    null,
+          p_notes:        'Follow-up payment',
+        });
+        if (pr.error) throw pr.error;
+        current.amount_paid = (Number(current.amount_paid) || 0) + paymentAmt;
+        if (current.amount_paid >= (Number(current.total_charged_ugx) || 0)) {
+          current.payment_status = 'paid';
+        }
+      }
+
+      showToast('Follow-up saved', 'success');
+      // Re-render detail with the updated row, then refresh the list in background
+      renderActiveDetailView();
+      loadActiveTreatments();
+      loadPendingPayments();
+      loadRevenue();
+    } catch (e) {
+      errEl.textContent = 'Save failed: ' + (e.message || e);
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">save</span> Save Follow-up';
+    }
+  }
+
   // ── Active treatments (open cases, all dates) ──
   // Build a short, human-readable code so staff can call out / look up a patient quickly.
   // Prefer the Homatt booking code (the patient already knows it); fall back to a
@@ -1177,7 +1384,7 @@
 
     // Try with discharged_at filter first; fall back if column doesn't exist yet
     var rows = null;
-    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,prescription_items,booking_id';
+    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,prescription_items,clinical_findings,booking_id';
     var tryWithFilter = await supabase.from('clinic_diagnoses')
       .select(SEL)
       .eq('clinic_id', clinicId)
