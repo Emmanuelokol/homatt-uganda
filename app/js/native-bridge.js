@@ -160,6 +160,12 @@
         //   - .cc-modal (chronic-disease)
         //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
         //   - .app-screen (default page scroll container)
+        // Walk up the DOM to find an ancestor that is actually scrollable
+        // (overflow-y:auto/scroll AND has content overflowing its bounds).
+        // Returns null when no such container exists — which is the correct
+        // signal to fall back to scrollIntoView rather than trying to scroll
+        // an overflow:hidden element (like .app-screen in medicine-orders) or
+        // a position:fixed container that is too short to overflow yet.
         const findScroller = (node) => {
           let cur = node.parentElement;
           while (cur && cur !== document.body) {
@@ -168,7 +174,7 @@
             if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
             cur = cur.parentElement;
           }
-          return document.querySelector('.app-screen');
+          return null;
         };
 
         const scroller = findScroller(el);
@@ -180,7 +186,10 @@
             - (scroller.clientHeight / 2) + (elRect.height / 2);
           scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
         } else {
-          // Last-resort: ask the browser itself
+          // No scrollable container found (overflow:hidden screens, short modals,
+          // position:fixed sheets). Let the browser scroll to the element — this
+          // correctly handles crx-modal, #cbInner, and other modal scroll containers
+          // because scrollIntoView walks the stacking context, not just the DOM.
           try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
         }
       }, 550);

@@ -15,9 +15,12 @@
   <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
   <style>
     .app-screen { overflow:hidden !important; display:flex; flex-direction:column; }
-    .mo-step { display:none; }
+    .mo-step { display:none; background:var(--surface); }
     .mo-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
-    .mo-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:24px; }
+    .mo-scroll { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:24px; background:var(--surface); }
+    /* When keyboard is open, shrink the safe-area padding on the action bar so
+       the buttons don't waste the limited space above the keyboard.           */
+    body.keyboard-open .mo-bottom { padding-bottom:10px; }
     /* Progress bar */
     .mo-prog { display:flex; gap:6px; padding:8px 20px 4px; }
     .mo-prog-dot { flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .3s; }
@@ -138,11 +141,14 @@
     /* adjustResize shrinks the WebView viewport above the keyboard, so the modal
        naturally sits just above it (align-items:flex-end, bottom:0).
        Only override max-height so older WebViews where dvh doesn't update still work. */
-    body.keyboard-open .crx-modal    { max-height:100%; padding-bottom:16px }
+    body.keyboard-open .crx-modal    { max-height:100%; padding-bottom:8px }
     .crx-modal-header { background:linear-gradient(135deg,#4527A0,#7B1FA2); color:#fff; padding:18px 20px 16px; border-radius:20px 20px 0 0; position:sticky; top:0; z-index:1; }
     .crx-modal-header h3 { font-size:16px; font-weight:700; margin:0 0 4px; display:flex; align-items:center; gap:8px; }
     .crx-modal-header p { font-size:11.5px; margin:0; opacity:.88; line-height:1.5; }
     .crx-modal-body { padding:18px 20px 8px; }
+    /* Stick the cancel/send buttons to the bottom of the modal so no black
+       gap appears between the last form field and the buttons when keyboard opens. */
+    .crx-btn-row { position:sticky; bottom:0; background:var(--surface,#fff); padding:12px 0 4px; margin:0 20px; border-top:1px solid var(--border); }
     .crx-field { margin-bottom:14px; }
     .crx-label { font-size:12px; font-weight:600; color:var(--text-primary); display:block; margin-bottom:6px; }
     .crx-req { color:#C62828; }

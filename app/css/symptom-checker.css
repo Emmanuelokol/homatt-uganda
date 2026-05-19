@@ -1216,3 +1216,21 @@
   color: #BF360C;
   line-height: 1.4;
 }
+
+/* ── Booking confirm — keyboard handling ─────────────────────────────────────
+   #cbConfirmStep has an inline padding-bottom:120px that reserves space for
+   the confirm button above the keyboard. When the keyboard IS open the
+   WebView already shrinks (adjustResize), so that 120 px becomes a large
+   black void. Override it with !important so the bottom padding collapses to
+   just enough to clear the sticky confirm button (≈ 20 px).               */
+body.keyboard-open #cbConfirmStep {
+  padding-bottom: 20px !important;
+}
+
+/* Ensure #cbInner itself never shows the dark body behind it */
+#cbInner {
+  background: #F8F9FA;
+}
+[data-theme="dark"] #cbInner {
+  background: #1E1E1E;
+}
