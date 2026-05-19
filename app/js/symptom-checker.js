@@ -81,6 +81,43 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateTime();
   setInterval(updateTime, 30000);
 
+  // ====== Photo lightbox (tap clinic photo to enlarge) ======
+  function showPhotoLightbox(src, caption) {
+    if (!src) return;
+    const overlay = document.createElement('div');
+    overlay.id = '_photoLightbox';
+    overlay.style.cssText = [
+      'position:fixed', 'inset:0', 'background:rgba(0,0,0,.92)',
+      'z-index:99999', 'display:flex', 'flex-direction:column',
+      'align-items:center', 'justify-content:center', 'padding:20px',
+      'opacity:0', 'transition:opacity .18s ease',
+    ].join(';');
+    overlay.innerHTML = `
+      <button id="_pbClose" aria-label="Close"
+        style="position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+        <span class="material-icons-outlined" style="font-size:24px">close</span>
+      </button>
+      <img src="${src}" alt="${(caption || 'Clinic photo').replace(/"/g, '&quot;')}"
+        style="max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.6);object-fit:contain" />
+      ${caption ? `<div style="color:#fff;font-size:14px;margin-top:14px;text-align:center;max-width:90%;text-shadow:0 1px 2px rgba(0,0,0,.5)">${caption}</div>` : ''}
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    const close = () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 180);
+    };
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('#_pbClose')) close();
+    });
+    // Close on Android back button / Escape
+    const onKey = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+  }
+  // Expose for inline onclick handlers in dynamically-built HTML
+  window._homattShowPhoto = showPhotoLightbox;
+
   // ====== Screen Navigation ======
   function showScreen(screenId) {
     // Dismiss keyboard before switching screens — otherwise the keyboard
@@ -2486,8 +2523,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         : null;
       // Full-width banner when a photo exists; plain header without
       const photoBanner = photoSrc
-        ? `<div style="width:100%;height:130px;background:#E8F5E9 url('${photoSrc}') center/cover no-repeat;position:relative">
+        ? `<div onclick="event.stopPropagation();window._homattShowPhoto && window._homattShowPhoto('${photoSrc}', ${JSON.stringify(clinic.name)})"
+              style="width:100%;height:150px;background:#E8F5E9 url('${photoSrc}') center/cover no-repeat;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent">
              <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));border-radius:0"></div>
+             <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:20px;padding:5px 10px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;backdrop-filter:blur(4px)">
+               <span class="material-icons-outlined" style="font-size:14px">zoom_in</span>Tap to enlarge
+             </div>
            </div>`
         : `<div style="width:100%;height:44px;background:linear-gradient(135deg,#E8F5E9,#C8E6C9);display:flex;align-items:center;padding:0 14px;gap:8px">
              <span class="material-icons-outlined" style="color:#1B5E20;font-size:20px">local_hospital</span>
@@ -2606,7 +2647,12 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       ? clinicObj.front_photo_url + (clinicObj.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinicObj.updated_at ? new Date(clinicObj.updated_at).getTime() : Date.now())
       : null;
     const confirmPhotoBanner = confirmPhotoSrc
-      ? `<div style="width:100%;height:110px;background:#E8F5E9 url('${confirmPhotoSrc}') center/cover no-repeat;border-radius:12px 12px 0 0;margin:-12px -14px 10px;width:calc(100% + 28px)"></div>`
+      ? `<div onclick="window._homattShowPhoto && window._homattShowPhoto('${confirmPhotoSrc}', ${JSON.stringify(clinicName)})"
+            style="width:100%;height:160px;background:#E8F5E9 url('${confirmPhotoSrc}') center/cover no-repeat;border-radius:12px 12px 0 0;margin:-12px -14px 10px;width:calc(100% + 28px);position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent">
+           <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:20px;padding:5px 10px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;backdrop-filter:blur(4px)">
+             <span class="material-icons-outlined" style="font-size:14px">zoom_in</span>Tap to enlarge
+           </div>
+         </div>`
       : '';
 
     cbConfirm.innerHTML = `
