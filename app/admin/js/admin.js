@@ -183,10 +183,17 @@ async function requireAdmin() {
     stored?.userId  &&
     stored?.verifiedAt && (Date.now() - stored.verifiedAt) < CACHE_MS;
 
-  // Only show the full-page spinner when a slow DB check is actually needed.
-  // This prevents pages that have already rendered demo content from being
-  // hidden behind the overlay on every navigation.
-  if (!hasFreshCache) {
+  // Fast path: fresh cache means we already verified this user recently — no network needed.
+  if (hasFreshCache) {
+    _applyAdminUI(stored.name || 'Admin');
+    return { email: stored.email, name: stored.name, isAdmin: true, userId: stored.userId };
+  }
+
+  // Only show the full-page spinner when there is NO stored session at all.
+  // When a session exists (even if cache-expired), demo/cached content is
+  // already visible — verify auth silently in the background instead of
+  // covering the page with a white overlay for up to 16 seconds.
+  if (!stored) {
     let authOverlay = document.getElementById('_adminAuthOverlay');
     if (!authOverlay) {
       authOverlay = document.createElement('div');

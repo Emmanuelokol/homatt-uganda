@@ -118,8 +118,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Show demo data immediately so the page is never stuck on "Loading..."
   allRx = DEMO_RX;
   allFollowups = DEMO_FOLLOWUPS;
-  try { renderRx(); }        catch(e) { var b1 = document.getElementById('rxTableBody');         if(b1) b1.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>'; }
-  try { renderFollowups(); } catch(e) { var b2 = document.getElementById('followupTableBody');   if(b2) b2.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>'; }
+  try { renderRx(); }        catch(e) { console.error('renderRx init error:', e); }
+  try { renderFollowups(); } catch(e) { console.error('renderFollowups init error:', e); }
 
   buildAdminSidebar('prescriptions');
   const session = await requireAdmin();

@@ -112,10 +112,7 @@ let activeTicketId = null;
 document.addEventListener('DOMContentLoaded', async () => {
   // Show demo data immediately so the page is never stuck on "Loading..."
   allTickets = DEMO_TICKETS_DATA;
-  try { renderTickets(); } catch(e) {
-    var tb = document.getElementById('ticketsTableBody');
-    if (tb) tb.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading…</td></tr>';
-  }
+  try { renderTickets(); } catch(e) { console.error('renderTickets init error:', e); }
 
   buildAdminSidebar('support');
   const session = await requireAdmin();
