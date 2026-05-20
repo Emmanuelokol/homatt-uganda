@@ -4,14 +4,16 @@
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://emmanuelokol.github.io/homatt-uganda/welcome.html",
+    "url": "https://homatt-uganda-emmanuelokols-projects.vercel.app",
     "androidScheme": "https",
     "allowNavigation": [
       "*.supabase.co",
+      "*.vercel.app",
+      "*.github.io",
       "fonts.googleapis.com",
       "fonts.gstatic.com",
       "cdn.jsdelivr.net",
-      "emmanuelokol.github.io"
+      "cdn.onesignal.com"
     ]
   },
   "android": {
@@ -48,9 +50,6 @@
       "smallIcon": "ic_launcher",
       "iconColor": "#4CAF50",
       "sound": "default"
-    },
-    "App": {
-      "launchUrl": "welcome.html"
     }
   }
 }
