@@ -450,6 +450,7 @@ window.saveSettings = async () => {
   const msg = document.getElementById('saveSettingsMsg');
   msg.style.display = 'inline-flex';
   setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  showAdminToast('Follow-up settings saved', 'success');
 };
 
 window.saveTemplates = async () => {
@@ -470,6 +471,7 @@ window.saveTemplates = async () => {
   const msg = document.getElementById('saveTmplMsg');
   msg.style.display = 'inline-flex';
   setTimeout(() => { msg.style.display = 'none'; }, 2500);
+  showAdminToast('Message templates saved', 'success');
 };
 
 // ── Load metrics + follow-up table ───────────────────────────

@@ -115,17 +115,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('emergencyUpdated').textContent = 'Demo mode';
   } else {
     try {
-      const { data } = await Promise.race([
-        supabase.from('site_content').select('*').eq('key', 'emergency').single(),
+      const { data, error } = await Promise.race([
+        supabase.from('site_content').select('*').eq('key', 'emergency').maybeSingle(),
         new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
       ]);
-      if (data) {
+      if (data && !error) {
         document.getElementById('emergencyContent').value = data.content || '';
         document.getElementById('emergencyPreview').textContent = data.content || '—';
         document.getElementById('emergencyUpdated').textContent = 'Last updated: ' + formatDate(data.updated_at);
+      } else {
+        document.getElementById('emergencyUpdated').textContent = 'No content saved yet — edit below and save.';
       }
     } catch(e) {
-      document.getElementById('emergencyUpdated').textContent = e.message === 'timeout' ? 'Could not load — connection issue' : 'Error loading content';
+      document.getElementById('emergencyUpdated').textContent = e.message === 'timeout' ? 'Could not load — connection issue' : 'Using default content';
     }
   }
 

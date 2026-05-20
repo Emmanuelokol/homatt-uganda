@@ -191,7 +191,7 @@
       </button>
       <div>
         <div style="font-size:16px;font-weight:700">Order Medicines</div>
-        <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4 — Choose Medicines</div>
+        <div style="font-size:11px;opacity:.8" id="moStepLabel">Step 1 of 4 — Order Type</div>
       </div>
       <button class="mo-cart-btn" onclick="goStep(2)">
         <span class="material-icons-outlined" style="font-size:16px">shopping_cart</span>
@@ -216,40 +216,15 @@
     </div>
 
     <!-- ═══════════════════════════════════════════════
-         STEP 1 — Choose medicines by symptom category
+         STEP 1 — Choose how to order
          ═══════════════════════════════════════════════ -->
     <div class="mo-step active" id="step1">
       <div class="mo-scroll">
 
         <!-- Instruction -->
-        <div style="padding:10px 16px 4px">
-          <div style="font-size:14px;font-weight:700;color:var(--text-primary)">What are you dealing with?</div>
-          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Tap a category to see medicines. OTC medicines are confirmed by the pharmacy; prescription (Rx) drugs require a doctor.</div>
-        </div>
-
-        <!-- Category grid — 3 columns, descriptive labels -->
-        <div class="cat-grid" id="catGrid"></div>
-
-        <!-- Search bar (secondary option: "I know the drug name") -->
-        <div style="padding:4px 16px 8px">
-          <input type="text" id="medSearch" placeholder="Or search by medicine name…"
-            inputmode="search" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-            oninput="onSearch()"
-            style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:16px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);box-sizing:border-box;transition:border-color .2s;min-height:48px">
-        </div>
-
-        <!-- Rx warning (shown when Rx category selected) -->
-        <div class="rx-banner" id="rxBanner" style="display:none">
-          <span class="material-icons-outlined" style="font-size:18px;flex-shrink:0;color:#7B1FA2">medical_services</span>
-          <span>These medicines require a valid prescription. The pharmacist will verify your prescription before dispensing.</span>
-        </div>
-
-        <!-- Medicine list -->
-        <div style="padding:4px 16px">
-          <div class="mo-label" id="medsLabel">All Common Medicines</div>
-          <div id="medsList">
-            <!-- Rendered by JS immediately on page load -->
-          </div>
+        <div style="padding:12px 16px 8px">
+          <div style="font-size:14px;font-weight:700;color:var(--text-primary)">How would you like to order?</div>
+          <div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Choose your medicine type below or paste your prescription text.</div>
         </div>
 
         <!-- Chronic / Expensive Drug Request card -->
@@ -258,25 +233,24 @@
             <span class="material-icons-outlined" style="font-size:24px">assignment</span>
           </div>
           <div style="flex:1;min-width:0">
-            <div class="crx-card-title">Chronic & Prescription Drugs</div>
+            <div class="crx-card-title">Chronic &amp; Prescription Drugs</div>
             <div class="crx-card-sub">Insulin, BP meds, diabetes drugs, cancer drugs — we deliver monthly. Pharmacist reviews your request first.</div>
           </div>
           <span class="material-icons-outlined" style="font-size:20px;opacity:.8">chevron_right</span>
         </div>
 
-        <!-- Prescription paste (secondary) -->
+        <!-- Prescription paste -->
         <div style="padding:0 16px 8px">
           <div class="mo-label">Or paste a prescription text</div>
           <textarea id="prescriptionText"
             placeholder="e.g. Amoxicillin 500mg × 21, Paracetamol 500mg × 10…"
-            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);-webkit-text-fill-color:var(--text-primary);resize:vertical;min-height:64px;box-sizing:border-box;transition:border-color .2s"></textarea>
+            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:var(--radius-md);font-size:13px;font-family:inherit;outline:none;background:var(--surface);color:var(--text-primary);-webkit-text-fill-color:var(--text-primary);resize:vertical;min-height:80px;box-sizing:border-box;transition:border-color .2s"></textarea>
         </div>
       </div>
 
       <div class="mo-bottom">
         <button class="mo-btn primary" id="step1Btn" onclick="goStep(2)">
-          View Cart
-          <span class="cart-badge" id="cartBadge2" style="font-size:12px;padding:3px 9px">0</span>
+          Continue
           <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
         </button>
       </div>
