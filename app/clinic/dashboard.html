@@ -1397,6 +1397,13 @@
       if (Object.keys(update).length) {
         var ur = await supabase.from('clinic_diagnoses')
           .update(update).eq('id', current.id).select().single();
+        // If follow_up_reason column not yet migrated, retry without it
+        if (ur.error && ur.error.message && ur.error.message.includes('follow_up_reason')) {
+          var compatUpdate = Object.assign({}, update);
+          delete compatUpdate.follow_up_reason;
+          ur = await supabase.from('clinic_diagnoses')
+            .update(compatUpdate).eq('id', current.id).select().single();
+        }
         if (ur.error) throw ur.error;
         // Refresh local context with the returned row so the detail view shows new totals
         Object.assign(current, ur.data || {});
@@ -1459,31 +1466,58 @@
 
     _activeMigrationNeeded = false;
 
-    // Try with discharged_at filter first; fall back if column doesn't exist yet
-    var rows = null;
-    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,follow_up_reason,prescription_items,clinical_findings,booking_id';
-    var tryWithFilter = await supabase.from('clinic_diagnoses')
-      .select(SEL)
-      .eq('clinic_id', clinicId)
-      .is('discharged_at', null)
-      .order('created_at', {ascending:false})
-      .limit(50);
+    // Build the SELECT string. We try the full version first; if PostgREST
+    // rejects a column that hasn't been migrated yet we strip it and retry.
+    var SEL_FULL   = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,follow_up_reason,prescription_items,clinical_findings,booking_id';
+    var SEL_COMPAT = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,prescription_items,clinical_findings,booking_id';
 
-    if (tryWithFilter.error && tryWithFilter.error.message && tryWithFilter.error.message.includes('discharged_at')) {
-      // Column missing — apply migration. Fall back to recent 14-day diagnoses.
-      _activeMigrationNeeded = true;
-      var fallback = await supabase.from('clinic_diagnoses')
-        .select(SEL)
+    // Helper: run one attempt with the given select and filter style
+    async function _tryLoad(sel, withDischargeFilter) {
+      var q = supabase.from('clinic_diagnoses').select(sel)
         .eq('clinic_id', clinicId)
-        .gte('created_at', new Date(Date.now() - 14*86400000).toISOString())
         .order('created_at', {ascending:false})
         .limit(50);
-      rows = fallback.error ? [] : (fallback.data || []);
-    } else if (tryWithFilter.error) {
-      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(tryWithFilter.error.message) + '</div>';
-      return;
+      if (withDischargeFilter) q = q.is('discharged_at', null);
+      else q = q.gte('created_at', new Date(Date.now() - 14*86400000).toISOString());
+      return q;
+    }
+
+    // Try full query (both new columns + discharged_at filter)
+    var rows = null;
+    var r1 = await _tryLoad(SEL_FULL, true);
+
+    if (!r1.error) {
+      rows = r1.data || [];
+    } else if (r1.error.message && r1.error.message.includes('follow_up_reason')) {
+      // follow_up_reason column not yet migrated — retry without it
+      var r2 = await _tryLoad(SEL_COMPAT, true);
+      if (!r2.error) {
+        rows = r2.data || [];
+      } else if (r2.error.message && r2.error.message.includes('discharged_at')) {
+        // Also missing discharged_at — oldest DB; use date-range fallback
+        _activeMigrationNeeded = true;
+        var r3 = await _tryLoad(SEL_COMPAT, false);
+        rows = r3.error ? [] : (r3.data || []);
+      } else {
+        el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(r2.error.message) + '</div>';
+        return;
+      }
+    } else if (r1.error.message && r1.error.message.includes('discharged_at')) {
+      // discharged_at not yet migrated — date-range fallback (try full SEL first)
+      _activeMigrationNeeded = true;
+      var r2b = await _tryLoad(SEL_FULL, false);
+      if (!r2b.error) {
+        rows = r2b.data || [];
+      } else if (r2b.error.message && r2b.error.message.includes('follow_up_reason')) {
+        // Both columns missing
+        var r3b = await _tryLoad(SEL_COMPAT, false);
+        rows = r3b.error ? [] : (r3b.data || []);
+      } else {
+        rows = [];
+      }
     } else {
-      rows = tryWithFilter.data || [];
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(r1.error.message) + '</div>';
+      return;
     }
 
     // Resolve booking_code for rows that have a booking_id (one batched query).

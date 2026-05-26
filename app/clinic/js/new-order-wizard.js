@@ -1617,10 +1617,22 @@
     };
     if (state.patient.id) dxPayload.clinician_id = session?.userId || null;
 
-    const { data: dx, error: dxError } = await supabase
+    let dx, dxError;
+    // First attempt — full payload including new columns
+    ({ data: dx, error: dxError } = await supabase
       .from('clinic_diagnoses')
       .insert(dxPayload)
-      .select().single();
+      .select().single());
+
+    // If follow_up_reason column doesn't exist yet (migration pending), retry without it
+    if (dxError && dxError.message && dxError.message.includes('follow_up_reason')) {
+      const compatPayload = Object.assign({}, dxPayload);
+      delete compatPayload.follow_up_reason;
+      ({ data: dx, error: dxError } = await supabase
+        .from('clinic_diagnoses')
+        .insert(compatPayload)
+        .select().single());
+    }
 
     if (dxError) {
       showToast('Save failed: ' + dxError.message, 'error');
