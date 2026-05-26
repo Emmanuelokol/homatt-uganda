@@ -1115,6 +1115,39 @@
         +'</div>'
       : '';
 
+    // Next return visit panel — shows when this patient is expected back & for what
+    var returnBlock = '';
+    if (current.follow_up_days && current.follow_up_days > 0) {
+      var due = new Date(d.getTime() + current.follow_up_days * 86400000);
+      var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+      var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+      var statusTxt, bg, fg, border;
+      if (daysLeft < 0)      { statusTxt = 'Overdue by ' + Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)!==1?'s':''); bg='#FFEBEE'; fg='#C62828'; border='#EF9A9A'; }
+      else if (daysLeft === 0) { statusTxt = 'Today'; bg='#FFF3E0'; fg='#E65100'; border='#FFB74D'; }
+      else if (daysLeft === 1) { statusTxt = 'Tomorrow'; bg='#FFF8E1'; fg='#E65100'; border='#FFD54F'; }
+      else if (daysLeft <= 3)  { statusTxt = 'In ' + daysLeft + ' days'; bg='#FFF8E1'; fg='#E65100'; border='#FFE082'; }
+      else                     { statusTxt = 'In ' + daysLeft + ' days'; bg='#E3F2FD'; fg='#1565C0'; border='#90CAF9'; }
+      returnBlock =
+        '<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:11px;color:'+fg+';font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:4px">'
+                +'<span class="material-icons-outlined" style="font-size:14px">event_repeat</span> Next return visit'
+              +'</div>'
+              +'<div style="font-size:14px;font-weight:700;color:'+fg+';margin-top:2px">'+esc(dueLabel)+'</div>'
+              +(current.follow_up_reason ? '<div style="font-size:12px;color:#424242;margin-top:4px"><strong>For:</strong> '+esc(current.follow_up_reason)+'</div>' : '<div style="font-size:11px;color:#9AA0A6;margin-top:4px;font-style:italic">No reason recorded</div>')
+            +'</div>'
+            +'<span style="background:'+fg+';color:#fff;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700;white-space:nowrap">'+esc(statusTxt.toUpperCase())+'</span>'
+          +'</div>'
+        +'</div>';
+    } else {
+      returnBlock =
+        '<div style="background:#F5F5F5;border:1px dashed #BDBDBD;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5F6368;display:flex;align-items:center;gap:8px">'
+          +'<span class="material-icons-outlined" style="font-size:16px;color:#9AA0A6">event_busy</span>'
+          +'No return visit scheduled. Set one when recording a follow-up.'
+        +'</div>';
+    }
+
     var currentBlock =
       '<div style="border:2px solid #1565C0;border-radius:12px;padding:14px 16px;margin-bottom:18px;background:#fff">'
         +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
@@ -1127,6 +1160,7 @@
         +'<div style="font-size:13px;color:#424242;margin-bottom:10px"><strong>Diagnosis:</strong> '+esc(current.confirmed_diagnosis||'Pending')+'</div>'
         +(current.patient_type ? '<div style="font-size:12px;color:#9AA0A6;margin-bottom:10px">Patient type: '+esc(current.patient_type)+'</div>' : '')
         +balanceBlock
+        +returnBlock
         +'<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Current Medications</div>'
         +renderMedsList(current.prescription_items)
       +'</div>';
@@ -1219,6 +1253,13 @@
         + '<option value="insurance">Insurance</option>'
       + '</select>'
 
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Next return visit (optional)</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:6px">'
+        + '<input id="fuNextDays" class="field-input" type="number" min="0" max="365" step="1" placeholder="Days from today" value="'+(Number(current.follow_up_days)>0?Number(current.follow_up_days):'')+'" style="flex:0 0 120px">'
+        + '<input id="fuNextReason" class="field-input" type="text" maxlength="200" placeholder="For… e.g. BP recheck, refill" value="'+esc(current.follow_up_reason||'')+'" style="flex:1">'
+      + '</div>'
+      + '<div id="fuNextDateHint" style="font-size:11px;color:#9AA0A6;margin-bottom:16px">—</div>'
+
       + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Visit notes (optional)</div>'
       + '<textarea id="fuNotes" class="field-input" rows="2" placeholder="What happened in this visit — e.g. patient feeling better, BP rechecked, refilled meds…" style="width:100%;margin-bottom:18px"></textarea>'
 
@@ -1239,6 +1280,23 @@
       wireFollowupRemoveButtons();
     };
     wireFollowupRemoveButtons();
+
+    // Live preview of next return date
+    function updateFuNextHint() {
+      var hintEl = document.getElementById('fuNextDateHint');
+      var days = parseInt((document.getElementById('fuNextDays')||{}).value, 10);
+      if (!hintEl) return;
+      if (!days || days <= 0) { hintEl.textContent = 'No follow-up scheduled.'; return; }
+      var dd = new Date(); dd.setDate(dd.getDate() + days);
+      var lbl = dd.toLocaleDateString('en-UG', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
+      var reason = (document.getElementById('fuNextReason')||{}).value || '';
+      hintEl.textContent = 'Patient should return on ' + lbl + (reason ? ' — for ' + reason : '');
+    }
+    var fuNextDaysEl = document.getElementById('fuNextDays');
+    var fuNextReasonEl = document.getElementById('fuNextReason');
+    if (fuNextDaysEl) fuNextDaysEl.addEventListener('input', updateFuNextHint);
+    if (fuNextReasonEl) fuNextReasonEl.addEventListener('input', updateFuNextHint);
+    updateFuNextHint();
 
     document.getElementById('fuCancelBtn').onclick = renderActiveDetailView;
     document.getElementById('fuSaveBtn').onclick   = saveFollowupVisit;
@@ -1291,9 +1349,13 @@
     var paymentAmt  = parseFloat(document.getElementById('fuPaymentAmount').value) || 0;
     var paymentMtd  = document.getElementById('fuPaymentMethod').value || 'cash';
     var notes       = (document.getElementById('fuNotes').value || '').trim();
+    var nextDaysRaw = parseInt((document.getElementById('fuNextDays')||{}).value, 10);
+    var nextDays    = isNaN(nextDaysRaw) ? null : Math.max(0, Math.min(365, nextDaysRaw));
+    var nextReason  = ((document.getElementById('fuNextReason')||{}).value || '').trim();
+    var nextChanged = nextDays !== null && (nextDays !== (Number(current.follow_up_days)||0) || nextReason !== (current.follow_up_reason||''));
 
-    if (!newMeds.length && extraCharge <= 0 && paymentAmt <= 0 && !notes) {
-      errEl.textContent = 'Add at least one medication, a charge, a payment, or a note.';
+    if (!newMeds.length && extraCharge <= 0 && paymentAmt <= 0 && !notes && !nextChanged) {
+      errEl.textContent = 'Add at least one medication, a charge, a payment, a note, or a return-visit update.';
       errEl.style.display = 'block';
       return;
     }
@@ -1315,6 +1377,21 @@
         var stamp = new Date().toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
         var prev = current.clinical_findings || '';
         update.clinical_findings = (prev ? prev + '\n\n' : '') + '[Follow-up · ' + stamp + ']\n' + notes;
+      }
+      if (nextChanged) {
+        // Re-baseline the follow-up so the date is computed from today, not the original visit
+        update.follow_up_days   = nextDays && nextDays > 0 ? nextDays : null;
+        update.follow_up_reason = nextReason || null;
+        // Also push created_at forward so (created_at + follow_up_days) lands on the new date.
+        // We don't actually mutate created_at — instead store the "anchor" via a separate column
+        // if it exists; otherwise, the display uses the most-recent visit timestamp from
+        // clinical_findings. For now we just update follow_up_days relative to today by
+        // computing days from the original created_at.
+        if (nextDays && nextDays > 0) {
+          var origCreated = new Date(current.created_at);
+          var targetDate = new Date(); targetDate.setDate(targetDate.getDate() + nextDays);
+          update.follow_up_days = Math.max(1, Math.round((targetDate - origCreated) / 86400000));
+        }
       }
 
       if (Object.keys(update).length) {
@@ -1384,7 +1461,7 @@
 
     // Try with discharged_at filter first; fall back if column doesn't exist yet
     var rows = null;
-    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,prescription_items,clinical_findings,booking_id';
+    var SEL = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,amount_paid,payment_status,follow_up_days,follow_up_reason,prescription_items,clinical_findings,booking_id';
     var tryWithFilter = await supabase.from('clinic_diagnoses')
       .select(SEL)
       .eq('clinic_id', clinicId)
@@ -1476,6 +1553,28 @@
             : '<span style="color:#1B5E20;font-weight:700">Paid</span>')
         : '';
       var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
+
+      // Return-visit line: shows due date + what the patient is coming back for
+      var returnLine = '';
+      if (c.follow_up_days && c.follow_up_days > 0) {
+        var due = new Date(d.getTime() + c.follow_up_days * 86400000);
+        var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+        var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short' });
+        var whenTxt, whenColor;
+        if (daysLeft < 0) { whenTxt = 'overdue by ' + Math.abs(daysLeft) + 'd'; whenColor = '#C62828'; }
+        else if (daysLeft === 0) { whenTxt = 'today'; whenColor = '#E65100'; }
+        else if (daysLeft === 1) { whenTxt = 'tomorrow'; whenColor = '#E65100'; }
+        else if (daysLeft <= 3) { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#F9A825'; }
+        else { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#1565C0'; }
+        var reasonTxt = c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '';
+        returnLine = '<div class="order-meta" style="margin-top:2px">'
+          + '<span style="display:inline-flex;align-items:center;gap:3px;color:' + whenColor + ';font-weight:600">'
+          + '<span class="material-icons-outlined" style="font-size:13px">event_repeat</span>'
+          + 'Returns ' + dueLabel + ' (' + whenTxt + ')'
+          + '</span>'
+          + '<span style="color:#5F6368">' + reasonTxt + '</span>'
+          + '</div>';
+      }
       var code = patientCodeFor(c);
       var codeBadge = code
         ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.4px;font-family:monospace">'+esc(code)+'</span>'
@@ -1489,6 +1588,7 @@
           +'<div class="order-patient" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+esc(c.patient_name||c.patient_phone||'Patient')+codeBadge+followDue+'</div>'
           +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
           +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(feeBadge?'<span>'+feeBadge+'</span>':'')+'</div>'
+          +returnLine
         +'</div>'
         +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
           +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'

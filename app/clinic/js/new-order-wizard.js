@@ -37,6 +37,8 @@
     medications: [],       // [{drug, dosage, timesPerDay, intakeTimes:[], durationDays, inventoryItemId, qtyToDeduct}]
     materialsUsed: [],     // [{item_id, item_name, unit, qty}] — non-drug consumables used
     expectedRecovery: '',
+    followUpDays: 7,       // when should the patient return (default 7d)
+    followUpReason: '',    // why they should come back (drug review, wound check, etc.)
     stockSource: 'clinic', // 'clinic' | 'pharmacy'
     pharmacyId: null,
     patientNotes: '',
@@ -1398,6 +1400,35 @@
     state.patientNotes = e.target.value;
   });
 
+  // Follow-up plan inputs ─────────────────────────────────────────
+  function updateFollowUpHint() {
+    const hint = document.getElementById('followUpDateHint');
+    if (!hint) return;
+    const days = Number(state.followUpDays);
+    if (!days || days <= 0) { hint.textContent = 'No follow-up scheduled.'; return; }
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const label = d.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+    hint.textContent = 'Patient should return on ' + label + (state.followUpReason ? ' — for ' + state.followUpReason : '');
+  }
+  const fuDaysEl = document.getElementById('followUpDays');
+  if (fuDaysEl) {
+    fuDaysEl.value = state.followUpDays;
+    fuDaysEl.addEventListener('input', e => {
+      const v = parseInt(e.target.value, 10);
+      state.followUpDays = isNaN(v) ? 0 : Math.max(0, Math.min(365, v));
+      updateFollowUpHint();
+    });
+  }
+  const fuReasonEl = document.getElementById('followUpReason');
+  if (fuReasonEl) {
+    fuReasonEl.addEventListener('input', e => {
+      state.followUpReason = e.target.value;
+      updateFollowUpHint();
+    });
+  }
+  updateFollowUpHint();
+
   // Step 4 → Step 5
   document.getElementById('step4Next').onclick = () => {
     const ok = state.medications.every(m => m.drug && m.dosage && m.intakeTimes.every(t => t));
@@ -1435,6 +1466,11 @@
       <div class="val">${medsLines}</div>
       <div class="lbl">Expected recovery</div>
       <div class="val">${esc(state.expectedRecovery)}</div>
+      ${Number(state.followUpDays) > 0 ? (() => {
+        const d = new Date(); d.setDate(d.getDate() + Number(state.followUpDays));
+        const label = d.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+        return `<div class="lbl">Return visit</div><div class="val">${esc(label)} (in ${state.followUpDays} days)${state.followUpReason ? ' — ' + esc(state.followUpReason) : ''}</div>`;
+      })() : ''}
       <div class="lbl">Source</div>
       <div class="val">${state.stockSource === 'clinic' ? 'Clinic stock' : 'E-prescription → partner pharmacy'}</div>
       ${state.patientNotes ? `<div class="lbl">Instructions</div><div class="val">${esc(state.patientNotes)}</div>` : ''}
@@ -1569,6 +1605,8 @@
       delivery_preference: state.stockSource === 'pharmacy' ? 'delivery' : 'pickup',
       treatment_plan: items.map(i => `${i.drug_name} ${i.strength} × ${i.duration}d`).join('; '),
       expected_recovery: state.expectedRecovery || null,
+      follow_up_days:    Number(state.followUpDays) > 0 ? Number(state.followUpDays) : null,
+      follow_up_reason:  (state.followUpReason || '').trim() || null,
       prescription_items: items,
       intake_schedule: items,
       consultation_fee_ugx: state.feeConsult || 0,
