@@ -4,108 +4,133 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Homatt Health — New Consultation</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link rel="stylesheet" href="css/clinic.css">
   <style>
-    /* ── Wizard layout ─────────────────────────────────────── */
-    .wiz { max-width: 760px; margin: 0 auto; }
-    .wiz-progress {
-      display: flex; gap: 6px; margin-bottom: 20px; align-items: center;
+    /* ── Wizard shell ───────────────────────────────────────────── */
+    .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
+
+    /* ── 2-dot progress ─────────────────────────────────────────── */
+    .wiz-dots {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 28px; user-select: none;
     }
-    .wiz-pill {
-      flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
+    .wiz-dot {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
       cursor: default;
     }
-    .wiz-pill-bar {
-      width: 100%; height: 5px; border-radius: 3px; background: #E0E0E0;
+    .wiz-dot-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid #E0E0E0; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #BDBDBD;
+      transition: all .2s;
+    }
+    .wiz-dot.done .wiz-dot-circle {
+      background: var(--primary); border-color: var(--primary); color: #fff;
+    }
+    .wiz-dot.current .wiz-dot-circle {
+      background: #E8F5E9; border-color: var(--primary); color: var(--primary);
+    }
+    .wiz-dot-label {
+      font-size: 10px; font-weight: 700; color: #BDBDBD;
+      text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+    }
+    .wiz-dot.done .wiz-dot-label,
+    .wiz-dot.current .wiz-dot-label { color: var(--primary); }
+    .wiz-dot-line {
+      flex: 1; height: 2px; background: #E0E0E0;
+      margin: 0 8px; margin-bottom: 20px;
       transition: background .2s;
     }
-    .wiz-pill.done .wiz-pill-bar { background: var(--primary); }
-    .wiz-pill.current .wiz-pill-bar { background: #42A5F5; }
-    .wiz-pill-label {
-      font-size: 9px; font-weight: 600; color: #BDBDBD;
-      text-transform: uppercase; letter-spacing: .3px; white-space: nowrap;
-      transition: color .2s;
-    }
-    .wiz-pill.done .wiz-pill-label { color: var(--primary); }
-    .wiz-pill.current .wiz-pill-label { color: #42A5F5; }
-    @media(max-width:480px){ .wiz-pill-label { display: none; } }
+    .wiz-dot-line.done { background: var(--primary); }
 
-    .wiz-step-h {
-      display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px;
+    /* ── Step header ────────────────────────────────────────────── */
+    .wiz-screen-title {
+      font-size: 24px; font-weight: 800; color: #111; margin-bottom: 4px;
     }
-    .wiz-step-num {
-      font-size: 11px; font-weight: 700; color: var(--primary);
-      text-transform: uppercase; letter-spacing: .5px;
-    }
-    .wiz-step-title {
-      font-size: 22px; font-weight: 700; color: #212121;
-    }
-    .wiz-step-sub {
-      font-size: 13px; color: #5F6368; margin-bottom: 18px; line-height: 1.5;
+    .wiz-screen-sub {
+      font-size: 13px; color: #5F6368; margin-bottom: 24px; line-height: 1.5;
     }
 
+    /* ── Section dividers ───────────────────────────────────────── */
+    .sec-label {
+      font-size: 11px; font-weight: 700; color: #9AA0A6;
+      text-transform: uppercase; letter-spacing: .6px;
+      margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .sec-label::after {
+      content: ''; flex: 1; height: 1px; background: #F0F0F0;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
     .wiz-card {
-      background: #fff; border-radius: 14px; padding: 20px 22px;
-      box-shadow: var(--shadow); margin-bottom: 14px;
+      background: #fff; border-radius: 16px; padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.04);
+      margin-bottom: 12px;
     }
+    .wiz-card + .wiz-card { margin-top: 0; }
 
-    /* Inputs */
+    /* ── Inputs ─────────────────────────────────────────────────── */
     .field-label {
-      font-size: 12px; font-weight: 600; color: #424242;
+      font-size: 11px; font-weight: 700; color: #424242;
       display: block; margin-bottom: 6px;
-      text-transform: uppercase; letter-spacing: .3px;
+      text-transform: uppercase; letter-spacing: .4px;
     }
     .field-input {
-      width: 100%; padding: 11px 14px;
+      width: 100%; padding: 12px 14px;
       border: 1.5px solid var(--border); border-radius: 10px;
       font-size: 15px; font-family: inherit;
-      outline: none; transition: border-color .15s;
-      background: #fff; box-sizing: border-box;
+      outline: none; transition: border-color .15s, box-shadow .15s;
+      background: #fff; box-sizing: border-box; color: #111;
     }
-    .field-input:focus { border-color: var(--primary); }
+    .field-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(27,94,32,.08);
+    }
     textarea.field-input { resize: vertical; min-height: 70px; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    @media (max-width: 600px) { .field-row { grid-template-columns: 1fr; } }
+    @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+    .helper { font-size: 12px; color: #9AA0A6; margin-top: 5px; line-height: 1.4; }
 
-    /* Patient pill */
+    /* ── Patient pill ───────────────────────────────────────────── */
     .patient-pill {
-      background: #E8F5E9; border: 1px solid #A5D6A7;
-      border-radius: 12px; padding: 12px 16px;
+      background: #E8F5E9; border: 1.5px solid #A5D6A7;
+      border-radius: 14px; padding: 14px 16px;
       display: flex; align-items: center; gap: 12px;
     }
     .patient-pill .avatar {
-      width: 38px; height: 38px; border-radius: 50%;
-      background: #66BB6A; color: #fff;
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--primary); color: #fff;
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; font-weight: 700; flex-shrink: 0;
+      font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
     .patient-pill .info { flex: 1; min-width: 0; }
-    .patient-pill .name { font-size: 14px; font-weight: 700; color: #1B5E20; }
-    .patient-pill .phone { font-size: 12px; color: #2E7D32; }
+    .patient-pill .name { font-size: 15px; font-weight: 700; color: #1B5E20; }
+    .patient-pill .phone { font-size: 12px; color: #2E7D32; margin-top: 1px; }
     .patient-pill .badge {
-      font-size: 11px; font-weight: 700;
+      font-size: 10px; font-weight: 700;
       background: #fff; color: #2E7D32;
-      padding: 3px 8px; border-radius: 10px;
+      padding: 3px 9px; border-radius: 10px; white-space: nowrap;
     }
     .patient-pill .change-btn {
       background: none; border: none; color: #2E7D32;
       cursor: pointer; padding: 4px;
     }
 
-    /* Autocomplete */
+    /* ── Autocomplete ───────────────────────────────────────────── */
     .autocomplete-wrap { position: relative; }
     .autocomplete-menu {
       position: absolute; top: 100%; left: 0; right: 0;
       background: #fff; border: 1px solid var(--border);
-      border-radius: 10px; margin-top: 4px;
+      border-radius: 12px; margin-top: 4px;
       max-height: 260px; overflow-y: auto;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+      box-shadow: 0 8px 28px rgba(0,0,0,.12);
       z-index: 50; display: none;
     }
     .autocomplete-item {
-      padding: 10px 14px; cursor: pointer;
+      padding: 11px 14px; cursor: pointer;
       border-bottom: 1px solid #F5F5F5;
     }
     .autocomplete-item:hover, .autocomplete-item.active { background: #F0F7FF; }
@@ -113,62 +138,75 @@
     .ac-name { font-size: 14px; font-weight: 600; color: #212121; }
     .ac-cat { font-size: 11px; color: #9AA0A6; text-transform: uppercase; letter-spacing: .3px; }
 
-    /* AI Diagnosis cards */
-    .dx-card {
-      border: 2px solid #E0E0E0; border-radius: 12px;
-      padding: 14px 16px; margin-bottom: 8px;
-      cursor: pointer; transition: all .12s;
-      background: #fff;
+    /* ── Lookup tabs ────────────────────────────────────────────── */
+    .lookup-tab {
+      flex: 1; padding: 10px; border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
     }
-    .dx-card:hover { border-color: var(--primary); }
-    .dx-card.selected {
-      border-color: var(--primary); background: #E8F5E9;
-    }
-    .dx-card-top {
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .dx-name { font-size: 15px; font-weight: 700; color: #212121; }
-    .dx-confidence {
-      font-size: 12px; font-weight: 700;
-      padding: 3px 10px; border-radius: 12px;
-      background: #E3F2FD; color: #0D47A1;
-    }
-    .dx-confidence.high { background: #FFEBEE; color: #C62828; }
-    .dx-confidence.med { background: #FFF8E1; color: #E65100; }
-    .dx-meta { font-size: 12px; color: #5F6368; margin-top: 4px; }
+    .lookup-tab.active { background: #E3F2FD; color: #1565C0; font-weight: 700; }
+    .lookup-tab:not(.active) { background: transparent; color: #5F6368; }
 
-    /* Care level toggle */
-    .care-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    /* ── Severity chips ─────────────────────────────────────────── */
+    .sev-chips { display: flex; gap: 8px; }
+    .sev-chip {
+      flex: 1; padding: 10px 6px;
+      border: 1.5px solid var(--border); border-radius: 22px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      background: #fff; font-family: inherit;
+      text-align: center; transition: all .12s; letter-spacing: .2px;
+    }
+    .sev-chip:hover { border-color: var(--primary); }
+    .sev-chip.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .sev-chip[data-sev="severe"].active  { background: #E65100; border-color: #E65100; }
+    .sev-chip[data-sev="critical"].active { background: #C62828; border-color: #C62828; }
+
+    /* ── Care toggle ────────────────────────────────────────────── */
+    .care-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .care-opt {
-      padding: 16px; border: 2px solid var(--border); border-radius: 12px;
+      padding: 14px 12px; border: 2px solid var(--border); border-radius: 12px;
       background: #fff; cursor: pointer; text-align: center;
       transition: all .12s; font-family: inherit;
     }
     .care-opt:hover { border-color: var(--primary); }
     .care-opt.active { background: #E3F2FD; border-color: var(--primary); }
-    .care-opt .material-icons-outlined { font-size: 28px; color: var(--primary); display: block; margin-bottom: 6px; }
-    .care-opt-label { font-size: 14px; font-weight: 700; color: #212121; }
-    .care-opt-desc { font-size: 11px; color: #5F6368; margin-top: 3px; }
+    .care-opt .material-icons-outlined { font-size: 26px; color: var(--primary); display: block; margin-bottom: 4px; }
+    .care-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .care-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
 
-    /* Severity chips */
-    .sev-chips { display: flex; gap: 8px; }
-    .sev-chip {
-      flex: 1; padding: 9px 6px;
-      border: 1.5px solid var(--border); border-radius: 20px;
-      font-size: 12px; font-weight: 600; cursor: pointer;
-      background: #fff; font-family: inherit;
-      text-align: center; transition: all .12s;
+    /* ── Lab test groups ────────────────────────────────────────── */
+    .lab-group { margin-bottom: 14px; }
+    .lab-group:last-child { margin-bottom: 0; }
+    .lab-group-title {
+      font-size: 10px; font-weight: 700; color: #9AA0A6;
+      text-transform: uppercase; letter-spacing: .7px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
     }
-    .sev-chip:hover { border-color: var(--primary); }
-    .sev-chip.active {
-      background: var(--primary); color: #fff; border-color: var(--primary);
+    .lab-group-title .lgt-icon {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    .lab-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .lab-chip {
+      padding: 6px 13px; border: 1.5px solid var(--border);
+      border-radius: 18px; background: #fff;
+      font-size: 12px; font-weight: 500; cursor: pointer;
+      font-family: inherit; transition: all .12s; line-height: 1.3;
+    }
+    .lab-chip:hover { border-color: var(--primary); background: #F1F8F1; }
+    .lab-chip.active {
+      background: #E3F2FD; border-color: #1565C0; color: #0D47A1; font-weight: 700;
+    }
+    /* Malaria chips get a red accent when active */
+    .lab-chip[data-group="malaria"].active {
+      background: #FFEBEE; border-color: #C62828; color: #B71C1C;
     }
 
-    /* Medication row */
+    /* ── Medication rows ────────────────────────────────────────── */
     .med-row {
-      border: 1.5px solid #E0E0E0; border-radius: 12px;
-      padding: 14px 16px; margin-bottom: 12px;
-      background: #FAFAFA;
+      border: 1.5px solid #E8EAED; border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 10px; background: #FAFAFA;
     }
     .med-row-h {
       display: flex; align-items: center; justify-content: space-between;
@@ -182,55 +220,85 @@
       background: none; border: none; cursor: pointer;
       color: #C62828; padding: 4px; display: inline-flex;
     }
-    .time-grid {
-      display: grid; gap: 8px; margin-top: 6px;
-    }
+    .time-grid { display: grid; gap: 8px; margin-top: 6px; }
     .time-grid input {
       padding: 8px 10px; border: 1.5px solid var(--border);
       border-radius: 8px; font-size: 14px; font-family: inherit;
       outline: none; box-sizing: border-box; text-align: center;
     }
 
-    /* Stock toggle */
-    .stock-row {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
-      margin-top: 12px;
-    }
+    /* ── Stock toggle ───────────────────────────────────────────── */
+    .stock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .stock-opt {
-      padding: 12px 14px; border: 1.5px solid var(--border);
-      border-radius: 10px; background: #fff; cursor: pointer;
-      transition: all .12s; font-family: inherit;
+      padding: 13px 14px; border: 1.5px solid var(--border);
+      border-radius: 12px; background: #fff; cursor: pointer;
+      transition: all .12s; font-family: inherit; text-align: left;
     }
     .stock-opt:hover { border-color: var(--primary); }
     .stock-opt.active { background: #E8F5E9; border-color: var(--primary); }
     .stock-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
     .stock-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
 
-    /* Lab tests chips */
-    .lab-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
-    .lab-chip {
-      padding: 6px 12px; border: 1.5px solid var(--border);
-      border-radius: 16px; background: #fff;
-      font-size: 12px; font-weight: 500; cursor: pointer;
-      font-family: inherit; transition: all .12s;
+    /* ── Collapsible materials section ──────────────────────────── */
+    .collapse-toggle {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: #5F6368;
+      cursor: pointer; padding: 10px 0; border: none; background: none;
+      font-family: inherit; width: 100%; text-align: left;
     }
-    .lab-chip:hover { border-color: var(--primary); }
-    .lab-chip.active {
-      background: #E3F2FD; border-color: var(--primary); color: var(--primary);
-    }
+    .collapse-toggle .ct-icon { font-size: 18px; transition: transform .2s; }
+    .collapse-toggle.open .ct-icon { transform: rotate(180deg); }
 
-    /* Review summary */
-    .review-grid {
-      display: grid; grid-template-columns: 130px 1fr; gap: 10px 16px;
-      font-size: 13px;
+    /* ── Payment chips ──────────────────────────────────────────── */
+    .pay-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pay-chip {
+      padding: 8px 16px; border-radius: 22px; border: 1.5px solid var(--border);
+      background: #fff; color: var(--text-lt); font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: all .15s; white-space: nowrap;
     }
-    .review-grid .lbl { color: #9AA0A6; font-weight: 600; }
-    .review-grid .val { color: #212121; }
+    .pay-chip.active { background: #E8F5E9; color: #1B5E20; border-color: #66BB6A; }
 
-    /* Wizard nav */
+    /* ── Fee grid ───────────────────────────────────────────────── */
+    .fee-grid {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 10px 14px; align-items: center;
+    }
+    .fee-grid .fee-lbl { font-size: 13px; color: #424242; font-weight: 500; }
+    .fee-grid .fee-input-wrap { display: flex; align-items: center; gap: 5px; }
+    .fee-grid .fee-pfx { font-size: 11px; color: #9AA0A6; white-space: nowrap; }
+    .fee-grid input { width: 120px; text-align: right; }
+    .fee-total-row {
+      border-top: 1.5px solid #E8EAED; margin-top: 4px; padding-top: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .fee-total-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .fee-total-val {
+      font-size: 20px; font-weight: 800; color: var(--primary);
+      display: flex; align-items: baseline; gap: 4px;
+    }
+    .fee-total-val .fee-currency { font-size: 12px; font-weight: 600; color: #9AA0A6; }
+
+    /* ── Live summary bar (top of screen 2) ─────────────────────── */
+    .consult-summary-bar {
+      background: #F1F8F1; border: 1.5px solid #C8E6C9;
+      border-radius: 14px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    }
+    .csb-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    .csb-info { flex: 1; min-width: 0; }
+    .csb-name { font-size: 13px; font-weight: 700; color: #1B5E20; }
+    .csb-dx { font-size: 12px; color: #2E7D32; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Navigation buttons ─────────────────────────────────────── */
     .wiz-nav {
-      display: flex; gap: 10px; margin-top: 14px;
-      padding-bottom: 32px;
+      display: flex; gap: 10px; margin-top: 20px;
+      padding-bottom: 24px;
     }
     .wiz-btn {
       padding: 14px 22px; border-radius: 12px;
@@ -247,24 +315,14 @@
       background: var(--primary); color: #fff;
       flex: 1; justify-content: center;
     }
-    .wiz-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-    .helper { font-size: 12px; color: #9AA0A6; margin-top: 6px; }
-    .empty-ai-state {
-      background: #FFF8E1; border: 1px dashed #FFC107;
-      border-radius: 10px; padding: 14px 16px;
-      font-size: 13px; color: #5D4037; line-height: 1.55;
+    .wiz-btn-send {
+      background: var(--primary); color: #fff;
+      width: 100%; justify-content: center;
+      padding: 16px; font-size: 16px; border-radius: 14px; margin-top: 8px;
     }
-    /* Fee chips */
-    .pay-chip {
-      padding: 7px 14px; border-radius: 20px; border: 1.5px solid var(--border);
-      background: var(--surface); color: var(--text-lt); font-size: 13px; font-weight: 600;
-      cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-      transition: all .15s;
-    }
-    .pay-chip.active { background: #E8F5E9; color: #1B5E20; border-color: #A5D6A7; }
+    .wiz-btn:disabled { opacity: .45; cursor: not-allowed; }
 
-    /* ── Returning-patient profile card ─────────────────────────── */
+    /* ── Patient profile card ───────────────────────────────────── */
     .pp-alert {
       border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
       font-size: 12px; font-weight: 600;
@@ -286,22 +344,20 @@
     .pp-row-label { color: #9AA0A6; font-weight: 600; min-width: 90px; flex-shrink: 0; }
     .pp-row-value { color: #212121; flex: 1; text-align: right; }
 
-    /* ── Lookup tabs ─────────────────────────────────────────────── */
-    .lookup-tab {
-      flex: 1; padding: 10px; border: none; font-size: 13px; font-weight: 600;
-      cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
-      display: flex; align-items: center; justify-content: center; gap: 5px;
-    }
-    .lookup-tab.active { background: #E3F2FD; color: #1565C0; font-weight: 700; }
-    .lookup-tab:not(.active) { background: transparent; color: #5F6368; }
-
-    /* ── Blood-group chips (intake modal) ───────────────────────── */
+    /* ── Blood-group chips ──────────────────────────────────────── */
     .bg-chip {
       padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px;
       background: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
       font-family: inherit; transition: all .12s;
     }
     .bg-chip.active { background: #E3F2FD; border-color: var(--primary); color: var(--primary); }
+
+    /* ── Return-visit row ───────────────────────────────────────── */
+    .return-row {
+      display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .return-row .rr-days { flex: 0 0 100px; }
+    .return-row .rr-reason { flex: 1; min-width: 160px; }
   </style>
 </head>
 <body>
@@ -346,51 +402,54 @@
     <div class="admin-content">
     <div class="wiz">
 
-      <!-- Progress -->
-      <div class="wiz-progress">
-        <div class="wiz-pill" data-pill="1"><div class="wiz-pill-bar"></div><span class="wiz-pill-label">Patient</span></div>
-        <div class="wiz-pill" data-pill="2"><div class="wiz-pill-bar"></div><span class="wiz-pill-label">AI Dx</span></div>
-        <div class="wiz-pill" data-pill="3"><div class="wiz-pill-bar"></div><span class="wiz-pill-label">Confirm</span></div>
-        <div class="wiz-pill" data-pill="4"><div class="wiz-pill-bar"></div><span class="wiz-pill-label">Meds</span></div>
-        <div class="wiz-pill" data-pill="5"><div class="wiz-pill-bar"></div><span class="wiz-pill-label">Send</span></div>
+      <!-- ── 2-dot progress ── -->
+      <div class="wiz-dots">
+        <div class="wiz-dot current" data-dot="1">
+          <div class="wiz-dot-circle">1</div>
+          <span class="wiz-dot-label">Patient &amp; Assessment</span>
+        </div>
+        <div class="wiz-dot-line" id="dotLine"></div>
+        <div class="wiz-dot" data-dot="2">
+          <div class="wiz-dot-circle">2</div>
+          <span class="wiz-dot-label">Treatment &amp; Bill</span>
+        </div>
       </div>
 
-      <!-- ──────── STEP 1: PATIENT ──────── -->
+      <!-- ════════════════════════════════════════════════════════
+           SCREEN 1 — Patient & Assessment
+           ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
-        <div class="wiz-step-h">
-          <span class="wiz-step-num">Step 1 of 5</span>
-        </div>
-        <div class="wiz-step-title">Find the patient</div>
-        <div class="wiz-step-sub">Search by phone (theirs or a parent's for children), or scan their Homatt booking code. Medical history loads instantly.</div>
+        <div class="wiz-screen-title">Patient &amp; Assessment</div>
+        <div class="wiz-screen-sub">Find the patient, confirm what's wrong, and document any tests done.</div>
 
+        <!-- ── Patient ── -->
         <div class="wiz-card">
-          <!-- Lookup mode toggle -->
           <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)">
             <button id="lookupTabPhone" class="lookup-tab active">
               <span class="material-icons-outlined" style="font-size:16px">phone</span> Phone / Name
             </button>
             <button id="lookupTabCode" class="lookup-tab">
-              <span class="material-icons-outlined" style="font-size:16px">qr_code</span> Homatt Code
+              <span class="material-icons-outlined" style="font-size:16px">qr_code</span> Booking Code
             </button>
           </div>
 
           <!-- Phone search -->
           <div id="patientSearchBlock">
-            <label class="field-label">Phone number</label>
+            <label class="field-label">Patient phone number</label>
             <div class="autocomplete-wrap">
               <input id="patientPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
               <div id="patientResults" class="autocomplete-menu"></div>
             </div>
-            <div class="helper" id="patientHelper">Works for the patient's own number <em>or</em> a parent's number for children.</div>
+            <div class="helper" id="patientHelper">Works for the patient's own number or a parent's number for children.</div>
           </div>
 
           <!-- Booking code search -->
           <div id="bookingCodeBlock" style="display:none">
             <label class="field-label">Homatt Booking Code</label>
-            <input id="bookingCodeInput" class="field-input" type="text" placeholder="HO-928" autocomplete="off"
-              style="text-transform:uppercase;font-weight:800;letter-spacing:2px;font-size:18px;text-align:center">
+            <input id="bookingCodeInput" class="field-input" type="text" placeholder="HO-928"
+              style="text-transform:uppercase;font-weight:800;letter-spacing:2px;font-size:20px;text-align:center" autocomplete="off">
             <button id="lookupCodeBtn"
-              style="margin-top:10px;width:100%;padding:12px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+              style="margin-top:10px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
               <span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient
             </button>
             <div id="codeError" style="display:none;margin-top:8px;background:#FFEBEE;color:#C62828;border-radius:8px;padding:8px 12px;font-size:13px"></div>
@@ -411,98 +470,34 @@
             </div>
           </div>
 
-          <!-- Patient profile card — appears instantly after selection -->
+          <!-- Patient profile alerts -->
           <div id="patientProfileCard" style="display:none;margin-top:12px"></div>
         </div>
 
-        <div class="wiz-nav">
-          <button class="wiz-btn wiz-btn-next" id="step1Next" disabled>
-            Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
-          </button>
+        <!-- ── Diagnosis ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">medical_services</span>
+          Diagnosis
         </div>
-      </section>
-
-      <!-- ──────── STEP 2: AI DIAGNOSES ──────── -->
-      <section class="wiz-section" data-step="2" style="display:none">
-        <div class="wiz-step-h">
-          <span class="wiz-step-num">Step 2 of 5</span>
-        </div>
-        <div class="wiz-step-title">AI diagnosis suggestions</div>
-        <div class="wiz-step-sub">Top 3 likely conditions — based on what the patient reported. Pick the closest match, or get fresh suggestions.</div>
-
-        <div class="wiz-card" id="aiDxArea">
-          <div style="text-align:center;padding:30px;color:#9AA0A6">
-            <span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:6px">hourglass_empty</span>
-            Looking up patient's symptom history…
-          </div>
-        </div>
-
-        <!-- Manual symptoms entry (shown when no AI data available) -->
-        <div class="wiz-card" id="manualSymptomsArea" style="display:none">
-          <label class="field-label">Symptoms reported by patient</label>
-          <textarea id="manualSymptoms" class="field-input" rows="3"
-            placeholder="e.g. Fever for 3 days, headache, body weakness, vomiting, no appetite…"></textarea>
-          <button id="getAiBtn" class="wiz-btn"
-            style="margin-top:10px;background:#E3F2FD;color:#0D47A1;border:1.5px solid #BBDEFB">
-            <span class="material-icons-outlined" style="font-size:18px">auto_awesome</span>
-            Get AI diagnosis suggestions
-          </button>
-        </div>
-
-        <div class="wiz-nav">
-          <button class="wiz-btn wiz-btn-back" data-back>
-            <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back
-          </button>
-          <button class="wiz-btn wiz-btn-next" id="step2Next">
-            Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- ──────── STEP 3: CONFIRMED DIAGNOSIS + CARE LEVEL ──────── -->
-      <section class="wiz-section" data-step="3" style="display:none">
-        <div class="wiz-step-h">
-          <span class="wiz-step-num">Step 3 of 5</span>
-        </div>
-        <div class="wiz-step-title">Confirmed diagnosis</div>
-        <div class="wiz-step-sub">After lab tests and clinical exam, what is the actual diagnosis?</div>
 
         <div class="wiz-card">
           <label class="field-label">Confirmed condition</label>
-          <input id="confirmedDx" class="field-input" placeholder="e.g. Malaria — P. Falciparum">
-          <div class="helper">Pre-filled from your AI selection. Edit if the lab/exam confirmed something different.</div>
-        </div>
+          <input id="confirmedDx" class="field-input"
+            placeholder="e.g. Malaria P. Falciparum, Typhoid, UTI…" autocomplete="off">
+          <div class="helper">Enter the diagnosis after your clinical exam and lab results.</div>
 
-        <div class="wiz-card">
-          <label class="field-label">Severity</label>
-          <div class="sev-chips" id="sevChips">
-            <button class="sev-chip" data-sev="mild">Mild</button>
-            <button class="sev-chip active" data-sev="moderate">Moderate</button>
-            <button class="sev-chip" data-sev="severe">Severe</button>
-            <button class="sev-chip" data-sev="critical">Critical</button>
+          <div style="margin-top:16px">
+            <label class="field-label">Severity</label>
+            <div class="sev-chips" id="sevChips">
+              <button class="sev-chip" data-sev="mild">Mild</button>
+              <button class="sev-chip active" data-sev="moderate">Moderate</button>
+              <button class="sev-chip" data-sev="severe">Severe</button>
+              <button class="sev-chip" data-sev="critical">Critical</button>
+            </div>
           </div>
         </div>
 
-        <div class="wiz-card">
-          <label class="field-label">Lab tests done</label>
-          <div class="lab-chips" id="labChips">
-            <button class="lab-chip" data-lab="Malaria RDT">Malaria RDT</button>
-            <button class="lab-chip" data-lab="Blood Slide">Blood slide</button>
-            <button class="lab-chip" data-lab="CBC">CBC</button>
-            <button class="lab-chip" data-lab="Urinalysis">Urinalysis</button>
-            <button class="lab-chip" data-lab="Stool">Stool exam</button>
-            <button class="lab-chip" data-lab="Widal">Widal (Typhoid)</button>
-            <button class="lab-chip" data-lab="HIV Test">HIV test</button>
-            <button class="lab-chip" data-lab="Pregnancy Test">Pregnancy test</button>
-            <button class="lab-chip" data-lab="Blood Sugar">Blood sugar</button>
-            <button class="lab-chip" data-lab="BP">BP measurement</button>
-          </div>
-          <div style="margin-top:10px">
-            <textarea id="labResults" class="field-input" rows="2"
-              placeholder="Lab results / clinical findings (e.g. Malaria RDT positive, BP 150/95)"></textarea>
-          </div>
-        </div>
-
+        <!-- ── Care level ── -->
         <div class="wiz-card">
           <label class="field-label">Care level</label>
           <div class="care-toggle">
@@ -517,51 +512,260 @@
               <div class="care-opt-desc">Admit to ward</div>
             </button>
           </div>
-          <div id="wardField" style="display:none;margin-top:12px">
+          <div id="wardField" style="display:none;margin-top:14px">
             <label class="field-label">Ward / Bed</label>
             <input id="wardInput" class="field-input" placeholder="e.g. General Ward — Bed 3">
           </div>
         </div>
 
-        <!-- ── Fees & Charges ── -->
-        <div class="wiz-card" id="feesCard">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-            <span class="material-icons-outlined" style="color:var(--primary);font-size:20px">payments</span>
-            <span style="font-size:14px;font-weight:700;color:var(--text)">Fees &amp; Charges</span>
-          </div>
+        <!-- ── Lab tests ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">science</span>
+          Lab Tests &amp; Findings
+        </div>
 
-          <div style="display:grid;grid-template-columns:1fr auto;gap:8px 10px;align-items:center">
-            <label class="field-label" style="margin:0">Consultation fee</label>
-            <div style="display:flex;align-items:center;gap:4px">
-              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
-              <input id="feeConsult" class="field-input" type="number" min="0" step="500"
-                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
+        <div class="wiz-card">
+          <!-- MALARIA -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#FFEBEE">🦟</span> Malaria
             </div>
-
-            <label class="field-label" style="margin:0">Lab / Tests fee</label>
-            <div style="display:flex;align-items:center;gap:4px">
-              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
-              <input id="feeLab" class="field-input" type="number" min="0" step="500"
-                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
-            </div>
-
-            <label class="field-label" style="margin:0">Medications fee</label>
-            <div style="display:flex;align-items:center;gap:4px">
-              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
-              <input id="feeMeds" class="field-input" type="number" min="0" step="500"
-                style="width:110px;text-align:right;padding:8px 10px" placeholder="0">
-            </div>
-
-            <div style="border-top:1px solid var(--border);padding-top:8px;font-size:13px;font-weight:700;color:var(--text)">Total charged</div>
-            <div style="border-top:1px solid var(--border);padding-top:8px;display:flex;align-items:center;gap:4px">
-              <span style="font-size:12px;color:var(--text-lt);white-space:nowrap">UGX</span>
-              <span id="feeTotal" style="font-size:15px;font-weight:800;color:var(--primary);min-width:110px;text-align:right">0</span>
+            <div class="lab-chips" id="labChips">
+              <button class="lab-chip" data-lab="Malaria RDT" data-group="malaria">Malaria RDT</button>
+              <button class="lab-chip" data-lab="Thick Blood Smear" data-group="malaria">Thick Blood Smear</button>
+              <button class="lab-chip" data-lab="Thin Blood Smear" data-group="malaria">Thin Smear (speciation)</button>
+              <button class="lab-chip" data-lab="Malaria PCR" data-group="malaria">Malaria PCR</button>
             </div>
           </div>
 
+          <!-- BLOOD COUNT & CHEMISTRY -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#FFF3E0">🩸</span> Blood Count &amp; Chemistry
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="Full Blood Count (FBC)">FBC / CBC</button>
+              <button class="lab-chip" data-lab="ESR">ESR</button>
+              <button class="lab-chip" data-lab="CRP">CRP</button>
+              <button class="lab-chip" data-lab="Blood Group & Rhesus">Blood Group &amp; Rh</button>
+              <button class="lab-chip" data-lab="Blood Sugar (Random)">Blood Sugar (Random)</button>
+              <button class="lab-chip" data-lab="Fasting Blood Sugar">Fasting Blood Sugar</button>
+              <button class="lab-chip" data-lab="HbA1c">HbA1c</button>
+              <button class="lab-chip" data-lab="Liver Function Tests (LFTs)">Liver Function (LFTs)</button>
+              <button class="lab-chip" data-lab="Kidney Function (Creatinine)">Kidney / Creatinine</button>
+              <button class="lab-chip" data-lab="Serum Electrolytes">Electrolytes (Na/K)</button>
+              <button class="lab-chip" data-lab="Blood Culture & Sensitivity">Blood Culture &amp; S</button>
+            </div>
+          </div>
+
+          <!-- INFECTIONS & SEROLOGY -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#E8F5E9">🔬</span> Infections &amp; Serology
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="HIV Rapid Test">HIV Rapid Test</button>
+              <button class="lab-chip" data-lab="CD4 Count">CD4 Count</button>
+              <button class="lab-chip" data-lab="Hepatitis B (HBsAg)">Hepatitis B (HBsAg)</button>
+              <button class="lab-chip" data-lab="Hepatitis C (HCV)">Hepatitis C (HCV)</button>
+              <button class="lab-chip" data-lab="Syphilis (VDRL/RPR)">Syphilis (VDRL)</button>
+              <button class="lab-chip" data-lab="Widal (Typhoid)">Widal / Typhoid</button>
+              <button class="lab-chip" data-lab="Brucella Agglutination">Brucella</button>
+              <button class="lab-chip" data-lab="TB Sputum AFB Smear">TB Sputum (AFB)</button>
+              <button class="lab-chip" data-lab="TB GeneXpert">TB GeneXpert</button>
+            </div>
+          </div>
+
+          <!-- URINE & STOOL -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#E3F2FD">💧</span> Urine &amp; Stool
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="Urinalysis (Dipstick)">Urinalysis (Dipstick)</button>
+              <button class="lab-chip" data-lab="Urine Microscopy">Urine Microscopy</button>
+              <button class="lab-chip" data-lab="Urine Culture & Sensitivity">Urine C&amp;S</button>
+              <button class="lab-chip" data-lab="Pregnancy Test (uHCG)">Pregnancy Test</button>
+              <button class="lab-chip" data-lab="Stool Microscopy (Ova & Parasites)">Stool Microscopy</button>
+              <button class="lab-chip" data-lab="Stool Culture & Sensitivity">Stool C&amp;S</button>
+              <button class="lab-chip" data-lab="H. Pylori (Stool Antigen)">H. Pylori (Stool)</button>
+            </div>
+          </div>
+
+          <!-- VITALS & IMAGING -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#F3E5F5">📋</span> Vitals &amp; Imaging
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="BP Measurement">BP Measurement</button>
+              <button class="lab-chip" data-lab="Pulse Oximetry (SpO2)">Pulse Oximetry</button>
+              <button class="lab-chip" data-lab="Blood Glucose (POC)">Blood Glucose (POC)</button>
+              <button class="lab-chip" data-lab="ECG">ECG</button>
+              <button class="lab-chip" data-lab="Chest X-Ray">Chest X-Ray</button>
+              <button class="lab-chip" data-lab="Ultrasound">Ultrasound</button>
+            </div>
+          </div>
+
+          <!-- Results textarea -->
+          <div style="margin-top:16px">
+            <label class="field-label">Findings &amp; Results</label>
+            <textarea id="labResults" class="field-input" rows="2"
+              placeholder="e.g. Malaria RDT positive, Thick smear 2+, BP 148/94, Blood sugar 12.4 mmol/L…"></textarea>
+          </div>
+        </div>
+
+        <!-- ── Continue ── -->
+        <div class="wiz-nav">
+          <button class="wiz-btn wiz-btn-next" id="step1Next" disabled>
+            Treatment &amp; Bill
+            <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════
+           SCREEN 2 — Treatment & Bill
+           ════════════════════════════════════════════════════════ -->
+      <section class="wiz-section" data-step="2" style="display:none">
+
+        <!-- Live summary of patient + dx from screen 1 -->
+        <div class="consult-summary-bar" id="consultSummaryBar">
+          <div class="csb-avatar" id="csbAvatar">?</div>
+          <div class="csb-info">
+            <div class="csb-name" id="csbName">—</div>
+            <div class="csb-dx" id="csbDx">—</div>
+          </div>
+          <button class="wiz-btn wiz-btn-back" data-back style="flex:0;white-space:nowrap;padding:10px 14px">
+            <span class="material-icons-outlined" style="font-size:16px">edit</span> Edit
+          </button>
+        </div>
+
+        <!-- ── Medications ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">medication</span>
+          Medications
+        </div>
+
+        <div style="margin-bottom:12px">
+          <!-- Expected recovery (hidden input, auto-set from drug duration) -->
+          <input id="expRecovery" type="date" style="display:none">
+
+          <div id="medsContainer"></div>
+
+          <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:#1B5E20;border:1.5px dashed #A5D6A7;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
+            <span class="material-icons-outlined" style="font-size:20px">add_circle_outline</span>
+            Add medication
+          </button>
+        </div>
+
+        <!-- ── Materials (collapsed by default) ── -->
+        <div class="wiz-card" id="materialsCard">
+          <button class="collapse-toggle" id="materialsToggle">
+            <span class="material-icons-outlined ct-icon">expand_more</span>
+            <span>Materials &amp; consumables used</span>
+            <span style="font-size:11px;color:#9AA0A6;margin-left:auto">e.g. Drip set, Gloves, Syringe</span>
+          </button>
+          <div id="materialsBody" style="display:none;margin-top:10px">
+            <div id="materialsContainer">
+              <div id="materialsEmptyHint" style="font-size:12px;color:#9AA0A6;padding:2px 0">Stock auto-deducted on save.</div>
+            </div>
+            <button id="addMaterialBtn" style="margin-top:10px;font-size:12px;padding:7px 14px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:14px">add</span> Add material
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Stock source ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">local_pharmacy</span>
+          Where does the patient get the meds?
+        </div>
+
+        <div class="wiz-card">
+          <div class="stock-row">
+            <button class="stock-opt active" data-stock="clinic">
+              <div class="stock-opt-label">🏥 Clinic stock</div>
+              <div class="stock-opt-desc">Patient gets meds here, now</div>
+            </button>
+            <button class="stock-opt" data-stock="pharmacy">
+              <div class="stock-opt-label">💊 E-prescription</div>
+              <div class="stock-opt-desc">Send to partner pharmacy</div>
+            </button>
+          </div>
           <div style="margin-top:14px">
+            <label class="field-label">Patient instructions</label>
+            <textarea id="patientNotes" class="field-input" rows="2"
+              placeholder="e.g. Take with food, drink plenty of water, avoid alcohol…"></textarea>
+          </div>
+        </div>
+
+        <!-- ── Return visit ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">event_repeat</span>
+          Return visit
+        </div>
+
+        <div class="wiz-card">
+          <div class="return-row">
+            <div class="rr-days">
+              <label class="field-label">Return in</label>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input id="followUpDays" type="number" min="0" max="365" step="1" class="field-input"
+                  style="text-align:center;font-weight:700" placeholder="7" inputmode="numeric">
+                <span style="font-size:12px;color:#9AA0A6;white-space:nowrap">days</span>
+              </div>
+            </div>
+            <div class="rr-reason">
+              <label class="field-label">For</label>
+              <input id="followUpReason" type="text" class="field-input"
+                placeholder="e.g. BP recheck, refill Amlodipine" maxlength="200" autocomplete="off">
+            </div>
+          </div>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:8px" id="followUpDateHint">—</div>
+        </div>
+
+        <!-- ── Fees & payment ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">payments</span>
+          Fees &amp; Payment
+        </div>
+
+        <div class="wiz-card" id="feesCard">
+          <div class="fee-grid">
+            <div class="fee-lbl">Consultation fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeConsult" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+
+            <div class="fee-lbl">Lab / Tests fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeLab" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+
+            <div class="fee-lbl">Medications fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeMeds" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+          </div>
+
+          <div class="fee-total-row">
+            <div class="fee-total-label">Total charged</div>
+            <div class="fee-total-val">
+              <span class="fee-currency">UGX</span>
+              <span id="feeTotal">0</span>
+            </div>
+          </div>
+
+          <div style="margin-top:16px">
             <label class="field-label">Payment status</label>
-            <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <div class="pay-chips">
               <button class="pay-chip active" data-pay="paid">✓ Paid</button>
               <button class="pay-chip" data-pay="pending">⏳ Pending</button>
               <button class="pay-chip" data-pay="credit">📋 Credit</button>
@@ -570,134 +774,16 @@
           </div>
         </div>
 
-        <div class="wiz-nav">
-          <button class="wiz-btn wiz-btn-back" data-back>
-            <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back
-          </button>
-          <button class="wiz-btn wiz-btn-next" id="step3Next">
-            Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- ──────── STEP 4: MEDICATIONS ──────── -->
-      <section class="wiz-section" data-step="4" style="display:none">
-        <div class="wiz-step-h">
-          <span class="wiz-step-num">Step 4 of 5</span>
-        </div>
-        <div class="wiz-step-title">Medications &amp; schedule</div>
-        <div class="wiz-step-sub">Add the drugs you're prescribing. The patient will get push reminders at each intake time.</div>
-
-        <div class="wiz-card">
-          <label class="field-label">Expected recovery date</label>
-          <input id="expRecovery" type="date" class="field-input">
-          <div class="helper">When the patient should be feeling well. Auto-set from drug duration — adjust if needed.</div>
-        </div>
-
-        <div id="medsContainer"></div>
-
-        <button id="addMedBtn" class="wiz-btn"
-          style="background:#E8F5E9;color:#1B5E20;border:1.5px dashed var(--primary);width:100%;justify-content:center">
-          <span class="material-icons-outlined" style="font-size:18px">add_circle</span>
-          Add medication
+        <!-- ── Send ── -->
+        <button id="submitBtn" class="wiz-btn wiz-btn-send" style="margin-top:12px">
+          <span class="material-icons-outlined" style="font-size:20px">send</span>
+          Send Prescription &amp; Start Follow-up
         </button>
 
-        <!-- Materials & Consumables used -->
-        <div class="wiz-card" style="margin-top:14px;border-left:3px solid #00897B" id="materialsCard">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-            <label class="field-label" style="margin:0">Materials &amp; Consumables used</label>
-            <button id="addMaterialBtn" style="font-size:11px;padding:5px 10px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
-              <span class="material-icons-outlined" style="font-size:14px">add</span> Add
-            </button>
-          </div>
-          <div id="materialsContainer">
-            <div id="materialsEmptyHint" style="font-size:12px;color:#9AA0A6;padding:4px 0">e.g. Drip set, Gloves, Syringe — stock auto-deducted on save</div>
-          </div>
+        <div style="text-align:center;font-size:11px;color:#9AA0A6;margin-top:10px;margin-bottom:32px">
+          Medication reminders, follow-up check-ins and inventory deduction happen automatically in the background.
         </div>
 
-        <div class="wiz-card" style="margin-top:14px">
-          <label class="field-label">Where will the patient get the meds?</label>
-          <div class="stock-row">
-            <button class="stock-opt active" data-stock="clinic">
-              <div class="stock-opt-label">🏥 Clinic has stock</div>
-              <div class="stock-opt-desc">Patient gets meds here, now</div>
-            </button>
-            <button class="stock-opt" data-stock="pharmacy">
-              <div class="stock-opt-label">💊 E-prescription</div>
-              <div class="stock-opt-desc">Send to nearest partner pharmacy</div>
-            </button>
-          </div>
-          <div id="patientInstructions" style="margin-top:12px">
-            <label class="field-label">Patient instructions</label>
-            <textarea id="patientNotes" class="field-input" rows="2"
-              placeholder="e.g. Take with food. Drink plenty of water. Avoid alcohol."></textarea>
-          </div>
-        </div>
-
-        <!-- Follow-up plan: when patient should return and for what -->
-        <div class="wiz-card" style="margin-top:14px;border-left:3px solid #1565C0">
-          <label class="field-label" style="display:flex;align-items:center;gap:6px">
-            <span class="material-icons-outlined" style="font-size:16px;color:#1565C0">event_repeat</span>
-            Return visit
-          </label>
-          <div style="font-size:12px;color:#5F6368;margin-bottom:10px">
-            When should this patient come back, and what for? Shown in Active Treatments so any clinician on duty knows what to check.
-          </div>
-          <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
-            <div style="flex:0 0 110px">
-              <label class="field-label" style="font-size:11px">Return in (days)</label>
-              <input id="followUpDays" type="number" min="0" max="365" step="1" class="field-input"
-                placeholder="7" inputmode="numeric">
-            </div>
-            <div style="flex:1;min-width:180px">
-              <label class="field-label" style="font-size:11px">Return for</label>
-              <input id="followUpReason" type="text" class="field-input"
-                placeholder="e.g. Review BP & refill Amlodipine" maxlength="200" autocomplete="off">
-            </div>
-          </div>
-          <div style="font-size:11px;color:#9AA0A6;margin-top:6px" id="followUpDateHint">—</div>
-        </div>
-
-        <div class="wiz-nav">
-          <button class="wiz-btn wiz-btn-back" data-back>
-            <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back
-          </button>
-          <button class="wiz-btn wiz-btn-next" id="step4Next">
-            Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
-          </button>
-        </div>
-      </section>
-
-      <!-- ──────── STEP 5: REVIEW & SEND ──────── -->
-      <section class="wiz-section" data-step="5" style="display:none">
-        <div class="wiz-step-h">
-          <span class="wiz-step-num">Step 5 of 5</span>
-        </div>
-        <div class="wiz-step-title">Review &amp; send</div>
-        <div class="wiz-step-sub">Confirm the consultation. The patient will get push reminders at every intake time and a check-in 24h later.</div>
-
-        <div class="wiz-card">
-          <div class="review-grid" id="reviewGrid"></div>
-        </div>
-
-        <div class="wiz-card" id="reminderPreviewCard">
-          <div style="font-size:12px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
-            <span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">notifications_active</span>
-            Push reminder schedule
-          </div>
-          <div id="reminderPreview" style="font-size:13px;color:#5F6368;line-height:1.7"></div>
-        </div>
-
-        <div class="wiz-nav">
-          <button class="wiz-btn wiz-btn-back" data-back>
-            <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back
-          </button>
-          <button class="wiz-btn wiz-btn-next" id="submitBtn"
-            style="background:var(--primary)">
-            <span class="material-icons-outlined" style="font-size:18px">send</span>
-            Send Prescription &amp; Start Follow-up
-          </button>
-        </div>
       </section>
 
     </div>
@@ -740,11 +826,11 @@
       </button>
     </div>
     <p style="font-size:13px;color:#5F6368;margin:0 0 16px;line-height:1.5">
-      Captured once and stored securely. Helps all clinicians in the Homatt network provide safer care — only shared with other clinics when the patient explicitly consents.
+      Captured once and stored securely. Helps all clinicians in the Homatt network provide safer care.
     </p>
 
     <label class="field-label">Known Allergies</label>
-    <input id="intakeAllergies" class="field-input" placeholder="e.g. Penicillin, Sulfa drugs, Peanuts — or type None"
+    <input id="intakeAllergies" class="field-input" placeholder="e.g. Penicillin, Sulfa drugs — or type None"
       style="margin-bottom:14px" autocomplete="off">
 
     <label class="field-label">Chronic Conditions</label>
@@ -764,31 +850,43 @@
       <button class="bg-chip" data-bg="Unknown">Unknown</button>
     </div>
 
-    <label class="field-label">Additional Medical Notes</label>
+    <label class="field-label">Other notes (optional)</label>
     <textarea id="intakeNotes" class="field-input" rows="2"
-      placeholder="Previous surgeries, family history, current medications, other relevant info…"
-      style="margin-bottom:14px"></textarea>
+      placeholder="e.g. Pregnant, breastfeeding, special dietary needs…"
+      style="margin-bottom:18px"></textarea>
 
-    <div style="background:#E8F5E9;border:1px solid #A5D6A7;border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#1B5E20;display:flex;align-items:flex-start;gap:6px">
-      <span class="material-icons-outlined" style="font-size:15px;flex-shrink:0;margin-top:1px">lock</span>
-      This information is stored securely and will only be shared with other clinics after the patient's verbal or written consent is recorded.
-    </div>
-
-    <button id="intakeSaveBtn" style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">
-      Save Intake Information
+    <button id="intakeSaveBtn" class="wiz-btn wiz-btn-next" style="width:100%;justify-content:center">
+      <span class="material-icons-outlined">save</span> Save &amp; Continue
     </button>
-    <button id="intakeSkipBtn" style="width:100%;margin-top:10px;padding:12px;background:transparent;color:#9AA0A6;border:none;font-size:13px;cursor:pointer;font-family:inherit">
+    <div style="height:8px"></div>
+    <button id="intakeSkipBtn" class="wiz-btn wiz-btn-back" style="width:100%;justify-content:center">
       Skip for now
     </button>
   </div>
 </div>
 
-<div id="clinicToast" class="admin-toast"></div>
+<!-- Success bottom sheet -->
+<div id="successSheet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:700;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:28px 24px 36px;text-align:center">
+    <div style="width:64px;height:64px;background:#E8F5E9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+      <span class="material-icons-outlined" style="font-size:36px;color:#1B5E20">check_circle</span>
+    </div>
+    <div style="font-size:20px;font-weight:800;color:#111;margin-bottom:6px">Consultation Saved</div>
+    <div style="font-size:13px;color:#5F6368;margin-bottom:20px;line-height:1.6" id="successMsg">
+      Prescription sent. Patient will receive medication reminders automatically.
+    </div>
+    <div style="background:#F1F8F1;border-radius:12px;padding:14px;margin-bottom:20px;text-align:left" id="successReminders"></div>
+    <a href="dashboard.html">
+      <button style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">
+        Back to Dashboard
+      </button>
+    </a>
+  </div>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic.js"></script>
 <script src="js/new-order-wizard.js"></script>
-<script src="../js/native-bridge.js"></script>
 </body>
 </html>

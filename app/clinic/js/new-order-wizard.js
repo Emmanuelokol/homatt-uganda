@@ -1,7 +1,10 @@
 /* ════════════════════════════════════════════════════════════════════
- * Homatt Health — New Consultation Wizard
- * 5-step flow: patient → AI dx → confirmed dx → meds → review/send
+ * Homatt Health — New Consultation Wizard  (2-screen)
+ * Screen 1: Patient & Assessment
+ * Screen 2: Treatment & Bill
  * Saves to: clinic_diagnoses, e_prescriptions, clinic_followups
+ * Background: medication reminders, follow-up scheduling,
+ *             inventory deduction, e-prescription generation
  * ════════════════════════════════════════════════════════════════════ */
 
 (function() {
@@ -21,42 +24,71 @@
   // ── State ────────────────────────────────────────────────────────
   const state = {
     step: 1,
-    patient: null,         // {id, clinicPatientId, name, phone, registered}
-    bookingId: null,       // set when verified via booking code
+    patient: null,
+    bookingId: null,
     bookingCode: null,
-    aiDiagnoses: [],       // [{name, likelihood_percent, urgency}]
-    aiSelectedIdx: -1,     // which AI diagnosis was selected
-    aiSource: 'app',       // 'app' (from triage history) | 'clinic_input'
-    enteredSymptoms: '',   // when clinician types symptoms manually
     confirmedDx: '',
     severity: 'moderate',
     patientType: 'outpatient',
     ward: '',
     labTests: [],
     labResults: '',
-    medications: [],       // [{drug, dosage, timesPerDay, intakeTimes:[], durationDays, inventoryItemId, qtyToDeduct}]
-    materialsUsed: [],     // [{item_id, item_name, unit, qty}] — non-drug consumables used
+    medications: [],
+    materialsUsed: [],
     expectedRecovery: '',
-    followUpDays: 7,       // when should the patient return (default 7d)
-    followUpReason: '',    // why they should come back (drug review, wound check, etc.)
-    stockSource: 'clinic', // 'clinic' | 'pharmacy'
+    followUpDays: 7,
+    followUpReason: '',
+    stockSource: 'clinic',
     pharmacyId: null,
     patientNotes: '',
     formulary: [],
-    clinicInventory: [],   // [{id, item_name, item_type, unit, quantity, is_low_stock}]
+    clinicInventory: [],
     feeConsult: 0,
     feeLab: 0,
     feeMeds: 0,
     paymentStatus: 'paid',
   };
-  window._wizState = state; // expose for debug
+  window._wizState = state;
 
-  // ── Default lab-test prices (UGX) ───────────────────────────────
+  // ── Lab-test prices (UGX) ────────────────────────────────────────
   const LAB_PRICES = {
-    'Malaria RDT': 5000, 'Blood Slide': 10000, 'CBC': 15000,
-    'Urinalysis': 10000, 'Stool': 10000, 'Widal': 15000,
-    'HIV Test': 5000, 'Pregnancy Test': 5000, 'Blood Sugar': 5000,
-    'BP': 2000,
+    'Malaria RDT':                        5000,
+    'Thick Blood Smear':                  8000,
+    'Thin Blood Smear':                  10000,
+    'Malaria PCR':                       25000,
+    'Full Blood Count (FBC)':            15000,
+    'ESR':                                8000,
+    'CRP':                               12000,
+    'Blood Group & Rhesus':               8000,
+    'Blood Sugar (Random)':               5000,
+    'Fasting Blood Sugar':                6000,
+    'HbA1c':                             35000,
+    'Liver Function Tests (LFTs)':       25000,
+    'Kidney Function (Creatinine)':      15000,
+    'Serum Electrolytes':                20000,
+    'Blood Culture & Sensitivity':       30000,
+    'HIV Rapid Test':                     5000,
+    'CD4 Count':                         30000,
+    'Hepatitis B (HBsAg)':              15000,
+    'Hepatitis C (HCV)':                 20000,
+    'Syphilis (VDRL/RPR)':              12000,
+    'Widal (Typhoid)':                   15000,
+    'Brucella Agglutination':            20000,
+    'TB Sputum AFB Smear':              15000,
+    'TB GeneXpert':                      50000,
+    'Urinalysis (Dipstick)':             5000,
+    'Urine Microscopy':                   8000,
+    'Urine Culture & Sensitivity':       25000,
+    'Pregnancy Test (uHCG)':             5000,
+    'Stool Microscopy (Ova & Parasites)':10000,
+    'Stool Culture & Sensitivity':       25000,
+    'H. Pylori (Stool Antigen)':         20000,
+    'BP Measurement':                     2000,
+    'Pulse Oximetry (SpO2)':              3000,
+    'Blood Glucose (POC)':                4000,
+    'ECG':                               20000,
+    'Chest X-Ray':                       40000,
+    'Ultrasound':                        60000,
   };
 
   // ── Fee helpers ──────────────────────────────────────────────────
@@ -76,7 +108,10 @@
     if (el && !parseFloat(el.value)) { el.value = total || ''; recalcFees(); }
   }
 
+  let _feeCardInited = false;
   function initFeeCard() {
+    if (_feeCardInited) return;
+    _feeCardInited = true;
     ['feeConsult','feeLab','feeMeds'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', recalcFees);
@@ -100,20 +135,40 @@
     }
   }
 
-  // ── Step navigation ─────────────────────────────────────────────
+  // ── Live summary bar ─────────────────────────────────────────────
+  function updateConsultSummaryBar() {
+    const p = state.patient;
+    if (!p) return;
+    const avatar = (p.name||'?').split(' ').map(x=>x[0]).slice(0,2).join('').toUpperCase();
+    const el1 = document.getElementById('csbAvatar');
+    const el2 = document.getElementById('csbName');
+    const el3 = document.getElementById('csbDx');
+    if (el1) el1.textContent = avatar;
+    if (el2) el2.textContent = p.name || '—';
+    if (el3) el3.textContent = (state.confirmedDx || '—') +
+      (state.severity && state.severity !== 'moderate' ? ' · ' + state.severity : '');
+  }
+
+  // ── Step navigation ──────────────────────────────────────────────
   function showStep(n) {
     state.step = n;
     document.querySelectorAll('.wiz-section').forEach(s => {
       s.style.display = (parseInt(s.dataset.step,10) === n) ? '' : 'none';
     });
-    document.querySelectorAll('.wiz-pill').forEach(p => {
-      const i = parseInt(p.dataset.pill,10);
-      p.classList.remove('done','current');
-      if (i < n) p.classList.add('done');
-      else if (i === n) p.classList.add('current');
+    document.querySelectorAll('.wiz-dot').forEach(dot => {
+      const i = parseInt(dot.dataset.dot, 10);
+      dot.classList.remove('done','current');
+      if (i < n) dot.classList.add('done');
+      else if (i === n) dot.classList.add('current');
     });
-    if (n === 5) renderReview();
-    if (n === 3) { initFeeCard(); autoFillLabFee(); }
+    const dotLine = document.getElementById('dotLine');
+    if (dotLine) dotLine.classList.toggle('done', n > 1);
+    if (n === 2) {
+      updateConsultSummaryBar();
+      initFeeCard();
+      autoFillLabFee();
+      if (!state.medications.length) addMedication();
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -125,7 +180,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════
-  // STEP 1: Patient lookup
+  // SCREEN 1: Patient lookup
   // ════════════════════════════════════════════════════════════════
   const phoneInput  = document.getElementById('patientPhone');
   const patientMenu = document.getElementById('patientResults');
@@ -148,14 +203,12 @@
   async function searchPatients(q) {
     if (!supabase) { renderPatientMenu([], q); return; }
 
-    // Search profiles (Homatt users)
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, phone_number, phone')
       .or(`phone_number.ilike.%${q}%,phone.ilike.%${q}%`)
       .limit(5);
 
-    // Search clinic_patients (stub patients at this clinic)
     let stubs = [];
     if (_clinicId) {
       const { data: cp } = await supabase
@@ -232,16 +285,13 @@
     }
     patientMenu.style.display = 'none';
     document.getElementById('step1Next').disabled = false;
-    // Hide booking code block whichever tab was active
     document.getElementById('bookingCodeBlock').style.display = 'none';
-    // Load returning patient profile
     loadPatientProfile(p);
   }
 
   document.getElementById('ppChangeBtn').onclick = () => {
     state.patient = null;
     phoneInput.value = '';
-    // Reset to phone tab
     document.getElementById('patientSearchBlock').style.display = '';
     document.getElementById('bookingCodeBlock').style.display = 'none';
     document.getElementById('lookupTabPhone').classList.add('active');
@@ -257,11 +307,7 @@
     if (!e.target.closest('.autocomplete-wrap')) patientMenu.style.display = 'none';
   });
 
-  // ════════════════════════════════════════════════════════════════
-  // RETURNING PATIENT — lookup tabs, booking code, profile card
-  // ════════════════════════════════════════════════════════════════
-
-  // Tab switching
+  // ── Lookup tabs ──────────────────────────────────────────────────
   document.getElementById('lookupTabPhone').onclick = () => {
     document.getElementById('lookupTabPhone').classList.add('active');
     document.getElementById('lookupTabCode').classList.remove('active');
@@ -277,7 +323,6 @@
     setTimeout(() => document.getElementById('bookingCodeInput').focus(), 80);
   };
 
-  // Booking code auto-format + Enter key
   const bookingCodeInput = document.getElementById('bookingCodeInput');
   if (bookingCodeInput) {
     bookingCodeInput.addEventListener('input', () => {
@@ -290,7 +335,6 @@
     });
   }
 
-  // Booking code lookup
   document.getElementById('lookupCodeBtn').onclick = async () => {
     const code = (bookingCodeInput?.value || '').trim().toUpperCase();
     const errEl = document.getElementById('codeError');
@@ -336,14 +380,12 @@
     btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient';
   };
 
-  // ── Load returning patient profile ───────────────────────────
+  // ── Load returning patient profile ───────────────────────────────
   async function loadPatientProfile(patient) {
     const card = document.getElementById('patientProfileCard');
     if (!card) return;
 
-    // Data already attached from booking code lookup
     if (patient._profilePreloaded) {
-      // Still fetch active meds (booking-code path doesn't include them)
       try {
         const { data: meds } = await supabase.rpc('get_patient_active_meds', {
           p_phone:   patient.phone || null,
@@ -364,7 +406,6 @@
     let medProfile = null;
     let activeMeds = [];
 
-    // Active medications across the network (drug-interaction safety check)
     try {
       const { data: meds } = await supabase.rpc('get_patient_active_meds', {
         p_phone:   patient.phone || null,
@@ -407,7 +448,6 @@
     fetchVisitHistory(merged, card);
   }
 
-  // ── Fetch visit history (own clinic, or cross-clinic if consented) ──
   async function fetchVisitHistory(patient, card) {
     if (!supabase || !card) return;
     const consent = patient.consent_share_history;
@@ -425,7 +465,6 @@
       } else if (consent && name) {
         query = query.ilike('patient_name', '%' + name + '%');
       } else {
-        // Own clinic only
         if (!_clinicId) { renderProfileCard(card, patient, []); return; }
         query = query.eq('clinic_id', _clinicId);
         if (phone) query = query.eq('patient_phone', phone);
@@ -439,7 +478,6 @@
     }
   }
 
-  // ── Render the profile card (safety banners + visit history) ────
   function renderProfileCard(card, patient, history) {
     if (!card) return;
     card.style.display = '';
@@ -452,7 +490,6 @@
 
     let html = '<div style="border-top:1px solid #F0F0F0;margin-top:6px;padding-top:12px">';
 
-    // ── Safety banners (top priority — drug interactions first) ──
     const activeMeds = patient._activeMeds || [];
     if (activeMeds.length) {
       const medList = activeMeds.slice(0, 5).map(m => {
@@ -499,7 +536,6 @@
       </div>`;
     }
 
-    // ── Intake prompt / edit button ──
     const hasIntake = notNone(allergies) || notNone(chronic) || (blood && blood !== 'Unknown');
     const canEdit   = patient.clinicPatientId || patient.id;
     if (!hasIntake && canEdit) {
@@ -516,7 +552,6 @@
       </div>`;
     }
 
-    // ── Visit history ──
     if (history === null) {
       html += '<div style="color:#9AA0A6;text-align:center;font-size:13px;padding:8px 0">Loading visit history…</div>';
     } else if (!history.length) {
@@ -525,7 +560,6 @@
         No previous visits recorded.
       </div>`;
     } else {
-      // Consent gate notice
       if (!consent) {
         html += `<div style="background:#E3F2FD;border-radius:10px;padding:10px 14px;font-size:12px;color:#0D47A1;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0">lock</span>
@@ -539,7 +573,6 @@
         </div>`;
       }
 
-      // Missed appointments count
       const missed = history.filter(h => h.missed).length;
       if (missed) {
         html += `<div style="background:#FFEBEE;border-radius:8px;padding:8px 12px;font-size:12px;color:#C62828;margin-bottom:8px;display:flex;align-items:center;gap:6px">
@@ -571,7 +604,6 @@
     html += '</div>';
     card.innerHTML = html;
 
-    // Wire buttons
     const intakeBtn = card.querySelector('#openIntakeBtn');
     if (intakeBtn) intakeBtn.onclick = () => openIntakeModal(state.patient);
 
@@ -579,7 +611,6 @@
     if (consentBtn) consentBtn.onclick = () => requestConsent(state.patient);
   }
 
-  // ── Request consent ──────────────────────────────────────────
   async function requestConsent(patient) {
     if (!supabase) return;
     if (!confirm('Ask the patient verbally:\n\n"Do you consent to sharing your medical history with other Homatt-network clinics for safer care?"\n\nOnce they agree, tap OK to record their consent.')) return;
@@ -597,7 +628,7 @@
   }
 
   // ════════════════════════════════════════════════════════════════
-  // INTAKE MODAL (first-visit: allergies, chronic, blood group)
+  // INTAKE MODAL
   // ════════════════════════════════════════════════════════════════
   let _selectedBloodGroup = '';
 
@@ -642,12 +673,12 @@
     const allergiesArr = allergiesRaw ? allergiesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
     const chronicArr   = chronicRaw   ? chronicRaw.split(',').map(s => s.trim()).filter(Boolean)   : [];
 
-    // Ensure patient is saved as clinic_patient before writing intake
     if (!patient.clinicPatientId && !patient.id) {
       showToast('Register the patient first before saving intake', 'error'); return;
     }
 
     const btn = document.getElementById('intakeSaveBtn');
+    const origHTML = btn.innerHTML;
     btn.disabled = true; btn.textContent = 'Saving…';
 
     try {
@@ -668,7 +699,6 @@
         }).eq('id', patient.id);
       }
 
-      // Update local state
       Object.assign(state.patient, {
         allergies:          allergiesArr,
         chronic_conditions: chronicArr,
@@ -683,10 +713,10 @@
     } catch(e) {
       showToast('Error: ' + e.message, 'error');
     }
-    btn.disabled = false; btn.textContent = 'Save Intake Information';
+    btn.disabled = false; btn.innerHTML = origHTML;
   };
 
-  // ── Quick-register modal ───────────────────────────────────────
+  // ── Quick-register modal ─────────────────────────────────────────
   const regModal = document.getElementById('registerModal');
   function openRegisterModal(prefillPhone) {
     document.getElementById('regPhone').value = prefillPhone || phoneInput.value;
@@ -736,21 +766,67 @@
     showToast('Patient registered', 'success');
   };
 
-  // Step 1 → Step 2
+  // ── Diagnosis input ──────────────────────────────────────────────
+  document.getElementById('confirmedDx').addEventListener('input', e => {
+    state.confirmedDx = e.target.value;
+  });
+
+  // ── Severity chips ───────────────────────────────────────────────
+  document.querySelectorAll('#sevChips .sev-chip').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#sevChips .sev-chip').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.severity = b.dataset.sev;
+    };
+  });
+
+  // ── Lab test chips (all groups) ──────────────────────────────────
+  document.querySelectorAll('.lab-chip').forEach(b => {
+    b.onclick = () => {
+      b.classList.toggle('active');
+      const lab = b.dataset.lab;
+      const i = state.labTests.indexOf(lab);
+      if (i === -1) state.labTests.push(lab); else state.labTests.splice(i, 1);
+    };
+  });
+
+  document.getElementById('labResults').addEventListener('input', e => {
+    state.labResults = e.target.value;
+  });
+
+  // ── Care level toggle ────────────────────────────────────────────
+  document.querySelectorAll('.care-opt').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('.care-opt').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.patientType = b.dataset.care;
+      document.getElementById('wardField').style.display =
+        (state.patientType === 'inpatient') ? '' : 'none';
+    };
+  });
+  document.getElementById('wardInput').addEventListener('input', e => {
+    state.ward = e.target.value;
+  });
+
+  // ── Step 1 → Step 2 ─────────────────────────────────────────────
   document.getElementById('step1Next').onclick = () => {
     if (!state.patient) { showToast('Select a patient first', 'error'); return; }
+    if (!state.confirmedDx.trim()) {
+      showToast('Enter the confirmed diagnosis', 'error');
+      document.getElementById('confirmedDx').focus();
+      return;
+    }
     showStep(2);
-    loadAiDiagnoses();
   };
 
-  // Pre-fill from URL params (from patients.html or verified booking code)
+  // ── Pre-fill from URL params ─────────────────────────────────────
   (function preFillFromURL() {
     const p = new URLSearchParams(window.location.search);
-    const name      = p.get('patient_name');
-    const phone     = p.get('patient_phone');
-    const id        = p.get('patient_id');
-    const cpId      = p.get('clinic_patient_id');
-    const bookingId = p.get('booking_id');
+    const name        = p.get('patient_name');
+    const phone       = p.get('patient_phone');
+    const id          = p.get('patient_id');
+    const cpId        = p.get('clinic_patient_id');
+    const bookingId   = p.get('booking_id');
     const bookingCode = p.get('booking_code');
 
     if (bookingId) {
@@ -766,264 +842,14 @@
         registered: !!id,
         fromBooking: !!bookingId,
       });
-
-      // If we came from a verified booking, advance straight to Step 2
-      // and load AI diagnoses from the booking record
-      if (bookingId) {
-        setTimeout(() => {
-          showStep(2);
-          loadAiDiagnosesFromBooking(bookingId);
-        }, 50);
-      }
+      // Patient is pre-selected. Clinician fills in diagnosis before advancing.
       return;
     }
     setTimeout(() => phoneInput.focus(), 200);
   })();
 
-  // Pull conditions_json from the booking the patient already created in the app
-  async function loadAiDiagnosesFromBooking(bookingId) {
-    if (!supabase) return;
-    aiDxArea.innerHTML = `
-      <div style="text-align:center;padding:30px;color:#9AA0A6">
-        <span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:6px">hourglass_empty</span>
-        Loading diagnoses from patient's booking…
-      </div>`;
-    const { data: booking } = await supabase
-      .from('bookings')
-      .select('conditions_json, ai_diagnosis, ai_confidence, symptoms, urgency_level, created_at')
-      .eq('id', bookingId)
-      .maybeSingle();
-
-    if (booking?.conditions_json?.length) {
-      state.aiDiagnoses = booking.conditions_json.slice(0, 3);
-      state.aiSource = 'app';
-      state.enteredSymptoms = booking.symptoms || '';
-      renderAiCards({
-        created_at: booking.created_at,
-        clinic_urgency: booking.urgency_level === 'high' ? 'urgent' : 'soon',
-      });
-    } else if (booking?.ai_diagnosis) {
-      // Single diagnosis fallback
-      state.aiDiagnoses = [{
-        name: booking.ai_diagnosis,
-        likelihood_percent: booking.ai_confidence || 60,
-      }];
-      state.aiSource = 'app';
-      renderAiCards({ created_at: booking.created_at });
-    } else {
-      showManualEntry('Booking found, but no AI diagnoses recorded — enter symptoms below');
-    }
-  }
-
   // ════════════════════════════════════════════════════════════════
-  // STEP 2: AI Diagnoses
-  // ════════════════════════════════════════════════════════════════
-  const aiDxArea = document.getElementById('aiDxArea');
-  const manualSymptomsArea = document.getElementById('manualSymptomsArea');
-
-  async function loadAiDiagnoses() {
-    aiDxArea.innerHTML = `
-      <div style="text-align:center;padding:30px;color:#9AA0A6">
-        <span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:6px">hourglass_empty</span>
-        Looking up patient's symptom history…
-      </div>`;
-    manualSymptomsArea.style.display = 'none';
-
-    if (!supabase || !state.patient) {
-      showManualEntry('No patient data available');
-      return;
-    }
-
-    // Pull most recent AI triage session for Homatt-registered patients
-    if (state.patient.id) {
-      const { data: sessions } = await supabase
-        .from('ai_triage_sessions')
-        .select('ai_conditions, top_diagnosis, ai_confidence, created_at, overall_risk, clinic_urgency')
-        .eq('user_id', state.patient.id)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      if (sessions?.length && sessions[0].ai_conditions?.length) {
-        const s = sessions[0];
-        state.aiDiagnoses = (s.ai_conditions || []).slice(0, 3);
-        state.aiSource = 'app';
-        renderAiCards(s);
-        return;
-      }
-      // Fallback: check bookings.ai_full_data
-      const { data: booking } = await supabase
-        .from('bookings')
-        .select('ai_full_data, symptoms, created_at')
-        .eq('patient_user_id', state.patient.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (booking?.ai_full_data?.conditions?.length) {
-        state.aiDiagnoses = booking.ai_full_data.conditions.slice(0, 3);
-        state.aiSource = 'app';
-        renderAiCards({ created_at: booking.created_at });
-        return;
-      }
-    }
-
-    // No data → manual symptoms entry
-    showManualEntry(state.patient.id ? 'No prior symptom check found for this patient' : 'Walk-in patient — enter their symptoms');
-  }
-
-  function showManualEntry(reason) {
-    aiDxArea.innerHTML = `
-      <div class="empty-ai-state">
-        <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px">info</span>
-        ${esc(reason)}. Enter symptoms below to get AI suggestions.
-      </div>`;
-    manualSymptomsArea.style.display = '';
-    state.aiSource = 'clinic_input';
-  }
-
-  function renderAiCards(meta) {
-    const ageMs = Date.now() - new Date(meta.created_at || Date.now()).getTime();
-    const ageHrs = Math.floor(ageMs / 3600000);
-    const ageLabel = ageHrs < 1 ? 'just now' :
-                     ageHrs < 24 ? `${ageHrs}h ago` :
-                     `${Math.floor(ageHrs/24)}d ago`;
-
-    const cards = state.aiDiagnoses.map((dx, i) => {
-      const conf = dx.likelihood_percent || dx.confidence || 0;
-      const cls = conf >= 75 ? 'high' : conf >= 50 ? 'med' : '';
-      const urgency = dx.urgency || meta.clinic_urgency || '';
-      return `
-        <div class="dx-card" data-idx="${i}">
-          <div class="dx-card-top">
-            <span class="dx-name">${esc(dx.name)}</span>
-            <span class="dx-confidence ${cls}">${conf}% match</span>
-          </div>
-          <div class="dx-meta">
-            ${dx.severity ? `Severity: ${esc(dx.severity)}` : ''}
-            ${urgency ? ` · ${esc(urgency)}` : ''}
-          </div>
-        </div>`;
-    }).join('');
-
-    aiDxArea.innerHTML = `
-      <div style="font-size:11px;color:#9AA0A6;margin-bottom:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:600">
-        From patient's symptom check · ${ageLabel}
-      </div>
-      ${cards}
-      <div class="helper" style="margin-top:10px">Tap the closest match. You can edit it on the next step after lab tests.</div>
-    `;
-    aiDxArea.querySelectorAll('.dx-card').forEach(el => {
-      el.onclick = () => {
-        aiDxArea.querySelectorAll('.dx-card').forEach(c => c.classList.remove('selected'));
-        el.classList.add('selected');
-        state.aiSelectedIdx = parseInt(el.dataset.idx, 10);
-        state.confirmedDx = state.aiDiagnoses[state.aiSelectedIdx].name;
-      };
-    });
-  }
-
-  // Manual symptoms → AI proxy
-  document.getElementById('getAiBtn').onclick = async () => {
-    const symptoms = document.getElementById('manualSymptoms').value.trim();
-    if (!symptoms) { showToast('Enter symptoms first', 'error'); return; }
-    state.enteredSymptoms = symptoms;
-
-    const btn = document.getElementById('getAiBtn');
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Thinking…';
-
-    try {
-      const prompt = `Patient in Uganda reports these symptoms: "${symptoms}". Provide exactly 3 most likely diagnoses ranked by likelihood. Respond with ONLY a JSON array (no markdown, no preamble): [{"name":"<condition>","likelihood_percent":<0-100>,"severity":"mild|moderate|severe","urgency":"routine|urgent|emergency"}]. Consider tropical diseases common in Uganda (malaria, typhoid, schistosomiasis, etc.).`;
-      const { data, error } = await supabase.functions.invoke('ai-proxy', {
-        body: { provider: 'groq', prompt }
-      });
-      if (error) throw error;
-      let parsed = [];
-      try {
-        const text = (data?.text || '').replace(/```json|```/g, '').trim();
-        parsed = JSON.parse(text);
-      } catch(e) {
-        showToast('AI response could not be parsed. Please type the diagnosis directly on the next step.', 'error');
-        // Skip ahead with empty diagnoses — clinician fills it manually
-        state.aiDiagnoses = [];
-        state.aiSelectedIdx = -1;
-        showStep(3);
-        return;
-      }
-      state.aiDiagnoses = (parsed || []).slice(0, 3);
-      state.aiSource = 'clinic_input';
-      manualSymptomsArea.style.display = 'none';
-      renderAiCards({ created_at: new Date().toISOString() });
-    } catch(e) {
-      showToast('AI request failed: ' + (e.message || 'unknown'), 'error');
-    }
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">auto_awesome</span> Get AI diagnosis suggestions';
-  };
-
-  // Step 2 → Step 3
-  document.getElementById('step2Next').onclick = () => {
-    // It's OK to skip AI selection — clinician can type confirmed dx directly
-    document.getElementById('confirmedDx').value = state.confirmedDx || '';
-    showStep(3);
-  };
-
-  // ════════════════════════════════════════════════════════════════
-  // STEP 3: Confirmed Dx + Severity + Lab tests + Care level
-  // ════════════════════════════════════════════════════════════════
-  document.getElementById('confirmedDx').addEventListener('input', e => {
-    state.confirmedDx = e.target.value;
-  });
-
-  // Severity chips
-  document.querySelectorAll('#sevChips .sev-chip').forEach(b => {
-    b.onclick = () => {
-      document.querySelectorAll('#sevChips .sev-chip').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      state.severity = b.dataset.sev;
-    };
-  });
-
-  // Lab test chips — also auto-fill lab fee when tests are selected
-  document.querySelectorAll('#labChips .lab-chip').forEach(b => {
-    b.onclick = () => {
-      b.classList.toggle('active');
-      const lab = b.dataset.lab;
-      const i = state.labTests.indexOf(lab);
-      if (i === -1) state.labTests.push(lab); else state.labTests.splice(i,1);
-      autoFillLabFee();
-    };
-  });
-
-  document.getElementById('labResults').addEventListener('input', e => {
-    state.labResults = e.target.value;
-  });
-
-  // Care level toggle
-  document.querySelectorAll('.care-opt').forEach(b => {
-    b.onclick = () => {
-      document.querySelectorAll('.care-opt').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      state.patientType = b.dataset.care;
-      document.getElementById('wardField').style.display =
-        (state.patientType === 'inpatient') ? '' : 'none';
-    };
-  });
-  document.getElementById('wardInput').addEventListener('input', e => {
-    state.ward = e.target.value;
-  });
-
-  // Step 3 → Step 4
-  document.getElementById('step3Next').onclick = () => {
-    if (!state.confirmedDx.trim()) {
-      showToast('Enter the confirmed diagnosis', 'error');
-      document.getElementById('confirmedDx').focus();
-      return;
-    }
-    showStep(4);
-    if (!state.medications.length) addMedication(); // start with one med row
-  };
-
-  // ════════════════════════════════════════════════════════════════
-  // STEP 4: Medications with intake times
+  // SCREEN 2: Medications
   // ════════════════════════════════════════════════════════════════
   const FALLBACK_FORMULARY = [
     { name: 'Coartem 20/120mg',    default_dosage:'4 tabs twice daily',     common_dosages:['4 tabs twice daily','3 tabs twice daily'], default_days: 3 },
@@ -1055,13 +881,12 @@
       if (!clinicId) return;
       const { data } = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
       state.clinicInventory = data || [];
-    } catch(e) { /* non-fatal */ }
+    } catch(e) {}
   }
 
   loadFormulary();
   loadClinicInventory();
 
-  // Default time slots based on times-per-day
   const DEFAULT_TIMES = {
     1: ['08:00'],
     2: ['08:00','20:00'],
@@ -1148,7 +973,6 @@
       </div>
     `).join('');
 
-    // Wire up listeners
     ct.querySelectorAll('.med-del-btn').forEach(b =>
       b.onclick = () => removeMedication(parseInt(b.dataset.rm,10)));
     ct.querySelectorAll('.drug-input').forEach(input => {
@@ -1192,19 +1016,16 @@
   function onDrugInput(e, idx) {
     const q = e.target.value.trim().toLowerCase();
     state.medications[idx].drug = e.target.value;
-    // Clear inventory link when user changes drug name
     state.medications[idx].inventoryItemId = null;
     state.medications[idx].qtyToDeduct     = 0;
     const menu = document.querySelector(`.drug-menu[data-idx="${idx}"]`);
     if (!q) { menu.style.display = 'none'; return; }
 
-    // Inventory items (medicines in clinic stock) — shown first with stock badge
     const invMatches = state.clinicInventory.filter(inv =>
       inv.item_type === 'medicine' &&
       inv.item_name.toLowerCase().includes(q)
     ).slice(0, 5);
 
-    // Formulary fallback
     const formMatches = state.formulary.filter(d =>
       d.name.toLowerCase().includes(q) || (d.generic_name||'').toLowerCase().includes(q)
     ).slice(0, 6);
@@ -1235,7 +1056,6 @@
       + (formMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;background:#FAFAFA">Formulary</div>${formHtml}` : '');
     menu.style.display = 'block';
 
-    // Inventory item selection
     menu.querySelectorAll('[data-inv-id]').forEach(el => {
       el.onclick = () => {
         const inv = state.clinicInventory.find(x => x.id === el.dataset.invId);
@@ -1243,7 +1063,6 @@
         state.medications[idx].drug            = inv.item_name;
         state.medications[idx].inventoryItemId = inv.id;
         state.medications[idx].qtyToDeduct     = 1;
-        // Try to match formulary for dosage/duration defaults
         const fMatch = state.formulary.find(d => d.name.toLowerCase() === inv.item_name.toLowerCase());
         if (fMatch) {
           state.medications[idx].dosage       = fMatch.default_dosage || state.medications[idx].dosage;
@@ -1255,7 +1074,6 @@
       };
     });
 
-    // Formulary item selection
     menu.querySelectorAll('[data-name]').forEach(el => {
       el.onclick = () => {
         const drug = state.formulary.find(d => d.name === el.dataset.name);
@@ -1263,7 +1081,6 @@
         state.medications[idx].drug            = drug.name;
         state.medications[idx].dosage          = drug.default_dosage || state.medications[idx].dosage;
         state.medications[idx].durationDays    = drug.default_days   || state.medications[idx].durationDays;
-        // Auto-link to inventory if exact name match exists
         const invLink = state.clinicInventory.find(x =>
           x.item_type === 'medicine' && x.item_name.toLowerCase() === drug.name.toLowerCase()
         );
@@ -1284,11 +1101,12 @@
     const d = new Date();
     d.setDate(d.getDate() + maxDays);
     const yyyy = d.getFullYear();
-    const mm = String(d.getMonth()+1).padStart(2,'0');
-    const dd = String(d.getDate()).padStart(2,'0');
-    const iso = `${yyyy}-${mm}-${dd}`;
+    const mm   = String(d.getMonth()+1).padStart(2,'0');
+    const dd   = String(d.getDate()).padStart(2,'0');
+    const iso  = `${yyyy}-${mm}-${dd}`;
     state.expectedRecovery = iso;
-    document.getElementById('expRecovery').value = iso;
+    const el = document.getElementById('expRecovery');
+    if (el) el.value = iso;
   }
 
   document.getElementById('expRecovery').addEventListener('change', e => {
@@ -1297,17 +1115,25 @@
 
   document.getElementById('addMedBtn').onclick = addMedication;
 
-  // ════════════════════════════════════════════════════════════════
-  // Materials & Consumables
-  // ════════════════════════════════════════════════════════════════
+  // ── Materials (collapsed section) ────────────────────────────────
+  const materialsToggle = document.getElementById('materialsToggle');
+  const materialsBody   = document.getElementById('materialsBody');
+  if (materialsToggle && materialsBody) {
+    materialsToggle.onclick = () => {
+      const isOpen = materialsBody.style.display !== 'none';
+      materialsBody.style.display = isOpen ? 'none' : '';
+      materialsToggle.classList.toggle('open', !isOpen);
+    };
+  }
+
   function renderMaterials() {
-    const ct    = document.getElementById('materialsContainer');
-    const hint  = document.getElementById('materialsEmptyHint');
+    const ct   = document.getElementById('materialsContainer');
+    const hint = document.getElementById('materialsEmptyHint');
     if (!ct) return;
     if (!state.materialsUsed.length) { if (hint) hint.style.display = 'block'; ct.innerHTML = ''; return; }
     if (hint) hint.style.display = 'none';
     ct.innerHTML = state.materialsUsed.map((m, i) => {
-      const inv = state.clinicInventory.find(x => x.id === m.item_id);
+      const inv     = state.clinicInventory.find(x => x.id === m.item_id);
       const stockTxt = inv ? ` (${inv.quantity} ${inv.unit} in stock)` : '';
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F5F5">
         <span style="flex:1;font-size:13px;font-weight:600;color:#202124">${esc(m.item_name)}${esc(stockTxt)}</span>
@@ -1335,13 +1161,11 @@
   }
 
   function showMaterialPicker() {
-    // Filter to non-medicine inventory items
     const options = state.clinicInventory.filter(x => x.item_type !== 'medicine' && x.is_active !== false);
     if (!options.length) {
       showToast('No materials/consumables in clinic stock yet. Add them in the Stock Tracker on the dashboard.', 'error');
       return;
     }
-    // Simple pick list in a bottom sheet style
     const existing = document.getElementById('matPickerSheet');
     if (existing) existing.remove();
 
@@ -1379,6 +1203,8 @@
         }
         sheet.remove();
         renderMaterials();
+        if (materialsBody) materialsBody.style.display = '';
+        if (materialsToggle) materialsToggle.classList.add('open');
       };
     });
     sheet.addEventListener('click', e => { if (e.target === sheet) sheet.remove(); });
@@ -1387,7 +1213,7 @@
   const addMaterialBtn = document.getElementById('addMaterialBtn');
   if (addMaterialBtn) addMaterialBtn.onclick = showMaterialPicker;
 
-  // Stock toggle
+  // ── Stock source toggle ──────────────────────────────────────────
   document.querySelectorAll('.stock-opt').forEach(b => {
     b.onclick = () => {
       document.querySelectorAll('.stock-opt').forEach(x => x.classList.remove('active'));
@@ -1400,7 +1226,7 @@
     state.patientNotes = e.target.value;
   });
 
-  // Follow-up plan inputs ─────────────────────────────────────────
+  // ── Return visit inputs ──────────────────────────────────────────
   function updateFollowUpHint() {
     const hint = document.getElementById('followUpDateHint');
     if (!hint) return;
@@ -1411,6 +1237,7 @@
     const label = d.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
     hint.textContent = 'Patient should return on ' + label + (state.followUpReason ? ' — for ' + state.followUpReason : '');
   }
+
   const fuDaysEl = document.getElementById('followUpDays');
   if (fuDaysEl) {
     fuDaysEl.value = state.followUpDays;
@@ -1429,77 +1256,13 @@
   }
   updateFollowUpHint();
 
-  // Step 4 → Step 5
-  document.getElementById('step4Next').onclick = () => {
-    const ok = state.medications.every(m => m.drug && m.dosage && m.intakeTimes.every(t => t));
-    if (!state.medications.length) {
-      showToast('Add at least one medication', 'error');
-      return;
-    }
-    if (!ok) {
-      showToast('Fill in drug name, dosage and intake times for each medication', 'error');
-      return;
-    }
-    if (!state.expectedRecovery) autoSetExpectedRecovery();
-    showStep(5);
-  };
-
   // ════════════════════════════════════════════════════════════════
-  // STEP 5: Review + Submit
+  // Background: build follow-up schedule rows
   // ════════════════════════════════════════════════════════════════
-  function renderReview() {
-    const grid = document.getElementById('reviewGrid');
-    const medsLines = state.medications.map(m =>
-      `${m.drug} · ${m.dosage} · ${m.intakeTimes.join(', ')} · ${m.durationDays} days`
-    ).join('<br>');
-
-    grid.innerHTML = `
-      <div class="lbl">Patient</div>
-      <div class="val">${esc(state.patient.name)} · ${esc(state.patient.phone)}</div>
-      <div class="lbl">Diagnosis</div>
-      <div class="val">${esc(state.confirmedDx)} (${esc(state.severity)})</div>
-      <div class="lbl">Care level</div>
-      <div class="val">${state.patientType === 'inpatient' ? 'Inpatient — '+esc(state.ward||'Ward TBC') : 'Outpatient'}</div>
-      ${state.labTests.length ? `<div class="lbl">Lab tests</div><div class="val">${state.labTests.map(esc).join(', ')}</div>` : ''}
-      ${state.labResults ? `<div class="lbl">Lab results</div><div class="val">${esc(state.labResults)}</div>` : ''}
-      <div class="lbl">Medications</div>
-      <div class="val">${medsLines}</div>
-      <div class="lbl">Expected recovery</div>
-      <div class="val">${esc(state.expectedRecovery)}</div>
-      ${Number(state.followUpDays) > 0 ? (() => {
-        const d = new Date(); d.setDate(d.getDate() + Number(state.followUpDays));
-        const label = d.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-        return `<div class="lbl">Return visit</div><div class="val">${esc(label)} (in ${state.followUpDays} days)${state.followUpReason ? ' — ' + esc(state.followUpReason) : ''}</div>`;
-      })() : ''}
-      <div class="lbl">Source</div>
-      <div class="val">${state.stockSource === 'clinic' ? 'Clinic stock' : 'E-prescription → partner pharmacy'}</div>
-      ${state.patientNotes ? `<div class="lbl">Instructions</div><div class="val">${esc(state.patientNotes)}</div>` : ''}
-      <div class="lbl">Fees</div>
-      <div class="val">
-        Consult: UGX ${(state.feeConsult||0).toLocaleString()} &nbsp;|&nbsp;
-        Lab: UGX ${(state.feeLab||0).toLocaleString()} &nbsp;|&nbsp;
-        Meds: UGX ${(state.feeMeds||0).toLocaleString()}<br>
-        <strong>Total: UGX ${((state.feeConsult||0)+(state.feeLab||0)+(state.feeMeds||0)).toLocaleString()}</strong>
-        &nbsp;—&nbsp;${({'paid':'✓ Paid','pending':'⏳ Pending','credit':'📋 Credit','waived':'🤝 Waived'})[state.paymentStatus]||'Pending'}
-      </div>
-    `;
-
-    // Reminder schedule preview
-    const allTimes = state.medications.flatMap(m => m.intakeTimes).sort();
-    const uniqTimes = [...new Set(allTimes)];
-    document.getElementById('reminderPreview').innerHTML = `
-      <div>📲 <strong>Daily medication reminders</strong> at ${uniqTimes.length ? uniqTimes.join(', ') : '—'}</div>
-      <div>💬 <strong>"How are you feeling?" check-in</strong> tomorrow ${uniqTimes[0] || '08:00'}</div>
-      <div>🎯 <strong>Course-completion check</strong> on ${state.expectedRecovery}</div>
-      ${state.stockSource === 'pharmacy' ? `<div>🚚 <strong>Delivery confirmation push</strong> to patient — they choose pickup or home delivery</div>` : ''}
-    `;
-  }
-
-  // ── Build followup schedule ───────────────────────────────────
   function buildFollowupRows(diagnosisId) {
-    const rows = [];
+    const rows  = [];
     const today = new Date();
-    today.setSeconds(0,0);
+    today.setSeconds(0, 0);
 
     function whenAt(daysFromNow, hhmm) {
       const d = new Date(today);
@@ -1509,7 +1272,6 @@
       return d.toISOString();
     }
 
-    // 1) "How are you feeling?" check-in 24h after start, at the first med time
     const firstTime = (state.medications[0]?.intakeTimes?.[0]) || '08:00';
     rows.push({
       diagnosis_id: diagnosisId,
@@ -1520,7 +1282,6 @@
       intake_time: firstTime,
     });
 
-    // 2) Per-medication intake reminders for the duration
     state.medications.forEach(m => {
       const days = m.durationDays;
       m.intakeTimes.forEach(time => {
@@ -1537,9 +1298,8 @@
       });
     });
 
-    // 3) Course-complete check on expected recovery
     if (state.expectedRecovery) {
-      const recDate = new Date(state.expectedRecovery);
+      const recDate  = new Date(state.expectedRecovery);
       const daysAhead = Math.max(1, Math.round((recDate - today) / 86400000));
       rows.push({
         diagnosis_id: diagnosisId,
@@ -1554,7 +1314,9 @@
     return rows;
   }
 
-  // ── Submit ────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════
+  // Submit
+  // ════════════════════════════════════════════════════════════════
   document.getElementById('submitBtn').onclick = async () => {
     const btn = document.getElementById('submitBtn');
     btn.disabled = true;
@@ -1567,11 +1329,27 @@
     if (!supabase || !_clinicId) {
       showToast('Demo mode — not saved. Connect a clinic to save.', 'error');
       btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">send</span> Send Prescription & Start Follow-up';
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
       return;
     }
 
-    // Build prescription_items jsonb from medications
+    // Validate medications
+    if (!state.medications.length) {
+      showToast('Add at least one medication', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      return;
+    }
+    const medsOk = state.medications.every(m => m.drug && m.dosage && m.intakeTimes.every(t => t));
+    if (!medsOk) {
+      showToast('Fill in drug name, dosage and intake times for each medication', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      return;
+    }
+
+    if (!state.expectedRecovery) autoSetExpectedRecovery();
+
     const items = state.medications.map(m => ({
       drug_name:    m.drug,
       strength:     m.dosage,
@@ -1588,12 +1366,6 @@
       patient_name: state.patient.name || null,
       patient_phone: state.patient.phone,
       clinic_patient_id: state.patient.clinicPatientId || null,
-      ai_diagnoses: state.aiDiagnoses,
-      ai_source: state.aiSource,
-      ai_suggested_diagnosis: state.aiDiagnoses[state.aiSelectedIdx]?.name || null,
-      ai_confidence: state.aiDiagnoses[state.aiSelectedIdx]?.likelihood_percent || null,
-      ai_match: state.aiSelectedIdx >= 0 &&
-        state.aiDiagnoses[state.aiSelectedIdx]?.name?.toLowerCase() === state.confirmedDx.toLowerCase(),
       confirmed_diagnosis: state.confirmedDx,
       severity: state.severity,
       patient_type: state.patientType,
@@ -1615,16 +1387,14 @@
       total_charged_ugx:    (state.feeConsult + state.feeLab + state.feeMeds) || 0,
       payment_status:       state.paymentStatus || 'pending',
     };
-    if (state.patient.id) dxPayload.clinician_id = session?.userId || null;
 
     let dx, dxError;
-    // First attempt — full payload including new columns
     ({ data: dx, error: dxError } = await supabase
       .from('clinic_diagnoses')
       .insert(dxPayload)
       .select().single());
 
-    // If follow_up_reason column doesn't exist yet (migration pending), retry without it
+    // Graceful fallback if follow_up_reason column not yet migrated
     if (dxError && dxError.message && dxError.message.includes('follow_up_reason')) {
       const compatPayload = Object.assign({}, dxPayload);
       delete compatPayload.follow_up_reason;
@@ -1637,18 +1407,16 @@
     if (dxError) {
       showToast('Save failed: ' + dxError.message, 'error');
       btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">send</span> Send Prescription & Start Follow-up';
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
       return;
     }
 
-    // 1b. Auto-deduct clinic inventory (fire-and-forget — non-blocking)
+    // 1b. Auto-deduct clinic inventory (fire-and-forget)
     try {
       const invItems = [
-        // Medications linked to inventory
         ...state.medications
           .filter(m => m.inventoryItemId && m.qtyToDeduct > 0)
           .map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
-        // Materials explicitly selected
         ...state.materialsUsed
           .filter(m => m.item_id && m.qty > 0)
           .map(m => ({ item_id: m.item_id, qty: m.qty })),
@@ -1660,18 +1428,15 @@
           p_booking_id:   state.bookingId || null,
           p_items:        invItems,
         }).then(({ data: dResult }) => {
-          // Warn if any items went low-stock
           const low = dResult?.low_stock;
           if (Array.isArray(low) && low.length) {
-            low.forEach(item => {
-              showToast(`⚠ Low stock: ${item.item_name} — ${item.quantity} left`, 'error');
-            });
+            low.forEach(item => showToast(`⚠ Low stock: ${item.item_name} — ${item.quantity} left`, 'error'));
           }
         }).catch(() => {});
       }
-    } catch(e) { /* inventory deduction is non-blocking */ }
+    } catch(e) {}
 
-    // 2. Insert e_prescription if there are meds
+    // 2. Insert e_prescription
     if (items.length) {
       const epx = {
         diagnosis_id: dx.id,
@@ -1691,31 +1456,21 @@
       await supabase.from('e_prescriptions').insert(epx);
     }
 
-    // 3. Insert clinic_followups for medication reminders + check-ins
+    // 3. Insert clinic_followups (medication reminders + check-ins)
     const followups = buildFollowupRows(dx.id);
     if (followups.length) {
-      // clinic_followups uses clinic_order_id FK, but we want to link to diagnosis.
-      // Map to the existing schema (clinic_order_id) using diagnosis_id stored elsewhere,
-      // OR just insert with diagnosis_id (added via migration's day_number / intake_time columns).
-      // Strategy: use clinic_orders as the routing record, OR insert a stub clinic_order
-      // pointing at the same diagnosis. Simpler: use a separate insert path.
-      // Fallback compatible with existing clinic_followups schema:
-      try {
-        await supabase.from('clinic_followups').insert(followups);
-      } catch (e) { /* non-fatal; reminders won't fire but consultation is saved */ }
+      try { await supabase.from('clinic_followups').insert(followups); } catch(e) {}
     }
 
-    // 4. Mark booking as attended — works even when bookingId wasn't in URL params
+    // 4. Mark booking as attended
     try {
       const now = new Date().toISOString();
       if (state.bookingId) {
-        // Came via verify flow — update the specific booking
         await supabase
           .from('bookings')
           .update({ status: 'attended', attended_at: now, clinic_diagnosis_id: dx.id })
           .eq('id', state.bookingId);
       } else if (state.patient && state.patient.id) {
-        // Manual patient entry — find any active booking for this patient today and close it
         const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
         await supabase
           .from('bookings')
@@ -1724,21 +1479,18 @@
           .in('status', ['pending', 'confirmed', 'in_progress'])
           .gte('created_at', since);
       }
-    } catch(e) { /* non-fatal */ }
+    } catch(e) {}
 
-    // 5. Post-consultation push to patient (best-effort)
+    // 5. Post-consultation push notification
     if (state.patient && state.patient.id) {
       try {
         let title, message;
         if (state.stockSource === 'pharmacy') {
           title   = 'Prescription Ready';
           message = 'Your prescription has been sent to a partner pharmacy. Tap to choose delivery or pickup.';
-        } else if (state.stockSource === 'clinic') {
-          title   = 'Consultation Complete';
-          message = 'Your consultation is done. Please collect your prescription at the clinic pharmacy.';
         } else {
           title   = 'Consultation Complete';
-          message = 'Your consultation is done. Follow the advice from your doctor and take care.';
+          message = 'Your consultation is done. Please collect your prescription at the clinic pharmacy.';
         }
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -1752,15 +1504,44 @@
       } catch(e) {}
     }
 
-    showToast('Consultation saved. Reminders scheduled.', 'success');
-    setTimeout(() => { window.location.href = 'dashboard.html'; }, 900);
+    // 6. Show success sheet
+    const allTimes  = state.medications.flatMap(m => m.intakeTimes).sort();
+    const uniqTimes = [...new Set(allTimes)];
+
+    const successMsgEl = document.getElementById('successMsg');
+    if (successMsgEl) {
+      successMsgEl.innerHTML = `<strong>${esc(state.patient?.name || 'Patient')}</strong>'s consultation saved. `
+        + (state.stockSource === 'pharmacy'
+          ? 'Prescription sent to partner pharmacy.'
+          : 'Prescription ready at clinic pharmacy.');
+    }
+    const successRemindersEl = document.getElementById('successReminders');
+    if (successRemindersEl) {
+      const lines = [
+        `📲 <strong>Medication reminders</strong> daily at ${uniqTimes.length ? uniqTimes.join(', ') : '—'}`,
+        `💬 <strong>Check-in message</strong> tomorrow at ${uniqTimes[0] || '08:00'}`,
+      ];
+      if (state.expectedRecovery) {
+        lines.push(`🎯 <strong>Course-completion check</strong> on ${state.expectedRecovery}`);
+      }
+      if (Number(state.followUpDays) > 0) {
+        const rd = new Date();
+        rd.setDate(rd.getDate() + Number(state.followUpDays));
+        lines.push(`📅 <strong>Return visit</strong> — ${rd.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short' })}`);
+      }
+      successRemindersEl.innerHTML = lines.map(l =>
+        `<div style="font-size:12px;color:#2E7D32;padding:3px 0">${l}</div>`
+      ).join('');
+    }
+    const successSheet = document.getElementById('successSheet');
+    if (successSheet) successSheet.style.display = 'flex';
   };
 
-  // Initialise: highlight step 1 pills and add first med row
+  // Initialise
   showStep(1);
   addMedication();
 
   window._wizState = state;
   window._showStep = showStep;
-  window._wizEsc = esc;
+  window._wizEsc   = esc;
 })();
