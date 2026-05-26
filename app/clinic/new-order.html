@@ -525,6 +525,24 @@
         </div>
 
         <div class="wiz-card">
+          <!-- Quick filter — type to narrow chips -->
+          <div style="position:relative;margin-bottom:14px">
+            <input id="labSearch" class="field-input" type="text"
+              placeholder="Type to find a test… e.g. malaria, HIV, urine, x-ray"
+              autocomplete="off"
+              style="padding-left:38px;padding-right:38px">
+            <span class="material-icons-outlined"
+              style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#9AA0A6;pointer-events:none">search</span>
+            <button id="labSearchClear" type="button"
+              style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:18px">close</span>
+            </button>
+          </div>
+          <div id="labSelectedTray" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:10px 12px;background:#F1F8F1;border:1px dashed #A5D6A7;border-radius:10px"></div>
+          <div id="labNoMatch" style="display:none;padding:14px 12px;margin-bottom:12px;background:#FFF8E1;border-radius:10px;text-align:center;color:#5D4037;font-size:12px">
+            No test matches. You can still record it in the Findings box below.
+          </div>
+
           <!-- MALARIA -->
           <div class="lab-group">
             <div class="lab-group-title">

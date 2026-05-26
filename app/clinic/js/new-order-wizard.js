@@ -781,14 +781,77 @@
   });
 
   // ── Lab test chips (all groups) ──────────────────────────────────
+  function renderLabSelectedTray() {
+    const tray = document.getElementById('labSelectedTray');
+    if (!tray) return;
+    if (!state.labTests.length) { tray.style.display = 'none'; tray.innerHTML = ''; return; }
+    tray.style.display = 'flex';
+    tray.innerHTML = state.labTests.map(t =>
+      `<span class="lab-tray-chip" data-lab="${esc(t)}"
+         style="display:inline-flex;align-items:center;gap:4px;background:#E3F2FD;color:#0D47A1;border:1.5px solid #1565C0;padding:4px 10px;border-radius:14px;font-size:12px;font-weight:700;cursor:pointer">
+         ${esc(t)} <span class="material-icons-outlined" style="font-size:14px">close</span>
+       </span>`
+    ).join('');
+    tray.querySelectorAll('.lab-tray-chip').forEach(chip => {
+      chip.onclick = () => {
+        const lab = chip.dataset.lab;
+        const idx = state.labTests.indexOf(lab);
+        if (idx >= 0) state.labTests.splice(idx, 1);
+        // Sync the matching chip's visual state
+        document.querySelectorAll('.lab-chip').forEach(c => {
+          if (c.dataset.lab === lab) c.classList.remove('active');
+        });
+        renderLabSelectedTray();
+      };
+    });
+  }
+
   document.querySelectorAll('.lab-chip').forEach(b => {
     b.onclick = () => {
       b.classList.toggle('active');
       const lab = b.dataset.lab;
       const i = state.labTests.indexOf(lab);
       if (i === -1) state.labTests.push(lab); else state.labTests.splice(i, 1);
+      renderLabSelectedTray();
     };
   });
+
+  // ── Lab search / filter ──────────────────────────────────────────
+  const labSearchEl   = document.getElementById('labSearch');
+  const labSearchClr  = document.getElementById('labSearchClear');
+  const labNoMatchEl  = document.getElementById('labNoMatch');
+
+  function applyLabFilter() {
+    const q = (labSearchEl?.value || '').trim().toLowerCase();
+    if (labSearchClr) labSearchClr.style.display = q ? 'block' : 'none';
+    let anyVisible = false;
+    document.querySelectorAll('.lab-chip').forEach(chip => {
+      const lab  = (chip.dataset.lab || '').toLowerCase();
+      const text = (chip.textContent || '').toLowerCase();
+      const match = !q || lab.includes(q) || text.includes(q);
+      chip.style.display = match ? '' : 'none';
+      if (match) anyVisible = true;
+    });
+    document.querySelectorAll('.lab-group').forEach(group => {
+      const visible = Array.from(group.querySelectorAll('.lab-chip'))
+        .some(c => c.style.display !== 'none');
+      group.style.display = visible ? '' : 'none';
+    });
+    if (labNoMatchEl) labNoMatchEl.style.display = (q && !anyVisible) ? 'block' : 'none';
+  }
+
+  if (labSearchEl) {
+    labSearchEl.addEventListener('input', applyLabFilter);
+    labSearchEl.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { labSearchEl.value = ''; applyLabFilter(); }
+    });
+  }
+  if (labSearchClr) {
+    labSearchClr.onclick = () => {
+      if (labSearchEl) { labSearchEl.value = ''; labSearchEl.focus(); }
+      applyLabFilter();
+    };
+  }
 
   document.getElementById('labResults').addEventListener('input', e => {
     state.labResults = e.target.value;
