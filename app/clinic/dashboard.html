@@ -280,6 +280,20 @@
         </div>
       </div>
 
+      <!-- ── Overdue Follow-up Tracker ── -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
+            Missed Return Visits
+          </div>
+          <span id="overdueCount" style="font-size:11px;background:#E65100;color:#fff;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
+        </div>
+        <div id="overdueFollowupList" style="padding:8px 0">
+          <div style="text-align:center;padding:16px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
       <!-- Pending Payments / Outstanding Balances -->
       <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
         <div class="table-header">
@@ -305,6 +319,25 @@
         </div>
         <div id="ordersList" style="padding:16px">
           <div style="text-align:center;padding:40px;color:#9AA0A6">Loading…</div>
+        </div>
+      </div>
+
+      <!-- ── Medicines Dispensed Tracker ── -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4">
+        <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
+            Medicines Dispensed
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="meds-period-btn active" data-mp="day"   onclick="setMedsPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00ACC1;background:#00ACC1;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
+            <button class="meds-period-btn"        data-mp="week"  onclick="setMedsPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="meds-period-btn"        data-mp="month" onclick="setMedsPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+            <button class="meds-period-btn"        data-mp="year"  onclick="setMedsPeriod('year')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Year</button>
+          </div>
+        </div>
+        <div id="medsDispensedList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -1533,6 +1566,7 @@
 
     _activeRows = rows;
     renderActiveTreatments();
+    renderOverdueFollowups();
   }
 
   function renderActiveTreatments() {
@@ -1643,6 +1677,247 @@
         openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
       };
     });
+  }
+
+  // ── Overdue Follow-up Tracker ────────────────────────────────────
+  function renderOverdueFollowups() {
+    var el = document.getElementById('overdueFollowupList');
+    var badge = document.getElementById('overdueCount');
+    if (!el) return;
+
+    var now = Date.now();
+    // Patients who had a follow-up date set AND that date is today or in the past
+    var overdue = (_activeRows || []).filter(function(c) {
+      if (!c.follow_up_days || c.follow_up_days <= 0) return false;
+      var created = new Date(c.created_at).getTime();
+      var due = created + c.follow_up_days * 86400000;
+      return due <= now + 86400000; // include due today
+    }).sort(function(a, b) {
+      // Most overdue first
+      var dueA = new Date(a.created_at).getTime() + a.follow_up_days * 86400000;
+      var dueB = new Date(b.created_at).getTime() + b.follow_up_days * 86400000;
+      return dueA - dueB;
+    });
+
+    if (badge) {
+      if (overdue.length) {
+        badge.textContent = overdue.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    if (!overdue.length) {
+      el.innerHTML = '<div style="padding:16px 20px;text-align:center;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">event_available</span>'
+        + 'No missed return visits. All follow-ups on track.</div>';
+      return;
+    }
+
+    el.innerHTML = overdue.map(function(c) {
+      var due = new Date(new Date(c.created_at).getTime() + c.follow_up_days * 86400000);
+      var daysLate = Math.floor((now - due.getTime()) / 86400000);
+      var isToday  = daysLate <= 0;
+      var urgColor = daysLate > 7 ? '#B71C1C' : daysLate > 3 ? '#C62828' : daysLate > 0 ? '#E65100' : '#F9A825';
+      var dueLabel = isToday ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : '');
+      var ini = (c.patient_name || c.patient_phone || 'P').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #FFF3E0">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
+        +   '<div style="font-size:12px;color:' + urgColor + ';font-weight:600">' + dueLabel + '</div>'
+        +   (c.follow_up_reason ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0">'
+        +   '<button onclick="sendFollowUpReminder(\'' + esc(c.id) + '\')" title="Send reminder" '
+        +     'style="padding:6px 10px;font-size:12px;font-weight:600;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +     '<span class="material-icons-outlined" style="font-size:14px">sms</span>Remind'
+        +   '</button>'
+        +   '<button onclick="openOverdueVisit(\'' + esc(c.id) + '\')" title="Record return visit" '
+        +     'style="padding:6px 10px;font-size:12px;font-weight:600;border:none;background:#1565C0;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +     '<span class="material-icons-outlined" style="font-size:14px">edit_note</span>Record'
+        +   '</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // Send an SMS reminder to a patient who missed their return
+  async function sendFollowUpReminder(diagId) {
+    var c = (_activeRows || []).find(function(r){ return r.id === diagId; });
+    if (!c) return;
+    var btn = event.currentTarget;
+    var origHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px;animation:spin 1s linear infinite">refresh</span> Sending…';
+
+    var sent = false;
+    if (supabase && c.follow_up_reason) {
+      try {
+        await supabase.functions.invoke('send-sms', {
+          body: {
+            phone: c.patient_phone,
+            message: 'Hi ' + (c.patient_name || 'there') + ', a reminder from Homatt Health: your follow-up visit was due'
+              + (c.follow_up_reason ? ' (' + c.follow_up_reason + ')' : '') + '. Please visit the clinic at your earliest. Reply STOP to opt out.'
+          }
+        });
+        sent = true;
+      } catch(e) {}
+    }
+    if (!sent && supabase) {
+      try {
+        var clinicId = await resolveClinicId();
+        var { data: cl } = await supabase.from('clinics').select('name').eq('id', clinicId).maybeSingle();
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            userId: null,
+            phone: c.patient_phone,
+            title: 'Follow-up Reminder',
+            message: 'Hi ' + (c.patient_name || 'there') + '! Your return visit at ' + (cl?.name || 'the clinic') + ' is overdue. Please come in soon.',
+            data: { screen: 'dashboard' }
+          }
+        });
+        sent = true;
+      } catch(e) {}
+    }
+    showToast(sent ? 'Reminder sent to ' + (c.patient_name || c.patient_phone) : 'Reminder queued (SMS/push delivery depends on patient app status)', 'success');
+    btn.disabled = false;
+    btn.innerHTML = origHTML;
+  }
+
+  // Open follow-up form for an overdue patient (reuse existing openPatientDetail)
+  function openOverdueVisit(diagId) {
+    var c = (_activeRows || []).find(function(r){ return r.id === diagId; });
+    if (!c) return;
+    openPatientDetail(c);
+    // The detail modal has "Record Return Visit" button that calls showFollowupForm
+  }
+
+  // ── Medicines Dispensed Tracker ──────────────────────────────────
+  var _medsPeriod = 'day';
+
+  function setMedsPeriod(period) {
+    _medsPeriod = period;
+    document.querySelectorAll('.meds-period-btn').forEach(function(btn) {
+      var active = btn.dataset.mp === period;
+      btn.style.background = active ? '#00ACC1' : 'transparent';
+      btn.style.color = active ? '#fff' : '#424242';
+      btn.style.borderColor = active ? '#00ACC1' : '#E0E0E0';
+    });
+    loadMedsDispensed();
+  }
+
+  async function loadMedsDispensed() {
+    var el = document.getElementById('medsDispensedList');
+    if (!el) return;
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>';
+
+    var now = new Date();
+    var since;
+    if (_medsPeriod === 'day') {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    } else if (_medsPeriod === 'week') {
+      var w = new Date(now); w.setDate(w.getDate() - 7); since = w.toISOString();
+    } else if (_medsPeriod === 'month') {
+      since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    } else {
+      since = new Date(now.getFullYear(), 0, 1).toISOString();
+    }
+
+    if (!supabase) { renderMedsDemo(el); return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { renderMedsDemo(el); return; }
+
+    var { data, error } = await supabase
+      .from('clinic_diagnoses')
+      .select('prescription_items,created_at')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', since)
+      .not('prescription_items', 'is', null);
+
+    if (error || !data) {
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
+      return;
+    }
+
+    // Tally drugs from prescription_items JSONB
+    var tally = {}; // { drugName: { patients, totalDays } }
+    data.forEach(function(row) {
+      var items = Array.isArray(row.prescription_items) ? row.prescription_items : [];
+      var seen = new Set(); // count each drug once per consultation
+      items.forEach(function(item) {
+        var name = (item.drug_name || item.name || item.drug || '').trim();
+        if (!name) return;
+        if (!tally[name]) tally[name] = { patients: 0, totalDays: 0 };
+        if (!seen.has(name)) { tally[name].patients++; seen.add(name); }
+        tally[name].totalDays += (parseInt(item.duration || item.durationDays, 10) || 0);
+      });
+    });
+
+    var keys = Object.keys(tally).sort(function(a,b){ return tally[b].patients - tally[a].patients; });
+    var totalConsults = data.length;
+
+    if (!keys.length) {
+      var periodLabel = { day:'today', week:'this week', month:'this month', year:'this year' }[_medsPeriod] || _medsPeriod;
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#E0E0E0">medication</span>'
+        + 'No medicines dispensed ' + periodLabel + '.</div>';
+      return;
+    }
+
+    var maxPts = tally[keys[0]].patients;
+    var topKeys = keys.slice(0, 12);
+
+    el.innerHTML = '<div style="padding:12px 16px 8px">'
+      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">'
+      + totalConsults + ' consultation' + (totalConsults !== 1 ? 's' : '') + ' · top ' + topKeys.length + ' drugs</div>'
+      + topKeys.map(function(name, i) {
+          var t = tally[name];
+          var pct = Math.round((t.patients / maxPts) * 100);
+          var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
+          var textColor = i < 3 ? '#006064' : '#424242';
+          return '<div style="margin-bottom:10px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
+            + '<span style="font-size:13px;font-weight:600;color:' + textColor + '">' + esc(name) + '</span>'
+            + '<span style="font-size:12px;color:#9AA0A6;margin-left:8px;white-space:nowrap">'
+            + t.patients + ' patient' + (t.patients !== 1 ? 's' : '')
+            + (t.totalDays > 0 ? ' · ' + t.totalDays + 'd total' : '') + '</span>'
+            + '</div>'
+            + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width .4s ease"></div>'
+            + '</div>'
+            + '</div>';
+        }).join('')
+      + (keys.length > 12 ? '<div style="font-size:11px;color:#9AA0A6;text-align:center;padding-top:4px">+' + (keys.length - 12) + ' more drugs this period</div>' : '')
+      + '</div>';
+  }
+
+  function renderMedsDemo(el) {
+    var demo = [
+      { name: 'Coartem 20/120mg',  patients: 12, totalDays: 36 },
+      { name: 'Paracetamol 500mg', patients: 9,  totalDays: 27 },
+      { name: 'Amoxicillin 500mg', patients: 7,  totalDays: 35 },
+      { name: 'ORS Sachet',        patients: 5,  totalDays: 15 },
+      { name: 'Metronidazole',     patients: 4,  totalDays: 28 },
+    ];
+    var maxPts = demo[0].patients;
+    el.innerHTML = '<div style="padding:12px 16px 8px">'
+      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Demo data — connect database for live figures</div>'
+      + demo.map(function(d, i) {
+          var pct = Math.round((d.patients / maxPts) * 100);
+          var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
+          return '<div style="margin-bottom:10px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
+            + '<span style="font-size:13px;font-weight:600;color:#006064">' + esc(d.name) + '</span>'
+            + '<span style="font-size:12px;color:#9AA0A6">' + d.patients + ' patients · ' + d.totalDays + 'd total</span>'
+            + '</div>'
+            + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px"></div>'
+            + '</div></div>';
+        }).join('')
+      + '</div>';
   }
 
   // Live filter as the user types in the active-treatments search box
@@ -2076,6 +2351,7 @@
     loadRevenue();
     loadInventory();
     loadFinancial(_finPeriod);
+    loadMedsDispensed();
   }
   loadAll();
 
@@ -2084,6 +2360,7 @@
     loadBookings(); loadActiveTreatments(); loadPendingPayments();
     loadConsultations(); loadRevenue();
     loadInventory(); loadFinancial(_finPeriod);
+    loadMedsDispensed();
   }, 60000);
 
   // ── Supabase Realtime ──
