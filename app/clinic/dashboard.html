@@ -578,14 +578,20 @@
   <div id="qsSheet" style="background:#fff;width:100%;max-width:600px;border-radius:24px 24px 0 0;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative">
 
     <!-- Header -->
-    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:10px">
+    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
         <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">point_of_sale</span>
         <span style="font-size:19px;font-weight:800;color:#1B5E20">Quick Sale</span>
       </div>
-      <button onclick="closeQuickSale()" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
-        <span class="material-icons-outlined">close</span>
-      </button>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="qsAddDrugBtn" type="button"
+          style="background:#E8F5E9;border:1.5px solid #A5D6A7;color:#1B5E20;border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> New Drug
+        </button>
+        <button id="qsCloseBtn" type="button" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
     </div>
 
     <!-- Search -->
@@ -603,27 +609,35 @@
 
     <!-- Selected drug + controls -->
     <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
-        <div id="qsSelTotal" style="font-size:16px;font-weight:800;color:#202124;white-space:nowrap"></div>
+        <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
       </div>
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
         <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
-          <button onclick="changeQsQty(-1)" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">−</button>
+          <button id="qsQtyMinus" type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">−</button>
           <div id="qsQtyVal" style="min-width:48px;text-align:center;font-size:18px;font-weight:800;color:#202124;padding:0 6px">1</div>
-          <button onclick="changeQsQty(1)"  style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">+</button>
+          <button id="qsQtyPlus"  type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">+</button>
         </div>
-        <span id="qsStockLeft" style="font-size:12px;color:#9AA0A6"></span>
         <div style="display:flex;gap:6px;margin-left:auto">
-          <button id="qsPmCash" class="qs-pm-chip selected" onclick="setQsPm('cash')">Cash</button>
-          <button id="qsPmMomo" class="qs-pm-chip"          onclick="setQsPm('momo')">MoMo</button>
+          <button id="qsPmCash" type="button" class="qs-pm-chip selected">Cash</button>
+          <button id="qsPmMomo" type="button" class="qs-pm-chip">MoMo</button>
         </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:600;color:#5F6368">UGX</span>
+        <input id="qsTotalInput" type="number" min="0" step="100" inputmode="numeric"
+          style="flex:1;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:18px;font-weight:800;color:#202124;font-family:inherit;outline:none;background:#fff;text-align:right;box-sizing:border-box">
+        <button id="qsResetTotal" type="button" title="Reset to auto"
+          style="background:transparent;border:none;color:#9AA0A6;cursor:pointer;padding:6px;display:flex;align-items:center;touch-action:manipulation">
+          <span class="material-icons-outlined" style="font-size:18px">refresh</span>
+        </button>
       </div>
     </div>
 
     <!-- Sell button -->
-    <button id="qsSellBtn" disabled onclick="submitQuickSale()"
+    <button id="qsSellBtn" type="button" disabled
       style="margin:10px 16px 16px;padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;font-family:inherit;flex-shrink:0;transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
@@ -2861,6 +2875,7 @@
   var _qsDrugs = [];
   var _qsSel   = null;
   var _qsQty   = 1;
+  var _qsTotalOverride = null;   // null = use auto (price × qty); otherwise user-typed amount
   var _qsPm;
   try { _qsPm = localStorage.getItem('qs_pm') || 'cash'; } catch(e) { _qsPm = 'cash'; }
 
@@ -2868,7 +2883,7 @@
     var el = document.getElementById('qsOverlay');
     if (!el) return;
     el.style.display = 'flex';
-    _qsSel = null; _qsQty = 1;
+    _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
     var panel = document.getElementById('qsSelectedPanel');
     var btn   = document.getElementById('qsSellBtn');
     var si    = document.getElementById('qsSearch');
@@ -2885,6 +2900,50 @@
     var el = document.getElementById('qsOverlay');
     if (el) el.style.display = 'none';
   }
+
+  // ── Wire up Quick Sale controls via addEventListener (reliable on Android WebView) ──
+  (function wireQuickSale() {
+    var sellBtn = document.getElementById('qsSellBtn');
+    if (sellBtn) sellBtn.addEventListener('click', function(e) { e.preventDefault(); submitQuickSale(); });
+
+    var closeBtn = document.getElementById('qsCloseBtn');
+    if (closeBtn) closeBtn.addEventListener('click', closeQuickSale);
+
+    var addBtn = document.getElementById('qsAddDrugBtn');
+    if (addBtn) addBtn.addEventListener('click', function() {
+      closeQuickSale();
+      if (typeof openAddStockModal === 'function') openAddStockModal();
+    });
+
+    var minus = document.getElementById('qsQtyMinus');
+    var plus  = document.getElementById('qsQtyPlus');
+    if (minus) minus.addEventListener('click', function() { changeQsQty(-1); });
+    if (plus)  plus.addEventListener('click',  function() { changeQsQty(1);  });
+
+    var cashBtn = document.getElementById('qsPmCash');
+    var momoBtn = document.getElementById('qsPmMomo');
+    if (cashBtn) cashBtn.addEventListener('click', function() { setQsPm('cash'); });
+    if (momoBtn) momoBtn.addEventListener('click', function() { setQsPm('momo'); });
+
+    var totalInput = document.getElementById('qsTotalInput');
+    if (totalInput) totalInput.addEventListener('input', function() {
+      var v = parseFloat(totalInput.value);
+      _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
+    });
+
+    var resetBtn = document.getElementById('qsResetTotal');
+    if (resetBtn) resetBtn.addEventListener('click', function() {
+      _qsTotalOverride = null;
+      updateQsPanel();
+    });
+
+    // Event delegation for drug card taps (works for dynamically-injected cards)
+    var grid = document.getElementById('qsDrugGrid');
+    if (grid) grid.addEventListener('click', function(e) {
+      var card = e.target.closest('.qs-drug-card');
+      if (card && card.dataset.id) selectQsDrug(card.dataset.id);
+    });
+  })();
 
   async function loadQsDrugs() {
     var grid = document.getElementById('qsDrugGrid');
@@ -2922,7 +2981,10 @@
     var grid = document.getElementById('qsDrugGrid');
     if (!grid) return;
     if (!items.length) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">No drugs in stock. Add items via Stock Tracker.</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:36px;display:block;margin-bottom:10px;color:#CFD8DC">inventory_2</span>'
+        + 'No drugs in stock yet. Tap <strong style="color:#1B5E20">+ New Drug</strong> above to add your first item.'
+        + '</div>';
       return;
     }
     grid.innerHTML = items.map(function(item) {
@@ -2930,7 +2992,7 @@
       var priceStr = price ? 'UGX ' + fmtUGX(price) : 'Set price';
       var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5) && Number(item.quantity) > 0;
       var stockClr = lowStock ? '#E65100' : '#9AA0A6';
-      return '<div class="qs-drug-card" data-id="' + esc(item.id) + '" onclick="selectQsDrug(\'' + esc(item.id) + '\')">'
+      return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
         + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
         + '<div class="qs-drug-price">' + priceStr + '</div>'
         + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
@@ -2956,7 +3018,7 @@
   function selectQsDrug(id) {
     var drug = _qsDrugs.find(function(d) { return d.id === id; });
     if (!drug) return;
-    _qsSel = drug; _qsQty = 1;
+    _qsSel = drug; _qsQty = 1; _qsTotalOverride = null;
     document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) {
       c.classList.toggle('selected', c.dataset.id === id);
     });
@@ -2967,22 +3029,31 @@
     if (btn) btn.disabled = false;
   }
 
+  function qsCurrentTotal() {
+    if (!_qsSel) return 0;
+    if (_qsTotalOverride !== null) return _qsTotalOverride;
+    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    return price * _qsQty;
+  }
+
   function updateQsPanel() {
     if (!_qsSel) return;
-    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
     var name  = document.getElementById('qsSelName');
-    var total = document.getElementById('qsSelTotal');
     var qty   = document.getElementById('qsQtyVal');
     var stock = document.getElementById('qsStockLeft');
+    var ti    = document.getElementById('qsTotalInput');
     if (name)  name.textContent  = _qsSel.item_name;
-    if (total) total.textContent = 'UGX ' + fmtUGX(price * _qsQty);
     if (qty)   qty.textContent   = _qsQty;
-    if (stock) stock.textContent = _qsSel.quantity + ' in stock';
+    if (stock) stock.textContent = _qsSel.quantity + ' ' + (_qsSel.unit || '') + ' in stock';
+    if (ti && _qsTotalOverride === null) ti.value = qsCurrentTotal();
   }
 
   function changeQsQty(delta) {
     if (!_qsSel) return;
     _qsQty = Math.max(1, Math.min(_qsQty + delta, Number(_qsSel.quantity) || 999));
+    _qsTotalOverride = null;  // reset override when qty changes
+    var ti = document.getElementById('qsTotalInput');
+    if (ti) ti.value = qsCurrentTotal();
     updateQsPanel();
   }
 
@@ -3000,13 +3071,15 @@
     var btn = document.getElementById('qsSellBtn');
     if (!btn || btn.disabled) return;
     btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span>';
+    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span> Saving…';
 
-    var price    = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
-    var total    = price * _qsQty;
-    var clinicId = await resolveClinicId();
+    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    var total = qsCurrentTotal();
+    var stockAfter = Math.max(0, Number(_qsSel.quantity) - _qsQty);
 
     try {
+      var clinicId = await resolveClinicId();
+
       if (supabase && clinicId && !_qsSel._isDemo) {
         var userId = null;
         try {
@@ -3015,56 +3088,66 @@
         } catch(e2) {}
 
         try {
-          await supabase.from('clinic_quick_sales').insert({
-            clinic_id:     clinicId,
-            drug_id:       _qsSel.id,
-            drug_name:     _qsSel.item_name,
-            unit:          _qsSel.unit || 'unit',
-            quantity:      _qsQty,
+          var ins = await supabase.from('clinic_quick_sales').insert({
+            clinic_id:      clinicId,
+            drug_id:        _qsSel.id,
+            drug_name:      _qsSel.item_name,
+            unit:           _qsSel.unit || 'unit',
+            quantity:       _qsQty,
             unit_price_ugx: price,
-            total_ugx:     total,
+            total_ugx:      total,
             payment_method: _qsPm,
-            sold_by:       userId,
-            created_at:    new Date().toISOString()
+            sold_by:        userId,
+            created_at:     new Date().toISOString()
           });
+          if (ins.error) console.warn('clinic_quick_sales:', ins.error.message);
         } catch(insErr) { console.warn('clinic_quick_sales:', insErr.message); }
 
         try {
-          await supabase.rpc('adjust_inventory', {
+          var adj = await supabase.rpc('adjust_inventory', {
             p_clinic_id:    clinicId,
             p_inventory_id: _qsSel.id,
             p_qty_change:   -_qsQty,
             p_txn_type:     'deduction',
             p_notes:        'Quick Sale'
           });
+          if (adj.error) console.warn('adjust_inventory:', adj.error.message);
+          else if (adj.data && typeof adj.data.quantity_after !== 'undefined') {
+            stockAfter = Number(adj.data.quantity_after);
+          }
         } catch(invErr) { console.warn('adjust_inventory:', invErr.message); }
       }
-      showQsSuccess(_qsSel.item_name, _qsQty, total);
     } catch(e) {
       console.warn('Quick sale error:', e.message);
-      showQsSuccess(_qsSel.item_name, _qsQty, total);
     }
+    showQsSuccess(_qsSel.item_name, _qsQty, total, stockAfter, _qsSel.unit || '');
   }
 
-  function showQsSuccess(name, qty, total) {
+  function showQsSuccess(name, qty, total, stockAfter, unit) {
     var flash = document.getElementById('qsSuccessFlash');
     var ft    = document.getElementById('qsFlashText');
     var fs    = document.getElementById('qsFlashSub');
     if (ft) ft.textContent = qty + ' × ' + name;
-    if (fs) fs.textContent = 'UGX ' + fmtUGX(total) + ' — ' + (_qsPm === 'momo' ? 'Mobile Money' : 'Cash');
+    if (fs) {
+      var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
+      fs.innerHTML = 'UGX ' + fmtUGX(total) + ' &middot; ' + pay
+        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'') + '</span>';
+    }
     if (flash) {
       flash.style.display = 'flex';
       setTimeout(function() {
         flash.style.display = 'none';
-        _qsSel = null; _qsQty = 1;
+        _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
         document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) { c.classList.remove('selected'); });
         var panel = document.getElementById('qsSelectedPanel');
         var btn   = document.getElementById('qsSellBtn');
+        var ti    = document.getElementById('qsTotalInput');
         if (panel) panel.style.display = 'none';
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
+        if (ti)  ti.value = '';
         loadQsDrugs();
-        setTimeout(function() { loadFinancial(_finPeriod); }, 300);
-      }, 1800);
+        setTimeout(function() { loadFinancial(_finPeriod); loadRevenue(); }, 300);
+      }, 1600);
     }
   }
 </script>
