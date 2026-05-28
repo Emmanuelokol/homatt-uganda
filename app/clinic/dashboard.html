@@ -125,6 +125,29 @@
       #quickVerifyPanel h2 { font-size: 16px !important }
     }
     @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+    /* ── Quick Sale POS ── */
+    .qs-drug-card {
+      background: #F8F9FA; border: 2px solid transparent; border-radius: 14px;
+      padding: 14px 10px 12px; text-align: center; cursor: pointer;
+      transition: border-color .1s, background .1s; touch-action: manipulation;
+      user-select: none;
+    }
+    .qs-drug-card:hover   { background: #E8F5E9; border-color: #81C784; }
+    .qs-drug-card.selected { background: #E8F5E9; border-color: #1B5E20; }
+    .qs-drug-name  { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
+    .qs-drug-price { font-size: 12px; color: #1B5E20; font-weight: 600; }
+    .qs-drug-stock { font-size: 11px; margin-top: 2px; }
+    .qs-pm-chip {
+      padding: 8px 16px; border-radius: 20px; border: 1.5px solid #E0E0E0;
+      background: transparent; color: #424242; font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; font-family: inherit; transition: all .1s;
+    }
+    .qs-pm-chip.selected { background: #1B5E20; color: #fff; border-color: #1B5E20; }
+    #qsSellBtn:disabled  { background: #BDBDBD !important; cursor: not-allowed; }
+    @media (max-width: 480px) {
+      #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
+    }
   </style>
 </head>
 <body>
@@ -215,6 +238,10 @@
             <span class="material-icons-outlined">medical_services</span>
             New Consultation
           </a>
+          <button class="home-cta" onclick="openQuickSale()" style="background:rgba(255,255,255,0.12);color:#fff;border:2px solid rgba(255,255,255,0.5)">
+            <span class="material-icons-outlined">point_of_sale</span>
+            Quick Sale
+          </button>
         </div>
       </div>
 
@@ -546,6 +573,72 @@
   </div>
 </div>
 
+<!-- ── Quick Sale POS Sheet ── -->
+<div id="qsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-end;justify-content:center" onclick="if(event.target===this)closeQuickSale()">
+  <div id="qsSheet" style="background:#fff;width:100%;max-width:600px;border-radius:24px 24px 0 0;max-height:92vh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative">
+
+    <!-- Header -->
+    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">point_of_sale</span>
+        <span style="font-size:19px;font-weight:800;color:#1B5E20">Quick Sale</span>
+      </div>
+      <button onclick="closeQuickSale()" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+
+    <!-- Search -->
+    <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
+      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+      <input id="qsSearch" type="text" placeholder="Search drug…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        oninput="filterQsDrugs(this.value)"
+        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
+    </div>
+
+    <!-- Drug grid -->
+    <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px;overflow-y:auto;flex:1">
+      <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+    </div>
+
+    <!-- Selected drug + controls -->
+    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div id="qsSelTotal" style="font-size:16px;font-weight:800;color:#202124;white-space:nowrap"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
+        <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
+          <button onclick="changeQsQty(-1)" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">−</button>
+          <div id="qsQtyVal" style="min-width:48px;text-align:center;font-size:18px;font-weight:800;color:#202124;padding:0 6px">1</div>
+          <button onclick="changeQsQty(1)"  style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">+</button>
+        </div>
+        <span id="qsStockLeft" style="font-size:12px;color:#9AA0A6"></span>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <button id="qsPmCash" class="qs-pm-chip selected" onclick="setQsPm('cash')">Cash</button>
+          <button id="qsPmMomo" class="qs-pm-chip"          onclick="setQsPm('momo')">MoMo</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sell button -->
+    <button id="qsSellBtn" disabled onclick="submitQuickSale()"
+      style="margin:10px 16px 16px;padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      <span class="material-icons-outlined" style="font-size:20px">sell</span>
+      Sell
+    </button>
+
+    <!-- Success flash (absolute over the sheet) -->
+    <div id="qsSuccessFlash" style="display:none;position:absolute;inset:0;background:rgba(27,94,32,0.95);z-index:10;align-items:center;justify-content:center;flex-direction:column;color:#fff;border-radius:24px 24px 0 0;text-align:center;padding:24px">
+      <span class="material-icons-outlined" style="font-size:72px;margin-bottom:12px">check_circle</span>
+      <div id="qsFlashText" style="font-size:22px;font-weight:800;margin-bottom:6px"></div>
+      <div id="qsFlashSub"  style="font-size:15px;opacity:.85"></div>
+    </div>
+
+  </div>
+</div>
+
 <!-- Verify Booking Code Modal -->
 <div id="verifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:26px 24px 28px">
@@ -625,6 +718,11 @@
         <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit Cost (UGX)</label>
         <input id="siCost" type="number" min="0" step="100" placeholder="0"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX)</label>
+        <input id="siSellPrice" type="number" min="0" step="100" placeholder="For Quick Sale"
+          style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
     </div>
     <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
@@ -884,10 +982,14 @@
       var startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
       var results = await Promise.all([
         supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
-        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString())
+        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
+        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
       ]);
-      var dayTotal = (results[0].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
-      var monTotal = (results[1].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
+      var qsDayTot = (results[2] && !results[2].error && results[2].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var qsMonTot = (results[3] && !results[3].error && results[3].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var dayTotal = (results[0].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsDayTot;
+      var monTotal = (results[1].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsMonTot;
       if (todayEl) todayEl.textContent = 'UGX ' + fmtUGX(dayTotal);
       if (monthEl) monthEl.textContent = 'UGX ' + fmtUGX(monTotal);
     } catch(e) {
@@ -2577,17 +2679,20 @@
     var unit  = (document.getElementById('siUnit').value||'tabs').trim();
     var qty   = parseFloat(document.getElementById('siQty').value) || 0;
     var thres = parseFloat(document.getElementById('siThreshold').value) || 5;
-    var cost  = parseFloat(document.getElementById('siCost').value) || null;
+    var cost      = parseFloat(document.getElementById('siCost').value) || null;
+    var sellPrice = parseFloat(document.getElementById('siSellPrice') ? document.getElementById('siSellPrice').value : 0) || null;
     if (!name) { errEl.textContent = 'Item name is required.'; errEl.style.display = 'block'; return; }
     var clinicId = await resolveClinicId();
     if (!clinicId) { errEl.textContent = 'Account not linked to a clinic.'; errEl.style.display = 'block'; return; }
     btn.disabled = true; btn.textContent = 'Saving…';
     try {
-      var r = await supabase.from('clinic_inventory').insert({
+      var insertData = {
         clinic_id: clinicId, item_name: name, item_type: type,
         unit: unit, quantity: qty, min_threshold: thres,
         reorder_level: thres * 2, unit_cost_ugx: cost,
-      });
+      };
+      if (sellPrice) insertData.selling_price_ugx = sellPrice;
+      var r = await supabase.from('clinic_inventory').insert(insertData);
       if (r.error) throw r.error;
       document.getElementById('stockItemModal').style.display = 'none';
       loadInventory();
@@ -2671,7 +2776,7 @@
     }
 
     try {
-      var [dxRes, txnRes, payRes] = await Promise.all([
+      var [dxRes, txnRes, payRes, qsRes] = await Promise.all([
         supabase.from('clinic_diagnoses')
           .select('id,total_charged_ugx,amount_paid,payment_status')
           .eq('clinic_id', clinicId)
@@ -2685,19 +2790,24 @@
           .select('amount_ugx,created_at')
           .eq('clinic_id', clinicId)
           .gte('created_at', start.toISOString()),
+        supabase.from('clinic_quick_sales')
+          .select('total_ugx')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
       ]);
 
-      var rows = dxRes.data || [];
-      var txns = txnRes.data || [];
-      var pays = payRes.data || [];
+      var rows    = dxRes.data || [];
+      var txns    = txnRes.data || [];
+      var pays    = payRes.data || [];
+      var qsSales = (qsRes && !qsRes.error && qsRes.data) ? qsRes.data : [];
+      var qsTotal = qsSales.reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
 
       var patients  = rows.length;
-      var billed    = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0);
-      // Collected = payments received in this period (real cash in hand)
-      // Falls back to amount_paid on diagnoses if clinic_payments table missing
-      var collected = pays.length
+      var billed    = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsTotal;
+      // Collected = payments received (consult payments) + all quick sales (immediate cash/momo)
+      var collected = (pays.length
         ? pays.reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
-        : rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0);
+        : rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0)) + qsTotal;
       var outstanding = Math.max(0, billed - rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0));
       var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
       // Margin uses Collected (real income) minus stock cost so it reflects actual cash position
@@ -2741,6 +2851,220 @@
       }
     } catch(e) {
       console.warn('Financial overview error:', e.message);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // QUICK SALE POS
+  // ═══════════════════════════════════════════════════════
+
+  var _qsDrugs = [];
+  var _qsSel   = null;
+  var _qsQty   = 1;
+  var _qsPm;
+  try { _qsPm = localStorage.getItem('qs_pm') || 'cash'; } catch(e) { _qsPm = 'cash'; }
+
+  function openQuickSale() {
+    var el = document.getElementById('qsOverlay');
+    if (!el) return;
+    el.style.display = 'flex';
+    _qsSel = null; _qsQty = 1;
+    var panel = document.getElementById('qsSelectedPanel');
+    var btn   = document.getElementById('qsSellBtn');
+    var si    = document.getElementById('qsSearch');
+    var flash = document.getElementById('qsSuccessFlash');
+    if (panel) panel.style.display = 'none';
+    if (btn)   { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
+    if (si)    si.value = '';
+    if (flash) flash.style.display = 'none';
+    setQsPm(_qsPm);
+    loadQsDrugs();
+  }
+
+  function closeQuickSale() {
+    var el = document.getElementById('qsOverlay');
+    if (el) el.style.display = 'none';
+  }
+
+  async function loadQsDrugs() {
+    var grid = document.getElementById('qsDrugGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) { renderQsDemo(); return; }
+    try {
+      var r = await supabase
+        .from('clinic_inventory')
+        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold')
+        .eq('clinic_id', clinicId)
+        .eq('is_active', true)
+        .gt('quantity', 0)
+        .order('item_name');
+      if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
+      _qsDrugs = r.data;
+      renderQsGrid(_qsDrugs);
+    } catch(e) { renderQsDemo(); }
+  }
+
+  function renderQsDemo() {
+    _qsDrugs = [
+      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,_isDemo:true},
+      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,_isDemo:true},
+      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, _isDemo:true},
+      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,_isDemo:true},
+      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,_isDemo:true},
+      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, _isDemo:true},
+    ];
+    renderQsGrid(_qsDrugs);
+  }
+
+  function renderQsGrid(items) {
+    var grid = document.getElementById('qsDrugGrid');
+    if (!grid) return;
+    if (!items.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">No drugs in stock. Add items via Stock Tracker.</div>';
+      return;
+    }
+    grid.innerHTML = items.map(function(item) {
+      var price    = Number(item.selling_price_ugx || item.unit_cost_ugx) || 0;
+      var priceStr = price ? 'UGX ' + fmtUGX(price) : 'Set price';
+      var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5) && Number(item.quantity) > 0;
+      var stockClr = lowStock ? '#E65100' : '#9AA0A6';
+      return '<div class="qs-drug-card" data-id="' + esc(item.id) + '" onclick="selectQsDrug(\'' + esc(item.id) + '\')">'
+        + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
+        + '<div class="qs-drug-price">' + priceStr + '</div>'
+        + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
+        + '</div>';
+    }).join('')
+      + '<div id="qsNoMatch" style="display:none;grid-column:1/-1;text-align:center;padding:24px;color:#9AA0A6;font-size:14px">No match found.</div>';
+  }
+
+  function filterQsDrugs(q) {
+    q = (q || '').trim().toLowerCase();
+    var cards = document.querySelectorAll('#qsDrugGrid .qs-drug-card');
+    var visible = 0;
+    cards.forEach(function(card) {
+      var drug = _qsDrugs.find(function(d) { return d.id === card.dataset.id; });
+      var match = !q || (drug && drug.item_name.toLowerCase().includes(q));
+      card.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    var nm = document.getElementById('qsNoMatch');
+    if (nm) nm.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  function selectQsDrug(id) {
+    var drug = _qsDrugs.find(function(d) { return d.id === id; });
+    if (!drug) return;
+    _qsSel = drug; _qsQty = 1;
+    document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) {
+      c.classList.toggle('selected', c.dataset.id === id);
+    });
+    var panel = document.getElementById('qsSelectedPanel');
+    if (panel) panel.style.display = 'block';
+    updateQsPanel();
+    var btn = document.getElementById('qsSellBtn');
+    if (btn) btn.disabled = false;
+  }
+
+  function updateQsPanel() {
+    if (!_qsSel) return;
+    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    var name  = document.getElementById('qsSelName');
+    var total = document.getElementById('qsSelTotal');
+    var qty   = document.getElementById('qsQtyVal');
+    var stock = document.getElementById('qsStockLeft');
+    if (name)  name.textContent  = _qsSel.item_name;
+    if (total) total.textContent = 'UGX ' + fmtUGX(price * _qsQty);
+    if (qty)   qty.textContent   = _qsQty;
+    if (stock) stock.textContent = _qsSel.quantity + ' in stock';
+  }
+
+  function changeQsQty(delta) {
+    if (!_qsSel) return;
+    _qsQty = Math.max(1, Math.min(_qsQty + delta, Number(_qsSel.quantity) || 999));
+    updateQsPanel();
+  }
+
+  function setQsPm(pm) {
+    _qsPm = pm;
+    try { localStorage.setItem('qs_pm', pm); } catch(e) {}
+    var cash = document.getElementById('qsPmCash');
+    var momo = document.getElementById('qsPmMomo');
+    if (cash) cash.classList.toggle('selected', pm === 'cash');
+    if (momo) momo.classList.toggle('selected', pm === 'momo');
+  }
+
+  async function submitQuickSale() {
+    if (!_qsSel) return;
+    var btn = document.getElementById('qsSellBtn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span>';
+
+    var price    = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    var total    = price * _qsQty;
+    var clinicId = await resolveClinicId();
+
+    try {
+      if (supabase && clinicId && !_qsSel._isDemo) {
+        var userId = null;
+        try {
+          var s = await supabase.auth.getSession();
+          userId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+        } catch(e2) {}
+
+        try {
+          await supabase.from('clinic_quick_sales').insert({
+            clinic_id:     clinicId,
+            drug_id:       _qsSel.id,
+            drug_name:     _qsSel.item_name,
+            unit:          _qsSel.unit || 'unit',
+            quantity:      _qsQty,
+            unit_price_ugx: price,
+            total_ugx:     total,
+            payment_method: _qsPm,
+            sold_by:       userId,
+            created_at:    new Date().toISOString()
+          });
+        } catch(insErr) { console.warn('clinic_quick_sales:', insErr.message); }
+
+        try {
+          await supabase.rpc('adjust_inventory', {
+            p_clinic_id:    clinicId,
+            p_inventory_id: _qsSel.id,
+            p_qty_change:   -_qsQty,
+            p_txn_type:     'deduction',
+            p_notes:        'Quick Sale'
+          });
+        } catch(invErr) { console.warn('adjust_inventory:', invErr.message); }
+      }
+      showQsSuccess(_qsSel.item_name, _qsQty, total);
+    } catch(e) {
+      console.warn('Quick sale error:', e.message);
+      showQsSuccess(_qsSel.item_name, _qsQty, total);
+    }
+  }
+
+  function showQsSuccess(name, qty, total) {
+    var flash = document.getElementById('qsSuccessFlash');
+    var ft    = document.getElementById('qsFlashText');
+    var fs    = document.getElementById('qsFlashSub');
+    if (ft) ft.textContent = qty + ' × ' + name;
+    if (fs) fs.textContent = 'UGX ' + fmtUGX(total) + ' — ' + (_qsPm === 'momo' ? 'Mobile Money' : 'Cash');
+    if (flash) {
+      flash.style.display = 'flex';
+      setTimeout(function() {
+        flash.style.display = 'none';
+        _qsSel = null; _qsQty = 1;
+        document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) { c.classList.remove('selected'); });
+        var panel = document.getElementById('qsSelectedPanel');
+        var btn   = document.getElementById('qsSellBtn');
+        if (panel) panel.style.display = 'none';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
+        loadQsDrugs();
+        setTimeout(function() { loadFinancial(_finPeriod); }, 300);
+      }, 1800);
     }
   }
 </script>
