@@ -609,10 +609,11 @@
 
     <!-- Selected drug + controls -->
     <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
         <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
       </div>
+      <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:10px"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
         <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
@@ -729,13 +730,13 @@
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit Cost (UGX)</label>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Buying Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what you paid</span></label>
         <input id="siCost" type="number" min="0" step="100" placeholder="0"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX)</label>
-        <input id="siSellPrice" type="number" min="0" step="100" placeholder="For Quick Sale"
+        <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
+        <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
           style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
     </div>
@@ -2956,6 +2957,7 @@
         .from('clinic_inventory')
         .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold')
         .eq('clinic_id', clinicId)
+        .eq('item_type', 'medicine')
         .eq('is_active', true)
         .gt('quantity', 0)
         .order('item_name');
@@ -2988,9 +2990,12 @@
       return;
     }
     grid.innerHTML = items.map(function(item) {
-      var price    = Number(item.selling_price_ugx || item.unit_cost_ugx) || 0;
-      var priceStr = price ? 'UGX ' + fmtUGX(price) : 'Set price';
-      var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5) && Number(item.quantity) > 0;
+      var sell     = Number(item.selling_price_ugx) || 0;
+      var buy      = Number(item.unit_cost_ugx)     || 0;
+      var priceStr = sell
+        ? '<span style="color:#1B5E20;font-weight:700">UGX ' + fmtUGX(sell) + '</span>'
+        : '<span style="color:#E65100;font-size:11px;font-weight:700">⚠ Set sell price</span>';
+      var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5);
       var stockClr = lowStock ? '#E65100' : '#9AA0A6';
       return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
         + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
@@ -3032,20 +3037,35 @@
   function qsCurrentTotal() {
     if (!_qsSel) return 0;
     if (_qsTotalOverride !== null) return _qsTotalOverride;
-    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    // Use selling price for revenue; buying price is cost-of-goods only
+    var price = Number(_qsSel.selling_price_ugx) || Number(_qsSel.unit_cost_ugx) || 0;
     return price * _qsQty;
   }
 
   function updateQsPanel() {
     if (!_qsSel) return;
-    var name  = document.getElementById('qsSelName');
-    var qty   = document.getElementById('qsQtyVal');
-    var stock = document.getElementById('qsStockLeft');
-    var ti    = document.getElementById('qsTotalInput');
-    if (name)  name.textContent  = _qsSel.item_name;
-    if (qty)   qty.textContent   = _qsQty;
-    if (stock) stock.textContent = _qsSel.quantity + ' ' + (_qsSel.unit || '') + ' in stock';
+    var nameEl  = document.getElementById('qsSelName');
+    var qty     = document.getElementById('qsQtyVal');
+    var stock   = document.getElementById('qsStockLeft');
+    var ti      = document.getElementById('qsTotalInput');
+    var priceEl = document.getElementById('qsSelPriceBreakdown');
+    if (nameEl) nameEl.textContent = _qsSel.item_name;
+    if (qty)    qty.textContent    = _qsQty;
+    if (stock)  stock.textContent  = _qsSel.quantity + ' ' + (_qsSel.unit || '') + ' in stock';
     if (ti && _qsTotalOverride === null) ti.value = qsCurrentTotal();
+    if (priceEl) {
+      var sell = Number(_qsSel.selling_price_ugx) || 0;
+      var buy  = Number(_qsSel.unit_cost_ugx)     || 0;
+      if (sell && buy) {
+        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;·&nbsp; Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b>';
+      } else if (sell) {
+        priceEl.innerHTML = 'Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
+      } else if (buy) {
+        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
+      } else {
+        priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Drug to add prices</span>';
+      }
+    }
   }
 
   function changeQsQty(delta) {
