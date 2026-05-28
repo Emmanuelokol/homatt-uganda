@@ -28,6 +28,12 @@
   <link rel="prefetch" href="patients.html">
   <link rel="prefetch" href="settings.html">
   <style>
+    /* Remove the 300ms mobile tap-delay on every clickable element */
+    button, a, .fin-tab, .meds-period-btn, .order-card, [onclick] {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(0,0,0,0.04);
+    }
+
     /* Home-specific polish */
     .home-hero {
       background: linear-gradient(135deg, #0B1626 0%, #1565C0 100%);
@@ -330,7 +336,7 @@
             Medicines Dispensed
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
-            <button class="meds-period-btn active" data-mp="day"   onclick="setMedsPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00ACC1;background:#00ACC1;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
+            <button class="meds-period-btn active" data-mp="day"   onclick="setMedsPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00ACC1;background:#00ACC1;color:#fff;cursor:pointer;font-weight:600;font-family:inherit;touch-action:manipulation">Today</button>
             <button class="meds-period-btn"        data-mp="week"  onclick="setMedsPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
             <button class="meds-period-btn"        data-mp="month" onclick="setMedsPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
             <button class="meds-period-btn"        data-mp="year"  onclick="setMedsPeriod('year')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Year</button>
@@ -1722,20 +1728,22 @@
       var urgColor = daysLate > 7 ? '#B71C1C' : daysLate > 3 ? '#C62828' : daysLate > 0 ? '#E65100' : '#F9A825';
       var dueLabel = isToday ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : '');
       var ini = (c.patient_name || c.patient_phone || 'P').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
+      var phone = c.patient_phone || '';
       return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #FFF3E0">'
         + '<div style="width:36px;height:36px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
         + '<div style="flex:1;min-width:0">'
         +   '<div style="font-size:13px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
         +   '<div style="font-size:12px;color:' + urgColor + ';font-weight:600">' + dueLabel + '</div>'
+        +   (phone ? '<div style="font-size:11px;color:#5F6368;margin-top:1px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> ' + esc(phone) + '</div>' : '')
         +   (c.follow_up_reason ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
         + '</div>'
         + '<div style="display:flex;gap:6px;flex-shrink:0">'
-        +   '<button onclick="sendFollowUpReminder(\'' + esc(c.id) + '\')" title="Send reminder" '
-        +     'style="padding:6px 10px;font-size:12px;font-weight:600;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
-        +     '<span class="material-icons-outlined" style="font-size:14px">sms</span>Remind'
+        +   '<button type="button" onclick="openReminderSheet(\'' + esc(c.id) + '\')" title="Contact patient" '
+        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +     '<span class="material-icons-outlined" style="font-size:14px">contact_phone</span>Contact'
         +   '</button>'
-        +   '<button onclick="openOverdueVisit(\'' + esc(c.id) + '\')" title="Record return visit" '
-        +     'style="padding:6px 10px;font-size:12px;font-weight:600;border:none;background:#1565C0;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +   '<button type="button" onclick="openActivePatientDetail(\'' + esc(c.id) + '\')" title="Record return visit" '
+        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:none;background:#1565C0;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
         +     '<span class="material-icons-outlined" style="font-size:14px">edit_note</span>Record'
         +   '</button>'
         + '</div>'
@@ -1743,55 +1751,104 @@
     }).join('');
   }
 
-  // Send an SMS reminder to a patient who missed their return
-  async function sendFollowUpReminder(diagId) {
+  // ── Contact / Reminder bottom sheet ──────────────────────────────
+  function openReminderSheet(diagId) {
     var c = (_activeRows || []).find(function(r){ return r.id === diagId; });
     if (!c) return;
-    var btn = event.currentTarget;
-    var origHTML = btn.innerHTML;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:14px;animation:spin 1s linear infinite">refresh</span> Sending…';
 
-    var sent = false;
-    if (supabase && c.follow_up_reason) {
-      try {
-        await supabase.functions.invoke('send-sms', {
-          body: {
-            phone: c.patient_phone,
-            message: 'Hi ' + (c.patient_name || 'there') + ', a reminder from Homatt Health: your follow-up visit was due'
-              + (c.follow_up_reason ? ' (' + c.follow_up_reason + ')' : '') + '. Please visit the clinic at your earliest. Reply STOP to opt out.'
-          }
-        });
-        sent = true;
-      } catch(e) {}
-    }
-    if (!sent && supabase) {
-      try {
-        var clinicId = await resolveClinicId();
-        var { data: cl } = await supabase.from('clinics').select('name').eq('id', clinicId).maybeSingle();
-        await supabase.functions.invoke('send-notification', {
-          body: {
-            userId: null,
-            phone: c.patient_phone,
-            title: 'Follow-up Reminder',
-            message: 'Hi ' + (c.patient_name || 'there') + '! Your return visit at ' + (cl?.name || 'the clinic') + ' is overdue. Please come in soon.',
-            data: { screen: 'dashboard' }
-          }
-        });
-        sent = true;
-      } catch(e) {}
-    }
-    showToast(sent ? 'Reminder sent to ' + (c.patient_name || c.patient_phone) : 'Reminder queued (SMS/push delivery depends on patient app status)', 'success');
-    btn.disabled = false;
-    btn.innerHTML = origHTML;
-  }
+    var existing = document.getElementById('reminderSheet');
+    if (existing) existing.remove();
 
-  // Open follow-up form for an overdue patient (reuse existing openPatientDetail)
-  function openOverdueVisit(diagId) {
-    var c = (_activeRows || []).find(function(r){ return r.id === diagId; });
-    if (!c) return;
-    openPatientDetail(c);
-    // The detail modal has "Record Return Visit" button that calls showFollowupForm
+    var due = c.follow_up_days ? new Date(new Date(c.created_at).getTime() + c.follow_up_days * 86400000) : null;
+    var daysLate = due ? Math.floor((Date.now() - due.getTime()) / 86400000) : 0;
+    var dueLabel = !due ? '' : (daysLate <= 0 ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : ''));
+
+    var phone = (c.patient_phone || '').replace(/\s+/g, '');
+    var phoneE164 = phone;
+    if (phoneE164.startsWith('0')) phoneE164 = '256' + phoneE164.slice(1);
+    phoneE164 = phoneE164.replace(/[^0-9]/g, '');
+
+    var smsMsg = 'Hi ' + (c.patient_name || 'there') + ', a reminder from Homatt Health: your follow-up visit'
+      + (c.follow_up_reason ? ' (' + c.follow_up_reason + ')' : '')
+      + ' is ' + (dueLabel || 'due') + '. Please visit the clinic at your earliest convenience.';
+    var encMsg = encodeURIComponent(smsMsg);
+
+    var sheet = document.createElement('div');
+    sheet.id = 'reminderSheet';
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;align-items:flex-end;justify-content:center';
+    sheet.innerHTML =
+        '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px 22px 28px;max-height:88vh;overflow-y:auto">'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+      +     '<div style="font-size:17px;font-weight:800;color:#111;display:flex;align-items:center;gap:8px">'
+      +       '<span class="material-icons-outlined" style="color:#E65100">contact_phone</span> Contact Patient'
+      +     '</div>'
+      +     '<button type="button" id="reminderSheetClose" style="background:#F5F5F5;border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation"><span class="material-icons-outlined">close</span></button>'
+      +   '</div>'
+
+      +   '<div style="background:#FFF8F6;border:1px solid #FFCCBC;border-radius:14px;padding:14px;margin-bottom:18px">'
+      +     '<div style="font-size:15px;font-weight:800;color:#111;margin-bottom:2px">' + esc(c.patient_name || 'Patient') + '</div>'
+      +     (dueLabel ? '<div style="font-size:12px;font-weight:700;color:#C62828;margin-bottom:6px">' + esc(dueLabel) + '</div>' : '')
+      +     (c.confirmed_diagnosis ? '<div style="font-size:12px;color:#5F6368"><strong>Diagnosis:</strong> ' + esc(c.confirmed_diagnosis) + (c.severity ? ' · ' + esc(c.severity) : '') + '</div>' : '')
+      +     (c.follow_up_reason ? '<div style="font-size:12px;color:#5F6368;margin-top:3px"><strong>Return reason:</strong> ' + esc(c.follow_up_reason) + '</div>' : '')
+      +     (c.created_at ? '<div style="font-size:11px;color:#9AA0A6;margin-top:6px">Last seen: ' + new Date(c.created_at).toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + '</div>' : '')
+      +   '</div>'
+
+      +   (phone
+          ? '<div style="margin-bottom:14px">'
+          +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Phone</div>'
+          +   '<div style="font-size:22px;font-weight:800;color:#1565C0;letter-spacing:.5px">' + esc(phone) + '</div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
+          +   '<a href="tel:' + esc(phone) + '" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">call</span> Call'
+          +     '</button>'
+          +   '</a>'
+          +   '<a href="https://wa.me/' + esc(phoneE164) + '?text=' + encMsg + '" target="_blank" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">chat</span> WhatsApp'
+          +     '</button>'
+          +   '</a>'
+          +   '<a href="sms:' + esc(phone) + '?body=' + encMsg + '" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#1565C0;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">sms</span> SMS'
+          +     '</button>'
+          +   '</a>'
+          + '</div>'
+          : '<div style="background:#FFEBEE;border-radius:10px;padding:12px;color:#C62828;font-size:13px;margin-bottom:14px">No phone number on file for this patient.</div>')
+
+      +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Suggested message</div>'
+      +   '<textarea id="reminderSheetMsg" rows="4" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;color:#202124;background:#FAFAFA">' + esc(smsMsg) + '</textarea>'
+      +   '<button type="button" id="reminderSheetCopy" style="touch-action:manipulation;margin-top:8px;width:100%;padding:11px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+      +     '<span class="material-icons-outlined" style="font-size:16px">content_copy</span> Copy message'
+      +   '</button>'
+
+      +   '<button type="button" id="reminderSheetRecord" style="touch-action:manipulation;margin-top:14px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+      +     '<span class="material-icons-outlined" style="font-size:18px">edit_note</span> Patient came in — Record visit'
+      +   '</button>'
+      + '</div>';
+
+    document.body.appendChild(sheet);
+
+    function closeSheet() { sheet.remove(); }
+    sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSheet(); });
+    document.getElementById('reminderSheetClose').onclick = closeSheet;
+
+    document.getElementById('reminderSheetCopy').onclick = function() {
+      var ta = document.getElementById('reminderSheetMsg');
+      ta.select();
+      try {
+        navigator.clipboard.writeText(ta.value).then(function() { showToast('Message copied', 'success'); });
+      } catch(_) {
+        document.execCommand('copy');
+        showToast('Message copied', 'success');
+      }
+    };
+
+    document.getElementById('reminderSheetRecord').onclick = function() {
+      closeSheet();
+      openActivePatientDetail(diagId);
+    };
   }
 
   // ── Medicines Dispensed Tracker ──────────────────────────────────
