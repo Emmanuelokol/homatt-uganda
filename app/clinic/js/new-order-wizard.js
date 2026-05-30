@@ -173,7 +173,7 @@
   }
 
   document.querySelectorAll('[data-back]').forEach(b =>
-    b.onclick = () => showStep(state.step - 1));
+    b.onclick = () => { if (state.step > 1) showStep(state.step - 1); });
 
   function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -1382,8 +1382,14 @@
   // ════════════════════════════════════════════════════════════════
   document.getElementById('submitBtn').onclick = async () => {
     const btn = document.getElementById('submitBtn');
+    const resetBtn = () => {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+    };
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Sending…';
+
+    try {
 
     if (!_clinicId && supabase && !session?.demo) {
       _clinicId = await resolveClinicId(supabase, session);
@@ -1391,23 +1397,20 @@
 
     if (!supabase || !_clinicId) {
       showToast('Demo mode — not saved. Connect a clinic to save.', 'error');
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      resetBtn();
       return;
     }
 
     // Validate medications
     if (!state.medications.length) {
       showToast('Add at least one medication', 'error');
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      resetBtn();
       return;
     }
     const medsOk = state.medications.every(m => m.drug && m.dosage && m.intakeTimes.every(t => t));
     if (!medsOk) {
       showToast('Fill in drug name, dosage and intake times for each medication', 'error');
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      resetBtn();
       return;
     }
 
@@ -1469,8 +1472,7 @@
 
     if (dxError) {
       showToast('Save failed: ' + dxError.message, 'error');
-      btn.disabled = false;
-      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">send</span> Send Prescription &amp; Start Follow-up';
+      resetBtn();
       return;
     }
 
@@ -1598,6 +1600,12 @@
     }
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
+
+    } catch (fatalErr) {
+      console.error('submitBtn fatal:', fatalErr);
+      showToast('Unexpected error: ' + fatalErr.message, 'error');
+      resetBtn();
+    }
   };
 
   // Initialise
