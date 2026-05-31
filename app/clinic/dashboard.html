@@ -574,7 +574,7 @@
 </div>
 
 <!-- ── Quick Sale POS Sheet ── -->
-<div id="qsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-end;justify-content:center;overscroll-behavior:none;touch-action:none" onclick="if(event.target===this)closeQuickSale()">
+<div id="qsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-end;justify-content:center;overscroll-behavior:none" onclick="if(event.target===this)closeQuickSale()">
   <div id="qsSheet" style="background:#fff;width:100%;max-width:600px;border-radius:24px 24px 0 0;height:85vh;height:85dvh;max-height:85vh;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative;overscroll-behavior:contain;touch-action:pan-y">
 
     <!-- Header -->
@@ -2944,64 +2944,47 @@
   }
 
   // ── Wire up Quick Sale controls ────────────────────────────────────────────
-  // Use touchend (fires the instant the finger lifts, with no browser delay)
-  // and block the subsequent synthetic click so nothing fires twice.
-  // A click fallback handles desktop/mouse use.
-  // submitQuickSale() is already guarded by btn.disabled, so double-calls
-  // from touchend+click overlap on some browsers are harmless.
+  // Use plain 'click' everywhere. With touch-action:manipulation on each
+  // button and user-scalable=no in the viewport, Chrome fires 'click'
+  // instantly on touch (no 300ms delay). The earlier touchend+dedup approach
+  // was causing click events to be suppressed on Android Chrome.
   (function wireQuickSale() {
 
-    // Helper: wire touchend (mobile, instant) + click (desktop fallback).
-    // cb receives the original event.
-    function onTap(el, cb) {
-      if (!el) return;
-      var _didTouch = false;
-      el.addEventListener('touchstart', function() {
-        _didTouch = false;
-      }, { passive: true });
-      el.addEventListener('touchend', function(e) {
-        e.preventDefault();           // stops the 300ms-delayed click from firing
-        e.stopPropagation();          // don't bubble to overlay onclick
-        _didTouch = true;
-        cb(e);
-        setTimeout(function() { _didTouch = false; }, 600);
-      }, { passive: false });
-      el.addEventListener('click', function(e) {
-        if (_didTouch) { _didTouch = false; return; } // already handled
-        e.stopPropagation();
-        cb(e);
-      });
-    }
-
-    // Sell button — also give immediate visual press feedback via touchstart
     var sellBtn = document.getElementById('qsSellBtn');
     if (sellBtn) {
+      // Immediate visual feedback on touchstart so the user knows the
+      // press registered before the click fires.
       sellBtn.addEventListener('touchstart', function() {
-        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.8)';
+        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
       }, { passive: true });
-      sellBtn.addEventListener('touchcancel', function() {
-        sellBtn.style.filter = '';
-      }, { passive: true });
+      sellBtn.addEventListener('touchend',    function() { sellBtn.style.filter = ''; }, { passive: true });
+      sellBtn.addEventListener('touchcancel', function() { sellBtn.style.filter = ''; }, { passive: true });
+      sellBtn.addEventListener('click', function(e) { e.stopPropagation(); submitQuickSale(); });
     }
-    onTap(sellBtn, function(e) {
-      if (sellBtn) sellBtn.style.filter = '';
-      submitQuickSale();
-    });
 
-    onTap(document.getElementById('qsCloseBtn'), closeQuickSale);
+    var closeBtn = document.getElementById('qsCloseBtn');
+    if (closeBtn) closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closeQuickSale(); });
 
-    onTap(document.getElementById('qsAddDrugBtn'), function() {
+    var addBtn = document.getElementById('qsAddDrugBtn');
+    if (addBtn) addBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       closeQuickSale();
       if (typeof openAddStockModal === 'function') openAddStockModal();
     });
 
-    onTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
-    onTap(document.getElementById('qsQtyPlus'),  function() { changeQsQty(1); });
+    var minus = document.getElementById('qsQtyMinus');
+    var plus  = document.getElementById('qsQtyPlus');
+    if (minus) minus.addEventListener('click', function(e) { e.stopPropagation(); changeQsQty(-1); });
+    if (plus)  plus.addEventListener( 'click', function(e) { e.stopPropagation(); changeQsQty(1);  });
 
-    onTap(document.getElementById('qsPmCash'), function() { setQsPm('cash'); });
-    onTap(document.getElementById('qsPmMomo'), function() { setQsPm('momo'); });
+    var cashBtn = document.getElementById('qsPmCash');
+    var momoBtn = document.getElementById('qsPmMomo');
+    if (cashBtn) cashBtn.addEventListener('click', function(e) { e.stopPropagation(); setQsPm('cash'); });
+    if (momoBtn) momoBtn.addEventListener('click', function(e) { e.stopPropagation(); setQsPm('momo'); });
 
-    onTap(document.getElementById('qsResetTotal'), function() {
+    var resetBtn = document.getElementById('qsResetTotal');
+    if (resetBtn) resetBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
       _qsTotalOverride = null;
       updateQsPanel();
     });
@@ -3012,24 +2995,12 @@
       _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
     });
 
-    // Event delegation for drug cards (dynamically injected — touchend + click)
+    // Event delegation for drug cards (dynamically injected)
     var grid = document.getElementById('qsDrugGrid');
-    if (grid) {
-      var _gridTouch = false;
-      grid.addEventListener('touchend', function(e) {
-        var card = e.target.closest('.qs-drug-card');
-        if (!card || !card.dataset.id) return;
-        e.preventDefault();
-        _gridTouch = true;
-        setTimeout(function() { _gridTouch = false; }, 600);
-        selectQsDrug(card.dataset.id);
-      }, { passive: false });
-      grid.addEventListener('click', function(e) {
-        if (_gridTouch) { _gridTouch = false; return; }
-        var card = e.target.closest('.qs-drug-card');
-        if (card && card.dataset.id) selectQsDrug(card.dataset.id);
-      });
-    }
+    if (grid) grid.addEventListener('click', function(e) {
+      var card = e.target.closest('.qs-drug-card');
+      if (card && card.dataset.id) selectQsDrug(card.dataset.id);
+    });
   })();
 
   async function loadQsDrugs() {
