@@ -1,0 +1,3277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Health — Clinic Home</title>
+  <script>
+    /* Force-clear any service worker that might be caching an old broken version */
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        if (regs.length) Promise.all(regs.map(r => r.unregister())).then(() => {
+          if (!sessionStorage.getItem('_swCleared')) {
+            sessionStorage.setItem('_swCleared', '1');
+            location.reload();
+          }
+        });
+      });
+      if (window.caches) caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/clinic.css">
+  <link rel="prefetch" href="new-order.html">
+  <link rel="prefetch" href="patients.html">
+  <link rel="prefetch" href="settings.html">
+  <style>
+    /* Remove the 300ms mobile tap-delay on every clickable element */
+    button, a, .fin-tab, .meds-period-btn, .order-card, [onclick] {
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: rgba(0,0,0,0.04);
+    }
+
+    /* Home-specific polish */
+    .home-hero {
+      background: linear-gradient(135deg, #0B1626 0%, #1565C0 100%);
+      color: #fff;
+      padding: 28px 28px 24px;
+      border-radius: 16px;
+      margin-bottom: 24px;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 20px; flex-wrap: wrap;
+    }
+    .home-hero h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px }
+    .home-hero p  { font-size: 14px; opacity: .85 }
+    .home-cta {
+      background: #fff; color: #0D47A1;
+      padding: 14px 26px; border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      border: none; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 10px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+      transition: transform .12s ease, box-shadow .12s ease;
+      text-decoration: none;
+    }
+    .home-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.22) }
+    .home-cta .material-icons-outlined { font-size: 22px }
+
+    .order-card {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      margin-bottom: 12px;
+      display: flex; align-items: center; gap: 16px;
+      transition: box-shadow .15s;
+    }
+    .order-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,0.08) }
+    .order-avatar {
+      width: 46px; height: 46px; border-radius: 50%;
+      background: #E3F2FD; color: #1565C0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700;
+      flex-shrink: 0;
+    }
+    .order-info { flex: 1; min-width: 0 }
+    .order-patient { font-size: 15px; font-weight: 700; margin-bottom: 3px }
+    .order-drug { font-size: 13px; color: var(--text-lt); margin-bottom: 4px }
+    .order-meta { font-size: 12px; color: #9AA0A6; display: flex; gap: 10px; flex-wrap: wrap }
+    .order-meta span { display: inline-flex; align-items: center; gap: 3px }
+    .order-right { text-align: right; flex-shrink: 0 }
+    .order-status { margin-bottom: 6px }
+    .completion-tick {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #E8F5E9; color: #2E7D32;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+    .completion-pending {
+      width: 24px; height: 24px; border-radius: 50%;
+      background: #F5F5F5; color: #9AA0A6;
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .empty-orders {
+      text-align: center; padding: 50px 20px;
+      color: var(--text-lt);
+    }
+    .empty-orders .material-icons-outlined {
+      font-size: 56px; color: #CFD8DC; display: block; margin: 0 auto 14px;
+    }
+    .empty-orders-cta {
+      margin-top: 18px;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 11px 22px;
+      background: var(--primary); color: #fff;
+      border: none; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      text-decoration: none;
+    }
+
+    @media (max-width: 600px) {
+      .home-hero { padding: 22px 20px; flex-direction: column; align-items: stretch }
+      .home-hero h1 { font-size: 19px }
+      .home-cta { justify-content: center; padding: 14px 18px }
+      .order-card { flex-wrap: wrap }
+      .order-right { margin-left: auto }
+      /* Inline verify panel — stack vertically on mobile */
+      #qvGrid { grid-template-columns: 1fr !important }
+      #quickVerifyPanel { padding: 18px 16px 16px !important }
+      #quickVerifyPanel h2 { font-size: 16px !important }
+    }
+    @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
+
+    /* ── Quick Sale POS ── */
+    .qs-drug-card {
+      background: #F8F9FA; border: 2px solid transparent; border-radius: 14px;
+      padding: 14px 10px 12px; text-align: center; cursor: pointer;
+      transition: border-color .1s, background .1s; touch-action: manipulation;
+      user-select: none;
+    }
+    .qs-drug-card:hover   { background: #E8F5E9; border-color: #81C784; }
+    .qs-drug-card.selected { background: #E8F5E9; border-color: #1B5E20; }
+    .qs-drug-name  { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
+    .qs-drug-price { font-size: 12px; color: #1B5E20; font-weight: 600; }
+    .qs-drug-stock { font-size: 11px; margin-top: 2px; }
+    .qs-pm-chip {
+      padding: 8px 16px; border-radius: 20px; border: 1.5px solid #E0E0E0;
+      background: transparent; color: #424242; font-size: 13px; font-weight: 700;
+      cursor: pointer; touch-action: manipulation; font-family: inherit; transition: all .1s;
+    }
+    .qs-pm-chip.selected { background: #1B5E20; color: #fff; border-color: #1B5E20; }
+    #qsSellBtn:disabled  { background: #BDBDBD !important; cursor: not-allowed; }
+    @media (max-width: 480px) {
+      #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <!-- Sidebar (4-item simplified) -->
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+      <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link active">
+        <span class="material-icons-outlined">home</span> Home
+      </a>
+      <a href="new-order.html" class="sidebar-link">
+        <span class="material-icons-outlined">medical_services</span> New Consultation
+      </a>
+      <a href="patients.html" class="sidebar-link">
+        <span class="material-icons-outlined">person_search</span> Patients
+      </a>
+      <a href="settings.html" class="sidebar-link">
+        <span class="material-icons-outlined">tune</span> Clinic Profile
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Home</div>
+      <div class="admin-topbar-right">
+        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- BIG inline patient code entry — always visible, no modal -->
+      <div id="quickVerifyPanel" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
+          <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
+        </div>
+        <p style="font-size:13px;color:#5D4037;margin:0 0 16px;line-height:1.5">Patient shows you the <strong>Booking Code</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HO-928</span>) and <strong>PIN</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HK-AEK26W</span>) from their Homatt app.</p>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end" id="qvGrid">
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Booking Code</label>
+            <input id="qvCode" type="text" placeholder="HO-928" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:20px;font-weight:800;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">PIN</label>
+            <input id="qvPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
+              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:18px;font-weight:700;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center;min-height:54px">
+          </div>
+          <div>
+            <button id="qvSubmitBtn"
+              style="background:#1565C0;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;white-space:nowrap">
+              <span class="material-icons-outlined">arrow_forward</span>
+              Verify &amp; Start
+            </button>
+          </div>
+        </div>
+        <div id="qvError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+        <div id="qvSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+      </div>
+
+      <!-- Hero with New Consultation CTA -->
+      <div class="home-hero">
+        <div>
+          <h1 id="heroGreeting">Good morning</h1>
+          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <a href="new-order.html" class="home-cta">
+            <span class="material-icons-outlined">medical_services</span>
+            New Consultation
+          </a>
+          <button class="home-cta" onclick="openQuickSale()" style="background:rgba(255,255,255,0.12);color:#fff;border:2px solid rgba(255,255,255,0.5)">
+            <span class="material-icons-outlined">point_of_sale</span>
+            Quick Sale
+          </button>
+        </div>
+      </div>
+
+      <!-- Outcomes mini-stats -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:24px">
+        <div class="stat-card">
+          <div class="stat-icon blue"><span class="material-icons-outlined">medical_services</span></div>
+          <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Today's Patients</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon orange"><span class="material-icons-outlined">hotel</span></div>
+          <div><div class="stat-number" id="statDispatched">0</div><div class="stat-label">Inpatient</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><span class="material-icons-outlined">payments</span></div>
+          <div><div class="stat-number" id="statRevToday" style="font-size:15px">—</div><div class="stat-label">Today's Revenue</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon teal"><span class="material-icons-outlined">bar_chart</span></div>
+          <div><div class="stat-number" id="statRevMonth" style="font-size:15px">—</div><div class="stat-label">This Month</div></div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue" style="background:#E3F2FD"><span class="material-icons-outlined" style="color:#1565C0">schedule</span></div>
+          <div><div class="stat-number" id="statPending">0</div><div class="stat-label">Waiting</div></div>
+        </div>
+      </div>
+
+      <!-- Low-stock alert banner (hidden until stock loads) -->
+      <div id="lowStockBanner" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
+          <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
+          <span id="lowStockCount" style="background:#C62828;color:#fff;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:700"></span>
+        </div>
+        <div id="lowStockList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
+      <!-- Pending bookings (patients who booked but haven't been seen) -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
+            Patients Coming In
+          </div>
+          <span id="pendingCount" style="font-size:13px;color:#E65100;font-weight:600"></span>
+        </div>
+        <div id="pendingBookingsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings… <small style="opacity:.5">[v20260502]</small></div>
+        </div>
+      </div>
+
+      <!-- Active treatments — open cases that have not been discharged yet -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
+            Active Treatments
+          </div>
+          <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
+        </div>
+        <div style="padding:8px 16px 4px;position:relative">
+          <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+          <input id="activeSearch" type="text" placeholder="Search by patient name or code…"
+            style="width:100%;padding:9px 12px 9px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#111;outline:none;box-sizing:border-box"
+            autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+        <div id="activeTreatmentsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- ── Overdue Follow-up Tracker ── -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
+            Missed Return Visits
+          </div>
+          <span id="overdueCount" style="font-size:11px;background:#E65100;color:#fff;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
+        </div>
+        <div id="overdueFollowupList" style="padding:8px 0">
+          <div style="text-align:center;padding:16px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Pending Payments / Outstanding Balances -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
+            Pending Payments
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <span id="pendingPaymentsTotal" style="font-size:13px;color:#E65100;font-weight:700"></span>
+            <span id="pendingPaymentsCount" style="font-size:11px;color:#fff;background:#E65100;padding:2px 9px;border-radius:20px;font-weight:700"></span>
+          </div>
+        </div>
+        <div id="pendingPaymentsList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Today's consultations list -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
+        <div class="table-header">
+          <div class="table-title">Today's Consultations</div>
+          <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
+        </div>
+        <div id="ordersList" style="padding:16px">
+          <div style="text-align:center;padding:40px;color:#9AA0A6">Loading…</div>
+        </div>
+      </div>
+
+      <!-- ── Medicines Dispensed Tracker ── -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4">
+        <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
+            Medicines Dispensed
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="meds-period-btn active" data-mp="day"   onclick="setMedsPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00ACC1;background:#00ACC1;color:#fff;cursor:pointer;font-weight:600;font-family:inherit;touch-action:manipulation">Today</button>
+            <button class="meds-period-btn"        data-mp="week"  onclick="setMedsPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="meds-period-btn"        data-mp="month" onclick="setMedsPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+            <button class="meds-period-btn"        data-mp="year"  onclick="setMedsPeriod('year')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Year</button>
+          </div>
+        </div>
+        <div id="medsDispensedList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Patient History Search -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">manage_search</span>
+            Patient History
+          </div>
+        </div>
+        <div style="padding:16px 20px">
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+            <input id="histSearchInput" type="text" placeholder="Search by patient name or phone…" autocomplete="off"
+              style="flex:1;min-width:200px;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none">
+            <button id="histSearchBtn" onclick="searchPatientHistory()"
+              style="padding:11px 20px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:18px">search</span> Search
+            </button>
+          </div>
+          <div id="histResults" style="min-height:40px;color:#9AA0A6;font-size:13px;text-align:center;padding:16px 0">
+            Enter a name or phone number to view a patient's full history.
+          </div>
+        </div>
+      </div>
+
+      <!-- Stock Tracker -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
+            Stock Tracker
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button onclick="openAddStockModal()" style="font-size:12px;padding:6px 14px;background:#00897B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:15px">add</span> Add Item
+            </button>
+          </div>
+        </div>
+        <div id="stockList" style="padding:8px 0">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+        </div>
+      </div>
+
+      <!-- Financial Overview -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2">
+        <div class="table-header">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#7B1FA2">analytics</span>
+            Financial Overview
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="fin-tab active" data-period="day"   onclick="setFinPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #7B1FA2;background:#7B1FA2;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
+            <button class="fin-tab"        data-period="week"  onclick="setFinPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:16px">
+          <div style="background:#F3E5F5;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#7B1FA2;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Patients</div>
+            <div id="finPatients" style="font-size:22px;font-weight:700;color:#4A148C">—</div>
+          </div>
+          <div style="background:#E8F5E9;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Billed (UGX)</div>
+            <div id="finRevenue" style="font-size:18px;font-weight:700;color:#1B5E20">—</div>
+          </div>
+          <div style="background:#E0F2F1;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#00695C;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Collected (UGX)</div>
+            <div id="finCollected" style="font-size:18px;font-weight:700;color:#00695C">—</div>
+          </div>
+          <div style="background:#FFEBEE;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#C62828;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Outstanding (UGX)</div>
+            <div id="finOutstanding" style="font-size:18px;font-weight:700;color:#C62828">—</div>
+          </div>
+          <div style="background:#E3F2FD;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stock Used (UGX)</div>
+            <div id="finStockCost" style="font-size:18px;font-weight:700;color:#1565C0">—</div>
+          </div>
+          <div style="background:#FFF8E1;border-radius:12px;padding:14px">
+            <div style="font-size:11px;color:#E65100;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Net Margin (UGX)</div>
+            <div id="finMargin" style="font-size:18px;font-weight:700;color:#E65100">—</div>
+          </div>
+        </div>
+        <div id="finTopItems" style="padding:0 16px 16px"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Discharge confirmation modal -->
+  <div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">task_alt</span>
+        <h3 style="font-size:17px;font-weight:700;margin:0">Discharge Patient</h3>
+      </div>
+      <p style="font-size:13px;color:#5F6368;margin:0 0 14px;line-height:1.5">
+        Marking <strong id="dischargePatientName">this patient</strong> as discharged will move them off the active list and notify them with their treatment summary.
+      </p>
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Discharge notes (optional)</label>
+      <textarea id="dischargeNotes" rows="2" placeholder="e.g. Patient stable, no follow-up needed."
+        style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:14px"></textarea>
+      <div id="dischargeError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
+      <div style="display:flex;gap:10px">
+        <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Record Payment Modal -->
+  <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:92vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <span class="material-icons-outlined" style="color:#E65100;font-size:26px">payments</span>
+        <h3 style="font-size:17px;font-weight:700;margin:0">Record Payment</h3>
+      </div>
+      <div style="background:#FFF8E1;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:#5F6368">
+        <div><strong id="pmPatientName" style="color:#202124">Patient</strong></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px">
+          <span>Total bill</span><span id="pmTotal" style="font-weight:700;color:#202124">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span>Paid so far</span><span id="pmPaid" style="font-weight:700;color:#1B5E20">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #E0E0E0;margin-top:6px">
+          <span style="font-weight:600">Balance due</span><span id="pmBalance" style="font-weight:700;color:#C62828">—</span>
+        </div>
+      </div>
+
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Amount Received (UGX) *</label>
+      <input id="pmAmount" type="number" min="0" step="500" placeholder="0"
+        style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px">
+      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+        <button type="button" onclick="setPmQuickAmount('half')"
+          style="font-size:12px;padding:6px 12px;background:#F5F5F5;border:1px solid var(--border);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Half</button>
+        <button type="button" onclick="setPmQuickAmount('full')"
+          style="font-size:12px;padding:6px 12px;background:#E8F5E9;border:1px solid #A5D6A7;color:#1B5E20;border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Full Balance</button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Method *</label>
+          <select id="pmMethod" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+            <option value="cash">Cash</option>
+            <option value="mobile_money">Mobile Money</option>
+            <option value="bank">Bank</option>
+            <option value="card">Card</option>
+            <option value="insurance">Insurance</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Reference</label>
+          <input id="pmRef" type="text" placeholder="MoMo TXN ID, etc."
+            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        </div>
+      </div>
+
+      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes</label>
+      <textarea id="pmNotes" rows="2" placeholder="e.g. First installment, will clear next week."
+        style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px;resize:vertical"></textarea>
+
+      <div id="pmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:10px">
+        <button id="pmCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="pmSaveBtn" style="flex:2;padding:12px;background:#E65100;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:18px">payments</span>
+          Record Payment
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Patient History Detail Modal -->
+  <div id="histModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
+    <div style="background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <div style="padding:20px 24px 16px;border-bottom:1px solid #E8EAED;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+        <div>
+          <div style="font-size:18px;font-weight:700" id="histModalName">Patient Name</div>
+          <div style="font-size:12px;color:#9AA0A6;margin-top:2px" id="histModalMeta"></div>
+        </div>
+        <button onclick="document.getElementById('histModal').style.display='none'"
+          style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+      <div id="histModalBody" style="overflow-y:auto;padding:20px 24px;flex:1">Loading…</div>
+      <div id="histModalFooter" style="display:none;padding:14px 24px 16px;border-top:1px solid #E8EAED;flex-shrink:0">
+        <button id="histModalNewVisitBtn"
+          style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px">post_add</span>
+          Record Follow-up Visit
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Quick Sale POS Sheet ── -->
+<div id="qsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-end;justify-content:center;overscroll-behavior:none" onclick="if(event.target===this)closeQuickSale()">
+  <div id="qsSheet" style="background:#fff;width:100%;max-width:600px;border-radius:24px 24px 0 0;height:85vh;height:85dvh;max-height:85vh;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative;overscroll-behavior:contain;touch-action:manipulation">
+
+    <!-- Header -->
+    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">point_of_sale</span>
+        <span style="font-size:19px;font-weight:800;color:#1B5E20">Quick Sale</span>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <button id="qsAddDrugBtn" type="button"
+          style="background:#E8F5E9;border:1.5px solid #A5D6A7;color:#1B5E20;border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
+          <span class="material-icons-outlined" style="font-size:16px">add</span> New Drug
+        </button>
+        <button id="qsCloseBtn" type="button" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
+          <span class="material-icons-outlined">close</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search -->
+    <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
+      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+      <input id="qsSearch" type="text" placeholder="Search drug…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        oninput="filterQsDrugs(this.value)"
+        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
+    </div>
+
+    <!-- Drug grid -->
+    <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px;overflow-y:auto;flex:1 1 0;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch">
+      <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+    </div>
+
+    <!-- Selected drug + controls -->
+    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
+      </div>
+      <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:10px"></div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
+        <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
+          <button id="qsQtyMinus" type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">−</button>
+          <div id="qsQtyVal" style="min-width:48px;text-align:center;font-size:18px;font-weight:800;color:#202124;padding:0 6px">1</div>
+          <button id="qsQtyPlus"  type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">+</button>
+        </div>
+        <div style="display:flex;gap:6px;margin-left:auto">
+          <button id="qsPmCash" type="button" class="qs-pm-chip selected">Cash</button>
+          <button id="qsPmMomo" type="button" class="qs-pm-chip">MoMo</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px;font-weight:600;color:#5F6368">UGX</span>
+        <input id="qsTotalInput" type="number" min="0" step="100" inputmode="numeric"
+          style="flex:1;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:18px;font-weight:800;color:#202124;font-family:inherit;outline:none;background:#fff;text-align:right;box-sizing:border-box">
+        <button id="qsResetTotal" type="button" title="Reset to auto"
+          style="background:transparent;border:none;color:#9AA0A6;cursor:pointer;padding:6px;display:flex;align-items:center;touch-action:manipulation">
+          <span class="material-icons-outlined" style="font-size:18px">refresh</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Sell button -->
+    <button id="qsSellBtn" type="button" disabled
+      style="margin:10px 16px;margin-bottom:calc(46px + env(safe-area-inset-bottom, 0px));padding:18px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      <span class="material-icons-outlined" style="font-size:20px">sell</span>
+      Sell
+    </button>
+
+    <!-- Success flash (absolute over the sheet) -->
+    <div id="qsSuccessFlash" style="display:none;position:absolute;inset:0;background:rgba(27,94,32,0.95);z-index:10;align-items:center;justify-content:center;flex-direction:column;color:#fff;border-radius:24px 24px 0 0;text-align:center;padding:24px">
+      <span class="material-icons-outlined" style="font-size:72px;margin-bottom:12px">check_circle</span>
+      <div id="qsFlashText" style="font-size:22px;font-weight:800;margin-bottom:6px"></div>
+      <div id="qsFlashSub"  style="font-size:15px;opacity:.85"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Verify Booking Code Modal -->
+<div id="verifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:26px 24px 28px">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+      <span class="material-icons-outlined" style="color:#1565C0;font-size:26px">qr_code_scanner</span>
+      <h3 style="font-size:18px;font-weight:700;margin:0">Verify Patient</h3>
+    </div>
+    <p style="font-size:13px;color:#5F6368;margin:0 0 18px;line-height:1.5">
+      Patient should show you their <strong>Booking Code</strong> (e.g. HO-928) and <strong>PIN</strong> (e.g. HK-AEK26W) from the Homatt app.
+    </p>
+
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Booking Code</label>
+    <input id="vmCode" type="text" placeholder="HO-928" autocomplete="off"
+      style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center">
+
+    <div style="height:14px"></div>
+
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">PIN</label>
+    <input id="vmPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
+      style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center">
+
+    <div id="vmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+    <div id="vmSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+
+    <div style="height:18px"></div>
+
+    <button id="vmSubmitBtn"
+      style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+      <span class="material-icons-outlined">verified</span>
+      Verify &amp; Start Consultation
+    </button>
+    <div style="height:8px"></div>
+    <button id="vmCancelBtn"
+      style="width:100%;padding:13px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      Cancel
+    </button>
+  </div>
+</div>
+
+<!-- Add / Edit Stock Item Modal -->
+<div id="stockItemModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">inventory_2</span>
+      <h3 id="stockModalTitle" style="font-size:17px;font-weight:700;margin:0">Add Stock Item</h3>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+      <div style="grid-column:1/-1">
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Item Name *</label>
+        <input id="siName" type="text" placeholder="e.g. Amoxicillin 500mg" autocomplete="off"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Type *</label>
+        <select id="siType" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+          <option value="medicine">Medicine</option>
+          <option value="material">Material</option>
+          <option value="consumable">Consumable</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
+        <input id="siUnit" type="text" placeholder="tabs / ml / pieces" value="tabs"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Opening Stock *</label>
+        <input id="siQty" type="number" min="0" step="1" placeholder="0"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Min Threshold</label>
+        <input id="siThreshold" type="number" min="0" step="1" placeholder="5"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Buying Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what you paid</span></label>
+        <input id="siCost" type="number" min="0" step="100" placeholder="0"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
+        <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
+          style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+    </div>
+    <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('stockItemModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<!-- Restock Modal -->
+<div id="restockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">add_shopping_cart</span>
+      <div>
+        <h3 style="font-size:17px;font-weight:700;margin:0" id="restockItemName">Restock</h3>
+        <div id="restockCurrentQty" style="font-size:12px;color:#9AA0A6;margin-top:2px"></div>
+      </div>
+    </div>
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Quantity to Add *</label>
+    <input id="restockQty" type="number" min="1" step="1" placeholder="Enter quantity"
+      style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes (optional)</label>
+    <input id="restockNotes" type="text" placeholder="e.g. Supplier delivery" autocomplete="off"
+      style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px">
+    <div id="restockError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
+    <div style="display:flex;gap:10px">
+      <button onclick="document.getElementById('restockModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button id="restockSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js?v=20260502"></script>
+<script src="js/clinic.js?v=20260502"></script>
+<script>
+  // ─── Catch any JS error and show it on-screen so we can debug ───
+  window.onerror = function(msg, src, line) {
+    var el = document.getElementById('pendingBookingsList');
+    if (el) el.innerHTML = '<div style="background:#D32F2F;color:#fff;padding:12px;border-radius:8px;font-size:12px">JS error line '+line+': '+msg+'</div>';
+  };
+
+  var session = requireClinic();
+  setupClinicLogout();
+  var supabase = _getClinicSupabase();
+
+  // Greeting
+  var h = new Date().getHours();
+  var greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  var hgEl = document.getElementById('heroGreeting');
+  if (hgEl) hgEl.textContent = greet + (session && session.staffName ? ', ' + session.staffName.split(' ')[0] : '');
+
+  // Clock
+  function tickClock() {
+    var d = new Date();
+    var cl = document.getElementById('liveClock');
+    var td = document.getElementById('todayDate');
+    var ud = document.getElementById('clinicUserDate');
+    if (cl) cl.textContent = d.toLocaleTimeString('en-UG', {hour:'2-digit',minute:'2-digit'});
+    if (td) td.textContent = d.toLocaleDateString('en-UG', {weekday:'long',day:'numeric',month:'long'});
+    if (ud) ud.textContent = d.toLocaleDateString('en-UG', {day:'numeric',month:'short',year:'numeric'});
+  }
+  tickClock();
+  setInterval(tickClock, 60000);
+
+  // ── HTML escape helper ──
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Format UGX ──
+  function fmtUGX(n) {
+    if (!n || isNaN(n)) return '0';
+    return Number(n).toLocaleString('en-UG');
+  }
+
+  // ── Resolve clinic ID (cached) ──
+  var _clinicId = null;
+  async function resolveClinicId() {
+    if (_clinicId) return _clinicId;
+    if (session && session.clinicId) { _clinicId = session.clinicId; return _clinicId; }
+    if (!supabase) return null;
+    try {
+      var su = await supabase.auth.getSession();
+      var uid = su && su.data && su.data.session && su.data.session.user && su.data.session.user.id;
+      if (!uid) return null;
+      var pr = await supabase.from('portal_users').select('clinic_id').eq('auth_user_id', uid).eq('is_active', true).maybeSingle();
+      _clinicId = pr.data && pr.data.clinic_id;
+    } catch(e) { _clinicId = null; }
+    return _clinicId;
+  }
+
+  // ── Verify panel ──
+  var qvCode = document.getElementById('qvCode');
+  var qvPin  = document.getElementById('qvPin');
+  var qvErr  = document.getElementById('qvError');
+  var qvOk   = document.getElementById('qvSuccess');
+  var qvBtn  = document.getElementById('qvSubmitBtn');
+
+  if (qvCode) qvCode.addEventListener('input', function() {
+    var v = qvCode.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HO')) v = 'HO-' + v.replace(/^HO-?/,'');
+    qvCode.value = v;
+  });
+  if (qvPin) qvPin.addEventListener('input', function() {
+    var v = qvPin.value.toUpperCase().replace(/[^A-Z0-9-]/g,'');
+    if (v && !v.startsWith('HK')) v = 'HK-' + v.replace(/^HK-?/,'');
+    qvPin.value = v;
+  });
+  if (qvCode && qvPin && qvBtn) {
+    [qvCode, qvPin].forEach(function(el) {
+      el.addEventListener('keydown', function(e) { if (e.key === 'Enter') qvBtn.click(); });
+    });
+  }
+
+  if (qvBtn) qvBtn.onclick = async function() {
+    if (!qvErr || !qvOk) return;
+    qvErr.style.display = 'none'; qvOk.style.display = 'none';
+    var code = (qvCode ? qvCode.value : '').trim().toUpperCase();
+    var pin  = (qvPin  ? qvPin.value  : '').trim().toUpperCase();
+    if (!code || !pin) { qvErr.textContent = 'Enter both the booking code and PIN.'; qvErr.style.display = 'block'; return; }
+    if (!supabase)     { qvErr.textContent = 'Database unavailable.'; qvErr.style.display = 'block'; return; }
+    qvBtn.disabled = true;
+    qvBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:16px">hourglass_empty</span> Verifying…';
+    try {
+      var res = await supabase.from('bookings').select('id,booking_code,pin_token,pin_expires_at,patient_user_id,patient_name,ai_diagnosis,urgency_level,clinic_id,status').eq('booking_code', code).maybeSingle();
+      var booking = res.data, err = res.error;
+      if (err || !booking) { qvErr.textContent = 'No booking found for that code.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_token !== pin) { qvErr.textContent = 'PIN does not match.'; qvErr.style.display = 'block'; qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return; }
+      if (booking.pin_expires_at && new Date(booking.pin_expires_at) < new Date()) {
+        if (!confirm('PIN has expired. Patient: ' + (booking.patient_name||'Unknown') + '\n\nIf they are at the desk, tap OK to proceed.')) {
+          qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start'; return;
+        }
+      }
+      try { await supabase.from('bookings').update({status:'in_progress',attended_at:new Date().toISOString()}).eq('id', booking.id); } catch(e2) {}
+      qvOk.innerHTML = '<strong>Verified!</strong> Patient: ' + esc(booking.patient_name||'Unknown') + '. Opening consultation…';
+      qvOk.style.display = 'block';
+      var phone = '';
+      if (booking.patient_user_id) {
+        try { var pr = await supabase.from('profiles').select('phone_number,phone').eq('id', booking.patient_user_id).maybeSingle(); phone = (pr.data && (pr.data.phone_number||pr.data.phone)) || ''; } catch(e3) {}
+      }
+      var params = new URLSearchParams({booking_id:booking.id,booking_code:booking.booking_code,patient_name:booking.patient_name||'',patient_phone:phone});
+      if (booking.patient_user_id) params.set('patient_id', booking.patient_user_id);
+      setTimeout(function() { window.location.href = 'new-order.html?' + params.toString(); }, 600);
+    } catch(e4) {
+      qvErr.textContent = 'Error: ' + e4.message; qvErr.style.display = 'block';
+      qvBtn.disabled = false; qvBtn.innerHTML = '<span class="material-icons-outlined">arrow_forward</span> Verify &amp; Start';
+    }
+  };
+
+  // ── Mark patient done (removes from waiting list) ──
+  async function markDone(bookingId, cardEl) {
+    if (!supabase) return;
+    try {
+      var r = await supabase.from('bookings').update({status:'attended',attended_at:new Date().toISOString()}).eq('id', bookingId);
+      if (r.error) throw r.error;
+      cardEl.style.transition = 'opacity .3s,transform .3s';
+      cardEl.style.opacity = '0';
+      cardEl.style.transform = 'translateX(40px)';
+      setTimeout(function() {
+        cardEl.remove();
+        var list = document.getElementById('pendingBookingsList');
+        var ct   = document.getElementById('pendingCount');
+        var sp   = document.getElementById('statPending');
+        var remaining = list ? list.querySelectorAll('.order-card').length : 0;
+        if (ct) ct.textContent = remaining ? remaining + ' waiting' : '';
+        if (sp) sp.textContent = remaining;
+        if (list && !remaining) list.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings right now.<br><span style="font-size:12px;color:#BDBDBD">All caught up!</span></div>';
+      }, 320);
+    } catch(e) { alert('Could not mark as done: ' + e.message); }
+  }
+
+  // ── Load pending bookings for THIS clinic ──
+  async function loadBookings() {
+    var el = document.getElementById('pendingBookingsList');
+    var ct = document.getElementById('pendingCount');
+    var sp = document.getElementById('statPending');
+    if (!el) return;
+    function msg(html) { el.innerHTML = html; if (ct) ct.textContent = ''; if (sp) sp.textContent = '0'; }
+    if (!supabase) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
+    if (session && session.demo) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>');
+      return;
+    }
+
+    try {
+      var since = new Date(Date.now() - 48*3600000).toISOString();
+      var res = await supabase.from('bookings')
+        .select('id,booking_code,patient_name,ai_diagnosis,urgency_level,preferred_time,status,created_at')
+        .eq('clinic_id', clinicId)
+        .in('status', ['pending','confirmed','in_progress'])
+        .gte('created_at', since)
+        .order('created_at', {ascending:false})
+        .limit(30);
+      if (res.error) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'); return; }
+      var rows = res.data || [];
+      if (!rows.length) {
+        msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>');
+        return;
+      }
+      if (ct) ct.textContent = rows.length + ' waiting';
+      if (sp) sp.textContent = rows.length;
+      el.innerHTML = rows.map(function(b) {
+        var ini = (b.patient_name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t   = new Date(b.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        var urg = b.urgency_level==='high'?'urgent':b.urgency_level==='medium'?'in-progress':'normal';
+        return '<div class="order-card" style="margin:8px 16px;position:relative" data-booking-id="'+esc(b.id)+'" data-code="'+esc(b.booking_code)+'">'
+          +'<div class="order-avatar" style="background:#FFF8E1;color:#E65100">'+ini+'</div>'
+          +'<div class="order-info" style="cursor:pointer">'
+            +'<div class="order-patient">'+esc(b.patient_name||'Unknown')+'</div>'
+            +'<div class="order-drug">'+esc(b.ai_diagnosis||'—')+' · Code <strong style="color:#1B5E20;letter-spacing:1px">'+esc(b.booking_code)+'</strong></div>'
+            +'<div class="order-meta"><span>'+t+'</span></div>'
+          +'</div>'
+          +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
+            +'<span class="status-badge '+urg+'">'+esc(b.urgency_level||'normal')+'</span>'
+            +'<button class="mark-done-btn" data-id="'+esc(b.id)+'" style="font-size:11px;padding:4px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">&#10003; Done</button>'
+          +'</div>'
+          +'</div>';
+      }).join('');
+
+      el.querySelectorAll('.order-card').forEach(function(card) {
+        var infoDiv = card.querySelector('.order-info');
+        if (infoDiv) {
+          infoDiv.onclick = function() {
+            var c = card.dataset.code;
+            if (qvCode) { qvCode.value = c; if (qvPin) qvPin.focus(); }
+          };
+        }
+        var doneBtn = card.querySelector('.mark-done-btn');
+        if (doneBtn) {
+          doneBtn.onclick = function(ev) {
+            ev.stopPropagation();
+            markDone(card.dataset.bookingId, card);
+          };
+        }
+      });
+    } catch(e) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading bookings: ' + esc(e.message) + '</div>'); }
+  }
+
+  // ── Revenue stats ──
+  async function loadRevenue() {
+    var todayEl = document.getElementById('statRevToday');
+    var monthEl = document.getElementById('statRevMonth');
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) return;
+    try {
+      var startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
+      var startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+      var results = await Promise.all([
+        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
+        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
+        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+      ]);
+      var qsDayTot = (results[2] && !results[2].error && results[2].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var qsMonTot = (results[3] && !results[3].error && results[3].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var dayTotal = (results[0].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsDayTot;
+      var monTotal = (results[1].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsMonTot;
+      if (todayEl) todayEl.textContent = 'UGX ' + fmtUGX(dayTotal);
+      if (monthEl) monthEl.textContent = 'UGX ' + fmtUGX(monTotal);
+    } catch(e) {
+      if (todayEl) todayEl.textContent = '—';
+      if (monthEl) monthEl.textContent = '—';
+    }
+  }
+
+  // ── Today's consultations ──
+  async function loadConsultations() {
+    var el = document.getElementById('ordersList');
+    if (!el) return;
+    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see consultations.</div>'; return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
+      return;
+    }
+    try {
+      var start = new Date(); start.setHours(0,0,0,0);
+      var res2 = await supabase.from('clinic_diagnoses')
+        .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', start.toISOString())
+        .order('created_at', {ascending:false});
+      var rows2 = res2.data || [];
+      var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
+      var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
+      var sd = document.getElementById('statDispatched'); if (sd) sd.textContent = inpatient;
+      if (!rows2.length) {
+        el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No consultations today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
+        return;
+      }
+      el.innerHTML = rows2.map(function(c) {
+        var ini2 = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var t2   = new Date(c.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+        var paid = c.payment_status==='paid'
+          ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+          : c.payment_status==='waived'
+          ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
+          : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>';
+        var fee = c.total_charged_ugx ? 'UGX ' + fmtUGX(c.total_charged_ugx) : '';
+        return '<div class="order-card">'
+          +'<div class="order-avatar">'+ini2+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+'</div>'
+            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+t2+'</span>'+(fee?'<span>'+esc(fee)+'</span>':'')+(c.patient_phone?'<span>'+esc(c.patient_phone)+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">'
+            +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
+            +paid
+          +'</div>'
+          +'</div>';
+      }).join('');
+    } catch(e2) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e2.message) + '</div>'; }
+  }
+
+  // ── Patient history search ──
+  async function searchPatientHistory() {
+    var inp = document.getElementById('histSearchInput');
+    var res = document.getElementById('histResults');
+    if (!inp || !res) return;
+    var q = inp.value.trim();
+    if (!q || q.length < 2) { res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Enter at least 2 characters to search.</div>'; return; }
+    if (!supabase) { res.innerHTML = '<div style="color:#C62828;text-align:center;padding:16px 0">Database not connected.</div>'; return; }
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Account not linked to a clinic.</div>'; return; }
+    res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Searching…</div>';
+    try {
+      var isPhone = /^[\d\+]/.test(q);
+      var qry = supabase.from('clinic_diagnoses')
+        .select('id,patient_name,patient_phone,confirmed_diagnosis,severity,total_charged_ugx,payment_status,created_at,patient_type')
+        .eq('clinic_id', clinicId)
+        .order('created_at', {ascending:false})
+        .limit(60);
+      qry = isPhone ? qry.ilike('patient_phone', '%'+q+'%') : qry.ilike('patient_name', '%'+q+'%');
+      var r = await qry;
+      if (r.error) throw r.error;
+      var rows = r.data || [];
+      if (!rows.length) {
+        res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">search_off</span>No records found for "'+esc(q)+'".</div>';
+        return;
+      }
+      var groups = {};
+      rows.forEach(function(row) {
+        var key = (row.patient_name||row.patient_phone||'Unknown').toLowerCase().trim();
+        if (!groups[key]) groups[key] = { name: row.patient_name||row.patient_phone||'Unknown', phone: row.patient_phone||'', records: [] };
+        groups[key].records.push(row);
+      });
+      window._histGroups = groups;
+      res.innerHTML = Object.keys(groups).map(function(k) {
+        var g = groups[k];
+        var latest = g.records[0];
+        var count = g.records.length;
+        var ini = (g.name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        return '<div class="order-card" style="cursor:pointer;margin-bottom:8px" onclick="openHistModal(\''+esc(k)+'\')">'
+          +'<div class="order-avatar" style="background:#E3F2FD;color:#1565C0">'+ini+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(g.name)+'</div>'
+            +'<div class="order-drug">'+esc(latest.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+count+' visit'+(count!==1?'s':'')+'</span>'+(g.phone?'<span>'+esc(g.phone)+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right"><span class="material-icons-outlined" style="color:#9AA0A6;font-size:20px">chevron_right</span></div>'
+          +'</div>';
+      }).join('');
+    } catch(e) {
+      res.innerHTML = '<div style="color:#C62828;text-align:center;padding:16px 0">Error: ' + esc(e.message) + '</div>';
+    }
+  }
+
+  var histInp = document.getElementById('histSearchInput');
+  if (histInp) histInp.addEventListener('keydown', function(e){ if(e.key==='Enter') searchPatientHistory(); });
+
+  // ── Patient history modal ──
+  function openHistModal(groupKey) {
+    var modal  = document.getElementById('histModal');
+    var nameEl = document.getElementById('histModalName');
+    var metaEl = document.getElementById('histModalMeta');
+    var bodyEl = document.getElementById('histModalBody');
+    if (!modal || !bodyEl) return;
+    var g = (window._histGroups||{})[groupKey];
+    if (!g) return;
+    if (nameEl) nameEl.textContent = g.name || 'Patient';
+    if (metaEl) metaEl.textContent = (g.phone ? g.phone + ' · ' : '') + g.records.length + ' visit' + (g.records.length !== 1 ? 's' : '');
+    modal.style.display = 'flex';
+    bodyEl.innerHTML = g.records.map(function(c, i) {
+      var d = new Date(c.created_at);
+      var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+      var timeStr = d.toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+      var paid = c.payment_status==='paid'
+        ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+        : c.payment_status==='waived'
+        ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
+        : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>';
+      var fee = c.total_charged_ugx ? 'UGX ' + fmtUGX(c.total_charged_ugx) : '';
+      return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(i===0?';border-left:4px solid #1565C0':'')+'">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+          +'<div style="font-weight:700;font-size:14px">Visit '+(g.records.length-i)+' — '+esc(dateStr)+' at '+esc(timeStr)+'</div>'
+          +(fee?'<div style="font-size:13px;font-weight:600;color:#1B5E20">'+esc(fee)+' '+paid+'</div>':'')
+        +'</div>'
+        +'<div style="font-size:13px;color:#424242;margin-bottom:4px"><strong>Diagnosis:</strong> '+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+        +(c.severity?'<div style="font-size:12px;color:#9AA0A6">Severity: '+esc(c.severity)+'</div>':'')
+        +(c.patient_type?'<div style="font-size:12px;color:#9AA0A6">Type: '+esc(c.patient_type)+'</div>':'')
+        +'</div>';
+    }).join('');
+  }
+
+  var histModal = document.getElementById('histModal');
+  if (histModal) histModal.addEventListener('click', function(e){ if(e.target===histModal) histModal.style.display='none'; });
+
+  // ── Active patient detail (tapped from Active Treatments list) ──
+  // Opens histModal with current visit on top showing medications + balance,
+  // and past visits for the same patient_phone below as history.
+  async function openActivePatientDetail(diagnosisId) {
+    var modal  = document.getElementById('histModal');
+    var nameEl = document.getElementById('histModalName');
+    var metaEl = document.getElementById('histModalMeta');
+    var bodyEl = document.getElementById('histModalBody');
+    if (!modal || !bodyEl) return;
+
+    var current = _activeRows.find(function(r){ return r.id === diagnosisId; });
+    if (!current) return;
+
+    var code = patientCodeFor(current);
+    if (nameEl) nameEl.textContent = current.patient_name || current.patient_phone || 'Patient';
+    if (metaEl) metaEl.textContent = (current.patient_phone ? current.patient_phone + ' · ' : '') + (code ? 'Code ' + code : '');
+    modal.style.display = 'flex';
+    bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6">Loading patient record…</div>';
+
+    // Fetch past visits for the same patient (by phone). Exclude the current one.
+    var history = [];
+    if (current.patient_phone && supabase) {
+      var clinicId = await resolveClinicId();
+      var hr = await supabase.from('clinic_diagnoses')
+        .select('id,confirmed_diagnosis,severity,created_at,total_charged_ugx,amount_paid,payment_status,prescription_items,patient_type')
+        .eq('clinic_id', clinicId)
+        .eq('patient_phone', current.patient_phone)
+        .neq('id', current.id)
+        .order('created_at', {ascending:false})
+        .limit(20);
+      history = hr.error ? [] : (hr.data || []);
+    }
+
+    // Stash so the follow-up form can return to the detail view on cancel
+    _activeDetailContext = { current: current, history: history };
+    renderActiveDetailView();
+
+    // Show "Record Follow-up" footer — appends to the existing case (not a new diagnosis)
+    var footer = document.getElementById('histModalFooter');
+    var followupBtn = document.getElementById('histModalNewVisitBtn');
+    if (footer) footer.style.display = 'block';
+    if (followupBtn) followupBtn.onclick = showFollowupForm;
+  }
+
+  // Patient detail context — used by the follow-up form to return to the detail view
+  var _activeDetailContext = { current: null, history: [] };
+
+  function renderActiveDetailView() {
+    var bodyEl = document.getElementById('histModalBody');
+    var footer = document.getElementById('histModalFooter');
+    var current = _activeDetailContext.current;
+    var history = _activeDetailContext.history || [];
+    if (!bodyEl || !current) return;
+
+    bodyEl.innerHTML = renderPatientDetailBody(current, history);
+    if (footer) footer.style.display = 'block';
+
+    // Wire the "Record Payment" shortcut button inside the modal
+    var payBtn = bodyEl.querySelector('[data-action="record-payment"]');
+    if (payBtn) payBtn.onclick = function() {
+      var modal = document.getElementById('histModal');
+      if (modal) modal.style.display = 'none';
+      var total   = Number(current.total_charged_ugx) || 0;
+      var paid    = Number(current.amount_paid) || 0;
+      var balance = Math.max(0, total - paid);
+      openPaymentModal(current.id, current.patient_name || 'Patient', total, paid, balance);
+    };
+  }
+
+  function renderMedsList(items) {
+    if (!Array.isArray(items) || !items.length) {
+      return '<div style="font-size:12px;color:#9AA0A6;font-style:italic">No medications recorded for this visit.</div>';
+    }
+    return items.map(function(m) {
+      var name = m.drug_name || m.name || 'Medication';
+      var dose = m.strength || m.dosage || '';
+      var freq = (m.frequency || '').replace('_daily','/day').replace(/_/g,' ');
+      var dur  = m.duration ? (m.duration + ' day' + (m.duration!==1?'s':'')) : '';
+      var sub  = [dose, freq, dur].filter(Boolean).join(' · ');
+      return '<div style="display:flex;gap:10px;padding:8px 10px;background:#F5F7F5;border-radius:8px;margin-bottom:6px;align-items:center">'
+        +'<span class="material-icons-outlined" style="font-size:18px;color:#1B5E20">medication</span>'
+        +'<div style="flex:1;min-width:0">'
+          +'<div style="font-size:13px;font-weight:600;color:#111">'+esc(name)+'</div>'
+          +(sub ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">'+esc(sub)+'</div>' : '')
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
+
+  function renderPatientDetailBody(current, history) {
+    var d = new Date(current.created_at);
+    var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    var timeStr = d.toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+    var total   = Number(current.total_charged_ugx) || 0;
+    var paid    = Number(current.amount_paid) || 0;
+    var balance = Math.max(0, total - paid);
+    var status  = current.payment_status || (balance > 0 ? 'pending' : 'paid');
+
+    var balanceBlock = total > 0
+      ? '<div style="background:'+(balance>0?'#FFF3E0':'#E8F5E9')+';border:1px solid '+(balance>0?'#FFB74D':'#A5D6A7')+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
+            +'<div>'
+              +'<div style="font-size:11px;color:'+(balance>0?'#E65100':'#1B5E20')+';font-weight:700;letter-spacing:.5px;text-transform:uppercase">'+(balance>0?'Outstanding Balance':'Bill Settled')+'</div>'
+              +'<div style="font-size:20px;font-weight:800;color:'+(balance>0?'#E65100':'#1B5E20')+';margin-top:2px">UGX '+fmtUGX(balance>0?balance:total)+'</div>'
+              +'<div style="font-size:11px;color:#5F6368;margin-top:4px">Total billed UGX '+fmtUGX(total)+' · Paid UGX '+fmtUGX(paid)+'</div>'
+            +'</div>'
+            +(balance>0
+              ? '<button data-action="record-payment" style="background:#E65100;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap"><span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
+              : '<span style="background:#1B5E20;color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700">PAID</span>')
+          +'</div>'
+        +'</div>'
+      : '';
+
+    // Next return visit panel — shows when this patient is expected back & for what
+    var returnBlock = '';
+    if (current.follow_up_days && current.follow_up_days > 0) {
+      var due = new Date(d.getTime() + current.follow_up_days * 86400000);
+      var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+      var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+      var statusTxt, bg, fg, border;
+      if (daysLeft < 0)      { statusTxt = 'Overdue by ' + Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)!==1?'s':''); bg='#FFEBEE'; fg='#C62828'; border='#EF9A9A'; }
+      else if (daysLeft === 0) { statusTxt = 'Today'; bg='#FFF3E0'; fg='#E65100'; border='#FFB74D'; }
+      else if (daysLeft === 1) { statusTxt = 'Tomorrow'; bg='#FFF8E1'; fg='#E65100'; border='#FFD54F'; }
+      else if (daysLeft <= 3)  { statusTxt = 'In ' + daysLeft + ' days'; bg='#FFF8E1'; fg='#E65100'; border='#FFE082'; }
+      else                     { statusTxt = 'In ' + daysLeft + ' days'; bg='#E3F2FD'; fg='#1565C0'; border='#90CAF9'; }
+      returnBlock =
+        '<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:11px;color:'+fg+';font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:4px">'
+                +'<span class="material-icons-outlined" style="font-size:14px">event_repeat</span> Next return visit'
+              +'</div>'
+              +'<div style="font-size:14px;font-weight:700;color:'+fg+';margin-top:2px">'+esc(dueLabel)+'</div>'
+              +(current.follow_up_reason ? '<div style="font-size:12px;color:#424242;margin-top:4px"><strong>For:</strong> '+esc(current.follow_up_reason)+'</div>' : '<div style="font-size:11px;color:#9AA0A6;margin-top:4px;font-style:italic">No reason recorded</div>')
+            +'</div>'
+            +'<span style="background:'+fg+';color:#fff;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700;white-space:nowrap">'+esc(statusTxt.toUpperCase())+'</span>'
+          +'</div>'
+        +'</div>';
+    } else {
+      returnBlock =
+        '<div style="background:#F5F5F5;border:1px dashed #BDBDBD;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5F6368;display:flex;align-items:center;gap:8px">'
+          +'<span class="material-icons-outlined" style="font-size:16px;color:#9AA0A6">event_busy</span>'
+          +'No return visit scheduled. Set one when recording a follow-up.'
+        +'</div>';
+    }
+
+    var currentBlock =
+      '<div style="border:2px solid #1565C0;border-radius:12px;padding:14px 16px;margin-bottom:18px;background:#fff">'
+        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
+          +'<div>'
+            +'<div style="font-size:11px;color:#1565C0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Active Visit</div>'
+            +'<div style="font-size:14px;font-weight:700;margin-top:2px">'+esc(dateStr)+' at '+esc(timeStr)+'</div>'
+          +'</div>'
+          +'<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700">'+esc((current.severity||'moderate').toUpperCase())+'</span>'
+        +'</div>'
+        +'<div style="font-size:13px;color:#424242;margin-bottom:10px"><strong>Diagnosis:</strong> '+esc(current.confirmed_diagnosis||'Pending')+'</div>'
+        +(current.patient_type ? '<div style="font-size:12px;color:#9AA0A6;margin-bottom:10px">Patient type: '+esc(current.patient_type)+'</div>' : '')
+        +balanceBlock
+        +returnBlock
+        +'<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Current Medications</div>'
+        +renderMedsList(current.prescription_items)
+      +'</div>';
+
+    var historyBlock = '';
+    if (history.length) {
+      historyBlock =
+        '<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Previous Visits ('+history.length+')</div>'
+        + history.map(function(h, i) {
+          var hd = new Date(h.created_at);
+          var hDate = hd.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+          var hPaid = h.payment_status === 'paid'
+            ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+            : (h.payment_status === 'waived'
+              ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
+              : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>');
+          var hFee = h.total_charged_ugx ? 'UGX ' + fmtUGX(h.total_charged_ugx) : '';
+          var hMeds = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
+          return '<div style="border:1px solid #E8EAED;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
+            +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'
+              +'<div style="font-weight:700;font-size:13px">'+esc(hDate)+'</div>'
+              +(hFee?'<div style="font-size:12px;color:#5F6368">'+esc(hFee)+' '+hPaid+'</div>':'')
+            +'</div>'
+            +'<div style="font-size:12px;color:#424242">'+esc(h.confirmed_diagnosis||'Pending')+(hMeds?' · '+hMeds+' med'+(hMeds!==1?'s':''):'')+'</div>'
+          +'</div>';
+        }).join('');
+    } else {
+      historyBlock = '<div style="font-size:12px;color:#9AA0A6;text-align:center;padding:8px;font-style:italic">No previous visits at this clinic.</div>';
+    }
+
+    return currentBlock + historyBlock;
+  }
+
+  // ── Follow-up visit form ────────────────────────────────
+  // Updates the existing clinic_diagnoses row in place — appends new meds,
+  // adds to the bill, optionally records a payment. Does NOT create a new case.
+  function followupMedRowHTML(i) {
+    return ''
+    + '<div class="fu-med-row" data-idx="'+i+'" style="border:1px solid #E8EAED;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
+        + '<div style="font-size:11px;font-weight:700;color:#1565C0;letter-spacing:.5px;text-transform:uppercase">Medication '+(i+1)+'</div>'
+        + (i > 0 ? '<button type="button" class="fu-med-remove" style="background:transparent;border:none;color:#C62828;font-size:12px;cursor:pointer;font-family:inherit;padding:2px 6px">Remove</button>' : '')
+      + '</div>'
+      + '<input class="fu-med-name field-input" placeholder="Drug name e.g. Amoxicillin" style="width:100%;margin-bottom:6px">'
+      + '<div style="display:flex;gap:6px;margin-bottom:6px">'
+        + '<input class="fu-med-strength field-input" placeholder="Strength e.g. 500mg" style="flex:1">'
+        + '<select class="fu-med-freq field-input" style="flex:1">'
+          + '<option value="1">1× daily</option>'
+          + '<option value="2" selected>2× daily</option>'
+          + '<option value="3">3× daily</option>'
+          + '<option value="4">4× daily</option>'
+        + '</select>'
+      + '</div>'
+      + '<input class="fu-med-days field-input" type="number" min="1" value="5" placeholder="Duration (days)" style="width:100%">'
+    + '</div>';
+  }
+
+  function showFollowupForm() {
+    var bodyEl = document.getElementById('histModalBody');
+    var footer = document.getElementById('histModalFooter');
+    var current = _activeDetailContext.current;
+    if (!bodyEl || !current) return;
+    if (footer) footer.style.display = 'none';
+
+    var total   = Number(current.total_charged_ugx) || 0;
+    var paid    = Number(current.amount_paid) || 0;
+    var balance = Math.max(0, total - paid);
+
+    bodyEl.innerHTML = ''
+      + '<div style="background:#E3F2FD;border:1px solid #90CAF9;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#0D47A1">'
+        + '<strong>Follow-up visit</strong> — adds to the existing case for <strong>'+esc(current.patient_name||'this patient')+'</strong>. No new diagnosis created.'
+      + '</div>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Add medications (optional)</div>'
+      + '<div id="fuMedsContainer">' + followupMedRowHTML(0) + '</div>'
+      + '<button type="button" id="fuAddMedBtn" style="width:100%;padding:10px;background:#F5F7F5;color:#1565C0;border:1px dashed #90CAF9;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:6px">'
+        + '<span class="material-icons-outlined" style="font-size:16px">add</span> Add another medication'
+      + '</button>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Additional charge (optional)</div>'
+      + '<input id="fuExtraCharge" class="field-input" type="number" min="0" step="500" placeholder="e.g. 10000" style="width:100%;margin-bottom:6px">'
+      + '<div style="font-size:11px;color:#9AA0A6;margin-bottom:16px">Adds to the bill. Current total: UGX '+fmtUGX(total)+(balance>0?' · Balance UGX '+fmtUGX(balance):'')+'</div>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Payment now (optional)</div>'
+      + '<input id="fuPaymentAmount" class="field-input" type="number" min="0" step="500" placeholder="Amount patient is paying today" style="width:100%;margin-bottom:6px">'
+      + '<select id="fuPaymentMethod" class="field-input" style="width:100%;margin-bottom:16px">'
+        + '<option value="cash">Cash</option>'
+        + '<option value="mobile_money">Mobile money</option>'
+        + '<option value="card">Card</option>'
+        + '<option value="insurance">Insurance</option>'
+      + '</select>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Next return visit (optional)</div>'
+      + '<div style="display:flex;gap:8px;margin-bottom:6px">'
+        + '<input id="fuNextDays" class="field-input" type="number" min="0" max="365" step="1" placeholder="Days from today" value="'+(Number(current.follow_up_days)>0?Number(current.follow_up_days):'')+'" style="flex:0 0 120px">'
+        + '<input id="fuNextReason" class="field-input" type="text" maxlength="200" placeholder="For… e.g. BP recheck, refill" value="'+esc(current.follow_up_reason||'')+'" style="flex:1">'
+      + '</div>'
+      + '<div id="fuNextDateHint" style="font-size:11px;color:#9AA0A6;margin-bottom:16px">—</div>'
+
+      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Visit notes (optional)</div>'
+      + '<textarea id="fuNotes" class="field-input" rows="2" placeholder="What happened in this visit — e.g. patient feeling better, BP rechecked, refilled meds…" style="width:100%;margin-bottom:18px"></textarea>'
+
+      + '<div id="fuError" style="display:none;background:#FFEBEE;color:#C62828;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px"></div>'
+
+      + '<div style="display:flex;gap:8px">'
+        + '<button id="fuCancelBtn" type="button" style="flex:1;padding:13px;background:#F5F5F5;color:#5F6368;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
+        + '<button id="fuSaveBtn" type="button" style="flex:2;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+          + '<span class="material-icons-outlined" style="font-size:18px">save</span> Save Follow-up'
+        + '</button>'
+      + '</div>';
+
+    // Wire add-row / remove-row buttons
+    document.getElementById('fuAddMedBtn').onclick = function() {
+      var ctr = document.getElementById('fuMedsContainer');
+      var idx = ctr.querySelectorAll('.fu-med-row').length;
+      ctr.insertAdjacentHTML('beforeend', followupMedRowHTML(idx));
+      wireFollowupRemoveButtons();
+    };
+    wireFollowupRemoveButtons();
+
+    // Live preview of next return date
+    function updateFuNextHint() {
+      var hintEl = document.getElementById('fuNextDateHint');
+      var days = parseInt((document.getElementById('fuNextDays')||{}).value, 10);
+      if (!hintEl) return;
+      if (!days || days <= 0) { hintEl.textContent = 'No follow-up scheduled.'; return; }
+      var dd = new Date(); dd.setDate(dd.getDate() + days);
+      var lbl = dd.toLocaleDateString('en-UG', {weekday:'short', day:'numeric', month:'short', year:'numeric'});
+      var reason = (document.getElementById('fuNextReason')||{}).value || '';
+      hintEl.textContent = 'Patient should return on ' + lbl + (reason ? ' — for ' + reason : '');
+    }
+    var fuNextDaysEl = document.getElementById('fuNextDays');
+    var fuNextReasonEl = document.getElementById('fuNextReason');
+    if (fuNextDaysEl) fuNextDaysEl.addEventListener('input', updateFuNextHint);
+    if (fuNextReasonEl) fuNextReasonEl.addEventListener('input', updateFuNextHint);
+    updateFuNextHint();
+
+    document.getElementById('fuCancelBtn').onclick = renderActiveDetailView;
+    document.getElementById('fuSaveBtn').onclick   = saveFollowupVisit;
+  }
+
+  function wireFollowupRemoveButtons() {
+    document.querySelectorAll('.fu-med-remove').forEach(function(btn) {
+      btn.onclick = function() {
+        var row = btn.closest('.fu-med-row');
+        if (row) row.remove();
+      };
+    });
+  }
+
+  // Default intake times by frequency — patient receives push reminders at these slots
+  function defaultIntakeTimes(timesPerDay) {
+    switch (Number(timesPerDay)) {
+      case 1: return ['08:00'];
+      case 2: return ['08:00','20:00'];
+      case 3: return ['08:00','14:00','20:00'];
+      case 4: return ['08:00','12:00','16:00','20:00'];
+      default: return ['08:00'];
+    }
+  }
+
+  async function saveFollowupVisit() {
+    var current = _activeDetailContext.current;
+    var errEl = document.getElementById('fuError');
+    var btn   = document.getElementById('fuSaveBtn');
+    if (!current || !supabase) return;
+    errEl.style.display = 'none';
+
+    // Collect new medications
+    var newMeds = [];
+    document.querySelectorAll('#fuMedsContainer .fu-med-row').forEach(function(row) {
+      var name = (row.querySelector('.fu-med-name').value || '').trim();
+      if (!name) return;
+      var freq = Number(row.querySelector('.fu-med-freq').value) || 1;
+      newMeds.push({
+        drug_name:    name,
+        strength:     (row.querySelector('.fu-med-strength').value || '').trim(),
+        frequency:    freq + 'x_daily',
+        duration:     Number(row.querySelector('.fu-med-days').value) || 0,
+        intake_times: defaultIntakeTimes(freq),
+        added_at:     new Date().toISOString(),
+      });
+    });
+
+    var extraCharge = parseFloat(document.getElementById('fuExtraCharge').value) || 0;
+    var paymentAmt  = parseFloat(document.getElementById('fuPaymentAmount').value) || 0;
+    var paymentMtd  = document.getElementById('fuPaymentMethod').value || 'cash';
+    var notes       = (document.getElementById('fuNotes').value || '').trim();
+    var nextDaysRaw = parseInt((document.getElementById('fuNextDays')||{}).value, 10);
+    var nextDays    = isNaN(nextDaysRaw) ? null : Math.max(0, Math.min(365, nextDaysRaw));
+    var nextReason  = ((document.getElementById('fuNextReason')||{}).value || '').trim();
+    var nextChanged = nextDays !== null && (nextDays !== (Number(current.follow_up_days)||0) || nextReason !== (current.follow_up_reason||''));
+
+    if (!newMeds.length && extraCharge <= 0 && paymentAmt <= 0 && !notes && !nextChanged) {
+      errEl.textContent = 'Add at least one medication, a charge, a payment, a note, or a return-visit update.';
+      errEl.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">hourglass_empty</span> Saving…';
+
+    try {
+      // Build updated row payload
+      var update = {};
+      var existingMeds = Array.isArray(current.prescription_items) ? current.prescription_items.slice() : [];
+      if (newMeds.length) {
+        update.prescription_items = existingMeds.concat(newMeds);
+      }
+      if (extraCharge > 0) {
+        update.total_charged_ugx = (Number(current.total_charged_ugx) || 0) + extraCharge;
+      }
+      if (notes) {
+        var stamp = new Date().toLocaleString('en-UG', {day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+        var prev = current.clinical_findings || '';
+        update.clinical_findings = (prev ? prev + '\n\n' : '') + '[Follow-up · ' + stamp + ']\n' + notes;
+      }
+      if (nextChanged) {
+        // Re-baseline the follow-up so the date is computed from today, not the original visit
+        update.follow_up_days   = nextDays && nextDays > 0 ? nextDays : null;
+        update.follow_up_reason = nextReason || null;
+        // Also push created_at forward so (created_at + follow_up_days) lands on the new date.
+        // We don't actually mutate created_at — instead store the "anchor" via a separate column
+        // if it exists; otherwise, the display uses the most-recent visit timestamp from
+        // clinical_findings. For now we just update follow_up_days relative to today by
+        // computing days from the original created_at.
+        if (nextDays && nextDays > 0) {
+          var origCreated = new Date(current.created_at);
+          var targetDate = new Date(); targetDate.setDate(targetDate.getDate() + nextDays);
+          update.follow_up_days = Math.max(1, Math.round((targetDate - origCreated) / 86400000));
+        }
+      }
+
+      if (Object.keys(update).length) {
+        var ur = await supabase.from('clinic_diagnoses')
+          .update(update).eq('id', current.id).select().single();
+        // If follow_up_reason column not yet migrated, retry without it
+        if (ur.error && ur.error.message && ur.error.message.includes('follow_up_reason')) {
+          var compatUpdate = Object.assign({}, update);
+          delete compatUpdate.follow_up_reason;
+          ur = await supabase.from('clinic_diagnoses')
+            .update(compatUpdate).eq('id', current.id).select().single();
+        }
+        if (ur.error) throw ur.error;
+        // Refresh local context with the returned row so the detail view shows new totals
+        Object.assign(current, ur.data || {});
+      }
+
+      // Optional payment — uses the same RPC the existing payment modal uses
+      if (paymentAmt > 0) {
+        var pr = await supabase.rpc('record_payment', {
+          p_diagnosis_id: current.id,
+          p_amount:       paymentAmt,
+          p_method:       paymentMtd,
+          p_reference:    null,
+          p_notes:        'Follow-up payment',
+        });
+        if (pr.error) throw pr.error;
+        current.amount_paid = (Number(current.amount_paid) || 0) + paymentAmt;
+        if (current.amount_paid >= (Number(current.total_charged_ugx) || 0)) {
+          current.payment_status = 'paid';
+        }
+      }
+
+      showToast('Follow-up saved', 'success');
+      // Re-render detail with the updated row, then refresh the list in background
+      renderActiveDetailView();
+      loadActiveTreatments();
+      loadPendingPayments();
+      loadRevenue();
+    } catch (e) {
+      errEl.textContent = 'Save failed: ' + (e.message || e);
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">save</span> Save Follow-up';
+    }
+  }
+
+  // ── Active treatments (open cases, all dates) ──
+  // Build a short, human-readable code so staff can call out / look up a patient quickly.
+  // Prefer the Homatt booking code (the patient already knows it); fall back to a
+  // clinic-generated code derived from the diagnosis UUID so walk-ins still have one.
+  function patientCodeFor(c) {
+    if (c && c.bookings && c.bookings.booking_code) return c.bookings.booking_code;
+    if (c && c.booking && c.booking.booking_code)   return c.booking.booking_code;
+    if (c && c._booking_code)                       return c._booking_code;
+    if (c && c.id) return 'CLN-' + String(c.id).replace(/-/g,'').slice(0,6).toUpperCase();
+    return '';
+  }
+
+  // Cache the loaded active treatments so the search box can filter without re-querying.
+  var _activeRows = [];
+  var _activeMigrationNeeded = false;
+
+  async function loadActiveTreatments() {
+    var el = document.getElementById('activeTreatmentsList');
+    var ct = document.getElementById('activeCount');
+    if (!el) return;
+    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
+
+    _activeMigrationNeeded = false;
+
+    // Resilient loader: start with the full column set and the discharged_at
+    // filter. If PostgREST rejects any column that isn't migrated yet, strip
+    // that exact column and retry. If discharged_at isn't migrated, fall back
+    // to a 14-day date range. This recovers from ANY missing column (amount_paid,
+    // follow_up_reason, clinical_findings …) instead of breaking the whole card.
+    var COLS = ['id','confirmed_diagnosis','severity','created_at','patient_phone',
+                'patient_name','patient_type','total_charged_ugx','amount_paid',
+                'payment_status','follow_up_days','follow_up_reason',
+                'prescription_items','clinical_findings','booking_id'];
+    // Never strip these — without them the card can't render
+    var REQUIRED = { id:1, confirmed_diagnosis:1, created_at:1, patient_name:1, patient_phone:1 };
+
+    var rows = null;
+    var hardError = null;
+    var useDischargeFilter = true;
+
+    for (var attempt = 0; attempt < 10; attempt++) {
+      var q = supabase.from('clinic_diagnoses').select(COLS.join(','))
+        .eq('clinic_id', clinicId)
+        .order('created_at', {ascending:false})
+        .limit(50);
+      if (useDischargeFilter) q = q.is('discharged_at', null);
+      else q = q.gte('created_at', new Date(Date.now() - 14*86400000).toISOString());
+
+      var res = await q;
+      if (!res.error) { rows = res.data || []; break; }
+
+      var msg = res.error.message || '';
+      // discharged_at filter unsupported on older DBs — switch to date-range
+      if (msg.indexOf('discharged_at') !== -1 && useDischargeFilter) {
+        useDischargeFilter = false; _activeMigrationNeeded = true; continue;
+      }
+      // Strip the first non-required column named in the error and retry
+      var stripped = false;
+      for (var i = COLS.length - 1; i >= 0; i--) {
+        if (!REQUIRED[COLS[i]] && msg.indexOf(COLS[i]) !== -1) {
+          COLS.splice(i, 1); stripped = true;
+          if (COLS.indexOf('follow_up_reason') === -1) _activeMigrationNeeded = true;
+          break;
+        }
+      }
+      if (stripped) continue;
+      hardError = msg; break;   // unrecoverable
+    }
+
+    if (rows === null) {
+      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(hardError || 'could not load active treatments') + '</div>';
+      return;
+    }
+
+    // Resolve booking_code for rows that have a booking_id (one batched query).
+    var bookingIds = rows.map(function(r){ return r.booking_id; }).filter(Boolean);
+    if (bookingIds.length) {
+      try {
+        var bres = await supabase.from('bookings').select('id,booking_code').in('id', bookingIds);
+        var codeById = {};
+        (bres.data || []).forEach(function(b){ codeById[b.id] = b.booking_code; });
+        rows.forEach(function(r){ if (r.booking_id && codeById[r.booking_id]) r._booking_code = codeById[r.booking_id]; });
+      } catch(_) { /* non-fatal — fall back to CLN-XXX code */ }
+    }
+
+    _activeRows = rows;
+    renderActiveTreatments();
+    renderOverdueFollowups();
+  }
+
+  function renderActiveTreatments() {
+    var el = document.getElementById('activeTreatmentsList');
+    var ct = document.getElementById('activeCount');
+    if (!el) return;
+
+    var q = (document.getElementById('activeSearch')||{}).value || '';
+    q = q.trim().toLowerCase();
+    var rows = q
+      ? _activeRows.filter(function(c) {
+          var name = (c.patient_name || '').toLowerCase();
+          var phone = (c.patient_phone || '').toLowerCase();
+          var code = patientCodeFor(c).toLowerCase();
+          var dx = (c.confirmed_diagnosis || '').toLowerCase();
+          return name.indexOf(q) !== -1 || phone.indexOf(q) !== -1 || code.indexOf(q) !== -1 || dx.indexOf(q) !== -1;
+        })
+      : _activeRows.slice();
+
+    if (ct) ct.textContent = _activeRows.length
+      ? (q ? rows.length + ' / ' + _activeRows.length + ' open' : _activeRows.length + ' open')
+      : '';
+
+    var notice = _activeMigrationNeeded
+      ? '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:10px 14px;margin:8px 16px;font-size:12px;color:#5D4037;display:flex;align-items:center;gap:8px">'
+          +'<span class="material-icons-outlined" style="font-size:18px;color:#F9A825">info</span>'
+          +'<span><strong>Migration needed:</strong> Run <code>20260516_patch_discharged_at.sql</code> in Supabase SQL Editor to enable discharge tracking. Showing last 14 days for now.</span>'
+        +'</div>'
+      : '';
+
+    if (!rows.length) {
+      var emptyMsg = q
+        ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#BDBDBD">search_off</span>No patient matches "'+esc(q)+'".'
+        : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!';
+      el.innerHTML = notice + '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
+      return;
+    }
+
+    el.innerHTML = notice + rows.map(function(c) {
+      var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+      var d   = new Date(c.created_at);
+      var ageMs = Date.now() - d.getTime();
+      var ageDays = Math.floor(ageMs / 86400000);
+      var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
+      var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
+      var total = Number(c.total_charged_ugx) || 0;
+      var paid  = Number(c.amount_paid) || 0;
+      var balance = Math.max(0, total - paid);
+      var feeBadge = total
+        ? (balance > 0
+            ? '<span style="color:#C62828;font-weight:700">UGX '+fmtUGX(balance)+' due</span>'
+            : '<span style="color:#1B5E20;font-weight:700">Paid</span>')
+        : '';
+      var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
+
+      // Return-visit line: shows due date + what the patient is coming back for
+      var returnLine = '';
+      if (c.follow_up_days && c.follow_up_days > 0) {
+        var due = new Date(d.getTime() + c.follow_up_days * 86400000);
+        var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+        var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short' });
+        var whenTxt, whenColor;
+        if (daysLeft < 0) { whenTxt = 'overdue by ' + Math.abs(daysLeft) + 'd'; whenColor = '#C62828'; }
+        else if (daysLeft === 0) { whenTxt = 'today'; whenColor = '#E65100'; }
+        else if (daysLeft === 1) { whenTxt = 'tomorrow'; whenColor = '#E65100'; }
+        else if (daysLeft <= 3) { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#F9A825'; }
+        else { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#1565C0'; }
+        var reasonTxt = c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '';
+        returnLine = '<div class="order-meta" style="margin-top:2px">'
+          + '<span style="display:inline-flex;align-items:center;gap:3px;color:' + whenColor + ';font-weight:600">'
+          + '<span class="material-icons-outlined" style="font-size:13px">event_repeat</span>'
+          + 'Returns ' + dueLabel + ' (' + whenTxt + ')'
+          + '</span>'
+          + '<span style="color:#5F6368">' + reasonTxt + '</span>'
+          + '</div>';
+      }
+      var code = patientCodeFor(c);
+      var codeBadge = code
+        ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.4px;font-family:monospace">'+esc(code)+'</span>'
+        : '';
+      var dischargeBtn = !_activeMigrationNeeded
+        ? '<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
+        : '';
+      return '<div class="order-card active-tap" style="margin:8px 16px;cursor:pointer" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
+        +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
+        +'<div class="order-info">'
+          +'<div class="order-patient" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+esc(c.patient_name||c.patient_phone||'Patient')+codeBadge+followDue+'</div>'
+          +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
+          +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(feeBadge?'<span>'+feeBadge+'</span>':'')+'</div>'
+          +returnLine
+        +'</div>'
+        +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
+          +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
+          +dischargeBtn
+        +'</div>'
+        +'</div>';
+    }).join('');
+
+    // Wire up: tapping a card opens the patient detail; the inner Discharge
+    // button must not bubble up and trigger the detail modal too.
+    el.querySelectorAll('.order-card.active-tap').forEach(function(card) {
+      card.onclick = function() {
+        openActivePatientDetail(card.dataset.diagnosisId);
+      };
+      var btn = card.querySelector('.discharge-btn');
+      if (btn) btn.onclick = function(ev) {
+        ev.stopPropagation();
+        openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
+      };
+    });
+  }
+
+  // ── Overdue Follow-up Tracker ────────────────────────────────────
+  function renderOverdueFollowups() {
+    var el = document.getElementById('overdueFollowupList');
+    var badge = document.getElementById('overdueCount');
+    if (!el) return;
+
+    var now = Date.now();
+    // Patients who had a follow-up date set AND that date is today or in the past
+    var overdue = (_activeRows || []).filter(function(c) {
+      if (!c.follow_up_days || c.follow_up_days <= 0) return false;
+      var created = new Date(c.created_at).getTime();
+      var due = created + c.follow_up_days * 86400000;
+      return due <= now + 86400000; // include due today
+    }).sort(function(a, b) {
+      // Most overdue first
+      var dueA = new Date(a.created_at).getTime() + a.follow_up_days * 86400000;
+      var dueB = new Date(b.created_at).getTime() + b.follow_up_days * 86400000;
+      return dueA - dueB;
+    });
+
+    if (badge) {
+      if (overdue.length) {
+        badge.textContent = overdue.length;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    if (!overdue.length) {
+      el.innerHTML = '<div style="padding:16px 20px;text-align:center;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">event_available</span>'
+        + 'No missed return visits. All follow-ups on track.</div>';
+      return;
+    }
+
+    el.innerHTML = overdue.map(function(c) {
+      var due = new Date(new Date(c.created_at).getTime() + c.follow_up_days * 86400000);
+      var daysLate = Math.floor((now - due.getTime()) / 86400000);
+      var isToday  = daysLate <= 0;
+      var urgColor = daysLate > 7 ? '#B71C1C' : daysLate > 3 ? '#C62828' : daysLate > 0 ? '#E65100' : '#F9A825';
+      var dueLabel = isToday ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : '');
+      var ini = (c.patient_name || c.patient_phone || 'P').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
+      var phone = c.patient_phone || '';
+      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #FFF3E0">'
+        + '<div style="width:36px;height:36px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
+        +   '<div style="font-size:12px;color:' + urgColor + ';font-weight:600">' + dueLabel + '</div>'
+        +   (phone ? '<div style="font-size:11px;color:#5F6368;margin-top:1px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> ' + esc(phone) + '</div>' : '')
+        +   (c.follow_up_reason ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
+        + '</div>'
+        + '<div style="display:flex;gap:6px;flex-shrink:0">'
+        +   '<button type="button" onclick="openReminderSheet(\'' + esc(c.id) + '\')" title="Contact patient" '
+        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +     '<span class="material-icons-outlined" style="font-size:14px">contact_phone</span>Contact'
+        +   '</button>'
+        +   '<button type="button" onclick="openActivePatientDetail(\'' + esc(c.id) + '\')" title="Record return visit" '
+        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:none;background:#1565C0;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
+        +     '<span class="material-icons-outlined" style="font-size:14px">edit_note</span>Record'
+        +   '</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── Contact / Reminder bottom sheet ──────────────────────────────
+  function openReminderSheet(diagId) {
+    var c = (_activeRows || []).find(function(r){ return r.id === diagId; });
+    if (!c) return;
+
+    var existing = document.getElementById('reminderSheet');
+    if (existing) existing.remove();
+
+    var due = c.follow_up_days ? new Date(new Date(c.created_at).getTime() + c.follow_up_days * 86400000) : null;
+    var daysLate = due ? Math.floor((Date.now() - due.getTime()) / 86400000) : 0;
+    var dueLabel = !due ? '' : (daysLate <= 0 ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : ''));
+
+    var phone = (c.patient_phone || '').replace(/\s+/g, '');
+    var phoneE164 = phone;
+    if (phoneE164.startsWith('0')) phoneE164 = '256' + phoneE164.slice(1);
+    phoneE164 = phoneE164.replace(/[^0-9]/g, '');
+
+    var smsMsg = 'Hi ' + (c.patient_name || 'there') + ', a reminder from Homatt Health: your follow-up visit'
+      + (c.follow_up_reason ? ' (' + c.follow_up_reason + ')' : '')
+      + ' is ' + (dueLabel || 'due') + '. Please visit the clinic at your earliest convenience.';
+    var encMsg = encodeURIComponent(smsMsg);
+
+    var sheet = document.createElement('div');
+    sheet.id = 'reminderSheet';
+    sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;align-items:flex-end;justify-content:center';
+    sheet.innerHTML =
+        '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px 22px 28px;max-height:88vh;overflow-y:auto">'
+      +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
+      +     '<div style="font-size:17px;font-weight:800;color:#111;display:flex;align-items:center;gap:8px">'
+      +       '<span class="material-icons-outlined" style="color:#E65100">contact_phone</span> Contact Patient'
+      +     '</div>'
+      +     '<button type="button" id="reminderSheetClose" style="background:#F5F5F5;border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation"><span class="material-icons-outlined">close</span></button>'
+      +   '</div>'
+
+      +   '<div style="background:#FFF8F6;border:1px solid #FFCCBC;border-radius:14px;padding:14px;margin-bottom:18px">'
+      +     '<div style="font-size:15px;font-weight:800;color:#111;margin-bottom:2px">' + esc(c.patient_name || 'Patient') + '</div>'
+      +     (dueLabel ? '<div style="font-size:12px;font-weight:700;color:#C62828;margin-bottom:6px">' + esc(dueLabel) + '</div>' : '')
+      +     (c.confirmed_diagnosis ? '<div style="font-size:12px;color:#5F6368"><strong>Diagnosis:</strong> ' + esc(c.confirmed_diagnosis) + (c.severity ? ' · ' + esc(c.severity) : '') + '</div>' : '')
+      +     (c.follow_up_reason ? '<div style="font-size:12px;color:#5F6368;margin-top:3px"><strong>Return reason:</strong> ' + esc(c.follow_up_reason) + '</div>' : '')
+      +     (c.created_at ? '<div style="font-size:11px;color:#9AA0A6;margin-top:6px">Last seen: ' + new Date(c.created_at).toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + '</div>' : '')
+      +   '</div>'
+
+      +   (phone
+          ? '<div style="margin-bottom:14px">'
+          +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Phone</div>'
+          +   '<div style="font-size:22px;font-weight:800;color:#1565C0;letter-spacing:.5px">' + esc(phone) + '</div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
+          +   '<a href="tel:' + esc(phone) + '" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">call</span> Call'
+          +     '</button>'
+          +   '</a>'
+          +   '<a href="https://wa.me/' + esc(phoneE164) + '?text=' + encMsg + '" target="_blank" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#25D366;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">chat</span> WhatsApp'
+          +     '</button>'
+          +   '</a>'
+          +   '<a href="sms:' + esc(phone) + '?body=' + encMsg + '" style="text-decoration:none">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#1565C0;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +       '<span class="material-icons-outlined" style="font-size:22px">sms</span> SMS'
+          +     '</button>'
+          +   '</a>'
+          + '</div>'
+          : '<div style="background:#FFEBEE;border-radius:10px;padding:12px;color:#C62828;font-size:13px;margin-bottom:14px">No phone number on file for this patient.</div>')
+
+      +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Suggested message</div>'
+      +   '<textarea id="reminderSheetMsg" rows="4" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;color:#202124;background:#FAFAFA">' + esc(smsMsg) + '</textarea>'
+      +   '<button type="button" id="reminderSheetCopy" style="touch-action:manipulation;margin-top:8px;width:100%;padding:11px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+      +     '<span class="material-icons-outlined" style="font-size:16px">content_copy</span> Copy message'
+      +   '</button>'
+
+      +   '<button type="button" id="reminderSheetRecord" style="touch-action:manipulation;margin-top:14px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+      +     '<span class="material-icons-outlined" style="font-size:18px">edit_note</span> Patient came in — Record visit'
+      +   '</button>'
+      + '</div>';
+
+    document.body.appendChild(sheet);
+
+    function closeSheet() { sheet.remove(); }
+    sheet.addEventListener('click', function(e){ if (e.target === sheet) closeSheet(); });
+    document.getElementById('reminderSheetClose').onclick = closeSheet;
+
+    document.getElementById('reminderSheetCopy').onclick = function() {
+      var ta = document.getElementById('reminderSheetMsg');
+      ta.select();
+      try {
+        navigator.clipboard.writeText(ta.value).then(function() { showToast('Message copied', 'success'); });
+      } catch(_) {
+        document.execCommand('copy');
+        showToast('Message copied', 'success');
+      }
+    };
+
+    document.getElementById('reminderSheetRecord').onclick = function() {
+      closeSheet();
+      openActivePatientDetail(diagId);
+    };
+  }
+
+  // ── Medicines Dispensed Tracker ──────────────────────────────────
+  var _medsPeriod = 'day';
+
+  function setMedsPeriod(period) {
+    _medsPeriod = period;
+    document.querySelectorAll('.meds-period-btn').forEach(function(btn) {
+      var active = btn.dataset.mp === period;
+      btn.style.background = active ? '#00ACC1' : 'transparent';
+      btn.style.color = active ? '#fff' : '#424242';
+      btn.style.borderColor = active ? '#00ACC1' : '#E0E0E0';
+    });
+    loadMedsDispensed();
+  }
+
+  async function loadMedsDispensed() {
+    var el = document.getElementById('medsDispensedList');
+    if (!el) return;
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>';
+
+    var now = new Date();
+    var since;
+    if (_medsPeriod === 'day') {
+      since = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    } else if (_medsPeriod === 'week') {
+      var w = new Date(now); w.setDate(w.getDate() - 7); since = w.toISOString();
+    } else if (_medsPeriod === 'month') {
+      since = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    } else {
+      since = new Date(now.getFullYear(), 0, 1).toISOString();
+    }
+
+    if (!supabase) { renderMedsDemo(el); return; }
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { renderMedsDemo(el); return; }
+
+    var { data, error } = await supabase
+      .from('clinic_diagnoses')
+      .select('prescription_items,created_at')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', since)
+      .not('prescription_items', 'is', null);
+
+    if (error || !data) {
+      el.innerHTML = '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
+      return;
+    }
+
+    // Tally drugs from prescription_items JSONB
+    var tally = {}; // { drugName: { patients, totalDays } }
+    data.forEach(function(row) {
+      var items = Array.isArray(row.prescription_items) ? row.prescription_items : [];
+      var seen = new Set(); // count each drug once per consultation
+      items.forEach(function(item) {
+        var name = (item.drug_name || item.name || item.drug || '').trim();
+        if (!name) return;
+        if (!tally[name]) tally[name] = { patients: 0, totalDays: 0 };
+        if (!seen.has(name)) { tally[name].patients++; seen.add(name); }
+        tally[name].totalDays += (parseInt(item.duration || item.durationDays, 10) || 0);
+      });
+    });
+
+    var keys = Object.keys(tally).sort(function(a,b){ return tally[b].patients - tally[a].patients; });
+    var totalConsults = data.length;
+
+    if (!keys.length) {
+      var periodLabel = { day:'today', week:'this week', month:'this month', year:'this year' }[_medsPeriod] || _medsPeriod;
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#E0E0E0">medication</span>'
+        + 'No medicines dispensed ' + periodLabel + '.</div>';
+      return;
+    }
+
+    var maxPts = tally[keys[0]].patients;
+    var topKeys = keys.slice(0, 12);
+
+    el.innerHTML = '<div style="padding:12px 16px 8px">'
+      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">'
+      + totalConsults + ' consultation' + (totalConsults !== 1 ? 's' : '') + ' · top ' + topKeys.length + ' drugs</div>'
+      + topKeys.map(function(name, i) {
+          var t = tally[name];
+          var pct = Math.round((t.patients / maxPts) * 100);
+          var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
+          var textColor = i < 3 ? '#006064' : '#424242';
+          return '<div style="margin-bottom:10px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
+            + '<span style="font-size:13px;font-weight:600;color:' + textColor + '">' + esc(name) + '</span>'
+            + '<span style="font-size:12px;color:#9AA0A6;margin-left:8px;white-space:nowrap">'
+            + t.patients + ' patient' + (t.patients !== 1 ? 's' : '')
+            + (t.totalDays > 0 ? ' · ' + t.totalDays + 'd total' : '') + '</span>'
+            + '</div>'
+            + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width .4s ease"></div>'
+            + '</div>'
+            + '</div>';
+        }).join('')
+      + (keys.length > 12 ? '<div style="font-size:11px;color:#9AA0A6;text-align:center;padding-top:4px">+' + (keys.length - 12) + ' more drugs this period</div>' : '')
+      + '</div>';
+  }
+
+  function renderMedsDemo(el) {
+    var demo = [
+      { name: 'Coartem 20/120mg',  patients: 12, totalDays: 36 },
+      { name: 'Paracetamol 500mg', patients: 9,  totalDays: 27 },
+      { name: 'Amoxicillin 500mg', patients: 7,  totalDays: 35 },
+      { name: 'ORS Sachet',        patients: 5,  totalDays: 15 },
+      { name: 'Metronidazole',     patients: 4,  totalDays: 28 },
+    ];
+    var maxPts = demo[0].patients;
+    el.innerHTML = '<div style="padding:12px 16px 8px">'
+      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Demo data — connect database for live figures</div>'
+      + demo.map(function(d, i) {
+          var pct = Math.round((d.patients / maxPts) * 100);
+          var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
+          return '<div style="margin-bottom:10px">'
+            + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
+            + '<span style="font-size:13px;font-weight:600;color:#006064">' + esc(d.name) + '</span>'
+            + '<span style="font-size:12px;color:#9AA0A6">' + d.patients + ' patients · ' + d.totalDays + 'd total</span>'
+            + '</div>'
+            + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
+            + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px"></div>'
+            + '</div></div>';
+        }).join('')
+      + '</div>';
+  }
+
+  // Live filter as the user types in the active-treatments search box
+  (function wireActiveSearch(){
+    var inp = document.getElementById('activeSearch');
+    if (!inp) return;
+    var t = null;
+    inp.addEventListener('input', function() {
+      clearTimeout(t);
+      t = setTimeout(renderActiveTreatments, 120);
+    });
+  })();
+
+  // ── Discharge flow ──
+  var _dischargeContext = { diagnosisId: null, cardEl: null };
+
+  // Toast for discharge notification result (also reused by payment recording)
+  function showDischargeToast(msg, kind) {
+    var bg = '#1B5E20', icon = 'check_circle';
+    if (kind === 'warning') { bg = '#E65100'; icon = 'warning'; }
+    if (kind === 'error')   { bg = '#C62828'; icon = 'error';   }
+    var t = document.createElement('div');
+    t.style.cssText =
+      'position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:9999;'+
+      'background:'+bg+';color:#fff;padding:12px 18px;border-radius:24px;font-size:13px;'+
+      'font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;'+
+      'display:flex;align-items:center;gap:8px;font-family:inherit;line-height:1.4;'+
+      'opacity:0;transition:opacity .25s,transform .25s';
+    t.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">'+icon+'</span><span>'+msg+'</span>';
+    document.body.appendChild(t);
+    requestAnimationFrame(function(){ t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(-4px)'; });
+    setTimeout(function(){
+      t.style.opacity='0'; t.style.transform='translateX(-50%) translateY(0)';
+      setTimeout(function(){ t.remove(); }, 280);
+    }, 4200);
+  }
+
+  function openDischargeModal(diagnosisId, patientName, cardEl) {
+    _dischargeContext = { diagnosisId: diagnosisId, cardEl: cardEl };
+    var modal = document.getElementById('dischargeModal');
+    document.getElementById('dischargePatientName').textContent = patientName || 'this patient';
+    document.getElementById('dischargeNotes').value = '';
+    document.getElementById('dischargeError').style.display = 'none';
+    if (modal) modal.style.display = 'flex';
+  }
+  document.getElementById('dischargeCancelBtn').onclick = function() {
+    document.getElementById('dischargeModal').style.display = 'none';
+  };
+  document.getElementById('dischargeConfirmBtn').onclick = async function() {
+    var btn = this;
+    var errEl = document.getElementById('dischargeError');
+    errEl.style.display = 'none';
+    var notes = document.getElementById('dischargeNotes').value.trim();
+    if (!_dischargeContext.diagnosisId) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Discharging…';
+    try {
+      var r = await supabase.rpc('discharge_patient', {
+        p_diagnosis_id: _dischargeContext.diagnosisId,
+        p_notes: notes || null,
+      });
+      if (r.error) throw r.error;
+
+      // Notify the patient — surface result so clinic knows what happened
+      var notifyMsg = '';
+      var notifyKind = 'success';   // success | warning | error
+      try {
+        var nr = await supabase.functions.invoke('discharge-notify', {
+          body: { diagnosisId: _dischargeContext.diagnosisId },
+        });
+        if (nr.error) {
+          notifyMsg = 'Discharge saved, but push notification failed: ' + (nr.error.message || 'unknown error');
+          notifyKind = 'warning';
+          console.warn('[discharge-notify] error', nr.error);
+        } else {
+          var d = nr.data || {};
+          if (d.delivered) {
+            notifyMsg = 'Patient notified on their phone.';
+          } else if (d.reason === 'patient_not_on_homatt') {
+            notifyMsg = 'Discharged. Patient is not on the Homatt app — no push sent.';
+            notifyKind = 'warning';
+          } else if (d.reason === 'daily_limit_reached') {
+            notifyMsg = 'Discharged. Patient has hit today’s notification limit.';
+            notifyKind = 'warning';
+          } else if (d.message) {
+            notifyMsg = 'Discharged. ' + d.message;
+            notifyKind = 'warning';
+          } else {
+            notifyMsg = 'Discharged successfully.';
+          }
+          console.log('[discharge-notify] result', d);
+        }
+      } catch(e) {
+        notifyMsg = 'Discharge saved, but push notification call failed: ' + (e.message || e);
+        notifyKind = 'warning';
+        console.warn('[discharge-notify] threw', e);
+      }
+      showDischargeToast(notifyMsg, notifyKind);
+
+      // Animate card out
+      var cardEl = _dischargeContext.cardEl;
+      if (cardEl) {
+        cardEl.style.transition = 'opacity .3s,transform .3s';
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'translateX(60px)';
+        setTimeout(function() { cardEl.remove(); loadActiveTreatments(); loadRevenue(); }, 320);
+      } else {
+        loadActiveTreatments();
+        loadRevenue();
+      }
+      document.getElementById('dischargeModal').style.display = 'none';
+    } catch(e) {
+      errEl.textContent = 'Error: ' + e.message;
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify';
+  };
+
+  // Close on backdrop click
+  var dm = document.getElementById('dischargeModal');
+  if (dm) dm.addEventListener('click', function(e){ if(e.target===dm) dm.style.display='none'; });
+
+  // ═══════════════════════════════════════════════════════
+  // PENDING PAYMENTS / INSTALLMENTS
+  // ═══════════════════════════════════════════════════════
+
+  var _paymentContext = { diagnosisId: null, total: 0, paid: 0, balance: 0, patientName: '' };
+
+  function timeAgo(iso) {
+    if (!iso) return '';
+    var diff = (Date.now() - new Date(iso).getTime()) / 1000;
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60)+'m ago';
+    if (diff < 86400) return Math.floor(diff/3600)+'h ago';
+    var days = Math.floor(diff/86400);
+    if (days < 7) return days+'d ago';
+    return new Date(iso).toLocaleDateString('en-UG', { day:'numeric', month:'short' });
+  }
+
+  async function loadPendingPayments() {
+    var listEl  = document.getElementById('pendingPaymentsList');
+    var totalEl = document.getElementById('pendingPaymentsTotal');
+    var countEl = document.getElementById('pendingPaymentsCount');
+    if (!listEl || !supabase) return;
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      return;
+    }
+
+    // Try the RPC first; fall back to a direct query if not deployed yet
+    var rows = [];
+    var res = await supabase.rpc('get_pending_payments', { p_clinic_id: clinicId });
+    if (res.error && (res.error.message||'').toLowerCase().indexOf('could not find the function') !== -1) {
+      var fallback = await supabase
+        .from('clinic_diagnoses')
+        .select('id,patient_name,patient_phone,confirmed_diagnosis,total_charged_ugx,amount_paid,payment_status,created_at')
+        .eq('clinic_id', clinicId)
+        .in('payment_status', ['pending','partial','credit'])
+        .order('created_at', { ascending: false });
+      if (fallback.error) {
+        listEl.innerHTML =
+          '<div style="padding:20px;margin:8px 14px;background:#FFF8E1;border:1.5px solid #FFE082;border-radius:10px;color:#5D4037;font-size:13px;line-height:1.55">'
+          +'<strong>Migration needed:</strong> Run <code style="font-size:11px">20260518_clinic_payments.sql</code> in Supabase SQL Editor to enable installment tracking.'
+          +'</div>';
+        if (totalEl) totalEl.textContent = '';
+        if (countEl) countEl.textContent = '';
+        return;
+      }
+      rows = (fallback.data || []).map(function(d){
+        var bal = Math.max(0, (Number(d.total_charged_ugx)||0) - (Number(d.amount_paid)||0));
+        return {
+          id: d.id, patient_name: d.patient_name, patient_phone: d.patient_phone,
+          confirmed_diagnosis: d.confirmed_diagnosis,
+          total_charged_ugx: d.total_charged_ugx, amount_paid: d.amount_paid || 0,
+          balance_ugx: bal, payment_status: d.payment_status,
+          created_at: d.created_at, last_payment_at: null,
+        };
+      }).filter(function(d){ return d.balance_ugx > 0; });
+    } else if (res.error) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading payments: '+esc(res.error.message)+'</div>';
+      return;
+    } else {
+      rows = res.data || [];
+    }
+
+    if (!rows.length) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
+      if (totalEl) totalEl.textContent = '';
+      if (countEl) countEl.textContent = '0';
+      return;
+    }
+
+    var totalOut = rows.reduce(function(s,r){ return s + (Number(r.balance_ugx)||0); }, 0);
+    if (totalEl) totalEl.textContent = 'UGX ' + fmtUGX(totalOut) + ' outstanding';
+    if (countEl) countEl.textContent = String(rows.length);
+
+    listEl.innerHTML = rows.map(function(r){
+      var statusBadge = r.payment_status === 'partial'
+        ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PARTIAL</span>'
+        : r.payment_status === 'credit'
+          ? '<span style="background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">CREDIT</span>'
+          : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">UNPAID</span>';
+      var ageDays = (Date.now() - new Date(r.created_at).getTime()) / 86400000;
+      var ageBg = ageDays > 7 ? '#FFEBEE' : ageDays > 2 ? '#FFF3E0' : '#F5F5F5';
+      var ageColor = ageDays > 7 ? '#C62828' : ageDays > 2 ? '#E65100' : '#5F6368';
+      var lastPay = r.last_payment_at ? 'Last paid '+timeAgo(r.last_payment_at) : 'No payments yet';
+      var pct = r.total_charged_ugx > 0 ? Math.min(100, Math.round((r.amount_paid / r.total_charged_ugx) * 100)) : 0;
+      return ''
+        +'<div style="padding:12px 16px;border-bottom:1px solid #F1F3F4">'
+          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:14px;font-weight:700;color:#202124">'+esc(r.patient_name || 'Walk-in')+' '+statusBadge+'</div>'
+              +'<div style="font-size:12px;color:#5F6368;margin-top:2px">'+esc(r.confirmed_diagnosis || 'No diagnosis recorded')+'</div>'
+              +(r.patient_phone ? '<div style="font-size:11px;color:#9AA0A6;margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
+            +'</div>'
+            +'<div style="text-align:right;flex-shrink:0">'
+              +'<div style="font-size:15px;font-weight:700;color:#C62828">UGX '+fmtUGX(r.balance_ugx)+'</div>'
+              +'<div style="font-size:10px;color:'+ageColor+';background:'+ageBg+';padding:2px 7px;border-radius:10px;display:inline-block;margin-top:2px">'+timeAgo(r.created_at)+'</div>'
+            +'</div>'
+          +'</div>'
+          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:#5F6368;margin-bottom:4px">'
+            +'<span>Paid UGX '+fmtUGX(r.amount_paid)+' / '+fmtUGX(r.total_charged_ugx)+'</span>'
+            +'<span>'+esc(lastPay)+'</span>'
+          +'</div>'
+          +'<div style="height:5px;background:#F1F3F4;border-radius:3px;overflow:hidden;margin-bottom:8px">'
+            +'<div style="width:'+pct+'%;height:100%;background:#1B5E20;transition:width .3s"></div>'
+          +'</div>'
+          +'<div style="display:flex;gap:6px">'
+            +'<button class="record-pay-btn" data-id="'+esc(r.id)+'" data-name="'+esc(r.patient_name||'Patient')+'" data-total="'+(r.total_charged_ugx||0)+'" data-paid="'+(r.amount_paid||0)+'" data-balance="'+(r.balance_ugx||0)+'" '
+              +'style="flex:2;font-size:12px;padding:7px 12px;background:#E65100;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px">'
+              +'<span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
+            +'<button class="view-pay-history-btn" data-id="'+esc(r.id)+'" data-name="'+esc(r.patient_name||'Patient')+'" '
+              +'style="flex:1;font-size:12px;padding:7px 10px;background:transparent;color:#5F6368;border:1.5px solid #E0E0E0;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit">History</button>'
+          +'</div>'
+        +'</div>';
+    }).join('');
+
+    // Wire up buttons
+    listEl.querySelectorAll('.record-pay-btn').forEach(function(b){
+      b.onclick = function() {
+        openPaymentModal(
+          b.getAttribute('data-id'),
+          b.getAttribute('data-name'),
+          Number(b.getAttribute('data-total')),
+          Number(b.getAttribute('data-paid')),
+          Number(b.getAttribute('data-balance'))
+        );
+      };
+    });
+    listEl.querySelectorAll('.view-pay-history-btn').forEach(function(b){
+      b.onclick = function() {
+        showPaymentHistory(b.getAttribute('data-id'), b.getAttribute('data-name'));
+      };
+    });
+  }
+
+  function openPaymentModal(diagnosisId, patientName, total, paid, balance) {
+    _paymentContext = {
+      diagnosisId: diagnosisId, patientName: patientName,
+      total: total, paid: paid, balance: balance,
+    };
+    document.getElementById('pmPatientName').textContent = patientName;
+    document.getElementById('pmTotal').textContent   = 'UGX ' + fmtUGX(total);
+    document.getElementById('pmPaid').textContent    = 'UGX ' + fmtUGX(paid);
+    document.getElementById('pmBalance').textContent = 'UGX ' + fmtUGX(balance);
+    document.getElementById('pmAmount').value = '';
+    document.getElementById('pmRef').value    = '';
+    document.getElementById('pmNotes').value  = '';
+    document.getElementById('pmMethod').value = 'cash';
+    document.getElementById('pmError').style.display = 'none';
+    document.getElementById('paymentModal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('pmAmount').focus(); }, 50);
+  }
+
+  window.setPmQuickAmount = function(kind) {
+    var input = document.getElementById('pmAmount');
+    if (kind === 'full') input.value = _paymentContext.balance;
+    if (kind === 'half') input.value = Math.round(_paymentContext.balance / 2);
+  };
+
+  document.getElementById('pmCancelBtn').onclick = function() {
+    document.getElementById('paymentModal').style.display = 'none';
+  };
+  document.getElementById('paymentModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('pmSaveBtn').onclick = async function() {
+    var btn   = this;
+    var errEl = document.getElementById('pmError');
+    errEl.style.display = 'none';
+
+    var amount = parseFloat(document.getElementById('pmAmount').value);
+    var method = document.getElementById('pmMethod').value || 'cash';
+    var ref    = (document.getElementById('pmRef').value||'').trim() || null;
+    var notes  = (document.getElementById('pmNotes').value||'').trim() || null;
+
+    if (!amount || amount <= 0) {
+      errEl.textContent = 'Enter an amount greater than 0.';
+      errEl.style.display = 'block';
+      return;
+    }
+    if (amount > _paymentContext.balance) {
+      var over = amount - _paymentContext.balance;
+      if (!confirm('This is UGX '+fmtUGX(over)+' more than the balance. Continue and overpay?')) return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
+
+    try {
+      var r = await supabase.rpc('record_payment', {
+        p_diagnosis_id: _paymentContext.diagnosisId,
+        p_amount:       amount,
+        p_method:       method,
+        p_reference:    ref,
+        p_notes:        notes,
+      });
+      if (r.error) throw r.error;
+      var data = r.data || {};
+      if (data.ok === false) throw new Error(data.error || 'Failed to record payment');
+
+      // Push receipt to patient (fire-and-forget but surface result)
+      var notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' recorded.';
+      var notifyKind = 'success';
+      try {
+        var nr = await supabase.functions.invoke('payment-notify', {
+          body: {
+            diagnosisId:    _paymentContext.diagnosisId,
+            amountReceived: amount,
+            balance:        Number(data.balance) || 0,
+            fullyPaid:      Boolean(data.fully_paid),
+            method:         method,
+          },
+        });
+        if (nr.error) {
+          // Distinguish relay 404 (function not deployed) from function-level errors.
+          // nr.error.context is the raw Response object in supabase-js v2.
+          var httpStatus = nr.error.context && nr.error.context.status ? nr.error.context.status : 0;
+          var errLow = (nr.error.message || '').toLowerCase();
+          var isNotDeployed = httpStatus === 404 ||
+            (errLow.indexOf('function') !== -1 && errLow.indexOf('not found') !== -1) ||
+            errLow.indexOf('relay_error') !== -1;
+          if (isNotDeployed) {
+            notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. (Push receipt not yet deployed — deploy payment-notify edge function.)';
+          } else {
+            notifyMsg = 'Payment saved. Push failed: ' + (nr.error.message || 'unknown error');
+          }
+          notifyKind = 'warning';
+          console.warn('[payment-notify] HTTP ' + httpStatus + ' error:', nr.error.message);
+        } else {
+          var nd = nr.data || {};
+          if (nd.ok === false) {
+            notifyMsg = 'Payment recorded. ' + (nd.message || 'Push notification skipped.');
+            notifyKind = 'warning';
+          } else if (nd.delivered) {
+            notifyMsg = data.fully_paid
+              ? 'Bill fully paid. Receipt sent to patient.'
+              : 'Payment recorded. Receipt sent to patient.';
+          } else if (nd.reason === 'patient_not_on_homatt') {
+            notifyMsg = 'Payment recorded. Patient is not on the Homatt app — no push sent.';
+            notifyKind = 'warning';
+          } else {
+            notifyMsg = 'Payment recorded. ' + (nd.message || '');
+            notifyKind = nd.delivered ? 'success' : 'warning';
+          }
+        }
+      } catch(e) {
+        notifyMsg = 'Payment saved; push notification call failed.';
+        notifyKind = 'warning';
+      }
+      showDischargeToast(notifyMsg, notifyKind);
+
+      document.getElementById('paymentModal').style.display = 'none';
+      loadPendingPayments();
+      loadRevenue();
+      loadFinancial(_finPeriod);
+    } catch(e) {
+      errEl.textContent = 'Error: ' + (e.message || e);
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">payments</span> Record Payment';
+  };
+
+  async function showPaymentHistory(diagnosisId, patientName) {
+    var r = await supabase
+      .from('clinic_payments')
+      .select('amount_ugx,method,reference,notes,created_at')
+      .eq('diagnosis_id', diagnosisId)
+      .order('created_at', { ascending: false });
+    if (r.error) {
+      alert('Error loading history: ' + r.error.message);
+      return;
+    }
+    var rows = r.data || [];
+    var modal = document.getElementById('histModal');
+    document.getElementById('histModalName').textContent = patientName;
+    document.getElementById('histModalMeta').textContent = 'Payment history';
+    var footer = document.getElementById('histModalFooter');
+    if (footer) footer.style.display = 'none';
+    var body = document.getElementById('histModalBody');
+    if (!rows.length) {
+      body.innerHTML = '<div style="text-align:center;padding:40px;color:#9AA0A6;font-size:13px">No payments recorded yet.</div>';
+    } else {
+      body.innerHTML = rows.map(function(p){
+        var d = new Date(p.created_at);
+        return '<div style="padding:12px 0;border-bottom:1px solid #F1F3F4">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center">'
+          +'<div style="font-size:14px;font-weight:700;color:#1B5E20">UGX '+fmtUGX(p.amount_ugx)+'</div>'
+          +'<div style="font-size:11px;color:#9AA0A6">'+d.toLocaleString('en-UG')+'</div>'
+          +'</div>'
+          +'<div style="font-size:12px;color:#5F6368;margin-top:2px">Method: '+esc(p.method||'')+(p.reference?' • Ref: '+esc(p.reference):'')+'</div>'
+          +(p.notes ? '<div style="font-size:12px;color:#5F6368;margin-top:4px;font-style:italic">"'+esc(p.notes)+'"</div>' : '')
+          +'</div>';
+      }).join('');
+    }
+    if (modal) modal.style.display = 'flex';
+  }
+
+  // ── Initial load ──
+  async function loadAll() {
+    await resolveClinicId();
+    loadBookings();
+    loadActiveTreatments();
+    loadPendingPayments();
+    loadConsultations();
+    loadRevenue();
+    loadInventory();
+    loadFinancial(_finPeriod);
+    loadMedsDispensed();
+  }
+  loadAll();
+
+  // ── Safety auto-refresh (in case realtime drops or isn't enabled) ──
+  function refreshAll() {
+    loadBookings(); loadActiveTreatments(); loadPendingPayments();
+    loadConsultations(); loadRevenue();
+    loadInventory(); loadFinancial(_finPeriod);
+    loadMedsDispensed();
+  }
+  setInterval(refreshAll, 25000);
+
+  // Refresh the instant the dashboard becomes visible again — returning from a
+  // consultation, switching back to the app, or bfcache restore — so the
+  // operator never has to manually reload to see fresh financials and stock.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') refreshAll();
+  });
+  window.addEventListener('focus', refreshAll);
+  window.addEventListener('pageshow', function(e) { if (e.persisted) refreshAll(); });
+
+  // ── Supabase Realtime ──
+  async function setupRealtime() {
+    if (!supabase) return;
+    var clinicId = await resolveClinicId();
+    if (!clinicId) return;
+    supabase.channel('dashboard-' + clinicId)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadBookings(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); loadPendingPayments(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_payments', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadPendingPayments(); loadRevenue(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadInventory(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory_txns', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadInventory(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_quick_sales', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadRevenue(); loadFinancial(_finPeriod); loadInventory(); })
+      .subscribe();
+  }
+  setupRealtime();
+
+  // ═══════════════════════════════════════════════════════
+  // INVENTORY & STOCK TRACKER
+  // ═══════════════════════════════════════════════════════
+
+  async function loadInventory() {
+    var listEl   = document.getElementById('stockList');
+    var banner   = document.getElementById('lowStockBanner');
+    var bList    = document.getElementById('lowStockList');
+    var bCount   = document.getElementById('lowStockCount');
+    if (!listEl || !supabase) return;
+
+    var clinicId = await resolveClinicId();
+    if (!clinicId) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      return;
+    }
+
+    try {
+      // Try the RPC first; fall back to direct table query if migration not yet applied
+      var res = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
+      var items;
+      if (res.error && (res.error.message.includes('get_clinic_stock') || res.error.message.includes('Could not find the function') || res.error.message.includes('clinic_inventory'))) {
+        // Migration not applied yet — direct table query with client-side flag computation
+        var direct = await supabase
+          .from('clinic_inventory')
+          .select('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx')
+          .eq('clinic_id', clinicId)
+          .eq('is_active', true)
+          .order('item_name');
+        if (direct.error) {
+          // clinic_inventory table itself doesn't exist yet
+          listEl.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 16px;margin:12px 16px;font-size:13px;color:#5D4037;display:flex;align-items:flex-start;gap:10px">'
+            +'<span class="material-icons-outlined" style="font-size:20px;color:#F9A825;flex-shrink:0">info</span>'
+            +'<div><strong>Apply migrations to enable Stock Tracker.</strong><br>Run both files in Supabase SQL Editor:<br>'
+            +'<code style="font-size:11px">20260516_patch_discharged_at.sql</code><br>'
+            +'<code style="font-size:11px">20260516_clinic_inventory.sql</code></div>'
+            +'</div>';
+          return;
+        }
+        items = (direct.data || []).map(function(i) {
+          return Object.assign({}, i, {
+            is_low_stock: Number(i.quantity) <= Number(i.min_threshold),
+            is_critical:  Number(i.quantity) === 0,
+          });
+        });
+      } else if (res.error) {
+        throw res.error;
+      } else {
+        items = res.data || [];
+      }
+
+      // Banner
+      var lowItems = items.filter(function(i){ return i.is_low_stock; });
+      if (lowItems.length) {
+        if (bCount) bCount.textContent = lowItems.length + ' item' + (lowItems.length !== 1 ? 's' : '');
+        if (bList) bList.innerHTML = lowItems.map(function(i) {
+          var bg = i.is_critical ? '#C62828' : '#E65100';
+          return '<span style="background:'+bg+';color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:4px">'
+            +'<span class="material-icons-outlined" style="font-size:12px">'+(i.is_critical?'block':'warning')+'</span>'
+            +esc(i.item_name)+' — '+i.quantity+' '+esc(i.unit)+'</span>';
+        }).join('');
+        if (banner) { banner.style.display = 'block'; }
+      } else {
+        if (banner) banner.style.display = 'none';
+      }
+
+      if (!items.length) {
+        listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">'
+          +'<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:8px">inventory_2</span>'
+          +'No stock items yet. Add your medicines and materials to start tracking.'
+          +'</div>';
+        return;
+      }
+
+      // Group by type
+      var groups = { medicine: [], material: [], consumable: [] };
+      items.forEach(function(i){ (groups[i.item_type] || groups.consumable).push(i); });
+
+      var html = '';
+      ['medicine','material','consumable'].forEach(function(type) {
+        if (!groups[type].length) return;
+        var label = { medicine:'Medicines', material:'Materials', consumable:'Consumables' }[type];
+        html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
+        groups[type].forEach(function(item) {
+          var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
+          var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
+          var badge = item.is_critical
+            ? '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">OUT OF STOCK</span>'
+            : item.is_low_stock
+            ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
+            : '';
+          var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
+          html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
+            +'<div style="flex:1;min-width:0">'
+              +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
+              +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+'</div>'
+              +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
+                +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
+              +'</div>'
+            +'</div>'
+            +'<div style="display:flex;gap:6px;flex-shrink:0">'
+              +'<button onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')" '
+                +'style="font-size:11px;padding:5px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">+ Restock</button>'
+            +'</div>'
+          +'</div>';
+        });
+      });
+      listEl.innerHTML = html;
+    } catch(e) {
+      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading stock: ' + esc(e.message) + '</div>';
+    }
+  }
+
+  // ── Add Stock Item Modal ──
+  function openAddStockModal() {
+    ['siName','siUnit','siQty','siThreshold','siCost'].forEach(function(id){
+      var el = document.getElementById(id); if (el) el.value = '';
+    });
+    var su = document.getElementById('siUnit'); if (su) su.value = 'tabs';
+    var se = document.getElementById('stockItemError'); if (se) se.style.display='none';
+    document.getElementById('stockModalTitle').textContent = 'Add Stock Item';
+    document.getElementById('stockItemModal').style.display = 'flex';
+  }
+
+  document.getElementById('stockItemModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('stockItemSaveBtn').onclick = async function() {
+    var btn  = this;
+    var errEl = document.getElementById('stockItemError');
+    errEl.style.display = 'none';
+    var name  = (document.getElementById('siName').value||'').trim();
+    var type  = document.getElementById('siType').value;
+    var unit  = (document.getElementById('siUnit').value||'tabs').trim();
+    var qty   = parseFloat(document.getElementById('siQty').value) || 0;
+    var thres = parseFloat(document.getElementById('siThreshold').value) || 5;
+    var cost      = parseFloat(document.getElementById('siCost').value) || null;
+    var sellPrice = parseFloat(document.getElementById('siSellPrice') ? document.getElementById('siSellPrice').value : 0) || null;
+    if (!name) { errEl.textContent = 'Item name is required.'; errEl.style.display = 'block'; return; }
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { errEl.textContent = 'Account not linked to a clinic.'; errEl.style.display = 'block'; return; }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var insertData = {
+        clinic_id: clinicId, item_name: name, item_type: type,
+        unit: unit, quantity: qty, min_threshold: thres,
+        reorder_level: thres * 2, unit_cost_ugx: cost,
+      };
+      if (sellPrice) insertData.selling_price_ugx = sellPrice;
+      var r = await supabase.from('clinic_inventory').insert(insertData);
+      if (r.error) throw r.error;
+      document.getElementById('stockItemModal').style.display = 'none';
+      loadInventory();
+    } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    btn.disabled = false; btn.textContent = 'Save Item';
+  };
+
+  // ── Restock Modal ──
+  var _restockItemId = null;
+
+  function openRestockModal(itemId, itemName, currentQty, unit) {
+    _restockItemId = itemId;
+    document.getElementById('restockItemName').textContent = itemName;
+    document.getElementById('restockCurrentQty').textContent = 'Current stock: ' + currentQty + ' ' + unit;
+    document.getElementById('restockQty').value = '';
+    document.getElementById('restockNotes').value = '';
+    var re = document.getElementById('restockError'); if (re) re.style.display = 'none';
+    document.getElementById('restockModal').style.display = 'flex';
+    setTimeout(function(){ document.getElementById('restockQty').focus(); }, 80);
+  }
+
+  document.getElementById('restockModal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+
+  document.getElementById('restockSaveBtn').onclick = async function() {
+    var btn   = this;
+    var errEl = document.getElementById('restockError');
+    errEl.style.display = 'none';
+    var qty   = parseFloat(document.getElementById('restockQty').value);
+    var notes = (document.getElementById('restockNotes').value||'').trim();
+    if (!qty || qty <= 0) { errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !_restockItemId) return;
+    btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
+    try {
+      var r = await supabase.rpc('adjust_inventory', {
+        p_clinic_id:    clinicId,
+        p_inventory_id: _restockItemId,
+        p_qty_change:   qty,
+        p_txn_type:     'addition',
+        p_notes:        notes || null,
+      });
+      if (r.error) throw r.error;
+      document.getElementById('restockModal').style.display = 'none';
+      loadInventory();
+    } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock';
+  };
+
+  // ═══════════════════════════════════════════════════════
+  // FINANCIAL OVERVIEW
+  // ═══════════════════════════════════════════════════════
+
+  var _finPeriod = 'day';
+
+  function setFinPeriod(period) {
+    _finPeriod = period;
+    document.querySelectorAll('.fin-tab').forEach(function(btn) {
+      var active = btn.dataset.period === period;
+      btn.style.background  = active ? '#7B1FA2' : 'transparent';
+      btn.style.color       = active ? '#fff'    : '#424242';
+      btn.style.borderColor = active ? '#7B1FA2' : '#E0E0E0';
+    });
+    loadFinancial(period);
+  }
+
+  async function loadFinancial(period) {
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) return;
+
+    var now   = new Date();
+    var start;
+    if (period === 'day') {
+      start = new Date(now); start.setHours(0,0,0,0);
+    } else if (period === 'week') {
+      start = new Date(now); start.setDate(now.getDate() - now.getDay()); start.setHours(0,0,0,0);
+    } else {
+      start = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    try {
+      var [dxRes, txnRes, payRes, qsRes] = await Promise.all([
+        supabase.from('clinic_diagnoses')
+          .select('id,total_charged_ugx,amount_paid,payment_status')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
+        supabase.from('clinic_inventory_txns')
+          .select('quantity_change,unit_cost_ugx,inventory_id')
+          .eq('clinic_id', clinicId)
+          .eq('txn_type', 'deduction')
+          .gte('created_at', start.toISOString()),
+        supabase.from('clinic_payments')
+          .select('amount_ugx,created_at')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
+        supabase.from('clinic_quick_sales')
+          .select('total_ugx')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString()),
+      ]);
+
+      // Graceful fallback: if amount_paid column isn't migrated yet, the whole
+      // diagnoses query fails. Refetch with only guaranteed columns so Patients
+      // and Billed never silently drop to zero.
+      if (dxRes.error) {
+        console.warn('Financial diagnoses query failed, retrying without amount_paid:', dxRes.error.message);
+        dxRes = await supabase.from('clinic_diagnoses')
+          .select('id,total_charged_ugx,payment_status')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString());
+      }
+
+      var rows    = dxRes.data || [];
+      var txns    = (txnRes && txnRes.data) || [];
+      var pays    = (payRes && !payRes.error && payRes.data) ? payRes.data : [];
+      var qsSales = (qsRes && !qsRes.error && qsRes.data) ? qsRes.data : [];
+      var qsTotal = qsSales.reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+
+      // Derive per-row paid amount defensively: use amount_paid if present,
+      // otherwise infer from payment_status (paid → full, else 0).
+      function rowPaid(r) {
+        if (r.amount_paid !== undefined && r.amount_paid !== null) return Number(r.amount_paid) || 0;
+        return r.payment_status === 'paid' ? (Number(r.total_charged_ugx) || 0) : 0;
+      }
+      var dxPaidTotal = rows.reduce(function(s,r){ return s + rowPaid(r); }, 0);
+
+      var patients  = rows.length;
+      var billed    = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsTotal;
+      // Collected = payments received (consult payments) + all quick sales (immediate cash/momo)
+      var collected = (pays.length
+        ? pays.reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
+        : dxPaidTotal) + qsTotal;
+      var outstanding = Math.max(0, billed - qsTotal - dxPaidTotal);
+      var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
+      // Margin uses Collected (real income) minus stock cost so it reflects actual cash position
+      var margin    = collected - stockCost;
+
+      var pEl  = document.getElementById('finPatients');
+      var rEl  = document.getElementById('finRevenue');
+      var cEl  = document.getElementById('finCollected');
+      var oEl  = document.getElementById('finOutstanding');
+      var scEl = document.getElementById('finStockCost');
+      var mEl  = document.getElementById('finMargin');
+      if (pEl)  pEl.textContent  = patients;
+      if (rEl)  rEl.textContent  = fmtUGX(billed);
+      if (cEl)  cEl.textContent  = fmtUGX(collected);
+      if (oEl)  oEl.textContent  = fmtUGX(outstanding);
+      if (scEl) scEl.textContent = fmtUGX(stockCost);
+      if (mEl) {
+        mEl.textContent  = fmtUGX(margin);
+        mEl.style.color  = margin < 0 ? '#C62828' : '#E65100';
+      }
+
+      // Top items used
+      var usage = {};
+      txns.forEach(function(t){ usage[t.inventory_id] = (usage[t.inventory_id]||0) + Math.abs(t.quantity_change); });
+      var topIds = Object.keys(usage).sort(function(a,b){ return usage[b]-usage[a]; }).slice(0,5);
+      var tiEl = document.getElementById('finTopItems');
+      if (tiEl && topIds.length) {
+        var invRes = await supabase.from('clinic_inventory').select('id,item_name,unit').in('id', topIds);
+        var invMap = {};
+        (invRes.data||[]).forEach(function(i){ invMap[i.id]=i; });
+        tiEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Top Items Used</div>'
+          + topIds.map(function(id) {
+              var item = invMap[id] || { item_name: id.slice(0,8)+'…', unit:'units' };
+              return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:13px">'
+                +'<span>'+esc(item.item_name)+'</span>'
+                +'<span style="font-weight:700;color:#424242">'+usage[id]+' '+esc(item.unit)+'</span>'
+              +'</div>';
+          }).join('');
+      } else if (tiEl) {
+        tiEl.innerHTML = '';
+      }
+    } catch(e) {
+      console.warn('Financial overview error:', e.message);
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════
+  // QUICK SALE POS
+  // ═══════════════════════════════════════════════════════
+
+  var _qsDrugs = [];
+  var _qsSel   = null;
+  var _qsQty   = 1;
+  var _qsTotalOverride = null;   // null = use auto (price × qty); otherwise user-typed amount
+  var _qsPm;
+  try { _qsPm = localStorage.getItem('qs_pm') || 'cash'; } catch(e) { _qsPm = 'cash'; }
+  var _qsClinicId = null;
+  var _qsUserId   = null;
+
+  function openQuickSale() {
+    var el = document.getElementById('qsOverlay');
+    if (!el) return;
+    el.style.display = 'flex';
+    // Lock body scroll so the background can't scroll while the sheet is open.
+    // Background scrolling was causing Chrome to treat the first tap on any
+    // sheet button as a scroll gesture rather than a click.
+    document.body.style.overflow = 'hidden';
+    _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
+    var panel = document.getElementById('qsSelectedPanel');
+    var btn   = document.getElementById('qsSellBtn');
+    var si    = document.getElementById('qsSearch');
+    var flash = document.getElementById('qsSuccessFlash');
+    if (panel) panel.style.display = 'none';
+    if (btn)   { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
+    if (si)    si.value = '';
+    if (flash) flash.style.display = 'none';
+    setQsPm(_qsPm);
+    loadQsDrugs();
+    // Pre-fetch clinicId + userId now so Sell tap is instant (no network call at sell time)
+    resolveClinicId().then(function(cid) { _qsClinicId = cid; });
+    if (supabase) {
+      supabase.auth.getSession().then(function(s) {
+        _qsUserId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id || null;
+      }).catch(function(){});
+    }
+  }
+
+  function closeQuickSale() {
+    var el = document.getElementById('qsOverlay');
+    if (el) el.style.display = 'none';
+    document.body.style.overflow = ''; // restore scrolling
+  }
+
+  // ── Wire up Quick Sale controls ────────────────────────────────────────────
+  // ROBUST TAP DETECTION. On Android Chrome, a tap inside a scrollable/pannable
+  // container (our drug grid + sheet) is reclassified as a scroll if the finger
+  // drifts even a couple of pixels, and the synthetic 'click' is then silently
+  // discarded — which is exactly why the Sell button needed several presses.
+  // We bypass the browser's click heuristic entirely by tracking pointerdown →
+  // pointerup ourselves and treating it as a tap when the finger barely moved.
+  (function wireQuickSale() {
+
+    var TAP_MOVE = 16;   // px of allowed finger drift
+    var TAP_TIME = 800;  // ms max press duration
+    var hasPointer = ('PointerEvent' in window);
+
+    // bindTap(el, handler[, matchFn])
+    //   matchFn(target) → element|null  for event delegation (drug grid).
+    function bindTap(el, handler, matchFn) {
+      if (!el) return;
+      if (!hasPointer) {
+        // Old WebView fallback: plain click.
+        el.addEventListener('click', function(e) {
+          var t = matchFn ? matchFn(e.target) : el;
+          if (t) { e.stopPropagation(); handler(t, e); }
+        });
+        return;
+      }
+      var sx = 0, sy = 0, t0 = 0, downTarget = null, active = false;
+      el.addEventListener('pointerdown', function(e) {
+        if (e.button && e.button !== 0) return;       // ignore non-primary
+        active = true;
+        sx = e.clientX; sy = e.clientY; t0 = Date.now();
+        downTarget = matchFn ? matchFn(e.target) : el;
+      });
+      el.addEventListener('pointerup', function(e) {
+        if (!active) return;
+        active = false;
+        var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
+        if (moved > TAP_MOVE) return;                 // it was a scroll/drag
+        if (Date.now() - t0 > TAP_TIME) return;       // long press, ignore
+        var t = downTarget || (matchFn ? matchFn(e.target) : el);
+        if (!t) return;
+        e.preventDefault();                           // suppress the late ghost click
+        e.stopPropagation();
+        handler(t, e);
+      });
+      el.addEventListener('pointercancel', function() { active = false; });
+      // Swallow the ghost click so nothing double-fires.
+      el.addEventListener('click', function(e) {
+        if (matchFn ? matchFn(e.target) : true) e.stopPropagation();
+      });
+    }
+
+    var sellBtn = document.getElementById('qsSellBtn');
+    if (sellBtn) {
+      // The Sell button has touch-action:none, so the browser can NEVER
+      // reclassify a touch on it as a scroll — that means pointerup is
+      // guaranteed to fire on the very first tap and is never cancelled.
+      // We fire on pointerup (the earliest reliable signal for touch AND
+      // mouse) and keep click as a fallback for browsers without Pointer
+      // Events, deduping the two so a single tap fires exactly one sale.
+      var _qsLastFire = 0;
+      var clearFx = function() { sellBtn.style.filter = ''; };
+      function fireSell(e) {
+        if (sellBtn.disabled) return;
+        var now = Date.now();
+        if (now - _qsLastFire < 700) return;   // swallow the follow-up ghost click
+        _qsLastFire = now;
+        if (e && e.cancelable) e.preventDefault();
+        clearFx();
+        submitQuickSale();
+      }
+      sellBtn.addEventListener('pointerdown', function() {
+        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
+      });
+      sellBtn.addEventListener('pointerup',     fireSell);   // primary: touch + mouse
+      sellBtn.addEventListener('pointercancel', clearFx);
+      sellBtn.addEventListener('pointerleave',  clearFx);
+      sellBtn.addEventListener('click',         fireSell);   // fallback / legacy WebView
+    }
+
+    bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
+
+    bindTap(document.getElementById('qsAddDrugBtn'), function() {
+      closeQuickSale();
+      if (typeof openAddStockModal === 'function') openAddStockModal();
+    });
+
+    bindTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
+    bindTap(document.getElementById('qsQtyPlus'),  function() { changeQsQty(1);  });
+
+    bindTap(document.getElementById('qsPmCash'), function() { setQsPm('cash'); });
+    bindTap(document.getElementById('qsPmMomo'), function() { setQsPm('momo'); });
+
+    bindTap(document.getElementById('qsResetTotal'), function() {
+      _qsTotalOverride = null;
+      updateQsPanel();
+    });
+
+    var totalInput = document.getElementById('qsTotalInput');
+    if (totalInput) totalInput.addEventListener('input', function() {
+      var v = parseFloat(totalInput.value);
+      _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
+    });
+
+    // Drug cards (dynamically injected) via delegation + the same tap logic.
+    bindTap(document.getElementById('qsDrugGrid'),
+      function(card) { if (card.dataset.id) selectQsDrug(card.dataset.id); },
+      function(target) { return target.closest ? target.closest('.qs-drug-card') : null; });
+  })();
+
+  async function loadQsDrugs() {
+    var grid = document.getElementById('qsDrugGrid');
+    if (!grid) return;
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) { renderQsDemo(); return; }
+    try {
+      var r = await supabase
+        .from('clinic_inventory')
+        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold')
+        .eq('clinic_id', clinicId)
+        .eq('item_type', 'medicine')
+        .eq('is_active', true)
+        .gt('quantity', 0)
+        .order('item_name');
+      if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
+      _qsDrugs = r.data;
+      renderQsGrid(_qsDrugs);
+    } catch(e) { renderQsDemo(); }
+  }
+
+  function renderQsDemo() {
+    _qsDrugs = [
+      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,_isDemo:true},
+      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,_isDemo:true},
+      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, _isDemo:true},
+      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,_isDemo:true},
+      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,_isDemo:true},
+      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, _isDemo:true},
+    ];
+    renderQsGrid(_qsDrugs);
+  }
+
+  function renderQsGrid(items) {
+    var grid = document.getElementById('qsDrugGrid');
+    if (!grid) return;
+    if (!items.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:36px;display:block;margin-bottom:10px;color:#CFD8DC">inventory_2</span>'
+        + 'No drugs in stock yet. Tap <strong style="color:#1B5E20">+ New Drug</strong> above to add your first item.'
+        + '</div>';
+      return;
+    }
+    grid.innerHTML = items.map(function(item) {
+      var sell     = Number(item.selling_price_ugx) || 0;
+      var buy      = Number(item.unit_cost_ugx)     || 0;
+      var priceStr = sell
+        ? '<span style="color:#1B5E20;font-weight:700">UGX ' + fmtUGX(sell) + '</span>'
+        : '<span style="color:#E65100;font-size:11px;font-weight:700">⚠ Set sell price</span>';
+      var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5);
+      var stockClr = lowStock ? '#E65100' : '#9AA0A6';
+      return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
+        + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
+        + '<div class="qs-drug-price">' + priceStr + '</div>'
+        + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
+        + '</div>';
+    }).join('')
+      + '<div id="qsNoMatch" style="display:none;grid-column:1/-1;text-align:center;padding:24px;color:#9AA0A6;font-size:14px">No match found.</div>';
+  }
+
+  function filterQsDrugs(q) {
+    q = (q || '').trim().toLowerCase();
+    var cards = document.querySelectorAll('#qsDrugGrid .qs-drug-card');
+    var visible = 0;
+    cards.forEach(function(card) {
+      var drug = _qsDrugs.find(function(d) { return d.id === card.dataset.id; });
+      var match = !q || (drug && drug.item_name.toLowerCase().includes(q));
+      card.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    var nm = document.getElementById('qsNoMatch');
+    if (nm) nm.style.display = visible === 0 ? 'block' : 'none';
+  }
+
+  function selectQsDrug(id) {
+    var drug = _qsDrugs.find(function(d) { return d.id === id; });
+    if (!drug) return;
+    _qsSel = drug; _qsQty = 1; _qsTotalOverride = null;
+    document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) {
+      c.classList.toggle('selected', c.dataset.id === id);
+    });
+    var panel = document.getElementById('qsSelectedPanel');
+    if (panel) panel.style.display = 'block';
+    updateQsPanel();
+    var btn = document.getElementById('qsSellBtn');
+    if (btn) btn.disabled = false;
+  }
+
+  function qsCurrentTotal() {
+    if (!_qsSel) return 0;
+    if (_qsTotalOverride !== null) return _qsTotalOverride;
+    // Use selling price for revenue; buying price is cost-of-goods only
+    var price = Number(_qsSel.selling_price_ugx) || Number(_qsSel.unit_cost_ugx) || 0;
+    return price * _qsQty;
+  }
+
+  function updateQsPanel() {
+    if (!_qsSel) return;
+    var nameEl  = document.getElementById('qsSelName');
+    var qty     = document.getElementById('qsQtyVal');
+    var stock   = document.getElementById('qsStockLeft');
+    var ti      = document.getElementById('qsTotalInput');
+    var priceEl = document.getElementById('qsSelPriceBreakdown');
+    if (nameEl) nameEl.textContent = _qsSel.item_name;
+    if (qty)    qty.textContent    = _qsQty;
+    if (stock)  stock.textContent  = _qsSel.quantity + ' ' + (_qsSel.unit || '') + ' in stock';
+    if (ti && _qsTotalOverride === null) ti.value = qsCurrentTotal();
+    if (priceEl) {
+      var sell = Number(_qsSel.selling_price_ugx) || 0;
+      var buy  = Number(_qsSel.unit_cost_ugx)     || 0;
+      if (sell && buy) {
+        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;·&nbsp; Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b>';
+      } else if (sell) {
+        priceEl.innerHTML = 'Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
+      } else if (buy) {
+        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
+      } else {
+        priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Drug to add prices</span>';
+      }
+    }
+  }
+
+  function changeQsQty(delta) {
+    if (!_qsSel) return;
+    _qsQty = Math.max(1, Math.min(_qsQty + delta, Number(_qsSel.quantity) || 999));
+    _qsTotalOverride = null;  // reset override when qty changes
+    var ti = document.getElementById('qsTotalInput');
+    if (ti) ti.value = qsCurrentTotal();
+    updateQsPanel();
+  }
+
+  function setQsPm(pm) {
+    _qsPm = pm;
+    try { localStorage.setItem('qs_pm', pm); } catch(e) {}
+    var cash = document.getElementById('qsPmCash');
+    var momo = document.getElementById('qsPmMomo');
+    if (cash) cash.classList.toggle('selected', pm === 'cash');
+    if (momo) momo.classList.toggle('selected', pm === 'momo');
+  }
+
+  async function submitQuickSale() {
+    if (!_qsSel) return;
+    var btn = document.getElementById('qsSellBtn');
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span> Saving…';
+
+    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
+    var total = qsCurrentTotal();
+    var stockAfter = Math.max(0, Number(_qsSel.quantity) - _qsQty);
+
+    try {
+      var clinicId = _qsClinicId || await resolveClinicId();
+      var userId   = _qsUserId;
+
+      if (supabase && clinicId && !_qsSel._isDemo) {
+        try {
+          var ins = await supabase.from('clinic_quick_sales').insert({
+            clinic_id:      clinicId,
+            drug_id:        _qsSel.id,
+            drug_name:      _qsSel.item_name,
+            unit:           _qsSel.unit || 'unit',
+            quantity:       _qsQty,
+            unit_price_ugx: price,
+            total_ugx:      total,
+            payment_method: _qsPm,
+            sold_by:        userId,
+            created_at:     new Date().toISOString()
+          });
+          if (ins.error) console.warn('clinic_quick_sales:', ins.error.message);
+        } catch(insErr) { console.warn('clinic_quick_sales:', insErr.message); }
+
+        try {
+          var adj = await supabase.rpc('adjust_inventory', {
+            p_clinic_id:    clinicId,
+            p_inventory_id: _qsSel.id,
+            p_qty_change:   -_qsQty,
+            p_txn_type:     'deduction',
+            p_notes:        'Quick Sale'
+          });
+          if (adj.error) console.warn('adjust_inventory:', adj.error.message);
+          else if (adj.data && typeof adj.data.quantity_after !== 'undefined') {
+            stockAfter = Number(adj.data.quantity_after);
+          }
+        } catch(invErr) { console.warn('adjust_inventory:', invErr.message); }
+      }
+    } catch(e) {
+      console.warn('Quick sale error:', e.message);
+    }
+    showQsSuccess(_qsSel.item_name, _qsQty, total, stockAfter, _qsSel.unit || '');
+  }
+
+  function showQsSuccess(name, qty, total, stockAfter, unit) {
+    var flash = document.getElementById('qsSuccessFlash');
+    var ft    = document.getElementById('qsFlashText');
+    var fs    = document.getElementById('qsFlashSub');
+    if (ft) ft.textContent = qty + ' × ' + name;
+    if (fs) {
+      var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
+      fs.innerHTML = 'UGX ' + fmtUGX(total) + ' &middot; ' + pay
+        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'') + '</span>';
+    }
+    if (flash) {
+      flash.style.display = 'flex';
+      setTimeout(function() {
+        flash.style.display = 'none';
+        _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
+        document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) { c.classList.remove('selected'); });
+        var panel = document.getElementById('qsSelectedPanel');
+        var btn   = document.getElementById('qsSellBtn');
+        var ti    = document.getElementById('qsTotalInput');
+        if (panel) panel.style.display = 'none';
+        if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
+        if (ti)  ti.value = '';
+        loadQsDrugs();
+        setTimeout(function() { loadFinancial(_finPeriod); loadRevenue(); }, 300);
+      }, 1600);
+    }
+  }
+</script>
+<script src="../js/native-bridge.js"></script>
+</body>
+</html>

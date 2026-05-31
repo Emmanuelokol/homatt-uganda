@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Homatt Health - Book Clinic</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    /* Critical: prevent outer app-screen from scrolling — let each step's inner div scroll instead */
+    .app-screen { overflow: hidden !important; display:flex; flex-direction:column; }
+    .cb-step { display:none; }
+    .cb-step.active { display:flex; flex-direction:column; flex:1; min-height:0; }
+    .cb-hero { text-align:center; padding:28px 24px 16px; }
+    .cb-hero-icon { width:72px; height:72px; border-radius:24px; background:linear-gradient(135deg,#1B5E20,#4CAF50); display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+    .cb-hero-icon .material-icons-outlined { font-size:36px; color:#fff; }
+    .cb-heading { font-size:22px; font-weight:700; color:var(--text-primary); margin-bottom:6px; }
+    .cb-subheading { font-size:14px; color:var(--text-secondary); line-height:1.5; }
+    .cb-section { padding:16px 20px; }
+    .cb-label { font-size:12px; font-weight:600; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.6px; margin-bottom:10px; }
+    .cb-field { margin-bottom:14px; }
+    .cb-field label { display:block; font-size:13px; font-weight:500; color:var(--text-primary); margin-bottom:6px; }
+    .cb-field input, .cb-field select, .cb-field textarea {
+      width:100%; padding:12px 16px; border:1.5px solid var(--border); border-radius:var(--radius-md);
+      font-size:14px; font-family:inherit; outline:none; background:var(--surface); color:var(--text-primary);
+      -webkit-text-fill-color:var(--text-primary); transition:border-color .2s;
+    }
+    .cb-field input:focus, .cb-field select:focus, .cb-field textarea:focus { border-color:var(--primary); }
+    .cb-field textarea { resize:vertical; min-height:80px; }
+    .clinic-card {
+      background:var(--surface); border-radius:var(--radius-md); padding:14px 16px;
+      margin-bottom:10px; border:2px solid var(--border); cursor:pointer; transition:all .2s;
+      display:flex; align-items:center; gap:14px;
+    }
+    .clinic-card:active, .clinic-card.selected { border-color:var(--primary); background:var(--primary-surface); }
+    .clinic-card-icon { width:56px; height:56px; border-radius:12px; background:var(--primary-surface); display:flex; align-items:center; justify-content:center; flex-shrink:0; overflow:hidden; }
+    .clinic-card-photo { width:100%; height:100%; object-fit:cover; display:block; }
+    .clinic-card-name { font-size:14px; font-weight:600; color:var(--text-primary); }
+    .clinic-card-meta { font-size:12px; color:var(--text-secondary); margin-top:2px; }
+    .urgency-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .urgency-option { padding:14px 12px; border:2px solid var(--border); border-radius:var(--radius-md); text-align:center; cursor:pointer; transition:all .2s; }
+    .urgency-option.selected { border-color:var(--primary); background:var(--primary-surface); }
+    .urgency-option .material-icons-outlined { font-size:28px; display:block; margin-bottom:6px; }
+    .urgency-option .urg-label { font-size:13px; font-weight:600; }
+    .urgency-option .urg-desc { font-size:11px; color:var(--text-secondary); margin-top:2px; }
+    .cb-btn {
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      width:100%; padding:14px; border-radius:var(--radius-md); font-size:15px;
+      font-weight:600; border:none; cursor:pointer; transition:all .2s;
+    }
+    .cb-btn.primary { background:var(--primary); color:#fff; }
+    .cb-btn.primary:active { background:var(--primary-dark); }
+    .cb-btn.secondary { background:#F3F4F6; color:var(--text-primary); }
+    .cb-bottom { padding:16px 20px 28px; position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); }
+    .cb-prog { display:flex; gap:6px; padding:0 20px 12px; }
+    .cb-prog-dot { flex:1; height:4px; border-radius:2px; background:var(--border); transition:background .3s; }
+    .cb-prog-dot.active { background:var(--primary); }
+    .booking-confirm-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #F0F0F0; font-size:13px; }
+    .booking-confirm-row:last-child { border-bottom:none; }
+    .booking-confirm-label { color:var(--text-secondary); font-weight:500; }
+    .booking-confirm-value { font-weight:600; color:var(--text-primary); text-align:right; max-width:55%; }
+    .success-container { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:40px 24px; text-align:center; height:100%; }
+    .success-icon-wrap { width:90px; height:90px; border-radius:50%; background:#E8F5E9; display:flex; align-items:center; justify-content:center; margin-bottom:20px; }
+    .booking-code-box { background:var(--primary-surface); border:1.5px dashed var(--primary); border-radius:var(--radius-md); padding:16px 24px; margin:20px 0; width:100%; }
+    .booking-code-text { font-size:28px; font-weight:800; color:var(--primary); letter-spacing:4px; }
+  </style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+      <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+      <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+    </div>
+  </div>
+
+  <div class="app-screen">
+    <!-- Top bar -->
+    <div class="sc-topbar" style="background:var(--primary);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+      <button onclick="history.back()" style="background:rgba(255,255,255,0.15);border:none;color:#fff;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <span class="material-icons-outlined">arrow_back</span>
+      </button>
+      <div>
+        <div style="font-size:16px;font-weight:700">Book Clinic Visit</div>
+        <div style="font-size:11px;opacity:.8" id="stepLabel">Step 1 of 4 — Select Urgency</div>
+      </div>
+    </div>
+
+    <!-- Progress dots -->
+    <div class="cb-prog">
+      <div class="cb-prog-dot active" id="prog1"></div>
+      <div class="cb-prog-dot" id="prog2"></div>
+      <div class="cb-prog-dot" id="prog3"></div>
+      <div class="cb-prog-dot" id="prog4"></div>
+    </div>
+
+    <!-- STEP 1: Urgency -->
+    <div class="cb-step active" id="step1">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">local_hospital</span></div>
+          <div class="cb-heading">How urgent is this?</div>
+          <div class="cb-subheading">This helps us prioritise your visit and match you to the right clinic.</div>
+        </div>
+        <div class="cb-section">
+          <div class="urgency-row">
+            <div class="urgency-option" id="urg-emergency" onclick="selectUrgency('emergency')">
+              <span class="material-icons-outlined" style="color:#D32F2F">emergency</span>
+              <div class="urg-label">Emergency</div>
+              <div class="urg-desc">Severe / life-threatening</div>
+            </div>
+            <div class="urgency-option" id="urg-high" onclick="selectUrgency('high')">
+              <span class="material-icons-outlined" style="color:#E65100">priority_high</span>
+              <div class="urg-label">Urgent</div>
+              <div class="urg-desc">Needs attention today</div>
+            </div>
+            <div class="urgency-option" id="urg-normal" onclick="selectUrgency('normal')">
+              <span class="material-icons-outlined" style="color:#1565C0">schedule</span>
+              <div class="urg-label">Standard</div>
+              <div class="urg-desc">Can wait a few hours</div>
+            </div>
+            <div class="urgency-option" id="urg-low" onclick="selectUrgency('low')">
+              <span class="material-icons-outlined" style="color:#2E7D32">event_note</span>
+              <div class="urg-label">Routine</div>
+              <div class="urg-desc">Scheduled check-up</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom">
+        <button class="cb-btn primary" id="step1Btn" disabled onclick="goStep(2)">
+          Continue <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Symptoms -->
+    <div class="cb-step" id="step2">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">stethoscope</span></div>
+          <div class="cb-heading">Describe your symptoms</div>
+          <div class="cb-subheading">Be as detailed as possible — this helps the doctor prepare.</div>
+        </div>
+        <div class="cb-section">
+          <div class="cb-field">
+            <label>Who is the patient? <span style="color:#D32F2F">*</span></label>
+            <select id="patientSelect">
+              <option value="">Loading…</option>
+            </select>
+          </div>
+          <div class="cb-field">
+            <label>Describe symptoms <span style="color:#D32F2F">*</span></label>
+            <textarea id="symptomsText" placeholder="e.g. Headache and fever for 2 days, cough, slight difficulty breathing…"></textarea>
+          </div>
+          <div class="cb-field">
+            <label>How long have you had these symptoms?</label>
+            <select id="symptomDuration">
+              <option value="">Select duration</option>
+              <option value="today">Started today</option>
+              <option value="1-2days">1–2 days</option>
+              <option value="3-7days">3–7 days</option>
+              <option value="1-2weeks">1–2 weeks</option>
+              <option value="chronic">Longer / ongoing</option>
+            </select>
+          </div>
+          <div class="cb-field">
+            <label>Any additional notes for the doctor</label>
+            <textarea id="notesText" placeholder="e.g. Allergic to penicillin, currently on Metformin…" style="min-height:60px"></textarea>
+          </div>
+          <!-- Preferred Appointment Date & Time -->
+          <div style="background:var(--primary-surface,#E8F5E9);border:1.5px solid #A5D6A7;border-radius:var(--radius-md,10px);padding:14px 16px;margin-top:4px">
+            <div style="font-size:12px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:16px">calendar_today</span> Preferred Appointment Date &amp; Time
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <div class="cb-field" style="margin-bottom:0">
+                <label style="font-size:12px;font-weight:600;color:#2E7D32">Date <span style="color:#D32F2F">*</span></label>
+                <input type="date" id="apptDate" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text-primary);outline:none">
+              </div>
+              <div class="cb-field" style="margin-bottom:0">
+                <label style="font-size:12px;font-weight:600;color:#2E7D32">Time <span style="color:#D32F2F">*</span></label>
+                <input type="time" id="apptTime" style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;background:var(--surface);color:var(--text-primary);outline:none">
+              </div>
+            </div>
+            <div style="font-size:11px;color:#2E7D32;margin-top:6px;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:13px">info</span>
+              The clinic will confirm or suggest a new time after receiving your booking.
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(1)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" onclick="goStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Select Clinic -->
+    <div class="cb-step" id="step3">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
+        <div class="cb-section" style="padding-top:16px">
+          <div class="cb-field">
+            <label>Your Area / District <span style="color:#D32F2F">*</span></label>
+            <select id="userLocationSelect">
+              <option value="">Select your area...</option>
+              <option value="kampala">Kampala</option>
+              <option value="wakiso">Wakiso</option>
+              <option value="mukono">Mukono</option>
+              <option value="jinja">Jinja</option>
+              <option value="busia">Busia</option>
+              <option value="tororo">Tororo</option>
+              <option value="iganga">Iganga</option>
+              <option value="bugiri">Bugiri</option>
+              <option value="mayuge">Mayuge</option>
+              <option value="mbale">Mbale</option>
+              <option value="soroti">Soroti</option>
+              <option value="lira">Lira</option>
+              <option value="gulu">Gulu</option>
+              <option value="arua">Arua</option>
+              <option value="mbarara">Mbarara</option>
+              <option value="masaka">Masaka</option>
+              <option value="fort_portal">Fort Portal</option>
+              <option value="hoima">Hoima</option>
+              <option value="kabale">Kabale</option>
+              <option value="entebbe">Entebbe</option>
+              <option value="ntinda">Ntinda, Kampala</option>
+              <option value="nakawa">Nakawa, Kampala</option>
+              <option value="other">Other area</option>
+            </select>
+          </div>
+          <div class="cb-field" id="customLocationWrap" style="display:none">
+            <label>Enter your specific area</label>
+            <input type="text" id="customLocation" placeholder="e.g. Bwaise, Kawempe, Lugogo…">
+          </div>
+          <button onclick="searchClinics()" style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-md);font-size:14px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;touch-action:manipulation">
+            <span class="material-icons-outlined" style="font-size:18px">search</span>
+            Find Clinics Near Me
+          </button>
+          <div class="cb-label">Clinics in Your Area</div>
+          <div id="clinicsList">
+            <div style="text-align:center;padding:40px 0;color:var(--text-secondary)">
+              <span class="material-icons-outlined" style="font-size:40px;display:block;margin-bottom:8px">location_on</span>
+              Select your area above to find nearby clinics
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(2)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" id="step3Btn" disabled onclick="goStep(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- STEP 4: Confirm -->
+    <div class="cb-step" id="step4">
+      <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:80px">
+        <div class="cb-hero">
+          <div class="cb-hero-icon"><span class="material-icons-outlined">receipt_long</span></div>
+          <div class="cb-heading">Confirm Booking</div>
+          <div class="cb-subheading">Review your details before submitting</div>
+        </div>
+        <div class="cb-section">
+          <div id="confirmDetails"></div>
+        </div>
+      </div>
+      <div class="cb-bottom" style="display:flex;gap:10px">
+        <button class="cb-btn secondary" style="flex:1" onclick="goStep(3)">← Back</button>
+        <button class="cb-btn primary" style="flex:2" id="submitBtn" onclick="submitBooking()">
+          <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Confirm Booking
+        </button>
+      </div>
+    </div>
+
+    <!-- SUCCESS -->
+    <div class="cb-step" id="stepSuccess">
+      <div class="success-container">
+        <div class="success-icon-wrap">
+          <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32">check_circle</span>
+        </div>
+        <div style="font-size:22px;font-weight:700;margin-bottom:8px">Booking Confirmed!</div>
+        <div style="font-size:14px;color:var(--text-secondary);margin-bottom:4px">Booking reference:</div>
+        <div class="booking-code-box">
+          <div class="booking-code-text" id="bookingCodeDisplay">HM-XXXX</div>
+        </div>
+
+        <!-- PIN Token -->
+        <div id="pinBox" style="width:100%;background:#E3F2FD;border:2px dashed #1565C0;border-radius:var(--radius-md);padding:16px 20px;margin:12px 0;text-align:center">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:#0D47A1;margin-bottom:6px">Check-In PIN Token</div>
+          <div id="pinDisplay" style="font-size:26px;font-weight:800;letter-spacing:4px;color:#1565C0">AFH-CHK-000000</div>
+          <div style="font-size:11px;color:#1565C0;margin-top:4px;opacity:.8">Valid 2 hours · Show at clinic reception</div>
+        </div>
+
+        <!-- Appointment time -->
+        <div id="apptTimeBox" style="display:none;width:100%;background:#E3F2FD;border:1.5px solid #90CAF9;border-radius:var(--radius-md);padding:14px 18px;margin:10px 0;text-align:left">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#0D47A1;margin-bottom:4px;display:flex;align-items:center;gap:4px">
+            <span class="material-icons-outlined" style="font-size:14px">event</span>
+            Scheduled Appointment
+          </div>
+          <div id="apptTimeDisplay" style="font-size:18px;font-weight:800;color:#1565C0"></div>
+          <div style="font-size:11px;color:#1565C0;margin-top:2px;opacity:.85">Show your PIN at reception on arrival.</div>
+        </div>
+
+        <!-- Expected payment at facility -->
+        <div id="expectedPayBox" style="display:none;width:100%;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:var(--radius-md);padding:14px 18px;margin:10px 0;text-align:left">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#2E7D32;margin-bottom:4px">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">price_check</span>
+            Expected Amount to Pay at Facility
+          </div>
+          <div id="expectedPayAmount" style="font-size:24px;font-weight:800;color:#1B5E20">—</div>
+          <div id="expectedPayLabel" style="font-size:11px;color:#2E7D32;margin-top:2px"></div>
+        </div>
+
+        <!-- All AI diagnoses fees breakdown -->
+        <div id="diagFeeBreakdown" style="display:none;width:100%;background:#F8F9FA;border:1px solid #E0E0E0;border-radius:var(--radius-md);padding:14px 18px;margin:8px 0;text-align:left">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5F6368;margin-bottom:8px;display:flex;align-items:center;gap:4px">
+            <span class="material-icons-outlined" style="font-size:14px">smart_toy</span>
+            AI Diagnoses &amp; Estimated Fees
+          </div>
+          <div id="diagFeeList"></div>
+          <div style="font-size:10px;color:#9AA0A6;margin-top:6px">Fees set by the clinic. Confirm exact amount at reception.</div>
+        </div>
+
+        <!-- Discount badge -->
+        <div id="discountBadge" style="display:none;width:100%;background:#FFF8E1;border:1px solid #FFD54F;border-radius:8px;padding:10px 16px;margin-bottom:12px;align-items:center;gap:10px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:18px">discount</span>
+          <div style="text-align:left">
+            <div style="font-size:13px;font-weight:600;color:#E65100">15% Probable Condition Discount Applied</div>
+            <div style="font-size:11px;color:#E65100">Discount applies if clinician confirms AI diagnosis</div>
+          </div>
+        </div>
+
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:24px">
+          The clinic has been notified. Show your PIN or booking code at reception.
+        </div>
+        <button class="cb-btn primary" style="width:100%;margin-bottom:10px" onclick="window.location.href='dashboard.html'">
+          <span class="material-icons-outlined" style="font-size:18px">home</span> Back to Dashboard
+        </button>
+        <button class="cb-btn secondary" style="width:100%" onclick="window.location.href='clinic-booking.html'">
+          Book Another Visit
+        </button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/app.js"></script>
+<style>
+  .clinic-score-bar { height:6px; border-radius:3px; background:#E0E0E0; margin-top:6px; overflow:hidden; }
+  .clinic-score-fill { height:100%; border-radius:3px; background:linear-gradient(90deg,#4CAF50,#1B5E20); transition:width .6s ease; }
+  .clinic-best-badge { background:#1B5E20; color:#fff; font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; letter-spacing:.5px; }
+  .clinic-fee-chip { font-size:11px; color:#1B5E20; background:#E8F5E9; border-radius:6px; padding:2px 8px; font-weight:600; }
+  .discount-preview { background:#FFF8E1; border:1px solid #FFD54F; border-radius:8px; padding:10px 14px; font-size:12px; color:#E65100; display:flex; align-items:center; gap:8px; margin-top:10px; }
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+</style>
+<script>
+const cfg = window.HOMATT_CONFIG || {};
+const supa = (cfg.SUPABASE_URL && window.supabase)
+  ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+let booking = {
+  urgency: null, patient: null, patientName: null,
+  symptoms: null, duration: null, notes: null,
+  clinicId: null, clinicName: null, clinicScore: 0, clinicFee: null,
+  matchedConditionFee: null,   // specific fee if AI condition matches clinic's list
+  matchedConditionName: null,  // the condition name that was matched
+  appointmentDate: null,       // preferred appointment date (YYYY-MM-DD)
+  appointmentTime: null,       // preferred appointment time (HH:MM)
+  condFeesMap: {},             // all condition fees for the selected clinic { condition_name: fee }
+};
+let currentStep = 1;
+const STEPS = ['Select Urgency', 'Describe Symptoms', 'Choose Clinic', 'Confirm Booking'];
+
+// Status time
+document.getElementById('statusTime').textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+// Generate AFH-CHK-XXXXXX pin token
+function generatePIN() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let pin = '';
+  for (let i = 0; i < 6; i++) pin += chars[Math.floor(Math.random() * chars.length)];
+  return 'AFH-CHK-' + pin;
+}
+
+// Weighted clinic scoring: Location 35% + Quality 30% + Price 20% + Availability 10% + Condition 5%
+// distKm: GPS distance in km (null if GPS unavailable)
+// geoNames: { district, county, subcounty, parish } from reverse-geocode
+function scoreClinic(c, userDistrict, aiCondition, distKm = null, geoNames = null) {
+  const qualPct  = (c.quality_score || c.avg_rating * 20 || 75) / 100;
+
+  // Location score: GPS distance (best) → Uganda hierarchy names → district text
+  let distPct;
+  if (distKm !== null) {
+    // GPS: 0 km = 100%, 5 km = 87%, 15 km = 60%, 30+ km = 20%
+    distPct = Math.max(0.2, 1 - distKm / 37.5);
+  } else if (geoNames) {
+    // Uganda place-name hierarchy: parish > subcounty > county > district
+    const cParish = (c.parish  || '').toLowerCase();
+    const cCity   = (c.city    || '').toLowerCase(); // subcounty
+    const cCounty = (c.county  || '').toLowerCase();
+    const cDist   = (c.district|| '').toLowerCase();
+    const { parish: uPar, subcounty: uSub, county: uCo, district: uDist } = geoNames;
+
+    if (uPar  && cParish && (cParish.includes(uPar)   || uPar.includes(cParish)))   distPct = 1.0;
+    else if (uSub && cCity   && (cCity.includes(uSub)   || uSub.includes(cCity)))     distPct = 0.90;
+    else if (uSub && cParish && (cParish.includes(uSub) || uSub.includes(cParish)))   distPct = 0.85;
+    else if (uCo  && cCounty && (cCounty.includes(uCo)  || uCo.includes(cCounty)))    distPct = 0.70;
+    else if (uDist && cDist  && (cDist === uDist || cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.50;
+    else distPct = 0.2;
+  } else {
+    const cDist = (c.district||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+    const uDist = (userDistrict||'').toLowerCase().replace(/[,\s]+/g,' ').trim();
+    distPct = 0.3;
+    if (uDist && cDist === uDist) distPct = 1.0;
+    else if (uDist && (cDist.includes(uDist) || uDist.includes(cDist))) distPct = 0.85;
+  }
+
+  const fee      = c.consultation_fee || 25000;
+  const feePct   = Math.max(0.2, 1 - Math.max(0, fee - 10000) / 60000);
+  const availPct = c.avg_wait_minutes ? Math.max(0.2, 1 - c.avg_wait_minutes / 120) : 0.85;
+  let condPct    = (c.cure_rate || 78) / 100;
+  if (aiCondition && c.condition_performance) {
+    const key = aiCondition.toLowerCase().replace(/\s+/g,'_');
+    if (c.condition_performance[key]) condPct = c.condition_performance[key] / 100;
+  }
+  return Math.min(99, Math.round(distPct*35 + qualPct*30 + feePct*20 + availPct*10 + condPct*5));
+}
+
+function fmtUGX(n) {
+  if (!n) return '—';
+  return 'UGX ' + parseInt(n).toLocaleString();
+}
+
+function goStep(n) {
+  if (n === 2 && !booking.urgency) { alert('Please select urgency level'); return; }
+  if (n === 2) {
+    // Pre-fill appointment date to tomorrow (earliest reasonable slot)
+    const apptDateEl = document.getElementById('apptDate');
+    if (apptDateEl && !apptDateEl.value) {
+      const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+      apptDateEl.value = tomorrow.toISOString().slice(0, 10);
+      apptDateEl.min = new Date().toISOString().slice(0, 10);
+    }
+    const apptTimeEl = document.getElementById('apptTime');
+    if (apptTimeEl && !apptTimeEl.value) apptTimeEl.value = '09:00';
+  }
+  if (n === 3) {
+    booking.symptoms = document.getElementById('symptomsText').value.trim();
+    booking.duration = document.getElementById('symptomDuration').value;
+    booking.notes = document.getElementById('notesText').value.trim();
+    if (!booking.symptoms) { alert('Please describe your symptoms'); return; }
+    booking.appointmentDate = document.getElementById('apptDate')?.value || null;
+    booking.appointmentTime = document.getElementById('apptTime')?.value || null;
+    if (!booking.appointmentDate) { alert('Please select a preferred appointment date'); return; }
+    if (!booking.appointmentTime) { alert('Please select a preferred appointment time'); return; }
+    const ps = document.getElementById('patientSelect');
+    booking.patient = ps.value;
+    booking.patientName = ps.options[ps.selectedIndex]?.text || 'Me';
+    loadClinics();
+  }
+  if (n === 4) {
+    if (!booking.clinicId) { alert('Please select a clinic'); return; }
+    renderConfirm();
+  }
+  document.querySelectorAll('.cb-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+  for (let i = 1; i <= 4; i++) {
+    const d = document.getElementById('prog' + i);
+    if (d) d.classList.toggle('active', i <= n);
+  }
+  document.getElementById('stepLabel').textContent = `Step ${n} of 4 — ${STEPS[n-1]}`;
+  currentStep = n;
+}
+
+function searchClinics() {
+  const sel = document.getElementById('userLocationSelect');
+  if (!sel.value) { alert('Please select your area first'); sel.focus(); return; }
+  loadClinics();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Pre-fill location from session
+  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const locSel = document.getElementById('userLocationSelect');
+  if (locSel && session.district) {
+    const opt = locSel.querySelector(`option[value="${session.district.toLowerCase()}"]`);
+    if (opt) locSel.value = session.district.toLowerCase();
+  }
+  // Toggle custom location input
+  locSel?.addEventListener('change', () => {
+    const wrap = document.getElementById('customLocationWrap');
+    if (wrap) wrap.style.display = locSel.value === 'other' ? 'block' : 'none';
+  });
+}, { once: true });
+
+function selectUrgency(level) {
+  booking.urgency = level;
+  document.querySelectorAll('.urgency-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('urg-' + level)?.classList.add('selected');
+  document.getElementById('step1Btn').disabled = false;
+}
+
+// Load patients (self + family)
+document.addEventListener('DOMContentLoaded', async () => {
+  const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const select = document.getElementById('patientSelect');
+  select.innerHTML = `<option value="self">Me (${session.first_name || session.name || 'You'})</option>`;
+  if (supa && session.userId) {
+    const { data: family } = await supa.from('family_members').select('id,name').eq('user_id', session.userId);
+    if (family?.length) {
+      family.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f.id; opt.textContent = f.name + ' (family)';
+        select.appendChild(opt);
+      });
+    }
+  }
+});
+
+async function loadClinics() {
+  const list = document.getElementById('clinicsList');
+  list.innerHTML = '<div style="text-align:center;padding:28px;color:var(--text-secondary)"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">manage_search</span>Finding best clinics for you…</div>';
+
+  const session   = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+  const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  // Use user-selected location from step 3 first, then session district
+  const selLoc    = document.getElementById('userLocationSelect')?.value || '';
+  const custLoc   = document.getElementById('customLocation')?.value.trim() || '';
+  const userDist  = selLoc === 'other' ? custLoc : (selLoc || session.district || '');
+  const aiCond    = triage.primary_condition || triage.topCondition || '';
+  const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
+
+  // Get GPS in parallel with the DB fetch for nearest-clinic sorting
+  const userCoords = await new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(null); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => resolve(null),
+      { timeout: 6000, maximumAge: 300000 }
+    );
+  });
+
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371, dLat = (lat2-lat1)*Math.PI/180, dLng = (lng2-lng1)*Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  let clinics = [];
+  let condFeesMap = {};   // { clinic_id: [{ condition_name, fee, notes }] }
+  if (supa) {
+    const clinicRes = await supa.from('clinics')
+      .select('*')
+      .eq('active', true)
+      .limit(300);
+    if (clinicRes.error) {
+      console.error('[Homatt] loadClinics error:', clinicRes.error.code, clinicRes.error.message);
+    }
+    clinics = clinicRes.data || [];
+
+    // Fetch condition-based fees for all active clinics in one query
+    if (clinics.length) {
+      const clinicIds = clinics.map(c => c.id);
+      const { data: feeRows } = await supa.from('clinic_condition_fees')
+        .select('clinic_id,condition_name,fee,notes')
+        .in('clinic_id', clinicIds);
+      if (feeRows) {
+        feeRows.forEach(r => {
+          if (!condFeesMap[r.clinic_id]) condFeesMap[r.clinic_id] = [];
+          condFeesMap[r.clinic_id].push(r);
+        });
+      }
+    }
+  }
+
+  if (!clinics.length) {
+    document.getElementById('clinicsList').innerHTML =
+      '<div style="text-align:center;padding:36px 16px;color:#666">' +
+        '<span class="material-icons-outlined" style="font-size:44px;display:block;margin-bottom:10px;color:#9AA0A6">local_hospital</span>' +
+        '<p style="font-weight:600;margin:0 0 6px;color:#333">No clinics found</p>' +
+        '<p style="font-size:13px;margin:0">No active clinics are registered yet. Check back soon.</p>' +
+      '</div>';
+    return;
+  }
+
+  // ── Build user location names from profile, then override with GPS if available ──
+  const userProfile = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  let userGeoNames = {
+    district:  (userDist || userProfile.district  || '').toLowerCase(),
+    county:    (userProfile.county    || '').toLowerCase(),
+    subcounty: (userProfile.city      || '').toLowerCase(),
+    parish:    (userProfile.parish    || '').toLowerCase(),
+  };
+  if (userCoords) {
+    try {
+      // zoom=18 gives street-level detail; zoom=14 only returned neighbourhood/suburb.
+      // We want the user's actual road / area, not a generic city name.
+      const rgRes = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userCoords.lat}&lon=${userCoords.lng}&zoom=18&addressdetails=1`,
+        { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } }
+      );
+      if (rgRes.ok) {
+        const rg = await rgRes.json();
+        const addr = rg.address || {};
+        userGeoNames = {
+          district:  (addr.state_district || addr.county || userGeoNames.district || '').toLowerCase(),
+          county:    (addr.county || userGeoNames.county || '').toLowerCase(),
+          subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || userGeoNames.subcounty || '').toLowerCase(),
+          // Prefer the most specific thing Nominatim returned: road > neighbourhood > hamlet
+          parish:    (addr.road || addr.pedestrian || addr.residential || addr.neighbourhood || addr.quarter || addr.hamlet || userGeoNames.parish || '').toLowerCase(),
+        };
+
+        // Expose a precise, human-readable "you are here" label for the UI header:
+        // "Kira Road, Kamwokya" rather than just "Kampala".
+        const preciseParts = [
+          addr.road || addr.pedestrian || addr.footway || addr.residential,
+          addr.neighbourhood || addr.quarter || addr.suburb || addr.village,
+          addr.city_district || addr.city || addr.town,
+        ].filter(Boolean);
+        window._homattPreciseLocation = preciseParts.length
+          ? preciseParts.slice(0, 2).join(', ')
+          : (rg.display_name || '').split(',').slice(0, 2).join(',').trim();
+        try { localStorage.setItem('homatt_precise_location', window._homattPreciseLocation || ''); } catch(_) {}
+      }
+    } catch (_) {}
+  }
+
+  // Helper: is clinic open right now?
+  function clinicOpenNow(hours) {
+    if (!hours || typeof hours !== 'object') return null;
+    const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    const now = new Date(), dayName = days[now.getDay()], h = hours[dayName];
+    if (!h || h.closed) return { open: false, label: 'Closed today' };
+    if (!h.open || !h.close) return null;
+    const [oh,om] = h.open.split(':').map(Number), [ch,cm] = h.close.split(':').map(Number);
+    const nowMin = now.getHours()*60+now.getMinutes(), openMin = oh*60+om, closeMin = ch*60+cm;
+    if (nowMin >= openMin && nowMin < closeMin) return { open: true, label: `Open · closes ${h.close}` };
+    if (nowMin < openMin) return { open: false, label: `Opens ${h.open}` };
+    return { open: false, label: `Closed · opens ${h.open} tomorrow` };
+  }
+
+  // Score and rank all clinics — GPS distance replaces district-text matching when available
+  const scored = clinics
+    .map(c => {
+      // GPS distance (km), or null if either side has no coords
+      const distKm = (userCoords && c.latitude && c.longitude)
+        ? haversineKm(userCoords.lat, userCoords.lng, parseFloat(c.latitude), parseFloat(c.longitude))
+        : null;
+
+      // Find matched condition fee for this clinic
+      const fees = condFeesMap[c.id] || [];
+      let matchedFee = null, matchedCond = null;
+      if (aiCond && fees.length) {
+        const aiLower = aiCond.toLowerCase();
+        const match = fees.find(f => {
+          const fLower = f.condition_name.toLowerCase();
+          return fLower === aiLower || fLower.includes(aiLower) || aiLower.includes(fLower);
+        });
+        if (match) { matchedFee = match.fee; matchedCond = match.condition_name; }
+      }
+
+      // Also check clinic.services for a matching service if no condFee matched
+      if (!matchedCond && aiCond && Array.isArray(c.services)) {
+        const aiLower = aiCond.toLowerCase();
+        const svcMatch = c.services.find(s => (s.type||'').toLowerCase().includes(aiLower) || aiLower.includes((s.type||'').toLowerCase()));
+        if (svcMatch?.fee) { matchedFee = svcMatch.fee; matchedCond = svcMatch.type; }
+      }
+
+      return { ...c, distKm, score: scoreClinic(c, userDist, aiCond, distKm, userGeoNames), condFees: fees, matchedFee, matchedCond };
+    })
+    .sort((a, b) => {
+      // GPS clinics within 10 km first, then local no-GPS clinics, then distant GPS clinics
+      const NEAR = 10;
+      const aNear = a.distKm !== null && a.distKm <= NEAR;
+      const bNear = b.distKm !== null && b.distKm <= NEAR;
+      if (aNear && !bNear) return -1;
+      if (!aNear && bNear) return 1;
+      if (aNear && bNear) return a.distKm - b.distKm || b.score - a.score;
+      // Both non-near: local no-GPS clinics sort before distant GPS clinics
+      if (a.distKm === null && b.distKm !== null) return -1;
+      if (a.distKm !== null && b.distKm === null) return 1;
+      if (a.distKm !== null && b.distKm !== null) return a.distKm - b.distKm || b.score - a.score;
+      return b.score - a.score;
+    });
+
+  list.innerHTML = scored.map((c, idx) => {
+    // Fee display: condition-matched (AI) > services > general consultation
+    const clinicSvcs = Array.isArray(c.services) ? c.services.filter(s => s.type && s.fee) : [];
+    const generalSvc = clinicSvcs.find(s => /general|consult|opd/i.test(s.type||'')) || clinicSvcs[0];
+    const displayFee = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || generalSvc?.fee);
+    const feeLabel = c.matchedCond
+      ? `<span class="clinic-fee-chip" title="Fee for ${c.matchedCond}">
+           <span class="material-icons-outlined" style="font-size:11px;vertical-align:middle">health_and_safety</span>
+           ${c.matchedCond}: ${fmtUGX(c.matchedFee)}
+         </span>`
+      : c.consultation_fee
+        ? `<span class="clinic-fee-chip">${fmtUGX(c.consultation_fee)}</span>`
+        : generalSvc?.fee
+          ? `<span class="clinic-fee-chip">General: ${fmtUGX(generalSvc.fee)}</span>`
+          : '';
+
+    // GPS distance label
+    const distLabel = c.distKm !== null
+      ? `<span style="font-size:10px;color:#2E7D32;font-weight:600"><span class="material-icons-outlined" style="font-size:11px;vertical-align:middle">gps_fixed</span>${c.distKm < 1 ? Math.round(c.distKm*1000)+'m' : c.distKm.toFixed(1)+'km'} away</span>`
+      : '';
+
+    // Opening hours badge
+    const openStatus = clinicOpenNow(c.opening_hours);
+    const openBadge = openStatus
+      ? `<span style="font-size:10px;font-weight:600;padding:2px 6px;border-radius:5px;background:${openStatus.open?'#E8F5E9':'#FAFAFA'};color:${openStatus.open?'#1B5E20':'#9E9E9E'};border:1px solid ${openStatus.open?'#A5D6A7':'#E0E0E0'}">${openStatus.label}</span>`
+      : '';
+
+    // Services mini-list (up to 3 lines)
+    const svcsHtml = clinicSvcs.length > 0
+      ? `<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:3px">
+           ${clinicSvcs.slice(0,3).map(s=>`<span style="font-size:10px;background:#FFF8E1;border:1px solid #FFE082;border-radius:5px;padding:1px 6px;color:#5D4037">${s.type} — ${fmtUGX(s.fee)}</span>`).join('')}
+           ${clinicSvcs.length>3?`<span style="font-size:10px;color:#9E9E9E">+${clinicSvcs.length-3} more</span>`:''}
+         </div>`
+      : '';
+
+    const matchedFeeArg = c.matchedFee != null ? c.matchedFee : (c.consultation_fee || 0);
+    const matchedCondArg = (c.matchedCond || '').replace(/'/g,"\\'");
+    const photoHtml = c.front_photo_url
+      ? `<img class="clinic-card-photo" src="${c.front_photo_url}" alt="${(c.name||'Clinic').replace(/"/g,'&quot;')}" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'material-icons-outlined',textContent:'local_hospital',style:'color:var(--primary);font-size:24px'}))">`
+      : `<span class="material-icons-outlined" style="color:var(--primary);font-size:24px">local_hospital</span>`;
+    return `
+    <div class="clinic-card" id="clinic-${c.id}" onclick="selectClinic('${c.id}','${(c.name||'').replace(/'/g,"\\'")}',${c.score},${c.consultation_fee||0},${matchedFeeArg},'${matchedCondArg}')">
+      <div class="clinic-card-icon">
+        ${photoHtml}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <div class="clinic-card-name">${c.name}</div>
+          ${idx===0 ? '<span class="clinic-best-badge">' + (userCoords && c.distKm !== null ? 'NEAREST' : 'BEST MATCH') + '</span>' : ''}
+          ${c.matchedCond ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px;letter-spacing:.5px">PRICE KNOWN</span>' : ''}
+        </div>
+        <div class="clinic-card-meta">
+          <span class="material-icons-outlined" style="font-size:12px;vertical-align:middle">location_on</span>
+          ${[c.parish, c.city, c.district].filter(Boolean).join(', ') || (c.address || 'Uganda')}
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:4px;flex-wrap:wrap">
+          ${feeLabel}
+          ${distLabel}
+          ${openBadge}
+          ${!distLabel ? `<span style="font-size:11px;color:var(--text-secondary)">Match: <strong>${c.score}%</strong></span>` : ''}
+          ${c.avg_wait_minutes ? `<span style="font-size:11px;color:var(--text-secondary)">~${c.avg_wait_minutes}m wait</span>` : ''}
+        </div>
+        ${svcsHtml}
+        <div class="clinic-score-bar">
+          <div class="clinic-score-fill" style="width:${c.score}%"></div>
+        </div>
+      </div>
+      <span class="material-icons-outlined" style="color:var(--border);flex-shrink:0">chevron_right</span>
+    </div>`;
+  }).join('');
+
+  // Attach condFees data to each card element for use when clinic is selected
+  scored.forEach(c => {
+    const el = document.getElementById('clinic-' + c.id);
+    if (el) el._condFees = c.condFees || [];
+  });
+
+  // Attach condFees + services data to each card element for use when clinic is selected
+  scored.forEach(c => {
+    const el = document.getElementById('clinic-' + c.id);
+    if (el) {
+      el._condFees = c.condFees || [];
+      el._services = Array.isArray(c.services) ? c.services : [];
+    }
+  });
+
+  // Show context hint: precise location label / district + AI condition
+  const preciseLabel = window._homattPreciseLocation || '';
+  const gpsHint = userCoords
+    ? (preciseLabel
+        ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> Sorted by distance from <strong>${preciseLabel}</strong>`
+        : `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">gps_fixed</span> <strong>Sorted by GPS distance</strong>`)
+    : userDist
+      ? `<span class="material-icons-outlined" style="font-size:14px;color:#2E7D32">location_on</span> Showing clinics near <strong>${userDist.charAt(0).toUpperCase()+userDist.slice(1)}</strong>`
+      : '';
+  const aiHint = aiCond ? `<span class="material-icons-outlined" style="font-size:14px;color:#1565C0;margin-left:8px">smart_toy</span> Ranked for <strong>${aiCond}</strong>` : '';
+  if (gpsHint || aiHint) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text-secondary);padding:4px 0 10px;display:flex;flex-wrap:wrap;gap:4px;align-items:center">
+      ${gpsHint}${aiHint}
+    </div>` + list.innerHTML;
+  }
+}
+
+function selectClinic(id, name, score, fee, matchedFee, matchedCond) {
+  booking.clinicId   = id;
+  booking.clinicName = name;
+  booking.clinicScore = score || 0;
+  booking.clinicFee  = fee || null;
+  booking.matchedConditionFee  = (matchedFee && matchedFee > 0) ? matchedFee : null;
+  booking.matchedConditionName = matchedCond || null;
+  // Build a map of all condition fees for this clinic for use in confirm/success screens
+  const triage = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  booking.condFeesMap = {};
+  // Will be populated when renderConfirm reads condFeesMap from the scored clinics
+  // Store the clinic's full condFees list in booking for later use
+  const clinicCard = document.getElementById('clinic-' + id);
+  if (clinicCard && clinicCard._condFees) {
+    clinicCard._condFees.forEach(f => { booking.condFeesMap[f.condition_name.toLowerCase()] = f; });
+  }
+  // Also store services from clinic settings for the confirm/summary screen
+  booking.clinicServices = (clinicCard && clinicCard._services) ? clinicCard._services : [];
+  document.querySelectorAll('.clinic-card').forEach(c => c.classList.remove('selected'));
+  document.getElementById('clinic-' + id)?.classList.add('selected');
+  document.getElementById('step3Btn').disabled = false;
+}
+
+function fmtApptDateTime(date, time) {
+  if (!date) return '—';
+  const d = new Date(date + 'T' + (time || '09:00'));
+  return d.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'long', year:'numeric' })
+    + (time ? ' at ' + d.toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit' }) : '');
+}
+
+function renderConfirm() {
+  const triage   = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  const aiConf   = parseFloat(triage.confidence || triage.ai_confidence || '0');
+  const confPct  = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
+  const discount = confPct >= 75;
+  const aiConditions = triage.ai_conditions || (triage.primary_condition ? [{ name: triage.primary_condition, likelihood_percent: confPct }] : []);
+
+  // Determine fee to display — use clinic's specific condition fee if matched, else general fee
+  const hasMatchedFee = booking.matchedConditionFee && booking.matchedConditionFee > 0;
+  const baseFee = hasMatchedFee ? booking.matchedConditionFee : booking.clinicFee;
+  const discountedFee = (baseFee && discount) ? Math.round(baseFee * 0.85) : baseFee;
+  const feeDisplay = baseFee
+    ? fmtUGX(discountedFee) + (discount ? ' <span style="color:#E65100;font-weight:700">(−15%)</span>' : '')
+    : '—';
+  const feeLabel = hasMatchedFee
+    ? `Pay at facility — ${booking.matchedConditionName}`
+    : 'Est. Consultation Fee';
+
+  // Build all AI diagnoses fee rows
+  const diagFeeRows = aiConditions.map(cond => {
+    const cLower = (cond.name || '').toLowerCase();
+    const matched = Object.values(booking.condFeesMap).find(f => {
+      const fL = (f.condition_name || '').toLowerCase();
+      return fL === cLower || fL.includes(cLower) || cLower.includes(fL);
+    });
+    const fee = matched ? matched.fee : null;
+    const displayedFee = (fee && discount) ? Math.round(fee * 0.85) : fee;
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid #F0F0F0;font-size:13px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:36px;text-align:center;font-weight:700;color:${cond.likelihood_percent>=70?'#1B5E20':cond.likelihood_percent>=50?'#E65100':'#5F6368'};font-size:13px">${Math.round(cond.likelihood_percent||0)}%</div>
+          <div>
+            <div style="font-weight:600;color:var(--text-primary)">${cond.name}</div>
+            ${cond.notes||cond.treatment_summary ? `<div style="font-size:11px;color:var(--text-secondary)">${(cond.notes||cond.treatment_summary||'').slice(0,60)}</div>` : ''}
+          </div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          ${fee ? `<div style="font-weight:700;color:#1B5E20">${fmtUGX(displayedFee)}</div>
+                   ${discount?'<div style="font-size:10px;color:#E65100">after −15%</div>':''}` : '<div style="color:#9AA0A6;font-size:12px">Fee TBC</div>'}
+        </div>
+      </div>`;
+  }).join('');
+
+  const apptStr = fmtApptDateTime(booking.appointmentDate, booking.appointmentTime);
+
+  document.getElementById('confirmDetails').innerHTML = `
+    <!-- Appointment time highlight -->
+    <div style="background:#E3F2FD;border:1.5px solid #90CAF9;border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px;display:flex;align-items:center;gap:12px">
+      <span class="material-icons-outlined" style="color:#1565C0;font-size:28px">event</span>
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#0D47A1">Preferred Appointment</div>
+        <div style="font-size:16px;font-weight:800;color:#1565C0">${apptStr}</div>
+        <div style="font-size:11px;color:#1565C0;opacity:.8">The clinic will confirm this time after receiving your booking.</div>
+      </div>
+    </div>
+
+    <div style="background:#F8F9FA;border-radius:var(--radius-md);padding:16px;margin-bottom:12px">
+      ${[
+        ['Patient',  booking.patientName || 'Me'],
+        ['Urgency',  booking.urgency],
+        ['Symptoms', booking.symptoms],
+        ['Duration', booking.duration ? booking.duration.replace(/-/g,' ') : '—'],
+        ['Clinic',   booking.clinicName],
+        ['Match',    booking.clinicScore + '% match score'],
+        ['Notes',    booking.notes || 'None'],
+      ].map(([k,v]) => `
+        <div class="booking-confirm-row">
+          <span class="booking-confirm-label">${k}</span>
+          <span class="booking-confirm-value">${v||'—'}</span>
+        </div>`).join('')}
+    </div>
+
+    ${aiConditions.length ? `
+    <div style="background:#F8F9FA;border:1px solid #E0E0E0;border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#5F6368;margin-bottom:8px;display:flex;align-items:center;gap:4px">
+        <span class="material-icons-outlined" style="font-size:14px">smart_toy</span>
+        AI Diagnoses &amp; Expected Costs at ${booking.clinicName || 'Clinic'}
+      </div>
+      ${diagFeeRows}
+      <div style="font-size:10px;color:#9AA0A6;margin-top:6px">Fees set by the clinic. Pay at facility after consultation.</div>
+    </div>` : ''}
+
+    ${(booking.clinicServices && booking.clinicServices.length > 0) ? `
+    <div style="background:#FFFDE7;border:1px solid #FFE082;border-radius:var(--radius-md);padding:14px 16px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:#795548;margin-bottom:8px;display:flex;align-items:center;gap:4px">
+        <span class="material-icons-outlined" style="font-size:14px">receipt_long</span>
+        Services &amp; Fees at ${booking.clinicName || 'Clinic'}
+      </div>
+      ${booking.clinicServices.filter(s=>s.type&&s.fee).map(s => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #FFF9C4;font-size:13px">
+          <span style="color:#333">${s.type}${s.notes ? '<br><span style="font-size:11px;color:#9E9E9E">'+s.notes+'</span>' : ''}</span>
+          <span style="font-weight:700;color:#1B5E20;white-space:nowrap;margin-left:12px">${fmtUGX(s.fee)}</span>
+        </div>`).join('')}
+      <div style="font-size:10px;color:#9AA0A6;margin-top:6px">Prices set by the clinic. If not listed here, ask at reception.</div>
+    </div>` : ''}
+
+    ${baseFee ? `
+    <div style="background:${hasMatchedFee?'#E8F5E9':'#F3F4F6'};border:${hasMatchedFee?'1.5px solid #A5D6A7':'1px solid #E0E0E0'};border-radius:var(--radius-md);padding:14px 16px;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:${hasMatchedFee?'#2E7D32':'#5F6368'};margin-bottom:4px">
+        <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">${hasMatchedFee?'price_check':'payments'}</span>
+        ${feeLabel}
+      </div>
+      <div style="font-size:22px;font-weight:800;color:${hasMatchedFee?'#1B5E20':'var(--text-primary)'}">${feeDisplay}</div>
+      ${hasMatchedFee ? '<div style="font-size:11px;color:#2E7D32;margin-top:2px">This is the clinic\'s listed fee for this condition. Pay at the facility after your consultation.</div>'
+        : '<div style="font-size:11px;color:#5F6368;margin-top:2px">Estimated fee — confirm with clinic at reception.</div>'}
+    </div>` : ''}
+
+    ${discount ? `
+    <div class="discount-preview">
+      <span class="material-icons-outlined" style="font-size:18px;color:#E65100">discount</span>
+      <div><strong>15% Probable Condition Discount</strong><br>AI confidence ≥75% — discount applied if clinician confirms diagnosis</div>
+    </div>` : ''}
+    <div style="background:#E8F5E9;border-radius:var(--radius-md);padding:12px 16px;font-size:12px;color:#2E7D32;display:flex;align-items:center;gap:8px;margin-top:10px">
+      <span class="material-icons-outlined" style="font-size:16px">info</span>
+      The clinic will be notified. Show your PIN at reception.
+    </div>`;
+}
+
+async function submitBooking() {
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Booking…';
+
+  const triage    = JSON.parse(localStorage.getItem('homatt_last_triage') || '{}');
+  const aiConf    = parseFloat(triage.confidence || triage.ai_confidence || '0');
+  const confPct   = aiConf > 1 ? aiConf : Math.round(aiConf * 100);
+  const discount  = confPct >= 75;
+
+  // Get Supabase auth session (works for properly logged-in users)
+  let authUserId = null;
+  if (supa) {
+    try {
+      const { data: authData } = await supa.auth.getSession();
+      authUserId = authData?.session?.user?.id || null;
+    } catch(e) {}
+  }
+
+  // Pull display info from homatt_user cache
+  const userCache = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+
+  const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
+  const pinToken      = generatePIN();
+  const pinExpiry     = new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(); // +2 hours
+
+  if (supa) {
+    const isMockClinic = ['c1','c2','c3','c4'].includes(booking.clinicId);
+    // Build ISO appointment timestamp
+    let appointmentAt = null;
+    if (booking.appointmentDate) {
+      appointmentAt = booking.appointmentDate + 'T' + (booking.appointmentTime || '09:00') + ':00';
+    }
+    const payload = {
+      patient_user_id:  authUserId,
+      patient_name:     userCache.firstName ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ') : (session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : 'Patient'),
+      patient_age:      userCache.age  || session.age  || null,
+      patient_sex:      userCache.sex  || session.sex  || null,
+      clinic_id:        isMockClinic ? null : booking.clinicId,
+      symptoms:         booking.symptoms || null,
+      urgency_level:    booking.urgency,
+      status:           'pending',
+      booking_code:     bookingCode,
+      location_district: session.district || null,
+      location_city:    session.city || null,
+      notes:            booking.notes || null,
+      family_member_id: booking.patient !== 'self' ? booking.patient : null,
+      pin_token:        pinToken,
+      pin_expires_at:   pinExpiry,
+      discount_applied: discount,
+      discount_pct:     discount ? 15 : 0,
+      ai_confidence:    confPct || null,
+      appointment_time: appointmentAt,
+      ai_full_data:     Object.keys(triage).length ? { ...triage, matched_condition_fee: booking.matchedConditionFee || null, matched_condition_name: booking.matchedConditionName || null } : null,
+    };
+
+    const { data: inserted, error } = await supa.from('bookings').insert(payload).select('id').single();
+    if (error) {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Confirm Booking';
+      alert('Booking failed: ' + error.message);
+      return;
+    }
+
+    // Save PIN to clinic_check_in_pins
+    if (inserted?.id) {
+      await supa.from('clinic_check_in_pins').insert({
+        pin_token:   pinToken,
+        booking_id:  inserted.id,
+        expires_at:  pinExpiry,
+        is_used:     false,
+      }).maybeSingle();
+    }
+  }
+
+  // Save booking reference to localStorage so user can always retrieve it
+  try {
+    const saved = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
+    saved.unshift({ bookingCode, pinToken, pinExpiry, clinicName: booking.clinicName, symptoms: booking.symptoms, createdAt: new Date().toISOString() });
+    localStorage.setItem('homatt_bookings', JSON.stringify(saved.slice(0, 10)));
+  } catch(e) {}
+
+  // Show success screen
+  document.getElementById('bookingCodeDisplay').textContent = bookingCode;
+  document.getElementById('pinDisplay').textContent = pinToken;
+
+  // Show appointment time on success screen
+  if (booking.appointmentDate) {
+    document.getElementById('apptTimeDisplay').textContent = fmtApptDateTime(booking.appointmentDate, booking.appointmentTime);
+    document.getElementById('apptTimeBox').style.display = 'block';
+  }
+
+  // Show expected payment
+  const hasMatchedFee = booking.matchedConditionFee && booking.matchedConditionFee > 0;
+  const baseFee = hasMatchedFee ? booking.matchedConditionFee : booking.clinicFee;
+  if (baseFee) {
+    const finalFee = (discount && baseFee) ? Math.round(baseFee * 0.85) : baseFee;
+    document.getElementById('expectedPayAmount').textContent = fmtUGX(finalFee);
+    document.getElementById('expectedPayLabel').textContent = hasMatchedFee
+      ? `For ${booking.matchedConditionName} consultation${discount ? ' (after 15% discount)' : ''}`
+      : `General consultation estimate${discount ? ' (after 15% discount)' : ''}`;
+    document.getElementById('expectedPayBox').style.display = 'block';
+  }
+
+  // Show all AI diagnoses fees breakdown on success screen
+  const aiConditions = triage.ai_conditions || (triage.primary_condition ? [{ name: triage.primary_condition, likelihood_percent: confPct }] : []);
+  if (aiConditions.length && Object.keys(booking.condFeesMap).length) {
+    const rows = aiConditions.map(cond => {
+      const cLower = (cond.name || '').toLowerCase();
+      const matched = Object.values(booking.condFeesMap).find(f => {
+        const fL = (f.condition_name || '').toLowerCase();
+        return fL === cLower || fL.includes(cLower) || cLower.includes(fL);
+      });
+      const fee = matched ? matched.fee : null;
+      const displayedFee = (fee && discount) ? Math.round(fee * 0.85) : fee;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #E8E8E8;font-size:13px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="width:34px;text-align:center;font-weight:700;color:${(cond.likelihood_percent||0)>=70?'#1B5E20':'#5F6368'}">${Math.round(cond.likelihood_percent||0)}%</span>
+          <span style="font-weight:600">${cond.name}</span>
+        </div>
+        ${fee ? `<span style="font-weight:700;color:#1B5E20">${fmtUGX(displayedFee)}</span>` : '<span style="color:#9AA0A6;font-size:12px">TBC</span>'}
+      </div>`;
+    }).join('');
+    document.getElementById('diagFeeList').innerHTML = rows;
+    document.getElementById('diagFeeBreakdown').style.display = 'block';
+  }
+
+  if (discount) {
+    const badge = document.getElementById('discountBadge');
+    badge.style.display = 'flex';
+  }
+  document.querySelectorAll('.cb-step').forEach(s => s.classList.remove('active'));
+  document.getElementById('stepSuccess').classList.add('active');
+  document.querySelector('.cb-prog').style.display = 'none';
+}
+</script>
+<script src="js/native-bridge.js"></script>
+</body>
+</html>

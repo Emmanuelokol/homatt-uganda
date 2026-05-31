@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Riders</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Rider Management</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="admin-table-wrap">
+        <div class="table-header">
+          <div class="table-title">All Riders</div>
+          <div class="table-filter">
+            <select id="filterStatus">
+              <option value="">All</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="suspended">Suspended</option>
+              <option value="removed">Removed</option>
+            </select>
+            <input type="text" id="searchRiders" placeholder="Search by name/phone..." style="width:200px">
+          </div>
+        </div>
+        <table class="admin-table">
+          <thead>
+            <tr><th>Rider</th><th>Phone</th><th>Vehicle</th><th>Plate</th><th>Deliveries</th><th>Rating</th><th>Status</th><th>Portal</th><th>Actions</th></tr>
+          </thead>
+          <tbody id="ridersBody">
+            <tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Rider Detail/Edit Modal -->
+<div class="admin-modal-overlay" id="riderModal" style="display:none">
+  <div class="admin-modal" style="max-width:500px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" id="riderModalTitle">Rider Details</div>
+      <button class="admin-modal-close" onclick="closeModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div class="admin-modal-body" id="riderModalBody"></div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" onclick="closeModal()">Close</button>
+      <button class="btn-admin danger" id="removeBtn" style="display:none" onclick="removeRider(activeRiderId)">
+        <span class="material-icons-outlined" style="font-size:16px">delete_forever</span> Remove
+      </button>
+      <button class="btn-admin warning" id="suspendBtn" style="display:none" onclick="updateStatus('suspended')">
+        <span class="material-icons-outlined" style="font-size:16px">block</span> Suspend
+      </button>
+      <button class="btn-admin success" id="approveBtn" style="display:none" onclick="updateStatus('approved')">
+        <span class="material-icons-outlined" style="font-size:16px">check_circle</span> Approve
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let supabase = null;
+let allRiders = [];
+let activeRiderId = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allRiders = DEMO_RIDERS;
+  renderRiders();
+
+  buildAdminSidebar('riders');
+  const session = await requireAdmin();
+  if (!session) return;
+  supabase = adminSupa();
+  setupAdminLogout();
+  await loadRiders();
+  document.getElementById('filterStatus').addEventListener('change', renderRiders);
+  document.getElementById('searchRiders').addEventListener('input', renderRiders);
+});
+
+const DEMO_RIDERS = [
+  { id:'r1', full_name:'Kato Moses', phone_number:'0772100011', vehicle_type:'motorcycle', plate_number:'UAA 123B', total_deliveries:47, rating:4.8, status:'approved', created_at: new Date(Date.now()-864e5*2).toISOString() },
+  { id:'r2', full_name:'Ssali David', phone_number:'0752200022', vehicle_type:'motorcycle', plate_number:'UBA 456C', total_deliveries:23, rating:4.5, status:'approved', created_at: new Date(Date.now()-864e5*7).toISOString() },
+  { id:'r3', full_name:'Nakabuye Fiona', phone_number:'0700300033', vehicle_type:'bicycle', plate_number:'N/A', total_deliveries:8, rating:4.2, status:'pending', created_at: new Date(Date.now()-864e5*1).toISOString() },
+  { id:'r4', full_name:'Mukasa Peter', phone_number:'0782400044', vehicle_type:'motorcycle', plate_number:'UCA 789D', total_deliveries:62, rating:4.9, status:'approved', created_at: new Date(Date.now()-864e5*14).toISOString() },
+  { id:'r5', full_name:'Tumwine Rogers', phone_number:'0704500055', vehicle_type:'motorcycle', plate_number:'UDA 321E', total_deliveries:3, rating:3.8, status:'suspended', created_at: new Date(Date.now()-864e5*20).toISOString() },
+];
+
+async function loadRiders() {
+  const demoSession = (() => { try { return JSON.parse(localStorage.getItem('admin_session')||'null'); } catch(e){return null;} })();
+  if (demoSession?.demo || !supabase) { allRiders = DEMO_RIDERS; renderRiders(); return; }
+  try {
+    const fetchPromise = supabase.from('riders').select('*').order('created_at',{ascending:false});
+    const timeoutPromise = new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 10000));
+    const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+    if (error) throw error;
+    allRiders = (data && data.length) ? data : DEMO_RIDERS;
+    if (!data || !data.length) showAdminToast('No riders yet — showing demo data', 'default');
+  } catch(e) {
+    console.error('loadRiders failed:', e);
+    allRiders = DEMO_RIDERS;
+    showAdminToast('Live data unavailable — showing demo riders', 'default');
+  }
+  renderRiders();
+}
+
+function renderRiders() {
+  const sf = document.getElementById('filterStatus').value;
+  const q  = document.getElementById('searchRiders').value.toLowerCase();
+  const filtered = allRiders.filter(r =>
+    (!sf || r.status === sf) &&
+    (!q || (r.full_name||'').toLowerCase().includes(q) || (r.phone_number||r.phone||'').includes(q))
+  );
+  const tbody = document.getElementById('ridersBody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No riders found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = filtered.map(r => {
+    const st = r.status || 'approved';
+    const portalBadge = r.portal_user_id
+      ? `<span class="status-badge approved" style="font-size:10px">Active</span>`
+      : `<span class="status-badge pending" style="font-size:10px">Not set up</span>`;
+    return `
+    <tr>
+      <td>
+        <div style="font-weight:600">${r.full_name}</div>
+        ${r.email ? `<div style="font-size:11px;color:#9AA0A6">${r.email}</div>` : ''}
+      </td>
+      <td style="font-size:12px">${r.phone_number || r.phone || '—'}</td>
+      <td style="text-transform:capitalize;font-size:12px">${r.vehicle_type || '—'}</td>
+      <td style="font-size:12px">${r.plate_number || '—'}</td>
+      <td style="font-weight:600">${r.total_deliveries || 0}</td>
+      <td><span style="color:${(r.rating||5)>=4.5?'#2E7D32':'#E65100'};font-weight:700">★ ${(r.rating||5).toFixed(1)}</span></td>
+      <td><span class="status-badge ${st}">${st}</span></td>
+      <td>${portalBadge}</td>
+      <td style="display:flex;gap:4px;flex-wrap:wrap">
+        <button class="btn-admin secondary sm" onclick="openModal('${r.id}')">
+          <span class="material-icons-outlined" style="font-size:13px">visibility</span>
+        </button>
+        ${st === 'pending' ? `<button class="btn-admin success sm" onclick="quickStatus('${r.id}','approved')"><span class="material-icons-outlined" style="font-size:13px">check</span></button>` : ''}
+        ${st === 'approved' ? `<button class="btn-admin warning sm" onclick="quickStatus('${r.id}','suspended')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>` : ''}
+        ${(st === 'suspended' || st === 'pending') ? `<button class="btn-admin success sm" onclick="quickStatus('${r.id}','approved')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>` : ''}
+        ${st !== 'removed' ? `<button class="btn-admin danger sm" onclick="removeRider('${r.id}')" title="Remove from platform"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openModal(id) {
+  const r = allRiders.find(x => x.id === id);
+  if (!r) return;
+  activeRiderId = id;
+  document.getElementById('riderModalTitle').textContent = r.full_name;
+  document.getElementById('riderModalBody').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      ${[
+        ['Full Name', r.full_name||'—'], ['Phone', r.phone_number||r.phone||'—'],
+        ['Email', r.email||'—'], ['Vehicle Type', r.vehicle_type||'—'],
+        ['Plate Number', r.plate_number||'—'], ['National ID', r.national_id||'—'],
+        ['Total Deliveries', r.total_deliveries||0], ['Rating', `★ ${(r.rating||5).toFixed(1)}`],
+        ['Total Earnings', formatUGX(r.total_earnings||0)], ['Registered', formatShortDate(r.created_at)],
+      ].map(([k,v]) => `
+        <div>
+          <div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.5px">${k}</div>
+          <div style="font-size:13px;font-weight:500;margin-top:3px">${v}</div>
+        </div>`).join('')}
+    </div>
+    ${r.notes ? `<div style="margin-top:16px;background:#F8F9FA;padding:12px;border-radius:8px;font-size:13px"><strong>Notes:</strong><br>${r.notes}</div>` : ''}`;
+
+  const approveBtn = document.getElementById('approveBtn');
+  const suspendBtn = document.getElementById('suspendBtn');
+  const removeBtn  = document.getElementById('removeBtn');
+  approveBtn.style.display = (r.status !== 'approved' && r.status !== 'removed') ? 'inline-flex' : 'none';
+  suspendBtn.style.display = r.status === 'approved' ? 'inline-flex' : 'none';
+  removeBtn.style.display  = r.status !== 'removed' ? 'inline-flex' : 'none';
+  document.getElementById('riderModal').style.display = 'flex';
+
+  // Append portal info section
+  const portalSection = document.createElement('div');
+  portalSection.style.cssText = 'margin-top:16px;background:#F0F7FF;border-radius:10px;padding:14px;border:1px solid #BBDEFB';
+  portalSection.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:#1565C0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+      <span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">electric_moped</span> Rider Portal
+    </div>
+    <div style="font-size:13px;color:#1565C0;margin-bottom:8px">
+      ${r.portal_user_id ? '✓ Portal account active' : '⚠ No portal account yet'}
+    </div>
+    <a href="../../rider/index.html" target="_blank" class="btn-admin info sm" style="text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:13px">open_in_new</span> Open Rider Portal
+    </a>`;
+  document.getElementById('riderModalBody').appendChild(portalSection);
+}
+
+function closeModal() { document.getElementById('riderModal').style.display = 'none'; activeRiderId = null; }
+
+async function updateStatus(status) {
+  if (!activeRiderId) return;
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); closeModal(); return; }
+  const { error } = await supa.from('riders').update({ status, active: status === 'approved', updated_at: new Date().toISOString() }).eq('id', activeRiderId);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  closeModal();
+  await loadRiders();
+  const msg = { approved: 'Rider approved!', suspended: 'Rider suspended', removed: 'Rider removed' }[status] || 'Status updated';
+  showAdminToast(msg, status === 'approved' ? 'success' : 'default');
+}
+
+async function quickStatus(riderId, status) {
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  const { error } = await supa.from('riders').update({ status, active: status === 'approved', updated_at: new Date().toISOString() }).eq('id', riderId);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadRiders();
+  showAdminToast(status === 'approved' ? 'Rider approved!' : 'Rider suspended', status === 'approved' ? 'success' : 'default');
+}
+
+async function removeRider(riderId) {
+  if (!confirm('Remove this rider from the platform? They will no longer be able to receive deliveries.')) return;
+  const supa = supabase || adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
+  const { error } = await supa.from('riders').update({ status: 'removed', active: false, available: false, updated_at: new Date().toISOString() }).eq('id', riderId || activeRiderId);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  if (activeRiderId) closeModal();
+  await loadRiders();
+  showAdminToast('Rider removed from platform', 'default');
+}
+</script>
+</body>
+</html>
