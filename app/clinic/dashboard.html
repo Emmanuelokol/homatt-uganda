@@ -2944,56 +2944,82 @@
   }
 
   // ── Wire up Quick Sale controls ────────────────────────────────────────────
-  // Use plain 'click' everywhere. With touch-action:manipulation on each
-  // button and user-scalable=no in the viewport, Chrome fires 'click'
-  // instantly on touch (no 300ms delay). The earlier touchend+dedup approach
-  // was causing click events to be suppressed on Android Chrome.
+  // ROBUST TAP DETECTION. On Android Chrome, a tap inside a scrollable/pannable
+  // container (our drug grid + sheet) is reclassified as a scroll if the finger
+  // drifts even a couple of pixels, and the synthetic 'click' is then silently
+  // discarded — which is exactly why the Sell button needed several presses.
+  // We bypass the browser's click heuristic entirely by tracking pointerdown →
+  // pointerup ourselves and treating it as a tap when the finger barely moved.
   (function wireQuickSale() {
+
+    var TAP_MOVE = 16;   // px of allowed finger drift
+    var TAP_TIME = 800;  // ms max press duration
+    var hasPointer = ('PointerEvent' in window);
+
+    // bindTap(el, handler[, matchFn])
+    //   matchFn(target) → element|null  for event delegation (drug grid).
+    function bindTap(el, handler, matchFn) {
+      if (!el) return;
+      if (!hasPointer) {
+        // Old WebView fallback: plain click.
+        el.addEventListener('click', function(e) {
+          var t = matchFn ? matchFn(e.target) : el;
+          if (t) { e.stopPropagation(); handler(t, e); }
+        });
+        return;
+      }
+      var sx = 0, sy = 0, t0 = 0, downTarget = null, active = false;
+      el.addEventListener('pointerdown', function(e) {
+        if (e.button && e.button !== 0) return;       // ignore non-primary
+        active = true;
+        sx = e.clientX; sy = e.clientY; t0 = Date.now();
+        downTarget = matchFn ? matchFn(e.target) : el;
+      });
+      el.addEventListener('pointerup', function(e) {
+        if (!active) return;
+        active = false;
+        var moved = Math.abs(e.clientX - sx) + Math.abs(e.clientY - sy);
+        if (moved > TAP_MOVE) return;                 // it was a scroll/drag
+        if (Date.now() - t0 > TAP_TIME) return;       // long press, ignore
+        var t = downTarget || (matchFn ? matchFn(e.target) : el);
+        if (!t) return;
+        e.preventDefault();                           // suppress the late ghost click
+        e.stopPropagation();
+        handler(t, e);
+      });
+      el.addEventListener('pointercancel', function() { active = false; });
+      // Swallow the ghost click so nothing double-fires.
+      el.addEventListener('click', function(e) {
+        if (matchFn ? matchFn(e.target) : true) e.stopPropagation();
+      });
+    }
 
     var sellBtn = document.getElementById('qsSellBtn');
     if (sellBtn) {
-      // Fire the sale on EITHER touchend OR click. On Android Chrome a tiny
-      // finger movement during the tap makes Chrome cancel the synthetic
-      // click (it thinks it was a pan), which is why the button "needed
-      // several presses". submitQuickSale() disables the button on first
-      // entry, so whichever event fires first wins and the other is a no-op.
-      sellBtn.addEventListener('touchstart', function() {
+      sellBtn.addEventListener('pointerdown', function() {
         if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
-      }, { passive: true });
-      sellBtn.addEventListener('touchend', function(e) {
-        sellBtn.style.filter = '';
-        if (sellBtn.disabled) return;
-        e.preventDefault();          // we are handling it now; suppress the late click
-        e.stopPropagation();
-        submitQuickSale();
-      }, { passive: false });
-      sellBtn.addEventListener('touchcancel', function() { sellBtn.style.filter = ''; }, { passive: true });
-      sellBtn.addEventListener('click', function(e) { e.stopPropagation(); submitQuickSale(); });
+      });
+      var clearFx = function() { sellBtn.style.filter = ''; };
+      sellBtn.addEventListener('pointerup', clearFx);
+      sellBtn.addEventListener('pointercancel', clearFx);
+      sellBtn.addEventListener('pointerleave', clearFx);
+      bindTap(sellBtn, function() { clearFx(); submitQuickSale(); });
     }
 
-    var closeBtn = document.getElementById('qsCloseBtn');
-    if (closeBtn) closeBtn.addEventListener('click', function(e) { e.stopPropagation(); closeQuickSale(); });
+    bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
 
-    var addBtn = document.getElementById('qsAddDrugBtn');
-    if (addBtn) addBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
+    bindTap(document.getElementById('qsAddDrugBtn'), function() {
       closeQuickSale();
       if (typeof openAddStockModal === 'function') openAddStockModal();
     });
 
-    var minus = document.getElementById('qsQtyMinus');
-    var plus  = document.getElementById('qsQtyPlus');
-    if (minus) minus.addEventListener('click', function(e) { e.stopPropagation(); changeQsQty(-1); });
-    if (plus)  plus.addEventListener( 'click', function(e) { e.stopPropagation(); changeQsQty(1);  });
+    bindTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
+    bindTap(document.getElementById('qsQtyPlus'),  function() { changeQsQty(1);  });
 
-    var cashBtn = document.getElementById('qsPmCash');
-    var momoBtn = document.getElementById('qsPmMomo');
-    if (cashBtn) cashBtn.addEventListener('click', function(e) { e.stopPropagation(); setQsPm('cash'); });
-    if (momoBtn) momoBtn.addEventListener('click', function(e) { e.stopPropagation(); setQsPm('momo'); });
+    bindTap(document.getElementById('qsPmCash'), function() { setQsPm('cash'); });
+    bindTap(document.getElementById('qsPmMomo'), function() { setQsPm('momo'); });
 
-    var resetBtn = document.getElementById('qsResetTotal');
-    if (resetBtn) resetBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
+    bindTap(document.getElementById('qsResetTotal'), function() {
       _qsTotalOverride = null;
       updateQsPanel();
     });
@@ -3004,12 +3030,10 @@
       _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
     });
 
-    // Event delegation for drug cards (dynamically injected)
-    var grid = document.getElementById('qsDrugGrid');
-    if (grid) grid.addEventListener('click', function(e) {
-      var card = e.target.closest('.qs-drug-card');
-      if (card && card.dataset.id) selectQsDrug(card.dataset.id);
-    });
+    // Drug cards (dynamically injected) via delegation + the same tap logic.
+    bindTap(document.getElementById('qsDrugGrid'),
+      function(card) { if (card.dataset.id) selectQsDrug(card.dataset.id); },
+      function(target) { return target.closest ? target.closest('.qs-drug-card') : null; });
   })();
 
   async function loadQsDrugs() {
