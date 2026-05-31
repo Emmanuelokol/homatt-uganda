@@ -103,6 +103,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     logSection.closest('.tracker-section').insertAdjacentElement('beforebegin', greetEl);
   }
 
+  // ---- Dismiss keyboard after time picker selection ----
+  document.getElementById('sleepStart').addEventListener('change', function() { this.blur(); });
+  document.getElementById('wakeTime').addEventListener('change', function() { this.blur(); });
+
   // ---- Counter: Night Awakenings ----
   let awakenings = 0;
   function updateAwakeDisplay() {
@@ -138,6 +142,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ---- Save Log ----
   document.getElementById('saveMoodLog').addEventListener('click', async () => {
+    // Dismiss any open keyboard before saving
+    if (document.activeElement) document.activeElement.blur();
     const sleepStart = document.getElementById('sleepStart').value;
     const wakeTime = document.getElementById('wakeTime').value;
 
@@ -240,12 +246,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (supabase && userId) {
       try {
-        const { data: sbLogs } = await supabase
-          .from('mood_sleep_logs')
-          .select('*')
-          .eq('user_id', userId)
-          .gte('log_date', cutoff)
-          .order('log_date', { ascending: false });
+        const { data: sbLogs } = await Promise.race([
+          supabase.from('mood_sleep_logs').select('*').eq('user_id', userId).gte('log_date', cutoff).order('log_date', { ascending: false }),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+        ]);
         if (sbLogs && sbLogs.length > logs.length) logs = sbLogs;
       } catch(e) {}
     }
@@ -425,12 +429,22 @@ Respond ONLY with valid JSON:
     historyEmpty.classList.add('hidden');
     historyList.innerHTML = '';
 
-    const { data: logs } = await supabase
-      .from('mood_sleep_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('log_date', { ascending: false })
-      .limit(20);
+    let logs = null;
+
+    if (supabase && userId) {
+      try {
+        const { data } = await Promise.race([
+          supabase.from('mood_sleep_logs').select('*').eq('user_id', userId).order('log_date', { ascending: false }).limit(20),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000)),
+        ]);
+        logs = data;
+      } catch(e) { console.warn('[MoodTracker] loadHistory failed:', e.message); }
+    }
+
+    // Fall back to localStorage
+    if (!logs || logs.length === 0) {
+      logs = JSON.parse(localStorage.getItem('homatt_mood_logs') || '[]').slice(0, 20);
+    }
 
     historyLoading.style.display = 'none';
 
@@ -470,15 +484,31 @@ Respond ONLY with valid JSON:
   async function callAI(prompt, cfg) {
     const proxyUrl = cfg.API_PROXY_URL;
     if (!proxyUrl) throw new Error('API_PROXY_URL not configured');
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(proxyUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-      body: JSON.stringify({ provider: 'groq', prompt }),
-    });
-    if (!res.ok) throw new Error(`AI proxy error: ${res.status}`);
-    const data = await res.json();
-    return data.text || '';
+    let accessToken = null;
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        accessToken = data?.session?.access_token || null;
+      } catch(e) {}
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 25000);
+    try {
+      const res = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}) },
+        body: JSON.stringify({ provider: 'groq', prompt }),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      if (!res.ok) throw new Error(`AI proxy error: ${res.status}`);
+      const data = await res.json();
+      return data.text || '';
+    } catch (err) {
+      clearTimeout(timer);
+      if (err.name === 'AbortError') throw new Error('Request timed out after 25s');
+      throw err;
+    }
   }
 
   function parseAIResponse(text) {

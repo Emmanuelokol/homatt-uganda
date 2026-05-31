@@ -48,13 +48,17 @@
       // 1. Let the current page handle it if it registered a custom handler
       if (window.HomattBackHandler && window.HomattBackHandler()) return;
 
-      // 2. Close any open sheet / modal
+      // 2. Close any open sheet / modal — also clears any stuck JS-injected overlay.
       const openSheet = document.querySelector('.bottom-sheet.open, .modal.open, .overlay.active');
       if (openSheet) {
         openSheet.classList.remove('open', 'active');
         document.querySelectorAll('.sheet-overlay').forEach(o => o.classList.remove('visible'));
+        _clearStuckOverlays();
         return;
       }
+
+      // Safety: even if no open sheet, remove any orphaned overlays before navigating.
+      _clearStuckOverlays();
 
       // 3. Default page navigation
       const mainPages = ['dashboard.html', 'signin.html', 'index.html'];
@@ -64,6 +68,21 @@
       } else {
         window.history.back();
       }
+    });
+  }
+
+  // Remove any JS-injected fixed overlays that may have been orphaned by interrupted
+  // navigation or by a hardware gesture dismissing a panel without running its close handler.
+  function _clearStuckOverlays() {
+    ['notifOverlay', 'notifPanel', '_rtaPanel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    // Also remove any anonymous fixed divs that cover the full screen (z-index > 500).
+    document.querySelectorAll('body > div[style*="position:fixed"], body > div[style*="position: fixed"]').forEach(el => {
+      const style = el.style;
+      const z = parseInt(style.zIndex || '0', 10);
+      if (z > 500 && !el.id.startsWith('_network')) el.remove();
     });
   }
 
@@ -92,25 +111,31 @@
   }
 
   // ─── KEYBOARD ────────────────────────────────────────────────────────────────
-  function initKeyboard() {
-    // Scroll focused input above keyboard whenever any input gains focus inside a sheet
-    document.addEventListener('focusin', (e) => {
-      const el = e.target;
-      if (!el || !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
-      // Delay to let keyboard animate in first
-      setTimeout(() => {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }, 300);
-    }, { passive: true });
+  // Public helper: dismiss keyboard from anywhere in the app.
+  window.HomattDismissKeyboard = function() {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) {
+      a.blur();
+    }
+    if (isNative() && window.Capacitor.Plugins.Keyboard) {
+      window.Capacitor.Plugins.Keyboard.hide().catch(() => {});
+    }
+  };
 
-    // Tap outside any input/textarea/select → blur immediately to dismiss keyboard fast
-    document.addEventListener('touchstart', (e) => {
-      const tag = e.target && e.target.tagName;
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-        const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-          active.blur();
-        }
+  function initKeyboard() {
+    // Tap outside any input/textarea/select → blur to dismiss keyboard.
+    // Walk UP the DOM to detect interactive ancestors — without this, tapping
+    // an icon <span> inside a bottom-nav <a> looked non-interactive, blurred
+    // the focused input, and the resulting layout reflow ate the click —
+    // forcing the user to tap twice or thrice for nav/buttons to register.
+    document.addEventListener('touchend', (e) => {
+      const interactive = e.target && e.target.closest && e.target.closest(
+        'input, textarea, select, button, a, label, [onclick], [role="button"], .cbn-link, .nav-item, .sidebar-link'
+      );
+      if (interactive) return;
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        active.blur();
       }
     }, { passive: true });
 
@@ -121,16 +146,60 @@
 
     Keyboard.addListener('keyboardWillShow', () => {
       document.body.classList.add('keyboard-open');
-      // Re-scroll focused element into view after keyboard appears
+      // 550ms: Android keyboard animation is ~300ms; Capacitor resize:body needs another
+      // ~100ms to propagate after the animation ends. We wait until both settle before
+      // scrolling so our getBoundingClientRect reads the post-resize layout.
       setTimeout(() => {
         const el = document.activeElement;
-        if (el && el !== document.body) {
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (!el || el === document.body) return;
+
+        // Find the actual scrollable ancestor of the focused input.
+        // This walks up the DOM looking for any element that is an overflow:auto/scroll
+        // container whose content overflows. This single function handles:
+        //   - .bottom-sheet/.sheet-body (symptom-checker, family, etc.)
+        //   - .cc-modal (chronic-disease)
+        //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
+        //   - .app-screen (default page scroll container)
+        // Walk up the DOM to find an ancestor that is actually scrollable
+        // (overflow-y:auto/scroll AND has content overflowing its bounds).
+        // Returns null when no such container exists — which is the correct
+        // signal to fall back to scrollIntoView rather than trying to scroll
+        // an overflow:hidden element (like .app-screen in medicine-orders) or
+        // a position:fixed container that is too short to overflow yet.
+        const findScroller = (node) => {
+          let cur = node.parentElement;
+          while (cur && cur !== document.body) {
+            const s = getComputedStyle(cur);
+            const oy = s.overflowY;
+            if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
+            cur = cur.parentElement;
+          }
+          return null;
+        };
+
+        const scroller = findScroller(el);
+        if (scroller) {
+          const elRect = el.getBoundingClientRect();
+          const scrollerRect = scroller.getBoundingClientRect();
+          // Center the input within the visible scroller area
+          const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+            - (scroller.clientHeight / 2) + (elRect.height / 2);
+          scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+        } else {
+          // No scrollable container found (overflow:hidden screens, short modals,
+          // position:fixed sheets). Let the browser scroll to the element — this
+          // correctly handles crx-modal, #cbInner, and other modal scroll containers
+          // because scrollIntoView walks the stacking context, not just the DOM.
+          try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
         }
-      }, 350);
+      }, 550);
     });
 
     Keyboard.addListener('keyboardWillHide', () => {
+      document.body.classList.remove('keyboard-open');
+    });
+
+    Keyboard.addListener('keyboardDidHide', () => {
       document.body.classList.remove('keyboard-open');
     });
   }
@@ -259,6 +328,82 @@
     }
   };
 
+  // ─── GEOLOCATION — Native wrapper ───────────────────────────────────────────
+  /**
+   * HomattGeolocation — wraps Capacitor Geolocation on native (which triggers
+   * the Android runtime permission dialog) and falls back to the browser API
+   * on web. Always use this instead of navigator.geolocation in the app.
+   */
+  window.HomattGeolocation = {
+    /**
+     * Returns [lat, lon] or null on failure.
+     * On native, requests permission first so Android shows the system dialog.
+     */
+    async getCurrentPosition(options) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: (options && options.timeout) || 8000,
+          });
+          return [pos.coords.latitude, pos.coords.longitude];
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      return new Promise(resolve => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: (options && options.timeout) || 8000 }
+        );
+      });
+    },
+
+    /**
+     * Starts watching position. Calls callback(lat, lon) on each update.
+     * Returns a watchId that can be passed to clearWatch().
+     */
+    async watchPosition(options, callback) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, maximumAge: options && options.maximumAge, timeout: options && options.timeout },
+            (pos, err) => { if (pos) callback(pos.coords.latitude, pos.coords.longitude); }
+          );
+          return { native: true, id: watchId };
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      if (!navigator.geolocation) return null;
+      const id = navigator.geolocation.watchPosition(
+        pos => callback(pos.coords.latitude, pos.coords.longitude),
+        null,
+        { enableHighAccuracy: true, maximumAge: (options && options.maximumAge) || 15000, timeout: (options && options.timeout) || 10000 }
+      );
+      return { native: false, id };
+    },
+
+    async clearWatch(handle) {
+      if (!handle) return;
+      if (handle.native && window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+        await window.Capacitor.Plugins.Geolocation.clearWatch({ id: handle.id }).catch(() => {});
+      } else {
+        navigator.geolocation.clearWatch(handle.id);
+      }
+    }
+  };
+
   // ─── HAPTICS ────────────────────────────────────────────────────────────────
   window.HomattHaptics = {
     light() {
@@ -337,6 +482,22 @@
         .catch(() => {}); // silently fail on non-HTTPS or unsupported env
     });
   }
+
+  // ─── SMOOTH NAVIGATION ──────────────────────────────────────────────────────
+  // navTo(url) — fades the page out before navigating so there's no white
+  // flash between bottom-nav tabs.  Falls back to an instant redirect if the
+  // frame element isn't found or animation preference is reduced.
+  window.navTo = function(url) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.location.href = url;
+      return;
+    }
+    const frame = document.querySelector('.phone-frame');
+    if (!frame) { window.location.href = url; return; }
+    frame.style.transition = 'opacity 0.12s ease';
+    frame.style.opacity = '0';
+    setTimeout(() => { window.location.href = url; }, 120);
+  };
 
   // Wait for Capacitor bridge to be ready
   if (window.Capacitor) {

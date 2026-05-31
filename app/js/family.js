@@ -77,36 +77,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Close any open sheets and health log panel when switching tabs
     const overlayEl = document.getElementById('sheetOverlay');
     if (overlayEl) overlayEl.classList.remove('visible');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    closeMemberDetail();
-
-    // Cart FAB only on shop tab
-    const cartFab = document.getElementById('cartFab');
-    if (target === 'shop') {
-      cartFab.classList.add('visible');
-      if (categories.length === 0) loadShop();
-      // Bottom nav: Shop active
-      document.getElementById('bottomNavFamily').classList.remove('active');
-      document.getElementById('bottomNavShop').classList.add('active');
-    } else {
-      cartFab.classList.remove('visible');
-      // Bottom nav: Family active
-      document.getElementById('bottomNavFamily').classList.add('active');
-      document.getElementById('bottomNavShop').classList.remove('active');
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      s.classList.remove('open');
+      s.style.visibility = 'hidden';
+    });
+    // Immediately hide the member-detail-panel — no transition delay
+    const detailPanelTab = document.getElementById('memberDetailPanel');
+    if (detailPanelTab) {
+      detailPanelTab.classList.remove('open');
+      detailPanelTab.style.display = 'none';
+      detailPanelTab.style.visibility = 'hidden';
     }
+    logEventForMemberId = null;
   }
 
   tabs.forEach(tab => {
     tab.addEventListener('click', () => activateTab(tab.dataset.tab));
   });
 
-  // Bottom nav clicks
-  document.getElementById('bottomNavFamily').addEventListener('click', () => activateTab('members'));
-  document.getElementById('bottomNavShop').addEventListener('click', () => activateTab('shop'));
+  // Bottom nav: Family always active on this page
+  const bottomNavFamily = document.getElementById('bottomNavFamily');
+  if (bottomNavFamily) bottomNavFamily.classList.add('active');
 
-  // Auto-activate shop tab if #shop hash in URL
-  const startTab = window.location.hash === '#shop' ? 'shop' : 'members';
-  activateTab(startTab);
+  activateTab('members');
 
   // ====== Load family members ======
   async function loadMembers() {
@@ -551,16 +544,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function updateCartBadge() {
-    const total = cart.reduce((s, c) => s + c.qty, 0);
-    const badge = document.getElementById('cartBadgeDot');
-    badge.textContent = total;
-    badge.classList.toggle('visible', total > 0);
+    // Cart badge lives on shop.html — no-op here
   }
-
-  updateCartBadge();
-
-  // Cart sheet
-  document.getElementById('cartFab').addEventListener('click', openCartSheet);
 
   function openCartSheet() {
     const listEl = document.getElementById('cartItemsList');
@@ -689,16 +674,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch(e) { return null; }
   }
 
-  function getUserCoords() {
-    return new Promise(resolve => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
-          () => resolve(null),
-          { timeout: 4000 }
-        );
-      } else resolve(null);
-    });
+  async function getUserCoords() {
+    return window.HomattGeolocation.getCurrentPosition({ timeout: 4000 });
   }
 
   // ====== Checkout — Place Order ======
@@ -752,80 +729,98 @@ document.addEventListener('DOMContentLoaded', async () => {
     const btn = document.getElementById('cartCheckoutBtn');
     if (btn) { btn.disabled = true; btn.textContent = 'Placing order…'; }
 
-    const itemsTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
-    const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
-
-    // Get user profile for name/phone/location
-    let patientName = 'Customer', patientPhone = null, userDistrict = null;
     try {
-      const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
-      if (prof) {
-        patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
-        patientPhone = prof.phone || null;
-        userDistrict = prof.district || null;
+      const itemsTotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
+      const itemsPayload = cart.map(c => ({ id: c.id, name: c.name, price: c.price, qty: c.qty, unit: c.unit || '' }));
+
+      // Get user profile for name/phone/location
+      let patientName = 'Customer', patientPhone = null, userDistrict = null;
+      try {
+        const { data: prof } = await supabase.from('profiles').select('first_name,last_name,phone,district').eq('id', userId).single();
+        if (prof) {
+          patientName = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
+          patientPhone = prof.phone || null;
+          userDistrict = prof.district || null;
+        }
+      } catch(e) {}
+
+      // Determine user coordinates for pharmacy routing
+      let userLat = null, userLon = null;
+      try {
+        const gpsCoords = await Promise.race([
+          getUserCoords().catch(() => null),
+          new Promise(resolve => setTimeout(() => resolve(null), 7000))
+        ]);
+        if (gpsCoords) {
+          [userLat, userLon] = gpsCoords;
+        } else if (userDistrict) {
+          const key = userDistrict.toLowerCase();
+          const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+          if (dc) [userLat, userLon] = dc;
+        }
+      } catch(e) {
+        if (userDistrict) {
+          const key = userDistrict.toLowerCase();
+          const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
+          if (dc) [userLat, userLon] = dc;
+        }
       }
-    } catch(e) {}
 
-    // Determine user coordinates for pharmacy routing
-    let userLat = null, userLon = null;
-    const gpsCoords = await getUserCoords();
-    if (gpsCoords) {
-      [userLat, userLon] = gpsCoords;
-    } else if (userDistrict) {
-      const key = userDistrict.toLowerCase();
-      const dc = DISTRICT_COORDS[key] || DISTRICT_COORDS[addr.toLowerCase().split(',')[0].trim()];
-      if (dc) [userLat, userLon] = dc;
-    }
-
-    // Find nearest pharmacy and compute delivery fee
-    let pharmacyId = null, deliveryFee = 2000;
-    if (userLat && userLon) {
-      const nearest = await findNearestPharmacy(userLat, userLon);
-      if (nearest) {
-        pharmacyId = nearest.id;
-        deliveryFee = calcDeliveryFee(nearest.distanceKm);
+      // Find nearest pharmacy and compute delivery fee
+      let pharmacyId = null, deliveryFee = 2000;
+      if (userLat && userLon) {
+        const nearest = await findNearestPharmacy(userLat, userLon);
+        if (nearest) {
+          pharmacyId = nearest.id;
+          deliveryFee = calcDeliveryFee(nearest.distanceKm);
+        }
       }
-    }
 
-    const total = itemsTotal + deliveryFee;
+      const total = itemsTotal + deliveryFee;
 
-    // Save order to marketplace_orders
-    const orderPayload = {
-      user_id: userId,
-      patient_name: patientName,
-      patient_phone: patientPhone,
-      delivery_address: addr,
-      items: itemsPayload,
-      total_amount: total,
-      status: 'pending',
-      payment_method: 'cash_on_delivery',
-      pharmacy_id: pharmacyId,
-      delivery_fee: deliveryFee,
-      user_latitude: userLat,
-      user_longitude: userLon,
-    };
+      // Save order to marketplace_orders
+      const orderPayload = {
+        user_id: userId,
+        patient_name: patientName,
+        patient_phone: patientPhone,
+        delivery_address: addr,
+        items: itemsPayload,
+        total_amount: total,
+        status: 'pending',
+        payment_method: 'cash_on_delivery',
+        pharmacy_id: pharmacyId,
+        delivery_fee: deliveryFee,
+        user_latitude: userLat,
+        user_longitude: userLon,
+      };
 
-    const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload);
+      const { error: orderErr } = await supabase.from('marketplace_orders').insert(orderPayload)
+        .catch(e => ({ error: { message: e.message || 'Network error. Check your connection.' }, data: null }));
 
-    if (orderErr) {
-      showToast('Order failed: ' + orderErr.message);
+      if (orderErr) {
+        showToast('Order failed: ' + orderErr.message);
+        if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
+        return;
+      }
+
+      // Deduct stock for each item (best-effort, ignore errors)
+      try {
+        for (const item of cart) {
+          await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
+        }
+      } catch(e) {}
+
+      // Clear cart and close ALL panels including health log
+      cart = [];
+      localStorage.removeItem('homatt_cart');
+      updateCartBadge();
+      closeAllSheets(); // also calls closeMemberDetail() internally
+      showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
+    } catch(e) {
+      console.error('submitOrder error:', e);
+      showToast('Order failed: ' + (e && e.message ? e.message : 'Please try again.'));
       if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined">shopping_bag</span> Place Order'; }
-      return;
     }
-
-    // Deduct stock for each item (best-effort, ignore errors)
-    try {
-      for (const item of cart) {
-        await supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty });
-      }
-    } catch(e) {}
-
-    // Clear cart and close ALL panels including health log
-    cart = [];
-    localStorage.removeItem('homatt_cart');
-    updateCartBadge();
-    closeAllSheets(); // also calls closeMemberDetail() internally
-    showToast(`Order placed! Delivery fee: UGX ${deliveryFee.toLocaleString()}. We will call to confirm.`);
   };
 
   // ====== Sheet / Overlay Management ======
@@ -833,7 +828,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openSheet(sheet) {
     document.querySelectorAll('.bottom-sheet').forEach(s => {
-      if (s !== sheet) s.classList.remove('open');
+      if (s !== sheet) {
+        s.classList.remove('open');
+        // Belt-and-suspenders: force visibility off so the sheet can never
+        // bleed through the cart or any other active sheet.
+        s.style.visibility = 'hidden';
+      }
     });
     // Immediately hide the member-detail panel — no transition delay so it
     // cannot bleed through the top of the cart/action sheet.
@@ -841,16 +841,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (detailPanel) {
       detailPanel.classList.remove('open');
       detailPanel.style.display = 'none';
+      detailPanel.style.visibility = 'hidden';
     }
     overlay.classList.add('visible');
+    sheet.style.visibility = ''; // let CSS class handle it
     sheet.classList.add('open');
   }
 
   function closeAllSheets() {
     overlay.classList.remove('visible');
-    document.querySelectorAll('.bottom-sheet').forEach(s => s.classList.remove('open'));
-    // Always close the health-log panel (not a .bottom-sheet, but must be hidden)
-    closeMemberDetail();
+    document.querySelectorAll('.bottom-sheet').forEach(s => {
+      s.classList.remove('open');
+      s.style.visibility = 'hidden';
+    });
+    // Immediately hide the member-detail-panel — don't wait for the CSS
+    // transform transition, as it can leak the --background colour on
+    // some Android WebViews even after the transition completes.
+    const detailPanel = document.getElementById('memberDetailPanel');
+    if (detailPanel) {
+      detailPanel.classList.remove('open');
+      detailPanel.style.display = 'none';
+      detailPanel.style.visibility = 'hidden';
+    }
+    logEventForMemberId = null;
   }
 
   overlay.addEventListener('click', closeAllSheets);
@@ -1071,13 +1084,53 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   function openMemberDetail(member) {
     const panel = document.getElementById('memberDetailPanel');
-    // Reset display so it's visible before animating in
     panel.style.display = 'flex';
+    panel.style.visibility = '';  // let CSS class handle it
     panel.offsetHeight; // force reflow so CSS transition fires
     logEventForMemberId = member.id;
+
+    // Header — name
     document.getElementById('memberDetailName').textContent = member.name;
-    document.getElementById('memberDetailRel').textContent =
-      member.relationship ? member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1) : '—';
+
+    // Header — avatar
+    const avatarEl = document.getElementById('memberDetailAvatar');
+    if (member.avatar_url) {
+      avatarEl.innerHTML = `<img src="${member.avatar_url}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    } else {
+      avatarEl.textContent = member.name ? member.name.charAt(0).toUpperCase() : '?';
+    }
+
+    // Header — meta line (relationship · age · sex)
+    const metaParts = [];
+    if (member.relationship) metaParts.push(member.relationship.charAt(0).toUpperCase() + member.relationship.slice(1));
+    if (member.dob) { const age = calcAge(member.dob); if (age !== null) metaParts.push(age + ' yrs'); }
+    if (member.sex) metaParts.push(member.sex === 'male' ? '♂ Male' : '♀ Female');
+    if (member.location) metaParts.push(member.location);
+    document.getElementById('memberDetailMeta').textContent = metaParts.join(' · ') || '—';
+
+    // Summary strip — conditions
+    const summaryEl = document.getElementById('memberDetailSummary');
+    const conditions = (member.chronic_conditions || []).filter(c => c !== 'none');
+    const meds = member.medications || [];
+    const allergies = member.allergies || [];
+    const hasSummary = conditions.length || meds.length || allergies.length;
+
+    if (hasSummary) {
+      summaryEl.style.display = 'block';
+      document.getElementById('memberDetailConditions').innerHTML = conditions.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#6A1B9A">medical_information</span><div><div class="mdp-summary-label">Conditions</div><div class="mdp-chips">${conditions.map(c => `<span class="mdp-chip mdp-chip-purple">${escHtml(c.replace(/_/g,' '))}</span>`).join('')}</div></div></div>` : '';
+      document.getElementById('memberDetailMeds').innerHTML = meds.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#1565C0">medication</span><div><div class="mdp-summary-label">Medications</div><div class="mdp-chips">${meds.map(m => `<span class="mdp-chip mdp-chip-blue">${escHtml(m)}</span>`).join('')}</div></div></div>` : '';
+      document.getElementById('memberDetailAllergies').innerHTML = allergies.length
+        ? `<div class="mdp-summary-row"><span class="material-icons-outlined mdp-summary-icon" style="color:#E65100">warning_amber</span><div><div class="mdp-summary-label">Allergies</div><div class="mdp-chips">${allergies.map(a => `<span class="mdp-chip mdp-chip-orange">${escHtml(a)}</span>`).join('')}</div></div></div>` : '';
+    } else {
+      summaryEl.style.display = 'none';
+    }
+
+    // Reset event count badge
+    const countBadge = document.getElementById('memberEventCount');
+    countBadge.style.display = 'none';
+
     panel.classList.add('open');
     loadMemberHealthLog(member.id);
   }
@@ -1129,10 +1182,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     const allEvents = [...(events || []), ...doseEvents]
       .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
+    // Update event count badge
+    const countBadge = document.getElementById('memberEventCount');
+    if (allEvents.length > 0) {
+      countBadge.textContent = allEvents.length;
+      countBadge.style.display = 'inline-flex';
+    } else {
+      countBadge.style.display = 'none';
+    }
+
     if (allEvents.length === 0) {
       timelineEl.innerHTML = `
         <div class="timeline-empty">
-          <span class="material-icons-outlined">history</span>
+          <span class="material-icons-outlined">favorite_border</span>
           No health events yet.<br>Tap "Log Health Event" to start the timeline.
         </div>`;
       return;

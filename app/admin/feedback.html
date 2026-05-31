@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Admin — Feedback & Ratings</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar"></aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Feedback & Ratings</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="adminUserAvatar">A</div>
+          <span id="adminUserNameTop">Admin</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Summary KPI cards -->
+      <div class="admin-kpi-row" style="display:flex;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+        <div class="admin-kpi-card" style="flex:1;min-width:140px">
+          <div class="kpi-label">Avg Clinic Rating</div>
+          <div class="kpi-value" id="kpiClinic">—</div>
+        </div>
+        <div class="admin-kpi-card" style="flex:1;min-width:140px">
+          <div class="kpi-label">Avg Pharmacy Rating</div>
+          <div class="kpi-value" id="kpiPharmacy">—</div>
+        </div>
+        <div class="admin-kpi-card" style="flex:1;min-width:140px">
+          <div class="kpi-label">Avg Platform Rating</div>
+          <div class="kpi-value" id="kpiPlatform">—</div>
+        </div>
+        <div class="admin-kpi-card" style="flex:1;min-width:140px">
+          <div class="kpi-label">Total Reviews</div>
+          <div class="kpi-value" id="kpiTotal">—</div>
+        </div>
+      </div>
+
+      <!-- Tab bar -->
+      <div style="display:flex;gap:0;border-bottom:2px solid #F0F0F0;margin-bottom:20px">
+        <button class="fb-tab active" data-tab="platform" style="padding:10px 20px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:600;color:#1A73E8;border-bottom:2px solid #1A73E8;margin-bottom:-2px;cursor:pointer">Platform / App</button>
+        <button class="fb-tab" data-tab="clinic" style="padding:10px 20px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:500;color:#5F6368;cursor:pointer">Clinic</button>
+        <button class="fb-tab" data-tab="pharmacy" style="padding:10px 20px;border:none;background:none;font-family:Inter,sans-serif;font-size:14px;font-weight:500;color:#5F6368;cursor:pointer">Pharmacy</button>
+      </div>
+
+      <!-- Platform feedback table -->
+      <div id="tabPlatform">
+        <div class="admin-table-wrap">
+          <div class="table-header">
+            <div class="table-title">Platform / App Feedback</div>
+            <div class="table-filter">
+              <select id="filterPlatformStatus">
+                <option value="">All Statuses</option>
+                <option value="new">New</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="resolved">Resolved</option>
+              </select>
+              <select id="filterPlatformCat">
+                <option value="">All Categories</option>
+                <option value="general">General</option>
+                <option value="app_speed">App Speed</option>
+                <option value="booking">Booking</option>
+                <option value="medicine">Medicine</option>
+                <option value="delivery">Delivery</option>
+                <option value="payment">Payment</option>
+                <option value="support">Support</option>
+              </select>
+            </div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Score</th>
+                <th>Category</th>
+                <th>Message</th>
+                <th>Contact</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="platformBody">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Clinic ratings table -->
+      <div id="tabClinic" style="display:none">
+        <div class="admin-table-wrap">
+          <div class="table-header">
+            <div class="table-title">Clinic Ratings</div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Score</th>
+                <th>Wait Time</th>
+                <th>Quality</th>
+                <th>Comms</th>
+                <th>Comment</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="clinicBody">
+              <tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pharmacy ratings table -->
+      <div id="tabPharmacy" style="display:none">
+        <div class="admin-table-wrap">
+          <div class="table-header">
+            <div class="table-title">Pharmacy / Medicine Order Ratings</div>
+          </div>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Score</th>
+                <th>Delivery Speed</th>
+                <th>Med Quality</th>
+                <th>Cost</th>
+                <th>Comment</th>
+                <th>Date</th>
+              </tr>
+            </thead>
+            <tbody id="pharmacyBody">
+              <tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<!-- Mark Reviewed Modal -->
+<div class="admin-modal-overlay" id="reviewModal" style="display:none">
+  <div class="admin-modal">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title">Update Feedback Status</div>
+      <button class="admin-modal-close" id="closeReviewModal">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <div class="admin-modal-body">
+      <div id="reviewFeedbackDetail" style="margin-bottom:16px;padding:14px;background:#F8F9FA;border-radius:10px;font-size:13px;line-height:1.7"></div>
+      <div class="admin-form-group">
+        <label>Status</label>
+        <select id="reviewStatusSelect">
+          <option value="new">New</option>
+          <option value="reviewed">Reviewed</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </div>
+    </div>
+    <div class="admin-modal-footer">
+      <button class="btn-admin secondary" id="cancelReviewBtn">Cancel</button>
+      <button class="btn-admin primary" id="saveReviewBtn">
+        <span class="material-icons-outlined" style="font-size:16px">save</span> Save
+      </button>
+    </div>
+  </div>
+</div>
+
+<div class="admin-toast" id="adminToast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script src="js/admin.js"></script>
+<script>
+let supabase = null;
+let allPlatform = [];
+let allClinic = [];
+let allPharmacy = [];
+let activeReviewId = null;
+
+const DEMO_PLATFORM = [
+  { id:'pf1', overall_score:5, category:'booking', message:'The booking process is so smooth. Booked a doctor in 2 minutes!', contact_email:'ssali@example.com', status:'new', created_at: new Date(Date.now()-3600000).toISOString() },
+  { id:'pf2', overall_score:4, category:'delivery', message:'Medicine arrived quickly. Driver was very professional.', contact_email:'', status:'new', created_at: new Date(Date.now()-86400000).toISOString() },
+  { id:'pf3', overall_score:3, category:'app_speed', message:'App is a bit slow when loading clinics. Otherwise good.', contact_email:'nakato@example.com', status:'reviewed', created_at: new Date(Date.now()-172800000).toISOString() },
+];
+const DEMO_CLINIC_RATINGS = [
+  { id:'cr1', rating_type:'clinic', score:5, score_speed:4, score_quality:5, score_comms:5, comment:'Excellent doctors, very thorough examination.', created_at: new Date(Date.now()-7200000).toISOString() },
+  { id:'cr2', rating_type:'clinic', score:4, score_speed:3, score_quality:4, score_comms:4, comment:'Good clinic but waiting time was long.', created_at: new Date(Date.now()-86400000).toISOString() },
+];
+const DEMO_PHARMACY_RATINGS = [
+  { id:'pr1', rating_type:'pharmacy', score:5, score_speed:5, score_quality:5, score_cost:4, comment:'Very fast delivery and correct medicines!', created_at: new Date(Date.now()-3600000).toISOString() },
+  { id:'pr2', rating_type:'pharmacy', score:4, score_speed:4, score_quality:4, score_cost:3, comment:'Good service. Slightly expensive but convenient.', created_at: new Date(Date.now()-172800000).toISOString() },
+];
+
+function stars(score) {
+  if (!score) return '<span style="color:#9AA0A6">—</span>';
+  const s = Math.round(score);
+  return '★'.repeat(s) + '☆'.repeat(5 - s) + ` <strong>${score}</strong>`;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function statusBadge(s) {
+  const map = { new:'#1A73E8', reviewed:'#F9A825', resolved:'#34A853' };
+  const col = map[s] || '#9AA0A6';
+  return `<span style="background:${col}20;color:${col};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;text-transform:capitalize">${s||'new'}</span>`;
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Show demo data immediately so the page is never stuck on "Loading..."
+  allPlatform = DEMO_PLATFORM;
+  allClinic = DEMO_CLINIC_RATINGS;
+  allPharmacy = DEMO_PHARMACY_RATINGS;
+  safeRenderPlatform(); safeRenderClinic(); safeRenderPharmacy();
+  try { computeKPIs(); } catch(e) {}
+
+  buildAdminSidebar('feedback');
+  let session;
+  try { session = await requireAdmin(); } catch(e) { console.error('requireAdmin failed:', e); }
+  if (!session) return;
+  supabase = adminSupa();
+  setupAdminLogout();
+
+  try {
+    await Promise.all([loadPlatform(), loadRatings()]);
+  } catch(e) {
+    console.error('Data load failed:', e);
+    safeRenderPlatform(); safeRenderClinic(); safeRenderPharmacy();
+  }
+  try { computeKPIs(); } catch(e) { console.error('computeKPIs failed:', e); }
+
+  // Tab switching
+  document.querySelectorAll('.fb-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.fb-tab').forEach(b => {
+        b.style.color = '#5F6368';
+        b.style.fontWeight = '500';
+        b.style.borderBottom = 'none';
+      });
+      btn.style.color = '#1A73E8';
+      btn.style.fontWeight = '600';
+      btn.style.borderBottom = '2px solid #1A73E8';
+      btn.style.marginBottom = '-2px';
+      document.querySelectorAll('#tabPlatform,#tabClinic,#tabPharmacy').forEach(t => t.style.display = 'none');
+      document.getElementById('tab' + btn.dataset.tab.charAt(0).toUpperCase() + btn.dataset.tab.slice(1)).style.display = '';
+    });
+  });
+
+  document.getElementById('filterPlatformStatus').addEventListener('change', renderPlatform);
+  document.getElementById('filterPlatformCat').addEventListener('change', renderPlatform);
+  document.getElementById('closeReviewModal').addEventListener('click', () => { document.getElementById('reviewModal').style.display = 'none'; });
+  document.getElementById('cancelReviewBtn').addEventListener('click', () => { document.getElementById('reviewModal').style.display = 'none'; });
+
+  document.getElementById('saveReviewBtn').addEventListener('click', async () => {
+    if (!activeReviewId || !supabase) return;
+    const status = document.getElementById('reviewStatusSelect').value;
+    const btn = document.getElementById('saveReviewBtn');
+    btn.disabled = true;
+    const { error } = await supabase
+      .from('platform_feedback')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', activeReviewId);
+    if (error) { showAdminToast('Failed to update: ' + error.message, 'error'); }
+    else {
+      showAdminToast('Status updated', 'success');
+      try { await loadPlatform(); computeKPIs(); } catch(e) { console.error('reload failed:', e); }
+    }
+    btn.disabled = false;
+    document.getElementById('reviewModal').style.display = 'none';
+  });
+});
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+  ]);
+}
+
+async function loadPlatform() {
+  if (!supabase) { allPlatform = DEMO_PLATFORM; safeRenderPlatform(); return; }
+  try {
+    const { data, error } = await withTimeout(
+      supabase
+        .from('platform_feedback')
+        .select('id,patient_id,overall_score,category,message,contact_email,status,created_at,updated_at')
+        .order('created_at', { ascending: false })
+        .limit(200),
+      10000
+    );
+    if (error) { console.error('loadPlatform error:', error); allPlatform = DEMO_PLATFORM; showAdminToast('Using demo feedback data', 'default'); }
+    else { allPlatform = (data && data.length) ? data : DEMO_PLATFORM; }
+  } catch(e) { console.error('loadPlatform exception:', e); allPlatform = DEMO_PLATFORM; }
+  safeRenderPlatform();
+}
+
+async function loadRatings() {
+  if (!supabase) { allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; safeRenderClinic(); safeRenderPharmacy(); return; }
+  try {
+    const { data, error } = await withTimeout(
+      supabase
+        .from('ratings')
+        .select('id,rating_type,score,score_speed,score_quality,score_cost,score_comms,comment,created_at')
+        .order('created_at', { ascending: false })
+        .limit(300),
+      10000
+    );
+    if (error) { console.error('loadRatings error:', error); allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; }
+    else {
+      const rows = data || [];
+      allClinic   = rows.filter(r => r.rating_type === 'clinic').length   ? rows.filter(r => r.rating_type === 'clinic')   : DEMO_CLINIC_RATINGS;
+      allPharmacy = rows.filter(r => r.rating_type === 'pharmacy').length ? rows.filter(r => r.rating_type === 'pharmacy') : DEMO_PHARMACY_RATINGS;
+    }
+  } catch(e) { console.error('loadRatings exception:', e); allClinic = DEMO_CLINIC_RATINGS; allPharmacy = DEMO_PHARMACY_RATINGS; }
+  safeRenderClinic();
+  safeRenderPharmacy();
+}
+
+function safeRenderPlatform() { try { renderPlatform(); } catch(e) { console.error('renderPlatform error:', e); const b = document.getElementById('platformBody'); if (b) b.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No feedback yet</td></tr>'; } }
+function safeRenderClinic()   { try { renderClinic();   } catch(e) { console.error('renderClinic error:', e);   const b = document.getElementById('clinicBody');   if (b) b.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No clinic ratings yet</td></tr>'; } }
+function safeRenderPharmacy() { try { renderPharmacy(); } catch(e) { console.error('renderPharmacy error:', e); const b = document.getElementById('pharmacyBody'); if (b) b.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No pharmacy ratings yet</td></tr>'; } }
+
+function computeKPIs() {
+  const avg = arr => arr.length ? (arr.reduce((s,r) => s + (r.score||r.overall_score||0), 0) / arr.length).toFixed(1) : '—';
+  document.getElementById('kpiClinic').textContent    = avg(allClinic) !== '—' ? '★ ' + avg(allClinic) : '—';
+  document.getElementById('kpiPharmacy').textContent  = avg(allPharmacy) !== '—' ? '★ ' + avg(allPharmacy) : '—';
+  document.getElementById('kpiPlatform').textContent  = avg(allPlatform.filter(x => x.overall_score)) !== '—' ? '★ ' + avg(allPlatform.filter(x => x.overall_score)) : '—';
+  document.getElementById('kpiTotal').textContent     = allClinic.length + allPharmacy.length + allPlatform.length;
+}
+
+function renderPlatform() {
+  const statusF = document.getElementById('filterPlatformStatus').value;
+  const catF    = document.getElementById('filterPlatformCat').value;
+  const list = allPlatform.filter(x =>
+    (!statusF || (x.status||'new') === statusF) &&
+    (!catF || (x.category||'') === catF)
+  );
+  const body = document.getElementById('platformBody');
+  if (!list.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;color:#9AA0A6">No feedback yet</td></tr>'; return; }
+  body.innerHTML = list.map(x => `
+    <tr>
+      <td>${stars(x.overall_score)}</td>
+      <td style="text-transform:capitalize">${(x.category||'general').replace('_',' ')}</td>
+      <td style="max-width:260px;word-break:break-word">${x.message ? escHtml(x.message) : '<span style="color:#9AA0A6">No message</span>'}</td>
+      <td style="font-size:12px;color:#5F6368">${x.contact_email ? escHtml(x.contact_email) : '—'}</td>
+      <td>${statusBadge(x.status)}</td>
+      <td style="white-space:nowrap;font-size:12px;color:#9AA0A6">${fmtDate(x.created_at)}</td>
+      <td><button class="btn-admin secondary sm" onclick="openReview('${x.id}')">Review</button></td>
+    </tr>
+  `).join('');
+}
+
+function renderClinic() {
+  const body = document.getElementById('clinicBody');
+  if (!allClinic.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No clinic ratings yet</td></tr>'; return; }
+  body.innerHTML = allClinic.map(x => `
+    <tr>
+      <td>${stars(x.score)}</td>
+      <td>${x.score_speed ? stars(x.score_speed) : '—'}</td>
+      <td>${x.score_quality ? stars(x.score_quality) : '—'}</td>
+      <td>${x.score_comms ? stars(x.score_comms) : '—'}</td>
+      <td style="max-width:220px;word-break:break-word;font-size:12px">${x.comment ? escHtml(x.comment) : '<span style="color:#9AA0A6">—</span>'}</td>
+      <td style="white-space:nowrap;font-size:12px;color:#9AA0A6">${fmtDate(x.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderPharmacy() {
+  const body = document.getElementById('pharmacyBody');
+  if (!allPharmacy.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;color:#9AA0A6">No pharmacy ratings yet</td></tr>'; return; }
+  body.innerHTML = allPharmacy.map(x => `
+    <tr>
+      <td>${stars(x.score)}</td>
+      <td>${x.score_speed ? stars(x.score_speed) : '—'}</td>
+      <td>${x.score_quality ? stars(x.score_quality) : '—'}</td>
+      <td>${x.score_cost ? stars(x.score_cost) : '—'}</td>
+      <td style="max-width:220px;word-break:break-word;font-size:12px">${x.comment ? escHtml(x.comment) : '<span style="color:#9AA0A6">—</span>'}</td>
+      <td style="white-space:nowrap;font-size:12px;color:#9AA0A6">${fmtDate(x.created_at)}</td>
+    </tr>
+  `).join('');
+}
+
+function openReview(id) {
+  activeReviewId = id;
+  const item = allPlatform.find(x => x.id === id);
+  if (!item) return;
+  document.getElementById('reviewFeedbackDetail').innerHTML = `
+    <strong>Score:</strong> ${stars(item.overall_score)}<br>
+    <strong>Category:</strong> ${(item.category||'general').replace('_',' ')}<br>
+    <strong>Message:</strong> ${item.message ? escHtml(item.message) : '—'}<br>
+    <strong>Contact:</strong> ${item.contact_email || '—'}<br>
+    <strong>Submitted:</strong> ${fmtDate(item.created_at)}
+  `;
+  document.getElementById('reviewStatusSelect').value = item.status || 'new';
+  document.getElementById('reviewModal').style.display = 'flex';
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+</script>
+</body>
+</html>

@@ -55,7 +55,44 @@ function requireClinic() {
   return s;
 }
 
+function setupClinicMobileNav() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const topbar  = document.querySelector('.admin-topbar');
+  if (!sidebar || !topbar) return;
+
+  // Inject hamburger into topbar
+  if (!topbar.querySelector('.sidebar-hamburger')) {
+    const burger = document.createElement('button');
+    burger.className = 'sidebar-hamburger';
+    burger.innerHTML = '<span class="material-icons-outlined">menu</span>';
+    burger.setAttribute('aria-label', 'Open navigation menu');
+    topbar.insertBefore(burger, topbar.firstChild);
+  }
+
+  // Inject overlay
+  if (!document.getElementById('_sidebarOverlay')) {
+    const overlay = document.createElement('div');
+    overlay.id = '_sidebarOverlay';
+    overlay.className = 'sidebar-overlay';
+    document.body.appendChild(overlay);
+  }
+
+  const toggle = (open) => {
+    sidebar.classList.toggle('open', open);
+    document.getElementById('_sidebarOverlay').classList.toggle('active', open);
+  };
+
+  topbar.querySelector('.sidebar-hamburger').onclick = () => toggle(!sidebar.classList.contains('open'));
+  document.getElementById('_sidebarOverlay').onclick = () => toggle(false);
+  sidebar.querySelectorAll('.sidebar-link').forEach(l =>
+    l.addEventListener('click', () => { if (window.innerWidth <= 768) toggle(false); })
+  );
+}
+
 function setupClinicLogout() {
+  // Setup mobile nav (called from every portal page after DOMContentLoaded)
+  setupClinicMobileNav();
+
   document.getElementById('clinicLogoutBtn')?.addEventListener('click', async () => {
     // Sign out of Supabase auth so the session token is invalidated
     const cfg = window.HOMATT_CONFIG || {};
@@ -70,6 +107,41 @@ function setupClinicLogout() {
     localStorage.removeItem('clinic_session');
     window.location.href = 'index.html';
   });
+}
+
+/**
+ * Resolves the clinic_id for the logged-in staff member.
+ * If the session already has a clinicId, returns it immediately.
+ * Otherwise queries portal_users, updates the stored session, and returns it.
+ * Returns null for demo sessions or when no clinic is linked.
+ */
+async function resolveClinicId(supabase, session) {
+  if (!session || session.demo) return null;
+  if (session.clinicId) return session.clinicId;
+  if (!supabase) return null;
+
+  try {
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData?.session?.user) return null;
+
+    const { data: pu } = await supabase
+      .from('portal_users')
+      .select('clinic_id, clinics(name)')
+      .eq('auth_user_id', authData.session.user.id)
+      .eq('role', 'clinic_staff')
+      .eq('is_active', true)
+      .single();
+
+    if (pu?.clinic_id) {
+      const updated = Object.assign({}, session, {
+        clinicId: pu.clinic_id,
+        clinicName: pu.clinics?.name || session.clinicName || 'Clinic',
+      });
+      localStorage.setItem('clinic_session', JSON.stringify(updated));
+      return pu.clinic_id;
+    }
+  } catch (e) { /* network error — fail gracefully */ }
+  return null;
 }
 
 function showToast(msg, type = 'success') {

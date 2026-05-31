@@ -3,6 +3,19 @@
    Android Material Design Inspired
    ============================ */
 
+/* Page-entry animation — fades and slides the phone-frame in when a new
+   page loads. navTo() fades OUT before navigating; this fades IN on arrival.
+   Skip the animation when the user prefers reduced motion. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .phone-frame {
+    animation: page-enter 0.18s ease both;
+  }
+}
+
 :root {
   --primary: #1B5E20;
   --primary-light: #4CAF50;
@@ -39,46 +52,108 @@
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #2C2C2C;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
+  background: var(--background);
+  padding: 0;
+  margin: 0;
+  min-height: 0;
+  /* Use dvh (dynamic viewport height) so the body shrinks when the keyboard
+     opens. svh (stable) would NOT shrink — last rule wins, so the previous
+     declaration "height:100svh" was overriding 100dvh and breaking
+     adjustResize keyboard handling.  Fallback to 100% for older WebView. */
+  height: 100%;
+  height: 100dvh;
 }
 
-/* Phone Frame */
+html {
+  height: 100%;
+  background: var(--background);
+}
+
+/* Phone Frame — mobile default: full screen, no decorative border */
 .phone-frame {
   width: 100%;
-  max-width: 393px;
-  height: 852px;
+  max-width: 100%;
+  height: 100%;
   background: var(--background);
-  border-radius: 40px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 0 0 4px #1a1a1a, 0 0 0 6px #333, var(--shadow-lg);
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   position: relative;
 }
 
-/* On actual mobile, remove the frame and status bar */
-@media (max-width: 430px) {
+/* Hide the fake status bar on real devices — the OS provides its own */
+.status-bar {
+  display: none !important;
+}
+
+/* ── Desktop preview only (≥ 600 px) ─────────────────────────────────────
+   Shows the phone-shaped canvas that makes the web preview look nice.
+   On actual Android devices this block never fires.                     */
+@media (min-width: 600px) {
+  html {
+    height: auto;
+    background: #2C2C2C;
+  }
   body {
-    background: var(--background);
-    padding: 0;
-    align-items: flex-start;
+    background: #2C2C2C;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+    height: auto;
   }
   .phone-frame {
-    border-radius: 0;
-    box-shadow: none;
-    height: 100dvh;        /* dynamic viewport height — no chrome overlap */
-    height: 100vh;         /* fallback for older Android */
-    max-width: 100%;
+    max-width: 393px;
+    height: 852px;
+    border-radius: 40px;
+    box-shadow: 0 0 0 4px #1a1a1a, 0 0 0 6px #333, var(--shadow-lg);
   }
-  /* Hide the fake status bar — phone already has one */
   .status-bar {
-    display: none !important;
+    display: flex !important;
   }
+}
+
+/* ── Keyboard handling ───────────────────────────────────────────────────── */
+/* windowSoftInputMode=adjustResize: Android shrinks the WebView viewport to
+   the area above the keyboard.  position:fixed modals with bottom:0 /
+   align-items:flex-end automatically sit just above the keyboard — no JS or
+   align-items change needed.
+   The ONLY thing we must fix is max-height: vh/dvh values are relative to the
+   INITIAL (pre-keyboard) viewport on some older WebViews, so we cap them to
+   100% (percentage of the now-smaller containing block) instead.
+   NEVER change align-items to flex-start — that moves the modal to the top of
+   the screen and leaves the modal background visible below it as a black gap. */
+@media (max-width: 599px) {
+  body.keyboard-open .bottom-sheet.open {
+    max-height: 100%;
+  }
+
+  /* Bottom-sheet modals: only cap inner content height */
+  body.keyboard-open [class*="modal-bg"].open > div,
+  body.keyboard-open .cc-modal-bg > div {
+    max-height: 100% !important;
+  }
+
+  /* Center-aligned dialogs: just ensure they don't overflow */
+  body.keyboard-open .modal-overlay > .modal-content {
+    max-height: 85% !important;
+    overflow-y: auto !important;
+  }
+}
+
+/* ── Global input sizing — 16px prevents Android/iOS from zooming/reflowing
+   the viewport when an input is focused, which is what causes the "freeze"
+   and layout jump the user sees when the keyboard opens.                   */
+input, textarea, select {
+  font-size: 16px;
+  font-family: inherit;
+}
+/* Restore smaller sizes for desktop preview only */
+@media (min-width: 600px) {
+  input, textarea, select { font-size: 14px; }
 }
 
 /* Status Bar */
@@ -103,10 +178,17 @@ body {
 /* App Screen */
 .app-screen {
   flex: 1;
+  /* min-height:0 is required for flexbox scroll containers.
+     Without it, the default min-height:auto lets this item grow to fit content,
+     which means overflow-y:auto never has a fixed height to scroll against. */
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+  /* NOTE: scroll-behavior:smooth intentionally removed.
+     On Android WebView with Capacitor resize:body, CSS smooth scroll causes
+     the viewport-resize scroll event (triggered when keyboard opens) to animate,
+     which conflicts with any JS scrollTo() call, producing a visual freeze. */
 }
 
 .app-screen::-webkit-scrollbar {
@@ -795,11 +877,18 @@ body {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding: 8px 0;
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  padding: 6px 4px;
+  padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   background: var(--surface);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  /* Hardware-accelerated to stay crisp during page scroll */
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
+  will-change: auto;
 }
 
 .nav-item {
@@ -810,7 +899,18 @@ body {
   padding: 4px 16px;
   color: var(--text-hint);
   cursor: pointer;
-  transition: color 0.2s ease;
+  transition: color 0.15s ease, transform 0.1s ease;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  border-radius: 12px;
+  min-width: 56px;
+}
+
+.nav-item:active {
+  transform: scale(0.88);
+  color: var(--primary);
 }
 
 .nav-item.active {
@@ -986,7 +1086,6 @@ body.keyboard-open .sheet-body {
 /* ============================================
    PERFORMANCE — GPU layers for animated elements
    ============================================ */
-.app-screen,
 .bottom-nav,
 .dash-header,
 .tracker-tabs,
@@ -995,6 +1094,15 @@ body.keyboard-open .sheet-body {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
   will-change: transform;
+}
+/* .app-screen intentionally excluded from will-change:transform.
+   Applying will-change:transform to an overflow scroll container on Android
+   WebView causes compositing conflicts during keyboard-driven viewport resizes,
+   contributing to the input-focus freeze. translateZ(0) hardware acceleration
+   is still applied separately via the scroll performance block below. */
+.app-screen {
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 /* Smooth scroll on Android Chrome */
@@ -1011,7 +1119,7 @@ body.keyboard-open .sheet-body {
 }
 
 /* Larger tap targets on mobile for old Android */
-@media (max-width: 430px) {
+@media (max-width: 599px) {
   .btn, .choice-btn, .tracker-tab {
     min-height: 48px;
   }
@@ -1045,12 +1153,15 @@ body.keyboard-open .sheet-body {
   --shadow-lg: 0 8px 24px rgba(0,0,0,0.5);
 }
 
-[data-theme="dark"] body {
-  background: #0A0A0A;
-}
-
-[data-theme="dark"] .phone-frame {
-  box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
+/* Dark body background only applies on desktop preview (≥ 600 px canvas).
+   On the actual device the phone-frame fills 100% so this never bleeds through. */
+@media (min-width: 600px) {
+  [data-theme="dark"] body {
+    background: #0A0A0A;
+  }
+  [data-theme="dark"] .phone-frame {
+    box-shadow: 0 0 0 4px #333, 0 0 0 6px #555, 0 20px 60px rgba(0,0,0,0.6);
+  }
 }
 
 [data-theme="dark"] .bottom-nav {
@@ -1070,26 +1181,44 @@ body.keyboard-open .sheet-body {
   background: #1E1E1E;
 }
 
-/* Global dark mode: ensure ALL inputs, selects and textareas are readable */
-[data-theme="dark"] input,
+/* Global dark mode: ensure ALL inputs, selects and textareas are readable.
+   !important is needed because many pages set inline `background:#fff` which
+   would otherwise leave white text on a white field (invisible in dark mode). */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]),
 [data-theme="dark"] select,
 [data-theme="dark"] textarea {
-  background: #2C2C2C;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
-  border-color: #555;
+  background: #2C2C2C !important;
+  color: #E8EAED !important;
+  -webkit-text-fill-color: #E8EAED !important;
+  border-color: #555 !important;
+  caret-color: #66BB6A;
 }
-[data-theme="dark"] input:focus,
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):focus,
 [data-theme="dark"] select:focus,
 [data-theme="dark"] textarea:focus {
-  background: #3a3a3a;
-  color: #E8EAED;
-  -webkit-text-fill-color: #E8EAED;
+  background: #3a3a3a !important;
+  color: #E8EAED !important;
+  -webkit-text-fill-color: #E8EAED !important;
 }
 [data-theme="dark"] input::placeholder,
 [data-theme="dark"] textarea::placeholder {
-  color: #6E7478;
+  color: #6E7478 !important;
   opacity: 1;
+}
+/* Date/time pickers use the OS calendar widget — invert its icon for dark mode */
+[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="time"]::-webkit-calendar-picker-indicator,
+[data-theme="dark"] input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(1.4);
+}
+/* Autofill background overrides (Chromium WebView keeps a yellow background) */
+[data-theme="dark"] input:-webkit-autofill,
+[data-theme="dark"] input:-webkit-autofill:hover,
+[data-theme="dark"] input:-webkit-autofill:focus,
+[data-theme="dark"] textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #2C2C2C inset !important;
+  -webkit-text-fill-color: #E8EAED !important;
+  caret-color: #66BB6A;
 }
 
 /* Dark mode input fields — clearly visible white text on dark bg */

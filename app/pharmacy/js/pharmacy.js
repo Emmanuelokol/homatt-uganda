@@ -45,6 +45,31 @@ function buildPharmacySidebar(activePage) {
         <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
       </button>
     </div>`;
+
+  // ── Mobile hamburger ──
+  const topbar = document.querySelector('.admin-topbar');
+  if (topbar && !topbar.querySelector('.sidebar-hamburger')) {
+    const burger = document.createElement('button');
+    burger.className = 'sidebar-hamburger';
+    burger.innerHTML = '<span class="material-icons-outlined">menu</span>';
+    topbar.insertBefore(burger, topbar.firstChild);
+  }
+  if (!document.getElementById('_sidebarOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = '_sidebarOverlay'; ov.className = 'sidebar-overlay';
+    document.body.appendChild(ov);
+  }
+  const toggle = (open) => {
+    el.classList.toggle('open', open);
+    document.getElementById('_sidebarOverlay').classList.toggle('active', open);
+  };
+  const burger = topbar?.querySelector('.sidebar-hamburger');
+  if (burger) burger.onclick = () => toggle(!el.classList.contains('open'));
+  const ov = document.getElementById('_sidebarOverlay');
+  if (ov) ov.onclick = () => toggle(false);
+  el.querySelectorAll('.sidebar-link').forEach(l =>
+    l.addEventListener('click', () => { if (window.innerWidth <= 768) toggle(false); })
+  );
 }
 
 /* ── Session management ── */

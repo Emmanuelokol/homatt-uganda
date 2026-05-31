@@ -81,8 +81,50 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateTime();
   setInterval(updateTime, 30000);
 
+  // ====== Photo lightbox (tap clinic photo to enlarge) ======
+  function showPhotoLightbox(src, caption) {
+    if (!src) return;
+    const overlay = document.createElement('div');
+    overlay.id = '_photoLightbox';
+    overlay.style.cssText = [
+      'position:fixed', 'inset:0', 'background:rgba(0,0,0,.92)',
+      'z-index:99999', 'display:flex', 'flex-direction:column',
+      'align-items:center', 'justify-content:center', 'padding:20px',
+      'opacity:0', 'transition:opacity .18s ease',
+    ].join(';');
+    overlay.innerHTML = `
+      <button id="_pbClose" aria-label="Close"
+        style="position:absolute;top:18px;right:18px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)">
+        <span class="material-icons-outlined" style="font-size:24px">close</span>
+      </button>
+      <img src="${src}" alt="${(caption || 'Clinic photo').replace(/"/g, '&quot;')}"
+        style="max-width:100%;max-height:80vh;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.6);object-fit:contain" />
+      ${caption ? `<div style="color:#fff;font-size:14px;margin-top:14px;text-align:center;max-width:90%;text-shadow:0 1px 2px rgba(0,0,0,.5)">${caption}</div>` : ''}
+    `;
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => { overlay.style.opacity = '1'; });
+
+    const close = () => {
+      overlay.style.opacity = '0';
+      setTimeout(() => overlay.remove(), 180);
+    };
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay || e.target.closest('#_pbClose')) close();
+    });
+    // Close on Android back button / Escape
+    const onKey = (e) => { if (e.key === 'Escape') { close(); document.removeEventListener('keydown', onKey); } };
+    document.addEventListener('keydown', onKey);
+  }
+  // Expose for inline onclick handlers in dynamically-built HTML
+  window._homattShowPhoto = showPhotoLightbox;
+
   // ====== Screen Navigation ======
   function showScreen(screenId) {
+    // Dismiss keyboard before switching screens — otherwise the keyboard
+    // from a textarea stays open even after the textarea is hidden.
+    if (document.activeElement && document.activeElement !== document.body) {
+      document.activeElement.blur();
+    }
     screens.forEach(s => s.classList.remove('active'));
     document.getElementById(screenId).classList.add('active');
     currentScreen = screenId;
@@ -106,6 +148,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   backBtn.addEventListener('click', handleBack);
+
+  // Scroll the monitoring action textarea into view when the user taps it.
+  // The monitoring screen has a header + condition card + tips card above it,
+  // so the textarea starts off-screen once the keyboard opens. Scrolling it
+  // into view prevents it being hidden behind the keyboard.
+  document.getElementById('monitorInitialAction').addEventListener('focus', () => {
+    setTimeout(() => {
+      const el = document.getElementById('monitorInitialAction');
+      if (!el) return;
+      const scroller = document.querySelector('.app-screen');
+      if (!scroller) return;
+      const elRect = el.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+        - (scroller.clientHeight / 2) + (elRect.height / 2);
+      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+    }, 350); // after the keyboard animation (~300 ms) settles
+  });
 
   // Register with native-bridge so the Android hardware back button does the same
   window.HomattBackHandler = function () {
@@ -928,14 +988,52 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const actionArea = document.getElementById('actionArea');
     actionArea.innerHTML = '';
 
-    // Consultation fee estimate based on condition
+    // Pricing transparency — early vs late detection cost data per condition
     const topCond = (data.conditions[0]?.name || '').toLowerCase();
-    const feeRange = topCond.includes('malaria') || topCond.includes('typhoid') ? 'UGX 20,000 – 35,000' :
-                     topCond.includes('uti') || topCond.includes('gastro') ? 'UGX 15,000 – 25,000' :
-                     topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory') ? 'UGX 10,000 – 20,000' :
-                     topCond.includes('headache') || topCond.includes('pain') ? 'UGX 10,000 – 20,000' :
-                     topCond.includes('diabetes') || topCond.includes('chronic') ? 'UGX 25,000 – 50,000' :
-                     'UGX 10,000 – 30,000';
+    const condLabel = data.conditions[0]?.name || 'this condition';
+    const pricingData = topCond.includes('malaria') || topCond.includes('typhoid')
+      ? { early: 'UGX 20,000 – 35,000', late: 'UGX 150,000 – 450,000', lateNote: 'hospitalisation, IV drugs, complications' }
+      : topCond.includes('uti') || topCond.includes('urinary')
+      ? { early: 'UGX 15,000 – 25,000', late: 'UGX 80,000 – 200,000', lateNote: 'kidney infection, surgery risk' }
+      : topCond.includes('gastro') || topCond.includes('diarrhea') || topCond.includes('stomach')
+      ? { early: 'UGX 15,000 – 25,000', late: 'UGX 100,000 – 300,000', lateNote: 'dehydration, IV fluids, admission' }
+      : topCond.includes('diabetes') || topCond.includes('chronic')
+      ? { early: 'UGX 25,000 – 50,000', late: 'UGX 300,000 – 1,000,000+', lateNote: 'complications: kidney, eyes, amputation' }
+      : topCond.includes('cold') || topCond.includes('flu') || topCond.includes('respiratory')
+      ? { early: 'UGX 10,000 – 20,000', late: 'UGX 60,000 – 150,000', lateNote: 'pneumonia, oxygen, admission' }
+      : topCond.includes('headache') || topCond.includes('pain')
+      ? { early: 'UGX 10,000 – 20,000', late: 'UGX 50,000 – 120,000', lateNote: 'specialist visits, advanced scans' }
+      : { early: 'UGX 10,000 – 30,000', late: 'UGX 80,000 – 400,000', lateNote: 'delayed complications, hospitalisation' };
+
+    // Pricing transparency card — shown whenever a clinic visit is suggested
+    const pricingCard = `
+      <div style="background:#fff;border:1.5px solid #E0E0E0;border-radius:14px;overflow:hidden;margin-bottom:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06)">
+        <div style="background:linear-gradient(135deg,#1B5E20,#2E7D32);padding:10px 14px;display:flex;align-items:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px;color:#fff">payments</span>
+          <span style="font-size:13px;font-weight:700;color:#fff">Early Detection Pricing</span>
+        </div>
+        <div style="padding:12px 14px">
+          <div style="display:flex;gap:10px;margin-bottom:10px">
+            <div style="flex:1;background:#E8F5E9;border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:#2E7D32;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Detect Early</div>
+              <div style="font-size:14px;font-weight:700;color:#1B5E20;line-height:1.3">${pricingData.early}</div>
+              <div style="font-size:10px;color:#4CAF50;margin-top:3px">consultation + test</div>
+            </div>
+            <div style="display:flex;align-items:center;flex-direction:column;justify-content:center;gap:4px;flex-shrink:0">
+              <span class="material-icons-outlined" style="font-size:20px;color:#BDBDBD">arrow_forward</span>
+              <span style="font-size:9px;color:#9E9E9E;font-weight:600">vs</span>
+            </div>
+            <div style="flex:1;background:#FFEBEE;border-radius:10px;padding:10px;text-align:center">
+              <div style="font-size:10px;font-weight:700;color:#C62828;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Treat Late</div>
+              <div style="font-size:14px;font-weight:700;color:#B71C1C;line-height:1.3">${pricingData.late}</div>
+              <div style="font-size:10px;color:#EF9A9A;margin-top:3px">${pricingData.lateNote}</div>
+            </div>
+          </div>
+          <div style="background:#FFF8E1;border-left:3px solid #FFC107;border-radius:6px;padding:8px 10px;font-size:11.5px;color:#5D4037;line-height:1.55">
+            <strong>Prices shown are early consultation rates</strong> from our partner clinics — set to make detection affordable. What happens if you wait? ${condLabel} caught late costs <strong>5–15× more</strong> and carries far higher health risks. The best time to go is now.
+          </div>
+        </div>
+      </div>`;
 
     if (data.overall_risk === 'high' || data.should_visit_clinic || data.clinic_urgency === 'urgent') {
       actionArea.innerHTML = `
@@ -943,10 +1041,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">emergency</span>
           <p>Based on your symptoms, we strongly recommend visiting a health facility as soon as possible.</p>
         </div>
-        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
-          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
-        </div>
+        ${pricingCard}
         <button class="btn sc-clinic-btn urgent" id="btnBookClinic">
           <span class="material-icons-outlined">local_hospital</span>
           Find Nearest Clinic
@@ -962,10 +1057,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">info</span>
           <p>${data.followup_message || 'Monitor your symptoms closely. If they persist or worsen, please visit a health facility.'}</p>
         </div>
-        <div style="background:#FFF8E1;border:1px solid #FFD54F;border-radius:10px;padding:10px 14px;font-size:12px;color:#795548;display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <span class="material-icons-outlined" style="font-size:16px;color:#F9A825">payments</span>
-          <span>Estimated clinic consultation fee: <strong>${feeRange}</strong></span>
-        </div>
+        ${pricingCard}
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
           Start Symptom Monitoring
@@ -981,6 +1073,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
           <span class="material-icons-outlined">check_circle</span>
           <p>${data.followup_message || 'Your symptoms appear mild. Follow the prevention tips above and monitor how you feel.'}</p>
         </div>
+        ${pricingCard}
         <button class="btn sc-monitor-btn primary" id="btnStartMonitor">
           <span class="material-icons-outlined">monitor_heart</span>
           Monitor My Symptoms
@@ -1100,16 +1193,10 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     const orderBtn = document.getElementById('btnOrderMeds');
     if (orderBtn) {
       orderBtn.addEventListener('click', () => {
-        // Map top condition name to a medicine-orders condition key
-        const cn = topCondName;
-        const condKey = cn.includes('malaria') ? 'malaria' :
-                        cn.includes('fever') || cn.includes('typhoid') ? 'fever' :
-                        cn.includes('pain') || cn.includes('headache') ? 'pain' :
-                        cn.includes('gastro') || cn.includes('diarrhea') || cn.includes('stomach') ? 'digestive' :
-                        cn.includes('respiratory') || cn.includes('cold') || cn.includes('flu') ? 'infection' :
-                        cn.includes('uti') || cn.includes('urinary') ? 'infection' :
-                        'other';
-        window.location.href = 'medicine-orders.html?condition=' + condKey;
+        // Pass AI recommendations to medicine-orders.html via localStorage so
+        // the pharmacy checkout pre-fills with the exact drugs shown to the user.
+        localStorage.setItem('homatt_ai_medicines', JSON.stringify(otcItems));
+        window.location.href = 'medicine-orders.html';
       });
     }
 
@@ -1143,35 +1230,310 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
   }
 
   // ====== SCREEN 5: Follow-up Monitoring ======
+  let countdownInterval = null;
+
+  // Prevention tips per condition (used in Phase 1 & 2)
+  function getPreventionTipsForCondition(conditionName, diagData) {
+    // Use AI-generated tips if available
+    if (diagData?.prevention_tips?.length) return diagData.prevention_tips;
+    const c = (conditionName || '').toLowerCase();
+    if (c.includes('malaria'))     return ['Sleep under a treated mosquito net tonight','Drink plenty of fluids and stay hydrated','Avoid going outside at dusk without mosquito repellent','Get a malaria rapid test (RDT) at the nearest clinic'];
+    if (c.includes('typhoid'))     return ['Drink only boiled or bottled water','Wash your hands thoroughly before eating','Eat freshly cooked food only','Visit a health facility for proper testing'];
+    if (c.includes('cold') || c.includes('respiratory') || c.includes('flu')) return ['Drink warm fluids — tea, soup, water with honey','Rest in a warm, well-ventilated room','Gargle with warm salt water for sore throat','Wash hands often to avoid spreading the infection'];
+    if (c.includes('gastro') || c.includes('diarrhea') || c.includes('stomach')) return ['Start ORS (Oral Rehydration Salts) right away','Eat small amounts of bland food: rice, bananas, toast','Avoid dairy, spicy and fatty foods until better','Visit a clinic if diarrhea lasts more than 3 days'];
+    if (c.includes('uti') || c.includes('urinary'))    return ['Drink at least 8 glasses of water today','Urinate frequently — don\'t hold it in','Avoid caffeine and alcohol while symptomatic','Visit a clinic for a urine test and antibiotics'];
+    if (c.includes('headache') || c.includes('tension')) return ['Drink 2 glasses of water immediately','Rest in a quiet, dim room for 20 minutes','Take paracetamol if the pain is strong','Apply a cool or warm cloth to your forehead'];
+    return ['Rest and get enough sleep','Drink plenty of water throughout the day','Eat light nutritious meals','Monitor your symptoms and visit a clinic if they worsen'];
+  }
+
+  function renderMonitorTipsCard(containerId, tips, conditionName) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="sc-monitor-tips-title">
+        <span class="material-icons-outlined">health_and_safety</span>
+        What to do for ${conditionName}
+      </div>
+      <ul class="sc-monitor-tips-list">
+        ${tips.map(t => `<li>${t}</li>`).join('')}
+      </ul>
+    `;
+  }
+
   function startMonitoring() {
+    const condName = diagnosisData.conditions[0]?.name || 'Your condition';
+    const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+
     monitoringSession = {
-      condition: diagnosisData.conditions[0]?.name || 'Your condition',
+      condition: condName,
       risk: diagnosisData.overall_risk,
-      startedAt: new Date().toISOString(),
+      startedAt: null, // set when countdown begins
       checkIns: [],
       symptomsSame: 0,
+      initialAction: '',
     };
 
-    localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+    // Update monitor header with personal greeting
+    const heading = document.getElementById('monitorHeading');
+    const subheading = document.getElementById('monitorSubheading');
+    if (heading) heading.textContent = `Hey ${firstName}, let's monitor your health`;
+    if (subheading) subheading.textContent = 'Follow the steps below while we check on you in 1 hour';
 
+    // Show condition card
     document.getElementById('monitorCondition').innerHTML = `
       <div class="sc-monitor-cond-card">
         <span class="material-icons-outlined">medical_information</span>
         <div>
-          <p class="sc-monitor-cond-name">Monitoring: ${monitoringSession.condition}</p>
+          <p class="sc-monitor-cond-name">Monitoring: ${condName}</p>
           <p class="sc-monitor-cond-risk">Risk level: <strong class="${monitoringSession.risk}">${monitoringSession.risk}</strong></p>
         </div>
       </div>
     `;
 
+    // Reset all phases
+    document.getElementById('monitorPhase1').style.display = 'block';
+    document.getElementById('monitorPhase2').style.display = 'none';
+    document.getElementById('monitorPhase3').style.display = 'none';
+    document.getElementById('feelingOptions').style.display = 'none';
     document.getElementById('monitorResponse').style.display = 'none';
     document.getElementById('monitorTimer').style.display = 'none';
+
+    // Render prevention tips in Phase 1
+    const tips = getPreventionTipsForCondition(condName, diagnosisData);
+    renderMonitorTipsCard('monitorTipsCard', tips, condName);
+
+    // Wire the "Start 1-Hour Monitoring" button
+    const startBtn = document.getElementById('btnStartCountdown');
+    if (startBtn) {
+      // Remove old listeners by cloning
+      const newStartBtn = startBtn.cloneNode(true);
+      startBtn.parentNode.replaceChild(newStartBtn, startBtn);
+      newStartBtn.addEventListener('click', () => {
+        const action = document.getElementById('monitorInitialAction')?.value.trim() || '';
+        monitoringSession.initialAction = action;
+        beginCountdown(tips, condName, action);
+      });
+    }
+
+    showScreen('screenMonitor');
+  }
+
+  function beginCountdown(tips, condName, initialAction) {
+    const now = new Date();
+    monitoringSession.startedAt = now.toISOString();
+    monitoringSession.countdownStartedAt = now.toISOString();
+    // nextCheckinAt tells dashboard.js when to show the banner; checkinPending=false hides it until then
+    monitoringSession.nextCheckinAt = new Date(now.getTime() + 3600000).toISOString(); // +1 hour
+    monitoringSession.checkinPending = false;
+    localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+    // Persist to Supabase so pg_cron JOB 11 can send hourly push reminders
+    try {
+      if (!window._symptomSupa) {
+        const _cfg = window.HOMATT_CONFIG || {};
+        if (_cfg.SUPABASE_URL && _cfg.SUPABASE_ANON_KEY && window.supabase) {
+          window._symptomSupa = window.supabase.createClient(_cfg.SUPABASE_URL, _cfg.SUPABASE_ANON_KEY);
+        }
+      }
+      if (window._symptomSupa) {
+        window._symptomSupa.auth.getSession().then(async ({ data }) => {
+          const userId = data?.session?.user?.id;
+          if (!userId) return;
+          // Mark any previous active sessions for this user as abandoned first
+          // so pg_cron doesn't send stale reminders
+          await window._symptomSupa
+            .from('symptom_monitoring_logs')
+            .update({ outcome: 'abandoned', ended_at: monitoringSession.startedAt })
+            .eq('user_id', userId)
+            .eq('outcome', 'active')
+            .catch(() => {});
+          // Insert the new monitoring session
+          window._symptomSupa.from('symptom_monitoring_logs').insert({
+            user_id: userId,
+            condition: condName,
+            started_at: monitoringSession.startedAt,
+            outcome: 'active',
+            check_ins: [],
+            last_checkin_at: monitoringSession.startedAt,
+          }).then(({ error }) => {
+            if (error) console.warn('[SC] monitoring log insert failed:', error.message);
+            else monitoringSession._dbLogged = true;
+          });
+        });
+      }
+    } catch (_e) { /* non-fatal */ }
+
+    // Switch to Phase 2
+    document.getElementById('monitorPhase1').style.display = 'none';
+    document.getElementById('monitorPhase2').style.display = 'block';
+
+    // Render tips in countdown card too (reminder)
+    renderMonitorTipsCard('monitorCountdownTips', tips, condName);
+
+    // Show what the user said they're doing
+    const reminderEl = document.getElementById('monitorActionReminder');
+    if (reminderEl) {
+      if (initialAction) {
+        reminderEl.style.display = 'flex';
+        reminderEl.innerHTML = `
+          <span class="material-icons-outlined" style="font-size:18px;color:#1565C0;flex-shrink:0">check_circle</span>
+          <span><strong>You're doing:</strong> ${initialAction}</span>
+        `;
+      } else {
+        reminderEl.style.display = 'none';
+      }
+    }
+
+    // Start the visual countdown
+    startCountdownTimer(3600); // 3600 seconds = 1 hour
+
+    // Request browser notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+
+    // Schedule a push notification for when the user is NOT in the app after 1 hour
+    // Uses send_after so OneSignal delivers it even if the app is backgrounded/closed
+    if (supabase && session?.user?.id) {
+      const sendAfterTime = new Date(Date.now() + 55 * 60 * 1000).toISOString();
+      supabase.functions.invoke('send-notification', {
+        body: {
+          userId:     session.user.id,
+          title:      `${condName} Check-in`,
+          message:    `It's been 1 hour. How are you feeling? Tap to check in — Better, Same or Worse.`,
+          data:       { screen: 'symptom-checkin' },
+          buttons:    [
+            { id: 'feeling_better', text: 'Better' },
+            { id: 'feeling_same',   text: 'Same' },
+            { id: 'feeling_worse',  text: 'Worse' },
+          ],
+          send_after:  sendAfterTime,
+          pref_category: 'recovery_checkins',
+        },
+      }).then(({ data: r }) => {
+        if (r?.notification_id) {
+          monitoringSession._scheduledNotifId = r.notification_id;
+          localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+        }
+      }).catch(() => {});
+    }
+
+    // Wire the "Save & End Monitoring" button
+    document.getElementById('btnSaveEndMonitor')?.addEventListener('click', endMonitoringEarly);
+  }
+
+  async function endMonitoringEarly() {
+    if (countdownInterval) { clearInterval(countdownInterval); countdownInterval = null; }
+
+    // Cancel the scheduled push if we have the notification ID
+    if (monitoringSession?._scheduledNotifId && supabase) {
+      supabase.functions.invoke('cancel-notification', {
+        body: { notification_id: monitoringSession._scheduledNotifId },
+      }).catch(() => {});
+    }
+
+    // Save outcome to Supabase
+    if (window._symptomSupa && monitoringSession?.startedAt) {
+      const { data: authData } = await window._symptomSupa.auth.getSession().catch(() => ({ data: null }));
+      const userId = authData?.session?.user?.id;
+      if (userId) {
+        window._symptomSupa.from('symptom_monitoring_logs')
+          .update({ outcome: 'abandoned', ended_at: new Date().toISOString() })
+          .eq('user_id', userId).eq('outcome', 'active').catch(() => {});
+      }
+    }
+
+    localStorage.removeItem('homatt_monitoring');
+    monitoringSession = null;
+
+    // Show a brief confirmation then go back to results
+    const phase2 = document.getElementById('monitorPhase2');
+    if (phase2) {
+      phase2.innerHTML = `
+        <div style="text-align:center;padding:28px 16px">
+          <span class="material-icons-outlined" style="font-size:48px;color:#2E7D32;display:block;margin-bottom:12px">check_circle</span>
+          <p style="font-size:16px;font-weight:700;color:var(--text-primary);margin:0 0 6px">Monitoring ended</p>
+          <p style="font-size:13px;color:var(--text-secondary);margin:0 0 20px">Your session has been saved. Stay well!</p>
+          <button onclick="window.location.href='dashboard.html'"
+            style="padding:12px 28px;background:#1B5E20;color:#fff;border:none;border-radius:10px;
+              font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
+            Back to Dashboard
+          </button>
+        </div>`;
+    }
+  }
+
+  function startCountdownTimer(totalSeconds) {
+    // Clear any existing interval
+    if (countdownInterval) clearInterval(countdownInterval);
+
+    const circumference = 2 * Math.PI * 44; // r=44 → 276.46
+    const progressCircle = document.getElementById('countdownProgressCircle');
+    const displayEl = document.getElementById('countdownDisplay');
+    let remaining = totalSeconds;
+
+    function updateDisplay() {
+      const mins = Math.floor(remaining / 60);
+      const secs = remaining % 60;
+      if (displayEl) displayEl.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+      if (progressCircle) {
+        const offset = circumference * (1 - remaining / totalSeconds);
+        progressCircle.style.strokeDashoffset = offset;
+      }
+    }
+
+    updateDisplay();
+
+    countdownInterval = setInterval(() => {
+      remaining--;
+      if (remaining < 0) remaining = 0;
+      updateDisplay();
+
+      if (remaining === 0) {
+        clearInterval(countdownInterval);
+        countdownInterval = null;
+        triggerCheckinPhase();
+      }
+    }, 1000);
+  }
+
+  function triggerCheckinPhase() {
+    const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+
+    // Mark check-in as pending so dashboard banner shows if user navigates away
+    const _ms = (() => { try { return JSON.parse(localStorage.getItem('homatt_monitoring') || 'null'); } catch(e) { return null; } })();
+    if (_ms) { _ms.checkinPending = true; try { localStorage.setItem('homatt_monitoring', JSON.stringify(_ms)); } catch(e) {} }
+
+    // Hide countdown, show check-in prompt
+    document.getElementById('monitorPhase2').style.display = 'none';
+    document.getElementById('monitorPhase3').style.display = 'block';
+    document.getElementById('feelingOptions').style.display = 'flex';
+
+    // Personalize the check-in text
+    const checkinText = document.getElementById('monitorCheckinText');
+    if (checkinText) {
+      checkinText.textContent = `Time's up, ${firstName}! How are you feeling now compared to when you started?`;
+    }
+
+    // Update header
+    const heading = document.getElementById('monitorHeading');
+    const subheading = document.getElementById('monitorSubheading');
+    if (heading) heading.textContent = 'Check-In Time!';
+    if (subheading) subheading.textContent = 'Tell us how you\'re feeling after 1 hour';
+
+    // Send browser notification if page is open
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Homatt Health Check-In', {
+        body: `Time to check in on your ${monitoringSession.condition}. How are you feeling?`,
+        icon: '/icons/icon-192.png',
+      });
+    }
+
+    // Re-enable feeling buttons and wire them
     document.querySelectorAll('.sc-feeling-btn').forEach(b => {
       b.classList.remove('selected');
       b.disabled = false;
     });
-
-    showScreen('screenMonitor');
     wireMonitoringButtons();
   }
 
@@ -1183,15 +1545,18 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       newBtn.addEventListener('click', () => {
         const feeling = newBtn.dataset.feeling;
 
+        // Disable all feeling buttons once one is selected
         document.querySelectorAll('.sc-feeling-btn').forEach(b => {
           b.classList.remove('selected');
           b.disabled = true;
         });
         newBtn.classList.add('selected');
 
+        const checkinTime = new Date().toISOString();
         monitoringSession.checkIns.push({
           feeling,
-          time: new Date().toISOString(),
+          time: checkinTime,
+          initialAction: monitoringSession.initialAction || '',
         });
 
         if (feeling === 'same') {
@@ -1201,6 +1566,23 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         }
 
         localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
+
+        // Update last_checkin_at in DB so pg_cron resets its 55-min window
+        // and doesn't send a duplicate push notification
+        if (window._symptomSupa && monitoringSession.startedAt) {
+          window._symptomSupa.auth.getSession().then(({ data }) => {
+            const userId = data?.session?.user?.id;
+            if (!userId) return;
+            window._symptomSupa
+              .from('symptom_monitoring_logs')
+              .update({ last_checkin_at: checkinTime, check_ins: monitoringSession.checkIns })
+              .eq('user_id', userId)
+              .eq('started_at', monitoringSession.startedAt)
+              .eq('outcome', 'active')
+              .catch(() => {});
+          });
+        }
+
         handleMonitoringResponse(feeling);
       });
     });
@@ -1438,14 +1820,14 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
             if (window._symptomSupa) {
               const { data: _sd } = await window._symptomSupa.auth.getSession();
               const _sess = _sd?.session || null;
-              await window._symptomSupa.from('symptom_monitoring_logs').insert({
+              await window._symptomSupa.from('symptom_monitoring_logs').upsert({
                 user_id: _sess?.user?.id || null,
                 condition: monitoringSession.condition,
                 started_at: monitoringSession.startedAt,
-                outcome: 'monitoring',
+                outcome: 'active',
                 check_ins: monitoringSession.checkIns,
-                last_action: actionText || null,
-              });
+                last_checkin_at: new Date().toISOString(),
+              }, { onConflict: 'user_id,started_at' });
             }
           } catch(_e) { console.warn('[SC] check-in save failed:', _e.message); }
 
@@ -1464,15 +1846,26 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
         });
       }
     } else if (feeling === 'worse') {
+      const firstName = user.first_name || user.firstName || user.name?.split(' ')[0] || 'there';
+      const condName = monitoringSession.condition || 'your condition';
       responseEl.innerHTML = `
         <div class="sc-monitor-msg worse">
           <span class="material-icons-outlined">emergency</span>
           <div>
-            <p class="sc-monitor-msg-title">Please seek medical attention</p>
-            <p>Your symptoms are getting worse. We strongly recommend visiting the nearest health facility as soon as possible. Don't wait - your health is important.</p>
+            <p class="sc-monitor-msg-title">${firstName}, please seek care now</p>
+            <p>Your ${condName} symptoms are getting worse after monitoring. Don't wait — visit the nearest health facility as soon as possible. Your health matters.</p>
           </div>
         </div>
-        <button class="btn sc-clinic-btn urgent" id="btnWorseClinic" style="margin-top:12px">
+        <div style="background:#FFEBEE;border:1px solid #EF9A9A;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:13px;color:#B71C1C">
+          <strong>Warning signs that need immediate attention:</strong>
+          <ul style="margin:8px 0 0 16px;line-height:1.8">
+            <li>Difficulty breathing or chest pain</li>
+            <li>High fever (above 39°C) that won't come down</li>
+            <li>Severe vomiting or diarrhea</li>
+            <li>Loss of consciousness or extreme weakness</li>
+          </ul>
+        </div>
+        <button class="btn sc-clinic-btn urgent" id="btnWorseClinic" style="margin-top:14px">
           <span class="material-icons-outlined">local_hospital</span>
           Find Nearest Clinic Now
         </button>
@@ -1505,7 +1898,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       hours === 1 ? '1 hour' : `${hours} hours`;
 
     const nextTime = new Date();
-    nextTime.setHours(nextTime.getHours() + hours);
+    nextTime.setTime(nextTime.getTime() + hours * 3600000);
     monitoringSession.nextCheckIn = nextTime.toISOString();
     localStorage.setItem('homatt_monitoring', JSON.stringify(monitoringSession));
 
@@ -1513,32 +1906,38 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    // Schedule in-page reminder using setTimeout (works while page is open)
+
+    // Show Phase 2 countdown again for the next hour
+    document.getElementById('monitorPhase3').style.display = 'none';
+    document.getElementById('monitorResponse').style.display = 'none';
+    document.getElementById('monitorTimer').style.display = 'none';
+    document.getElementById('feelingOptions').style.display = 'none';
+    document.getElementById('monitorPhase2').style.display = 'block';
+
+    const tips = getPreventionTipsForCondition(monitoringSession.condition, diagnosisData);
+    renderMonitorTipsCard('monitorCountdownTips', tips, monitoringSession.condition);
+
+    const reminderEl = document.getElementById('monitorActionReminder');
+    if (reminderEl && monitoringSession.initialAction) {
+      reminderEl.style.display = 'flex';
+      reminderEl.innerHTML = `
+        <span class="material-icons-outlined" style="font-size:18px;color:#1565C0;flex-shrink:0">check_circle</span>
+        <span><strong>Keep doing:</strong> ${monitoringSession.initialAction}</span>
+      `;
+    }
+
+    // Start countdown for next check-in
     const msUntil = nextTime - Date.now();
-    if (msUntil > 0 && msUntil < 2 * 3600000) { // only if within 2 hours
+    startCountdownTimer(Math.max(0, Math.round(msUntil / 1000)));
+
+    // Schedule in-page reminder using setTimeout (fallback if countdown misses)
+    if (msUntil > 0 && msUntil < 2 * 3600000) {
       setTimeout(() => {
-        // Show check-in if monitoring still active
         const m = JSON.parse(localStorage.getItem('homatt_monitoring') || 'null');
         if (!m) return;
-        // Send browser notification if possible
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('Homatt-health Check-in', {
-            body: `Time to check in on your ${m.condition}. How are you feeling?`,
-            icon: '/icons/icon-192.png',
-          });
-        }
-        // Re-enable buttons for new check-in
-        document.querySelectorAll('.sc-feeling-btn').forEach(b => {
-          b.classList.remove('selected');
-          b.disabled = false;
-        });
-        document.getElementById('monitorResponse').style.display = 'none';
-        document.getElementById('monitorTimer').style.display = 'none';
         if (document.getElementById('screenMonitor').classList.contains('active')) {
-          document.querySelector('.sc-subheading') &&
-            (document.querySelector('#screenMonitor .sc-subheading').textContent = 'Time for your hourly check-in. How are you feeling now?');
+          triggerCheckinPhase();
         }
-        wireMonitoringButtons();
       }, msUntil);
     }
   }
@@ -1568,6 +1967,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
       clinic_urgency:    data.clinic_urgency || 'none',
       symptoms:          enteredSymptoms,
       timestamp:         new Date().toISOString(),
+      ai_conditions:     data.conditions || [],   // all up-to-3 diagnoses with percentages
     };
     localStorage.setItem('homatt_last_triage', JSON.stringify(triageCtx));
 
@@ -1710,260 +2110,962 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
   }
 
-  // ====== Clinic Booking Modal ======
-  function openClinicBookingModal(data) {
+  // ====== Haversine distance (km) between two lat/lng points ======
+  function haversineKm(lat1, lng1, lat2, lng2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLng = (lng2 - lng1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Get user GPS coords — returns {lat, lng} or null
+  async function getUserCoords() {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        ()  => resolve(null),
+        { timeout: 6000, maximumAge: 300000 }
+      );
+    });
+  }
+
+  // ====== Clinic Booking — Full Screen Modal ======
+  async function openClinicBookingModal(diagData) {
     localStorage.setItem('homatt_clinic_reason', JSON.stringify({
-      condition: data.conditions[0]?.name || 'Health Check',
-      urgency: data.clinic_urgency || data.overall_risk,
-      symptoms: data.symptoms_identified,
+      condition: diagData.conditions[0]?.name || 'Health Check',
+      urgency: diagData.clinic_urgency || diagData.overall_risk,
+      symptoms: diagData.symptoms_identified,
     }));
 
-    // Remove existing modal if present
     const existing = document.getElementById('clinicBookingModal');
     if (existing) existing.remove();
 
     const modal = document.createElement('div');
     modal.id = 'clinicBookingModal';
-    modal.style.cssText = 'display:flex; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:flex-end';
+    modal.style.cssText = 'display:flex;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:flex-end';
+
+    const topConditionName = diagData.conditions[0]?.name || 'Health Check';
+    const urgencyColor = diagData.overall_risk === 'high' ? '#C62828' :
+                         diagData.overall_risk === 'medium' ? '#E65100' : '#1B5E20';
 
     modal.innerHTML = `
-      <div id="clinicBookingInner" style="background:#fff;border-radius:20px 20px 0 0;padding:24px;width:100%;max-height:80vh;overflow-y:auto;box-sizing:border-box">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-          <h3 style="font-size:18px;font-weight:700;color:#111">Book a Clinic Visit</h3>
-          <button id="closeBookingModal" style="background:none;border:none;cursor:pointer;padding:4px">
-            <span class="material-icons-outlined" style="font-size:24px;color:#666">close</span>
-          </button>
-        </div>
-
-        <div style="margin-bottom:16px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
-          <input id="bookingPatientName" type="text" value="${selectedPatient.name || ''}"
-            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff"
-            placeholder="Patient name" />
-        </div>
-
-        <div style="margin-bottom:16px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Select Clinic</label>
-          <select id="bookingClinicSelect"
-            style="width:100%;padding:12px 14px;border:1.5px solid #DDD;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff;appearance:none">
-            <option value="">Loading clinics...</option>
-          </select>
-        </div>
-
-        <div style="margin-bottom:20px">
-          <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Preferred Time</label>
-          <div style="display:flex;flex-direction:column;gap:8px" id="bookingTimeOptions">
-            <button class="booking-time-btn" data-time="asap" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">As soon as possible</button>
-            <button class="booking-time-btn" data-time="today_afternoon" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Today afternoon</button>
-            <button class="booking-time-btn" data-time="tomorrow_morning" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333;transition:all 0.2s">Tomorrow morning</button>
+      <div id="cbInner" style="background:#F8F9FA;border-radius:22px 22px 0 0;width:100%;min-height:62%;max-height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;box-sizing:border-box;display:flex;flex-direction:column">
+        <!-- Header -->
+        <div style="background:#fff;border-radius:22px 22px 0 0;padding:20px 20px 16px;position:sticky;top:0;z-index:2;border-bottom:1px solid #F0F0F0">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <h3 style="font-size:17px;font-weight:700;color:#111;margin:0">Clinics Near You</h3>
+            <button id="cbClose" style="background:none;border:none;cursor:pointer;padding:4px;color:#666">
+              <span class="material-icons-outlined" style="font-size:24px">close</span>
+            </button>
           </div>
+          <p style="font-size:12px;color:#666;margin:0">Based on your assessment: <strong style="color:${urgencyColor}">${topConditionName}</strong></p>
         </div>
 
-        <button id="btnConfirmBooking"
-          style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-          <span class="material-icons-outlined">check_circle</span>
-          Confirm Booking
-        </button>
+        <!-- Loading state -->
+        <div id="cbLoading" style="display:flex;flex-direction:column;align-items:center;padding:40px 20px;gap:12px">
+          <span class="material-icons-outlined" style="font-size:40px;color:#1B5E20;animation:scBounce 1s ease-in-out infinite">my_location</span>
+          <p style="font-size:14px;color:#555;text-align:center;margin:0">Finding clinics near you…</p>
+        </div>
+
+        <!-- Clinic list -->
+        <div id="cbClinicList" style="display:none;padding:12px 16px 24px"></div>
+
+        <!-- Booking confirm step — padding-bottom gives room to scroll above keyboard -->
+        <div id="cbConfirmStep" style="display:none;padding:20px 16px 120px"></div>
       </div>
     `;
 
     document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    document.getElementById('cbClose').addEventListener('click', () => modal.remove());
 
-    // Close modal on backdrop click
-    modal.addEventListener('click', (e) => {
-      if (e.target === modal) modal.remove();
+    // ── Fetch user location + clinics in parallel ──
+    async function fetchClinics() {
+      if (!supabase) return { data: null, error: 'no_supabase' };
+      const res = await supabase.from('clinics')
+        .select('*')
+        .eq('active', true)
+        .limit(300);
+      if (res.error) {
+        console.error('[Homatt] fetchClinics error:', res.error.code, res.error.message);
+      }
+      return res;
+    }
+
+    const [userCoords, clinicsResult] = await Promise.all([
+      getUserCoords(),
+      fetchClinics(),
+    ]);
+
+    const userLat = userCoords?.lat ?? null;
+    const userLng = userCoords?.lng ?? null;
+    const userDistrict = (user.district || user.location || '').toLowerCase();
+
+    // Build location context from user's saved profile — used for text matching
+    // when GPS is unavailable or clinics have no coordinates.
+    let userGeoNames = {
+      district:  (user.district  || '').toLowerCase(),
+      county:    (user.county    || '').toLowerCase(),
+      subcounty: (user.city      || user.subcounty || '').toLowerCase(),
+      parish:    (user.parish    || '').toLowerCase(),
+    };
+
+    // Override with GPS reverse-geocode when the device has a position — gives
+    // the most accurate subcounty/parish names even without clinic GPS coords.
+    if (userLat !== null && userLng !== null) {
+      try {
+        const rgRes = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${userLat}&lon=${userLng}&zoom=14&addressdetails=1`,
+          { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } }
+        );
+        if (rgRes.ok) {
+          const rg = await rgRes.json();
+          const addr = rg.address || {};
+          userGeoNames = {
+            district:  (addr.state_district || addr.county || userGeoNames.district || '').toLowerCase(),
+            county:    (addr.county || userGeoNames.county || '').toLowerCase(),
+            subcounty: (addr.village || addr.town || addr.suburb || addr.city_district || userGeoNames.subcounty || '').toLowerCase(),
+            parish:    (addr.neighbourhood || addr.hamlet || addr.isolated_dwelling || userGeoNames.parish || '').toLowerCase(),
+          };
+        }
+      } catch (_) { /* Nominatim unavailable — keep profile location */ }
+    }
+
+    // condFeeMap is built after clinics are sorted/sliced (needs real clinic IDs)
+    // { clinic_id: [{condition_name, fee, notes}, ...] }
+    let condFeeMap = {};
+
+    // If Supabase returned an error or no clinics, show a clear message rather than
+    // hiding real problems behind fake Kampala demo data.
+    if (clinicsResult.error || !clinicsResult.data?.length) {
+      document.getElementById('cbLoading').style.display = 'none';
+      document.getElementById('cbClinicList').style.display = 'block';
+      document.getElementById('cbClinicList').innerHTML = `
+        <div style="text-align:center;padding:32px 16px">
+          <span class="material-icons-outlined" style="font-size:44px;color:#9AA0A6;display:block;margin-bottom:12px">local_hospital</span>
+          <p style="font-size:15px;font-weight:600;color:#333;margin:0 0 6px">No clinics found</p>
+          <p style="font-size:13px;color:#666;margin:0 0 20px">
+            ${clinicsResult.error
+              ? 'Could not load clinics — please check your connection and try again.'
+              : 'No active clinics are registered in your area yet.'}
+          </p>
+          <a href="clinic-booking.html" style="display:inline-block;padding:12px 24px;background:#1B5E20;color:#fff;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none">
+            Open Full Clinic Booking
+          </a>
+        </div>`;
+      return;
+    }
+
+    let clinics = clinicsResult.data;
+
+    // Store full clinic objects so the booking confirm step can access services/pricing
+    let _cbClinics = clinics;
+
+    // ── Attach GPS distance to every clinic ──
+    clinics = clinics.map(c => ({
+      ...c,
+      _distKm: (userLat !== null && userLng !== null && c.latitude && c.longitude)
+        ? haversineKm(userLat, userLng, parseFloat(c.latitude), parseFloat(c.longitude))
+        : null,
+    }));
+
+    // ── Tiered local-zone filter ──
+    // Tries increasingly wide zones; only falls back to the next tier when the
+    // current one has zero results.  This ensures a user in Butto never sees
+    // Kampala clinics unless there are literally none in Butto → Namave →
+    // Kiwanga (subcounty) → the district.
+    const { district: uDist, subcounty: uSub, county: uCo, parish: uPar } = userGeoNames;
+    const hasGps = userLat !== null && userLng !== null;
+
+    function nameMatch(a, b) {
+      if (!a || !b) return false;
+      return a.includes(b) || b.includes(a);
+    }
+    function clinicMatchesParish(c) {
+      const cp = (c.parish || '').toLowerCase();
+      const cc = (c.city   || '').toLowerCase();
+      return nameMatch(cp, uPar) || nameMatch(cc, uPar);
+    }
+    function clinicMatchesSubcounty(c) {
+      const cc = (c.city   || '').toLowerCase();
+      const cp = (c.parish || '').toLowerCase();
+      return nameMatch(cc, uSub) || nameMatch(cp, uSub);
+    }
+    function clinicMatchesCounty(c) {
+      return nameMatch((c.county || '').toLowerCase(), uCo);
+    }
+    function clinicMatchesDistrict(c) {
+      const cd = (c.district || '').toLowerCase();
+      return cd === uDist || nameMatch(cd, uDist);
+    }
+
+    let locationLabel = '';
+
+    function applyTieredFilter(all) {
+      const noCoord = all.filter(c => c._distKm === null);
+
+      if (hasGps) {
+        const withDist = all.filter(c => c._distKm !== null);
+
+        if (withDist.length > 0) {
+          const sorted = [...withDist].sort((a, b) => a._distKm - b._distKm);
+
+          // Pick nearest GPS-coord clinics
+          let gpsClinics = sorted; // fallback: all GPS clinics sorted by distance
+          for (const [km, label] of [[10,'within 10 km'],[25,'within 25 km'],[60,'within 60 km']]) {
+            const r = sorted.filter(c => c._distKm <= km);
+            if (r.length >= 1) { locationLabel = label; gpsClinics = r; break; }
+          }
+          if (!locationLabel) locationLabel = 'nearest available';
+
+          // Always also include clinics without GPS coords that match the user's district/area
+          // so clinics registered without coordinates are never invisible
+          const localNoCoord = _textMatchLocal(noCoord);
+          return [...gpsClinics, ...localNoCoord];
+        }
+        // No clinic has GPS coords at all — fall through to text matching
+      }
+
+      // Text-only path (no GPS or no GPS-coord clinics found)
+      const textResult = _textMatchLocal(all);
+      if (textResult !== all) return textResult;
+      locationLabel = 'your area';
+      return all;
+    }
+
+    // Returns the closest text-tier subset of `clinics` that has ≥1 result.
+    // Falls back to all clinics so nothing is ever hidden.
+    function _textMatchLocal(clinics) {
+      const tiers = [
+        { fn: clinicMatchesParish,    label: uPar  },
+        { fn: clinicMatchesSubcounty, label: uSub  },
+        { fn: clinicMatchesCounty,    label: uCo   },
+        { fn: clinicMatchesDistrict,  label: uDist },
+      ];
+      for (const { fn, label } of tiers) {
+        if (!label) continue;
+        const r = clinics.filter(fn);
+        if (r.length >= 1) { locationLabel = locationLabel || label; return r; }
+      }
+      return clinics; // nothing matched — return all passed in
+    }
+
+    clinics = applyTieredFilter(clinics);
+
+    // Hide clinics that are closed RIGHT NOW (per their opening_hours setting),
+    // so the patient doesn't book a clinic that won't see them today.
+    // Clinics with no opening_hours configured are kept (treated as "always available").
+    function _isOpenNow(hours) {
+      if (!hours || typeof hours !== 'object') return true; // unconfigured → assume open
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const now = new Date();
+      const h = hours[days[now.getDay()]];
+      if (!h || h.closed) return false;
+      if (!h.open || !h.close) return true;
+      const [oh,om] = h.open.split(':').map(Number);
+      const [ch,cm] = h.close.split(':').map(Number);
+      const nowMin = now.getHours()*60 + now.getMinutes();
+      return nowMin >= (oh*60+om) && nowMin < (ch*60+cm);
+    }
+    const beforeFilter = clinics.length;
+    clinics = clinics.filter(c => _isOpenNow(c.opening_hours));
+    if (beforeFilter && !clinics.length) {
+      // All filtered out — fall back to showing all so the user isn't left empty-handed
+      clinics = clinicsResult.data || [];
+    }
+
+    // Sort order: GPS clinics <10 km → local no-GPS clinics (same district) → GPS clinics >10 km
+    // This ensures clinics registered without coordinates (but in the user's area) appear
+    // before far-away GPS clinics, not after them.
+    const NEAR_KM = 10;
+    clinics.sort((a, b) => {
+      const aNear = a._distKm !== null && a._distKm <= NEAR_KM;
+      const bNear = b._distKm !== null && b._distKm <= NEAR_KM;
+      if (aNear && !bNear) return -1;
+      if (!aNear && bNear) return 1;
+      if (aNear && bNear) return a._distKm - b._distKm;
+      // Both non-near: no-GPS local clinics sort before distant GPS clinics
+      if (a._distKm === null && b._distKm !== null) return -1;
+      if (a._distKm !== null && b._distKm === null) return 1;
+      if (a._distKm !== null && b._distKm !== null) return a._distKm - b._distKm;
+      return (a.name || '').localeCompare(b.name || '');
     });
-    document.getElementById('closeBookingModal').addEventListener('click', () => modal.remove());
 
-    // Time selection
-    let selectedTime = 'asap';
-    document.querySelectorAll('.booking-time-btn').forEach(btn => {
+    clinics = clinics.slice(0, 10);
+    _cbClinics = clinics;
+
+    // ── Fetch ALL condition fees for the top clinics (sequential — needs IDs first) ──
+    // Fetches every row from clinic_condition_fees for the returned clinics so that
+    // ALL AI conditions (not just the top one's first word) can be matched.
+    if (supabase) {
+      const realIds = clinics.filter(c => !String(c.id).startsWith('mock-')).map(c => c.id);
+      if (realIds.length) {
+        const feesRes = await supabase.from('clinic_condition_fees')
+          .select('clinic_id, condition_name, fee, notes')
+          .in('clinic_id', realIds);
+        if (feesRes?.data) {
+          feesRes.data.forEach(row => {
+            if (!condFeeMap[row.clinic_id]) condFeeMap[row.clinic_id] = [];
+            condFeeMap[row.clinic_id].push(row);
+          });
+        }
+      }
+    }
+
+    // Returns the best-matching fee row for a clinic given the AI conditions list,
+    // or null when no condition fee has been entered for this clinic.
+    function getBestFeeMatch(clinicId) {
+      const fees = condFeeMap[clinicId] || [];
+      if (!fees.length) return null;
+      for (const cond of (diagData.conditions || [])) {
+        // Split condition name into meaningful words (>3 chars) for fuzzy matching
+        const words = cond.name.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+        const match = fees.find(f => {
+          const fn = f.condition_name.toLowerCase();
+          return words.some(w => fn.includes(w));
+        });
+        if (match) return { ...match, _matchedCondition: cond.name };
+      }
+      return null;
+    }
+
+    // ── Render clinic cards ──
+    const cbLoading = document.getElementById('cbLoading');
+    const cbList    = document.getElementById('cbClinicList');
+    cbLoading.style.display = 'none';
+    cbList.style.display    = 'block';
+
+    if (!clinics.length) {
+      cbList.innerHTML = '<p style="text-align:center;color:#888;padding:20px;font-size:14px">No clinics found. Please try again later.</p>';
+      return;
+    }
+
+    const zoneName = locationLabel
+      ? locationLabel.charAt(0).toUpperCase() + locationLabel.slice(1)
+      : (user.district || 'your area');
+    const locationBadge = hasGps
+      ? `<span style="font-size:11px;color:#2E7D32;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">gps_fixed</span>Clinics ${zoneName}</span>`
+      : `<span style="font-size:11px;color:#888">Clinics in ${zoneName}</span>`;
+
+    cbList.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">${locationBadge}</div>`;
+
+    // Helper: is clinic open right now?
+    function clinicOpenStatus(hours) {
+      if (!hours || typeof hours !== 'object') return null;
+      const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+      const now = new Date();
+      const dayName = days[now.getDay()];
+      const h = hours[dayName];
+      if (!h || h.closed) return { open: false, label: 'Closed today' };
+      if (!h.open || !h.close) return null;
+      const [oh, om] = h.open.split(':').map(Number);
+      const [ch, cm] = h.close.split(':').map(Number);
+      const nowMin = now.getHours() * 60 + now.getMinutes();
+      const openMin = oh * 60 + om;
+      const closeMin = ch * 60 + cm;
+      if (nowMin >= openMin && nowMin < closeMin) return { open: true, label: `Open · closes ${h.close}` };
+      if (nowMin < openMin) return { open: false, label: `Opens ${h.open}` };
+      return { open: false, label: `Closed · opens ${h.open} tomorrow` };
+    }
+
+    clinics.forEach(clinic => {
+      // Condition-specific fee: matched against ALL AI conditions, not just the first word
+      const condFee = getBestFeeMatch(clinic.id);
+
+      // Fee priority: condition-specific (AI matched) > services list > general consultation fee
+      const clinicServices = Array.isArray(clinic.services) ? clinic.services : [];
+      const generalSvc = clinicServices.find(s => /general|consult|opd/i.test(s.type || '')) || clinicServices[0];
+
+      const feeDisplay = condFee
+        ? `UGX ${Number(condFee.fee).toLocaleString()}`
+        : clinic.consultation_fee
+          ? `UGX ${Number(clinic.consultation_fee).toLocaleString()}`
+          : generalSvc?.fee
+            ? `UGX ${Number(generalSvc.fee).toLocaleString()}`
+            : 'Fee on visit';
+      // Show the matched condition name (e.g. "Malaria") or fall back to general label
+      const feeNote = condFee
+        ? (condFee._matchedCondition || condFee.condition_name)
+        : (generalSvc && !clinic.consultation_fee)
+          ? (generalSvc.type || 'General')
+          : 'General consultation';
+      // Distance label: GPS km if available, else show subcounty/parish/district area name
+      const distLabel = (clinic._distKm !== null && clinic._distKm !== undefined)
+        ? `${clinic._distKm < 1 ? Math.round(clinic._distKm * 1000) + ' m' : clinic._distKm.toFixed(1) + ' km'} away`
+        : [clinic.parish, clinic.city, clinic.district].filter(Boolean).join(', ');
+
+      const openStatus = clinicOpenStatus(clinic.opening_hours);
+      const openBadge = openStatus
+        ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:${openStatus.open ? '#E8F5E9' : '#FAFAFA'};color:${openStatus.open ? '#1B5E20' : '#9E9E9E'};border:1px solid ${openStatus.open ? '#A5D6A7' : '#E0E0E0'}">${openStatus.label}</span>`
+        : '';
+
+      const onlineBadge = clinic.accepts_online_slots
+        ? `<span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:6px;background:#E3F2FD;color:#1565C0;border:1px solid #90CAF9">Online booking</span>`
+        : '';
+
+      const specChips = Array.isArray(clinic.specialties) && clinic.specialties.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${clinic.specialties.slice(0,3).map(s => `<span style="font-size:10px;background:#F3E5F5;color:#6A1B9A;border-radius:6px;padding:2px 7px">${s}</span>`).join('')}${clinic.specialties.length > 3 ? `<span style="font-size:10px;color:#9E9E9E">+${clinic.specialties.length - 3}</span>` : ''}</div>`
+        : '';
+
+      const phoneLink = clinic.phone
+        ? `<a href="tel:${clinic.phone.replace(/\s/g,'')}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;text-decoration:none;margin-top:5px"><span class="material-icons-outlined" style="font-size:13px">phone</span>${clinic.phone}</a>`
+        : '';
+
+      const card = document.createElement('div');
+      card.style.cssText = 'background:#fff;border-radius:14px;overflow:hidden;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,.07)';
+      // Cache-bust so the mobile app always fetches the latest clinic photo
+      const photoSrc = clinic.front_photo_url
+        ? clinic.front_photo_url + (clinic.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinic.updated_at ? new Date(clinic.updated_at).getTime() : Date.now())
+        : null;
+      // Full-width banner when a photo exists; plain header without
+      const photoBanner = photoSrc
+        ? `<div onclick="event.stopPropagation();window._homattShowPhoto && window._homattShowPhoto('${photoSrc}', ${JSON.stringify(clinic.name)})"
+              style="width:100%;height:150px;background:#E8F5E9 url('${photoSrc}') center/cover no-repeat;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent">
+             <div style="position:absolute;inset:0;background:linear-gradient(to bottom,transparent 40%,rgba(0,0,0,.45));border-radius:0"></div>
+             <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:20px;padding:5px 10px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;backdrop-filter:blur(4px)">
+               <span class="material-icons-outlined" style="font-size:14px">zoom_in</span>Tap to enlarge
+             </div>
+           </div>`
+        : `<div style="width:100%;height:44px;background:linear-gradient(135deg,#E8F5E9,#C8E6C9);display:flex;align-items:center;padding:0 14px;gap:8px">
+             <span class="material-icons-outlined" style="color:#1B5E20;font-size:20px">local_hospital</span>
+           </div>`;
+      card.innerHTML = `
+        ${photoBanner}
+        <div style="padding:12px 14px">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:700;color:#111">${clinic.name}</div>
+              <div style="font-size:11px;color:#888;margin-top:2px;display:flex;align-items:center;gap:3px">
+                <span class="material-icons-outlined" style="font-size:12px">place</span>
+                ${distLabel}${distLabel && clinic.address ? ' · ' : ''}${clinic.address || ''}
+              </div>
+              ${phoneLink}
+            </div>
+            <button class="cb-book-btn" data-clinic-id="${clinic.id}" data-clinic-name="${clinic.name.replace(/"/g, '&quot;')}" data-fee="${condFee?.fee || clinic.consultation_fee || 0}" data-fee-label="${feeDisplay}"
+              style="flex-shrink:0;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;align-self:flex-start">
+              Book
+            </button>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:4px">
+            <div style="background:#FFF8E1;border:1px solid #FFE082;border-radius:8px;padding:4px 10px;font-size:12px;color:#795548;font-weight:600">
+              <span style="font-size:10px;color:#9E9E9E;font-weight:400">${feeNote}: </span>${feeDisplay}
+            </div>
+            ${openBadge}
+            ${onlineBadge}
+          </div>
+          ${specChips}
+        </div>
+      `;
+      cbList.appendChild(card);
+    });
+
+    // ── Wire "Book" buttons ──
+    document.querySelectorAll('.cb-book-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.booking-time-btn').forEach(b => {
-          b.style.borderColor = '#DDD';
-          b.style.background = '#fff';
-          b.style.color = '#333';
-          b.style.fontWeight = '400';
+        const clinicId   = btn.dataset.clinicId;
+        const clinicName = btn.dataset.clinicName;
+        const feeLabel   = btn.dataset.feeLabel;
+        // Look up the full clinic object so the confirm step can show the services table
+        const clinicObj  = _cbClinics.find(c => c.id === clinicId) || {};
+        // Pass all condition fees so the confirm step can render a per-diagnosis fee table
+        const clinicFees = condFeeMap[clinicId] || [];
+        showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj, clinicFees);
+      });
+    });
+  }
+
+  // ── Show booking confirmation step (time select + confirm) ──
+  function showBookingConfirmStep(diagData, clinicId, clinicName, feeLabel, clinicObj = {}, clinicFees = []) {
+    const cbList    = document.getElementById('cbClinicList');
+    const cbConfirm = document.getElementById('cbConfirmStep');
+    if (cbList)    cbList.style.display    = 'none';
+    if (!cbConfirm) return;
+    cbConfirm.style.display = 'block';
+
+    const isMock = !clinicId || clinicId.startsWith('mock-');
+
+    // ── Per-diagnosis fee table ──
+    // For each AI condition show the fee this clinic has entered, or "Ask at reception".
+    const aiConditions = (diagData.conditions || []).slice(0, 5);
+    const diagFeeRows = aiConditions.map(cond => {
+      const words = cond.name.toLowerCase().split(/[\s,/-]+/).filter(w => w.length > 3);
+      const matched = clinicFees.find(f => {
+        const fn = f.condition_name.toLowerCase();
+        return words.some(w => fn.includes(w));
+      });
+      return { condName: cond.name, pct: cond.likelihood_percent, matched };
+    });
+    // Consultation fee fallback — used when no condition-specific fee is set for a condition
+    const consultFee = clinicObj.consultation_fee ? Number(clinicObj.consultation_fee) : null;
+
+    // Always show the fee table so every condition has a visible price
+    const diagFeesHtml = aiConditions.length
+      ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
+           <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">FEES FOR YOUR CONDITIONS</div>
+           ${diagFeeRows.map(r => {
+             const feeAmt = r.matched ? Number(r.matched.fee) : consultFee;
+             const feeStr = feeAmt ? 'UGX ' + feeAmt.toLocaleString() : 'Ask at reception';
+             const tag    = (!r.matched && consultFee)
+               ? ' <span style="font-size:9px;color:#9E9E9E;font-weight:400">(consultation)</span>' : '';
+             return `
+               <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid #F1F8E9">
+                 <div style="font-size:12px;color:#333;max-width:65%">
+                   ${r.condName}
+                   ${r.pct ? `<span style="font-size:10px;color:#9E9E9E;margin-left:4px">${r.pct}%</span>` : ''}
+                 </div>
+                 <span style="font-size:12px;font-weight:700;color:${feeAmt ? '#1B5E20' : '#9E9E9E'}">
+                   ${feeStr}${tag}
+                 </span>
+               </div>`;
+           }).join('')}
+         </div>`
+      : '';
+
+    // ── General services / pricing table — shown only when AI produced no conditions ──
+    const clinicServices = Array.isArray(clinicObj.services) ? clinicObj.services.filter(s => s.type && s.fee) : [];
+    const servicesHtml = (!aiConditions.length && clinicServices.length > 0)
+      ? `<div style="border-top:1px solid #C8E6C9;margin-top:8px;padding-top:8px">
+           <div style="font-size:10px;color:#388E3C;font-weight:700;letter-spacing:.5px;margin-bottom:5px">SERVICES &amp; FEES</div>
+           ${clinicServices.map(s => `
+             <div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid #F1F8E9">
+               <span style="font-size:12px;color:#333">${s.type}</span>
+               <span style="font-size:12px;font-weight:700;color:#1B5E20">UGX ${Number(s.fee).toLocaleString()}</span>
+             </div>`).join('')}
+         </div>`
+      : '';
+
+    // Address / phone info for the confirm card
+    const addressLine = clinicObj.address ? `<div style="font-size:11px;color:#777;margin-top:2px;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:12px">place</span>${clinicObj.address}${clinicObj.city ? ', ' + clinicObj.city : ''}</div>` : '';
+    const phoneLine   = clinicObj.phone   ? `<a href="tel:${(clinicObj.phone).replace(/\s/g,'')}" style="display:inline-flex;align-items:center;gap:3px;font-size:11px;color:#1565C0;text-decoration:none;margin-top:3px"><span class="material-icons-outlined" style="font-size:12px">phone</span>${clinicObj.phone}</a>` : '';
+
+    // Clinic photo banner for the confirm card
+    const confirmPhotoSrc = clinicObj.front_photo_url
+      ? clinicObj.front_photo_url + (clinicObj.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (clinicObj.updated_at ? new Date(clinicObj.updated_at).getTime() : Date.now())
+      : null;
+    const confirmPhotoBanner = confirmPhotoSrc
+      ? `<div onclick="window._homattShowPhoto && window._homattShowPhoto('${confirmPhotoSrc}', ${JSON.stringify(clinicName)})"
+            style="width:100%;height:160px;background:#E8F5E9 url('${confirmPhotoSrc}') center/cover no-repeat;border-radius:12px 12px 0 0;margin:-12px -14px 10px;width:calc(100% + 28px);position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent">
+           <div style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.55);color:#fff;border-radius:20px;padding:5px 10px;display:flex;align-items:center;gap:4px;font-size:11px;font-weight:600;backdrop-filter:blur(4px)">
+             <span class="material-icons-outlined" style="font-size:14px">zoom_in</span>Tap to enlarge
+           </div>
+         </div>`
+      : '';
+
+    cbConfirm.innerHTML = `
+      <button id="cbBack" style="background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px;color:#1B5E20;font-size:13px;font-weight:600;font-family:inherit;padding:0;margin-bottom:16px">
+        <span class="material-icons-outlined" style="font-size:18px">arrow_back</span> Back to clinics
+      </button>
+
+      <div style="background:#E8F5E9;border-radius:12px;padding:12px 14px;margin-bottom:16px;overflow:hidden">
+        ${confirmPhotoBanner}
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          ${confirmPhotoSrc ? '' : '<span class="material-icons-outlined" style="font-size:24px;color:#1B5E20;margin-top:2px;flex-shrink:0">local_hospital</span>'}
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:#111">${clinicName}</div>
+            ${addressLine}
+            ${phoneLine}
+            <div style="font-size:12px;color:#555;margin-top:5px">Estimated fee: <strong>${feeLabel}</strong></div>
+            ${diagFeesHtml}
+            ${servicesHtml}
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:6px">Patient Name</label>
+        <input id="cbPatientName" type="text" value="${selectedPatient?.name || ''}"
+          inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false"
+          style="width:100%;padding:14px;border:1.5px solid #DDD;border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;color:#111;background:#fff;min-height:50px"
+          placeholder="Patient name" />
+      </div>
+
+      <div style="margin-bottom:16px">
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:8px">Preferred Appointment Time</label>
+        <div style="display:flex;flex-direction:column;gap:8px" id="cbTimeOpts">
+          <button class="cb-time-btn" data-time="asap" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">As soon as possible</button>
+          <button class="cb-time-btn" data-time="today_afternoon" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">Today afternoon</button>
+          <button class="cb-time-btn" data-time="tomorrow_morning" style="padding:12px 16px;border:1.5px solid #DDD;border-radius:10px;background:#fff;font-size:14px;font-family:inherit;text-align:left;cursor:pointer;color:#333">Tomorrow morning</button>
+        </div>
+      </div>
+
+      <button id="cbConfirmBtn"
+        style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+        <span class="material-icons-outlined">check_circle</span>
+        Confirm Booking
+      </button>
+    `;
+
+    document.getElementById('cbBack').addEventListener('click', () => {
+      cbConfirm.style.display = 'none';
+      cbConfirm.innerHTML = '';
+      document.getElementById('cbClinicList').style.display = 'block';
+    });
+
+    // Scroll the name input into view when keyboard opens.
+    // #cbInner is the actual scrollable container (not .app-screen which is outside the modal).
+    const cbNameInp = document.getElementById('cbPatientName');
+    if (cbNameInp) {
+      cbNameInp.addEventListener('focus', () => {
+        setTimeout(() => {
+          const inner = document.getElementById('cbInner');
+          if (!inner) return;
+          const elRect = cbNameInp.getBoundingClientRect();
+          const innerRect = inner.getBoundingClientRect();
+          const target = inner.scrollTop + elRect.top - innerRect.top - (inner.clientHeight / 2) + (elRect.height / 2);
+          inner.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+        }, 380);
+      });
+    }
+
+    let selectedTime = 'asap';
+    document.querySelectorAll('.cb-time-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.cb-time-btn').forEach(b => {
+          b.style.borderColor = '#DDD'; b.style.background = '#fff'; b.style.fontWeight = '400';
         });
         btn.style.borderColor = '#00695C';
-        btn.style.background = '#E8F5E9';
-        btn.style.color = '#1B5E20';
-        btn.style.fontWeight = '600';
+        btn.style.background  = '#E8F5E9';
+        btn.style.fontWeight  = '600';
         selectedTime = btn.dataset.time;
       });
-      // Auto-select first
       if (btn.dataset.time === 'asap') btn.click();
     });
 
-    // Load clinics from Supabase, fallback to mock
-    const clinicSelect = document.getElementById('bookingClinicSelect');
-    const mockClinics = [
-      { id: 'mock-1', name: 'Mulago National Referral Hospital' },
-      { id: 'mock-2', name: 'Kampala International Hospital' },
-      { id: 'mock-3', name: 'Case Medical Centre' },
-      { id: 'mock-4', name: 'Nsambya Hospital' },
-      { id: 'mock-5', name: 'Nakasero Hospital' },
-    ];
-
-    const clinicLoad = supabase
-      ? supabase.from('clinics').select('id, name').eq('active', true).limit(20)
-      : Promise.resolve({ data: null });
-    clinicLoad
-      .then(({ data: clinicsData }) => {
-        const list = (clinicsData && clinicsData.length) ? clinicsData : mockClinics;
-        clinicSelect.innerHTML = list.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      })
-      .catch(() => {
-        clinicSelect.innerHTML = mockClinics.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
-      });
-
-    // Confirm booking
-    document.getElementById('btnConfirmBooking').addEventListener('click', async () => {
-      const patientName = document.getElementById('bookingPatientName').value.trim();
-      const selectedClinicId = clinicSelect.value || null;
-      const selectedClinicName = clinicSelect.options[clinicSelect.selectedIndex]?.text || '';
-
+    document.getElementById('cbConfirmBtn').addEventListener('click', async () => {
+      const patientName = document.getElementById('cbPatientName').value.trim();
       if (!patientName) {
-        document.getElementById('bookingPatientName').focus();
-        document.getElementById('bookingPatientName').style.borderColor = '#D32F2F';
+        const inp = document.getElementById('cbPatientName');
+        inp.style.borderColor = '#D32F2F';
+        inp.focus();
         return;
       }
 
-      const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
+      const confirmBtn = document.getElementById('cbConfirmBtn');
+      confirmBtn.disabled = true;
+      confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking…';
 
-      // Generate a PIN token so clinic can look up by PIN too
+      const bookingCode = 'HO-' + Math.floor(100 + Math.random() * 900);
       const pinChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let pinToken = 'HK-';
       for (let i = 0; i < 6; i++) pinToken += pinChars[Math.floor(Math.random() * pinChars.length)];
-      const pinExpiry = new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(); // 4 hours
-
-      // Mock IDs are not valid UUIDs — set clinic_id to null for those
-      const isMockClinic = !selectedClinicId || selectedClinicId.startsWith('mock-');
+      const pinExpiry = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
 
       const bookingRecord = {
-        booking_code:  bookingCode,
-        patient_name:  patientName,
-        patient_id:    session?.user?.id || null,
-        patient_age:   selectedPatient.age || null,
-        patient_sex:   selectedPatient.sex || null,
-        symptoms:      enteredSymptoms ? [enteredSymptoms] : null,
-        ai_diagnosis:  diagnosisData.conditions[0]?.name || null,
-        ai_confidence: diagnosisData.conditions[0]?.likelihood_percent || null,
-        ai_full_data: {
-          primary_condition: diagnosisData.conditions[0]?.name || null,
-          confidence:        diagnosisData.conditions[0]?.likelihood_percent || null,
-          overall_risk:      diagnosisData.overall_risk || null,
-          symptoms:          enteredSymptoms || null,
-          clinic_urgency:    diagnosisData.clinic_urgency || null,
-          conditions:        diagnosisData.conditions || [],
-          immediate_actions: diagnosisData.immediate_actions || [],
-        },
-        urgency_level: diagnosisData.clinic_urgency === 'urgent' ? 'high' : diagnosisData.clinic_urgency === 'soon' ? 'medium' : 'normal',
-        risk_score:    diagnosisData.conditions[0]?.likelihood_percent || 50,
-        clinic_id:     isMockClinic ? null : selectedClinicId,
+        booking_code:   bookingCode,
+        patient_name:   patientName,
+        patient_user_id: session?.user?.id || null,
+        patient_age:    selectedPatient?.age || null,
+        patient_sex:    selectedPatient?.sex || null,
+        symptoms:       enteredSymptoms || null,
+        ai_diagnosis:   diagData.conditions[0]?.name || null,
+        conditions_json: diagData.conditions || [],
+        ai_confidence:  diagData.conditions[0]?.likelihood_percent || null,
+        urgency_level:  diagData.clinic_urgency === 'urgent' ? 'high' : diagData.clinic_urgency === 'soon' ? 'medium' : 'normal',
+        risk_score:     diagData.conditions[0]?.likelihood_percent || 50,
+        clinic_id:      isMock ? null : clinicId,
         preferred_time: selectedTime,
-        status:        'pending',
-        pin_token:     pinToken,
+        status:         'pending',
+        pin_token:      pinToken,
         pin_expires_at: pinExpiry,
       };
 
-      // Disable button and show loading state
-      const confirmBtn = document.getElementById('btnConfirmBooking');
-      confirmBtn.disabled = true;
-      confirmBtn.innerHTML = '<span class="material-icons-outlined" style="animation:scBounce 1s ease-in-out infinite">hourglass_empty</span> Booking...';
-
-      // Save to Supabase
       let savedOk = false;
+      let savedId  = null;
+      let insertErrMsg = null;
       if (supabase) {
         try {
-          const { error: insertErr } = await supabase.from('bookings').insert(bookingRecord);
+          const { data: inserted, error: insertErr } = await supabase
+            .from('bookings').insert(bookingRecord).select('id').single();
           if (insertErr) {
-            console.error('[Homatt] Booking insert error:', insertErr.message);
+            console.error('[Homatt] Booking insert error:', insertErr.message, insertErr.code);
+            insertErrMsg = insertErr.message;
           } else {
             savedOk = true;
+            savedId  = inserted?.id || null;
           }
         } catch (e) {
-          console.warn('[Homatt] Booking insert failed (may be offline):', e.message);
+          console.warn('[Homatt] Booking insert failed (offline?):', e.message);
+          insertErrMsg = e.message;
         }
       }
 
-      // Always save to localStorage as backup
+      // localStorage backup
       const localBookings = JSON.parse(localStorage.getItem('homatt_bookings') || '[]');
-      localBookings.unshift({ ...bookingRecord, clinic_name: selectedClinicName, savedToDb: savedOk });
+      localBookings.unshift({ ...bookingRecord, clinic_name: clinicName, savedToDb: savedOk, id: savedId });
       if (localBookings.length > 20) localBookings.pop();
       localStorage.setItem('homatt_bookings', JSON.stringify(localBookings));
 
-      // Show success screen
-      const inner = document.getElementById('clinicBookingInner');
-      inner.innerHTML = `
-        <div style="text-align:center;padding:8px 0 16px">
-          <div style="width:64px;height:64px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
-            <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32">check_circle</span>
-          </div>
-          <h3 style="font-size:18px;font-weight:700;color:#111;margin-bottom:8px">Booking Confirmed!</h3>
-          <p style="font-size:13px;color:#666;margin-bottom:20px">Your appointment has been submitted.</p>
+      // ── Push notification via OneSignal Edge Function ──
+      if (savedOk && supabase && session?.user?.id) {
+        const timeLabel = selectedTime === 'asap' ? 'as soon as possible'
+                        : selectedTime === 'today_afternoon' ? 'this afternoon'
+                        : 'tomorrow morning';
+        try {
+          // Include the locally-cached player_id so the edge function can target
+          // this device directly without requiring the DB column to exist yet.
+          const cachedPlayerId = localStorage.getItem('homatt_onesignal_player_id');
+          await supabase.functions.invoke('send-notification', {
+            body: {
+              userId:        session.user.id,
+              player_ids:    cachedPlayerId ? [cachedPlayerId] : undefined,
+              title:         'Booking Confirmed!',
+              message:       `Your visit to ${clinicName} is confirmed for ${timeLabel}. Show code ${bookingCode} at reception.`,
+              data:          { screen: 'appointment', id: savedId || bookingCode },
+              pref_category: 'appointment_reminders',
+            },
+          });
+        } catch (e) {
+          console.warn('[Homatt] Push notification failed:', e.message);
+        }
+      }
 
-          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:16px">
-            <p style="font-size:12px;color:#555;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Your Booking Code</p>
-            <p style="font-size:36px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
+      // ── Success screen ──
+      const cbConfirm = document.getElementById('cbConfirmStep');
+      if (!cbConfirm) return;
+      cbConfirm.innerHTML = `
+        <div style="text-align:center;padding:12px 0 8px">
+          <div style="width:68px;height:68px;border-radius:50%;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+            <span class="material-icons-outlined" style="font-size:38px;color:#2E7D32">check_circle</span>
+          </div>
+          <h3 style="font-size:18px;font-weight:700;color:#111;margin:0 0 6px">Booking Confirmed!</h3>
+          <p style="font-size:13px;color:#666;margin:0 0 20px">${savedOk ? 'Your booking has been saved. The clinic will see it on their dashboard.' : 'Saved locally — please show this code at the clinic.'}</p>
+          ${!savedOk ? `<div style="background:#FFF3E0;border:1px solid #FFB74D;border-radius:10px;padding:10px 14px;margin:-10px 0 16px;font-size:12px;color:#E65100;text-align:left"><strong>Note:</strong> Could not sync to server ${insertErrMsg ? '(' + insertErrMsg.slice(0,80) + ')' : '(offline?)'}. Your booking code is saved on this device — show it at reception.</div>` : ''}
+
+          <div style="background:#F1F8E9;border:2px dashed #4CAF50;border-radius:14px;padding:20px;margin-bottom:14px">
+            <p style="font-size:11px;color:#555;margin:0 0 5px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Booking Code</p>
+            <p style="font-size:34px;font-weight:800;color:#1B5E20;letter-spacing:4px;margin:0 0 12px">${bookingCode}</p>
             <div style="background:rgba(0,0,0,0.05);border-radius:8px;padding:10px">
-              <p style="font-size:11px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">PIN Token (show to reception)</p>
+              <p style="font-size:10px;color:#555;margin:0 0 4px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">PIN (show to reception)</p>
               <p style="font-size:18px;font-weight:700;color:#00695C;letter-spacing:2px;margin:0">${pinToken}</p>
             </div>
           </div>
 
-          <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:20px">
+          <div style="background:#fff;border:1px solid #E0E0E0;border-radius:12px;padding:14px;text-align:left;margin-bottom:18px">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
               <span class="material-icons-outlined" style="font-size:18px;color:#00695C">local_hospital</span>
-              <span style="font-size:13px;font-weight:600;color:#333">${selectedClinicName}</span>
+              <span style="font-size:13px;font-weight:600;color:#333">${clinicName}</span>
             </div>
-            <div style="display:flex;align-items:center;gap:8px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
               <span class="material-icons-outlined" style="font-size:18px;color:#00695C">schedule</span>
               <span style="font-size:13px;color:#555">${selectedTime === 'asap' ? 'As soon as possible' : selectedTime === 'today_afternoon' ? 'Today afternoon' : 'Tomorrow morning'}</span>
             </div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="material-icons-outlined" style="font-size:18px;color:#00695C">payments</span>
+              <span style="font-size:13px;color:#555">Expected fee: <strong>${feeLabel}</strong></span>
+            </div>
           </div>
 
-          <p style="font-size:13px;color:#555;line-height:1.6;margin-bottom:20px">
-            Show the booking code <strong>or</strong> PIN to the reception desk.<br>The clinic will verify and check you in.
-          </p>
-
-          <button id="btnCloseSuccess"
+          <button id="cbDoneBtn"
             style="width:100%;padding:14px;background:#00695C;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer">
             Done
           </button>
         </div>
       `;
 
-      document.getElementById('btnCloseSuccess').addEventListener('click', () => {
-        modal.remove();
+      document.getElementById('cbDoneBtn').addEventListener('click', () => {
+        document.getElementById('clinicBookingModal')?.remove();
       });
     });
   }
 
   // ====== Check for existing monitoring session ======
+  // Also handle notification tap: ?screen=symptom-checkin[&feeling=better|same|worse]
+  const _urlParams    = new URLSearchParams(window.location.search);
+  const _notifScreen  = _urlParams.get('screen');
+  const _notifFeeling = _urlParams.get('feeling');    // pre-selected from action button
+  const _notifId      = _urlParams.get('notif_id');   // booking ID passed from prescription check-in
+  const _checkinType  = _urlParams.get('checkin_type') || 'general'; // dose_checkin / mid_course / end_of_course
+  const _drugName     = _urlParams.get('drug') || '';
   const existingMonitor = localStorage.getItem('homatt_monitoring');
-  if (existingMonitor) {
-    const session = JSON.parse(existingMonitor);
-    if (session.nextCheckIn) {
-      const nextTime = new Date(session.nextCheckIn);
-      const now = new Date();
-      if (now >= nextTime) {
-        monitoringSession = session;
-        diagnosisData = { conditions: [{ name: session.condition }], overall_risk: session.risk };
-        document.getElementById('monitorCondition').innerHTML = `
-          <div class="sc-monitor-cond-card">
-            <span class="material-icons-outlined">medical_information</span>
-            <div>
-              <p class="sc-monitor-cond-name">Monitoring: ${session.condition}</p>
-              <p class="sc-monitor-cond-risk">Risk level: <strong class="${session.risk}">${session.risk}</strong></p>
+
+  // ── Prescription check-in (from medication reminder / course-end notification) ──
+  // Identified by screen=prescription-checkin OR (screen=symptom-checkin AND no monitoring session)
+  const isPrescriptionCheckin = _notifScreen === 'prescription-checkin' ||
+    (_notifScreen === 'symptom-checkin' && !existingMonitor && _notifFeeling);
+
+  if (isPrescriptionCheckin && _notifFeeling && ['better','same','worse'].includes(_notifFeeling)) {
+    // Show a lightweight prescription check-in response screen instead of full monitoring
+    showScreen('screenPatient'); // show something while we process
+    (async () => {
+      // Save feeling response to patient_health_followups
+      try {
+        const cfg = window.HOMATT_CONFIG || {};
+        if (cfg.SUPABASE_URL && window.supabase) {
+          const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+          const { data: { session } } = await client.auth.getSession();
+          if (session?.user?.id) {
+            // Find the active diagnosis for this booking/user (always filter by patient to avoid cross-patient matches)
+            const diagQuery = _notifId
+              ? client.from('clinic_diagnoses').select('id').eq('booking_id', _notifId).eq('patient_user_id', session.user.id).maybeSingle()
+              : client.from('clinic_diagnoses')
+                  .select('id')
+                  .eq('patient_user_id', session.user.id)
+                  .order('created_at', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+            const { data: diag } = await diagQuery;
+
+            await client.from('patient_health_followups').insert({
+              diagnosis_id:    diag?.id    || null,
+              patient_user_id: session.user.id,
+              followup_type:   _checkinType === 'dose_checkin' ? 'dose_feeling'
+                              : _checkinType === 'chronic_checkin' ? 'chronic_feeling'
+                              : 'patient_feeling',
+              feeling:         _notifFeeling,
+              clinical_note:   `Patient tapped: ${_notifFeeling} (${_checkinType}${_drugName ? ' — ' + _drugName : ''})`,
+              created_at:      new Date().toISOString(),
+            });
+
+            // If worse — check escalation threshold before sending urgent notification
+            if (_notifFeeling === 'worse') {
+              const _fuSettings = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_settings') || '{}'); } catch(_){return {};} })();
+              const escalateAt  = _fuSettings.escalateAt  ?? 1; // default: escalate on first "worse"
+              const referral    = _fuSettings.referralClinic || 'Mulago National Referral Hospital';
+              const tmpl        = (() => { try { return JSON.parse(localStorage.getItem('homatt_followup_templates') || '{}'); } catch(_){return {};} })();
+
+              // Count previous "worse" responses for this patient (and this diagnosis if known)
+              let worseQuery = client.from('patient_health_followups')
+                .select('id', { count: 'exact', head: true })
+                .eq('patient_user_id', session.user.id)
+                .eq('feeling', 'worse');
+              if (diag?.id) worseQuery = worseQuery.eq('diagnosis_id', diag.id);
+              const { count: worseCount } = await worseQuery;
+
+              // Escalate only when the total "worse" count (including the one just inserted) reaches the threshold
+              if ((worseCount || 1) >= escalateAt) {
+                const msg = (tmpl.escalate || 'We are concerned about your health. Please visit {referral} as soon as possible for specialist care.')
+                  .replace('{referral}', referral);
+                await client.functions.invoke('send-notification', {
+                  body: {
+                    userId:        session.user.id,
+                    title:         'Urgent: Please Seek Further Care',
+                    message:       msg,
+                    data:          { screen: 'bookings' },
+                    pref_category: 'appointment_reminders',
+                  },
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+      } catch(_) {}
+
+      // Show inline response card (replaces the patient list screen briefly)
+      const icons   = { better: 'sentiment_very_satisfied', same: 'sentiment_neutral', worse: 'sentiment_very_dissatisfied' };
+      const colors  = { better: '#2E7D32', same: '#E65100', worse: '#C62828' };
+      const bgs     = { better: '#E8F5E9', same: '#FFF3E0', worse: '#FFEBEE' };
+      const isDose  = _checkinType === 'dose_checkin';
+      const drugCtx = _drugName ? ` after taking ${_drugName}` : '';
+      const messages= {
+        better: isDose
+          ? `Good to hear you feel better${drugCtx}! Keep taking your full course as prescribed.`
+          : 'Great to hear you are feeling better! Keep taking any remaining medication through the full course.',
+        same: isDose
+          ? `OK — some medicines take a few days to show full effect${drugCtx}. Keep taking as prescribed.`
+          : 'Keep taking your medication as prescribed. If you do not feel better in 2 days, please visit your clinic.',
+        worse: isDose
+          ? `We are concerned you feel worse${drugCtx}. An urgent message has been sent. Please seek care today.`
+          : 'We are sorry you are not improving. An urgent message has been sent to you. Please seek care immediately.',
+      };
+
+      const patientList = document.getElementById('patientList');
+      if (patientList) {
+        patientList.innerHTML = `
+          <div style="text-align:center;padding:20px 10px">
+            <div style="width:64px;height:64px;border-radius:50%;background:${bgs[_notifFeeling]};
+              display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
+              <span class="material-icons-outlined" style="font-size:32px;color:${colors[_notifFeeling]}">${icons[_notifFeeling]}</span>
             </div>
-          </div>
-        `;
-        document.getElementById('monitorResponse').style.display = 'none';
-        document.getElementById('monitorTimer').style.display = 'none';
-        showScreen('screenMonitor');
-        wireMonitoringButtons();
+            <div style="font-size:16px;font-weight:700;color:${colors[_notifFeeling]};margin-bottom:8px">
+              ${_notifFeeling === 'better' ? 'Glad you are feeling better!' : _notifFeeling === 'same' ? 'Keep going!' : 'Your response has been recorded'}
+            </div>
+            <div style="font-size:13px;color:#5F6368;line-height:1.6;margin-bottom:20px">${messages[_notifFeeling]}</div>
+            <button onclick="window.location.href='dashboard.html'"
+              style="padding:12px 24px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+              Back to Home
+            </button>
+          </div>`;
       }
+    })();
+    return; // skip normal monitoring restore
+  }
+
+  // ── Monitoring session restore (symptom checker 1-hour monitoring) ──
+  // Helper that shows the monitor screen with a given session and (optionally) jumps
+  // straight to the check-in phase. Used for both localStorage and Supabase restores.
+  const _showMonitorCheckin = (ms, preselectFeeling) => {
+    monitoringSession = ms;
+    diagnosisData = { conditions: [{ name: ms.condition }], overall_risk: ms.risk || 'medium' };
+    const condEl = document.getElementById('monitorCondition');
+    if (condEl) {
+      condEl.innerHTML = `
+        <div class="sc-monitor-cond-card">
+          <span class="material-icons-outlined">medical_information</span>
+          <div>
+            <p class="sc-monitor-cond-name">Monitoring: ${ms.condition}</p>
+            <p class="sc-monitor-cond-risk">Risk level: <strong class="${ms.risk || 'medium'}">${ms.risk || 'medium'}</strong></p>
+          </div>
+        </div>`;
     }
+    const respEl = document.getElementById('monitorResponse');
+    const timerEl = document.getElementById('monitorTimer');
+    if (respEl) respEl.style.display = 'none';
+    if (timerEl) timerEl.style.display = 'none';
+    showScreen('screenMonitor');
+    wireMonitoringButtons();
+
+    if (preselectFeeling && ['better', 'same', 'worse'].includes(preselectFeeling)) {
+      setTimeout(() => {
+        triggerCheckinPhase();
+        setTimeout(() => {
+          const btn = document.querySelector(`.sc-feeling-btn[data-feeling="${preselectFeeling}"]`);
+          if (btn) btn.click();
+        }, 300);
+      }, 400);
+    } else {
+      setTimeout(() => triggerCheckinPhase(), 400);
+    }
+  };
+
+  const openedFromSymptomNotif = _notifScreen === 'symptom-checkin';
+
+  if (existingMonitor) {
+    const savedMs = JSON.parse(existingMonitor);
+    const isCheckinDue = savedMs.nextCheckIn && new Date() >= new Date(savedMs.nextCheckIn);
+    if (isCheckinDue || openedFromSymptomNotif) {
+      _showMonitorCheckin(savedMs, _notifFeeling);
+    }
+  } else if (openedFromSymptomNotif) {
+    // Notification tapped but localStorage was cleared (e.g. app reopened fresh).
+    // Try to recover the active monitoring session from Supabase so the tap still
+    // takes the user straight to the check-in screen instead of the empty patient list.
+    (async () => {
+      try {
+        const cfg = window.HOMATT_CONFIG || {};
+        if (!cfg.SUPABASE_URL || !window.supabase) return;
+        const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.user?.id) return;
+        const { data: log } = await client.from('symptom_monitoring_logs')
+          .select('*').eq('user_id', session.user.id).eq('outcome', 'active')
+          .order('started_at', { ascending: false }).limit(1).maybeSingle();
+        if (!log) return;
+        const restored = {
+          condition:    log.condition || 'your symptoms',
+          risk:         log.risk || 'medium',
+          startedAt:    log.started_at,
+          checkIns:     Array.isArray(log.check_ins) ? log.check_ins : [],
+          symptomsSame: Array.isArray(log.check_ins) ? log.check_ins.filter(c => c.feeling === 'same').length : 0,
+          initialAction: log.initial_action || '',
+          checkinPending: true,
+        };
+        try { localStorage.setItem('homatt_monitoring', JSON.stringify(restored)); } catch(_) {}
+        _showMonitorCheckin(restored, _notifFeeling);
+      } catch(_) {}
+    })();
   }
 });

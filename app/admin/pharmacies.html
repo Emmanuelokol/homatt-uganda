@@ -49,7 +49,9 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
+              <option value="removed">Removed</option>
             </select>
             <input type="text" id="searchPharmacies" placeholder="Search..." style="width:160px">
           </div>
@@ -128,24 +130,23 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="admin-form-group">
               <label>District *</label>
-              <input type="text" id="pharmacyDistrict" placeholder="e.g. Kampala">
+              <input type="text" id="pharmacyDistrict" placeholder="e.g. Mukono">
             </div>
             <div class="admin-form-group">
-              <label>City / Zone</label>
-              <input type="text" id="pharmacyCity" placeholder="e.g. Nakasero">
+              <label>County</label>
+              <input type="text" id="pharmacyCounty" placeholder="e.g. Mukono County">
+            </div>
+            <div class="admin-form-group">
+              <label>Subcounty / Town</label>
+              <input type="text" id="pharmacyCity" placeholder="e.g. Mukono Town">
+            </div>
+            <div class="admin-form-group">
+              <label>Parish / Village</label>
+              <input type="text" id="pharmacyParish" placeholder="e.g. Butto">
             </div>
             <div class="admin-form-group" style="grid-column:span 2">
               <label>Full Address</label>
               <input type="text" id="pharmacyAddress" placeholder="Plot number, street, area">
-            </div>
-            <div class="admin-form-group">
-              <label>Latitude (GPS)</label>
-              <input type="number" id="pharmacyLat" placeholder="e.g. 0.3311" step="0.0001">
-              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Use Google Maps for coordinates</div>
-            </div>
-            <div class="admin-form-group">
-              <label>Longitude (GPS)</label>
-              <input type="number" id="pharmacyLng" placeholder="e.g. 32.5731" step="0.0001">
             </div>
           </div>
         </div>
@@ -296,11 +297,19 @@
         </div>
         <div class="admin-form-group">
           <label>District *</label>
-          <input type="text" id="paPharmacyDistrict" placeholder="e.g. Kampala">
+          <input type="text" id="paPharmacyDistrict" placeholder="e.g. Mukono">
         </div>
         <div class="admin-form-group">
-          <label>City / Area</label>
-          <input type="text" id="paPharmacyCity" placeholder="e.g. Nakasero">
+          <label>County</label>
+          <input type="text" id="paPharmacyCounty" placeholder="e.g. Mukono County">
+        </div>
+        <div class="admin-form-group">
+          <label>Subcounty / Town</label>
+          <input type="text" id="paPharmacyCity" placeholder="e.g. Mukono Town">
+        </div>
+        <div class="admin-form-group">
+          <label>Parish / Village</label>
+          <input type="text" id="paPharmacyParish" placeholder="e.g. Butto">
         </div>
         <div class="admin-form-group" style="grid-column:span 2">
           <label>Full Address</label>
@@ -321,14 +330,6 @@
         <div class="admin-form-group">
           <label>NDA License Number</label>
           <input type="text" id="paPharmacyLicense" placeholder="NDA-2024-XXXX">
-        </div>
-        <div class="admin-form-group">
-          <label>Latitude (GPS)</label>
-          <input type="number" id="paPharmacyLat" placeholder="e.g. 0.3311" step="0.0001">
-        </div>
-        <div class="admin-form-group">
-          <label>Longitude (GPS)</label>
-          <input type="number" id="paPharmacyLng" placeholder="e.g. 32.5731" step="0.0001">
         </div>
         <div class="admin-form-group">
           <label>Delivery Fee (UGX)</label>
@@ -450,8 +451,21 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function loadPharmacies() {
   var supa = adminSupa();
   if (!supa) { allPharmacies = DEMO_PHARMACIES; renderPharmacies(); return; }
-  var res = await supa.from('pharmacies').select('*').order('created_at',{ascending:false});
-  allPharmacies = (res.data && res.data.length) ? res.data : DEMO_PHARMACIES;
+  try {
+    var res = await Promise.race([
+      supa.from('pharmacies').select('*').order('created_at',{ascending:false}),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 10000); })
+    ]);
+    if (res.error) {
+      showAdminToast('Error loading pharmacies: ' + res.error.message, 'error');
+      allPharmacies = [];
+    } else {
+      allPharmacies = res.data || [];
+    }
+  } catch(e) {
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading pharmacies', 'error');
+    allPharmacies = [];
+  }
   renderPharmacies();
 }
 
@@ -472,9 +486,12 @@ function renderPharmacies() {
       '<td style="font-size:12px">' + delivery + '</td>' +
       '<td><span style="font-weight:700;color:' + scoreColor + '">' + score + '</span>/100</td>' +
       '<td><span class="status-badge ' + (p.status||'approved') + '">' + (p.status||'approved') + '</span></td>' +
-      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
-        '<button class="btn-admin secondary sm" onclick="openModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
-        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + p.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
+      '<td style="display:flex;gap:4px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + p.id + '\')" title="Edit"><span class="material-icons-outlined" style="font-size:13px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + p.id + '\')" title="Add staff"><span class="material-icons-outlined" style="font-size:13px">person_add</span></button>' +
+        (p.status !== 'suspended' && p.status !== 'removed' ? '<button class="btn-admin warning sm" onclick="togglePharmacyStatus(\'' + p.id + '\',\'suspended\')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>' : '') +
+        (p.status === 'suspended' ? '<button class="btn-admin success sm" onclick="togglePharmacyStatus(\'' + p.id + '\',\'approved\')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>' : '') +
+        (p.status !== 'removed' ? '<button class="btn-admin danger sm" onclick="removePharmacy(\'' + p.id + '\')" title="Remove"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -493,10 +510,10 @@ function openModal(id) {
   document.getElementById('pharmacyContact').value = p?.contact_person || '';
   document.getElementById('pharmacyLicense').value = p?.license_number || '';
   document.getElementById('pharmacyDistrict').value = p?.district || '';
+  document.getElementById('pharmacyCounty').value = p?.county || '';
   document.getElementById('pharmacyCity').value = p?.city || '';
+  document.getElementById('pharmacyParish').value = p?.parish || '';
   document.getElementById('pharmacyAddress').value = p?.address || '';
-  document.getElementById('pharmacyLat').value = p?.latitude || '';
-  document.getElementById('pharmacyLng').value = p?.longitude || '';
   document.getElementById('pharmacyDelivery').checked = p?.delivery_available !== false;
   document.getElementById('pharmacyDeliveryFee').value = p?.delivery_fee || '';
   document.getElementById('pharmacyDeliveryRadius').value = p?.delivery_radius_km || '';
@@ -520,15 +537,15 @@ async function savePharmacy() {
     name: name,
     description: document.getElementById('pharmacyDescription').value.trim() || null,
     district: document.getElementById('pharmacyDistrict').value.trim() || null,
-    city: document.getElementById('pharmacyCity').value.trim() || null,
-    address: document.getElementById('pharmacyAddress').value.trim() || null,
-    phone: document.getElementById('pharmacyPhone').value.trim() || null,
+    county:   document.getElementById('pharmacyCounty').value.trim() || null,
+    city:     document.getElementById('pharmacyCity').value.trim() || null,
+    parish:   document.getElementById('pharmacyParish').value.trim() || null,
+    address:  document.getElementById('pharmacyAddress').value.trim() || null,
+    phone:    document.getElementById('pharmacyPhone').value.trim() || null,
     whatsapp: document.getElementById('pharmacyWhatsapp').value.trim() || null,
-    email: document.getElementById('pharmacyEmail').value.trim() || null,
+    email:    document.getElementById('pharmacyEmail').value.trim() || null,
     contact_person: document.getElementById('pharmacyContact').value.trim() || null,
     license_number: document.getElementById('pharmacyLicense').value.trim() || null,
-    latitude: parseFloat(document.getElementById('pharmacyLat').value) || null,
-    longitude: parseFloat(document.getElementById('pharmacyLng').value) || null,
     delivery_available: document.getElementById('pharmacyDelivery').checked,
     delivery_fee: Number(document.getElementById('pharmacyDeliveryFee').value) || 0,
     delivery_radius_km: Number(document.getElementById('pharmacyDeliveryRadius').value) || 10,
@@ -615,8 +632,8 @@ window.copyStaffCreds = function() {
 
 /* ── Create Pharmacy Account Modal ── */
 function openCreatePharmacyAccountModal() {
-  ['paPharmacyName','paPharmacyDistrict','paPharmacyCity','paPharmacyAddress','paPharmacyPhone','paPharmacyWhatsapp','paPharmacyContact','paPharmacyLicense','paPharmacyEmail','paPharmacyPassword'].forEach(function(id){ document.getElementById(id).value=''; });
-  ['paPharmacyLat','paPharmacyLng','paPharmacyDeliveryFee','paPharmacyRadius'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['paPharmacyName','paPharmacyDistrict','paPharmacyCounty','paPharmacyCity','paPharmacyParish','paPharmacyAddress','paPharmacyPhone','paPharmacyWhatsapp','paPharmacyContact','paPharmacyLicense','paPharmacyEmail','paPharmacyPassword'].forEach(function(id){ document.getElementById(id).value=''; });
+  ['paPharmacyDeliveryFee','paPharmacyRadius'].forEach(function(id){ document.getElementById(id).value=''; });
   document.getElementById('paPharmacySuccessBox').style.display = 'none';
   document.getElementById('paPharmacyFooter').style.display = 'flex';
   var btn = document.getElementById('createPharmacyAccountSubmitBtn');
@@ -632,14 +649,14 @@ var _lastPharmacyCredentials = '';
 async function submitCreatePharmacyAccount() {
   var name     = document.getElementById('paPharmacyName').value.trim();
   var district = document.getElementById('paPharmacyDistrict').value.trim();
+  var county   = document.getElementById('paPharmacyCounty').value.trim();
   var city     = document.getElementById('paPharmacyCity').value.trim();
+  var parish   = document.getElementById('paPharmacyParish').value.trim();
   var address  = document.getElementById('paPharmacyAddress').value.trim();
   var phone    = document.getElementById('paPharmacyPhone').value.trim();
   var whatsapp = document.getElementById('paPharmacyWhatsapp').value.trim();
   var contact  = document.getElementById('paPharmacyContact').value.trim();
   var license  = document.getElementById('paPharmacyLicense').value.trim();
-  var lat      = parseFloat(document.getElementById('paPharmacyLat').value) || null;
-  var lng      = parseFloat(document.getElementById('paPharmacyLng').value) || null;
   var delivFee = Number(document.getElementById('paPharmacyDeliveryFee').value) || 5000;
   var radius   = Number(document.getElementById('paPharmacyRadius').value) || 10;
   var email    = document.getElementById('paPharmacyEmail').value.trim();
@@ -685,14 +702,14 @@ async function submitCreatePharmacyAccount() {
     email: email, auth_user_id: authUserId,
     delivery_available: true, delivery_fee: delivFee, delivery_radius_km: radius
   };
-  if (city) insertPayload.city = city;
+  if (county)  insertPayload.county  = county;
+  if (city)    insertPayload.city    = city;
+  if (parish)  insertPayload.parish  = parish;
   if (address) insertPayload.address = address;
-  if (phone) insertPayload.phone = phone;
+  if (phone)   insertPayload.phone   = phone;
   if (whatsapp) insertPayload.whatsapp = whatsapp;
   if (contact) insertPayload.contact_person = contact;
   if (license) insertPayload.license_number = license;
-  if (lat) insertPayload.latitude = lat;
-  if (lng) insertPayload.longitude = lng;
 
   var { data: pharmRow, error: insertErr } = await supa.from('pharmacies').insert(insertPayload).select().single();
 
@@ -722,6 +739,28 @@ async function submitCreatePharmacyAccount() {
 
 function copyPharmacyCredentials() {
   navigator.clipboard.writeText(_lastPharmacyCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+
+/* ── Suspend / Remove pharmacy ── */
+async function togglePharmacyStatus(id, newStatus) {
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  var isActive = (newStatus === 'approved' || newStatus === 'active');
+  var { error } = await supa.from('pharmacies').update({ status: newStatus, active: isActive, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadPharmacies();
+  var msgs = { suspended: 'Pharmacy suspended', approved: 'Pharmacy reactivated!' };
+  showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
+}
+
+async function removePharmacy(id) {
+  if (!confirm('Remove this pharmacy from the platform? Users will no longer be able to order medicine from them.')) return;
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
+  var { error } = await supa.from('pharmacies').update({ status: 'removed', active: false, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadPharmacies();
+  showAdminToast('Pharmacy removed from platform', 'default');
 }
 </script>
 </body>

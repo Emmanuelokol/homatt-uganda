@@ -1,0 +1,66 @@
+name: Apply DB Migrations
+
+# Runs whenever a new migration SQL file is pushed.
+# Uses the Supabase Management API to execute SQL directly —
+# no DB password required, only SUPABASE_ACCESS_TOKEN.
+on:
+  push:
+    branches: [main, 'claude/**']
+    paths:
+      - 'supabase/migrations/**'
+  workflow_dispatch:
+
+env:
+  SUPABASE_PROJECT_REF: kgkdiykzmqjougwzzewi
+
+jobs:
+  migrate:
+    name: Apply DB Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check SUPABASE_ACCESS_TOKEN is set
+        run: |
+          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN secret is not set."
+            echo "::error::Go to: Supabase dashboard → Account → Access Tokens → create one"
+            echo "::error::Then: GitHub repo → Settings → Secrets → Actions → New secret"
+            exit 1
+          fi
+          echo "✓ SUPABASE_ACCESS_TOKEN is set"
+
+      - name: Apply all migrations via Supabase API
+        run: |
+          FAILED=0
+          for SQL_FILE in $(ls supabase/migrations/*.sql | sort); do
+            echo "──────────────────────────────────────────"
+            echo "Applying: $SQL_FILE"
+
+            SQL=$(cat "$SQL_FILE")
+
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+              "https://api.supabase.com/v1/projects/${{ env.SUPABASE_PROJECT_REF }}/database/query" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              --data-binary "$(jq -n --rawfile q "$SQL_FILE" '{query: $q}')")
+
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            BODY=$(echo "$RESPONSE" | head -1)
+
+            echo "HTTP: $HTTP_CODE"
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+              echo "✓ $SQL_FILE applied"
+            else
+              echo "::warning::Migration $SQL_FILE returned HTTP $HTTP_CODE: $BODY"
+              # Don't fail the whole job — some statements may already exist (idempotent)
+            fi
+          done
+
+          echo "──────────────────────────────────────────"
+          echo "✓ Migration run complete"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

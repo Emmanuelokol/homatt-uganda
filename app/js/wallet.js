@@ -122,16 +122,23 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('closeAddMoneySheet').addEventListener('click', closeAllSheets);
   document.getElementById('closeTransferSheet').addEventListener('click', closeAllSheets);
 
-  // ====== Open Add Money ======
+  // ====== Open Add Money — goes directly to mobile money sheet ======
   function openAddMoney(walletType) {
-    addMoneyWalletType = walletType;
-    document.getElementById('addMoneySheetTitle').textContent =
+    // Route directly to the mobile money sheet so SIM payment is requested
+    momoWalletType = walletType;
+    document.getElementById('momoSheetTitle').textContent =
       `Add to ${walletType === 'family' ? 'Family' : 'Care'} Wallet`;
-    document.getElementById('wtFamily').classList.toggle('selected', walletType === 'family');
-    document.getElementById('wtCare').classList.toggle('selected', walletType === 'care');
-    document.getElementById('depositAmount').value = '';
-    document.getElementById('depositDesc').value = '';
-    openSheet(addMoneySheet);
+    document.getElementById('momoWtFamily').classList.toggle('selected', walletType === 'family');
+    document.getElementById('momoWtCare').classList.toggle('selected', walletType === 'care');
+    document.getElementById('momoPhone').value = '';
+    document.getElementById('momoAmount').value = '';
+    document.getElementById('momoStatusArea').style.display = 'none';
+    document.getElementById('momoSubmitBtn').disabled = false;
+    document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+    document.querySelectorAll('.momo-quick-amt').forEach(b => b.classList.remove('selected'));
+    // Default phone hint for add money (no specific network pre-selected)
+    document.getElementById('momoPhoneHint').textContent = 'Enter your MTN or Airtel number';
+    openSheet(momoSheet);
   }
 
   document.getElementById('addMoneyFamilyBtn').addEventListener('click', () => openAddMoney('family'));
@@ -278,11 +285,185 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast('Refreshed');
   });
 
-  // ====== MTN/Airtel/Card placeholders ======
-  ['mtnBtn', 'airtelBtn', 'cardBtn'].forEach(id => {
-    document.getElementById(id).addEventListener('click', () => {
-      showToast('Mobile money integration coming soon!');
+  // ====== Mobile Money (Relworx) ======
+  let momoNetwork = 'MTN'; // 'MTN' | 'AIRTEL'
+  let momoWalletType = 'family';
+  let momoPollingInterval = null;
+
+  const momoSheet = document.getElementById('momoSheet');
+
+  function openMomoSheet(network) {
+    momoNetwork = network;
+    document.getElementById('momoSheetTitle').textContent = `Pay with ${network === 'MTN' ? 'MTN Mobile Money' : 'Airtel Money'}`;
+    document.getElementById('momoPhoneHint').textContent =
+      network === 'MTN' ? 'Enter your MTN number e.g. 0772 123 456' : 'Enter your Airtel number e.g. 0752 123 456';
+    document.getElementById('momoPhone').value = '';
+    document.getElementById('momoAmount').value = '';
+    document.getElementById('momoStatusArea').style.display = 'none';
+    document.getElementById('momoSubmitBtn').disabled = false;
+    document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+    document.querySelectorAll('.momo-quick-amt').forEach(b => b.classList.remove('selected'));
+    openSheet(momoSheet);
+  }
+
+  document.getElementById('mtnBtn').addEventListener('click', () => openMomoSheet('MTN'));
+  document.getElementById('airtelBtn').addEventListener('click', () => openMomoSheet('AIRTEL'));
+  document.getElementById('closeMomoSheet').addEventListener('click', () => {
+    clearMomoPolling();
+    closeAllSheets();
+  });
+
+  // Wallet selector inside momo sheet
+  document.getElementById('momoWtFamily').addEventListener('click', () => {
+    momoWalletType = 'family';
+    document.getElementById('momoWtFamily').classList.add('selected');
+    document.getElementById('momoWtCare').classList.remove('selected');
+  });
+  document.getElementById('momoWtCare').addEventListener('click', () => {
+    momoWalletType = 'care';
+    document.getElementById('momoWtCare').classList.add('selected');
+    document.getElementById('momoWtFamily').classList.remove('selected');
+  });
+
+  // Quick amounts for momo
+  document.querySelectorAll('.momo-quick-amt').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('momoAmount').value = btn.dataset.amount;
+      document.querySelectorAll('.momo-quick-amt').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
     });
+  });
+
+  // Submit mobile money payment request
+  document.getElementById('momoSubmitBtn').addEventListener('click', async () => {
+    const rawPhone = document.getElementById('momoPhone').value.trim();
+    const amount   = parseInt(document.getElementById('momoAmount').value);
+
+    if (!rawPhone) { showToast('Please enter your mobile money number'); return; }
+    if (!amount || amount < 500) { showToast('Minimum amount is UGX 500'); return; }
+
+    const btn = document.getElementById('momoSubmitBtn');
+    btn.disabled = true;
+    document.getElementById('momoSubmitLabel').textContent = 'Sending request…';
+
+    // Reset status area to waiting state
+    const statusArea = document.getElementById('momoStatusArea');
+    statusArea.style.display = 'none';
+    statusArea.style.background = '#FFF3E0';
+    statusArea.style.border = '1px solid #FFB74D';
+    statusArea.innerHTML = `
+      <div id="momoStatusSpinner" style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:6px">
+        <span class="material-icons-outlined" style="font-size:20px;color:#E65100;animation:spin 1.2s linear infinite">refresh</span>
+        <span style="font-size:13px;font-weight:600;color:#E65100">Waiting for your approval…</span>
+      </div>
+      <p style="font-size:12px;color:#BF360C;margin:0">Check your phone and enter your PIN to confirm.</p>
+      <p style="font-size:11px;color:#9AA0A6;margin:6px 0 0" id="momoStatusTimer"></p>
+    `;
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const anonKey = cfg.SUPABASE_ANON_KEY;
+      const fnUrl   = `${cfg.SUPABASE_URL.replace('/rest/v1','')}/functions/v1/relworx-payment`;
+
+      const resp = await fetch(fnUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || anonKey}`,
+        },
+        body: JSON.stringify({
+          action: 'collect',
+          msisdn: rawPhone,
+          amount,
+          walletType: momoWalletType,
+          description: `Homatt ${momoWalletType} wallet top-up via ${momoNetwork}`,
+        }),
+      });
+
+      const result = await resp.json();
+
+      if (!resp.ok || !result.success) {
+        const errMsg = result.error || 'Payment request failed. Please try again.';
+        // Show error inline so user sees it clearly (not just a brief toast)
+        const statusArea = document.getElementById('momoStatusArea');
+        statusArea.style.display = 'block';
+        statusArea.style.background = '#FFEBEE';
+        statusArea.style.border = '1px solid #EF9A9A';
+        statusArea.innerHTML = `
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span class="material-icons-outlined" style="font-size:20px;color:#C62828">error_outline</span>
+            <span style="font-size:13px;font-weight:600;color:#C62828">Payment Not Sent</span>
+          </div>
+          <p style="font-size:12px;color:#B71C1C;margin:0">${errMsg}</p>
+          <p style="font-size:11px;color:#9AA0A6;margin:6px 0 0">Check your phone number and try again. If the problem persists, call support: <a href="tel:+256708520466" style="color:#1B5E20">0708 520 466</a></p>
+        `;
+        btn.disabled = false;
+        document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+        return;
+      }
+
+      // Show waiting state
+      document.getElementById('momoStatusArea').style.display = 'block';
+      document.getElementById('momoSubmitLabel').textContent = 'Waiting for approval…';
+
+      // Poll for status every 8 seconds for up to 3 minutes
+      let elapsed = 0;
+      const totalWait = 180;
+      momoPollingInterval = setInterval(async () => {
+        elapsed += 8;
+        document.getElementById('momoStatusTimer').textContent =
+          `Waiting ${elapsed}s of max ${totalWait}s…`;
+
+        if (elapsed >= totalWait) {
+          clearMomoPolling();
+          showToast('Payment not confirmed yet — check your phone and try again');
+          btn.disabled = false;
+          document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+          document.getElementById('momoStatusArea').style.display = 'none';
+          return;
+        }
+
+        try {
+          const statusResp = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token || anonKey}`,
+            },
+            body: JSON.stringify({ action: 'status', internalReference: result.internalReference }),
+          });
+          const statusData = await statusResp.json();
+          const txStatus = statusData?.transaction?.status;
+
+          if (txStatus === 'successful' || txStatus === 'completed') {
+            clearMomoPolling();
+            closeAllSheets();
+            await loadWallet();
+            showToast(`UGX ${amount.toLocaleString()} added to ${momoWalletType === 'family' ? 'Family' : 'Care'} Wallet!`);
+          } else if (txStatus === 'failed' || txStatus === 'cancelled') {
+            clearMomoPolling();
+            showToast('Payment was not completed. Please try again.');
+            btn.disabled = false;
+            document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+            document.getElementById('momoStatusArea').style.display = 'none';
+          }
+        } catch(e) { /* network error during polling — keep trying */ }
+      }, 8000);
+
+    } catch(e) {
+      showToast('Network error. Please check your connection and try again.');
+      btn.disabled = false;
+      document.getElementById('momoSubmitLabel').textContent = 'Request Payment';
+    }
+  });
+
+  function clearMomoPolling() {
+    if (momoPollingInterval) { clearInterval(momoPollingInterval); momoPollingInterval = null; }
+  }
+
+  // Card placeholder
+  document.getElementById('cardBtn').addEventListener('click', () => {
+    showToast('Card payments coming soon!');
   });
 
   // ====== Toast ======

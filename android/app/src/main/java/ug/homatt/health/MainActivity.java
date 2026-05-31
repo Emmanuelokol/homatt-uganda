@@ -1,8 +1,8 @@
 package ug.homatt.health;
 
 import android.os.Bundle;
-import android.view.WindowManager;
 import androidx.core.splashscreen.SplashScreen;
+import androidx.core.view.WindowCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
@@ -16,10 +16,9 @@ public class MainActivity extends BridgeActivity {
         // Keep splash visible until WebView is ready (Capacitor signals this)
         splashScreen.setKeepOnScreenCondition(() -> false);
 
-        // Full screen / edge-to-edge
-        getWindow().setFlags(
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        );
+        // Edge-to-edge: let content draw behind status/nav bars.
+        // Do NOT use FLAG_LAYOUT_NO_LIMITS — it breaks soft keyboard resize on
+        // Android 11+ and causes a black screen when any input is focused.
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
     }
 }
