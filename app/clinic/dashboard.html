@@ -2525,13 +2525,23 @@
   }
   loadAll();
 
-  // ── Auto-refresh every 60 s ──
-  setInterval(function() {
+  // ── Safety auto-refresh (in case realtime drops or isn't enabled) ──
+  function refreshAll() {
     loadBookings(); loadActiveTreatments(); loadPendingPayments();
     loadConsultations(); loadRevenue();
     loadInventory(); loadFinancial(_finPeriod);
     loadMedsDispensed();
-  }, 60000);
+  }
+  setInterval(refreshAll, 25000);
+
+  // Refresh the instant the dashboard becomes visible again — returning from a
+  // consultation, switching back to the app, or bfcache restore — so the
+  // operator never has to manually reload to see fresh financials and stock.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') refreshAll();
+  });
+  window.addEventListener('focus', refreshAll);
+  window.addEventListener('pageshow', function(e) { if (e.persisted) refreshAll(); });
 
   // ── Supabase Realtime ──
   async function setupRealtime() {
