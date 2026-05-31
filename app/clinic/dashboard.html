@@ -639,7 +639,7 @@
 
     <!-- Sell button -->
     <button id="qsSellBtn" type="button" disabled
-      style="margin:10px 16px 16px;padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      style="margin:10px 16px;margin-bottom:calc(20px + env(safe-area-inset-bottom, 0px));padding:18px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:manipulation;font-family:inherit;flex-shrink:0;transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
     </button>
@@ -2952,12 +2952,21 @@
 
     var sellBtn = document.getElementById('qsSellBtn');
     if (sellBtn) {
-      // Immediate visual feedback on touchstart so the user knows the
-      // press registered before the click fires.
+      // Fire the sale on EITHER touchend OR click. On Android Chrome a tiny
+      // finger movement during the tap makes Chrome cancel the synthetic
+      // click (it thinks it was a pan), which is why the button "needed
+      // several presses". submitQuickSale() disables the button on first
+      // entry, so whichever event fires first wins and the other is a no-op.
       sellBtn.addEventListener('touchstart', function() {
         if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
       }, { passive: true });
-      sellBtn.addEventListener('touchend',    function() { sellBtn.style.filter = ''; }, { passive: true });
+      sellBtn.addEventListener('touchend', function(e) {
+        sellBtn.style.filter = '';
+        if (sellBtn.disabled) return;
+        e.preventDefault();          // we are handling it now; suppress the late click
+        e.stopPropagation();
+        submitQuickSale();
+      }, { passive: false });
       sellBtn.addEventListener('touchcancel', function() { sellBtn.style.filter = ''; }, { passive: true });
       sellBtn.addEventListener('click', function(e) { e.stopPropagation(); submitQuickSale(); });
     }
