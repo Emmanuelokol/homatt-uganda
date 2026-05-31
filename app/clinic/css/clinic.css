@@ -20,11 +20,13 @@
   --shadow:    0 2px 8px rgba(0,0,0,0.08);
 }
 *{margin:0;padding:0;box-sizing:border-box}
-/* Kill the Android-WebView double-tap-zoom delay that made buttons need two
-   taps. With user-scalable=no in the viewport, every tap registers on the
-   first press across all clinic pages. */
 html,body{touch-action:manipulation}
+/* All interactive elements: kill double-tap-zoom delay */
 button,a,[onclick],input,select,label,.fin-tab,.meds-period-btn,.order-card,.qs-drug-card,.cbn-link,.sidebar-link{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0.06)}
+/* Icons/spans inside buttons/anchors must NOT absorb the tap themselves —
+   that puts the hit-element back to the parent which already has
+   touch-action:manipulation, so there is zero 300ms delay. */
+button>*,a>*{pointer-events:none}
 body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;animation:pg-in .2s ease both}
 @keyframes pg-in{from{opacity:0}to{opacity:1}}
 

@@ -2938,29 +2938,68 @@
     if (el) el.style.display = 'none';
   }
 
-  // ── Wire up Quick Sale controls via addEventListener (reliable on Android WebView) ──
+  // ── Wire up Quick Sale controls ────────────────────────────────────────────
+  // Use touchend (fires the instant the finger lifts, with no browser delay)
+  // and block the subsequent synthetic click so nothing fires twice.
+  // A click fallback handles desktop/mouse use.
+  // submitQuickSale() is already guarded by btn.disabled, so double-calls
+  // from touchend+click overlap on some browsers are harmless.
   (function wireQuickSale() {
+
+    // Helper: wire touchend (mobile, instant) + click (desktop fallback).
+    // cb receives the original event.
+    function onTap(el, cb) {
+      if (!el) return;
+      var _didTouch = false;
+      el.addEventListener('touchstart', function() {
+        _didTouch = false;
+      }, { passive: true });
+      el.addEventListener('touchend', function(e) {
+        e.preventDefault();           // stops the 300ms-delayed click from firing
+        e.stopPropagation();          // don't bubble to overlay onclick
+        _didTouch = true;
+        cb(e);
+        setTimeout(function() { _didTouch = false; }, 600);
+      }, { passive: false });
+      el.addEventListener('click', function(e) {
+        if (_didTouch) { _didTouch = false; return; } // already handled
+        e.stopPropagation();
+        cb(e);
+      });
+    }
+
+    // Sell button — also give immediate visual press feedback via touchstart
     var sellBtn = document.getElementById('qsSellBtn');
-    if (sellBtn) sellBtn.addEventListener('click', function(e) { e.preventDefault(); submitQuickSale(); });
+    if (sellBtn) {
+      sellBtn.addEventListener('touchstart', function() {
+        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.8)';
+      }, { passive: true });
+      sellBtn.addEventListener('touchcancel', function() {
+        sellBtn.style.filter = '';
+      }, { passive: true });
+    }
+    onTap(sellBtn, function(e) {
+      if (sellBtn) sellBtn.style.filter = '';
+      submitQuickSale();
+    });
 
-    var closeBtn = document.getElementById('qsCloseBtn');
-    if (closeBtn) closeBtn.addEventListener('click', closeQuickSale);
+    onTap(document.getElementById('qsCloseBtn'), closeQuickSale);
 
-    var addBtn = document.getElementById('qsAddDrugBtn');
-    if (addBtn) addBtn.addEventListener('click', function() {
+    onTap(document.getElementById('qsAddDrugBtn'), function() {
       closeQuickSale();
       if (typeof openAddStockModal === 'function') openAddStockModal();
     });
 
-    var minus = document.getElementById('qsQtyMinus');
-    var plus  = document.getElementById('qsQtyPlus');
-    if (minus) minus.addEventListener('click', function() { changeQsQty(-1); });
-    if (plus)  plus.addEventListener('click',  function() { changeQsQty(1);  });
+    onTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
+    onTap(document.getElementById('qsQtyPlus'),  function() { changeQsQty(1); });
 
-    var cashBtn = document.getElementById('qsPmCash');
-    var momoBtn = document.getElementById('qsPmMomo');
-    if (cashBtn) cashBtn.addEventListener('click', function() { setQsPm('cash'); });
-    if (momoBtn) momoBtn.addEventListener('click', function() { setQsPm('momo'); });
+    onTap(document.getElementById('qsPmCash'), function() { setQsPm('cash'); });
+    onTap(document.getElementById('qsPmMomo'), function() { setQsPm('momo'); });
+
+    onTap(document.getElementById('qsResetTotal'), function() {
+      _qsTotalOverride = null;
+      updateQsPanel();
+    });
 
     var totalInput = document.getElementById('qsTotalInput');
     if (totalInput) totalInput.addEventListener('input', function() {
@@ -2968,18 +3007,24 @@
       _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
     });
 
-    var resetBtn = document.getElementById('qsResetTotal');
-    if (resetBtn) resetBtn.addEventListener('click', function() {
-      _qsTotalOverride = null;
-      updateQsPanel();
-    });
-
-    // Event delegation for drug card taps (works for dynamically-injected cards)
+    // Event delegation for drug cards (dynamically injected — touchend + click)
     var grid = document.getElementById('qsDrugGrid');
-    if (grid) grid.addEventListener('click', function(e) {
-      var card = e.target.closest('.qs-drug-card');
-      if (card && card.dataset.id) selectQsDrug(card.dataset.id);
-    });
+    if (grid) {
+      var _gridTouch = false;
+      grid.addEventListener('touchend', function(e) {
+        var card = e.target.closest('.qs-drug-card');
+        if (!card || !card.dataset.id) return;
+        e.preventDefault();
+        _gridTouch = true;
+        setTimeout(function() { _gridTouch = false; }, 600);
+        selectQsDrug(card.dataset.id);
+      }, { passive: false });
+      grid.addEventListener('click', function(e) {
+        if (_gridTouch) { _gridTouch = false; return; }
+        var card = e.target.closest('.qs-drug-card');
+        if (card && card.dataset.id) selectQsDrug(card.dataset.id);
+      });
+    }
   })();
 
   async function loadQsDrugs() {
