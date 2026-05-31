@@ -2553,6 +2553,8 @@
         function() { loadInventory(); loadFinancial(_finPeriod); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory_txns', filter: 'clinic_id=eq.' + clinicId },
         function() { loadInventory(); loadFinancial(_finPeriod); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_quick_sales', filter: 'clinic_id=eq.' + clinicId },
+        function() { loadRevenue(); loadFinancial(_finPeriod); loadInventory(); })
       .subscribe();
   }
   setupRealtime();
@@ -2811,19 +2813,38 @@
           .gte('created_at', start.toISOString()),
       ]);
 
+      // Graceful fallback: if amount_paid column isn't migrated yet, the whole
+      // diagnoses query fails. Refetch with only guaranteed columns so Patients
+      // and Billed never silently drop to zero.
+      if (dxRes.error) {
+        console.warn('Financial diagnoses query failed, retrying without amount_paid:', dxRes.error.message);
+        dxRes = await supabase.from('clinic_diagnoses')
+          .select('id,total_charged_ugx,payment_status')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString());
+      }
+
       var rows    = dxRes.data || [];
-      var txns    = txnRes.data || [];
-      var pays    = payRes.data || [];
+      var txns    = (txnRes && txnRes.data) || [];
+      var pays    = (payRes && !payRes.error && payRes.data) ? payRes.data : [];
       var qsSales = (qsRes && !qsRes.error && qsRes.data) ? qsRes.data : [];
       var qsTotal = qsSales.reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+
+      // Derive per-row paid amount defensively: use amount_paid if present,
+      // otherwise infer from payment_status (paid → full, else 0).
+      function rowPaid(r) {
+        if (r.amount_paid !== undefined && r.amount_paid !== null) return Number(r.amount_paid) || 0;
+        return r.payment_status === 'paid' ? (Number(r.total_charged_ugx) || 0) : 0;
+      }
+      var dxPaidTotal = rows.reduce(function(s,r){ return s + rowPaid(r); }, 0);
 
       var patients  = rows.length;
       var billed    = rows.reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsTotal;
       // Collected = payments received (consult payments) + all quick sales (immediate cash/momo)
       var collected = (pays.length
         ? pays.reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
-        : rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0)) + qsTotal;
-      var outstanding = Math.max(0, billed - rows.reduce(function(s,r){ return s + (Number(r.amount_paid)||0); }, 0));
+        : dxPaidTotal) + qsTotal;
+      var outstanding = Math.max(0, billed - qsTotal - dxPaidTotal);
       var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
       // Margin uses Collected (real income) minus stock cost so it reflects actual cash position
       var margin    = collected - stockCost;
