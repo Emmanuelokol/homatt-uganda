@@ -639,7 +639,7 @@
 
     <!-- Sell button -->
     <button id="qsSellBtn" type="button" disabled
-      style="margin:10px 16px;margin-bottom:calc(20px + env(safe-area-inset-bottom, 0px));padding:18px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      style="margin:10px 16px;margin-bottom:calc(46px + env(safe-area-inset-bottom, 0px));padding:18px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
     </button>
@@ -2996,19 +2996,30 @@
 
     var sellBtn = document.getElementById('qsSellBtn');
     if (sellBtn) {
-      // touch-action:none on the button means the browser never reclassifies
-      // this touch as a scroll, so pointercancel never fires and click fires
-      // on the very first tap. Keep it simple: just use click.
+      // The Sell button has touch-action:none, so the browser can NEVER
+      // reclassify a touch on it as a scroll — that means pointerup is
+      // guaranteed to fire on the very first tap and is never cancelled.
+      // We fire on pointerup (the earliest reliable signal for touch AND
+      // mouse) and keep click as a fallback for browsers without Pointer
+      // Events, deduping the two so a single tap fires exactly one sale.
+      var _qsLastFire = 0;
       var clearFx = function() { sellBtn.style.filter = ''; };
-      sellBtn.addEventListener('touchstart', function() {
-        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
-      }, { passive: true });
-      sellBtn.addEventListener('touchend',    clearFx, { passive: true });
-      sellBtn.addEventListener('touchcancel', clearFx, { passive: true });
-      sellBtn.addEventListener('click', function() {
+      function fireSell(e) {
+        if (sellBtn.disabled) return;
+        var now = Date.now();
+        if (now - _qsLastFire < 700) return;   // swallow the follow-up ghost click
+        _qsLastFire = now;
+        if (e && e.cancelable) e.preventDefault();
         clearFx();
         submitQuickSale();
+      }
+      sellBtn.addEventListener('pointerdown', function() {
+        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
       });
+      sellBtn.addEventListener('pointerup',     fireSell);   // primary: touch + mouse
+      sellBtn.addEventListener('pointercancel', clearFx);
+      sellBtn.addEventListener('pointerleave',  clearFx);
+      sellBtn.addEventListener('click',         fireSell);   // fallback / legacy WebView
     }
 
     bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
