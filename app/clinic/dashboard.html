@@ -2896,6 +2896,8 @@
   var _qsTotalOverride = null;   // null = use auto (price × qty); otherwise user-typed amount
   var _qsPm;
   try { _qsPm = localStorage.getItem('qs_pm') || 'cash'; } catch(e) { _qsPm = 'cash'; }
+  var _qsClinicId = null;
+  var _qsUserId   = null;
 
   function openQuickSale() {
     var el = document.getElementById('qsOverlay');
@@ -2912,6 +2914,13 @@
     if (flash) flash.style.display = 'none';
     setQsPm(_qsPm);
     loadQsDrugs();
+    // Pre-fetch clinicId + userId now so Sell tap is instant (no network call at sell time)
+    resolveClinicId().then(function(cid) { _qsClinicId = cid; });
+    if (supabase) {
+      supabase.auth.getSession().then(function(s) {
+        _qsUserId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id || null;
+      }).catch(function(){});
+    }
   }
 
   function closeQuickSale() {
@@ -3115,15 +3124,10 @@
     var stockAfter = Math.max(0, Number(_qsSel.quantity) - _qsQty);
 
     try {
-      var clinicId = await resolveClinicId();
+      var clinicId = _qsClinicId || await resolveClinicId();
+      var userId   = _qsUserId;
 
       if (supabase && clinicId && !_qsSel._isDemo) {
-        var userId = null;
-        try {
-          var s = await supabase.auth.getSession();
-          userId = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
-        } catch(e2) {}
-
         try {
           var ins = await supabase.from('clinic_quick_sales').insert({
             clinic_id:      clinicId,
