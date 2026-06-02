@@ -688,6 +688,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Auto-fill delivery address with GPS location if field is empty
     const addrInput = document.getElementById('cartDeliveryAddress');
     if (addrInput && !addrInput.value) autoFillCartAddress();
+    // Pre-warm GPS + pharmacy lookup in the background so that by the time
+    // the user fills in their address and taps "Place Order", _cachedCoords
+    // and _nearestPharmacy are already resolved — making checkout near-instant
+    // instead of blocking for up to 7 seconds on GPS.
+    _warmUpCheckout();
+  }
+
+  let _warmUpDone = false;
+  async function _warmUpCheckout() {
+    if (_warmUpDone || _nearestPharmacy) return;
+    _warmUpDone = true;
+    try {
+      const coords = await Promise.race([
+        getUserCoords().catch(() => null),
+        new Promise(r => setTimeout(() => r(null), 6000)),
+      ]);
+      if (coords) await findNearestPharmacy(coords[0], coords[1]).catch(() => {});
+    } catch(e) {}
   }
 
   // ====== Pharmacy Routing ======

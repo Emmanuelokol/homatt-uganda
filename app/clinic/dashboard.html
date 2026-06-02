@@ -602,6 +602,9 @@
         style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
     </div>
 
+    <!-- Category / illness filter chips (populated by JS after drugs load) -->
+    <div id="qsCategoryRow" style="display:flex;gap:6px;padding:0 16px 8px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none"></div>
+
     <!-- Drug grid -->
     <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px;overflow-y:auto;flex:1 1 0;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch">
       <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>
@@ -738,6 +741,22 @@
         <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
         <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
           style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Category / Illness <span style="font-weight:400;color:#9AA0A6;text-transform:none">what it treats — used for Quick Sale filter</span></label>
+        <input id="siCategory" type="text" list="siCategoryList" placeholder="e.g. Malaria, Antibiotics, Pain / Fever…" autocomplete="off"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+        <datalist id="siCategoryList">
+          <option value="Malaria">
+          <option value="Antibiotics">
+          <option value="Pain / Fever">
+          <option value="Respiratory">
+          <option value="Digestive">
+          <option value="Skin / Wound">
+          <option value="Vitamins">
+          <option value="Chronic">
+          <option value="Other">
+        </datalist>
       </div>
     </div>
     <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
@@ -2680,7 +2699,7 @@
 
   // ── Add Stock Item Modal ──
   function openAddStockModal() {
-    ['siName','siUnit','siQty','siThreshold','siCost'].forEach(function(id){
+    ['siName','siUnit','siQty','siThreshold','siCost','siSellPrice','siCategory'].forEach(function(id){
       var el = document.getElementById(id); if (el) el.value = '';
     });
     var su = document.getElementById('siUnit'); if (su) su.value = 'tabs';
@@ -2715,6 +2734,9 @@
         reorder_level: thres * 2, unit_cost_ugx: cost,
       };
       if (sellPrice) insertData.selling_price_ugx = sellPrice;
+      var catEl = document.getElementById('siCategory');
+      var category = catEl ? (catEl.value || '').trim() : '';
+      if (category) insertData.category = category;
       var r = await supabase.from('clinic_inventory').insert(insertData);
       if (r.error) throw r.error;
       document.getElementById('stockItemModal').style.display = 'none';
@@ -2908,6 +2930,7 @@
   try { _qsPm = localStorage.getItem('qs_pm') || 'cash'; } catch(e) { _qsPm = 'cash'; }
   var _qsClinicId = null;
   var _qsUserId   = null;
+  var _qsCategoryFilter = 'all'; // active category chip ('all' = no filter)
 
   function openQuickSale() {
     var el = document.getElementById('qsOverlay');
@@ -2917,7 +2940,7 @@
     // Background scrolling was causing Chrome to treat the first tap on any
     // sheet button as a scroll gesture rather than a click.
     document.body.style.overflow = 'hidden';
-    _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
+    _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsCategoryFilter = 'all';
     var panel = document.getElementById('qsSelectedPanel');
     var btn   = document.getElementById('qsSellBtn');
     var si    = document.getElementById('qsSearch');
@@ -3061,7 +3084,7 @@
     try {
       var r = await supabase
         .from('clinic_inventory')
-        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold')
+        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold,category')
         .eq('clinic_id', clinicId)
         .eq('item_type', 'medicine')
         .eq('is_active', true)
@@ -3070,19 +3093,21 @@
       if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
       _qsDrugs = r.data;
       renderQsGrid(_qsDrugs);
+      renderQsCategoryChips();
     } catch(e) { renderQsDemo(); }
   }
 
   function renderQsDemo() {
     _qsDrugs = [
-      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,_isDemo:true},
-      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,_isDemo:true},
-      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, _isDemo:true},
-      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,_isDemo:true},
-      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,_isDemo:true},
-      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, _isDemo:true},
+      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,category:'Pain / Fever',   _isDemo:true},
+      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,category:'Antibiotics',    _isDemo:true},
+      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, category:'Digestive',      _isDemo:true},
+      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,category:'Digestive',      _isDemo:true},
+      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,category:'Pain / Fever',   _isDemo:true},
+      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, category:'Antibiotics',    _isDemo:true},
     ];
     renderQsGrid(_qsDrugs);
+    renderQsCategoryChips();
   }
 
   function renderQsGrid(items) {
@@ -3103,8 +3128,12 @@
         : '<span style="color:#E65100;font-size:11px;font-weight:700">⚠ Set sell price</span>';
       var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5);
       var stockClr = lowStock ? '#E65100' : '#9AA0A6';
+      var catBadge = item.category
+        ? '<div style="font-size:10px;color:#1B5E20;background:#E8F5E9;border-radius:10px;padding:1px 6px;display:inline-block;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(item.category) + '</div>'
+        : '';
       return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
         + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
+        + catBadge
         + '<div class="qs-drug-price">' + priceStr + '</div>'
         + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
         + '</div>';
@@ -3112,19 +3141,55 @@
       + '<div id="qsNoMatch" style="display:none;grid-column:1/-1;text-align:center;padding:24px;color:#9AA0A6;font-size:14px">No match found.</div>';
   }
 
-  function filterQsDrugs(q) {
-    q = (q || '').trim().toLowerCase();
+  function renderQsCategoryChips() {
+    var row = document.getElementById('qsCategoryRow');
+    if (!row) return;
+    var cats = [];
+    _qsDrugs.forEach(function(d) {
+      var c = (d.category || '').trim();
+      if (c && cats.indexOf(c) < 0) cats.push(c);
+    });
+    if (!cats.length) { row.innerHTML = ''; return; }
+    cats.sort();
+    var all = ['all'].concat(cats);
+    row.innerHTML = all.map(function(c) {
+      var label  = c === 'all' ? 'All' : c;
+      var active = _qsCategoryFilter === c;
+      return '<button type="button" onclick="setQsCategory(\'' + c.replace(/'/g, "\\'") + '\')"'
+        + ' style="flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;'
+        + 'cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;'
+        + 'border:1.5px solid ' + (active ? '#1B5E20' : '#E0E0E0') + ';'
+        + 'background:' + (active ? '#1B5E20' : '#fff') + ';'
+        + 'color:' + (active ? '#fff' : '#5F6368') + '">'
+        + esc(label) + '</button>';
+    }).join('');
+  }
+
+  function setQsCategory(cat) {
+    _qsCategoryFilter = cat || 'all';
+    renderQsCategoryChips();
+    applyQsFilters();
+  }
+
+  function applyQsFilters() {
+    var searchEl = document.getElementById('qsSearch');
+    var q   = ((searchEl ? searchEl.value : '') || '').trim().toLowerCase();
+    var cat = _qsCategoryFilter || 'all';
     var cards = document.querySelectorAll('#qsDrugGrid .qs-drug-card');
     var visible = 0;
     cards.forEach(function(card) {
       var drug = _qsDrugs.find(function(d) { return d.id === card.dataset.id; });
-      var match = !q || (drug && drug.item_name.toLowerCase().includes(q));
-      card.style.display = match ? '' : 'none';
-      if (match) visible++;
+      if (!drug) { card.style.display = 'none'; return; }
+      var nameMatch = !q || drug.item_name.toLowerCase().includes(q);
+      var catMatch  = cat === 'all' || (drug.category || '').trim().toLowerCase() === cat.toLowerCase();
+      card.style.display = (nameMatch && catMatch) ? '' : 'none';
+      if (nameMatch && catMatch) visible++;
     });
     var nm = document.getElementById('qsNoMatch');
     if (nm) nm.style.display = visible === 0 ? 'block' : 'none';
   }
+
+  function filterQsDrugs() { applyQsFilters(); }
 
   function selectQsDrug(id) {
     var drug = _qsDrugs.find(function(d) { return d.id === id; });
