@@ -19,12 +19,12 @@
   "android": {
     "allowMixedContent": false,
     "webContentsDebuggingEnabled": false,
-    "backgroundColor": "#1B5E20",
+    "backgroundColor": "#0A1628",
     "minWebViewVersion": 60
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 0,
+      "launchShowDuration": 2000,
       "launchAutoHide": true,
       "backgroundColor": "#1B5E20",
       "androidSplashResourceName": "splash",

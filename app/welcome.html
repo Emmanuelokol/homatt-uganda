@@ -271,16 +271,37 @@
 </div>
 
 <script>
-// Redirect to dashboard if already logged in
 (function() {
+  // Returning users skip the welcome screen and go straight to the dashboard.
+  // Brand-new users have no session, so they simply see this welcome screen —
+  // no sign-in/login is forced on them.
+  var redirecting = false;
   try {
     const sess = JSON.parse(localStorage.getItem('homatt_session') || 'null');
     const user = JSON.parse(localStorage.getItem('homatt_user') || 'null');
     if ((sess && typeof sess === 'object') || (user && typeof user === 'object')) {
+      redirecting = true;
       window.location.replace('dashboard.html');
-      return;
     }
   } catch(e) {}
+
+  // Hide the native splash the moment the welcome screen is on-screen.
+  // welcome.html previously didn't load native-bridge.js, so the green splash
+  // lingered until Capacitor's slow auto-hide — that was the long green screen.
+  if (!redirecting) {
+    var hideSplash = function() {
+      try {
+        var cap = window.Capacitor;
+        if (cap && cap.Plugins && cap.Plugins.SplashScreen) {
+          cap.Plugins.SplashScreen.hide({ fadeOutDuration: 200 }).catch(function(){});
+        }
+      } catch(e) {}
+    };
+    // Wait for one paint so the welcome content is visible before the splash lifts.
+    requestAnimationFrame(function(){ requestAnimationFrame(hideSplash); });
+    // Safety net in case Capacitor wasn't ready on the first try.
+    setTimeout(hideSplash, 800);
+  }
 })();
 
 // Status bar time
