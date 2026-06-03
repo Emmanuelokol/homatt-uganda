@@ -270,6 +270,14 @@
           <div class="cb-subheading">Review your details before submitting</div>
         </div>
         <div class="cb-section">
+          <!-- Guest name prompt: only shown when there is no signed-in user name -->
+          <div id="guestNameCard" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:14px 16px;margin-bottom:14px">
+            <div style="font-size:12px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px">Your details (for the clinic)</div>
+            <input id="guestNameInput" type="text" placeholder="Your full name" autocomplete="name"
+              style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px;background:#fff">
+            <input id="guestPhoneInput" type="tel" placeholder="Phone number (optional)" autocomplete="tel" inputmode="tel"
+              style="width:100%;padding:11px 14px;border:1.5px solid #C8E6C9;border-radius:8px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;background:#fff">
+          </div>
           <div id="confirmDetails"></div>
         </div>
       </div>
@@ -356,6 +364,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/guest-profile.js"></script>
 <script src="js/app.js"></script>
 <style>
   .clinic-score-bar { height:6px; border-radius:3px; background:#E0E0E0; margin-top:6px; overflow:hidden; }
@@ -473,6 +482,22 @@ function goStep(n) {
   if (n === 4) {
     if (!booking.clinicId) { alert('Please select a clinic'); return; }
     renderConfirm();
+    // Show the guest name card only if no signed-in user name is available
+    var guestCard = document.getElementById('guestNameCard');
+    if (guestCard) {
+      var sess = JSON.parse(localStorage.getItem('homatt_session') || '{}');
+      var usr  = JSON.parse(localStorage.getItem('homatt_user')    || '{}');
+      var hasName = sess.first_name || sess.name || usr.firstName;
+      guestCard.style.display = hasName ? 'none' : 'block';
+      // Pre-fill from guest profile if available
+      if (!hasName && window.guestProfile) {
+        var gp = window.guestProfile.get();
+        var ni = document.getElementById('guestNameInput');
+        var pi = document.getElementById('guestPhoneInput');
+        if (ni && gp.name  && !ni.value) ni.value = gp.name;
+        if (pi && gp.phone && !pi.value) pi.value = gp.phone;
+      }
+    }
   }
   document.querySelectorAll('.cb-step').forEach(s => s.classList.remove('active'));
   document.getElementById('step' + n).classList.add('active');
@@ -516,7 +541,9 @@ function selectUrgency(level) {
 document.addEventListener('DOMContentLoaded', async () => {
   const session = JSON.parse(localStorage.getItem('homatt_session') || '{}');
   const select = document.getElementById('patientSelect');
-  select.innerHTML = `<option value="self">Me (${session.first_name || session.name || 'You'})</option>`;
+  const guestN = (window.guestProfile ? window.guestProfile.get().name : '') || '';
+  const selfLabel = session.first_name || session.name || (guestN ? guestN.split(' ')[0] : 'You');
+  select.innerHTML = `<option value="self">Me (${selfLabel})</option>`;
   if (supa && session.userId) {
     const { data: family } = await supa.from('family_members').select('id,name').eq('user_id', session.userId);
     if (family?.length) {
@@ -965,8 +992,17 @@ async function submitBooking() {
     } catch(e) {}
   }
 
-  // Pull display info from homatt_user cache
+  // Pull display info from homatt_user cache, falling back to guest profile
   const userCache = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  // Save guest name/phone typed in step 4 into the guest profile for future use
+  const guestNameEl  = document.getElementById('guestNameInput');
+  const guestPhoneEl = document.getElementById('guestPhoneInput');
+  const typedName  = guestNameEl  ? (guestNameEl.value  || '').trim() : '';
+  const typedPhone = guestPhoneEl ? (guestPhoneEl.value || '').trim() : '';
+  if ((typedName || typedPhone) && window.guestProfile) {
+    window.guestProfile.save({ name: typedName, phone: typedPhone });
+  }
+  const guestData = window.guestProfile ? window.guestProfile.get() : {};
 
   const bookingCode   = 'HM-' + Math.random().toString(36).toUpperCase().slice(2,6);
   const pinToken      = generatePIN();
@@ -981,9 +1017,13 @@ async function submitBooking() {
     }
     const payload = {
       patient_user_id:  authUserId,
-      patient_name:     userCache.firstName ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ') : (session.first_name ? [session.first_name, session.last_name].filter(Boolean).join(' ') : 'Patient'),
-      patient_age:      userCache.age  || session.age  || null,
-      patient_sex:      userCache.sex  || session.sex  || null,
+      patient_name:     userCache.firstName
+                          ? [userCache.firstName, userCache.lastName].filter(Boolean).join(' ')
+                          : (session.first_name
+                              ? [session.first_name, session.last_name].filter(Boolean).join(' ')
+                              : (typedName || guestData.name || 'Patient')),
+      patient_age:      userCache.age  || session.age  || guestData.age  || null,
+      patient_sex:      userCache.sex  || session.sex  || guestData.sex  || null,
       clinic_id:        isMockClinic ? null : booking.clinicId,
       symptoms:         booking.symptoms || null,
       urgency_level:    booking.urgency,

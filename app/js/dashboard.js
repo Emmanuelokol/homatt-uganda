@@ -15,24 +15,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch(e) { console.warn('[Dashboard] Supabase init failed:', e.message); }
 
-  if (!session) {
-    // Only redirect if we have no cached user either (fully signed out)
-    const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
-    const localUser = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
-    if (!localSession && !localUser) {
-      window.location.href = 'signin.html';
-      return;
-    }
-    // If session exists but profile is not yet complete, go to onboarding
-    if (localSession && localSession.userId && !localSession.first_name) {
-      const localUserObj = localUser || {};
-      if (!localUserObj.firstName) {
-        window.location.href = 'onboarding.html';
-        return;
-      }
-    }
-    // Offline or token expired but we have cached data — continue with cache
-  }
+  // No auth redirect — guests can use the app freely.
+  // We load whatever we have: Supabase session > localStorage cache > guest profile.
 
   // Load user data — prefer Supabase, fall back to localStorage cache
   const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
@@ -67,12 +51,8 @@ document.addEventListener('DOMContentLoaded', async () => {
           healthGoals: profile.health_goals,
         };
         localStorage.setItem('homatt_user', JSON.stringify(user));
-      } else if (!user.firstName && !localSession) {
-        // Supabase session exists but no patient profile AND no cached data.
-        // This is a portal staff account that slipped through — sign out and go to signin.
-        await supabase.auth.signOut();
-        window.location.href = 'signin.html';
-        return;
+      } else {
+        // No profile yet — they'll fill in details as they use the app.
       }
     } catch(e) { console.warn('[Dashboard] Profile fetch failed:', e.message); }
   }
@@ -102,8 +82,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     return 'Good evening,';
   }
 
+  // Fill in name from guest profile if no signed-in user has a name yet
+  if (!user.firstName && window.guestProfile) {
+    const gp = window.guestProfile.get();
+    if (gp.name) user.firstName = gp.name.split(' ')[0];
+  }
+
   document.querySelector('.dash-welcome').textContent = getGreeting();
-  document.getElementById('userName').textContent = user.firstName || 'User';
+  document.getElementById('userName').textContent = user.firstName || '';
 
   // User avatar initial — click navigates to profile
   const avatarEl = document.getElementById('userAvatar');
