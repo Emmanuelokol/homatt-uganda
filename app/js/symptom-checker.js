@@ -2034,7 +2034,7 @@ Provide 2-3 possible conditions ordered by likelihood. Be specific but compassio
     }
 
     console.log('[Homatt AI] Starting AI call chain via proxy...');
-    const providers = ['gemini', 'groq', 'openai'];
+    const providers = ['anthropic', 'gemini', 'groq', 'openai'];
     const errors = [];
 
     for (const provider of providers) {

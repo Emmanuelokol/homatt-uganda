@@ -354,7 +354,7 @@ Respond ONLY with valid JSON:
       const res = await fetch(proxyUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-        body: JSON.stringify({ provider: 'groq', prompt }),
+        body: JSON.stringify({ provider: 'anthropic', prompt }),
         signal: controller.signal,
       });
       clearTimeout(timer);
