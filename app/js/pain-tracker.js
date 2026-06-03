@@ -7,10 +7,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
+  // Guests welcome — no redirect. userId is null for guests (data stays local).
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { window.location.href = 'signin.html'; return; }
-
-  const userId = session.user.id;
+  const userId = (session && session.user && session.user.id)
+    || (function(){ try { return JSON.parse(localStorage.getItem('homatt_session')||'{}').userId || null; } catch(e){ return null; } })();
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
   const today = new Date().toISOString().split('T')[0];
 

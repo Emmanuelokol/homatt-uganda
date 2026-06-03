@@ -7,11 +7,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   const cfg = window.HOMATT_CONFIG || {};
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  // Auth check
+  // Guests welcome — no redirect. userId is null for guests (orders use guest profile).
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { window.location.href = 'signin.html'; return; }
-
-  const userId = session.user.id;
+  const userId = (session && session.user && session.user.id)
+    || (function(){ try { return JSON.parse(localStorage.getItem('homatt_session')||'{}').userId || null; } catch(e){ return null; } })();
 
   // Status bar time
   function updateTime() {
@@ -685,8 +684,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   function openCartSheet() {
     renderCartContents();
     openSheet(document.getElementById('cartSheet'));
-    // Auto-fill delivery address with GPS location if field is empty
+    // Pre-fill the saved delivery address from a previous order if we have one
     const addrInput = document.getElementById('cartDeliveryAddress');
+    if (addrInput && !addrInput.value && window.guestProfile) {
+      const savedAddr = window.guestProfile.get().address;
+      if (savedAddr) { addrInput.value = savedAddr; addrInput.style.display = 'block'; }
+    }
+    // Auto-fill delivery address with GPS location if still empty
     if (addrInput && !addrInput.value) autoFillCartAddress();
     // Pre-warm GPS + pharmacy lookup in the background so that by the time
     // the user fills in their address and taps "Place Order", _cachedCoords
@@ -882,7 +886,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       ]);
 
       const [profResult, gpsCoords] = await Promise.all([
-        Promise.resolve(supabase.from('profiles').select('first_name,last_name,phone_number,district').eq('id', userId).single()).catch(() => ({ data: null })),
+        userId
+          ? Promise.resolve(supabase.from('profiles').select('first_name,last_name,phone_number,district').eq('id', userId).single()).catch(() => ({ data: null }))
+          : Promise.resolve({ data: null }),
         gpsWithTimeout,
       ]);
 
@@ -891,7 +897,15 @@ document.addEventListener('DOMContentLoaded', async () => {
         patientName  = ((prof.first_name || '') + ' ' + (prof.last_name || '')).trim() || 'Customer';
         patientPhone = prof.phone_number || null;
         userDistrict = prof.district || null;
+      } else if (window.guestProfile) {
+        // Guest checkout — use the name/phone collected elsewhere in the app
+        const gp = window.guestProfile.get();
+        if (gp.name)     patientName  = gp.name;
+        if (gp.phone)    patientPhone = gp.phone;
+        if (gp.district) userDistrict = gp.district;
       }
+      // Remember this delivery address + phone for next time
+      if (window.guestProfile) window.guestProfile.save({ address: addr, phone: patientPhone || '' });
 
       if (gpsCoords) {
         [userLat, userLon] = gpsCoords;

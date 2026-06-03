@@ -21,7 +21,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       session = data?.session || null;
     }
   } catch(e) {}
-  if (!session) { window.location.href = 'signin.html'; return; }
+  // Guests welcome — no redirect. userId is null for guests (enrolments need an account).
+  const userId = (session && session.user && userId)
+    || (function(){ try { return JSON.parse(localStorage.getItem('homatt_session')||'{}').userId || null; } catch(e){ return null; } })();
 
   // Status bar clock
   (function tick() {
@@ -107,11 +109,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Load active enrolments ──
   async function reloadActive() {
+    if (!userId) { active = []; renderActive(); return; }
     try {
       const { data } = await supabase
         .from('patient_conditions')
         .select('*')
-        .eq('user_id', session.user.id)
+        .eq('user_id', userId)
         .eq('status', 'active')
         .order('enrolled_at', { ascending: false });
       active = data || [];
@@ -185,6 +188,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   document.getElementById('enrollBtn').addEventListener('click', async () => {
     if (!selectedKey || !selectedCatalogItem) return;
+    if (!userId) {
+      alert('Enrolling in a condition pathway saves your progress, so it needs an account. Tap "I already have an account" on the welcome screen, or create one — it only takes a moment.');
+      return;
+    }
     const btn = document.getElementById('enrollBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">refresh</span> Enrolling...';
@@ -196,7 +203,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
       const { data: row, error } = await supabase.from('patient_conditions').insert({
-        user_id:              session.user.id,
+        user_id:              userId,
         condition:            selectedKey,
         condition_label:      selectedCatalogItem.label,
         medication_name:      medName || null,
@@ -269,7 +276,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     refillAt.setHours(9, 0, 0, 0);
     if (refillAt > now) {
       invoke({
-        userId:        session.user.id,
+        userId:        userId,
         title:         `Refill your ${medName || label} medication`,
         message:       `Your ${medName || label} medication is almost done. Refill in 2 days to avoid missing a dose.`,
         data:          { screen: 'orders', id: conditionId, pathway:'refill' },
@@ -285,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       at.setDate(at.getDate() + i * freqDays);
       at.setHours(10, 0, 0, 0);
       invoke({
-        userId:        session.user.id,
+        userId:        userId,
         title:         `How is your ${label}?`,
         message:       `Quick check-in: how are you feeling with your ${label} today?`,
         data:          { screen:'prescription-checkin', id:conditionId, checkin_type:'chronic_checkin', drug: medName || label },
@@ -305,7 +312,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       at.setDate(at.getDate() + (i + 1) * 7);
       at.setHours(14, 0, 0, 0);
       invoke({
-        userId:        session.user.id,
+        userId:        userId,
         title:         `${label} tip`,
         message:       tip,
         data:          { screen:'dashboard', pathway:'education' },

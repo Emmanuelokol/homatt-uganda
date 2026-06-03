@@ -22,10 +22,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   const _localSess = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
   const _localUser = (() => { try { return JSON.parse(localStorage.getItem('homatt_user') || 'null'); } catch(e) { return null; } })();
 
-  if (!session && !_localSess && !_localUser) {
-    window.location.href = 'signin.html';
-    return;
-  }
+  // Guests welcome — no redirect. The symptom checker works fully without an account.
 
   // ====== API Config ======
   const PROXY_URL = cfg.API_PROXY_URL || '';

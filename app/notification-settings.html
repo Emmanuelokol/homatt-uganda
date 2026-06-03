@@ -212,18 +212,20 @@
     }
     tick(); setInterval(tick, 30000);
 
-    // Auth guard
+    // Guests welcome — no redirect. Preferences only persist once signed in.
     const { data: { session } } = await supa.auth.getSession();
-    if (!session) { window.location.href = 'signin.html'; return; }
+    const userId = (session && session.user && session.user.id) || null;
 
-    const userId = session.user.id;
-
-    // Load existing preferences
-    const { data: profile } = await supa
-      .from('profiles')
-      .select('notification_preferences, onesignal_player_id')
-      .eq('id', userId)
-      .single();
+    // Load existing preferences (signed-in users only)
+    let profile = null;
+    if (userId) {
+      const res = await supa
+        .from('profiles')
+        .select('notification_preferences, onesignal_player_id')
+        .eq('id', userId)
+        .single();
+      profile = res.data;
+    }
 
     const prefs = profile?.notification_preferences || {};
 
@@ -282,6 +284,12 @@
         const el = document.getElementById('pref_' + k);
         if (el) newPrefs[k] = el.checked;
       });
+
+      if (!userId) {
+        btn.textContent = 'Sign in to save';
+        setTimeout(() => { btn.textContent = 'Save Preferences'; btn.disabled = false; }, 1800);
+        return;
+      }
 
       const { error } = await supa
         .from('profiles')

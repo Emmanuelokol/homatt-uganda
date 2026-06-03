@@ -19,9 +19,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   } catch(e) { console.warn('[MoodTracker] Supabase init failed:', e.message); }
 
-  // Accept localStorage session for offline / APK users
+  // Accept localStorage session for offline / APK users. Guests welcome — no redirect.
   const localSession = (() => { try { return JSON.parse(localStorage.getItem('homatt_session') || 'null'); } catch(e) { return null; } })();
-  if (!session && !localSession) { window.location.href = 'signin.html'; return; }
   if (!userId && localSession?.userId) userId = localSession.userId;
 
   const user = JSON.parse(localStorage.getItem('homatt_user') || '{}');

@@ -40,9 +40,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('closeFaqSheet')?.addEventListener('click', closeAllSheets);
   document.getElementById('closeLanguageSheet')?.addEventListener('click', closeAllSheets);
 
-  // Auth check
+  // Guests welcome — no redirect. Shows guest details; saving needs an account.
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session) { window.location.href = 'signin.html'; return; }
+  const userId = (session && session.user && session.user.id) || null;
 
   // Status bar time
   function updateTime() {
@@ -55,17 +55,23 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // Load profile from cache then server
   let user = JSON.parse(localStorage.getItem('homatt_user') || '{}');
+  // For guests, fill name/phone from the guest profile collected across the app
+  if (!user.firstName && window.guestProfile) {
+    const gp = window.guestProfile.get();
+    if (gp.name)  { const parts = gp.name.split(' '); user.firstName = parts[0]; user.lastName = parts.slice(1).join(' '); }
+    if (gp.phone) user.phone = gp.phone;
+  }
   renderProfile(user); // render immediately from cache
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', session.user.id)
-    .single();
+  let profile = null;
+  if (userId) {
+    const res = await supabase.from('profiles').select('*').eq('id', userId).single();
+    profile = res.data;
+  }
 
   if (profile) {
     user = {
-      id: session.user.id,
+      id: userId,
       firstName: profile.first_name,
       lastName: profile.last_name,
       phone: profile.phone_number,
@@ -158,11 +164,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('avatarInput').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (!userId) { showToast('Sign in to upload a profile photo'); return; }
     if (file.size > 5 * 1024 * 1024) { showToast('Image must be under 5MB'); return; }
 
     showToast('Uploading photo...');
     const ext = file.name.split('.').pop().toLowerCase() || 'jpg';
-    const path = `${session.user.id}/avatar.${ext}`;
+    const path = `${userId}/avatar.${ext}`;
 
     const { error: uploadError } = await supabase.storage
       .from('avatars')
@@ -173,7 +180,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
     const avatarUrl = publicUrl + '?t=' + Date.now(); // cache bust
 
-    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', session.user.id);
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', userId);
 
     user.avatarUrl = avatarUrl;
     localStorage.setItem('homatt_user', JSON.stringify(user));
@@ -241,15 +248,25 @@ document.addEventListener('DOMContentLoaded', async () => {
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">refresh</span> Saving...';
 
-    const { error } = await supabase
-      .from('profiles')
-      .update({ first_name: firstName, last_name: lastName, district, city })
-      .eq('id', session.user.id);
+    // Guests: save locally to the guest profile so it persists and pre-fills forms.
+    if (!userId) {
+      if (window.guestProfile) {
+        window.guestProfile.save({ name: [firstName, lastName].filter(Boolean).join(' '), district: district });
+      }
+    } else {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ first_name: firstName, last_name: lastName, district, city })
+        .eq('id', userId);
+      if (error) {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<span class="material-icons-outlined">save</span> Save Changes';
+        showToast('Failed to save. Try again.'); return;
+      }
+    }
 
     saveBtn.disabled = false;
     saveBtn.innerHTML = '<span class="material-icons-outlined">save</span> Save Changes';
-
-    if (error) { showToast('Failed to save. Try again.'); return; }
 
     user.firstName = firstName;
     user.lastName = lastName;
@@ -278,7 +295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">refresh</span> Sending...';
 
     const { error } = await supabase.from('support_tickets').insert({
-      user_id: session.user.id,
+      user_id: userId,
       user_name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'User',
       user_phone: user.phone || null,
       category,
@@ -483,10 +500,11 @@ support@homatt.ug | +256 708 520 466`;
 
     await supabase.auth.signOut();
     localStorage.removeItem('homatt_user');
+    localStorage.removeItem('homatt_session');
     localStorage.removeItem('homatt_wallets');
     localStorage.removeItem('homatt_quiz_streak');
     localStorage.removeItem('homatt_cart');
-    window.location.href = 'signin.html';
+    window.location.href = 'welcome.html';
   });
 
   // ====== Toast ======
