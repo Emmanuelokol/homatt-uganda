@@ -616,7 +616,9 @@
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
         <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
       </div>
-      <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:10px"></div>
+      <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:8px"></div>
+      <!-- Unit type selector: Tab / Pack / Box — shown only when pack/box pricing is set -->
+      <div id="qsUnitTypeRow" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
         <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
         <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
@@ -757,6 +759,35 @@
           <option value="Chronic">
           <option value="Other">
         </datalist>
+      </div>
+      <!-- Packaging — optional, enables Pack / Box selling in Quick Sale -->
+      <div style="grid-column:1/-1;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding:6px 10px;background:#E8F5E9;border-radius:8px;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px">inventory_2</span>
+          Packaging — enables Pack &amp; Box selling in Quick Sale (optional)
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#424242;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px"># per pack <span style="font-weight:400;color:#9AA0A6;text-transform:none">(tabs/pack)</span></label>
+            <input id="siTabsPerPack" type="number" min="1" step="1" placeholder="e.g. 10"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#1B5E20;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Pack price (UGX)</label>
+            <input id="siPackPrice" type="number" min="0" step="100" placeholder="e.g. 8,000"
+              style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#424242;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Packs per box</label>
+            <input id="siPacksPerBox" type="number" min="1" step="1" placeholder="e.g. 10"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#1B5E20;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Box price (UGX)</label>
+            <input id="siBoxPrice" type="number" min="0" step="100" placeholder="e.g. 75,000"
+              style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          </div>
+        </div>
       </div>
     </div>
     <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
@@ -2699,7 +2730,8 @@
 
   // ── Add Stock Item Modal ──
   function openAddStockModal() {
-    ['siName','siUnit','siQty','siThreshold','siCost','siSellPrice','siCategory'].forEach(function(id){
+    ['siName','siUnit','siQty','siThreshold','siCost','siSellPrice','siCategory',
+     'siTabsPerPack','siPackPrice','siPacksPerBox','siBoxPrice'].forEach(function(id){
       var el = document.getElementById(id); if (el) el.value = '';
     });
     var su = document.getElementById('siUnit'); if (su) su.value = 'tabs';
@@ -2723,6 +2755,10 @@
     var thres = parseFloat(document.getElementById('siThreshold').value) || 5;
     var cost      = parseFloat(document.getElementById('siCost').value) || null;
     var sellPrice = parseFloat(document.getElementById('siSellPrice') ? document.getElementById('siSellPrice').value : 0) || null;
+    var tabsPerPack  = parseInt(document.getElementById('siTabsPerPack').value)  || null;
+    var packPrice    = parseFloat(document.getElementById('siPackPrice').value)   || null;
+    var packsPerBox  = parseInt(document.getElementById('siPacksPerBox').value)  || null;
+    var boxPrice     = parseFloat(document.getElementById('siBoxPrice').value)    || null;
     if (!name) { errEl.textContent = 'Item name is required.'; errEl.style.display = 'block'; return; }
     var clinicId = await resolveClinicId();
     if (!clinicId) { errEl.textContent = 'Account not linked to a clinic.'; errEl.style.display = 'block'; return; }
@@ -2733,7 +2769,11 @@
         unit: unit, quantity: qty, min_threshold: thres,
         reorder_level: thres * 2, unit_cost_ugx: cost,
       };
-      if (sellPrice) insertData.selling_price_ugx = sellPrice;
+      if (sellPrice)   insertData.selling_price_ugx      = sellPrice;
+      if (tabsPerPack) insertData.tabs_per_pack           = tabsPerPack;
+      if (packPrice)   insertData.pack_selling_price_ugx  = packPrice;
+      if (packsPerBox) insertData.packs_per_box           = packsPerBox;
+      if (boxPrice)    insertData.box_selling_price_ugx   = boxPrice;
       var catEl = document.getElementById('siCategory');
       var category = catEl ? (catEl.value || '').trim() : '';
       if (category) insertData.category = category;
@@ -2931,6 +2971,7 @@
   var _qsClinicId = null;
   var _qsUserId   = null;
   var _qsCategoryFilter = 'all'; // active category chip ('all' = no filter)
+  var _qsUnitType = 'tab'; // 'tab' | 'pack' | 'box' — what the clinician is selling
 
   function openQuickSale() {
     var el = document.getElementById('qsOverlay');
@@ -2940,7 +2981,7 @@
     // Background scrolling was causing Chrome to treat the first tap on any
     // sheet button as a scroll gesture rather than a click.
     document.body.style.overflow = 'hidden';
-    _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsCategoryFilter = 'all';
+    _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsCategoryFilter = 'all'; _qsUnitType = 'tab';
     var panel = document.getElementById('qsSelectedPanel');
     var btn   = document.getElementById('qsSellBtn');
     var si    = document.getElementById('qsSearch');
@@ -3084,7 +3125,7 @@
     try {
       var r = await supabase
         .from('clinic_inventory')
-        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold,category')
+        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold,category,tabs_per_pack,packs_per_box,pack_selling_price_ugx,box_selling_price_ugx')
         .eq('clinic_id', clinicId)
         .eq('item_type', 'medicine')
         .eq('is_active', true)
@@ -3099,12 +3140,12 @@
 
   function renderQsDemo() {
     _qsDrugs = [
-      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,category:'Pain / Fever',   _isDemo:true},
-      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,category:'Antibiotics',    _isDemo:true},
-      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, category:'Digestive',      _isDemo:true},
-      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,category:'Digestive',      _isDemo:true},
-      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,category:'Pain / Fever',   _isDemo:true},
-      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, category:'Antibiotics',    _isDemo:true},
+      {id:'qs-d1',item_name:'Paracetamol 500mg',  unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:200,category:'Pain / Fever',  tabs_per_pack:10,packs_per_box:10,pack_selling_price_ugx:7000,box_selling_price_ugx:65000,_isDemo:true},
+      {id:'qs-d2',item_name:'Amoxicillin 250mg',  unit:'cap',unit_cost_ugx:1500,selling_price_ugx:2500,quantity:100,category:'Antibiotics',   tabs_per_pack:8, packs_per_box:10,pack_selling_price_ugx:18000,box_selling_price_ugx:170000,_isDemo:true},
+      {id:'qs-d3',item_name:'ORS Sachet',          unit:'pkt',unit_cost_ugx:1000,selling_price_ugx:1500,quantity:80, category:'Digestive',     tabs_per_pack:null,packs_per_box:null,pack_selling_price_ugx:null,box_selling_price_ugx:null,_isDemo:true},
+      {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,category:'Digestive',     tabs_per_pack:10,packs_per_box:10,pack_selling_price_ugx:10500,box_selling_price_ugx:98000,_isDemo:true},
+      {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,category:'Pain / Fever',  tabs_per_pack:10,packs_per_box:10,pack_selling_price_ugx:8500,box_selling_price_ugx:80000,_isDemo:true},
+      {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, category:'Antibiotics',   tabs_per_pack:10,packs_per_box:5, pack_selling_price_ugx:7000,box_selling_price_ugx:33000,_isDemo:true},
     ];
     renderQsGrid(_qsDrugs);
     renderQsCategoryChips();
@@ -3131,10 +3172,18 @@
       var catBadge = item.category
         ? '<div style="font-size:10px;color:#1B5E20;background:#E8F5E9;border-radius:10px;padding:1px 6px;display:inline-block;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(item.category) + '</div>'
         : '';
+      var packBadge = '';
+      if (item.pack_selling_price_ugx && item.tabs_per_pack) {
+        packBadge = '<div style="font-size:9px;color:#0D47A1;background:#E3F2FD;border-radius:8px;padding:1px 5px;display:inline-block;margin-right:3px;font-weight:700;white-space:nowrap">pack</div>';
+      }
+      if (item.box_selling_price_ugx && item.packs_per_box) {
+        packBadge += '<div style="font-size:9px;color:#4A148C;background:#F3E5F5;border-radius:8px;padding:1px 5px;display:inline-block;font-weight:700;white-space:nowrap">box</div>';
+      }
       return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
         + '<div class="qs-drug-name">' + esc(item.item_name) + '</div>'
         + catBadge
         + '<div class="qs-drug-price">' + priceStr + '</div>'
+        + (packBadge ? '<div style="margin-top:2px">' + packBadge + '</div>' : '')
         + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
         + '</div>';
     }).join('')
@@ -3194,55 +3243,153 @@
   function selectQsDrug(id) {
     var drug = _qsDrugs.find(function(d) { return d.id === id; });
     if (!drug) return;
-    _qsSel = drug; _qsQty = 1; _qsTotalOverride = null;
+    _qsSel = drug; _qsQty = 1; _qsTotalOverride = null; _qsUnitType = 'tab';
     document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) {
       c.classList.toggle('selected', c.dataset.id === id);
     });
     var panel = document.getElementById('qsSelectedPanel');
     if (panel) panel.style.display = 'block';
+    updateQsUnitChips();
     updateQsPanel();
     var btn = document.getElementById('qsSellBtn');
     if (btn) btn.disabled = false;
   }
 
+  function qsUnitPrice() {
+    if (!_qsSel) return 0;
+    if (_qsUnitType === 'pack') return Number(_qsSel.pack_selling_price_ugx) || 0;
+    if (_qsUnitType === 'box')  return Number(_qsSel.box_selling_price_ugx)  || 0;
+    return Number(_qsSel.selling_price_ugx) || Number(_qsSel.unit_cost_ugx) || 0;
+  }
+
+  // How many base units (tabs/caps) does one sell unit represent?
+  function qsBaseUnitsPerSellUnit() {
+    if (!_qsSel) return 1;
+    if (_qsUnitType === 'pack') return Number(_qsSel.tabs_per_pack) || 1;
+    if (_qsUnitType === 'box')  return (Number(_qsSel.tabs_per_pack) || 1) * (Number(_qsSel.packs_per_box) || 1);
+    return 1;
+  }
+
   function qsCurrentTotal() {
     if (!_qsSel) return 0;
     if (_qsTotalOverride !== null) return _qsTotalOverride;
-    // Use selling price for revenue; buying price is cost-of-goods only
-    var price = Number(_qsSel.selling_price_ugx) || Number(_qsSel.unit_cost_ugx) || 0;
-    return price * _qsQty;
+    return qsUnitPrice() * _qsQty;
+  }
+
+  function updateQsUnitChips() {
+    var row = document.getElementById('qsUnitTypeRow');
+    if (!row || !_qsSel) { if (row) row.style.display = 'none'; return; }
+
+    var d    = _qsSel;
+    var unit = d.unit || 'unit';
+    var hasPack = !!(d.pack_selling_price_ugx && d.tabs_per_pack);
+    var hasBox  = !!(d.box_selling_price_ugx  && d.packs_per_box && d.tabs_per_pack);
+
+    // Only show the row if there is at least one packaging option
+    if (!hasPack && !hasBox) { row.style.display = 'none'; return; }
+    row.style.display = 'flex';
+
+    function chip(type, label, active) {
+      return '<button type="button" onclick="setQsUnitType(\'' + type + '\')" '
+        + 'style="padding:6px 13px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;'
+        + 'border:1.5px solid ' + (active ? '#1B5E20' : '#E0E0E0') + ';'
+        + 'background:' + (active ? '#1B5E20' : '#fff') + ';'
+        + 'color:' + (active ? '#fff' : '#5F6368') + '">'
+        + label + '</button>';
+    }
+
+    var packLabel = hasPack
+      ? 'Pack (' + d.tabs_per_pack + ' ' + unit + 's)'
+      : '';
+    var boxLabel  = hasBox
+      ? 'Box (' + (d.packs_per_box) + ' packs)'
+      : '';
+
+    row.innerHTML =
+      chip('tab',  '1 ' + unit,   _qsUnitType === 'tab')
+      + (hasPack ? chip('pack', packLabel, _qsUnitType === 'pack') : '')
+      + (hasBox  ? chip('box',  boxLabel,  _qsUnitType === 'box')  : '');
+  }
+
+  function setQsUnitType(type) {
+    _qsUnitType = type;
+    _qsQty = 1;
+    _qsTotalOverride = null;
+    updateQsUnitChips();
+    updateQsPanel();
+    var ti = document.getElementById('qsTotalInput');
+    if (ti) ti.value = qsCurrentTotal();
   }
 
   function updateQsPanel() {
     if (!_qsSel) return;
     var nameEl  = document.getElementById('qsSelName');
-    var qty     = document.getElementById('qsQtyVal');
+    var qtyEl   = document.getElementById('qsQtyVal');
     var stock   = document.getElementById('qsStockLeft');
     var ti      = document.getElementById('qsTotalInput');
     var priceEl = document.getElementById('qsSelPriceBreakdown');
-    if (nameEl) nameEl.textContent = _qsSel.item_name;
-    if (qty)    qty.textContent    = _qsQty;
-    if (stock)  stock.textContent  = _qsSel.quantity + ' ' + (_qsSel.unit || '') + ' in stock';
+    var d       = _qsSel;
+    var unit    = d.unit || 'unit';
+
+    if (nameEl) nameEl.textContent = d.item_name;
+    if (qtyEl)  qtyEl.textContent  = _qsQty;
+
+    // Stock shown in base units always
+    var baseStock = Number(d.quantity) || 0;
+    if (stock) {
+      var stockStr = baseStock + ' ' + unit + 's in stock';
+      if (_qsUnitType === 'pack' && d.tabs_per_pack) {
+        var availPacks = Math.floor(baseStock / d.tabs_per_pack);
+        stockStr = baseStock + ' ' + unit + 's (' + availPacks + ' packs) in stock';
+      } else if (_qsUnitType === 'box' && d.tabs_per_pack && d.packs_per_box) {
+        var availBoxes = Math.floor(baseStock / (d.tabs_per_pack * d.packs_per_box));
+        stockStr = baseStock + ' ' + unit + 's (' + availBoxes + ' boxes) in stock';
+      }
+      stock.textContent = stockStr;
+    }
+
     if (ti && _qsTotalOverride === null) ti.value = qsCurrentTotal();
+
     if (priceEl) {
-      var sell = Number(_qsSel.selling_price_ugx) || 0;
-      var buy  = Number(_qsSel.unit_cost_ugx)     || 0;
-      if (sell && buy) {
-        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;·&nbsp; Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b>';
-      } else if (sell) {
-        priceEl.innerHTML = 'Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
-      } else if (buy) {
-        priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
+      var buy    = Number(d.unit_cost_ugx) || 0;
+      var sell   = Number(d.selling_price_ugx) || 0;
+      var uPrice = qsUnitPrice();
+
+      if (_qsUnitType === 'pack' || _qsUnitType === 'box') {
+        var unitLabel = _qsUnitType === 'pack'
+          ? 'pack (' + (d.tabs_per_pack || '?') + ' ' + unit + 's)'
+          : 'box (' + (d.packs_per_box || '?') + ' packs)';
+        priceEl.innerHTML = uPrice
+          ? 'Sell per ' + unitLabel + ': <b style="color:#1B5E20">UGX ' + fmtUGX(uPrice) + '</b>'
+            + (sell ? ' &nbsp;<span style="color:#9AA0A6;font-size:11px">(' + fmtUGX(sell) + '/' + unit + ')</span>' : '')
+          : '<span style="color:#E65100">⚠ No ' + unitLabel + ' price set</span>';
       } else {
-        priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Drug to add prices</span>';
+        if (sell && buy) {
+          priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &middot; Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> per ' + unit;
+        } else if (sell) {
+          priceEl.innerHTML = 'Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> per ' + unit + ' &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
+        } else if (buy) {
+          priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
+        } else {
+          priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Drug to add prices</span>';
+        }
       }
     }
   }
 
   function changeQsQty(delta) {
     if (!_qsSel) return;
-    _qsQty = Math.max(1, Math.min(_qsQty + delta, Number(_qsSel.quantity) || 999));
-    _qsTotalOverride = null;  // reset override when qty changes
+    var baseStock = Number(_qsSel.quantity) || 999;
+    var maxSellUnits;
+    if (_qsUnitType === 'pack' && _qsSel.tabs_per_pack) {
+      maxSellUnits = Math.max(1, Math.floor(baseStock / _qsSel.tabs_per_pack));
+    } else if (_qsUnitType === 'box' && _qsSel.tabs_per_pack && _qsSel.packs_per_box) {
+      maxSellUnits = Math.max(1, Math.floor(baseStock / (_qsSel.tabs_per_pack * _qsSel.packs_per_box)));
+    } else {
+      maxSellUnits = baseStock;
+    }
+    _qsQty = Math.max(1, Math.min(_qsQty + delta, maxSellUnits));
+    _qsTotalOverride = null;
     var ti = document.getElementById('qsTotalInput');
     if (ti) ti.value = qsCurrentTotal();
     updateQsPanel();
@@ -3264,9 +3411,16 @@
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span> Saving…';
 
-    var price = Number(_qsSel.selling_price_ugx || _qsSel.unit_cost_ugx) || 0;
-    var total = qsCurrentTotal();
-    var stockAfter = Math.max(0, Number(_qsSel.quantity) - _qsQty);
+    var price     = qsUnitPrice();
+    var total     = qsCurrentTotal();
+    // Always deduct in base units (tabs/caps/ml) regardless of sell unit type
+    var baseDeduct = _qsQty * qsBaseUnitsPerSellUnit();
+    var stockAfter = Math.max(0, Number(_qsSel.quantity) - baseDeduct);
+    var saleUnitLabel = _qsUnitType === 'pack'
+      ? (_qsSel.tabs_per_pack ? 'pack (' + _qsSel.tabs_per_pack + ' ' + (_qsSel.unit||'unit') + 's)' : 'pack')
+      : _qsUnitType === 'box'
+      ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
+      : (_qsSel.unit || 'unit');
 
     try {
       var clinicId = _qsClinicId || await resolveClinicId();
@@ -3278,7 +3432,7 @@
             clinic_id:      clinicId,
             drug_id:        _qsSel.id,
             drug_name:      _qsSel.item_name,
-            unit:           _qsSel.unit || 'unit',
+            unit:           saleUnitLabel,
             quantity:       _qsQty,
             unit_price_ugx: price,
             total_ugx:      total,
@@ -3293,9 +3447,9 @@
           var adj = await supabase.rpc('adjust_inventory', {
             p_clinic_id:    clinicId,
             p_inventory_id: _qsSel.id,
-            p_qty_change:   -_qsQty,
+            p_qty_change:   -baseDeduct,
             p_txn_type:     'deduction',
-            p_notes:        'Quick Sale'
+            p_notes:        'Quick Sale — ' + _qsQty + ' × ' + saleUnitLabel
           });
           if (adj.error) console.warn('adjust_inventory:', adj.error.message);
           else if (adj.data && typeof adj.data.quantity_after !== 'undefined') {
@@ -3313,22 +3467,24 @@
     var flash = document.getElementById('qsSuccessFlash');
     var ft    = document.getElementById('qsFlashText');
     var fs    = document.getElementById('qsFlashSub');
-    if (ft) ft.textContent = qty + ' × ' + name;
+    if (ft) ft.textContent = qty + ' × ' + name + (_qsUnitType !== 'tab' ? ' (' + _qsUnitType + ')' : '');
     if (fs) {
       var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
       fs.innerHTML = 'UGX ' + fmtUGX(total) + ' &middot; ' + pay
-        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'') + '</span>';
+        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'tab') + 's</span>';
     }
     if (flash) {
       flash.style.display = 'flex';
       setTimeout(function() {
         flash.style.display = 'none';
-        _qsSel = null; _qsQty = 1; _qsTotalOverride = null;
+        _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsUnitType = 'tab';
         document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c) { c.classList.remove('selected'); });
         var panel = document.getElementById('qsSelectedPanel');
+        var urow  = document.getElementById('qsUnitTypeRow');
         var btn   = document.getElementById('qsSellBtn');
         var ti    = document.getElementById('qsTotalInput');
         if (panel) panel.style.display = 'none';
+        if (urow)  urow.style.display = 'none';
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
         if (ti)  ti.value = '';
         loadQsDrugs();
