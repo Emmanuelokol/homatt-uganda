@@ -3650,10 +3650,12 @@
   async function generateMonthlyReport() {
     var clinicId = await resolveClinicId();
     if (!clinicId) return;
-    var y   = parseInt(document.getElementById('mrYear').value);
-    var m   = parseInt(document.getElementById('mrMonth').value);
-    var btn = document.getElementById('mrGenBtn');
+    var y    = parseInt(document.getElementById('mrYear').value);
+    var m    = parseInt(document.getElementById('mrMonth').value);
+    var btn  = document.getElementById('mrGenBtn');
+    var body = document.getElementById('mrBody');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generating…'; }
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Generating report for ' + MONTH_NAMES[m] + ' ' + y + '…</div>';
     var res = await supabase.rpc('generate_clinic_monthly_summary', {
       p_clinic_id: clinicId,
       p_year:      y,
@@ -3661,7 +3663,14 @@
       p_manual:    true
     });
     if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generate'; }
-    if (res.error) { alert('Could not generate report: ' + res.error.message); return; }
+    if (res.error) {
+      body.innerHTML = '<div style="padding:16px;background:#FFEBEE;border-radius:10px;margin:4px">'
+        + '<div style="font-weight:700;color:#C62828;margin-bottom:6px">Could not generate report</div>'
+        + '<div style="font-size:13px;color:#B71C1C">' + esc(res.error.message) + '</div>'
+        + '<div style="font-size:11px;color:#9AA0A6;margin-top:8px">If this says "function not found", the database migration may still be deploying. Wait a few minutes and try again.</div>'
+        + '</div>';
+      return;
+    }
     loadMonthlyReport();
     loadMrPastList();
   }
