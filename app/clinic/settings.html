@@ -178,6 +178,24 @@
         </div>
       </div>
 
+      <!-- Staff & Access -->
+      <div class="settings-card" id="staffAccessCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">badge</span> Staff &amp; Access
+        </div>
+        <p style="font-size:13px;color:#5F6368;margin:-6px 0 16px;line-height:1.5">
+          Choose what each staff member can see in the portal.
+          <strong>Owners</strong> access everything. <strong>Clinicians</strong> and
+          <strong>nurses</strong> see consultations, patient history and bookings.
+          <strong>Receptionists</strong> handle the front desk — bookings, history,
+          payments and quick sales — but not financial reports, stock or settings.
+        </p>
+        <div id="staffList">
+          <div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading staff…</div>
+        </div>
+        <div id="staffStatus" style="font-size:12px;color:#555;min-height:16px;margin-top:8px"></div>
+      </div>
+
       <!-- Location -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -447,6 +465,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   var session = requireClinic();
   if (!session) return;
   setupClinicLogout();
+  // Clinic Profile / settings is owner-only.
+  if (!requireClinicCap('settings')) return;
   document.getElementById('clinicUserDate').textContent = new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long'});
 
   _clinicId = session.clinicId || null;
@@ -490,7 +510,74 @@ document.addEventListener('DOMContentLoaded', async function() {
     await Promise.race([loadClinicProfile(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]).catch(() => {});
     await Promise.race([loadCondFees(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]).catch(() => {});
   }
+
+  // Staff & access management (owner only)
+  loadStaffList();
 });
+
+/* ── Staff & Access ────────────────────────────────────────── */
+var STAFF_ROLE_OPTIONS = [
+  { value: 'owner',        label: 'Owner / Manager (full access)' },
+  { value: 'clinician',    label: 'Clinician (consultations + history)' },
+  { value: 'nurse',        label: 'Nurse (consultations + history)' },
+  { value: 'receptionist', label: 'Receptionist (front desk)' },
+];
+
+async function loadStaffList() {
+  var card = document.getElementById('staffAccessCard');
+  var list = document.getElementById('staffList');
+  if (!list) return;
+
+  if (_sessionIsDemo || !_supa) {
+    if (card) card.style.display = 'none';   // nothing to manage in demo
+    return;
+  }
+
+  var res = await _supa.rpc('get_clinic_staff');
+  if (res.error) {
+    // RPC not deployed yet, or not an owner — hide the card cleanly
+    if (card) card.style.display = 'none';
+    return;
+  }
+  var staff = res.data || [];
+  if (!staff.length) {
+    if (card) card.style.display = 'none';   // non-owners get an empty set
+    return;
+  }
+
+  list.innerHTML = staff.map(function(s) {
+    var opts = STAFF_ROLE_OPTIONS.map(function(o) {
+      return '<option value="' + o.value + '"' + (o.value === s.staff_role ? ' selected' : '') + '>' + o.label + '</option>';
+    }).join('');
+    var name = (s.full_name || s.email || 'Staff member');
+    return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #F5F5F5">'
+      + '<div style="flex:1;min-width:160px">'
+      +   '<div style="font-weight:600;color:#202124;font-size:14px">' + escHtml(name)
+      +     (s.is_self ? ' <span style="font-size:11px;color:#1B5E20;font-weight:700">(you)</span>' : '') + '</div>'
+      +   (s.email ? '<div style="font-size:12px;color:#9AA0A6">' + escHtml(s.email) + '</div>' : '')
+      + '</div>'
+      + '<select onchange="changeStaffRole(\'' + s.id + '\', this.value, this)" '
+      +   (s.is_self ? 'disabled title="You cannot change your own role" ' : '')
+      +   'class="form-input" style="max-width:280px;flex:0 0 auto">' + opts + '</select>'
+      + '</div>';
+  }).join('');
+}
+
+async function changeStaffRole(targetId, role, selectEl) {
+  var status = document.getElementById('staffStatus');
+  if (selectEl) selectEl.disabled = true;
+  if (status) { status.style.color = '#555'; status.textContent = 'Saving…'; }
+  var res = await _supa.rpc('set_staff_role', { p_target_id: targetId, p_role: role });
+  if (selectEl) selectEl.disabled = false;
+  if (res.error || (res.data && res.data.ok === false)) {
+    var msg = (res.data && res.data.error) || (res.error && res.error.message) || 'Could not update role';
+    if (status) { status.style.color = '#C62828'; status.textContent = msg; }
+    loadStaffList();   // revert the dropdown to the true value
+    return;
+  }
+  if (status) { status.style.color = '#1B5E20'; status.textContent = 'Role updated ✓'; }
+  setTimeout(function() { if (status) status.textContent = ''; }, 2500);
+}
 
 function buildSuggestedSpecs() {
   var el = document.getElementById('suggestedSpecs');

@@ -119,6 +119,7 @@
       staffName: pu.full_name || email,
       clinicId: pu.clinic_id,
       clinicName: pu.clinics?.name || 'Clinic',
+      staffRole: pu.staff_role || 'owner',
       email
     }));
     window.location.href = 'dashboard.html';

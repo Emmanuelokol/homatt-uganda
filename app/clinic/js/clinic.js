@@ -126,7 +126,7 @@ async function resolveClinicId(supabase, session) {
 
     const { data: pu } = await supabase
       .from('portal_users')
-      .select('clinic_id, clinics(name)')
+      .select('clinic_id, staff_role, clinics(name)')
       .eq('auth_user_id', authData.session.user.id)
       .eq('role', 'clinic_staff')
       .eq('is_active', true)
@@ -136,12 +136,72 @@ async function resolveClinicId(supabase, session) {
       const updated = Object.assign({}, session, {
         clinicId: pu.clinic_id,
         clinicName: pu.clinics?.name || session.clinicName || 'Clinic',
+        staffRole: pu.staff_role || session.staffRole || 'owner',
       });
       localStorage.setItem('clinic_session', JSON.stringify(updated));
       return pu.clinic_id;
     }
   } catch (e) { /* network error — fail gracefully */ }
   return null;
+}
+
+/* ──────────────────────────────────────────────────────────
+ * Staff role-based access control
+ *
+ * Each clinic staff member has a role that decides which portal
+ * sections they can use. Sections/links are tagged in the HTML with
+ * data-cap="<capability>" (or data-nav-cap on nav links); anything
+ * the role can't access is hidden.
+ *
+ * FAIL-SAFE: unknown / missing role → treated as 'owner' (full
+ * access) so a missing column or older session never locks anyone out.
+ * ────────────────────────────────────────────────────────── */
+var CLINIC_ROLE_CAPS = {
+  owner:        ['*'],
+  clinician:    ['consultations', 'history', 'bookings', 'meds'],
+  nurse:        ['consultations', 'history', 'bookings', 'meds'],
+  receptionist: ['bookings', 'history', 'payments', 'quicksale'],
+};
+
+var CLINIC_ROLE_LABELS = {
+  owner:        'Owner / Manager',
+  clinician:    'Clinician (Doctor)',
+  nurse:        'Nurse',
+  receptionist: 'Receptionist',
+};
+
+function clinicRole() {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+    if (s && s.staffRole && CLINIC_ROLE_CAPS[s.staffRole]) return s.staffRole;
+  } catch (e) {}
+  return 'owner';   // fail-safe: full access
+}
+
+function clinicCan(cap) {
+  var caps = CLINIC_ROLE_CAPS[clinicRole()] || ['*'];
+  return caps.indexOf('*') !== -1 || caps.indexOf(cap) !== -1;
+}
+
+// Hide every [data-cap] / [data-nav-cap] element the current role can't use.
+function applyRoleGating() {
+  try {
+    document.querySelectorAll('[data-cap]').forEach(function (el) {
+      if (!clinicCan(el.getAttribute('data-cap'))) el.style.display = 'none';
+    });
+    document.querySelectorAll('[data-nav-cap]').forEach(function (el) {
+      if (!clinicCan(el.getAttribute('data-nav-cap'))) el.style.display = 'none';
+    });
+  } catch (e) { /* never let gating break the page */ }
+}
+
+// Page-level guard: redirect to the dashboard if the role lacks a capability.
+// Call at the top of a protected page (e.g. new-order requires 'consultations').
+function requireClinicCap(cap) {
+  if (clinicCan(cap)) return true;
+  alert('Your role does not have access to this page.');
+  window.location.href = 'dashboard.html';
+  return false;
 }
 
 function showToast(msg, type = 'success') {

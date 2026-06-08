@@ -163,13 +163,13 @@
       <a href="dashboard.html" class="sidebar-link active">
         <span class="material-icons-outlined">home</span> Home
       </a>
-      <a href="new-order.html" class="sidebar-link">
+      <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations">
         <span class="material-icons-outlined">medical_services</span> New Consultation
       </a>
-      <a href="patients.html" class="sidebar-link">
+      <a href="patients.html" class="sidebar-link" data-nav-cap="history">
         <span class="material-icons-outlined">person_search</span> Patients
       </a>
-      <a href="settings.html" class="sidebar-link">
+      <a href="settings.html" class="sidebar-link" data-nav-cap="settings">
         <span class="material-icons-outlined">tune</span> Clinic Profile
       </a>
     </nav>
@@ -197,7 +197,7 @@
     <div class="admin-content">
 
       <!-- BIG inline patient code entry — always visible, no modal -->
-      <div id="quickVerifyPanel" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
+      <div id="quickVerifyPanel" data-cap="bookings" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
           <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
@@ -234,11 +234,11 @@
           <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <a href="new-order.html" class="home-cta">
+          <a href="new-order.html" class="home-cta" data-cap="consultations">
             <span class="material-icons-outlined">medical_services</span>
             New Consultation
           </a>
-          <button class="home-cta" onclick="openQuickSale()" style="background:rgba(255,255,255,0.12);color:#fff;border:2px solid rgba(255,255,255,0.5)">
+          <button class="home-cta" onclick="openQuickSale()" data-cap="quicksale" style="background:rgba(255,255,255,0.12);color:#fff;border:2px solid rgba(255,255,255,0.5)">
             <span class="material-icons-outlined">point_of_sale</span>
             Quick Sale
           </button>
@@ -255,11 +255,11 @@
           <div class="stat-icon orange"><span class="material-icons-outlined">hotel</span></div>
           <div><div class="stat-number" id="statDispatched">0</div><div class="stat-label">Inpatient</div></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-cap="financials">
           <div class="stat-icon green"><span class="material-icons-outlined">payments</span></div>
           <div><div class="stat-number" id="statRevToday" style="font-size:15px">—</div><div class="stat-label">Today's Revenue</div></div>
         </div>
-        <div class="stat-card">
+        <div class="stat-card" data-cap="financials">
           <div class="stat-icon teal"><span class="material-icons-outlined">bar_chart</span></div>
           <div><div class="stat-number" id="statRevMonth" style="font-size:15px">—</div><div class="stat-label">This Month</div></div>
         </div>
@@ -270,7 +270,7 @@
       </div>
 
       <!-- Low-stock alert banner (hidden until stock loads) -->
-      <div id="lowStockBanner" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
+      <div id="lowStockBanner" data-cap="stock" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
           <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
@@ -280,7 +280,7 @@
       </div>
 
       <!-- Pending bookings (patients who booked but haven't been seen) -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
+      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
@@ -294,7 +294,7 @@
       </div>
 
       <!-- Active treatments — open cases that have not been discharged yet -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
@@ -314,7 +314,7 @@
       </div>
 
       <!-- ── Overdue Follow-up Tracker ── -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
@@ -328,7 +328,7 @@
       </div>
 
       <!-- Pending Payments / Outstanding Balances -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
@@ -345,7 +345,7 @@
       </div>
 
       <!-- Today's consultations list -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" style="padding:0;margin-bottom:24px">
         <div class="table-header">
           <div class="table-title">Today's Consultations</div>
           <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
@@ -356,7 +356,7 @@
       </div>
 
       <!-- ── Medicines Dispensed Tracker ── -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4">
+      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
@@ -375,7 +375,7 @@
       </div>
 
       <!-- Patient History Search -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" style="padding:0;margin-bottom:24px">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">manage_search</span>
@@ -398,7 +398,7 @@
       </div>
 
       <!-- Stock Tracker -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B">
+      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
@@ -416,7 +416,7 @@
       </div>
 
       <!-- Financial Overview -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2">
+      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#7B1FA2">analytics</span>
@@ -458,7 +458,7 @@
       </div>
 
       <!-- Monthly Reports -->
-      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
+      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
@@ -877,7 +877,28 @@
 
   var session = requireClinic();
   setupClinicLogout();
+  applyRoleGating();   // hide sections this staff role can't access
   var supabase = _getClinicSupabase();
+
+  // Refresh the staff role straight from the DB so changes the owner makes
+  // take effect on next load (and sessions created before roles existed get
+  // their real role). Fail-safe: on any error we keep the current role.
+  setTimeout(async function() {
+    try {
+      if (!supabase || !session || session.demo) return;
+      var su  = await supabase.auth.getSession();
+      var uid = su && su.data && su.data.session && su.data.session.user && su.data.session.user.id;
+      if (!uid) return;
+      var pr = await supabase.from('portal_users')
+        .select('staff_role').eq('auth_user_id', uid).eq('is_active', true).maybeSingle();
+      var role = pr && pr.data && pr.data.staff_role;
+      if (role && role !== session.staffRole) {
+        session.staffRole = role;
+        try { localStorage.setItem('clinic_session', JSON.stringify(session)); } catch(e) {}
+        applyRoleGating();
+      }
+    } catch (e) { /* keep current role on error */ }
+  }, 800);
 
   // Greeting
   var h = new Date().getHours();

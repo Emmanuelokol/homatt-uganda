@@ -10,6 +10,8 @@
 (function() {
   const session  = requireClinic();
   setupClinicLogout();
+  // Consultations are clinical — receptionists are sent back to the dashboard.
+  if (!requireClinicCap('consultations')) return;
   const supabase = _getClinicSupabase();
 
   document.getElementById('clinicUserDate').textContent =
