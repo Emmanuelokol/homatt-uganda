@@ -260,7 +260,7 @@ begin
   end if;
 
   for v_clinic in
-    select id from public.clinics where is_active = true
+    select id from public.clinics where coalesce(active, true) = true
   loop
     begin
       perform public.generate_clinic_monthly_summary(v_clinic.id, v_year, v_month, false);
@@ -271,15 +271,26 @@ begin
 end;
 $$;
 
--- Schedule (idempotent — unschedule first if it already exists)
+-- Schedule the cron job. Wrapped in an exception-safe DO block so that, even
+-- if pg_cron is unavailable or rejects the schedule on this environment, the
+-- table + RPC above are still committed (the manual "Generate" button keeps
+-- working regardless of whether the nightly job is scheduled).
 do $$
 begin
-  perform cron.unschedule('monthly-summaries-generate');
-exception when others then null;
+  begin
+    perform cron.unschedule('monthly-summaries-generate');
+  exception when others then null;  -- not scheduled yet
+  end;
+
+  perform cron.schedule(
+    'monthly-summaries-generate',
+    '30 22 28-31 * *',          -- daily 22:30 UTC = 01:30 EAT, on days 28–31 only
+    'select cron_generate_monthly_summaries()'
+  );
+exception when others then
+  raise warning 'monthly-summaries cron not scheduled: %', sqlerrm;
 end $$;
 
-select cron.schedule(
-  'monthly-summaries-generate',
-  '30 22 28-31 * *',          -- daily 22:30 UTC = 01:30 EAT, on days 28–31 only
-  'select cron_generate_monthly_summaries()'
-);
+-- Force PostgREST to reload its schema cache so the new RPC is callable
+-- immediately (otherwise the client gets "function not found in schema cache").
+notify pgrst, 'reload schema';
