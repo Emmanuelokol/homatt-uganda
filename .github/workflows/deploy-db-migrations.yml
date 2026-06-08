@@ -64,3 +64,32 @@ jobs:
           echo "✓ Migration run complete"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Enable pg_cron push notifications ────────────────────────────────
+      # Every scheduled reminder (follow-up "come back" nudges, medication
+      # reminders, symptom check-ins) runs through the DB function
+      # notify_call(), which can only reach the send-notification edge function
+      # if app.service_role_key is set on the database. This used to be a manual
+      # one-time step in the SQL Editor; automating it here means cron-based
+      # push notifications work without anyone remembering to run it.
+      - name: Configure pg_cron notification key
+        run: |
+          if [ -z "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" ]; then
+            echo "::warning::SUPABASE_SERVICE_ROLE_KEY not set — scheduled push reminders will be skipped."
+            echo "::warning::Add it at: GitHub repo → Settings → Secrets → Actions"
+            exit 0
+          fi
+          SQL="alter database postgres set app.service_role_key = '${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}';"
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.supabase.com/v1/projects/${{ env.SUPABASE_PROJECT_REF }}/database/query" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ACCESS_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --data-binary "$(jq -n --arg q "$SQL" '{query: $q}')")
+          CODE=$(echo "$RESPONSE" | tail -1)
+          if [ "$CODE" = "200" ] || [ "$CODE" = "201" ]; then
+            echo "✓ pg_cron notification key configured — scheduled reminders can now send pushes"
+          else
+            echo "::warning::Could not set app.service_role_key (HTTP $CODE) — scheduled push reminders may be skipped"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
