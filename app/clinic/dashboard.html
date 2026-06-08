@@ -1588,6 +1588,10 @@
         // Re-baseline the follow-up so the date is computed from today, not the original visit
         update.follow_up_days   = nextDays && nextDays > 0 ? nextDays : null;
         update.follow_up_reason = nextReason || null;
+        // Reset reminder flags so the patient gets fresh "come back" reminders
+        // for this newly-scheduled follow-up (cron_clinic_followup_reminder).
+        update.follow_up_reminder_sent     = false;
+        update.follow_up_reminder_eve_sent = false;
         // Also push created_at forward so (created_at + follow_up_days) lands on the new date.
         // We don't actually mutate created_at — instead store the "anchor" via a separate column
         // if it exists; otherwise, the display uses the most-recent visit timestamp from
@@ -1603,12 +1607,17 @@
       if (Object.keys(update).length) {
         var ur = await supabase.from('clinic_diagnoses')
           .update(update).eq('id', current.id).select().single();
-        // If follow_up_reason column not yet migrated, retry without it
-        if (ur.error && ur.error.message && ur.error.message.includes('follow_up_reason')) {
-          var compatUpdate = Object.assign({}, update);
-          delete compatUpdate.follow_up_reason;
-          ur = await supabase.from('clinic_diagnoses')
-            .update(compatUpdate).eq('id', current.id).select().single();
+        // If any newer column isn't migrated yet, strip the offending optional
+        // columns and retry so the core follow-up still saves on older DBs.
+        if (ur.error && ur.error.message) {
+          var optionalCols = ['follow_up_reason', 'follow_up_reminder_sent', 'follow_up_reminder_eve_sent'];
+          var needsRetry = optionalCols.some(function(c){ return ur.error.message.indexOf(c) !== -1; });
+          if (needsRetry) {
+            var compatUpdate = Object.assign({}, update);
+            optionalCols.forEach(function(c){ delete compatUpdate[c]; });
+            ur = await supabase.from('clinic_diagnoses')
+              .update(compatUpdate).eq('id', current.id).select().single();
+          }
         }
         if (ur.error) throw ur.error;
         // Refresh local context with the returned row so the detail view shows new totals
@@ -1629,6 +1638,17 @@
         if (current.amount_paid >= (Number(current.total_charged_ugx) || 0)) {
           current.payment_status = 'paid';
         }
+        // Send the patient a receipt push (fire-and-forget) like the payment modal
+        var prData = pr.data || {};
+        supabase.functions.invoke('payment-notify', {
+          body: {
+            diagnosisId:    current.id,
+            amountReceived: paymentAmt,
+            balance:        Number(prData.balance) || 0,
+            fullyPaid:      Boolean(prData.fully_paid),
+            method:         paymentMtd,
+          },
+        }).catch(function(e){ console.warn('[payment-notify] follow-up receipt failed', e); });
       }
 
       showToast('Follow-up saved', 'success');
