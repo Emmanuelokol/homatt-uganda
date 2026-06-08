@@ -457,6 +457,45 @@
         <div id="finTopItems" style="padding:0 16px 16px"></div>
       </div>
 
+      <!-- Monthly Reports -->
+      <div class="admin-table-wrap" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
+        <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
+            Monthly Reports
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="mrYear"  style="padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff"></select>
+            <select id="mrMonth" style="padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+              <option value="1">January</option><option value="2">February</option>
+              <option value="3">March</option><option value="4">April</option>
+              <option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option>
+              <option value="9">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
+            </select>
+            <button onclick="loadMonthlyReport()" id="mrLoadBtn"
+              style="padding:7px 14px;background:#0277BD;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;touch-action:manipulation">
+              <span class="material-icons-outlined" style="font-size:15px">search</span> View
+            </button>
+            <button onclick="generateMonthlyReport()" id="mrGenBtn" title="Re-generate this month's report from live data"
+              style="padding:7px 14px;background:#E3F2FD;color:#0277BD;border:1.5px solid #90CAF9;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:5px;touch-action:manipulation">
+              <span class="material-icons-outlined" style="font-size:15px">refresh</span> Generate
+            </button>
+          </div>
+        </div>
+
+        <!-- Past summaries list -->
+        <div id="mrPastList" style="padding:8px 16px 4px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #F0F0F0;min-height:38px"></div>
+
+        <!-- Report body -->
+        <div id="mrBody" style="padding:16px">
+          <div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">
+            Select a year and month above, then tap <strong>View</strong>.
+          </div>
+        </div>
+      </div>
+
     </div>
   </main>
 
@@ -3512,6 +3551,185 @@
       }, 1600);
     }
   }
+
+  // ── Monthly Reports ──────────────────────────────────────
+
+  var MONTH_NAMES = ['','January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+
+  function initMrPickers() {
+    var yearSel = document.getElementById('mrYear');
+    if (!yearSel) return;
+    var now = new Date();
+    var curY = now.getFullYear();
+    yearSel.innerHTML = '';
+    for (var y = curY; y >= curY - 3; y--) {
+      var opt = document.createElement('option');
+      opt.value = y; opt.textContent = y;
+      yearSel.appendChild(opt);
+    }
+    yearSel.value = curY;
+    document.getElementById('mrMonth').value = now.getMonth() + 1;
+    loadMrPastList();
+  }
+
+  async function loadMrPastList() {
+    var clinicId = await resolveClinicId();
+    if (!clinicId) return;
+    var container = document.getElementById('mrPastList');
+    if (!container) return;
+    var res = await supabase.from('clinic_monthly_summaries')
+      .select('year,month,total_revenue_ugx,generated_at')
+      .eq('clinic_id', clinicId)
+      .order('year', { ascending: false })
+      .order('month', { ascending: false })
+      .limit(24);
+    if (!res.data || !res.data.length) {
+      container.innerHTML = '<span style="font-size:12px;color:#9AA0A6;padding:6px 0">No reports yet — generates automatically on the last day of each month.</span>';
+      return;
+    }
+    container.innerHTML = res.data.map(function(r) {
+      return '<button onclick="jumpMrPeriod(' + r.year + ',' + r.month + ')" '
+        + 'style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #90CAF9;background:#E3F2FD;color:#0277BD;cursor:pointer;font-weight:600;font-family:inherit;touch-action:manipulation">'
+        + MONTH_NAMES[r.month] + ' ' + r.year
+        + '</button>';
+    }).join('');
+  }
+
+  function jumpMrPeriod(y, m) {
+    document.getElementById('mrYear').value  = y;
+    document.getElementById('mrMonth').value = m;
+    loadMonthlyReport();
+  }
+
+  async function loadMonthlyReport() {
+    var clinicId = await resolveClinicId();
+    if (!clinicId) return;
+    var y = parseInt(document.getElementById('mrYear').value);
+    var m = parseInt(document.getElementById('mrMonth').value);
+    var body = document.getElementById('mrBody');
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading…</div>';
+    var res = await supabase.from('clinic_monthly_summaries')
+      .select('*')
+      .eq('clinic_id', clinicId)
+      .eq('year', y)
+      .eq('month', m)
+      .maybeSingle();
+    if (res.error) { body.innerHTML = '<div style="padding:16px;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'; return; }
+    if (!res.data) {
+      body.innerHTML = '<div style="text-align:center;padding:32px">'
+        + '<div style="font-size:13px;color:#9AA0A6;margin-bottom:14px">No report found for ' + MONTH_NAMES[m] + ' ' + y + '.</div>'
+        + '<button onclick="generateMonthlyReport()" style="padding:10px 20px;background:#0277BD;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation">Generate Now</button>'
+        + '</div>';
+      return;
+    }
+    renderMonthlyReport(res.data);
+  }
+
+  async function generateMonthlyReport() {
+    var clinicId = await resolveClinicId();
+    if (!clinicId) return;
+    var y   = parseInt(document.getElementById('mrYear').value);
+    var m   = parseInt(document.getElementById('mrMonth').value);
+    var btn = document.getElementById('mrGenBtn');
+    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generating…'; }
+    var res = await supabase.rpc('generate_clinic_monthly_summary', {
+      p_clinic_id: clinicId,
+      p_year:      y,
+      p_month:     m,
+      p_manual:    true
+    });
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generate'; }
+    if (res.error) { alert('Could not generate report: ' + res.error.message); return; }
+    loadMonthlyReport();
+    loadMrPastList();
+  }
+
+  function renderMonthlyReport(r) {
+    var body = document.getElementById('mrBody');
+    var genAt = r.generated_at ? new Date(r.generated_at).toLocaleString('en-UG') : '';
+    var genLabel = r.generated_manually ? 'Manually generated' : 'Auto-generated';
+
+    // Financial cards
+    var cards = [
+      { label:'Billed (UGX)',       val: fmtUGX(r.total_billed_ugx),    bg:'#E8F5E9', col:'#1B5E20' },
+      { label:'Collected (UGX)',     val: fmtUGX(r.total_collected_ugx), bg:'#E0F2F1', col:'#00695C' },
+      { label:'Quick Sales (UGX)',   val: fmtUGX(r.quick_sales_ugx),     bg:'#E3F2FD', col:'#1565C0' },
+      { label:'Total Revenue (UGX)', val: fmtUGX(r.total_revenue_ugx),   bg:'#F3E5F5', col:'#4A148C' },
+      { label:'Outstanding (UGX)',   val: fmtUGX(r.total_outstanding_ugx),bg:'#FFEBEE',col:'#C62828' },
+      { label:'Stock Cost (UGX)',    val: fmtUGX(r.stock_cost_ugx),      bg:'#FFF3E0', col:'#E65100' },
+      { label:'Net Margin (UGX)',    val: fmtUGX(r.net_margin_ugx),      bg: r.net_margin_ugx >= 0 ? '#E8F5E9':'#FFEBEE', col: r.net_margin_ugx >= 0 ? '#1B5E20':'#C62828' },
+      { label:'Consultations',       val: r.total_consultations,          bg:'#E3F2FD', col:'#0277BD' },
+      { label:'Patients',            val: r.total_patients,               bg:'#E8EAF6', col:'#283593' },
+    ];
+    var cardsHtml = cards.map(function(c) {
+      return '<div style="background:' + c.bg + ';border-radius:12px;padding:14px">'
+           + '<div style="font-size:10px;color:' + c.col + ';font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">' + c.label + '</div>'
+           + '<div style="font-size:17px;font-weight:700;color:' + c.col + '">' + c.val + '</div>'
+           + '</div>';
+    }).join('');
+
+    // Payment method breakdown
+    var pmHtml = '';
+    var pm = r.payment_methods || {};
+    var pmKeys = Object.keys(pm);
+    if (pmKeys.length) {
+      var pmLabels = { cash:'Cash', mobile_money:'Mobile Money', bank:'Bank', card:'Card', insurance:'Insurance', other:'Other' };
+      pmHtml = '<div style="margin-bottom:20px">'
+             + '<div style="font-size:12px;font-weight:700;color:#424242;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Collections by Method</div>'
+             + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
+             + pmKeys.map(function(k) {
+                 return '<div style="background:#F5F5F5;border-radius:8px;padding:9px 14px;font-size:13px">'
+                      + '<span style="font-weight:600;color:#424242">' + (pmLabels[k]||k) + '</span>'
+                      + '<span style="color:#1B5E20;font-weight:700;margin-left:8px">UGX ' + fmtUGX(pm[k]) + '</span>'
+                      + '</div>';
+               }).join('')
+             + '</div></div>';
+    }
+
+    // Stock table
+    var snapshot = Array.isArray(r.stock_snapshot) ? r.stock_snapshot : [];
+    var stockHtml = '';
+    if (snapshot.length) {
+      var rows = snapshot.map(function(s) {
+        return '<tr style="border-bottom:1px solid #F0F0F0">'
+          + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:#202124">' + esc(s.item_name) + '</td>'
+          + '<td style="padding:9px 10px;font-size:12px;color:#5F6368;text-align:center">' + esc(s.unit||'') + '</td>'
+          + '<td style="padding:9px 10px;font-size:13px;color:#C62828;text-align:right;font-weight:600">' + (s.qty_used||0) + '</td>'
+          + '<td style="padding:9px 10px;font-size:13px;color:#1B5E20;text-align:right;font-weight:600">' + (s.qty_added||0) + '</td>'
+          + '<td style="padding:9px 10px;font-size:13px;color:#0277BD;text-align:right;font-weight:600">' + (s.closing_qty||0) + '</td>'
+          + '<td style="padding:9px 10px;font-size:12px;color:#E65100;text-align:right">'
+          + (s.total_cost_ugx > 0 ? fmtUGX(s.total_cost_ugx) : '—') + '</td>'
+          + '</tr>';
+      }).join('');
+      stockHtml = '<div>'
+        + '<div style="font-size:12px;font-weight:700;color:#424242;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Stock Used This Month</div>'
+        + '<div style="overflow-x:auto">'
+        + '<table style="width:100%;border-collapse:collapse;font-family:inherit">'
+        + '<thead><tr style="background:#F5F5F5">'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:left;color:#424242;font-weight:700;text-transform:uppercase">Item</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:center;color:#424242;font-weight:700;text-transform:uppercase">Unit</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#C62828;font-weight:700;text-transform:uppercase">Used</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#1B5E20;font-weight:700;text-transform:uppercase">Restocked</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#0277BD;font-weight:700;text-transform:uppercase">Closing Stock</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#E65100;font-weight:700;text-transform:uppercase">Cost (UGX)</th>'
+        + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
+    } else {
+      stockHtml = '<div style="font-size:13px;color:#9AA0A6;padding:8px 0">No stock activity recorded this month.</div>';
+    }
+
+    body.innerHTML = ''
+      + '<div style="font-size:11px;color:#9AA0A6;margin-bottom:16px">'
+      + MONTH_NAMES[r.month] + ' ' + r.year + ' · ' + genLabel + ' · ' + genAt
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px">'
+      + cardsHtml + '</div>'
+      + pmHtml
+      + stockHtml;
+  }
+
+  // Initialise the month/year pickers and load the past-reports list.
+  initMrPickers();
 </script>
 <script src="../js/native-bridge.js"></script>
 </body>
