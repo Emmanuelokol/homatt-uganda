@@ -3691,7 +3691,7 @@
       .select('*').eq('clinic_id', clinicId).eq('year', y).eq('month', m).maybeSingle();
 
     // Table doesn't exist yet — compute live from raw tables
-    if (res.error && (res.error.code === '42P01' || (res.error.message||'').includes('does not exist') || (res.error.message||'').includes('relation'))) {
+    if (res.error && (res.error.code === '42P01' || (res.error.message||'').includes('does not exist') || (res.error.message||'').includes('relation') || (res.error.message||'').includes('schema cache') || (res.error.message||'').includes('clinic_monthly_summaries'))) {
       body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Computing from live data…</div>';
       var r = await computeMonthlyReportClientSide(clinicId, y, m);
       renderMonthlyReport(r);

@@ -33,6 +33,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (overlay)    overlay.addEventListener('click', closeAllSheets);
   document.getElementById('editProfileBtn')?.addEventListener('click', () => openSheet(editSheet));
   document.getElementById('closeEditSheet')?.addEventListener('click', closeAllSheets);
+
+  // ── Keyboard: scroll active input into view when the on-screen keyboard opens ──
+  // In Capacitor/Android WebView the visual viewport shrinks when the keyboard
+  // appears while the layout viewport stays the same, causing inputs at the
+  // bottom of the sheet to be hidden behind the keyboard.
+  function scrollFocusedIntoView() {
+    const el = document.activeElement;
+    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
+      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
+    }
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', scrollFocusedIntoView);
+  }
+  // Fallback: also fire on plain focus so it works on iOS/older browsers
+  editSheet.addEventListener('focusin', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
+    }
+  });
   document.getElementById('closeSupportSheet')?.addEventListener('click', closeAllSheets);
   document.getElementById('closeEmergencySheet')?.addEventListener('click', closeAllSheets);
   document.getElementById('closeTermsSheet')?.addEventListener('click', closeAllSheets);
@@ -235,6 +255,40 @@ document.addEventListener('DOMContentLoaded', async () => {
     showToast(notifOn ? 'Reminders enabled' : 'Reminders disabled');
   });
 
+  // ====== Edit Profile — auto-save draft to localStorage while typing ======
+  const DRAFT_KEY = 'homatt_profile_draft';
+
+  function saveDraft() {
+    const draft = {
+      firstName: document.getElementById('editFirstName').value,
+      lastName:  document.getElementById('editLastName').value,
+      district:  document.getElementById('editDistrict').value,
+      city:      document.getElementById('editCity').value,
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  }
+
+  function restoreDraft() {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const d = JSON.parse(raw);
+      if (d.firstName) document.getElementById('editFirstName').value = d.firstName;
+      if (d.lastName)  document.getElementById('editLastName').value  = d.lastName;
+      if (d.district)  document.getElementById('editDistrict').value  = d.district;
+      if (d.city)      document.getElementById('editCity').value      = d.city;
+    } catch { /* ignore corrupt draft */ }
+  }
+
+  // Auto-save on every keystroke / change in the sheet
+  ['editFirstName','editLastName','editCity'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', saveDraft);
+  });
+  document.getElementById('editDistrict')?.addEventListener('change', saveDraft);
+
+  // Restore draft when the sheet opens (so nothing is ever lost)
+  document.getElementById('editProfileBtn')?.addEventListener('click', restoreDraft, { capture: true });
+
   // ====== Edit Profile ======
   document.getElementById('saveProfileBtn').addEventListener('click', async () => {
     const firstName = document.getElementById('editFirstName').value.trim();
@@ -273,6 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     user.district = district;
     user.city = city;
     localStorage.setItem('homatt_user', JSON.stringify(user));
+    localStorage.removeItem(DRAFT_KEY); // draft committed — clear it
 
     renderProfile(user);
     closeAllSheets();
