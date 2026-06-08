@@ -58,6 +58,25 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── Deploy discharge-notify ───────────────────────────────────────────
+      # Used by: clinic portal discharge → patient treatment-summary push.
+      - name: Deploy discharge-notify function
+        run: |
+          supabase functions deploy discharge-notify \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      # ── Deploy payment-notify ─────────────────────────────────────────────
+      - name: Deploy payment-notify function
+        run: |
+          supabase functions deploy payment-notify \
+            --project-ref kgkdiykzmqjougwzzewi \
+            --no-verify-jwt
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       # ── Deploy relworx-payment ────────────────────────────────────────────
       - name: Deploy relworx-payment function
         run: |

@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
     .select(
       "id, clinic_id, booking_id, confirmed_diagnosis, total_charged_ugx, " +
       "payment_status, patient_phone, patient_name, prescription_items, follow_up_at, " +
-      "follow_up_days, patient_instructions"
+      "follow_up_days, follow_up_reason, patient_instructions"
     )
     .eq("id", diagnosisId)
     .maybeSingle();
@@ -126,13 +126,18 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Follow-up text — prefer explicit follow_up_at date, else "in N days"
+  // Follow-up text — prefer explicit follow_up_at date, else "in N days",
+  // and append the clinician's reason when recorded ("for BP recheck").
   let followUpText = "";
   const followUpDate = fmtDate(dx.follow_up_at);
+  const followUpReason =
+    typeof dx.follow_up_reason === "string" && dx.follow_up_reason.trim()
+      ? ` for ${dx.follow_up_reason.trim()}`
+      : "";
   if (followUpDate) {
-    followUpText = `Follow-up: ${followUpDate}.`;
+    followUpText = `Follow-up: ${followUpDate}${followUpReason}.`;
   } else if (Number(dx.follow_up_days) > 0) {
-    followUpText = `Follow-up in ${dx.follow_up_days} days.`;
+    followUpText = `Follow-up in ${dx.follow_up_days} days${followUpReason}.`;
   }
 
   // Balance text — only show if there's an outstanding amount
