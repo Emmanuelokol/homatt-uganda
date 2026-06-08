@@ -29,9 +29,9 @@
     <form id="loginForm">
       <div class="login-field">
         <label for="email">Staff Email</label>
-        <input type="email" id="email" placeholder="doctor@yourclinic.ug" required
+        <input type="text" id="email" placeholder="doctor@yourclinic.ug" required
                inputmode="email" autocomplete="username" autocapitalize="none"
-               autocorrect="off" spellcheck="false">
+               autocorrect="off" spellcheck="false" data-form-type="email">
       </div>
       <div class="login-field">
         <label for="password">Password</label>
@@ -75,14 +75,15 @@
         auth: { storageKey: 'sb-homatt-clinic-auth' }
       }) : null;
 
-  // Strip any whitespace the keyboard's predictive text injects — an email
-  // address can never contain spaces, so this prevents the duplicated /
-  // mangled text some Android keyboards produce in email fields.
+  // Strip characters that can't appear in an email address.
+  // Using type="text" + inputmode="email" instead of type="email" prevents
+  // Android from showing email domain suggestions (@gmail.com etc.) that get
+  // injected mid-word and cause duplicated / mangled addresses.
   const emailInput = document.getElementById('email');
   emailInput.addEventListener('input', () => {
-    const cleaned = emailInput.value.replace(/\s+/g, '');
+    const cleaned = emailInput.value.replace(/[^a-zA-Z0-9._%+@\-]/g, '');
     if (cleaned !== emailInput.value) {
-      const pos = cleaned.length;
+      const pos = Math.min(emailInput.selectionStart, cleaned.length);
       emailInput.value = cleaned;
       try { emailInput.setSelectionRange(pos, pos); } catch (e) {}
     }

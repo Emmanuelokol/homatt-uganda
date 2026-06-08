@@ -3623,6 +3623,63 @@
     loadMonthlyReport();
   }
 
+  // Computes a monthly summary directly from the raw clinic tables.
+  // Used as a fallback when the DB function/table haven't been deployed yet.
+  async function computeMonthlyReportClientSide(clinicId, year, month) {
+    // Uganda = UTC+3; midnight local = 21:00 UTC previous day
+    var start = new Date(Date.UTC(year, month - 1, 1) - 3 * 3600000).toISOString();
+    var end   = new Date(Date.UTC(year, month,     1) - 3 * 3600000).toISOString();
+
+    var results = await Promise.all([
+      supabase.from('clinic_diagnoses').select('total_charged_ugx,patient_phone,patient_name')
+        .eq('clinic_id', clinicId).gte('created_at', start).lt('created_at', end),
+      supabase.from('clinic_payments').select('amount_ugx,method')
+        .eq('clinic_id', clinicId).gte('created_at', start).lt('created_at', end),
+      supabase.from('clinic_quick_sales').select('total_ugx')
+        .eq('clinic_id', clinicId).gte('created_at', start).lt('created_at', end),
+      supabase.from('clinic_diagnoses').select('total_charged_ugx,amount_paid')
+        .eq('clinic_id', clinicId).in('payment_status', ['pending','partial','credit']),
+    ]);
+
+    var dxRows  = results[0].data || [];
+    var pmtRows = results[1].data || [];
+    var qsRows  = results[2].data || [];
+    var outRows = results[3].data || [];
+
+    var billed = dxRows.reduce(function(s,d){ return s + Number(d.total_charged_ugx||0); }, 0);
+    var ptSet  = new Set(dxRows.map(function(d){ return d.patient_phone||d.patient_name||'?'; }));
+
+    var collected = pmtRows.reduce(function(s,p){ return s + Number(p.amount_ugx||0); }, 0);
+    var methods   = pmtRows.reduce(function(acc,p){
+      if (p.method) acc[p.method] = (acc[p.method]||0) + Number(p.amount_ugx||0);
+      return acc;
+    }, {});
+
+    var qs = qsRows.reduce(function(s,q){ return s + Number(q.total_ugx||0); }, 0);
+
+    var outstanding = outRows.reduce(function(s,d){
+      return s + Math.max(0, Number(d.total_charged_ugx||0) - Number(d.amount_paid||0));
+    }, 0);
+
+    return {
+      clinic_id: clinicId, year: year, month: month,
+      total_billed_ugx:      billed,
+      total_collected_ugx:   collected,
+      quick_sales_ugx:       qs,
+      total_revenue_ugx:     collected + qs,
+      total_outstanding_ugx: outstanding,
+      stock_cost_ugx:        0,
+      net_margin_ugx:        collected + qs,
+      total_consultations:   dxRows.length,
+      total_patients:        ptSet.size,
+      payment_methods:       methods,
+      stock_snapshot:        [],
+      generated_at:          new Date().toISOString(),
+      generated_manually:    true,
+      _live:                 true,
+    };
+  }
+
   async function loadMonthlyReport() {
     var clinicId = await resolveClinicId();
     if (!clinicId) return;
@@ -3631,11 +3688,16 @@
     var body = document.getElementById('mrBody');
     body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading…</div>';
     var res = await supabase.from('clinic_monthly_summaries')
-      .select('*')
-      .eq('clinic_id', clinicId)
-      .eq('year', y)
-      .eq('month', m)
-      .maybeSingle();
+      .select('*').eq('clinic_id', clinicId).eq('year', y).eq('month', m).maybeSingle();
+
+    // Table doesn't exist yet — compute live from raw tables
+    if (res.error && (res.error.code === '42P01' || (res.error.message||'').includes('does not exist') || (res.error.message||'').includes('relation'))) {
+      body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Computing from live data…</div>';
+      var r = await computeMonthlyReportClientSide(clinicId, y, m);
+      renderMonthlyReport(r);
+      return;
+    }
+
     if (res.error) { body.innerHTML = '<div style="padding:16px;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'; return; }
     if (!res.data) {
       body.innerHTML = '<div style="text-align:center;padding:32px">'
@@ -3657,17 +3719,20 @@
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generating…'; }
     body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Generating report for ' + MONTH_NAMES[m] + ' ' + y + '…</div>';
     var res = await supabase.rpc('generate_clinic_monthly_summary', {
-      p_clinic_id: clinicId,
-      p_year:      y,
-      p_month:     m,
-      p_manual:    true
+      p_clinic_id: clinicId, p_year: y, p_month: m, p_manual: true
     });
     if (btn) { btn.disabled = false; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generate'; }
     if (res.error) {
+      // DB function not installed — fall back to client-side computation
+      if (res.error.code === 'PGRST202' || (res.error.message||'').includes('function') || (res.error.message||'').includes('schema cache')) {
+        body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Computing live report…</div>';
+        var r = await computeMonthlyReportClientSide(clinicId, y, m);
+        renderMonthlyReport(r);
+        return;
+      }
       body.innerHTML = '<div style="padding:16px;background:#FFEBEE;border-radius:10px;margin:4px">'
         + '<div style="font-weight:700;color:#C62828;margin-bottom:6px">Could not generate report</div>'
         + '<div style="font-size:13px;color:#B71C1C">' + esc(res.error.message) + '</div>'
-        + '<div style="font-size:11px;color:#9AA0A6;margin-top:8px">If this says "function not found", the database migration may still be deploying. Wait a few minutes and try again.</div>'
         + '</div>';
       return;
     }
@@ -3678,7 +3743,7 @@
   function renderMonthlyReport(r) {
     var body = document.getElementById('mrBody');
     var genAt = r.generated_at ? new Date(r.generated_at).toLocaleString('en-UG') : '';
-    var genLabel = r.generated_manually ? 'Manually generated' : 'Auto-generated';
+    var genLabel = r._live ? 'Live from current data' : (r.generated_manually ? 'Manually generated' : 'Auto-generated');
 
     // Financial cards
     var cards = [
