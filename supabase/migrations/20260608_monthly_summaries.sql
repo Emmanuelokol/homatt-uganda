@@ -291,6 +291,8 @@ exception when others then
   raise warning 'monthly-summaries cron not scheduled: %', sqlerrm;
 end $$;
 
--- Force PostgREST to reload its schema cache so the new RPC is callable
--- immediately (otherwise the client gets "function not found in schema cache").
-notify pgrst, 'reload schema';
+-- NOTE: do NOT NOTIFY pgrst here — the Supabase Management API applies
+-- migrations through the transaction-mode connection pooler, which does
+-- not support LISTEN/NOTIFY. Any NOTIFY errors and rolls back the whole
+-- migration. Supabase reloads the PostgREST schema cache automatically
+-- on DDL via its built-in event trigger, so no manual reload is needed.

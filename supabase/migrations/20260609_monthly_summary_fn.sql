@@ -168,4 +168,7 @@ grant execute on function
   public.generate_clinic_monthly_summary(uuid, integer, integer, boolean)
   to authenticated;
 
-notify pgrst, 'reload schema';
+-- NOTE: no NOTIFY pgrst — the Supabase migration API runs through the
+-- transaction-mode pooler which rejects NOTIFY and would roll back this
+-- whole file (that is exactly why earlier attempts left the function
+-- missing). Supabase reloads the PostgREST schema cache on DDL itself.

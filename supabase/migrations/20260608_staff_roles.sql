@@ -161,5 +161,6 @@ $$;
 
 grant execute on function public.set_staff_role(uuid, text) to authenticated;
 
--- Refresh PostgREST so the new RPCs are callable immediately
-notify pgrst, 'reload schema';
+-- NOTE: no NOTIFY pgrst — the Supabase migration API runs through the
+-- transaction-mode pooler which rejects NOTIFY (it would roll back the
+-- whole migration). Supabase reloads the PostgREST cache on DDL itself.
