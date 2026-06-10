@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Standing helper figure — upper right, leaning forward -->
+  <circle cx="132" cy="36" r="18" fill="white"/>
+  <path d="M128 54 L114 94 L104 94 L118 52 Z" fill="white"/>
+  <path d="M116 68 Q90 84 76 100 L82 106 Q96 90 122 74 Z" fill="white"/>
+  <path d="M122 62 L144 76 L140 84 L118 70 Z" fill="white"/>
+  <path d="M106 94 L100 142 L112 142 L118 94 Z" fill="white"/>
+  <path d="M120 94 L128 142 L140 142 L132 94 Z" fill="white"/>
+
+  <!-- Kneeling person being helped — lower left -->
+  <circle cx="64" cy="86" r="16" fill="white"/>
+  <path d="M62 102 L54 136 L70 136 L72 102 Z" fill="white"/>
+  <path d="M70 106 Q78 98 82 100 L82 106 Q78 106 74 112 Z" fill="white"/>
+  <path d="M60 108 L48 126 L54 130 L64 114 Z" fill="white"/>
+  <path d="M56 134 L50 160 L60 160 L66 134 Z" fill="white"/>
+  <path d="M68 134 L66 152 Q72 160 84 160 L84 152 Q74 152 76 134 Z" fill="white"/>
+
+  <!-- Clasped hands (connection point) -->
+  <circle cx="82" cy="103" r="7" fill="white"/>
+</svg>

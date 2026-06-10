@@ -56,12 +56,13 @@ body {
   padding: 0;
   margin: 0;
   min-height: 0;
-  /* Use dvh (dynamic viewport height) so the body shrinks when the keyboard
-     opens. svh (stable) would NOT shrink — last rule wins, so the previous
-     declaration "height:100svh" was overriding 100dvh and breaking
-     adjustResize keyboard handling.  Fallback to 100% for older WebView. */
+  /* --actual-vh is set by native-bridge.js via window.innerHeight on every
+     resize event. This is more reliable than dvh on some Android WebViews
+     where dvh is cached at the keyboard-open height and never resets.
+     Fallback chain: var(--actual-vh) → 100dvh → 100% */
   height: 100%;
   height: 100dvh;
+  height: var(--actual-vh, 100dvh);
 }
 
 html {

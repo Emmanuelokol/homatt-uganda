@@ -7,6 +7,24 @@
 (function () {
   'use strict';
 
+  // ─── VIEWPORT HEIGHT FIX ─────────────────────────────────────────────────────
+  // Some Android WebViews (especially Samsung) cache the `100dvh` value at the
+  // keyboard-open height and never reset it when the keyboard closes. This leaves
+  // the body/phone-frame stuck at half-height with a black native-background gap
+  // below. We fix it by writing window.innerHeight to a CSS variable on every
+  // resize event — window.innerHeight ALWAYS reflects the correct current height.
+  // This IIFE runs immediately when the script loads, before Capacitor is ready,
+  // so the variable is set as early as possible on every page.
+  (function initViewportHeightVar() {
+    function _updateVh() {
+      document.documentElement.style.setProperty('--actual-vh', window.innerHeight + 'px');
+    }
+    window.addEventListener('resize', _updateVh, { passive: true });
+    _updateVh(); // set immediately
+    // Expose so keyboard hide handlers can call it explicitly
+    window._homattUpdateVh = _updateVh;
+  })();
+
   function isNative() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform());
   }
@@ -214,14 +232,20 @@
       Keyboard.addListener('keyboardWillHide', () => {
         document.body.classList.remove('keyboard-open');
         _resetDocumentScroll();
+        // Force --actual-vh back to full height immediately — some WebViews fire
+        // the resize event late, leaving the body stuck at keyboard height briefly.
+        if (window._homattUpdateVh) window._homattUpdateVh();
       });
 
       Keyboard.addListener('keyboardDidHide', () => {
         document.body.classList.remove('keyboard-open');
-        // Run after the WebView regrows, when any stray document scroll
-        // becomes out-of-bounds and must be cleared.
         _resetDocumentScroll();
-        setTimeout(_resetDocumentScroll, 250);
+        if (window._homattUpdateVh) window._homattUpdateVh();
+        // Double-check after the WebView finishes growing back
+        setTimeout(() => {
+          _resetDocumentScroll();
+          if (window._homattUpdateVh) window._homattUpdateVh();
+        }, 250);
       });
     } else if (window.visualViewport) {
       // Web/PWA fallback: detect the keyboard via visual viewport height changes.
@@ -236,7 +260,11 @@
         } else {
           document.body.classList.remove('keyboard-open');
           _resetDocumentScroll();
-          setTimeout(_resetDocumentScroll, 250);
+          if (window._homattUpdateVh) window._homattUpdateVh();
+          setTimeout(() => {
+            _resetDocumentScroll();
+            if (window._homattUpdateVh) window._homattUpdateVh();
+          }, 250);
         }
       });
     }
