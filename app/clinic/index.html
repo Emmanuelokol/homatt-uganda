@@ -29,9 +29,9 @@
     <form id="loginForm">
       <div class="login-field">
         <label for="email">Staff Email</label>
-        <input type="text" id="email" placeholder="doctor@yourclinic.ug" required
-               inputmode="email" autocomplete="username" autocapitalize="none"
-               autocorrect="off" spellcheck="false" data-form-type="email">
+        <input type="text" id="email" name="clinic-login-id" placeholder="doctor@yourclinic.ug" required
+               inputmode="email" autocomplete="off" autocapitalize="none"
+               autocorrect="off" spellcheck="false" aria-autocomplete="none">
       </div>
       <div class="login-field">
         <label for="password">Password</label>
@@ -75,22 +75,29 @@
         auth: { storageKey: 'sb-homatt-clinic-auth' }
       }) : null;
 
-  // Strip characters that can't appear in an email address.
-  // Using type="text" + inputmode="email" instead of type="email" prevents
-  // Android from showing email domain suggestions (@gmail.com etc.) that get
-  // injected mid-word and cause duplicated / mangled addresses.
+  // IMPORTANT: never rewrite the field's value while the user is typing.
+  // Samsung/Gboard keyboards hold the current word in an IME composition
+  // buffer; changing input.value mid-composition makes the keyboard re-commit
+  // its whole buffer, which DUPLICATES the text (emmanuel@emmanuel@…).
+  // So we only sanitize when it's safe: after composition ends, on blur,
+  // and right before submitting.
   const emailInput = document.getElementById('email');
-  emailInput.addEventListener('input', () => {
+  let _composing = false;
+
+  function sanitizeEmail() {
+    if (_composing) return; // never touch the value mid-composition
     const cleaned = emailInput.value.replace(/[^a-zA-Z0-9._%+@\-]/g, '');
-    if (cleaned !== emailInput.value) {
-      const pos = Math.min(emailInput.selectionStart, cleaned.length);
-      emailInput.value = cleaned;
-      try { emailInput.setSelectionRange(pos, pos); } catch (e) {}
-    }
-  });
+    if (cleaned !== emailInput.value) emailInput.value = cleaned;
+  }
+
+  emailInput.addEventListener('compositionstart', () => { _composing = true; });
+  emailInput.addEventListener('compositionend',   () => { _composing = false; sanitizeEmail(); });
+  emailInput.addEventListener('blur', sanitizeEmail);
 
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
+    _composing = false;
+    sanitizeEmail();
     const email = document.getElementById('email').value.trim().toLowerCase();
     const password = document.getElementById('password').value;
     const btn = document.getElementById('loginBtn');
