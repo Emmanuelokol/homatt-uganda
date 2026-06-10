@@ -34,25 +34,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('editProfileBtn')?.addEventListener('click', () => openSheet(editSheet));
   document.getElementById('closeEditSheet')?.addEventListener('click', closeAllSheets);
 
-  // ── Keyboard: scroll active input into view when the on-screen keyboard opens ──
-  // In Capacitor/Android WebView the visual viewport shrinks when the keyboard
-  // appears while the layout viewport stays the same, causing inputs at the
-  // bottom of the sheet to be hidden behind the keyboard.
-  function scrollFocusedIntoView() {
-    const el = document.activeElement;
-    if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
-      setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 120);
-    }
-  }
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', scrollFocusedIntoView);
-  }
-  // Fallback: also fire on plain focus so it works on iOS/older browsers
-  editSheet.addEventListener('focusin', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-      setTimeout(() => e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }), 150);
-    }
-  });
+  // Keyboard handling is done globally in native-bridge.js (keyboardWillShow
+  // scrolls the focused input within its own scrollable container, and
+  // keyboardWillHide restores any stray document scroll). Do NOT add
+  // per-page visualViewport/scrollIntoView handlers here — a previous one
+  // scrolled the document itself mid-keyboard-animation, which Android
+  // WebView never clamps back, leaving a huge blank area after the
+  // keyboard dismissed.
   document.getElementById('closeSupportSheet')?.addEventListener('click', closeAllSheets);
   document.getElementById('closeEmergencySheet')?.addEventListener('click', closeAllSheets);
   document.getElementById('closeTermsSheet')?.addEventListener('click', closeAllSheets);

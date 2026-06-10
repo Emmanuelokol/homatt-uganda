@@ -122,6 +122,66 @@
     }
   };
 
+  // Find the actual scrollable ancestor of the focused input.
+  // This walks up the DOM looking for any element that is an overflow:auto/scroll
+  // container whose content overflows. This single function handles:
+  //   - .bottom-sheet/.sheet-body (profile, symptom-checker, family, etc.)
+  //   - .cc-modal (chronic-disease)
+  //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
+  //   - .app-screen (default page scroll container)
+  // Returns null when no such container exists — which is the correct
+  // signal to fall back to scrollIntoView rather than trying to scroll
+  // an overflow:hidden element (like .app-screen in medicine-orders) or
+  // a position:fixed container that is too short to overflow yet.
+  function _findScroller(node) {
+    let cur = node.parentElement;
+    while (cur && cur !== document.body) {
+      const s = getComputedStyle(cur);
+      const oy = s.overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  function _scrollFocusedInputIntoView() {
+    const el = document.activeElement;
+    if (!el || el === document.body) return;
+    if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
+
+    const scroller = _findScroller(el);
+    if (scroller) {
+      const elRect = el.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      // Center the input within the visible scroller area
+      const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+        - (scroller.clientHeight / 2) + (elRect.height / 2);
+      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+    } else {
+      // No scrollable container found (overflow:hidden screens, short modals,
+      // position:fixed sheets). Let the browser scroll to the element — this
+      // correctly handles crx-modal, #cbInner, and other modal scroll containers
+      // because scrollIntoView walks the stacking context, not just the DOM.
+      try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
+    }
+  }
+
+  // The app never scrolls the document itself — all scrolling happens inside
+  // .app-screen / .sheet-body etc. But while the keyboard is open the WebView
+  // is temporarily shorter, content overflows, and the document CAN get
+  // scrolled (by the browser revealing the focused input, or by a
+  // scrollIntoView fallback). Android WebView does not clamp that scroll back
+  // when the keyboard closes, which leaves the page shoved up with a big
+  // blank area at the bottom. Restore it explicitly on every keyboard hide.
+  function _resetDocumentScroll() {
+    try {
+      window.scrollTo(0, 0);
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch(_) {}
+  }
+
   function initKeyboard() {
     // Tap outside any input/textarea/select → blur to dismiss keyboard.
     // Walk UP the DOM to detect interactive ancestors — without this, tapping
@@ -139,69 +199,47 @@
       }
     }, { passive: true });
 
-    // Capacitor Keyboard plugin listeners (native only)
-    if (!isNative()) return;
-    const { Keyboard } = window.Capacitor.Plugins;
-    if (!Keyboard) return;
+    if (isNative() && window.Capacitor.Plugins.Keyboard) {
+      // Native: Capacitor Keyboard plugin events
+      const { Keyboard } = window.Capacitor.Plugins;
 
-    Keyboard.addListener('keyboardWillShow', () => {
-      document.body.classList.add('keyboard-open');
-      // 550ms: Android keyboard animation is ~300ms; Capacitor resize:body needs another
-      // ~100ms to propagate after the animation ends. We wait until both settle before
-      // scrolling so our getBoundingClientRect reads the post-resize layout.
-      setTimeout(() => {
-        const el = document.activeElement;
-        if (!el || el === document.body) return;
+      Keyboard.addListener('keyboardWillShow', () => {
+        document.body.classList.add('keyboard-open');
+        // 550ms: Android keyboard animation is ~300ms; the adjustResize WebView
+        // reflow takes another beat after the animation ends. We wait until both
+        // settle before scrolling so getBoundingClientRect reads the post-resize layout.
+        setTimeout(_scrollFocusedInputIntoView, 550);
+      });
 
-        // Find the actual scrollable ancestor of the focused input.
-        // This walks up the DOM looking for any element that is an overflow:auto/scroll
-        // container whose content overflows. This single function handles:
-        //   - .bottom-sheet/.sheet-body (symptom-checker, family, etc.)
-        //   - .cc-modal (chronic-disease)
-        //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
-        //   - .app-screen (default page scroll container)
-        // Walk up the DOM to find an ancestor that is actually scrollable
-        // (overflow-y:auto/scroll AND has content overflowing its bounds).
-        // Returns null when no such container exists — which is the correct
-        // signal to fall back to scrollIntoView rather than trying to scroll
-        // an overflow:hidden element (like .app-screen in medicine-orders) or
-        // a position:fixed container that is too short to overflow yet.
-        const findScroller = (node) => {
-          let cur = node.parentElement;
-          while (cur && cur !== document.body) {
-            const s = getComputedStyle(cur);
-            const oy = s.overflowY;
-            if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
-            cur = cur.parentElement;
-          }
-          return null;
-        };
+      Keyboard.addListener('keyboardWillHide', () => {
+        document.body.classList.remove('keyboard-open');
+        _resetDocumentScroll();
+      });
 
-        const scroller = findScroller(el);
-        if (scroller) {
-          const elRect = el.getBoundingClientRect();
-          const scrollerRect = scroller.getBoundingClientRect();
-          // Center the input within the visible scroller area
-          const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
-            - (scroller.clientHeight / 2) + (elRect.height / 2);
-          scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+      Keyboard.addListener('keyboardDidHide', () => {
+        document.body.classList.remove('keyboard-open');
+        // Run after the WebView regrows, when any stray document scroll
+        // becomes out-of-bounds and must be cleared.
+        _resetDocumentScroll();
+        setTimeout(_resetDocumentScroll, 250);
+      });
+    } else if (window.visualViewport) {
+      // Web/PWA fallback: detect the keyboard via visual viewport height changes.
+      let baseHeight = window.visualViewport.height;
+      window.visualViewport.addEventListener('resize', () => {
+        const h = window.visualViewport.height;
+        if (h > baseHeight) baseHeight = h; // rotation / chrome UI growth
+        const keyboardOpen = baseHeight - h > 150;
+        if (keyboardOpen) {
+          document.body.classList.add('keyboard-open');
+          setTimeout(_scrollFocusedInputIntoView, 300);
         } else {
-          // No scrollable container found (overflow:hidden screens, short modals,
-          // position:fixed sheets). Let the browser scroll to the element — this
-          // correctly handles crx-modal, #cbInner, and other modal scroll containers
-          // because scrollIntoView walks the stacking context, not just the DOM.
-          try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
+          document.body.classList.remove('keyboard-open');
+          _resetDocumentScroll();
+          setTimeout(_resetDocumentScroll, 250);
         }
-      }, 550);
-    });
-
-    Keyboard.addListener('keyboardWillHide', () => {
-      document.body.classList.remove('keyboard-open');
-    });
-
-    Keyboard.addListener('keyboardDidHide', () => {
-      document.body.classList.remove('keyboard-open');
-    });
+      });
+    }
   }
 
   // ─── NETWORK STATUS ─────────────────────────────────────────────────────────
