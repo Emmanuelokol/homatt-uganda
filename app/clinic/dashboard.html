@@ -2841,6 +2841,21 @@
     if (e.target === this) this.style.display = 'none';
   });
 
+  // ── Inventory extras overlay ──
+  // selling_price_ugx / category / packaging columns come from newer migrations.
+  // If the live DB doesn't have them yet, the insert strips them and we keep the
+  // values here (per clinic, keyed by item name) so Quick Sale still gets prices.
+  function _invExtrasMap(clinicId) {
+    try { return JSON.parse(localStorage.getItem('homatt_inv_extras_' + clinicId) || '{}'); }
+    catch(e) { return {}; }
+  }
+  function _saveInvExtras(clinicId, itemName, extras) {
+    var map = _invExtrasMap(clinicId);
+    var key = (itemName || '').toLowerCase();
+    map[key] = Object.assign(map[key] || {}, extras);
+    try { localStorage.setItem('homatt_inv_extras_' + clinicId, JSON.stringify(map)); } catch(e) {}
+  }
+
   document.getElementById('stockItemSaveBtn').onclick = async function() {
     var btn  = this;
     var errEl = document.getElementById('stockItemError');
@@ -2874,10 +2889,44 @@
       var catEl = document.getElementById('siCategory');
       var category = catEl ? (catEl.value || '').trim() : '';
       if (category) insertData.category = category;
+
       var r = await supabase.from('clinic_inventory').insert(insertData);
-      if (r.error) throw r.error;
+
+      // If the live DB is missing newer columns (selling_price_ugx, category,
+      // packaging — added by later migrations), PostgREST rejects the WHOLE
+      // insert with "Could not find the 'X' column". Strip the offending
+      // column and retry so the medicine is never lost; keep stripped values
+      // in localStorage so Quick Sale still shows the right prices.
+      var stripped = {};
+      var guard = 0;
+      while (r.error && guard++ < 8) {
+        var m = (r.error.message || '').match(/Could not find the '([^']+)' column/);
+        if (!m || !(m[1] in insertData)) break;
+        stripped[m[1]] = insertData[m[1]];
+        delete insertData[m[1]];
+        r = await supabase.from('clinic_inventory').insert(insertData);
+      }
+
+      if (r.error) {
+        var msg = r.error.message || '';
+        if (msg.indexOf('duplicate') >= 0 || msg.indexOf('idx_clinic_inventory_name') >= 0) {
+          throw new Error('"' + name + '" is already in your stock list. Use the + Restock button on that item instead.');
+        }
+        throw r.error;
+      }
+
+      if (Object.keys(stripped).length) {
+        _saveInvExtras(clinicId, name, stripped);
+        if (typeof showToast === 'function') {
+          showToast('Item saved. Prices kept on this device — apply the inventory migration to store them in the database.', 'info');
+        }
+      } else if (typeof showToast === 'function') {
+        showToast('"' + name + '" added to stock', 'success');
+      }
+
       document.getElementById('stockItemModal').style.display = 'none';
       loadInventory();
+      if (typeof loadQsDrugs === 'function') loadQsDrugs();
     } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
     btn.disabled = false; btn.textContent = 'Save Item';
   };
@@ -3228,7 +3277,32 @@
         .eq('is_active', true)
         .gt('quantity', 0)
         .order('item_name');
+
+      // Live DB may not have the newer columns yet (selling_price_ugx, category,
+      // packaging) — the select fails entirely and the user used to see DEMO
+      // drugs instead of their real stock. Retry with base columns only.
+      if (r.error) {
+        r = await supabase
+          .from('clinic_inventory')
+          .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,min_threshold')
+          .eq('clinic_id', clinicId)
+          .eq('item_type', 'medicine')
+          .eq('is_active', true)
+          .gt('quantity', 0)
+          .order('item_name');
+      }
       if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
+
+      // Merge any locally-kept extras (prices/category saved on this device
+      // while the DB columns were missing) so Quick Sale still has prices.
+      var extras = _invExtrasMap(clinicId);
+      r.data.forEach(function(d) {
+        var e = extras[(d.item_name || '').toLowerCase()];
+        if (e) {
+          Object.keys(e).forEach(function(k) { if (d[k] == null) d[k] = e[k]; });
+        }
+      });
+
       _qsDrugs = r.data;
       renderQsGrid(_qsDrugs);
       renderQsCategoryChips();
