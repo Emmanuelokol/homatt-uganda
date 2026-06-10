@@ -98,6 +98,23 @@
       .cond-fee-table td:nth-child(3)::before { content:"Notes"; }
       .cond-fee-table td:nth-child(4)::before { content:""; }
 
+      /* Diagnostic tests table */
+      .diag-table { width:100%; border-collapse:collapse; }
+      .diag-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+      .diag-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
+      @media(max-width:600px){
+        .diag-table, .diag-table tbody, .diag-table tr, .diag-table td { display:block; width:100%; }
+        .diag-table thead { display:none; }
+        .diag-table tr { background:#FAFAFA; border:1px solid #EEE; border-radius:10px; padding:12px; margin-bottom:10px; }
+        .diag-table td { padding:8px 0 0; border:none; font-size:13px; display:flex; flex-direction:column; gap:5px; }
+        .diag-table td:first-child { padding-top:0; }
+        .diag-table td::before { color:#5F6368; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+        .diag-table td:nth-child(1)::before { content:"Test / Service"; }
+        .diag-table td:nth-child(2)::before { content:"Disease / Condition"; }
+        .diag-table td:nth-child(3)::before { content:"Price (UGX)"; }
+        .diag-table td:nth-child(4)::before { content:""; }
+      }
+
       /* Hours row: stack day on its own row, then opens/closes side-by-side */
       .hours-row {
         grid-template-columns:1fr 1fr;
@@ -313,6 +330,33 @@
         </div>
       </div>
 
+      <!-- Diagnostic Tests & Lab Services -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">biotech</span> Diagnostic Tests &amp; Lab Services
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Add the tests and lab services your clinic offers — patients will see these when choosing your clinic. Use <strong>Fill from Specialties</strong> to auto-populate from the conditions you treat, or add tests manually.</span>
+        </div>
+        <table class="diag-table">
+          <thead><tr><th>Test / Service Name</th><th>Disease / Condition</th><th>Price (UGX)</th><th></th></tr></thead>
+          <tbody id="diagTestsBody">
+            <tr><td colspan="4" class="cond-fee-empty">No tests added yet. Use the buttons below.</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button onclick="addTestRow()" style="background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Test</button>
+          <button onclick="populateTestsFromConditions()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
+          </button>
+        </div>
+        <div id="testSuggestionsWrap" style="margin-top:14px;display:none">
+          <div style="font-size:12px;font-weight:600;color:#5F6368;margin-bottom:8px">Suggested tests for your conditions:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="testSuggestions"></div>
+        </div>
+      </div>
+
       <!-- Condition-Based Fees -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -442,6 +486,8 @@ var currentSpecs = [];
 var currentFacilities = [];
 var condFeeData = [];      // { id (existing uuid|null), condition_name, fee, notes, _delete }
 var condFeeDbRows = [];    // original rows fetched from DB
+var testsData = [];        // { test, condition, price }
+var _testSuggCache = [];   // flat list used by _addSuggByIdx
 
 var DEFAULT_FEES = [
   { type:'General Consultation', fee:'', notes:'Standard OPD visit' },
@@ -504,6 +550,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   buildFacilities([]);
   buildHours({});
   buildSuggestedSpecs();
+  buildTestSuggestions();
 
   // Load existing data
   if (_supa && _clinicId) {
@@ -613,6 +660,7 @@ function renderSpecChips() {
     wrap.appendChild(chip);
   });
   wrap.appendChild(input);
+  buildTestSuggestions();
 }
 
 window.removeSpec = function(i) { currentSpecs.splice(i,1); renderSpecChips(); };
@@ -973,6 +1021,11 @@ async function loadClinicProfile() {
   if (c.booking_window_days != null) document.getElementById('sBookingWindow').value = c.booking_window_days;
   if (c.accepts_online_slots != null) document.getElementById('sAcceptsOnlineSlots').checked = !!c.accepts_online_slots;
   if (c.auto_confirm_slots != null) document.getElementById('sAutoConfirmSlots').checked = !!c.auto_confirm_slots;
+
+  // Diagnostic tests
+  testsData = Array.isArray(c.diagnostic_tests) ? c.diagnostic_tests : [];
+  renderTestsTable();
+  buildTestSuggestions();
 }
 
 function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : s; }
@@ -1068,6 +1121,119 @@ async function saveCondFees() {
   }
 }
 
+/* ── Diagnostic Tests ── */
+var TEST_SUGGESTIONS = {
+  'Malaria':           [{ test:'Malaria RDT (Rapid)', condition:'Malaria' }, { test:'Blood Smear / Microscopy', condition:'Malaria' }],
+  'Typhoid':           [{ test:'Widal Test', condition:'Typhoid' }, { test:'Blood Culture', condition:'Typhoid' }],
+  'Diabetes':          [{ test:'Fasting Blood Sugar (FBS)', condition:'Diabetes' }, { test:'HbA1c', condition:'Diabetes' }, { test:'Random Blood Sugar', condition:'Diabetes' }],
+  'Hypertension':      [{ test:'Blood Pressure Check', condition:'Hypertension' }, { test:'Renal Function Test (Creatinine)', condition:'Hypertension' }, { test:'ECG', condition:'Hypertension' }],
+  'HIV / AIDS':        [{ test:'HIV Rapid Test', condition:'HIV' }, { test:'CD4 Count', condition:'HIV' }, { test:'Viral Load', condition:'HIV' }],
+  'Tuberculosis (TB)': [{ test:'GeneXpert / TB PCR', condition:'TB' }, { test:'Sputum Microscopy (AAFB)', condition:'TB' }, { test:'Chest X-ray', condition:'TB' }],
+  'Maternity':         [{ test:'Pregnancy Test (HCG)', condition:'Pregnancy' }, { test:'Antenatal Blood Panel', condition:'Antenatal care' }, { test:'Obstetric Ultrasound', condition:'Pregnancy' }],
+  'Paediatrics':       [{ test:'Full Blood Count (FBC)', condition:'Paediatric illness' }, { test:'Malaria RDT', condition:'Malaria in children' }, { test:'Widal Test', condition:'Typhoid in children' }],
+  'Skin Conditions':   [{ test:'Skin Scraping / KOH Test', condition:'Fungal skin infection' }, { test:'VDRL / Syphilis Test', condition:'Syphilis' }],
+  'Eye Care':          [{ test:'Visual Acuity Test', condition:'Refractive error' }, { test:'Intraocular Pressure (IOP)', condition:'Glaucoma' }],
+  'Dental':            [{ test:'Dental X-ray (periapical)', condition:'Dental caries / abscess' }],
+  'Gynaecology':       [{ test:'Pap Smear', condition:'Cervical cancer screening' }, { test:'Pelvic Ultrasound', condition:'Fibroid / ovarian cyst' }, { test:'Vaginal Swab Culture', condition:'Vaginal infection' }],
+  'Cardiology':        [{ test:'ECG (Electrocardiogram)', condition:'Heart disease' }, { test:'Echocardiogram', condition:'Heart disease' }, { test:'Full Blood Count', condition:'Anaemia / cardiac workup' }],
+  'Orthopaedics':      [{ test:'X-ray (limb / spine)', condition:'Fracture / bone disease' }],
+  'Mental Health':     [{ test:'PHQ-9 Depression Screening', condition:'Depression' }, { test:'GAD-7 Anxiety Screening', condition:'Anxiety' }],
+  'Surgery':           [{ test:'Full Blood Count (pre-op)', condition:'Pre-operative workup' }, { test:'Clotting Profile (PT/APTT)', condition:'Pre-operative workup' }, { test:'Blood Group & Cross-match', condition:'Pre-operative workup' }],
+};
+
+function renderTestsTable() {
+  var tbody = document.getElementById('diagTestsBody');
+  if (!testsData.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No tests added yet. Use the buttons below.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = testsData.map(function(t, i) {
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(t.test||'') + '" oninput="testsData[' + i + '].test=this.value" placeholder="e.g. Malaria RDT, Blood Sugar…"></td>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(t.condition||'') + '" oninput="testsData[' + i + '].condition=this.value" placeholder="e.g. Malaria, Diabetes…"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (t.price||'') + '" oninput="testsData[' + i + '].price=Number(this.value)||this.value" placeholder="Optional" min="0" style="width:120px"></td>' +
+      '<td><button onclick="removeTest(' + i + ')" title="Remove" style="background:none;border:none;cursor:pointer;color:#D32F2F;font-size:18px;line-height:1;padding:0">×</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+window.addTestRow = function() {
+  testsData.push({ test:'', condition:'', price:'' });
+  renderTestsTable();
+  var rows = document.querySelectorAll('#diagTestsBody tr');
+  var last = rows[rows.length - 1];
+  if (last) { var inp = last.querySelector('input'); if (inp) inp.focus(); }
+};
+
+window.removeTest = function(i) {
+  testsData.splice(i, 1);
+  renderTestsTable();
+};
+
+function buildTestSuggestions() {
+  var wrap = document.getElementById('testSuggestionsWrap');
+  var container = document.getElementById('testSuggestions');
+  if (!wrap || !container) return;
+
+  var seen = {};
+  _testSuggCache = [];
+  currentSpecs.forEach(function(spec) {
+    var key = Object.keys(TEST_SUGGESTIONS).find(function(k) {
+      return k.toLowerCase() === spec.toLowerCase() || spec.toLowerCase().indexOf(k.toLowerCase()) !== -1;
+    });
+    if (key) {
+      TEST_SUGGESTIONS[key].forEach(function(s) {
+        if (!seen[s.test]) {
+          seen[s.test] = true;
+          _testSuggCache.push(s);
+        }
+      });
+    }
+  });
+
+  if (!_testSuggCache.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  container.innerHTML = _testSuggCache.map(function(s, idx) {
+    return '<button onclick="_addSuggByIdx(' + idx + ')" style="background:#F3E5F5;border:none;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;color:#6A1B9A">' + escHtml(s.test) + '</button>';
+  }).join('');
+}
+
+window._addSuggByIdx = function(idx) {
+  var s = _testSuggCache[idx];
+  if (!s) return;
+  var existing = testsData.find(function(t){ return t.test.toLowerCase() === s.test.toLowerCase(); });
+  if (!existing) {
+    testsData.push({ test: s.test, condition: s.condition, price: '' });
+    renderTestsTable();
+    showToast('Added: ' + s.test, 'success');
+  } else {
+    showToast('Test already in list', 'info');
+  }
+};
+
+window.populateTestsFromConditions = function() {
+  var added = 0;
+  currentSpecs.forEach(function(spec) {
+    var key = Object.keys(TEST_SUGGESTIONS).find(function(k) {
+      return k.toLowerCase() === spec.toLowerCase() || spec.toLowerCase().indexOf(k.toLowerCase()) !== -1;
+    });
+    if (key) {
+      TEST_SUGGESTIONS[key].forEach(function(s) {
+        var existing = testsData.find(function(t){ return t.test.toLowerCase() === s.test.toLowerCase(); });
+        if (!existing) { testsData.push({ test: s.test, condition: s.condition, price: '' }); added++; }
+      });
+    }
+  });
+  if (added) {
+    renderTestsTable();
+    showToast(added + ' test(s) added from your specialties', 'success');
+  } else if (!currentSpecs.length) {
+    showToast('Add specialties first, then use this button', 'info');
+  } else {
+    showToast('All suggested tests are already in the list', 'info');
+  }
+};
+
 /* ── Save ── */
 async function saveSettings() {
   var btn = document.getElementById('saveSettingsBtn');
@@ -1142,6 +1308,10 @@ async function saveSettings() {
     await saveCondFees();
     // Reload condition fees to get fresh IDs from DB
     await loadCondFees();
+    // Save diagnostic tests — separate call so it doesn't block main save if column absent
+    try {
+      await _supa.from('clinics').update({ diagnostic_tests: testsData }).eq('id', _clinicId);
+    } catch(e) {}
   }
 
   btn.disabled = false;
