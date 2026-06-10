@@ -64,6 +64,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     setTimeout(() => oneSignalLogin(session.user.id), 1500);
   }
 
+  // Ensure player_id is persisted to the DB for every logged-in session.
+  // Covers new users whose player_id save failed the first time (network error,
+  // column not yet migrated, etc.) and ensures the DB is always up-to-date.
+  if (session?.user?.id && supabase) {
+    const cachedId = localStorage.getItem('homatt_onesignal_player_id');
+    if (cachedId) {
+      supabase.from('profiles')
+        .select('onesignal_player_id')
+        .eq('id', session.user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (!data?.onesignal_player_id) {
+            // player_id in localStorage but not yet in DB — save it now
+            supabase.from('profiles')
+              .update({ onesignal_player_id: cachedId })
+              .eq('id', session.user.id)
+              .then(() => {
+                console.log('[Dashboard] player_id recovered from localStorage to DB');
+              });
+          }
+        });
+    }
+  }
+
   // Update status bar time
   function updateTime() {
     const now = new Date();
@@ -89,14 +113,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.querySelector('.dash-welcome').textContent = getGreeting();
-  document.getElementById('userName').textContent = user.firstName || '';
+  const displayName = user.firstName || user.name?.split(' ')[0] || '';
+  document.getElementById('userName').textContent = displayName || 'there';
 
   // User avatar initial — click navigates to profile
   const avatarEl = document.getElementById('userAvatar');
-  if (user.firstName) {
-    avatarEl.innerHTML = `<span>${user.firstName.charAt(0).toUpperCase()}</span>`;
+  if (displayName) {
+    avatarEl.innerHTML = `<span>${displayName.charAt(0).toUpperCase()}</span>`;
   }
   avatarEl.addEventListener('click', () => { window.location.href = 'profile.html'; });
+
+  // When the user updates their profile in profile.html and navigates back,
+  // localStorage is already updated — this storage event keeps the greeting
+  // in sync if the same page is still open in another tab/webview.
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'homatt_user' && e.newValue) {
+      try {
+        const u = JSON.parse(e.newValue);
+        if (u.firstName) {
+          document.getElementById('userName').textContent = u.firstName;
+          avatarEl.querySelector('span').textContent = u.firstName.charAt(0).toUpperCase();
+        }
+      } catch (_) {}
+    }
+  });
 
   // ====== Feature Cards Navigation ======
   document.getElementById('symptomChecker').addEventListener('click', () => {

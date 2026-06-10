@@ -247,11 +247,13 @@
         </div>
         <div class="sheet-input-group">
           <label class="sheet-label">Subject *</label>
-          <input type="text" class="sheet-input" id="supportSubject" placeholder="Brief description of your issue">
+          <input type="text" class="sheet-input" id="supportSubject" placeholder="Brief description of your issue"
+                 autocapitalize="sentences" autocorrect="off" spellcheck="true">
         </div>
         <div class="sheet-input-group">
           <label class="sheet-label">Message *</label>
-          <textarea class="sheet-input sheet-textarea" id="supportMessage" placeholder="Describe your issue in detail..."></textarea>
+          <textarea class="sheet-input sheet-textarea" id="supportMessage" placeholder="Describe your issue in detail..."
+                    autocapitalize="sentences" autocorrect="off" spellcheck="true"></textarea>
         </div>
         <button class="sheet-submit-btn sheet-submit-blue" id="submitSupportBtn">
           <span class="material-icons-outlined">send</span>
@@ -364,15 +366,18 @@
 
         <div class="sheet-input-group">
           <label class="sheet-label">First Name</label>
-          <input type="text" class="sheet-input" id="editFirstName" placeholder="First name">
+          <input type="text" class="sheet-input" id="editFirstName" placeholder="First name"
+                 autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="given-name">
         </div>
         <div class="sheet-input-group">
           <label class="sheet-label">Last Name</label>
-          <input type="text" class="sheet-input" id="editLastName" placeholder="Last name">
+          <input type="text" class="sheet-input" id="editLastName" placeholder="Last name"
+                 autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="family-name">
         </div>
         <div class="sheet-input-group">
           <label class="sheet-label">District</label>
-          <select class="sheet-input sheet-select" id="editDistrict">
+          <select class="sheet-input sheet-select" id="editDistrict"
+                  autocomplete="address-level1">
             <option value="">Select district</option>
             <option value="kampala">Kampala</option>
             <option value="wakiso">Wakiso</option>
@@ -394,7 +399,8 @@
         </div>
         <div class="sheet-input-group">
           <label class="sheet-label">City / Town</label>
-          <input type="text" class="sheet-input" id="editCity" placeholder="City or town">
+          <input type="text" class="sheet-input" id="editCity" placeholder="City or town"
+                 autocapitalize="words" autocorrect="off" spellcheck="false" autocomplete="address-level2">
         </div>
 
         <button class="sheet-submit-btn" id="saveProfileBtn">
