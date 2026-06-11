@@ -446,6 +446,12 @@
     }
 
     const merged = { ...patient, ...(medProfile || {}), _activeMeds: activeMeds };
+    // Keep age info on the live patient so smart dosing can pick adult vs child
+    if (medProfile && state.patient) {
+      if (medProfile.date_of_birth != null) state.patient.date_of_birth = medProfile.date_of_birth;
+      if (medProfile.is_child != null)      state.patient.is_child      = medProfile.is_child;
+      if (window._syncDosingToggle) window._syncDosingToggle();
+    }
     renderProfileCard(card, merged, null);
     fetchVisitHistory(merged, card);
   }
@@ -959,6 +965,173 @@
     4: ['07:00','12:00','17:00','22:00'],
   };
 
+  // ── Smart prescription defaults ─────────────────────────────────
+  // The clinician just types the drug; dose, times/day, intake times and
+  // duration fill themselves from standard Uganda outpatient regimens —
+  // adult or child depending on the patient. Every field stays editable.
+  const DRUG_REGIMENS = [
+    { match:['paracetamol','panadol','acetaminophen'],
+      adult:{dose:'1g (2 tabs of 500mg)', times:3, days:3},
+      child:{dose:'250mg (syrup 5–10ml)', times:3, days:3} },
+    { match:['coartem','artemether','lumefantrine','duo-cotecxin','artefan'],
+      adult:{dose:'4 tabs per dose',      times:2, days:3},
+      child:{dose:'1–2 tabs per dose (by weight)', times:2, days:3} },
+    { match:['amoxicillin','amoxil','amoxyl'],
+      adult:{dose:'500mg',               times:3, days:5},
+      child:{dose:'250mg (syrup 5ml of 250mg/5ml)', times:3, days:5} },
+    { match:['metronidazole','flagyl'],
+      adult:{dose:'400mg',               times:3, days:7},
+      child:{dose:'100–200mg (7.5mg/kg)', times:3, days:7} },
+    { match:['ciprofloxacin','cipro'],
+      adult:{dose:'500mg',               times:2, days:7} },
+    { match:['doxycycline','doxy'],
+      adult:{dose:'100mg',               times:2, days:7} },
+    { match:['cotrimoxazole','septrin','co-trimoxazole','bactrim'],
+      adult:{dose:'960mg (2 tabs of 480mg)', times:2, days:5},
+      child:{dose:'240mg (syrup 5ml)',   times:2, days:5} },
+    { match:['azithromycin','zithromax'],
+      adult:{dose:'500mg',               times:1, days:3},
+      child:{dose:'10mg/kg',             times:1, days:3} },
+    { match:['erythromycin'],
+      adult:{dose:'500mg',               times:4, days:5},
+      child:{dose:'125–250mg',           times:4, days:5} },
+    { match:['ibuprofen','brufen'],
+      adult:{dose:'400mg',               times:3, days:3},
+      child:{dose:'10mg/kg (syrup)',     times:3, days:3} },
+    { match:['diclofenac'],
+      adult:{dose:'50mg',                times:2, days:5} },
+    { match:['ors','oral rehydration'],
+      adult:{dose:'1 sachet after each loose stool', times:3, days:3},
+      child:{dose:'½–1 sachet after each loose stool', times:3, days:3} },
+    { match:['zinc'],
+      adult:{dose:'20mg',                times:1, days:10},
+      child:{dose:'10–20mg',             times:1, days:10} },
+    { match:['cetirizine','zyrtec'],
+      adult:{dose:'10mg',                times:1, days:5},
+      child:{dose:'5mg (syrup 5ml)',     times:1, days:5} },
+    { match:['chlorpheniramine','piriton'],
+      adult:{dose:'4mg',                 times:3, days:5},
+      child:{dose:'2mg (syrup 5ml)',     times:2, days:5} },
+    { match:['omeprazole','losec'],
+      adult:{dose:'20mg',                times:1, days:14} },
+    { match:['metformin','glucophage'],
+      adult:{dose:'500mg',               times:2, days:30} },
+    { match:['amlodipine','norvasc'],
+      adult:{dose:'5mg',                 times:1, days:30} },
+    { match:['albendazole','zentel'],
+      adult:{dose:'400mg single dose',   times:1, days:1},
+      child:{dose:'400mg single dose (200mg if 1–2 yrs)', times:1, days:1} },
+    { match:['mebendazole','vermox'],
+      adult:{dose:'100mg',               times:2, days:3},
+      child:{dose:'100mg',               times:2, days:3} },
+    { match:['fluconazole','diflucan'],
+      adult:{dose:'150mg single dose',   times:1, days:1} },
+    { match:['ferrous','iron'],
+      adult:{dose:'200mg',               times:1, days:30},
+      child:{dose:'Syrup as directed',   times:1, days:30} },
+    { match:['folic'],
+      adult:{dose:'5mg',                 times:1, days:30} },
+    { match:['vitamin c','ascorbic'],
+      adult:{dose:'1 tab',               times:1, days:7},
+      child:{dose:'1 tab',               times:1, days:7} },
+    { match:['salbutamol','ventolin'],
+      adult:{dose:'4mg (or 2 puffs inhaler)', times:3, days:5},
+      child:{dose:'2mg (syrup 5ml)',     times:3, days:5} },
+  ];
+
+  function patientAgeYears() {
+    const p = state.patient || {};
+    if (p.date_of_birth) {
+      const a = (Date.now() - new Date(p.date_of_birth).getTime()) / 31557600000;
+      if (isFinite(a) && a >= 0 && a < 130) return a;
+    }
+    return null;
+  }
+
+  // 'adult' | 'child' — manual toggle wins, else patient record, else adult
+  state.dosingMode = null;
+  function effectiveDosingMode() {
+    if (state.dosingMode) return state.dosingMode;
+    const age = patientAgeYears();
+    if (age !== null) return age < 12 ? 'child' : 'adult';
+    if (state.patient && state.patient.is_child) return 'child';
+    return 'adult';
+  }
+
+  function findRegimen(name) {
+    const n = (name || '').toLowerCase();
+    if (n.length < 3) return null;
+    return DRUG_REGIMENS.find(r => r.match.some(m => n.includes(m))) || null;
+  }
+
+  // "three times daily" / "bd" / "every 8 hours" → 1–4
+  function parseTimesPerDay(text) {
+    const t = (text || '').toLowerCase();
+    if (/four times|4 times|\bqid\b|\bqds\b|every 6 ?h/.test(t)) return 4;
+    if (/three times|3 times|\btds\b|\btid\b|every 8 ?h/.test(t)) return 3;
+    if (/twice|two times|2 times|\bbd\b|\bbid\b|every 12 ?h/.test(t)) return 2;
+    if (/once|one time|1 time|\bod\b|single dose|\bstat\b/.test(t)) return 1;
+    return null;
+  }
+
+  // Fill dosage, frequency, intake times and duration for medication idx
+  // from its drug name. Returns true if anything was auto-filled.
+  function applyAutoRegimen(idx) {
+    const m = state.medications[idx];
+    if (!m || !m.drug) return false;
+    const mode = effectiveDosingMode();
+    const reg = findRegimen(m.drug);
+    if (reg) {
+      const r = (mode === 'child' && reg.child) ? reg.child : reg.adult;
+      m.dosage       = r.dose;
+      m.timesPerDay  = r.times;
+      m.intakeTimes  = [...DEFAULT_TIMES[r.times]];
+      m.durationDays = r.days;
+      m._autoNote = (mode === 'child')
+        ? (reg.child ? 'child dose' : 'adult dose — verify for child')
+        : 'adult dose';
+      return true;
+    }
+    // Fallback: formulary defaults, with the frequency parsed out of the text
+    const dl = m.drug.toLowerCase();
+    const f = state.formulary.find(d => (d.name || '').toLowerCase() === dl)
+           || state.formulary.find(d => d.generic_name && dl.includes(d.generic_name.toLowerCase()));
+    if (f && f.default_dosage) {
+      m.dosage       = f.default_dosage;
+      m.durationDays = f.default_days || m.durationDays;
+      const n = parseTimesPerDay(f.default_dosage);
+      if (n) { m.timesPerDay = n; m.intakeTimes = [...DEFAULT_TIMES[n]]; }
+      m._autoNote = 'formulary default';
+      return true;
+    }
+    return false;
+  }
+
+  // Dosing-mode toggle: re-applies regimens to drugs that were auto-filled
+  (function wireDosingToggle() {
+    const aBtn = document.getElementById('doseModeAdult');
+    const cBtn = document.getElementById('doseModeChild');
+    if (!aBtn || !cBtn) return;
+    function setMode(mode) {
+      state.dosingMode = mode;
+      aBtn.classList.toggle('active', mode === 'adult');
+      cBtn.classList.toggle('active', mode === 'child');
+      let changed = false;
+      state.medications.forEach((m, i) => {
+        if (m._autoNote && applyAutoRegimen(i)) changed = true;
+      });
+      if (changed) { autoSetExpectedRecovery(); renderMeds(); }
+    }
+    aBtn.onclick = () => setMode('adult');
+    cBtn.onclick = () => setMode('child');
+    // Pre-select from the patient record once their profile has loaded
+    window._syncDosingToggle = function() {
+      const mode = effectiveDosingMode();
+      aBtn.classList.toggle('active', mode === 'adult');
+      cBtn.classList.toggle('active', mode === 'child');
+    };
+  })();
+
   function addMedication() {
     state.medications.push({
       drug: '', dosage: '',
@@ -999,6 +1172,8 @@
           return `<div style="font-size:11px;color:${stockClr};background:${stockBg};padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px">
             <span class="material-icons-outlined" style="font-size:12px">inventory_2</span>${esc(stockTxt)}</div>`;
         })() : ''}
+        ${m._autoNote ? `<div style="font-size:11px;color:#1B5E20;background:#E8F5E9;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
+          <span class="material-icons-outlined" style="font-size:12px">bolt</span>Auto-filled (${esc(m._autoNote)}) — edit anything below if needed</div>` : ''}
 
         <div style="height:10px"></div>
         <div class="field-row">
@@ -1042,10 +1217,22 @@
       b.onclick = () => removeMedication(parseInt(b.dataset.rm,10)));
     ct.querySelectorAll('.drug-input').forEach(input => {
       input.addEventListener('input', e => onDrugInput(e, parseInt(input.dataset.idx,10)));
+      // Typed a name without picking from the menu (e.g. "panadol" then tapped
+      // away) — still auto-fill, but never clobber a dosage already entered.
+      input.addEventListener('change', () => {
+        const i = parseInt(input.dataset.idx,10);
+        const m = state.medications[i];
+        if (m && m.drug && !m.dosage && applyAutoRegimen(i)) {
+          autoSetExpectedRecovery();
+          renderMeds();
+        }
+      });
     });
     ct.querySelectorAll('.dose-input').forEach(input => {
       input.addEventListener('input', e => {
-        state.medications[parseInt(input.dataset.idx,10)].dosage = e.target.value;
+        const i = parseInt(input.dataset.idx,10);
+        state.medications[i].dosage = e.target.value;
+        state.medications[i]._autoNote = '';   // clinician took over — drop the auto badge
       });
     });
     ct.querySelectorAll('.days-input').forEach(input => {
@@ -1128,11 +1315,7 @@
         state.medications[idx].drug            = inv.item_name;
         state.medications[idx].inventoryItemId = inv.id;
         state.medications[idx].qtyToDeduct     = 1;
-        const fMatch = state.formulary.find(d => d.name.toLowerCase() === inv.item_name.toLowerCase());
-        if (fMatch) {
-          state.medications[idx].dosage       = fMatch.default_dosage || state.medications[idx].dosage;
-          state.medications[idx].durationDays = fMatch.default_days   || state.medications[idx].durationDays;
-        }
+        applyAutoRegimen(idx);
         menu.style.display = 'none';
         autoSetExpectedRecovery();
         renderMeds();
@@ -1143,9 +1326,8 @@
       el.onclick = () => {
         const drug = state.formulary.find(d => d.name === el.dataset.name);
         if (!drug) return;
-        state.medications[idx].drug            = drug.name;
-        state.medications[idx].dosage          = drug.default_dosage || state.medications[idx].dosage;
-        state.medications[idx].durationDays    = drug.default_days   || state.medications[idx].durationDays;
+        state.medications[idx].drug = drug.name;
+        applyAutoRegimen(idx);
         const invLink = state.clinicInventory.find(x =>
           x.item_type === 'medicine' && x.item_name.toLowerCase() === drug.name.toLowerCase()
         );

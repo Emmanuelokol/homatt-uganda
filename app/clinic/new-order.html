@@ -669,6 +669,15 @@
           <!-- Expected recovery (hidden input, auto-set from drug duration) -->
           <input id="expRecovery" type="date" style="display:none">
 
+          <!-- Dosing mode: pre-selected from the patient record; drives auto-filled
+               dose/frequency/duration when a drug is picked. Always editable. -->
+          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
+            <span class="material-icons-outlined" style="font-size:17px;color:#1B5E20">bolt</span>
+            <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px;flex:1">Auto-dose for</span>
+            <button type="button" id="doseModeAdult" class="sev-chip active" style="padding:7px 16px">Adult</button>
+            <button type="button" id="doseModeChild" class="sev-chip" style="padding:7px 16px">Child</button>
+          </div>
+
           <div id="medsContainer"></div>
 
           <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:#1B5E20;border:1.5px dashed #A5D6A7;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
