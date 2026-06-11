@@ -192,6 +192,10 @@
   // when the keyboard closes, which leaves the page shoved up with a big
   // blank area at the bottom. Restore it explicitly on every keyboard hide.
   function _resetDocumentScroll() {
+    // Clinic portal pages use the document as their scroll container (no fixed-height
+    // app-screen wrapper). Resetting scrollY there would snap the operator's scroll
+    // position back to the top every time the keyboard closes.
+    if (window.location.pathname.indexOf('/clinic/') !== -1) return;
     try {
       window.scrollTo(0, 0);
       if (document.scrollingElement) document.scrollingElement.scrollTop = 0;

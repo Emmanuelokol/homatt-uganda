@@ -2687,7 +2687,10 @@
   document.addEventListener('visibilitychange', function() {
     if (document.visibilityState === 'visible') refreshAll();
   });
-  window.addEventListener('focus', refreshAll);
+  // Note: window 'focus' is intentionally omitted — on Android WebView it fires
+  // when the keyboard opens/closes, triggering constant refreshAll() calls that
+  // interfere with the operator's scroll position. visibilitychange covers the
+  // app-returns-from-background case already.
   window.addEventListener('pageshow', function(e) { if (e.persisted) refreshAll(); });
 
   // ── Supabase Realtime ──
