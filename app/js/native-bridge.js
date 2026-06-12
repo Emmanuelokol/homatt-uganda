@@ -494,11 +494,38 @@
   };
 
   // ─── INIT ────────────────────────────────────────────────────────────────────
+  // ─── EXTERNAL LINK INTERCEPTOR ──────────────────────────────────────────────
+  // Capacitor's WebView swallows clicks on external <a href="https://..."> links
+  // and either loads them inside the app or does nothing. Using window.open with
+  // the '_system' target tells Android to hand the URL to the device's default
+  // browser (Chrome) instead — so Google Maps, WhatsApp, websites, etc. all open
+  // correctly. Works for target="_blank" links too.
+  function initExternalLinks() {
+    const appHost = window.location.hostname; // e.g. homatt-uganda-emmanuelokols-projects.vercel.app or localhost
+    document.addEventListener('click', function(e) {
+      const anchor = e.target && e.target.closest && e.target.closest('a[href]');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      // Only intercept fully-qualified external URLs (http / https)
+      if (!/^https?:\/\//i.test(href)) return;
+      try {
+        const url = new URL(href);
+        // Let internal app links (same host) load normally
+        if (url.hostname === appHost || url.hostname === 'localhost') return;
+      } catch(_) { return; }
+      // Open in Chrome / system browser
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(href, '_system');
+    }, true); // capturing so it fires before any onclick handlers
+  }
+
   function init() {
     initStatusBar();
     initBackButton();
     initNetwork();
     initKeyboard();
+    initExternalLinks();
     // Hide splash after a short delay to ensure content is visible
     if (document.readyState === 'complete') {
       hideSplash();
