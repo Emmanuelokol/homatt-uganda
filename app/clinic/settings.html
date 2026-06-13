@@ -460,6 +460,47 @@
         <div id="hoursContainer"></div>
       </div>
 
+      <!-- Change Password -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">lock</span> Change Password
+        </div>
+        <div class="form-row">
+          <label>Current Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="currentPwd" placeholder="Enter your current password" autocomplete="current-password">
+            <button type="button" onclick="togglePwd('currentPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>New Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="newPwd" placeholder="Min 8 characters" autocomplete="new-password">
+            <button type="button" onclick="togglePwd('newPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Confirm New Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="confirmPwd" placeholder="Repeat new password" autocomplete="new-password">
+            <button type="button" onclick="togglePwd('confirmPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div id="pwdMsg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="save-btn" id="changePwdBtn" onclick="changePassword()" style="background:#1565C0">
+          <span class="material-icons-outlined">lock_reset</span> Change Password
+        </button>
+      </div>
+
       <!-- Save -->
       <div style="display:flex;align-items:center;gap:14px;padding-bottom:32px">
         <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">
@@ -1341,6 +1382,63 @@ async function saveSettings() {
   msg.style.color = '#33691E';
   msg.textContent = 'Saved ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
   showToast('Clinic profile updated!', 'success');
+}
+
+// ── Password change ──
+function togglePwd(id, btn) {
+  var inp = document.getElementById(id);
+  var ico = btn.querySelector('.material-icons-outlined');
+  if (inp.type === 'password') { inp.type = 'text'; ico.textContent = 'visibility_off'; }
+  else                         { inp.type = 'password'; ico.textContent = 'visibility'; }
+}
+
+async function changePassword() {
+  var currentPwd = (document.getElementById('currentPwd').value || '').trim();
+  var newPwd     = (document.getElementById('newPwd').value || '').trim();
+  var confirmPwd = (document.getElementById('confirmPwd').value || '').trim();
+  var msg        = document.getElementById('pwdMsg');
+  var btn        = document.getElementById('changePwdBtn');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.color = ok ? '#1B5E20' : '#D32F2F';
+    msg.style.background = ok ? '#E8F5E9' : '#FFEBEE';
+    msg.style.padding = '10px 14px';
+    msg.style.borderRadius = '8px';
+    msg.style.display = 'block';
+  }
+
+  if (!currentPwd)            { showMsg('Enter your current password.', false); return; }
+  if (newPwd.length < 8)      { showMsg('New password must be at least 8 characters.', false); return; }
+  if (newPwd !== confirmPwd)  { showMsg('Passwords don\'t match — check and try again.', false); return; }
+  if (!_supa)                 { showMsg('Not connected. Try reloading.', false); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Verifying…';
+
+  try {
+    // Re-authenticate to verify the current password before changing it
+    var authData = await _supa.auth.getSession();
+    var email = authData && authData.data && authData.data.session && authData.data.session.user && authData.data.session.user.email;
+    if (!email) { showMsg('Could not read session email. Please sign out and back in.', false); return; }
+
+    var { error: signInErr } = await _supa.auth.signInWithPassword({ email: email, password: currentPwd });
+    if (signInErr) { showMsg('Current password is incorrect.', false); return; }
+
+    var { error: updateErr } = await _supa.auth.updateUser({ password: newPwd });
+    if (updateErr) { showMsg('Error: ' + updateErr.message, false); return; }
+
+    showMsg('Password changed successfully!', true);
+    document.getElementById('currentPwd').value = '';
+    document.getElementById('newPwd').value = '';
+    document.getElementById('confirmPwd').value = '';
+    showToast('Password updated!', 'success');
+  } catch(e) {
+    showMsg('Unexpected error: ' + (e.message || e), false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">lock_reset</span> Change Password';
+  }
 }
 </script>
 <script src="../js/native-bridge.js"></script>

@@ -689,7 +689,11 @@ body {
   /* Show hamburger, topbar shrinks */
   .sidebar-hamburger { display: flex; }
 
+  /* Pin topbar to top so it stays visible while scrolling */
   .admin-topbar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 200;
     padding: 10px 14px;
     gap: 8px;
   }
@@ -713,8 +717,8 @@ body {
   /* Stats grid: 2 columns on phone */
   .stats-grid { grid-template-columns: 1fr 1fr; }
 
-  /* Admin content: tighter padding */
-  .admin-content { padding: 14px; }
+  /* Admin content: compensate for fixed topbar, tighter side padding */
+  .admin-content { padding: 70px 14px 24px; }
 
   /* Tables: allow horizontal scroll */
   .admin-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
