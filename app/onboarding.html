@@ -225,6 +225,15 @@
       <div class="onboard-subtitle">This helps us personalise your health experience. You only need to do this once.</div>
     </div>
 
+    <!-- Auto-recognition banner: shown when a clinic already has this phone on file -->
+    <div id="knownBanner" style="display:none;background:linear-gradient(135deg,#E8F5E9,#F1F8E9);border:1px solid #A5D6A7;border-radius:14px;padding:14px 16px;margin-bottom:18px;align-items:flex-start;gap:10px">
+      <span class="material-icons-outlined" style="font-size:22px;color:#2E7D32;flex-shrink:0">verified_user</span>
+      <div style="font-size:13px;color:#1B5E20;line-height:1.5">
+        <strong id="knownBannerTitle">Welcome back!</strong>
+        <div id="knownBannerBody" style="margin-top:2px;color:#33691E"></div>
+      </div>
+    </div>
+
     <form id="onboardingForm" novalidate>
 
       <!-- Your Name -->
@@ -410,6 +419,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/identity.js"></script>
 <script src="js/onboarding.js"></script>
 <script src="js/onesignal.js"></script>
 <script src="js/native-bridge.js"></script>

@@ -903,6 +903,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (gp.name)     patientName  = gp.name;
         if (gp.phone)    patientPhone = gp.phone;
         if (gp.district) userDistrict = gp.district;
+
+        // If we know the phone but not the name, ask the unified identity
+        // spine — a clinic or earlier booking may already know who this is.
+        if (patientPhone && (!patientName || patientName === 'Customer') && typeof HomattIdentity !== 'undefined') {
+          try {
+            const who = await HomattIdentity.lookup(supabase, patientPhone);
+            if (who && who.found && who.full_name) {
+              patientName = who.full_name;
+              if (who.district && !userDistrict) userDistrict = who.district;
+            }
+          } catch(e) {}
+        }
       }
       // Remember this delivery address + phone for next time
       if (window.guestProfile) window.guestProfile.save({ address: addr, phone: patientPhone || '' });
@@ -975,6 +987,16 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Post-order cleanup: best-effort — errors here must NOT mask the success above.
       try {
+        // Remember this person centrally so their next order/booking is
+        // pre-filled and personalised (find-or-create by phone).
+        if (patientPhone && typeof HomattIdentity !== 'undefined') {
+          HomattIdentity.findOrRegister(supabase, {
+            phone:    patientPhone,
+            name:     patientName,
+            district: userDistrict || null,
+            source:   'shop',
+          });
+        }
         for (const item of cart) {
           supabase.rpc('deduct_stock', { item_id: item.id, qty: item.qty }).catch(() => {});
         }

@@ -96,6 +96,80 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // ── Auto-recognition by phone ──────────────────────────────────────────
+  // If a clinic (or an earlier booking/shop visit) already registered this
+  // phone, recognise the person the moment they type it and pre-fill their
+  // details. The DB trigger then links their clinic history to this account
+  // automatically when the profile is saved.
+  const phoneInput   = document.getElementById('phone');
+  const knownBanner  = document.getElementById('knownBanner');
+  let   _recognised  = false;
+
+  function applyKnownIdentity(who) {
+    if (!who || !who.found) return;
+    _recognised = true;
+
+    // Pre-fill only empty fields so we never clobber what the user typed.
+    if (who.full_name) {
+      const parts = who.full_name.trim().split(/\s+/);
+      const fn = document.getElementById('firstName');
+      const ln = document.getElementById('lastName');
+      if (fn && !fn.value) fn.value = parts.shift() || '';
+      if (ln && !ln.value && parts.length) ln.value = parts.join(' ');
+    }
+    if (who.date_of_birth) {
+      const dobEl = document.getElementById('dob');
+      if (dobEl && !dobEl.value) dobEl.value = who.date_of_birth;
+    }
+    if (who.sex) {
+      const btn = document.querySelector('.sex-btn[data-value="' + who.sex + '"]');
+      if (btn && !selectedSex) {
+        document.querySelectorAll('.sex-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedSex = who.sex;
+      }
+    }
+    if (who.district) {
+      const dEl = document.getElementById('district');
+      if (dEl && !dEl.value) {
+        const opt = Array.from(dEl.options).find(o => o.value.toLowerCase() === String(who.district).toLowerCase() || o.text.toLowerCase() === String(who.district).toLowerCase());
+        if (opt) dEl.value = opt.value;
+      }
+    }
+    if (who.city) {
+      const cEl = document.getElementById('city');
+      if (cEl && !cEl.value) cEl.value = who.city;
+    }
+
+    // Friendly banner
+    if (knownBanner) {
+      const name = (who.full_name || '').split(/\s+/)[0] || 'there';
+      document.getElementById('knownBannerTitle').textContent = 'Welcome back, ' + name + '!';
+      document.getElementById('knownBannerBody').textContent =
+        'We found your records and filled in what we already know — just check the details and confirm.';
+      knownBanner.style.display = 'flex';
+    }
+  }
+
+  if (phoneInput && global_HomattIdentity()) {
+    let _lkTimer = null;
+    const runLookup = async () => {
+      const HI = global_HomattIdentity();
+      if (!HI || !HI.normPhone(phoneInput.value)) return;
+      const who = await HI.lookup(supabase, phoneInput.value);
+      applyKnownIdentity(who);
+    };
+    phoneInput.addEventListener('blur', runLookup);
+    phoneInput.addEventListener('input', () => {
+      clearTimeout(_lkTimer);
+      if (HomattIdentity.normPhone(phoneInput.value)) _lkTimer = setTimeout(runLookup, 600);
+    });
+  }
+
+  function global_HomattIdentity() {
+    return (typeof HomattIdentity !== 'undefined') ? HomattIdentity : null;
+  }
+
   // ── Form submit ────────────────────────────────────────────────────────
   const errorEl   = document.getElementById('formError');
   const submitBtn = document.getElementById('submitBtn');
