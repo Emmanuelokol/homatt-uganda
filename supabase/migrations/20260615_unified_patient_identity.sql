@@ -314,12 +314,13 @@ create trigger trg_sync_clinic_patient_identity
 -- ── 6. Back-fill the directory from existing data (one-off, idempotent) ──
 insert into public.patient_directory
   (phone_norm, full_name, date_of_birth, sex, district, city, profile_id, first_seen_source)
-select
+select distinct on (public.homatt_norm_phone(p.phone_number))
   public.homatt_norm_phone(p.phone_number),
   nullif(trim(coalesce(p.first_name,'') || ' ' || coalesce(p.last_name,'')),''),
   p.dob, p.sex, p.district, p.city, p.id, 'app'
 from public.profiles p
 where public.homatt_norm_phone(p.phone_number) is not null
+order by public.homatt_norm_phone(p.phone_number), p.updated_at desc nulls last
 on conflict (phone_norm) do update
   set profile_id = coalesce(public.patient_directory.profile_id, excluded.profile_id),
       full_name  = coalesce(public.patient_directory.full_name, excluded.full_name);
