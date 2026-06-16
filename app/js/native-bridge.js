@@ -167,6 +167,22 @@
     if (!el || el === document.body) return;
     if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
 
+    // Bottom-sheets: always scroll .sheet-body directly instead of falling through
+    // to scrollIntoView(), which scrolls the document and exposes the black native
+    // background below the phone-frame on Android.
+    const sheet = el.closest && el.closest('.bottom-sheet');
+    if (sheet) {
+      const sheetBody = sheet.querySelector('.sheet-body');
+      if (sheetBody) {
+        const elRect = el.getBoundingClientRect();
+        const sbRect = sheetBody.getBoundingClientRect();
+        const targetTop = sheetBody.scrollTop + elRect.top - sbRect.top
+          - sheetBody.clientHeight / 2 + el.offsetHeight / 2;
+        sheetBody.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+        return;
+      }
+    }
+
     const scroller = _findScroller(el);
     if (scroller) {
       const elRect = el.getBoundingClientRect();

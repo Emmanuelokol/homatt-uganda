@@ -200,8 +200,8 @@ async function loadTickets() {
 }
 
 function renderTickets() {
-  const statusFilter = document.getElementById('filterStatus').value;
-  const categoryFilter = document.getElementById('filterCategory').value;
+  const statusFilter = (document.getElementById('filterStatus') || {}).value || '';
+  const categoryFilter = (document.getElementById('filterCategory') || {}).value || '';
   const filtered = allTickets.filter(t =>
     (!statusFilter || t.status === statusFilter) &&
     (!categoryFilter || t.category === categoryFilter)

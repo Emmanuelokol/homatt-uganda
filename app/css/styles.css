@@ -1071,8 +1071,13 @@ body.keyboard-open .bottom-sheet.open {
 }
 
 body.keyboard-open .sheet-body {
-  /* Smooth scrolling when navigating between inputs */
   scroll-behavior: smooth;
+  /* Push the bottom of the sheet-body down so it overflows its container,
+     making it scrollable even when the form is short. Without this,
+     _findScroller() can't find a scrollable ancestor and falls back to
+     scrollIntoView() which scrolls the document — showing the black native
+     background on Android. */
+  padding-bottom: 260px;
 }
 
 /* ============================================

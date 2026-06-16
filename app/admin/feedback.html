@@ -342,8 +342,8 @@ function computeKPIs() {
 }
 
 function renderPlatform() {
-  const statusF = document.getElementById('filterPlatformStatus').value;
-  const catF    = document.getElementById('filterPlatformCat').value;
+  const statusF = (document.getElementById('filterPlatformStatus') || {}).value || '';
+  const catF    = (document.getElementById('filterPlatformCat') || {}).value || '';
   const list = allPlatform.filter(x =>
     (!statusF || (x.status||'new') === statusF) &&
     (!catF || (x.category||'') === catF)
