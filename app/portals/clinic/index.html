@@ -57,6 +57,15 @@
       background: #FFEBEE; color: var(--accent-red);
       padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700;
     }
+    .topbar-back-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 12px; background: #F5F5F5; border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--text-secondary);
+      transition: all 0.2s; margin-right: 12px;
+    }
+    .topbar-back-btn:hover {
+      background: var(--border); color: var(--text-primary);
+    }
   </style>
 </head>
 <body>
@@ -125,8 +134,8 @@
       </div>
     </nav>
     <div class="sidebar-footer">
-      <button class="logout-btn" onclick="doLogout()">
-        <span class="material-icons-outlined">logout</span> Sign Out
+      <button class="logout-btn" onclick="backToLogin()">
+        <span class="material-icons-outlined">arrow_back</span> Back to Login
       </button>
     </div>
   </aside>
@@ -138,6 +147,10 @@
         <div class="topbar-subtitle" id="pageDate">Today — Loading...</div>
       </div>
       <div class="topbar-actions">
+        <button class="topbar-back-btn" onclick="backToLogin()">
+          <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
+          Back
+        </button>
         <button class="topbar-icon-btn"><span class="material-icons-outlined">notifications_outlined</span><span class="notif-dot"></span></button>
         <button class="avatar-btn" style="background:#1565C0" id="avatarBtn">D</button>
       </div>
@@ -335,7 +348,7 @@
           <div class="card">
             <div class="card-body">
               <div style="text-align:center;padding:20px 0">
-                <div style="width:72px;height:72px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;margin:0 auto 12px">D</div>
+                <div style="width:72px;height:72px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;margin:0 auto;margin-bottom:12px">D</div>
                 <div style="font-size:20px;font-weight:800">Dr. Sarah Nakamya</div>
                 <div style="font-size:13px;color:var(--text-light);margin-top:4px">General Medicine</div>
                 <span class="badge badge-verified" style="margin-top:8px">✓ License Verified</span>
