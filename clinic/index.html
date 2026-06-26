@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt — Clinic Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="../portals.css">
+  <style>
+    .patient-card {
+      background: white; border-radius: 12px; border: 1px solid var(--border);
+      padding: 16px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s;
+      display: flex; align-items: center; gap: 14px;
+    }
+    .patient-card:hover { border-color: var(--accent-blue); box-shadow: var(--shadow-md); }
+    .patient-card.selected { border-color: var(--accent-blue); background: #E3F2FD; }
+    .patient-card.priority { border-left: 4px solid var(--accent-red); }
+    .patient-avatar {
+      width: 44px; height: 44px; border-radius: 50%; background: #E3F2FD;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 700; color: var(--accent-blue); flex-shrink: 0;
+    }
+    .patient-info { flex: 1; }
+    .patient-name { font-size: 14px; font-weight: 700; }
+    .patient-meta { font-size: 12px; color: var(--text-light); margin-top: 2px; }
+    .patient-time { font-size: 11px; color: var(--text-light); }
+    .ai-diag-card {
+      background: linear-gradient(135deg, #E3F2FD, #BBDEFB);
+      border-radius: 12px; padding: 20px; margin-bottom: 16px;
+    }
+    .ai-diag-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent-blue); margin-bottom: 8px; }
+    .ai-diag-name { font-size: 22px; font-weight: 800; color: var(--text-dark); }
+    .ai-confidence { font-size: 13px; color: var(--accent-blue); margin-top: 4px; font-weight: 600; }
+    .drug-builder-row {
+      display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 40px;
+      gap: 8px; align-items: center; margin-bottom: 8px;
+    }
+    .remove-drug-btn {
+      width: 32px; height: 32px; border-radius: 50%; background: #FFEBEE;
+      border: none; color: var(--accent-red); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .rx-preview {
+      background: #F9F9F9; border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px; font-size: 13px; white-space: pre-wrap;
+      font-family: 'Courier New', monospace; max-height: 300px; overflow-y: auto;
+    }
+    .scan-success {
+      background: var(--brand-pale); border: 2px solid var(--brand-primary);
+      border-radius: 12px; padding: 24px; text-align: center;
+      display: none;
+    }
+    .scan-success .material-icons-outlined { font-size: 48px; color: var(--brand-primary); }
+    .urgent-flag {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #FFEBEE; color: var(--accent-red);
+      padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700;
+    }
+    .qr-scan-box {
+      border: 3px dashed var(--border);
+      border-radius: 12px;
+      padding: 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: var(--bg);
+    }
+    .qr-scan-box:hover {
+      border-color: var(--brand-primary);
+      background: var(--brand-pale);
+    }
+    .qr-scan-box .material-icons-outlined {
+      font-size: 48px;
+      color: var(--text-light);
+      display: block;
+      margin-bottom: 8px;
+    }
+    .empty-state {
+      text-align: center;
+      padding: 48px 24px;
+      color: var(--text-light);
+    }
+    .empty-state .material-icons-outlined {
+      font-size: 48px;
+      opacity: 0.3;
+      display: block;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon" style="background:#1565C0">
+        <span class="material-icons-outlined">local_hospital</span>
+      </div>
+      <div class="login-logo-name">Clinic Portal</div>
+    </div>
+    <div class="login-subtitle">Homatt Health — Doctor Dashboard</div>
+    <div class="login-field">
+      <label>Doctor Email / Clinic ID</label>
+      <input type="email" id="loginEmail" placeholder="doctor@clinic.ug">
+    </div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="••••••••">
+    </div>
+    <div class="login-error" id="loginError">Invalid credentials.</div>
+    <button class="login-btn" onclick="doLogin()" style="background:#1565C0">Sign In</button>
+    <div class="login-divider">or</div>
+    <button class="demo-btn" onclick="enterDemo()" style="color:#1565C0;border-color:#1565C0">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">science</span>
+      Demo Mode — No Login Required
+    </button>
+    <div class="login-back"><a href="../">← Back to Portal Hub</a></div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="appLayout" class="portal-layout" style="display:none">
+
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge">
+        <div class="logo-icon" style="background:#1565C0">
+          <span class="material-icons-outlined">local_hospital</span>
+        </div>
+        <div class="logo-text">
+          <span class="logo-name">Homatt</span>
+          <span class="logo-tag">Clinic Portal</span>
+        </div>
+      </div>
+    </div>
+    <div class="sidebar-user">
+      <div class="s-user-name" id="sDocName">Dr. Sarah Nakamya</div>
+      <div class="s-user-role">General Medicine · <span id="sClinicName">Kampala Medical Center</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" onclick="showPage('queue',this)">
+        <span class="material-icons-outlined">queue</span> Patient Queue
+        <span class="nav-badge" id="badgeQueue">3</span>
+      </div>
+      <div class="nav-item" onclick="showPage('scan',this)">
+        <span class="material-icons-outlined">qr_code_scanner</span> QR Scanner
+      </div>
+      <div class="nav-item" onclick="showPage('prescriptions',this)">
+        <span class="material-icons-outlined">medication</span> My Prescriptions
+      </div>
+      <div class="nav-item" onclick="showPage('profile',this)">
+        <span class="material-icons-outlined">badge</span> My Profile
+      </div>
+    </nav>
+    <div class="sidebar-footer">
+      <button class="logout-btn" onclick="backToLogin()">
+        <span class="material-icons-outlined">arrow_back</span> Back to Login
+      </button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <div class="topbar">
+      <div>
+        <div class="topbar-title" id="pageTitle">Patient Queue</div>
+        <div class="topbar-subtitle" id="pageDate">Today — Loading...</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-icon-btn"><span class="material-icons-outlined">notifications_outlined</span><span class="notif-dot"></span></button>
+        <button class="avatar-btn" style="background:#1565C0" id="avatarBtn">D</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+
+      <!-- QUEUE -->
+      <div class="page active" id="page-queue">
+        <div class="demo-banner">
+          <span class="material-icons-outlined">science</span>
+          Demo Mode — Click any patient to review their AI diagnosis and issue a prescription.
+        </div>
+
+        <div class="grid-2 mt-16" style="margin-bottom:20px">
+          <div class="stat-card">
+            <div class="stat-icon blue"><span class="material-icons-outlined">pending_actions</span></div>
+            <div class="stat-info"><div class="stat-value" id="qPending">3</div><div class="stat-label">Awaiting QR Scan</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><span class="material-icons-outlined">check_circle</span></div>
+            <div class="stat-info"><div class="stat-value" id="qCompleted">5</div><div class="stat-label">Completed Today</div></div>
+          </div>
+        </div>
+
+        <div class="section-header">
+          <div class="section-title">Pending Patients</div>
+        </div>
+
+        <div id="patientQueue"></div>
+      </div>
+
+      <!-- QR SCANNER -->
+      <div class="page" id="page-scan">
+        <div class="section-header">
+          <div class="section-title">QR Code Scanner</div>
+          <div class="section-sub">Scan patient's booking QR code on arrival</div>
+        </div>
+        <div class="grid-2">
+          <div>
+            <div class="qr-scan-box" onclick="simulateScan()">
+              <span class="material-icons-outlined">qr_code_scanner</span>
+              <p style="font-size:14px;font-weight:600;margin-bottom:4px">Tap to Simulate QR Scan</p>
+              <p>Point camera at patient's booking QR code</p>
+            </div>
+          </div>
+          <div>
+            <div class="scan-success" id="scanSuccess">
+              <span class="material-icons-outlined">check_circle</span>
+              <h3 style="margin:12px 0 4px;font-size:18px;color:var(--brand-primary)">Patient Found!</h3>
+              <p id="scanPatientName" style="font-size:15px;font-weight:700;margin-bottom:8px">—</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRESCRIPTIONS -->
+      <div class="page" id="page-prescriptions">
+        <div class="section-header">
+          <div class="section-title">My Issued Prescriptions</div>
+        </div>
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Rx ID</th><th>Patient</th><th>Status</th><th>Issued</th></tr></thead>
+              <tbody id="myRxTable"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- PROFILE -->
+      <div class="page" id="page-profile">
+        <div class="section-header"><div class="section-title">Doctor Profile</div></div>
+        <div style="max-width:500px">
+          <div class="card">
+            <div class="card-body">
+              <div style="text-align:center;padding:20px 0">
+                <div style="width:72px;height:72px;background:#1565C0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;color:white;margin:0 auto;margin-bottom:12px">D</div>
+                <div style="font-size:20px;font-weight:800">Dr. Sarah Nakamya</div>
+                <div style="font-size:13px;color:var(--text-light);margin-top:4px">General Medicine</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="clinic.js"></script>
+</body>
+</html>
