@@ -3,7 +3,7 @@
  */
 
 const SUPABASE_URL  = 'https://kgkdiykzmqjougwzzewi.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57j[...]
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 let isDemoMode = false;
@@ -39,11 +39,11 @@ const DEMO_QUEUE = [
 ];
 
 const DEMO_RX = [
-  { id:'RX-001', patient_name:'Sarah Nalwoga', final_diagnosis:'Pneumonia', ai_diagnosis_confirmed:true, drugs:[{generic_name:'Amoxicillin',strength:'500mg',frequency:'3x daily',duration:'7 days'}], status:'dispensed', created_at:'2026-03-02T10:30:00Z' },
-  { id:'RX-002', patient_name:'Grace Atim',    final_diagnosis:'Hypertensive Crisis', ai_diagnosis_confirmed:false, drugs:[{generic_name:'Amlodipine',strength:'5mg',frequency:'1x daily',duration:'30 days'}], status:'issued', created_at:'2026-03-01T17:00:00Z' },
+  { id:'RX-001', patient_name:'Sarah Nalwoga', final_diagnosis:'Pneumonia', ai_diagnosis_confirmed:true, drugs:[{generic_name:'Amoxicillin',strength:'500mg',frequency:'3x daily',duration:'7 days'}[...]
+  { id:'RX-002', patient_name:'Grace Atim',    final_diagnosis:'Hypertensive Crisis', ai_diagnosis_confirmed:false, drugs:[{generic_name:'Amlodipine',strength:'5mg',frequency:'1x daily',duration:'[...]
 ];
 
-// ── AUTH ─────────────────────────────────────────────────────────────────────
+// ── AUTH ────────────────────────────────────────────────────────────
 
 async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
@@ -66,6 +66,15 @@ function doLogout() {
   location.href = '../';
 }
 
+function backToLogin() {
+  document.getElementById('appLayout').style.display = 'none';
+  document.getElementById('loginScreen').style.display = 'block';
+  document.getElementById('loginEmail').value = '';
+  document.getElementById('loginPassword').value = '';
+  document.getElementById('loginError').classList.remove('visible');
+  isDemoMode = false;
+}
+
 function launchApp(user) {
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appLayout').style.display   = 'flex';
@@ -75,7 +84,7 @@ function launchApp(user) {
   loadData();
 }
 
-// ── PAGE NAV ──────────────────────────────────────────────────────────────────
+// ── PAGE NAV ───────────────────────────────────────────────────────────
 
 function showPage(name, el) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -86,7 +95,7 @@ function showPage(name, el) {
     { queue:'Patient Queue', scan:'QR Scanner', prescriptions:'My Prescriptions', profile:'My Profile' }[name] || name;
 }
 
-// ── DATA ──────────────────────────────────────────────────────────────────────
+// ── DATA ────────────────────────────────────────────────────────────
 
 async function loadData() {
   let queue, rxs;
@@ -107,7 +116,7 @@ async function loadData() {
   document.getElementById('qPending').textContent = queue.filter(p => p.status !== 'completed').length;
 }
 
-// ── RENDER QUEUE ──────────────────────────────────────────────────────────────
+// ── RENDER QUEUE ─────────────────────────────────────────────────────────
 
 function renderQueue(patients) {
   const el = document.getElementById('patientQueue');
@@ -126,7 +135,7 @@ function renderQueue(patients) {
             ${isUrgent ? `<span class="urgent-flag"><span class="material-icons-outlined" style="font-size:11px">emergency</span>${p.urgency_level.toUpperCase()}</span>` : ''}
           </div>
           <div class="patient-meta">${p.patient_age||'?'}${p.patient_sex?'/'+p.patient_sex[0].toUpperCase():''} · AI: ${p.ai_diagnosis}</div>
-          <div class="patient-time">${new Date(p.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})} · <span class="code-badge" style="font-size:10px">${p.booking_code}</span></div>
+          <div class="patient-time">${new Date(p.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'})} · <span class="code-badge" style="font-size:10px">${p.booking_code}</s[...]
         </div>
         <div>
           <span class="badge ${p.status==='confirmed'?'badge-confirmed':'badge-pending'}">${p.status}</span>
@@ -186,7 +195,7 @@ function closePatient() {
   document.getElementById('patientPanel').style.display = 'none';
 }
 
-// ── DRUG BUILDER ──────────────────────────────────────────────────────────────
+// ── DRUG BUILDER ─────────────────────────────────────────────────────────
 
 function addDrugRow() {
   const id = ++drugCount;
@@ -226,7 +235,7 @@ function getDrugs() {
   return drugs;
 }
 
-// ── ISSUE PRESCRIPTION ────────────────────────────────────────────────────────
+// ── ISSUE PRESCRIPTION ───────────────────────────────────────────────────────
 
 async function issuePrescription() {
   if (!selectedPatient) return;
@@ -296,7 +305,7 @@ ${'═'.repeat(40)}
   document.getElementById('rxModal').classList.remove('hidden');
 
   // Add to local list
-  myPrescriptions.unshift({ id: rxId, patient_name: selectedPatient.patient_name, final_diagnosis: finalDiag, ai_diagnosis_confirmed: aiConfirmed, drugs, status: 'issued', created_at: now.toISOString() });
+  myPrescriptions.unshift({ id: rxId, patient_name: selectedPatient.patient_name, final_diagnosis: finalDiag, ai_diagnosis_confirmed: aiConfirmed, drugs, status: 'issued', created_at: now.toISOSt[...]
   renderRxTable(myPrescriptions);
   closePatient();
 }
@@ -305,7 +314,7 @@ function closeRxModal() {
   document.getElementById('rxModal').classList.add('hidden');
 }
 
-// ── QR SCANNER ────────────────────────────────────────────────────────────────
+// ── QR SCANNER ──────────────────────────────────────────────────────────
 
 let scannedPatient = null;
 
@@ -356,7 +365,7 @@ function renderRxTable(rxs) {
   `).join('');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+// ── INIT ────────────────────────────────────────────────────────────
 
 (async () => {
   const { data: { session } } = await sb.auth.getSession();
