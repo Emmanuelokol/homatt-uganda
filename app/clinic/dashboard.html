@@ -1206,7 +1206,7 @@
     try {
       var isPhone = /^[\d\+]/.test(q);
       var qry = supabase.from('clinic_diagnoses')
-        .select('id,patient_name,patient_phone,confirmed_diagnosis,severity,total_charged_ugx,payment_status,created_at,patient_type')
+        .select('id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,course_completed,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at')
         .eq('clinic_id', clinicId)
         .order('created_at', {ascending:false})
         .limit(60);
@@ -1259,27 +1259,116 @@
     if (!g) return;
     if (nameEl) nameEl.textContent = g.name || 'Patient';
     if (metaEl) metaEl.textContent = (g.phone ? g.phone + ' · ' : '') + g.records.length + ' visit' + (g.records.length !== 1 ? 's' : '');
+    // This is a read-only history view — hide the active-patient follow-up footer
+    // (it's wired to a different patient context and would be stale here).
+    var histFooter = document.getElementById('histModalFooter');
+    if (histFooter) histFooter.style.display = 'none';
     modal.style.display = 'flex';
     bodyEl.innerHTML = g.records.map(function(c, i) {
-      var d = new Date(c.created_at);
-      var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-      var timeStr = d.toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
-      var paid = c.payment_status==='paid'
-        ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
-        : c.payment_status==='waived'
-        ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
-        : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>';
-      var fee = c.total_charged_ugx ? 'UGX ' + fmtUGX(c.total_charged_ugx) : '';
-      return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(i===0?';border-left:4px solid #1565C0':'')+'">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-          +'<div style="font-weight:700;font-size:14px">Visit '+(g.records.length-i)+' — '+esc(dateStr)+' at '+esc(timeStr)+'</div>'
-          +(fee?'<div style="font-size:13px;font-weight:600;color:#1B5E20">'+esc(fee)+' '+paid+'</div>':'')
-        +'</div>'
-        +'<div style="font-size:13px;color:#424242;margin-bottom:4px"><strong>Diagnosis:</strong> '+esc(c.confirmed_diagnosis||'Pending')+'</div>'
-        +(c.severity?'<div style="font-size:12px;color:#9AA0A6">Severity: '+esc(c.severity)+'</div>':'')
-        +(c.patient_type?'<div style="font-size:12px;color:#9AA0A6">Type: '+esc(c.patient_type)+'</div>':'')
-        +'</div>';
+      return renderHistVisitCard(c, g.records.length - i, i === 0);
     }).join('');
+  }
+
+  // Full clinical + financial detail for one past visit in the Patient History modal.
+  // Shows diagnosis, what was found (clinical findings), lab tests + results,
+  // medicines given, treatment plan, patient instructions, whether the course was
+  // completed, the next return visit, and the full bill / payment status.
+  function renderHistVisitCard(c, visitNum, isLatest) {
+    var d = new Date(c.created_at);
+    var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+    var timeStr = d.toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+
+    var total   = Number(c.total_charged_ugx) || 0;
+    var paidAmt = Number(c.amount_paid) || 0;
+    var balance = Math.max(0, total - paidAmt);
+    var payBadge = c.payment_status==='paid'
+      ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+      : c.payment_status==='waived'
+      ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
+      : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">'+((balance>0&&paidAmt>0)?'PART-PAID':'PENDING')+'</span>';
+
+    // Free-text / list section helper — hides itself when there's no value.
+    function sect(label, value) {
+      if (value === null || value === undefined) return '';
+      var v = value;
+      if (Array.isArray(v)) v = v.filter(Boolean).join(', ');
+      else if (typeof v === 'object') {
+        try { v = (v.procedures || []).join(', ') + (v.notes ? ' — ' + v.notes : ''); }
+        catch(e) { v = JSON.stringify(v); }
+      }
+      v = String(v).trim();
+      if (!v) return '';
+      return '<div style="margin-bottom:8px">'
+        +'<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px">'+label+'</div>'
+        +'<div style="font-size:13px;color:#333;white-space:pre-line">'+esc(v)+'</div>'
+      +'</div>';
+    }
+
+    // Treatment completion status
+    var courseChip = c.course_completed
+      ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> Course completed</span>'
+      : '<span style="background:#FFF8E1;color:#E65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">pending</span> Treatment ongoing</span>';
+
+    // Next return visit
+    var followBlock = '';
+    if (c.follow_up_days && c.follow_up_days > 0) {
+      var due = new Date(d.getTime() + c.follow_up_days * 86400000);
+      var dueStr = due.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+      followBlock = '<div style="font-size:12px;color:#1565C0;margin-top:6px;margin-bottom:8px"><span class="material-icons-outlined" style="font-size:14px;vertical-align:-3px">event_repeat</span> Return by '+esc(dueStr)
+        + (c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '') + '</div>';
+    }
+
+    // Medicines given
+    var medsBlock = '<div style="margin-bottom:8px">'
+      +'<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.3px;text-transform:uppercase;margin-bottom:4px">Medicines given</div>'
+      + renderMedsList(c.prescription_items)
+      +'</div>';
+
+    // Financial breakdown
+    function feeRow(label, amt){ return amt > 0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:#5F6368;margin-bottom:2px"><span>'+label+'</span><span>UGX '+fmtUGX(amt)+'</span></div>' : ''; }
+    var feeRows = feeRow('Consultation', Number(c.consultation_fee_ugx)||0)
+      + feeRow('Lab / tests', Number(c.lab_fee_ugx)||0)
+      + feeRow('Medicines', Number(c.meds_fee_ugx)||0);
+    var financialBlock = total > 0
+      ? '<div style="background:#FAFAFA;border:1px solid #ECECEC;border-radius:10px;padding:10px 12px;margin-top:10px">'
+          + feeRows
+          + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#212121;border-top:1px solid #E0E0E0;margin-top:4px;padding-top:4px"><span>Total billed</span><span>UGX '+fmtUGX(total)+'</span></div>'
+          + (paidAmt>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:#1B5E20"><span>Paid</span><span>UGX '+fmtUGX(paidAmt)+'</span></div>' : '')
+          + (balance>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#E65100"><span>Balance due</span><span>UGX '+fmtUGX(balance)+'</span></div>' : '')
+        +'</div>'
+      : '';
+
+    // lab_results is often stored identical to clinical_findings — only show it
+    // separately when it actually differs, to avoid repeating the same text.
+    var labResultsTxt = (c.lab_results && c.lab_results !== c.clinical_findings) ? c.lab_results : '';
+    // treatment_plan is auto-generated from the meds list, so skip it when we
+    // already render the structured medicines block above.
+    var planTxt = (Array.isArray(c.prescription_items) && c.prescription_items.length) ? '' : c.treatment_plan;
+
+    return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(isLatest?';border-left:4px solid #1565C0':'')+'">'
+      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">'
+        +'<div style="font-weight:700;font-size:14px">Visit '+visitNum+' — '+esc(dateStr)
+          +'<div style="font-size:11px;color:#9AA0A6;font-weight:500">'+esc(timeStr)+'</div></div>'
+        +'<div style="text-align:right;flex-shrink:0">'+payBadge
+          +(total?'<div style="font-size:12px;font-weight:600;color:#1B5E20;margin-top:3px">UGX '+fmtUGX(total)+'</div>':'')
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
+        +'<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700">'+esc(c.confirmed_diagnosis||'Pending')+'</span>'
+        +(c.severity?'<span style="background:#F3E5F5;color:#6A1B9A;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">'+esc(c.severity)+'</span>':'')
+        +(c.patient_type?'<span style="background:#ECEFF1;color:#37474F;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">'+esc(c.patient_type)+(c.ward?' · '+esc(c.ward):'')+'</span>':'')
+        +courseChip
+      +'</div>'
+      + sect('Clinical findings / what was found', c.clinical_findings)
+      + sect('Lab tests ordered', c.lab_tests_ordered)
+      + sect('Lab results', labResultsTxt)
+      + medsBlock
+      + sect('Treatment plan', planTxt)
+      + sect('Patient instructions', c.patient_instructions)
+      + sect('Expected recovery by', c.expected_recovery ? new Date(c.expected_recovery).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '')
+      + followBlock
+      + financialBlock
+    +'</div>';
   }
 
   var histModal = document.getElementById('histModal');
