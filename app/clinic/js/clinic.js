@@ -89,24 +89,60 @@ function setupClinicMobileNav() {
   );
 }
 
+async function clinicSignOut() {
+  // Sign out of Supabase auth so the session token is invalidated
+  const cfg = window.HOMATT_CONFIG || {};
+  if (window.supabase && cfg.SUPABASE_URL) {
+    try {
+      const tmpSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
+      });
+      await tmpSupa.auth.signOut();
+    } catch(e) {}
+  }
+  localStorage.removeItem('clinic_session');
+  window.location.href = 'index.html';
+}
+
 function setupClinicLogout() {
   // Setup mobile nav (called from every portal page after DOMContentLoaded)
   setupClinicMobileNav();
 
-  document.getElementById('clinicLogoutBtn')?.addEventListener('click', async () => {
-    // Sign out of Supabase auth so the session token is invalidated
-    const cfg = window.HOMATT_CONFIG || {};
-    if (window.supabase && cfg.SUPABASE_URL) {
-      try {
-        const tmpSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-          auth: { storageKey: 'sb-homatt-clinic-auth' }
-        });
-        await tmpSupa.auth.signOut();
-      } catch(e) {}
-    }
-    localStorage.removeItem('clinic_session');
-    window.location.href = 'index.html';
-  });
+  document.getElementById('clinicLogoutBtn')?.addEventListener('click', clinicSignOut);
+
+  // Inject an always-visible exit control into the top bar. Without this the only
+  // way out is the Sign Out button at the bottom of the sidebar, which is hidden
+  // behind the hamburger on mobile — so a demo user has no obvious way back to
+  // the login screen to sign in with their live account.
+  _injectClinicTopbarExit();
+}
+
+function _injectClinicTopbarExit() {
+  const right = document.querySelector('.admin-topbar-right');
+  if (!right || document.getElementById('clinicTopbarExitBtn')) return;
+
+  let session = null;
+  try { session = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
+  const isDemo = !!(session && session.demo);
+
+  // "DEMO" badge so it is obvious this is not the live account
+  if (isDemo) {
+    const badge = document.createElement('span');
+    badge.id = 'clinicDemoBadge';
+    badge.className = 'clinic-demo-badge';
+    badge.textContent = 'DEMO';
+    right.insertBefore(badge, right.firstChild);
+  }
+
+  const btn = document.createElement('button');
+  btn.id = 'clinicTopbarExitBtn';
+  btn.type = 'button';
+  btn.className = 'clinic-exit-btn' + (isDemo ? ' demo' : '');
+  btn.innerHTML =
+    '<span class="material-icons-outlined" style="font-size:18px">logout</span>' +
+    '<span class="exit-label">' + (isDemo ? 'Exit Demo' : 'Sign Out') + '</span>';
+  btn.addEventListener('click', clinicSignOut);
+  right.appendChild(btn);
 }
 
 /**
