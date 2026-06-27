@@ -450,6 +450,7 @@
     if (medProfile && state.patient) {
       if (medProfile.date_of_birth != null) state.patient.date_of_birth = medProfile.date_of_birth;
       if (medProfile.is_child != null)      state.patient.is_child      = medProfile.is_child;
+      if (medProfile.sex != null)           state.patient.sex           = medProfile.sex;
       if (window._syncDosingToggle) window._syncDosingToggle();
     }
     renderProfileCard(card, merged, null);
@@ -969,49 +970,59 @@
   // The clinician just types the drug; dose, times/day, intake times and
   // duration fill themselves from standard Uganda outpatient regimens —
   // adult or child depending on the patient. Every field stays editable.
+  // Each regimen may carry adult / child / infant (<1 yr) doses. `preg:true`
+  // flags drugs to avoid/verify in pregnancy (shown for female & unknown-sex
+  // adults). `wt:true` marks weight-based paediatric dosing where an estimated
+  // weight hint is most useful.
   const DRUG_REGIMENS = [
     { match:['paracetamol','panadol','acetaminophen'],
       adult:{dose:'1g (2 tabs of 500mg)', times:3, days:3},
-      child:{dose:'250mg (syrup 5–10ml)', times:3, days:3} },
+      child:{dose:'15mg/kg per dose (syrup 120mg/5ml)', times:3, days:3, wt:true},
+      infant:{dose:'15mg/kg (syrup 120mg/5ml)', times:3, days:3, wt:true} },
     { match:['coartem','artemether','lumefantrine','duo-cotecxin','artefan'],
       adult:{dose:'4 tabs per dose',      times:2, days:3},
-      child:{dose:'1–2 tabs per dose (by weight)', times:2, days:3} },
+      child:{dose:'1–3 tabs per dose by weight (5–14kg:1, 15–24kg:2, 25–34kg:3)', times:2, days:3, wt:true},
+      infant:{dose:'1 tab per dose (5–14kg)', times:2, days:3, wt:true} },
     { match:['amoxicillin','amoxil','amoxyl'],
       adult:{dose:'500mg',               times:3, days:5},
-      child:{dose:'250mg (syrup 5ml of 250mg/5ml)', times:3, days:5} },
+      child:{dose:'25mg/kg per dose (syrup 250mg/5ml)', times:3, days:5, wt:true},
+      infant:{dose:'62.5–125mg (syrup 125mg/5ml)', times:3, days:5, wt:true} },
     { match:['metronidazole','flagyl'],
       adult:{dose:'400mg',               times:3, days:7},
-      child:{dose:'100–200mg (7.5mg/kg)', times:3, days:7} },
+      child:{dose:'7.5mg/kg per dose',   times:3, days:7, wt:true} },
     { match:['ciprofloxacin','cipro'],
-      adult:{dose:'500mg',               times:2, days:7} },
+      adult:{dose:'500mg',               times:2, days:7, preg:true} },
     { match:['doxycycline','doxy'],
-      adult:{dose:'100mg',               times:2, days:7} },
+      adult:{dose:'100mg',               times:2, days:7, preg:true} },
     { match:['cotrimoxazole','septrin','co-trimoxazole','bactrim'],
       adult:{dose:'960mg (2 tabs of 480mg)', times:2, days:5},
-      child:{dose:'240mg (syrup 5ml)',   times:2, days:5} },
+      child:{dose:'24mg/kg per dose (syrup 240mg/5ml)', times:2, days:5, wt:true},
+      infant:{dose:'120mg (syrup 2.5ml)', times:2, days:5} },
     { match:['azithromycin','zithromax'],
       adult:{dose:'500mg',               times:1, days:3},
-      child:{dose:'10mg/kg',             times:1, days:3} },
+      child:{dose:'10mg/kg',             times:1, days:3, wt:true} },
     { match:['erythromycin'],
       adult:{dose:'500mg',               times:4, days:5},
-      child:{dose:'125–250mg',           times:4, days:5} },
+      child:{dose:'12.5mg/kg per dose',  times:4, days:5, wt:true} },
     { match:['ibuprofen','brufen'],
       adult:{dose:'400mg',               times:3, days:3},
-      child:{dose:'10mg/kg (syrup)',     times:3, days:3} },
+      child:{dose:'10mg/kg (syrup 100mg/5ml)', times:3, days:3, wt:true, preg:false} },
     { match:['diclofenac'],
-      adult:{dose:'50mg',                times:2, days:5} },
+      adult:{dose:'50mg',                times:2, days:5, preg:true} },
     { match:['ors','oral rehydration'],
-      adult:{dose:'1 sachet after each loose stool', times:3, days:3},
-      child:{dose:'½–1 sachet after each loose stool', times:3, days:3} },
+      adult:{dose:'1 sachet in 1L water, after each loose stool', times:3, days:3},
+      child:{dose:'½–1 sachet, after each loose stool', times:3, days:3},
+      infant:{dose:'¼–½ sachet, 5ml/kg after each stool', times:3, days:3, wt:true} },
     { match:['zinc'],
       adult:{dose:'20mg',                times:1, days:10},
-      child:{dose:'10–20mg',             times:1, days:10} },
+      child:{dose:'20mg (10mg if under 6 months)', times:1, days:10},
+      infant:{dose:'10mg',               times:1, days:10} },
     { match:['cetirizine','zyrtec'],
       adult:{dose:'10mg',                times:1, days:5},
       child:{dose:'5mg (syrup 5ml)',     times:1, days:5} },
     { match:['chlorpheniramine','piriton'],
       adult:{dose:'4mg',                 times:3, days:5},
-      child:{dose:'2mg (syrup 5ml)',     times:2, days:5} },
+      child:{dose:'1–2mg (syrup 2.5–5ml)', times:2, days:5} },
     { match:['omeprazole','losec'],
       adult:{dose:'20mg',                times:1, days:14} },
     { match:['metformin','glucophage'],
@@ -1019,16 +1030,16 @@
     { match:['amlodipine','norvasc'],
       adult:{dose:'5mg',                 times:1, days:30} },
     { match:['albendazole','zentel'],
-      adult:{dose:'400mg single dose',   times:1, days:1},
+      adult:{dose:'400mg single dose',   times:1, days:1, preg:true},
       child:{dose:'400mg single dose (200mg if 1–2 yrs)', times:1, days:1} },
     { match:['mebendazole','vermox'],
-      adult:{dose:'100mg',               times:2, days:3},
+      adult:{dose:'100mg',               times:2, days:3, preg:true},
       child:{dose:'100mg',               times:2, days:3} },
     { match:['fluconazole','diflucan'],
-      adult:{dose:'150mg single dose',   times:1, days:1} },
+      adult:{dose:'150mg single dose',   times:1, days:1, preg:true} },
     { match:['ferrous','iron'],
       adult:{dose:'200mg',               times:1, days:30},
-      child:{dose:'Syrup as directed',   times:1, days:30} },
+      child:{dose:'3mg/kg elemental iron (syrup)', times:1, days:30, wt:true} },
     { match:['folic'],
       adult:{dose:'5mg',                 times:1, days:30} },
     { match:['vitamin c','ascorbic'],
@@ -1036,10 +1047,54 @@
       child:{dose:'1 tab',               times:1, days:7} },
     { match:['salbutamol','ventolin'],
       adult:{dose:'4mg (or 2 puffs inhaler)', times:3, days:5},
-      child:{dose:'2mg (syrup 5ml)',     times:3, days:5} },
+      child:{dose:'2mg (syrup 5ml) or 1–2 puffs', times:3, days:5} },
+    // ── Additional common Uganda OPD drugs ──
+    { match:['nystatin'],
+      adult:{dose:'1–2 tabs / 5ml suspension', times:4, days:7},
+      child:{dose:'1ml suspension to each side of mouth', times:4, days:7},
+      infant:{dose:'1ml suspension', times:4, days:7} },
+    { match:['nifedipine'],
+      adult:{dose:'20mg',                times:2, days:30} },
+    { match:['hydrochlorothiazide','hctz'],
+      adult:{dose:'25mg',                times:1, days:30} },
+    { match:['prednisolone','prednisone'],
+      adult:{dose:'30–40mg',             times:1, days:5},
+      child:{dose:'1mg/kg',              times:1, days:5, wt:true} },
+    { match:['dexamethasone'],
+      adult:{dose:'4mg',                 times:1, days:3},
+      child:{dose:'0.15mg/kg',           times:1, days:3, wt:true} },
+    { match:['hyoscine','buscopan'],
+      adult:{dose:'10mg',                times:3, days:3} },
+    { match:['loratadine','clarityne'],
+      adult:{dose:'10mg',                times:1, days:5},
+      child:{dose:'5mg (syrup 5ml)',     times:1, days:5} },
+    { match:['ranitidine','zantac'],
+      adult:{dose:'150mg',               times:2, days:14} },
+    { match:['ceftriaxone'],
+      adult:{dose:'1–2g IV/IM',          times:1, days:5},
+      child:{dose:'50–80mg/kg IV/IM',    times:1, days:5, wt:true} },
+    { match:['benzylpenicillin','crystalline penicillin'],
+      adult:{dose:'2–4 MU IV',           times:4, days:5},
+      child:{dose:'50,000 IU/kg IV',     times:4, days:5, wt:true} },
+    { match:['gentamicin'],
+      adult:{dose:'5–7mg/kg IV/IM',      times:1, days:5, wt:true},
+      child:{dose:'7.5mg/kg IV/IM',      times:1, days:5, wt:true} },
+    { match:['nevirapine','dolutegravir','tenofovir','efavirenz','tld'],
+      adult:{dose:'As per national ART guidelines — confirm regimen', times:1, days:30} },
+    { match:['quinine'],
+      adult:{dose:'600mg',               times:3, days:7},
+      child:{dose:'10mg/kg per dose',    times:3, days:7, wt:true} },
+    { match:['artesunate'],
+      adult:{dose:'2.4mg/kg IV at 0,12,24h then daily', times:1, days:3, wt:true},
+      child:{dose:'3mg/kg IV (under 20kg)', times:1, days:3, wt:true} },
   ];
 
+  // Age the clinician typed in (years). Wins over the patient record so a
+  // walk-in with no DOB can still be dosed by age.
+  state.manualAgeYears = null;
+
   function patientAgeYears() {
+    if (state.manualAgeYears !== null && state.manualAgeYears !== undefined) return state.manualAgeYears;
     const p = state.patient || {};
     if (p.date_of_birth) {
       const a = (Date.now() - new Date(p.date_of_birth).getTime()) / 31557600000;
@@ -1048,14 +1103,43 @@
     return null;
   }
 
+  // Rough paediatric weight estimate (APLS) so weight-based doses have a hint.
+  function estWeightKg(age) {
+    if (age === null || age >= 18) return null;
+    if (age < 1)  return Math.round((age * 12 * 0.5 + 3.5) * 10) / 10; // ~0.5kg/month + 3.5
+    if (age <= 5) return Math.round((age + 4) * 2);
+    return Math.round(age * 3 + 7);
+  }
+
   // 'adult' | 'child' — manual toggle wins, else patient record, else adult
   state.dosingMode = null;
   function effectiveDosingMode() {
-    if (state.dosingMode) return state.dosingMode;
+    const band = effectiveAgeBand();
+    return band === 'adult' ? 'adult' : 'child';
+  }
+
+  // 'infant' (<1yr) | 'child' (1–11) | 'adult' (12+). Age (typed or DOB) wins;
+  // then the manual Adult/Child toggle; then the patient record; else adult.
+  function effectiveAgeBand() {
     const age = patientAgeYears();
-    if (age !== null) return age < 12 ? 'child' : 'adult';
+    if (age !== null) {
+      if (age < 1)  return 'infant';
+      if (age < 12) return 'child';
+      return 'adult';
+    }
+    if (state.dosingMode) return state.dosingMode === 'child' ? 'child' : 'adult';
     if (state.patient && state.patient.is_child) return 'child';
     return 'adult';
+  }
+
+  // True when we should surface a pregnancy caution: female adult, or adult of
+  // unknown sex (so the clinician is reminded to check).
+  function pregnancyRelevant() {
+    const age = patientAgeYears();
+    if (age !== null && age < 12) return false;
+    const sex = (state.patient && (state.patient.sex || state.patient.gender) || '').toString().toLowerCase();
+    if (sex === 'male' || sex === 'm') return false;
+    return true; // female or unknown
   }
 
   function findRegimen(name) {
@@ -1079,17 +1163,34 @@
   function applyAutoRegimen(idx) {
     const m = state.medications[idx];
     if (!m || !m.drug) return false;
-    const mode = effectiveDosingMode();
-    const reg = findRegimen(m.drug);
+    m._pregWarn = false;
+    const band = effectiveAgeBand();
+    const age  = patientAgeYears();
+    const reg  = findRegimen(m.drug);
     if (reg) {
-      const r = (mode === 'child' && reg.child) ? reg.child : reg.adult;
+      // Pick the closest available dose for the age band.
+      let r, usedBand;
+      if (band === 'infant')      { r = reg.infant || reg.child || reg.adult; usedBand = reg.infant ? 'infant' : (reg.child ? 'child' : 'adult'); }
+      else if (band === 'child')  { r = reg.child  || reg.adult;              usedBand = reg.child ? 'child' : 'adult'; }
+      else                        { r = reg.adult;                            usedBand = 'adult'; }
+
       m.dosage       = r.dose;
       m.timesPerDay  = r.times;
       m.intakeTimes  = [...DEFAULT_TIMES[r.times]];
       m.durationDays = r.days;
-      m._autoNote = (mode === 'child')
-        ? (reg.child ? 'child dose' : 'adult dose — verify for child')
-        : 'adult dose';
+
+      // Build the auto-fill badge: which dose, the age used, weight hint, and
+      // a pregnancy caution where relevant.
+      let note;
+      if (usedBand === 'adult' && band !== 'adult') note = 'adult dose — verify for this age';
+      else note = usedBand + ' dose';
+      if (age !== null) {
+        const yrs = age < 1 ? Math.round(age * 12) + ' mo' : (Math.round(age * 10) / 10) + ' yr';
+        note += ' · ' + yrs;
+        if (r.wt) { const w = estWeightKg(age); if (w) note += ' · ~' + w + 'kg'; }
+      }
+      m._autoNote   = note;
+      m._pregWarn   = (r.preg && pregnancyRelevant()) ? true : false;
       return true;
     }
     // Fallback: formulary defaults, with the frequency parsed out of the text
@@ -1107,29 +1208,84 @@
     return false;
   }
 
-  // Dosing-mode toggle: re-applies regimens to drugs that were auto-filled
+  // Age input + Adult/Child toggle: set the age once and every auto-filled drug
+  // re-doses for that age. Re-applies regimens to drugs that were auto-filled.
   (function wireDosingToggle() {
-    const aBtn = document.getElementById('doseModeAdult');
-    const cBtn = document.getElementById('doseModeChild');
+    const aBtn    = document.getElementById('doseModeAdult');
+    const cBtn    = document.getElementById('doseModeChild');
+    const ageInp  = document.getElementById('patientAgeInput');
+    const yrsBtn  = document.getElementById('ageUnitYrs');
+    const mosBtn  = document.getElementById('ageUnitMos');
+    const label   = document.getElementById('dosingBandLabel');
     if (!aBtn || !cBtn) return;
-    function setMode(mode) {
-      state.dosingMode = mode;
-      aBtn.classList.toggle('active', mode === 'adult');
-      cBtn.classList.toggle('active', mode === 'child');
+    state.ageUnit = 'yrs';
+
+    function reapplyAll() {
       let changed = false;
       state.medications.forEach((m, i) => {
         if (m._autoNote && applyAutoRegimen(i)) changed = true;
       });
-      if (changed) { autoSetExpectedRecovery(); renderMeds(); }
+      if (changed) autoSetExpectedRecovery();
+      renderMeds();
+      updateLabel();
+    }
+
+    function updateLabel() {
+      const band = effectiveAgeBand();
+      const age  = patientAgeYears();
+      aBtn.classList.toggle('active', band === 'adult');
+      cBtn.classList.toggle('active', band !== 'adult');
+      if (!label) return;
+      let txt;
+      if (age !== null) {
+        const ageStr = age < 1 ? Math.round(age * 12) + ' month' + (Math.round(age*12)!==1?'s':'') : (Math.round(age*10)/10) + ' yr' + (age>=2?'s':'');
+        const bandWord = band === 'infant' ? 'infant' : band === 'child' ? 'child' : 'adult';
+        const w = estWeightKg(age);
+        txt = 'Dosing for a ' + ageStr + ' ' + bandWord + (w ? ' · approx ' + w + 'kg' : '');
+      } else {
+        txt = 'Dosing for: ' + (band === 'adult' ? 'Adult' : 'Child') + ' — set the age above for exact paediatric doses';
+      }
+      label.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">bolt</span>' + esc(txt);
+    }
+
+    function readAge() {
+      const raw = (ageInp && ageInp.value || '').trim();
+      if (raw === '') { state.manualAgeYears = null; }
+      else {
+        let v = parseFloat(raw);
+        if (!isFinite(v) || v < 0) { state.manualAgeYears = null; }
+        else { state.manualAgeYears = state.ageUnit === 'mos' ? v / 12 : v; }
+      }
+      reapplyAll();
+    }
+
+    if (ageInp) ageInp.addEventListener('input', readAge);
+    if (yrsBtn) yrsBtn.onclick = () => { state.ageUnit = 'yrs'; yrsBtn.classList.add('active'); mosBtn && mosBtn.classList.remove('active'); readAge(); };
+    if (mosBtn) mosBtn.onclick = () => { state.ageUnit = 'mos'; mosBtn.classList.add('active'); yrsBtn && yrsBtn.classList.remove('active'); readAge(); };
+
+    function setMode(mode) {
+      // Tapping Adult/Child clears the typed age and uses the simple band.
+      state.dosingMode = mode;
+      state.manualAgeYears = null;
+      if (ageInp) ageInp.value = '';
+      reapplyAll();
     }
     aBtn.onclick = () => setMode('adult');
     cBtn.onclick = () => setMode('child');
-    // Pre-select from the patient record once their profile has loaded
+
+    // Pre-fill the age box from the patient record once their profile loads.
     window._syncDosingToggle = function() {
-      const mode = effectiveDosingMode();
-      aBtn.classList.toggle('active', mode === 'adult');
-      cBtn.classList.toggle('active', mode === 'child');
+      const p = state.patient || {};
+      if (state.manualAgeYears === null && p.date_of_birth && ageInp && !ageInp.value) {
+        const a = (Date.now() - new Date(p.date_of_birth).getTime()) / 31557600000;
+        if (isFinite(a) && a >= 0 && a < 130) {
+          if (a < 2) { state.ageUnit = 'mos'; if (yrsBtn) yrsBtn.classList.remove('active'); if (mosBtn) mosBtn.classList.add('active'); ageInp.value = String(Math.round(a * 12)); }
+          else        { state.ageUnit = 'yrs'; if (mosBtn) mosBtn.classList.remove('active'); if (yrsBtn) yrsBtn.classList.add('active'); ageInp.value = String(Math.round(a)); }
+        }
+      }
+      reapplyAll();
     };
+    updateLabel();
   })();
 
   function addMedication() {
@@ -1174,6 +1330,8 @@
         })() : ''}
         ${m._autoNote ? `<div style="font-size:11px;color:#1B5E20;background:#E8F5E9;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
           <span class="material-icons-outlined" style="font-size:12px">bolt</span>Auto-filled (${esc(m._autoNote)}) — edit anything below if needed</div>` : ''}
+        ${m._pregWarn ? `<div style="font-size:11px;color:#C62828;background:#FFEBEE;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
+          <span class="material-icons-outlined" style="font-size:12px">pregnant_woman</span>Caution in pregnancy — confirm before prescribing</div>` : ''}
 
         <div style="height:10px"></div>
         <div class="field-row">

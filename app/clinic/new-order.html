@@ -672,14 +672,24 @@
           <!-- Expected recovery (hidden input, auto-set from drug duration) -->
           <input id="expRecovery" type="date" style="display:none">
 
-          <!-- Dosing mode: pre-selected from the patient record; drives auto-filled
-               dose/frequency/duration when a drug is picked. Always editable. -->
-          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;margin-bottom:12px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
+          <!-- Auto-dosing: set the patient's age once and every drug typed below
+               fills its dose/frequency/duration for that age automatically.
+               Pre-filled from the patient record when known. Always editable. -->
+          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
             <span class="material-icons-outlined" style="font-size:17px;color:#1B5E20">bolt</span>
-            <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px;flex:1">Auto-dose for</span>
-            <button type="button" id="doseModeAdult" class="sev-chip active" style="padding:7px 16px">Adult</button>
-            <button type="button" id="doseModeChild" class="sev-chip" style="padding:7px 16px">Child</button>
+            <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">Auto-dose for age</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input id="patientAgeInput" type="number" min="0" max="120" inputmode="numeric"
+                     placeholder="Age" autocomplete="off"
+                     style="width:62px;padding:7px 8px;border:1.5px solid #E8EAED;border-radius:9px;font-size:15px;font-family:inherit;text-align:center;outline:none">
+              <button type="button" id="ageUnitYrs" class="sev-chip active" style="padding:6px 10px">yrs</button>
+              <button type="button" id="ageUnitMos" class="sev-chip" style="padding:6px 10px">mos</button>
+            </div>
+            <span style="flex:1;min-width:8px"></span>
+            <button type="button" id="doseModeAdult" class="sev-chip active" style="padding:7px 14px">Adult</button>
+            <button type="button" id="doseModeChild" class="sev-chip" style="padding:7px 14px">Child</button>
           </div>
+          <div id="dosingBandLabel" style="font-size:12px;color:#1B5E20;font-weight:600;margin:0 0 12px;padding-left:4px;display:flex;align-items:center;gap:5px"></div>
 
           <div id="medsContainer"></div>
 
@@ -918,6 +928,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic.js?v=20260627"></script>
-<script src="js/new-order-wizard.js"></script>
+<script src="js/new-order-wizard.js?v=20260627"></script>
 </body>
 </html>
