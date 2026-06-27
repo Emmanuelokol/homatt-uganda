@@ -1205,13 +1205,24 @@
     res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Searching…</div>';
     try {
       var isPhone = /^[\d\+]/.test(q);
-      var qry = supabase.from('clinic_diagnoses')
-        .select('id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,course_completed,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at')
-        .eq('clinic_id', clinicId)
-        .order('created_at', {ascending:false})
-        .limit(60);
-      qry = isPhone ? qry.ilike('patient_phone', '%'+q+'%') : qry.ilike('patient_name', '%'+q+'%');
-      var r = await qry;
+      // Rich column set for the full clinical + financial detail view. Some
+      // deployments may not have every column migrated yet (e.g. follow_up_reason),
+      // so if the rich select fails with "column does not exist" we transparently
+      // retry with the minimal set that is guaranteed to exist.
+      var RICH_COLS = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at';
+      var SAFE_COLS = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,total_charged_ugx,payment_status,created_at';
+      function buildHistQuery(cols) {
+        var x = supabase.from('clinic_diagnoses')
+          .select(cols)
+          .eq('clinic_id', clinicId)
+          .order('created_at', {ascending:false})
+          .limit(60);
+        return isPhone ? x.ilike('patient_phone', '%'+q+'%') : x.ilike('patient_name', '%'+q+'%');
+      }
+      var r = await buildHistQuery(RICH_COLS);
+      if (r.error && /does not exist/i.test(r.error.message || '')) {
+        r = await buildHistQuery(SAFE_COLS);
+      }
       if (r.error) throw r.error;
       var rows = r.data || [];
       if (!rows.length) {
@@ -1304,10 +1315,23 @@
       +'</div>';
     }
 
-    // Treatment completion status
-    var courseChip = c.course_completed
-      ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> Course completed</span>'
-      : '<span style="background:#FFF8E1;color:#E65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">pending</span> Treatment ongoing</span>';
+    // Treatment status — derived from the prescribed course length and the visit
+    // date (clinic_diagnoses has no completion flag). "Course period over" means
+    // the prescribed days have elapsed; otherwise show how many days remain.
+    var courseChip = '';
+    (function() {
+      var items = Array.isArray(c.prescription_items) ? c.prescription_items : [];
+      var maxDur = 0;
+      items.forEach(function(m){ var dd = Number(m.duration) || 0; if (dd > maxDur) maxDur = dd; });
+      if (!maxDur) return; // no duration info — don't show a misleading chip
+      var endTs = d.getTime() + maxDur * 86400000;
+      var daysLeft = Math.ceil((endTs - Date.now()) / 86400000);
+      if (daysLeft <= 0) {
+        courseChip = '<span style="background:#E8F5E9;color:#1B5E20;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> '+maxDur+'-day course period over</span>';
+      } else {
+        courseChip = '<span style="background:#FFF8E1;color:#E65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">pending</span> On treatment · '+daysLeft+' day'+(daysLeft!==1?'s':'')+' left</span>';
+      }
+    })();
 
     // Next return visit
     var followBlock = '';
