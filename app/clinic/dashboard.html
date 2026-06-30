@@ -139,9 +139,19 @@
       padding: 14px 10px 12px; text-align: center; cursor: pointer;
       transition: border-color .1s, background .1s; touch-action: manipulation;
       user-select: none;
+      align-self: start;          /* don't stretch to the row height */
     }
-    .qs-drug-card:hover   { background: #E8F5E9; border-color: #81C784; }
-    .qs-drug-card.selected { background: #E8F5E9; border-color: #1B5E20; }
+    /* Only apply hover on devices with a real pointer — on touch screens the
+       :hover state sticks after a tap and makes an unselected card look
+       selected. */
+    @media (hover: hover) and (pointer: fine) {
+      .qs-drug-card:hover { background: #E8F5E9; border-color: #81C784; }
+    }
+    /* Selected must be clearly distinct from hover so staff know what's chosen. */
+    .qs-drug-card.selected {
+      background: #E8F5E9; border-color: #1B5E20;
+      box-shadow: 0 0 0 3px rgba(27,94,32,.22);
+    }
     .qs-drug-name  { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
     .qs-drug-price { font-size: 12px; color: #1B5E20; font-weight: 600; }
     .qs-drug-stock { font-size: 11px; margin-top: 2px; }
@@ -666,7 +676,7 @@
     <div id="qsCategoryRow" style="display:flex;gap:6px;padding:0 16px 8px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none"></div>
 
     <!-- Drug grid -->
-    <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px;overflow-y:auto;flex:1 1 0;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch">
+    <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start;padding:10px 16px;overflow-y:auto;flex:1 1 0;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch">
       <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>
     </div>
 
@@ -3282,7 +3292,8 @@
   // pointerup ourselves and treating it as a tap when the finger barely moved.
   (function wireQuickSale() {
 
-    var TAP_MOVE = 16;   // px of allowed finger drift
+    var TAP_MOVE = 24;   // px of allowed finger drift (forgiving so a tap on a
+                         // drug card still selects even if the finger drifts)
     var TAP_TIME = 800;  // ms max press duration
     var hasPointer = ('PointerEvent' in window);
 
@@ -3540,10 +3551,13 @@
     });
     var panel = document.getElementById('qsSelectedPanel');
     if (panel) panel.style.display = 'block';
-    updateQsUnitChips();
-    updateQsPanel();
+    // Enable Sell + reveal the panel FIRST, so even if a render helper below
+    // throws (e.g. a missing packaging field) the button never stays stuck
+    // disabled after a valid selection.
     var btn = document.getElementById('qsSellBtn');
     if (btn) btn.disabled = false;
+    try { updateQsUnitChips(); } catch (e) { console.error('qs unit chips', e); }
+    try { updateQsPanel(); }     catch (e) { console.error('qs panel', e); }
   }
 
   function qsUnitPrice() {
