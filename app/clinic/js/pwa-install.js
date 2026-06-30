@@ -39,9 +39,9 @@
       'box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:12px 14px;' +
       'display:flex;align-items:center;gap:12px;font-family:inherit;max-width:520px;margin:0 auto';
     bar.innerHTML =
-      '<img src="icons/clinic-192.png" alt="" width="44" height="44" style="border-radius:10px;flex-shrink:0">' +
+      '<img src="icons/clinic-192.png?v=2" alt="" width="44" height="44" style="border-radius:10px;flex-shrink:0">' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:14px;font-weight:700;color:#111">Install Homatt Clinic</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#111">Install Homatt Health</div>' +
         '<div style="font-size:12px;color:#5F6368;margin-top:1px">' + labelHtml + '</div>' +
       '</div>' +
       '<button id="_clinicInstallBtn" style="background:#1B5E20;color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Install</button>' +
