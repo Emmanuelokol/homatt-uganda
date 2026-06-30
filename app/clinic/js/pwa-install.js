@@ -10,10 +10,11 @@
 (function () {
   'use strict';
 
-  // ── Register the service worker (needed for the native install prompt) ───
+  // ── Register the clinic service worker (needed for the install prompt and
+  //    for the portal to open offline). Scoped to /clinic/. ─────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('../sw.js', { scope: '../' }).catch(function () {});
+      navigator.serviceWorker.register('clinic-sw.js', { scope: './' }).catch(function () {});
     });
   }
 
