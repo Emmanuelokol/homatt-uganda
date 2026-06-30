@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!-- Homatt Clinic app icon — "helping / lifting" mark.
+       Brand-green maskable background with a white two-figure silhouette:
+       one person reaching down to help another up. This is a clean vector
+       stand-in for the supplied logo; replace clinic-512.png / clinic-192.png
+       with the exact raster any time to override it. -->
+  <rect width="512" height="512" rx="112" fill="#1B5E20"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="40" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Helper (left): bending forward, arm reaching down to the right -->
+    <path d="M150 360 L196 250 L150 360 M196 250 L168 196"/>
+    <path d="M196 250 C 240 252, 286 286, 312 300"/>
+    <!-- Helped (right): seated, reaching up; bent legs -->
+    <path d="M360 300 L322 372 L388 410 M322 372 L292 426"/>
+    <path d="M360 300 C 344 304, 326 304, 312 300"/>
+  </g>
+  <!-- Heads -->
+  <circle cx="176" cy="150" r="38" fill="#FFFFFF"/>
+  <circle cx="384" cy="262" r="36" fill="#FFFFFF"/>
+</svg>

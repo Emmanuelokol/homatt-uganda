@@ -9,6 +9,14 @@
   <title>Homatt Health — Clinic Portal</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="manifest" href="clinic.webmanifest">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png">
   <link rel="stylesheet" href="css/clinic.css?v=20260627">
   <script>
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -60,6 +68,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js"></script>
+<script src="js/pwa-install.js?v=20260630"></script>
 <script>
   (function() {
     try {
