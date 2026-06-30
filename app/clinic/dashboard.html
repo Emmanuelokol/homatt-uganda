@@ -3400,27 +3400,29 @@
     var clinicId = await resolveClinicId();
     if (!clinicId || !supabase) { renderQsDemo(); return; }
     try {
-      var r = await supabase
-        .from('clinic_inventory')
-        .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,selling_price_ugx,min_threshold,category,tabs_per_pack,packs_per_box,pack_selling_price_ugx,box_selling_price_ugx')
-        .eq('clinic_id', clinicId)
-        .eq('item_type', 'medicine')
-        .eq('is_active', true)
-        .gt('quantity', 0)
-        .order('item_name');
-
-      // Live DB may not have the newer columns yet (selling_price_ugx, category,
-      // packaging) — the select fails entirely and the user used to see DEMO
-      // drugs instead of their real stock. Retry with base columns only.
-      if (r.error) {
+      // Select every useful column, but if the live DB is missing a newer one
+      // (selling_price_ugx, category, packaging…) PostgREST rejects the WHOLE
+      // query. Drop ONLY the missing column and retry, so packaging is kept
+      // whenever those columns exist (old code dropped them all at once, which
+      // is why Pack/Box selling silently disappeared).
+      var cols = ['id','item_name','item_type','unit','quantity','unit_cost_ugx',
+                  'selling_price_ugx','min_threshold','category','tabs_per_pack',
+                  'packs_per_box','pack_selling_price_ugx','box_selling_price_ugx'];
+      var r, guard = 0;
+      while (true) {
         r = await supabase
           .from('clinic_inventory')
-          .select('id,item_name,item_type,unit,quantity,unit_cost_ugx,min_threshold')
+          .select(cols.join(','))
           .eq('clinic_id', clinicId)
           .eq('item_type', 'medicine')
           .eq('is_active', true)
           .gt('quantity', 0)
           .order('item_name');
+        if (!r.error || guard++ > 8) break;
+        var m = (r.error.message || '').match(/'([^']+)' column|column \S*?\.?"?([a-z_]+)"? does not exist/i);
+        var bad = m && (m[1] || m[2]);
+        if (!bad || cols.indexOf(bad) < 0 || bad === 'id' || bad === 'item_name') break;
+        cols = cols.filter(function(c) { return c !== bad; });
       }
       if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
 
@@ -3475,10 +3477,10 @@
         ? '<div style="font-size:10px;color:#1B5E20;background:#E8F5E9;border-radius:10px;padding:1px 6px;display:inline-block;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(item.category) + '</div>'
         : '';
       var packBadge = '';
-      if (item.pack_selling_price_ugx && item.tabs_per_pack) {
+      if (qsHasPack(item)) {
         packBadge = '<div style="font-size:9px;color:#0D47A1;background:#E3F2FD;border-radius:8px;padding:1px 5px;display:inline-block;margin-right:3px;font-weight:700;white-space:nowrap">pack</div>';
       }
-      if (item.box_selling_price_ugx && item.packs_per_box) {
+      if (qsHasBox(item)) {
         packBadge += '<div style="font-size:9px;color:#4A148C;background:#F3E5F5;border-radius:8px;padding:1px 5px;display:inline-block;font-weight:700;white-space:nowrap">box</div>';
       }
       return '<div class="qs-drug-card" data-id="' + esc(item.id) + '">'
@@ -3560,11 +3562,20 @@
     try { updateQsPanel(); }     catch (e) { console.error('qs panel', e); }
   }
 
+  // Base (single-unit) selling price.
+  function qsBaseUnitPrice(d) { return Number(d.selling_price_ugx) || Number(d.unit_cost_ugx) || 0; }
+  // A drug can be sold by pack/box as long as the COUNT is set — the price is
+  // taken from the explicit pack/box price, or derived from the unit price.
+  function qsPackPrice(d) { return Number(d.pack_selling_price_ugx) || qsBaseUnitPrice(d) * (Number(d.tabs_per_pack) || 0); }
+  function qsBoxPrice(d)  { return Number(d.box_selling_price_ugx)  || qsBaseUnitPrice(d) * (Number(d.tabs_per_pack) || 0) * (Number(d.packs_per_box) || 0); }
+  function qsHasPack(d) { return Number(d.tabs_per_pack) > 0 && qsPackPrice(d) > 0; }
+  function qsHasBox(d)  { return Number(d.tabs_per_pack) > 0 && Number(d.packs_per_box) > 0 && qsBoxPrice(d) > 0; }
+
   function qsUnitPrice() {
     if (!_qsSel) return 0;
-    if (_qsUnitType === 'pack') return Number(_qsSel.pack_selling_price_ugx) || 0;
-    if (_qsUnitType === 'box')  return Number(_qsSel.box_selling_price_ugx)  || 0;
-    return Number(_qsSel.selling_price_ugx) || Number(_qsSel.unit_cost_ugx) || 0;
+    if (_qsUnitType === 'pack') return qsPackPrice(_qsSel) || 0;
+    if (_qsUnitType === 'box')  return qsBoxPrice(_qsSel)  || 0;
+    return qsBaseUnitPrice(_qsSel);
   }
 
   // How many base units (tabs/caps) does one sell unit represent?
@@ -3587,8 +3598,8 @@
 
     var d    = _qsSel;
     var unit = d.unit || 'unit';
-    var hasPack = !!(d.pack_selling_price_ugx && d.tabs_per_pack);
-    var hasBox  = !!(d.box_selling_price_ugx  && d.packs_per_box && d.tabs_per_pack);
+    var hasPack = qsHasPack(d);
+    var hasBox  = qsHasBox(d);
 
     // Only show the row if there is at least one packaging option
     if (!hasPack && !hasBox) { row.style.display = 'none'; return; }
@@ -3604,14 +3615,14 @@
     }
 
     var packLabel = hasPack
-      ? 'Pack (' + d.tabs_per_pack + ' ' + unit + 's)'
+      ? 'Pack (' + d.tabs_per_pack + ' ' + unit + 's) · UGX ' + fmtUGX(qsPackPrice(d))
       : '';
     var boxLabel  = hasBox
-      ? 'Box (' + (d.packs_per_box) + ' packs)'
+      ? 'Box (' + d.packs_per_box + ' packs) · UGX ' + fmtUGX(qsBoxPrice(d))
       : '';
 
     row.innerHTML =
-      chip('tab',  '1 ' + unit,   _qsUnitType === 'tab')
+      chip('tab',  '1 ' + unit + ' · UGX ' + fmtUGX(qsBaseUnitPrice(d)), _qsUnitType === 'tab')
       + (hasPack ? chip('pack', packLabel, _qsUnitType === 'pack') : '')
       + (hasBox  ? chip('box',  boxLabel,  _qsUnitType === 'box')  : '');
   }
