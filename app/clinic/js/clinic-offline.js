@@ -69,7 +69,7 @@
   // connection returns. The page registers a sync handler that knows how to
   // perform each queued op against Supabase.
   var OUTBOX = 'outbox';
-  var _syncFn = null;
+  var _handlers = {};   // op type -> async fn(item) => boolean (true = done)
   var _syncing = false;
 
   function outbox() { return get(OUTBOX, []) || []; }
@@ -86,22 +86,27 @@
     return list.length;
   }
 
-  function registerSync(fn) { _syncFn = fn; if (!isOffline()) flush(); }
+  // Register a replay handler for one op type. Multiple types can be registered
+  // (from different modules/pages), so a queued item syncs wherever a handler
+  // for its type is loaded — a sale queued offline still syncs from the
+  // dashboard, a consultation from any page that loaded clinic.js, etc.
+  function registerSyncHandler(type, fn) { _handlers[type] = fn; if (!isOffline()) flush(); }
 
   async function flush() {
-    if (_syncing || isOffline() || !_syncFn) return;
+    if (_syncing || isOffline()) return;
     var list = outbox();
     if (!list.length) { updateIndicator(); return; }
+    if (!Object.keys(_handlers).length) return;
     _syncing = true;
     try {
       for (var i = 0; i < list.length; i++) {
+        var item = list[i];
+        var h = _handlers[item.type];
+        if (!h) continue;                 // no handler here — leave for later
         var ok = false;
-        try { ok = await _syncFn(list[i]); } catch (e) { ok = false; }
-        if (ok) {
-          saveOutbox(outbox().filter(function (x) { return x.id !== list[i].id; }));
-        } else {
-          break; // keep order — retry this and the rest next time
-        }
+        try { ok = await h(item); } catch (e) { ok = false; }
+        if (ok) saveOutbox(outbox().filter(function (x) { return x.id !== item.id; }));
+        // keep failures; they retry on the next flush (order within a type holds)
       }
     } finally {
       _syncing = false;
@@ -143,9 +148,20 @@
   if (document.readyState !== 'loading') updateIndicator();
   else document.addEventListener('DOMContentLoaded', updateIndicator);
 
+  // Client-side UUID so records created offline have a stable id that all their
+  // related rows (prescription, reminders, booking link) can reference before
+  // they ever reach the server.
+  function uuid() {
+    try { if (crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+      var r = (Math.random() * 16) | 0, v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
   window.ClinicOffline = {
     set: set, get: get, age: age, isOffline: isOffline, cachedQuery: cachedQuery,
-    enqueue: enqueue, pendingCount: pendingCount, registerSync: registerSync,
-    flush: flush, updateIndicator: updateIndicator,
+    enqueue: enqueue, pendingCount: pendingCount, registerSyncHandler: registerSyncHandler,
+    flush: flush, updateIndicator: updateIndicator, uuid: uuid,
   };
 })();

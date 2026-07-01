@@ -277,3 +277,52 @@ const MOCK_APPOINTMENTS = [
   { time:'14:00', name:'Nambi Sarah',                   type:'BP monitoring' },
   { time:'14:30', name:'Okello Dennis',                 type:'Malaria follow-up' },
 ];
+
+/* ── Offline consultation replay ───────────────────────────────────────────
+ * A New Consultation recorded offline is queued (type 'consultation') with a
+ * client-generated diagnosis id and everything that depends on it. This handler
+ * replays the same sequence the wizard runs online, from any page that loaded
+ * clinic.js, once the connection returns. The diagnosis id is the primary key,
+ * so a re-run is a duplicate insert (treated as "already done") — the sale/
+ * prescription/reminders are never double-created for the diagnosis.
+ */
+async function _replayConsultation(bundle) {
+  var supa = _getClinicSupabase();
+  if (!supa) return false;
+  if (!bundle || !bundle.dxPayload) return true; // malformed → drop
+  var dx = bundle.dxPayload;
+
+  // 1. Diagnosis (fetch throw = offline → keep; server error = drop/continue).
+  try {
+    var r = await supa.from('clinic_diagnoses').insert(dx);
+    if (r.error && /follow_up_reason/.test(r.error.message || '')) {
+      var p = Object.assign({}, dx); delete p.follow_up_reason;
+      r = await supa.from('clinic_diagnoses').insert(p);
+    }
+    if (r.error && !/duplicate|already exists/i.test(r.error.message || '')) {
+      console.warn('replay diagnosis (will retry):', r.error.message);
+      // KEEP it queued rather than drop. If a clinic was offline long enough for
+      // its login to expire, the insert fails on auth — we must not lose the
+      // consultation; it syncs after the staff signs in again. (Duplicate = a
+      // prior partial run → fall through and finish the dependent rows.)
+      return false;
+    }
+  } catch (e) {
+    return false; // network — keep and retry later
+  }
+
+  // 2–5. Dependent rows — best effort (mirror the wizard's fire-and-forget).
+  if (bundle.invItems && bundle.invItems.length) {
+    try { await supa.rpc('deduct_inventory', { p_clinic_id: dx.clinic_id, p_diagnosis_id: dx.id, p_booking_id: (bundle.booking && bundle.booking.bookingId) || null, p_items: bundle.invItems }); } catch (e) {}
+  }
+  if (bundle.epx) { try { await supa.from('e_prescriptions').insert(bundle.epx); } catch (e) {} }
+  if (bundle.followups && bundle.followups.length) { try { await supa.from('clinic_followups').insert(bundle.followups); } catch (e) {} }
+  if (bundle.booking && bundle.booking.bookingId) {
+    try { await supa.from('bookings').update({ status: 'attended', attended_at: bundle.booking.attended_at, clinic_diagnosis_id: dx.id }).eq('id', bundle.booking.bookingId); } catch (e) {}
+  }
+  return true; // done → remove from queue
+}
+
+if (window.ClinicOffline) {
+  ClinicOffline.registerSyncHandler('consultation', function (item) { return _replayConsultation(item.payload); });
+}

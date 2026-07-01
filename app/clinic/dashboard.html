@@ -898,8 +898,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic.js?v=20260627"></script>
-<script src="js/clinic-offline.js?v=3"></script>
+<script src="js/clinic-offline.js?v=4"></script>
+<script src="js/clinic.js?v=20260703"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -914,12 +914,10 @@
 
   // Replay Quick Sales made offline — now (if online) and on every reconnect.
   if (window.ClinicOffline) {
-    ClinicOffline.registerSync(async function(item) {
-      if (item.type === 'quick_sale' && supabase) {
-        var res = await _pushQuickSale(item.payload.sale, item.payload.deduct);
-        return !!res.ok;   // true → remove from queue; false → keep and retry
-      }
-      return true;         // unknown op → drop so it can't wedge the queue
+    ClinicOffline.registerSyncHandler('quick_sale', async function(item) {
+      if (!supabase) return false;
+      var res = await _pushQuickSale(item.payload.sale, item.payload.deduct);
+      return !!res.ok;   // true → remove from queue; false → keep and retry
     });
   }
 

@@ -1796,6 +1796,56 @@
       payment_status:       state.paymentStatus || 'pending',
     };
 
+    // ── OFFLINE: queue the entire consultation and sync when back online ──
+    // We only intercept when the device is definitely offline, so the normal
+    // online path below is left completely untouched.
+    if (window.ClinicOffline && navigator.onLine === false) {
+      const cid = ClinicOffline.uuid();
+      dxPayload.id = cid;                          // client id links all rows
+      const epx = items.length ? {
+        diagnosis_id: cid,
+        patient_id: state.patient.id || null,
+        clinic_patient_id: state.patient.clinicPatientId || null,
+        clinic_id: _clinicId,
+        issued_by: session?.userId || null,
+        items,
+        status: 'active',
+        start_date: new Date().toISOString().slice(0,10),
+        end_date: state.expectedRecovery || null,
+        delivery_method: state.stockSource === 'pharmacy' ? 'delivery' : 'pickup',
+        delivery_preference: state.stockSource === 'pharmacy' ? 'delivery' : 'pickup',
+        patient_instructions: state.patientNotes || null,
+        notes: state.confirmedDx,
+      } : null;
+      const followups = buildFollowupRows(cid);
+      const invItems = [
+        ...state.medications.filter(m => m.inventoryItemId && m.qtyToDeduct > 0).map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
+        ...state.materialsUsed.filter(m => m.item_id && m.qty > 0).map(m => ({ item_id: m.item_id, qty: m.qty })),
+      ];
+      ClinicOffline.enqueue('consultation', {
+        dxPayload, epx, followups, invItems,
+        booking: { bookingId: state.bookingId || null, attended_at: new Date().toISOString() },
+      });
+      // Keep the cached Quick Sale stock accurate for anything deducted here.
+      try {
+        if (invItems.length) {
+          const key = 'qs_inventory_' + _clinicId;
+          const cachedInv = ClinicOffline.get(key);
+          if (Array.isArray(cachedInv)) {
+            invItems.forEach(it => { const c = cachedInv.find(x => x.id === it.item_id); if (c) c.quantity = Math.max(0, Number(c.quantity) - Number(it.qty)); });
+            ClinicOffline.set(key, cachedInv);
+          }
+        }
+      } catch(e) {}
+      const successMsgEl = document.getElementById('successMsg');
+      if (successMsgEl) successMsgEl.innerHTML = '<strong>' + esc(state.patient?.name || 'Patient') + '</strong>’s consultation <strong>saved offline</strong>. It syncs automatically when you’re back online.';
+      const successRemindersEl = document.getElementById('successReminders');
+      if (successRemindersEl) successRemindersEl.innerHTML = '<div style="font-size:12px;color:#2E7D32;padding:3px 0"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Prescription &amp; reminders will be scheduled once it syncs.</div>';
+      const successSheet = document.getElementById('successSheet');
+      if (successSheet) successSheet.style.display = 'flex';
+      return;
+    }
+
     let dx, dxError;
     ({ data: dx, error: dxError } = await supabase
       .from('clinic_diagnoses')
