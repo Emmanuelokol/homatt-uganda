@@ -899,7 +899,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
 <script src="js/clinic.js?v=20260627"></script>
-<script src="js/clinic-offline.js?v=2"></script>
+<script src="js/clinic-offline.js?v=3"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -1180,11 +1180,16 @@
     }
     try {
       var start = new Date(); start.setHours(0,0,0,0);
-      var res2 = await supabase.from('clinic_diagnoses')
-        .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status')
-        .eq('clinic_id', clinicId)
-        .gte('created_at', start.toISOString())
-        .order('created_at', {ascending:false});
+      var _consultQ = function() {
+        return supabase.from('clinic_diagnoses')
+          .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status')
+          .eq('clinic_id', clinicId)
+          .gte('created_at', start.toISOString())
+          .order('created_at', {ascending:false});
+      };
+      var res2 = window.ClinicOffline
+        ? await ClinicOffline.cachedQuery('consultations_today_' + clinicId, _consultQ)
+        : await _consultQ();
       var rows2 = res2.data || [];
       var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
       var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
@@ -1923,7 +1928,15 @@
     var rows = null;
     var hardError = null;
     var useDischargeFilter = true;
+    var _atKey = 'active_treatments_' + clinicId;
 
+    // Offline: render the last-saved active treatments; skip the network loop.
+    if (window.ClinicOffline && ClinicOffline.isOffline()) {
+      var _atCached = ClinicOffline.get(_atKey);
+      if (_atCached) rows = _atCached;
+    }
+
+    if (rows === null) try {
     for (var attempt = 0; attempt < 10; attempt++) {
       var q = supabase.from('clinic_diagnoses').select(COLS.join(','))
         .eq('clinic_id', clinicId)
@@ -1952,6 +1965,13 @@
       if (stripped) continue;
       hardError = msg; break;   // unrecoverable
     }
+    } catch (e) {
+      // Network threw (offline/transient) — fall back to the last saved data.
+      var _atErr = window.ClinicOffline && ClinicOffline.get(_atKey);
+      if (_atErr) rows = _atErr; else hardError = (e && e.message) || 'offline';
+    }
+
+    if (rows !== null && window.ClinicOffline) ClinicOffline.set(_atKey, rows);
 
     if (rows === null) {
       el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(hardError || 'could not load active treatments') + '</div>';

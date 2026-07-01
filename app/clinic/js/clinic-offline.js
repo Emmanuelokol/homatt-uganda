@@ -15,6 +15,18 @@
   'use strict';
   var PREFIX = '_co_';
 
+  // Ask the browser to KEEP our cached data & queued changes even under storage
+  // pressure. Without this, phones can silently evict the cache after a while —
+  // this is what lets a clinic stay offline for weeks/months without losing the
+  // app, its saved data, or unsynced sales.
+  try {
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persisted().then(function (p) {
+        if (!p) navigator.storage.persist().catch(function () {});
+      }).catch(function () {});
+    }
+  } catch (e) {}
+
   function k(key) { return PREFIX + key; }
   function set(key, value) {
     try { localStorage.setItem(k(key), JSON.stringify({ ts: Date.now(), v: value })); } catch (e) {}
