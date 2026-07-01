@@ -899,7 +899,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
 <script src="js/clinic.js?v=20260627"></script>
-<script src="js/clinic-offline.js?v=1"></script>
+<script src="js/clinic-offline.js?v=2"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -911,6 +911,17 @@
   setupClinicLogout();
   applyRoleGating();   // hide sections this staff role can't access
   var supabase = _getClinicSupabase();
+
+  // Replay Quick Sales made offline — now (if online) and on every reconnect.
+  if (window.ClinicOffline) {
+    ClinicOffline.registerSync(async function(item) {
+      if (item.type === 'quick_sale' && supabase) {
+        var res = await _pushQuickSale(item.payload.sale, item.payload.deduct);
+        return !!res.ok;   // true → remove from queue; false → keep and retry
+      }
+      return true;         // unknown op → drop so it can't wedge the queue
+    });
+  }
 
   // Refresh the staff role straight from the DB so changes the owner makes
   // take effect on next load (and sessions created before roles existed get
@@ -3756,48 +3767,83 @@
       ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
       : (_qsSel.unit || 'unit');
 
+    var queuedOffline = false;
     try {
       var clinicId = _qsClinicId || await resolveClinicId();
       var userId   = _qsUserId;
+      var isDemo   = !!_qsSel._isDemo;
+      var invId    = _qsSel.id;
 
-      if (supabase && clinicId && !_qsSel._isDemo) {
-        try {
-          var ins = await supabase.from('clinic_quick_sales').insert({
-            clinic_id:      clinicId,
-            drug_id:        _qsSel.id,
-            drug_name:      _qsSel.item_name,
-            unit:           saleUnitLabel,
-            quantity:       _qsQty,
-            unit_price_ugx: price,
-            total_ugx:      total,
-            payment_method: _qsPm,
-            sold_by:        userId,
-            created_at:     new Date().toISOString()
-          });
-          if (ins.error) console.warn('clinic_quick_sales:', ins.error.message);
-        } catch(insErr) { console.warn('clinic_quick_sales:', insErr.message); }
+      if (!isDemo && clinicId) {
+        var sale = {
+          clinic_id: clinicId, drug_id: invId, drug_name: _qsSel.item_name,
+          unit: saleUnitLabel, quantity: _qsQty, unit_price_ugx: price, total_ugx: total,
+          payment_method: _qsPm, sold_by: userId, created_at: new Date().toISOString()
+        };
+        var deduct = { clinic_id: clinicId, inventory_id: invId, base_deduct: baseDeduct, unit_label: saleUnitLabel, qty: _qsQty };
 
-        try {
-          var adj = await supabase.rpc('adjust_inventory', {
-            p_clinic_id:    clinicId,
-            p_inventory_id: _qsSel.id,
-            p_qty_change:   -baseDeduct,
-            p_txn_type:     'deduction',
-            p_notes:        'Quick Sale — ' + _qsQty + ' × ' + saleUnitLabel
-          });
-          if (adj.error) console.warn('adjust_inventory:', adj.error.message);
-          else if (adj.data && typeof adj.data.quantity_after !== 'undefined') {
-            stockAfter = Number(adj.data.quantity_after);
-          }
-        } catch(invErr) { console.warn('adjust_inventory:', invErr.message); }
+        var canTry = supabase && navigator.onLine !== false;
+        var pushed = canTry ? await _pushQuickSale(sale, deduct) : { ok: false, network: true };
+        if (pushed.ok) {
+          if (pushed.stockAfter != null) stockAfter = pushed.stockAfter;
+        } else if (window.ClinicOffline) {
+          // Offline or network failure — queue the sale and deduct stock locally
+          // so the count is right and the sale syncs when the connection returns.
+          ClinicOffline.enqueue('quick_sale', { sale: sale, deduct: deduct });
+          _applyLocalStockDeduction(invId, baseDeduct, clinicId);
+          queuedOffline = true;
+        }
       }
     } catch(e) {
-      console.warn('Quick sale error:', e.message);
+      console.warn('Quick sale error:', e && e.message);
     }
-    showQsSuccess(_qsSel.item_name, _qsQty, total, stockAfter, _qsSel.unit || '');
+    showQsSuccess(_qsSel.item_name, _qsQty, total, stockAfter, _qsSel.unit || '', queuedOffline);
   }
 
-  function showQsSuccess(name, qty, total, stockAfter, unit) {
+  // Perform the sale against Supabase. Returns {ok, stockAfter, network}.
+  //  ok:false + network:true  → transient/offline, caller should queue it.
+  //  ok:true                  → recorded (or a non-network server error we log).
+  async function _pushQuickSale(sale, deduct) {
+    try {
+      var ins = await supabase.from('clinic_quick_sales').insert(sale);
+      if (ins.error) { console.warn('clinic_quick_sales:', ins.error.message); }
+      var stockAfter = null;
+      try {
+        var adj = await supabase.rpc('adjust_inventory', {
+          p_clinic_id: deduct.clinic_id, p_inventory_id: deduct.inventory_id,
+          p_qty_change: -deduct.base_deduct, p_txn_type: 'deduction',
+          p_notes: 'Quick Sale — ' + deduct.qty + ' × ' + deduct.unit_label
+        });
+        if (!adj.error && adj.data && typeof adj.data.quantity_after !== 'undefined') {
+          stockAfter = Number(adj.data.quantity_after);
+        }
+      } catch(invErr) { console.warn('adjust_inventory:', invErr && invErr.message); }
+      return { ok: true, stockAfter: stockAfter };
+    } catch(e) {
+      return { ok: false, network: true };   // fetch threw → offline/transient
+    }
+  }
+
+  // Optimistically reduce the locally-cached stock so the grid + offline cache
+  // stay accurate between an offline sale and the next successful sync.
+  function _applyLocalStockDeduction(invId, baseDeduct, clinicId) {
+    try {
+      if (Array.isArray(_qsDrugs)) {
+        var d = _qsDrugs.find(function(x){ return x.id === invId; });
+        if (d) d.quantity = Math.max(0, Number(d.quantity) - baseDeduct);
+      }
+      if (window.ClinicOffline && clinicId) {
+        var key = 'qs_inventory_' + clinicId;
+        var cached = ClinicOffline.get(key);
+        if (Array.isArray(cached)) {
+          var c = cached.find(function(x){ return x.id === invId; });
+          if (c) { c.quantity = Math.max(0, Number(c.quantity) - baseDeduct); ClinicOffline.set(key, cached); }
+        }
+      }
+    } catch(e){}
+  }
+
+  function showQsSuccess(name, qty, total, stockAfter, unit, queued) {
     var flash = document.getElementById('qsSuccessFlash');
     var ft    = document.getElementById('qsFlashText');
     var fs    = document.getElementById('qsFlashSub');
@@ -3805,7 +3851,8 @@
     if (fs) {
       var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
       fs.innerHTML = 'UGX ' + fmtUGX(total) + ' &middot; ' + pay
-        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'tab') + 's</span>';
+        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'tab') + 's</span>'
+        + (queued ? '<br><span style="font-size:12px;opacity:.9"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Saved offline — will sync when online</span>' : '');
     }
     if (flash) {
       flash.style.display = 'flex';
