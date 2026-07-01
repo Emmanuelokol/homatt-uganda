@@ -64,6 +64,18 @@
     }
   }
 
+  // Is this error a lost-connection error (or are we simply offline)?
+  function isNetworkErr(e) {
+    var m = (e && e.message) || String(e || '');
+    return isOffline() || /Failed to fetch|NetworkError|network ?error|ERR_INTERNET|Load failed|fetch/i.test(m);
+  }
+  // Friendly placeholder to show in a section instead of a raw error offline.
+  function offlineHtml(msg) {
+    return '<div style="padding:22px;text-align:center;color:#5F6368;font-size:13px">' +
+      '<span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:6px;color:#B0BEC5">cloud_off</span>' +
+      (msg || 'You’re offline — reconnect to load this.') + '</div>';
+  }
+
   // ── Offline write outbox ─────────────────────────────────────────────────
   // Mutations made offline are queued here and replayed (in order) when the
   // connection returns. The page registers a sync handler that knows how to
@@ -163,5 +175,6 @@
     set: set, get: get, age: age, isOffline: isOffline, cachedQuery: cachedQuery,
     enqueue: enqueue, pendingCount: pendingCount, registerSyncHandler: registerSyncHandler,
     flush: flush, updateIndicator: updateIndicator, uuid: uuid,
+    isNetworkErr: isNetworkErr, offlineHtml: offlineHtml,
   };
 })();

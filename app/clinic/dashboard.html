@@ -898,7 +898,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=4"></script>
+<script src="js/clinic-offline.js?v=5"></script>
 <script src="js/clinic.js?v=20260703"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -1085,14 +1085,18 @@
 
     try {
       var since = new Date(Date.now() - 48*3600000).toISOString();
-      var res = await supabase.from('bookings')
+      var _bkQ = function() { return supabase.from('bookings')
         .select('id,booking_code,patient_name,ai_diagnosis,urgency_level,preferred_time,status,created_at')
         .eq('clinic_id', clinicId)
         .in('status', ['pending','confirmed','in_progress'])
         .gte('created_at', since)
         .order('created_at', {ascending:false})
-        .limit(30);
-      if (res.error) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'); return; }
+        .limit(30); };
+      var res = window.ClinicOffline ? await ClinicOffline.cachedQuery('bookings_' + clinicId, _bkQ) : await _bkQ();
+      if (res.error) {
+        if (window.ClinicOffline && ClinicOffline.isNetworkErr(res.error)) { msg(ClinicOffline.offlineHtml('Upcoming patients aren’t saved for offline yet.<br>Open this page once while online.')); return; }
+        msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'); return;
+      }
       var rows = res.data || [];
       if (!rows.length) {
         msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>');
@@ -1134,7 +1138,10 @@
           };
         }
       });
-    } catch(e) { msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading bookings: ' + esc(e.message) + '</div>'); }
+    } catch(e) {
+      if (window.ClinicOffline && ClinicOffline.isNetworkErr(e)) { msg(ClinicOffline.offlineHtml('Upcoming patients aren’t saved for offline yet.')); return; }
+      msg('<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading bookings: ' + esc(e.message) + '</div>');
+    }
   }
 
   // ── Revenue stats ──
@@ -1972,7 +1979,9 @@
     if (rows !== null && window.ClinicOffline) ClinicOffline.set(_atKey, rows);
 
     if (rows === null) {
-      el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(hardError || 'could not load active treatments') + '</div>';
+      el.innerHTML = (window.ClinicOffline && ClinicOffline.isNetworkErr(hardError))
+        ? ClinicOffline.offlineHtml('Active treatments aren’t saved for offline yet.<br>Open this page once while online.')
+        : '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(hardError || 'could not load active treatments') + '</div>';
       return;
     }
 
@@ -3427,17 +3436,24 @@
     var grid = document.getElementById('qsDrugGrid');
     if (!grid) return;
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+
+    // OFFLINE: never touch the network (it would throw/hang and leave the grid
+    // stuck on "Loading…"). Use the session's clinic id + the last saved stock.
+    // If nothing was saved yet, show a clear message rather than demo drugs.
+    if (window.ClinicOffline && ClinicOffline.isOffline()) {
+      var offCid = (session && session.clinicId) || _clinicId || null;
+      var offCache = offCid ? ClinicOffline.get('qs_inventory_' + offCid) : null;
+      if (offCache && offCache.length) {
+        _qsDrugs = offCache; renderQsGrid(_qsDrugs); renderQsCategoryChips();
+      } else {
+        grid.innerHTML = ClinicOffline.offlineHtml('No saved stock yet.<br>Open Quick Sale once while online and your stock will be available offline.');
+      }
+      return;
+    }
+
     var clinicId = await resolveClinicId();
     if (!clinicId || !supabase) { renderQsDemo(); return; }
-
-    // Offline: serve the last-saved stock so staff can still sell.
     var _coKey = 'qs_inventory_' + clinicId;
-    if (window.ClinicOffline && ClinicOffline.isOffline()) {
-      var cachedOff = ClinicOffline.get(_coKey);
-      if (cachedOff && cachedOff.length) {
-        _qsDrugs = cachedOff; renderQsGrid(_qsDrugs); renderQsCategoryChips(); return;
-      }
-    }
     try {
       // Select every useful column, but if the live DB is missing a newer one
       // (selling_price_ugx, category, packaging…) PostgREST rejects the WHOLE
