@@ -899,6 +899,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
 <script src="js/clinic.js?v=20260627"></script>
+<script src="js/clinic-offline.js?v=1"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -3399,6 +3400,15 @@
     grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
     var clinicId = await resolveClinicId();
     if (!clinicId || !supabase) { renderQsDemo(); return; }
+
+    // Offline: serve the last-saved stock so staff can still sell.
+    var _coKey = 'qs_inventory_' + clinicId;
+    if (window.ClinicOffline && ClinicOffline.isOffline()) {
+      var cachedOff = ClinicOffline.get(_coKey);
+      if (cachedOff && cachedOff.length) {
+        _qsDrugs = cachedOff; renderQsGrid(_qsDrugs); renderQsCategoryChips(); return;
+      }
+    }
     try {
       // Select every useful column, but if the live DB is missing a newer one
       // (selling_price_ugx, category, packaging…) PostgREST rejects the WHOLE
@@ -3437,9 +3447,17 @@
       });
 
       _qsDrugs = r.data;
+      if (window.ClinicOffline) ClinicOffline.set(_coKey, r.data); // cache for offline
       renderQsGrid(_qsDrugs);
       renderQsCategoryChips();
-    } catch(e) { renderQsDemo(); }
+    } catch(e) {
+      // Network failed — fall back to the last-saved stock before demo data.
+      var cachedErr = window.ClinicOffline && ClinicOffline.get(_coKey);
+      if (cachedErr && cachedErr.length) {
+        _qsDrugs = cachedErr; renderQsGrid(_qsDrugs); renderQsCategoryChips(); return;
+      }
+      renderQsDemo();
+    }
   }
 
   function renderQsDemo() {
