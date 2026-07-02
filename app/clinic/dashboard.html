@@ -3470,10 +3470,6 @@
           .from('clinic_inventory')
           .select(cols.join(','))
           .eq('clinic_id', clinicId)
-          // Sellable items only: medicines + consumables (pampers, condoms,
-          // etc.). Internal 'material' supplies (drip sets, gloves…) are used in
-          // consultations, not sold over the counter, so they're hidden here.
-          .neq('item_type', 'material')
           .eq('is_active', true)
           .gt('quantity', 0)
           .order('item_name');
@@ -3495,8 +3491,17 @@
         }
       });
 
-      _qsDrugs = r.data;
-      if (window.ClinicOffline) ClinicOffline.set(_coKey, r.data); // cache for offline
+      // Show SELLABLE items only. Everything a clinic/drug shop sells appears —
+      // medicines, and any non-medicine item (consumables like pampers/condoms).
+      // Only INTERNAL materials with no selling price (gloves, drip sets used
+      // during consultations) are hidden. So an item is hidden ONLY when it is
+      // typed 'material' AND has no sell price — otherwise it shows.
+      var sellable = r.data.filter(function(d) {
+        return d.item_type !== 'material' || Number(d.selling_price_ugx) > 0;
+      });
+
+      _qsDrugs = sellable;
+      if (window.ClinicOffline) ClinicOffline.set(_coKey, sellable); // cache for offline
       renderQsGrid(_qsDrugs);
       renderQsCategoryChips();
     } catch(e) {
@@ -4270,6 +4275,6 @@
   loadTopConditions();
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/pwa-install.js?v=20260630d"></script>
+<script src="js/pwa-install.js?v=20260702"></script>
 </body>
 </html>
