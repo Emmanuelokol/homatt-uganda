@@ -3359,6 +3359,33 @@
     var TAP_TIME = 800;  // ms max press duration
     var hasPointer = ('PointerEvent' in window);
 
+    // GHOST-CLICK GUARD. After we handle a tap ourselves, Android still fires a
+    // delayed synthetic click at the same screen coordinates ~100-300ms later.
+    // By then the layout has reflowed (selecting a bottom-row drug card opens
+    // the panel underneath it), so that ghost click used to land on the UGX
+    // total input — focusing it and popping the keyboard uninvited. Swallow any
+    // click in the window right after a handled tap.
+    var _swallowClicksUntil = 0, _swallowX = -1, _swallowY = -1;
+    function armClickSwallow(e) {
+      _swallowClicksUntil = Date.now() + 450;
+      _swallowX = e && typeof e.clientX === 'number' ? e.clientX : -1;
+      _swallowY = e && typeof e.clientY === 'number' ? e.clientY : -1;
+    }
+    document.addEventListener('click', function(e) {
+      if (Date.now() >= _swallowClicksUntil) return;
+      // Ghost clicks land at (almost) the same coordinates as the handled tap.
+      // A genuine fast tap on a DIFFERENT control passes through untouched.
+      var near = _swallowX < 0 ||
+        (Math.abs(e.clientX - _swallowX) + Math.abs(e.clientY - _swallowY)) <= 40;
+      if (!near) return;
+      e.stopPropagation();
+      if (e.cancelable) e.preventDefault();
+      // If the ghost click already focused an input the user never tapped,
+      // release it so the keyboard doesn't appear.
+      var a = document.activeElement;
+      if (a && a.id === 'qsTotalInput' && e.target !== a) a.blur();
+    }, true);
+
     // bindTap(el, handler[, matchFn])
     //   matchFn(target) → element|null  for event delegation (drug grid).
     function bindTap(el, handler, matchFn) {
@@ -3388,6 +3415,7 @@
         if (!t) return;
         e.preventDefault();                           // suppress the late ghost click
         e.stopPropagation();
+        armClickSwallow(e);                           // …and catch it if it fires anyway
         handler(t, e);
       });
       el.addEventListener('pointercancel', function() { active = false; });
@@ -3399,30 +3427,30 @@
 
     var sellBtn = document.getElementById('qsSellBtn');
     if (sellBtn) {
-      // The Sell button has touch-action:none, so the browser can NEVER
-      // reclassify a touch on it as a scroll — that means pointerup is
-      // guaranteed to fire on the very first tap and is never cancelled.
-      // We fire on pointerup (the earliest reliable signal for touch AND
-      // mouse) and keep click as a fallback for browsers without Pointer
-      // Events, deduping the two so a single tap fires exactly one sale.
+      // FIRE ON POINTERDOWN — the very first instant of the touch. This makes
+      // one tap always enough: even when the number keyboard is open, the sale
+      // fires BEFORE the keyboard-dismiss reflow moves the button (which used
+      // to eat the first tap and force a second one). touch-action:none on the
+      // button means a scroll can never start there, so down = intent to sell.
+      // pointerup and click stay as deduped fallbacks for older WebViews.
       var _qsLastFire = 0;
       var clearFx = function() { sellBtn.style.filter = ''; };
       function fireSell(e) {
         if (sellBtn.disabled) return;
         var now = Date.now();
-        if (now - _qsLastFire < 700) return;   // swallow the follow-up ghost click
+        if (now - _qsLastFire < 900) return;   // dedupe down/up/ghost-click trio
         _qsLastFire = now;
         if (e && e.cancelable) e.preventDefault();
-        clearFx();
+        armClickSwallow(e);
+        sellBtn.style.filter = 'brightness(0.75)';
+        setTimeout(clearFx, 180);
         submitQuickSale();
       }
-      sellBtn.addEventListener('pointerdown', function() {
-        if (!sellBtn.disabled) sellBtn.style.filter = 'brightness(0.75)';
-      });
-      sellBtn.addEventListener('pointerup',     fireSell);   // primary: touch + mouse
+      sellBtn.addEventListener('pointerdown',   fireSell);   // primary: instant
+      sellBtn.addEventListener('pointerup',     fireSell);   // fallback (deduped)
       sellBtn.addEventListener('pointercancel', clearFx);
       sellBtn.addEventListener('pointerleave',  clearFx);
-      sellBtn.addEventListener('click',         fireSell);   // fallback / legacy WebView
+      sellBtn.addEventListener('click',         fireSell);   // legacy WebView fallback
     }
 
     bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
@@ -3693,6 +3721,10 @@
     try { updateQsPanel(); }     catch (e) { console.error('qs panel', e); }
   }
 
+  // Pluralise a unit without doubling the s (units are often stored already
+  // plural: "tabs", "pieces" — naive +'s' rendered "96 tabss").
+  function qsPlural(w, n) { return n === 1 ? w : (/s$/i.test(w || '') ? w : (w || '') + 's'); }
+
   // Base (single-unit) selling price.
   function qsBaseUnitPrice(d) { return Number(d.selling_price_ugx) || Number(d.unit_cost_ugx) || 0; }
   // A drug can be sold by pack/box as long as the COUNT is set — the price is
@@ -3746,7 +3778,7 @@
     }
 
     var packLabel = hasPack
-      ? 'Pack (' + d.tabs_per_pack + ' ' + unit + 's) · UGX ' + fmtUGX(qsPackPrice(d))
+      ? 'Pack (' + d.tabs_per_pack + ' ' + qsPlural(unit, Number(d.tabs_per_pack)) + ') · UGX ' + fmtUGX(qsPackPrice(d))
       : '';
     var boxLabel  = hasBox
       ? 'Box (' + d.packs_per_box + ' packs) · UGX ' + fmtUGX(qsBoxPrice(d))
@@ -3787,8 +3819,8 @@
     var availUnits = per > 0 ? Math.floor(baseStock / per) : baseStock;
     var uname = _qsUnitType === 'pack' ? 'pack' : _qsUnitType === 'box' ? 'box' : unit;
     if (stock) {
-      var s = availUnits + ' ' + uname + (availUnits !== 1 ? 's' : '') + ' available';
-      if (_qsUnitType !== 'tab') s += ' · ' + baseStock + ' ' + unit + 's';
+      var s = availUnits + ' ' + qsPlural(uname, availUnits) + ' available';
+      if (_qsUnitType !== 'tab') s += ' · ' + baseStock + ' ' + qsPlural(unit, baseStock);
       stock.textContent = s;
     }
 
@@ -3801,7 +3833,7 @@
 
       if (_qsUnitType === 'pack' || _qsUnitType === 'box') {
         var unitLabel = _qsUnitType === 'pack'
-          ? 'pack (' + (d.tabs_per_pack || '?') + ' ' + unit + 's)'
+          ? 'pack (' + (d.tabs_per_pack || '?') + ' ' + qsPlural(unit, Number(d.tabs_per_pack) || 2) + ')'
           : 'box (' + (d.packs_per_box || '?') + ' packs)';
         priceEl.innerHTML = uPrice
           ? 'Sell per ' + unitLabel + ': <b style="color:#1B5E20">UGX ' + fmtUGX(uPrice) + '</b>'
@@ -3827,10 +3859,10 @@
     var enough = true, warn = '';
     if (availUnits < 1) {
       enough = false;
-      warn = 'Not enough for 1 ' + uname + ' — needs ' + per + ' ' + unit + 's, you have ' + baseStock + '.';
+      warn = 'Not enough for 1 ' + uname + ' — needs ' + per + ' ' + qsPlural(unit, per) + ', you have ' + baseStock + '.';
     } else if (_qsQty > availUnits) {
       enough = false;
-      warn = 'Only ' + availUnits + ' ' + uname + (availUnits !== 1 ? 's' : '') + ' in stock.';
+      warn = 'Only ' + availUnits + ' ' + qsPlural(uname, availUnits) + ' in stock.';
     }
     if (warnEl) { warnEl.style.display = enough ? 'none' : 'block'; warnEl.innerHTML = warn; }
     if (sellBtn) sellBtn.disabled = !enough;
@@ -3881,7 +3913,7 @@
     var baseDeduct = _qsQty * qsBaseUnitsPerSellUnit();
     var stockAfter = Math.max(0, Number(_qsSel.quantity) - baseDeduct);
     var saleUnitLabel = _qsUnitType === 'pack'
-      ? (_qsSel.tabs_per_pack ? 'pack (' + _qsSel.tabs_per_pack + ' ' + (_qsSel.unit||'unit') + 's)' : 'pack')
+      ? (_qsSel.tabs_per_pack ? 'pack (' + _qsSel.tabs_per_pack + ' ' + qsPlural(_qsSel.unit||'unit', Number(_qsSel.tabs_per_pack)) + ')' : 'pack')
       : _qsUnitType === 'box'
       ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
       : (_qsSel.unit || 'unit');
@@ -3989,7 +4021,7 @@
     if (fs) {
       var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
       fs.innerHTML = 'UGX ' + fmtUGX(total) + ' &middot; ' + pay
-        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(unit||'tab') + 's</span>'
+        + '<br><span style="font-size:13px;opacity:.8">Stock left: ' + stockAfter + ' ' + esc(qsPlural(unit||'tab', Number(stockAfter))) + '</span>'
         + (queued ? '<br><span style="font-size:12px;opacity:.9"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Saved offline — will sync when online</span>' : '');
     }
     if (flash) {
