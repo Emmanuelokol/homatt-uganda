@@ -3864,13 +3864,17 @@
     if (momo) momo.classList.toggle('selected', pm === 'momo');
   }
 
-  async function submitQuickSale() {
+  // LOCAL-FIRST sale: one tap → success flash IMMEDIATELY. The sale is written
+  // to the local outbox and pushed to the server in the background, so a slow
+  // connection never makes the Sell button feel dead (which is what made people
+  // tap it many times while it silently awaited the network).
+  function submitQuickSale() {
     if (!_qsSel) return;
     var btn = document.getElementById('qsSellBtn');
     if (!btn || btn.disabled) return;
     btn.disabled = true;
-    btn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite;font-size:18px">hourglass_empty</span> Saving…';
 
+    // Capture everything NOW — the UI resets while the background write runs.
     var price     = qsUnitPrice();
     var total     = qsCurrentTotal();
     // Always deduct in base units (tabs/caps/ml) regardless of sell unit type
@@ -3881,38 +3885,44 @@
       : _qsUnitType === 'box'
       ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
       : (_qsSel.unit || 'unit');
+    var isDemo   = !!_qsSel._isDemo;
+    var invId    = _qsSel.id;
+    var itemName = _qsSel.item_name;
+    var unitName = _qsSel.unit || '';
+    var qty      = _qsQty;
+    var userId   = _qsUserId;
+    var offlineNow = !!(window.ClinicOffline && ClinicOffline.isOffline());
 
-    var queuedOffline = false;
-    try {
-      var clinicId = _qsClinicId || await resolveClinicId();
-      var userId   = _qsUserId;
-      var isDemo   = !!_qsSel._isDemo;
-      var invId    = _qsSel.id;
+    if (!isDemo) {
+      var sale = {
+        clinic_id: null, drug_id: invId, drug_name: itemName,
+        unit: saleUnitLabel, quantity: qty, unit_price_ugx: price, total_ugx: total,
+        payment_method: _qsPm, sold_by: userId, created_at: new Date().toISOString()
+      };
+      // Client-generated id makes retries idempotent: if a push half-completed,
+      // the replay's insert fails as a duplicate and stock is NOT deducted twice.
+      if (window.ClinicOffline && ClinicOffline.uuid) sale.id = ClinicOffline.uuid();
 
-      if (!isDemo && clinicId) {
-        var sale = {
-          clinic_id: clinicId, drug_id: invId, drug_name: _qsSel.item_name,
-          unit: saleUnitLabel, quantity: _qsQty, unit_price_ugx: price, total_ugx: total,
-          payment_method: _qsPm, sold_by: userId, created_at: new Date().toISOString()
-        };
-        var deduct = { clinic_id: clinicId, inventory_id: invId, base_deduct: baseDeduct, unit_label: saleUnitLabel, qty: _qsQty };
-
-        var canTry = supabase && navigator.onLine !== false;
-        var pushed = canTry ? await _pushQuickSale(sale, deduct) : { ok: false, network: true };
-        if (pushed.ok) {
-          if (pushed.stockAfter != null) stockAfter = pushed.stockAfter;
-        } else if (window.ClinicOffline) {
-          // Offline or network failure — queue the sale and deduct stock locally
-          // so the count is right and the sale syncs when the connection returns.
+      var finishWrite = function(cid) {
+        if (!cid) return;                 // no clinic linked — nothing to record
+        sale.clinic_id = cid;
+        var deduct = { clinic_id: cid, inventory_id: invId, base_deduct: baseDeduct, unit_label: saleUnitLabel, qty: qty };
+        _applyLocalStockDeduction(invId, baseDeduct, cid);
+        if (window.ClinicOffline) {
+          // Queue first, then drain in the background: the outbox pushes it now
+          // when online, retries on reconnect otherwise. Nothing is ever lost.
           ClinicOffline.enqueue('quick_sale', { sale: sale, deduct: deduct });
-          _applyLocalStockDeduction(invId, baseDeduct, clinicId);
-          queuedOffline = true;
+          ClinicOffline.flush();
+        } else if (supabase && navigator.onLine !== false) {
+          _pushQuickSale(sale, deduct);   // best effort without the offline layer
         }
-      }
-    } catch(e) {
-      console.warn('Quick sale error:', e && e.message);
+      };
+      var cidNow = _qsClinicId || (session && session.clinicId) || _clinicId || null;
+      if (cidNow) finishWrite(cidNow);
+      else resolveClinicId().then(finishWrite).catch(function(){});
     }
-    showQsSuccess(_qsSel.item_name, _qsQty, total, stockAfter, _qsSel.unit || '', queuedOffline);
+
+    showQsSuccess(itemName, qty, total, stockAfter, unitName, offlineNow);
   }
 
   // Perform the sale against Supabase. Returns {ok, stockAfter, network}.
@@ -3921,6 +3931,11 @@
   async function _pushQuickSale(sale, deduct) {
     try {
       var ins = await supabase.from('clinic_quick_sales').insert(sale);
+      if (ins.error && /duplicate|already exists/i.test(ins.error.message || '')) {
+        // A previous push already recorded this exact sale (client-generated id)
+        // — treat as done and DO NOT deduct the stock a second time.
+        return { ok: true, stockAfter: null };
+      }
       if (ins.error) { console.warn('clinic_quick_sales:', ins.error.message); }
       var stockAfter = null;
       try {
@@ -3983,9 +3998,9 @@
         if (urow)  urow.style.display = 'none';
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
         if (ti)  ti.value = '';
-        loadQsDrugs();
+        loadQsDrugs();   // cache-first → repaints instantly with updated stock
         setTimeout(function() { loadFinancial(_finPeriod); loadRevenue(); }, 300);
-      }, 1600);
+      }, 1100);
     }
   }
 
