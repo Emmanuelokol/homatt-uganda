@@ -900,7 +900,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=5"></script>
+<script src="js/clinic-offline.js?v=6"></script>
 <script src="js/clinic.js?v=20260703"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -979,12 +979,25 @@
     if (_clinicId) return _clinicId;
     if (session && session.clinicId) { _clinicId = session.clinicId; return _clinicId; }
     if (!supabase) return null;
+    // Every dashboard section calls this before its own query, so it must never
+    // hang: cache the result per browser and cap the network lookups.
     try {
-      var su = await supabase.auth.getSession();
+      var cachedCid = window.ClinicOffline && session && session.userId
+        ? ClinicOffline.get('clinic_id_' + session.userId) : null;
+      if (cachedCid) { _clinicId = cachedCid; return _clinicId; }
+    } catch(e) {}
+    try {
+      var TO = function(p) { return window.ClinicOffline ? ClinicOffline.withTimeout(p, 8000) : p; };
+      var su = await TO(supabase.auth.getSession());
+      if (su && su._timeout) return null;
       var uid = su && su.data && su.data.session && su.data.session.user && su.data.session.user.id;
       if (!uid) return null;
-      var pr = await supabase.from('portal_users').select('clinic_id').eq('auth_user_id', uid).eq('is_active', true).maybeSingle();
+      var pr = await TO(supabase.from('portal_users').select('clinic_id').eq('auth_user_id', uid).eq('is_active', true).maybeSingle());
+      if (pr && pr._timeout) return null;
       _clinicId = pr.data && pr.data.clinic_id;
+      if (_clinicId && window.ClinicOffline && session && session.userId) {
+        ClinicOffline.set('clinic_id_' + session.userId, _clinicId);
+      }
     } catch(e) { _clinicId = null; }
     return _clinicId;
   }
@@ -1952,7 +1965,9 @@
       if (useDischargeFilter) q = q.is('discharged_at', null);
       else q = q.gte('created_at', new Date(Date.now() - 14*86400000).toISOString());
 
-      var res = await q;
+      // Cap each attempt so a stalled request can't leave this card loading forever.
+      var res = window.ClinicOffline ? await ClinicOffline.withTimeout(q, 10000) : await q;
+      if (res && res._timeout) { hardError = 'timeout — poor connection'; break; }
       if (!res.error) { rows = res.data || []; break; }
 
       var msg = res.error.message || '';
@@ -1973,9 +1988,14 @@
       hardError = msg; break;   // unrecoverable
     }
     } catch (e) {
-      // Network threw (offline/transient) — fall back to the last saved data.
-      var _atErr = window.ClinicOffline && ClinicOffline.get(_atKey);
-      if (_atErr) rows = _atErr; else hardError = (e && e.message) || 'offline';
+      hardError = (e && e.message) || 'offline';
+    }
+
+    // Any failure (throw, timeout, network error) → serve the last saved data
+    // rather than an error, so the card is useful even on a bad connection.
+    if (rows === null && window.ClinicOffline && ClinicOffline.isNetworkErr(hardError)) {
+      var _atCache2 = ClinicOffline.get(_atKey);
+      if (_atCache2) rows = _atCache2;
     }
 
     if (rows !== null && window.ClinicOffline) ClinicOffline.set(_atKey, rows);
@@ -1991,7 +2011,8 @@
     var bookingIds = rows.map(function(r){ return r.booking_id; }).filter(Boolean);
     if (bookingIds.length) {
       try {
-        var bres = await supabase.from('bookings').select('id,booking_code').in('id', bookingIds);
+        var bq = supabase.from('bookings').select('id,booking_code').in('id', bookingIds);
+        var bres = window.ClinicOffline ? await ClinicOffline.withTimeout(bq, 6000) : await bq;
         var codeById = {};
         (bres.data || []).forEach(function(b){ codeById[b.id] = b.booking_code; });
         rows.forEach(function(r){ if (r.booking_id && codeById[r.booking_id]) r._booking_code = codeById[r.booking_id]; });
@@ -3437,24 +3458,42 @@
   async function loadQsDrugs() {
     var grid = document.getElementById('qsDrugGrid');
     if (!grid) return;
-    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+    // INSTANT FIRST PAINT: if we have saved stock for this clinic, show it
+    // right away (even online) and refresh from the network in the background.
+    // "Loading stock…" only ever appears when there is nothing saved yet.
+    var quickCid = (session && session.clinicId) || _qsClinicId || _clinicId || null;
+    var hadInstant = false;
+    if (window.ClinicOffline && quickCid) {
+      var saved = ClinicOffline.get('qs_inventory_' + quickCid);
+      if (saved && saved.length) {
+        _qsDrugs = saved; renderQsGrid(_qsDrugs); renderQsCategoryChips();
+        hadInstant = true;
+      }
+    }
+    if (!hadInstant) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+    }
 
-    // OFFLINE: never touch the network (it would throw/hang and leave the grid
-    // stuck on "Loading…"). Use the session's clinic id + the last saved stock.
-    // If nothing was saved yet, show a clear message rather than demo drugs.
+    // OFFLINE: stop here — the cache (or a clear message) is all we can show.
     if (window.ClinicOffline && ClinicOffline.isOffline()) {
-      var offCid = (session && session.clinicId) || _clinicId || null;
-      var offCache = offCid ? ClinicOffline.get('qs_inventory_' + offCid) : null;
-      if (offCache && offCache.length) {
-        _qsDrugs = offCache; renderQsGrid(_qsDrugs); renderQsCategoryChips();
-      } else {
+      if (!hadInstant) {
         grid.innerHTML = ClinicOffline.offlineHtml('No saved stock yet.<br>Open Quick Sale once while online and your stock will be available offline.');
       }
       return;
     }
 
-    var clinicId = await resolveClinicId();
-    if (!clinicId || !supabase) { renderQsDemo(); return; }
+    // Resolve the clinic id — capped so a stalled connection can't hang us.
+    var clinicId = quickCid;
+    if (!clinicId) {
+      var cidRace = window.ClinicOffline
+        ? await ClinicOffline.withTimeout(resolveClinicId().then(function(c){ return { data: c }; }), 8000)
+        : { data: await resolveClinicId() };
+      clinicId = cidRace && cidRace.data;
+    }
+    if (!clinicId || !supabase) {
+      if (!hadInstant) renderQsDemo();
+      return;
+    }
     var _coKey = 'qs_inventory_' + clinicId;
     try {
       // Select every useful column, but if the live DB is missing a newer one
@@ -3467,20 +3506,32 @@
                   'packs_per_box','pack_selling_price_ugx','box_selling_price_ugx'];
       var r, guard = 0;
       while (true) {
-        r = await supabase
+        var q = supabase
           .from('clinic_inventory')
           .select(cols.join(','))
           .eq('clinic_id', clinicId)
           .eq('is_active', true)
           .gt('quantity', 0)
           .order('item_name');
+        // Cap every attempt so a stalled request on poor 4G can't hang the sheet.
+        r = window.ClinicOffline ? await ClinicOffline.withTimeout(q, 10000) : await q;
+        if (r && r._timeout) break;
         if (!r.error || guard++ > 8) break;
         var m = (r.error.message || '').match(/'([^']+)' column|column \S*?\.?"?([a-z_]+)"? does not exist/i);
         var bad = m && (m[1] || m[2]);
         if (!bad || cols.indexOf(bad) < 0 || bad === 'id' || bad === 'item_name') break;
         cols = cols.filter(function(c) { return c !== bad; });
       }
-      if (r.error || !r.data || !r.data.length) { renderQsDemo(); return; }
+      if (r.error || !r.data || !r.data.length) {
+        if (hadInstant) return;               // keep the saved stock on screen
+        if (r._timeout || (window.ClinicOffline && ClinicOffline.isNetworkErr(r.error))) {
+          grid.innerHTML = window.ClinicOffline
+            ? ClinicOffline.offlineHtml('Slow connection — couldn’t load stock.<br><button onclick="loadQsDrugs()" style="margin-top:10px;background:#1B5E20;color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit">Retry</button>')
+            : '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Slow connection — reopen Quick Sale to retry.</div>';
+          return;
+        }
+        renderQsDemo(); return;
+      }
 
       // Merge any locally-kept extras (prices/category saved on this device
       // while the DB columns were missing) so Quick Sale still has prices.
@@ -3501,11 +3552,16 @@
         return d.item_type !== 'material' || Number(d.selling_price_ugx) > 0;
       });
 
-      _qsDrugs = sellable;
       if (window.ClinicOffline) ClinicOffline.set(_coKey, sellable); // cache for offline
+      // If the staff member has already selected an item from the instant
+      // cache render, don't rebuild the grid under their fingers — the fresh
+      // data is saved and will show on the next open.
+      if (hadInstant && _qsSel) return;
+      _qsDrugs = sellable;
       renderQsGrid(_qsDrugs);
       renderQsCategoryChips();
     } catch(e) {
+      if (hadInstant) return;                 // saved stock is already on screen
       // Network failed — fall back to the last-saved stock before demo data.
       var cachedErr = window.ClinicOffline && ClinicOffline.get(_coKey);
       if (cachedErr && cachedErr.length) {

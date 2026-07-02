@@ -41,7 +41,24 @@
   function age(key) { var r = raw(key); return r ? Date.now() - r.ts : Infinity; }
   function isOffline() { return navigator.onLine === false; }
 
+  // Race a promise against a timeout so a stalled request on a poor connection
+  // can NEVER hang the UI. Resolves with a supabase-style error result on
+  // timeout (never rejects).
+  var NET_TIMEOUT_MS = 10000;
+  function withTimeout(promise, ms) {
+    return Promise.race([
+      Promise.resolve(promise).catch(function (e) { return { data: null, error: e || { message: 'request failed' } }; }),
+      new Promise(function (resolve) {
+        setTimeout(function () {
+          resolve({ data: null, error: { message: 'timeout — poor connection' }, _timeout: true });
+        }, ms || NET_TIMEOUT_MS);
+      }),
+    ]);
+  }
+
   // run() should return a Promise resolving to a supabase-style {data, error}.
+  // Every call is capped at NET_TIMEOUT_MS so a slow connection falls back to
+  // the cache instead of hanging forever.
   async function cachedQuery(key, run) {
     // Offline: serve cache immediately if we have it.
     if (isOffline()) {
@@ -49,12 +66,12 @@
       if (c) return { data: c.v, error: null, fromCache: true, cachedAt: c.ts };
     }
     try {
-      var res = await run();
+      var res = await withTimeout(run());
       if (res && !res.error && res.data != null) {
         set(key, res.data);
         return { data: res.data, error: null, fromCache: false };
       }
-      var cc = raw(key);                    // query errored → fall back to cache
+      var cc = raw(key);                    // errored / timed out → cache
       if (cc) return { data: cc.v, error: null, fromCache: true, cachedAt: cc.ts };
       return res || { data: null, error: { message: 'No data' } };
     } catch (e) {
@@ -67,7 +84,7 @@
   // Is this error a lost-connection error (or are we simply offline)?
   function isNetworkErr(e) {
     var m = (e && e.message) || String(e || '');
-    return isOffline() || /Failed to fetch|NetworkError|network ?error|ERR_INTERNET|Load failed|fetch/i.test(m);
+    return isOffline() || /Failed to fetch|NetworkError|network ?error|ERR_INTERNET|Load failed|fetch|timeout/i.test(m);
   }
   // Friendly placeholder to show in a section instead of a raw error offline.
   function offlineHtml(msg) {
@@ -175,6 +192,6 @@
     set: set, get: get, age: age, isOffline: isOffline, cachedQuery: cachedQuery,
     enqueue: enqueue, pendingCount: pendingCount, registerSyncHandler: registerSyncHandler,
     flush: flush, updateIndicator: updateIndicator, uuid: uuid,
-    isNetworkErr: isNetworkErr, offlineHtml: offlineHtml,
+    isNetworkErr: isNetworkErr, offlineHtml: offlineHtml, withTimeout: withTimeout,
   };
 })();
