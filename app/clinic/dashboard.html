@@ -681,7 +681,7 @@
     </div>
 
     <!-- Selected drug + controls -->
-    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0">
+    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
         <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
@@ -701,6 +701,7 @@
           <button id="qsPmMomo" type="button" class="qs-pm-chip">MoMo</button>
         </div>
       </div>
+      <div id="qsStockWarn" style="display:none;font-size:12px;color:#C62828;font-weight:600;margin-bottom:8px"></div>
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:13px;font-weight:600;color:#5F6368">UGX</span>
         <input id="qsTotalInput" type="number" min="0" step="100" inputmode="numeric"
@@ -714,7 +715,7 @@
 
     <!-- Sell button -->
     <button id="qsSellBtn" type="button" disabled
-      style="margin:10px 16px;margin-bottom:calc(46px + env(safe-area-inset-bottom, 0px));padding:18px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      style="margin:10px 16px;margin-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
     </button>
@@ -3724,18 +3725,15 @@
     if (nameEl) nameEl.textContent = d.item_name;
     if (qtyEl)  qtyEl.textContent  = _qsQty;
 
-    // Stock shown in base units always
+    // Stock shown precisely in the SELECTED unit (boxes/packs/pieces).
     var baseStock = Number(d.quantity) || 0;
+    var per       = qsBaseUnitsPerSellUnit();          // base units per sell unit
+    var availUnits = per > 0 ? Math.floor(baseStock / per) : baseStock;
+    var uname = _qsUnitType === 'pack' ? 'pack' : _qsUnitType === 'box' ? 'box' : unit;
     if (stock) {
-      var stockStr = baseStock + ' ' + unit + 's in stock';
-      if (_qsUnitType === 'pack' && d.tabs_per_pack) {
-        var availPacks = Math.floor(baseStock / d.tabs_per_pack);
-        stockStr = baseStock + ' ' + unit + 's (' + availPacks + ' packs) in stock';
-      } else if (_qsUnitType === 'box' && d.tabs_per_pack && d.packs_per_box) {
-        var availBoxes = Math.floor(baseStock / (d.tabs_per_pack * d.packs_per_box));
-        stockStr = baseStock + ' ' + unit + 's (' + availBoxes + ' boxes) in stock';
-      }
-      stock.textContent = stockStr;
+      var s = availUnits + ' ' + uname + (availUnits !== 1 ? 's' : '') + ' available';
+      if (_qsUnitType !== 'tab') s += ' · ' + baseStock + ' ' + unit + 's';
+      stock.textContent = s;
     }
 
     if (ti && _qsTotalOverride === null) ti.value = qsCurrentTotal();
@@ -3761,24 +3759,40 @@
         } else if (buy) {
           priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
         } else {
-          priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Drug to add prices</span>';
+          priceEl.innerHTML = '<span style="color:#E65100">⚠ No prices set — tap + New Item to add prices</span>';
         }
       }
     }
+
+    // Stock check: block overselling and explain the exact shortfall so the
+    // maths is clear (e.g. a box needs 200 pieces but only 150 are in stock).
+    var warnEl = document.getElementById('qsStockWarn');
+    var sellBtn = document.getElementById('qsSellBtn');
+    var enough = true, warn = '';
+    if (availUnits < 1) {
+      enough = false;
+      warn = 'Not enough for 1 ' + uname + ' — needs ' + per + ' ' + unit + 's, you have ' + baseStock + '.';
+    } else if (_qsQty > availUnits) {
+      enough = false;
+      warn = 'Only ' + availUnits + ' ' + uname + (availUnits !== 1 ? 's' : '') + ' in stock.';
+    }
+    if (warnEl) { warnEl.style.display = enough ? 'none' : 'block'; warnEl.innerHTML = warn; }
+    if (sellBtn) sellBtn.disabled = !enough;
+  }
+
+  // Whole sellable units of the current unit type that are actually in stock.
+  function qsMaxUnits() {
+    if (!_qsSel) return 0;
+    var baseStock = Number(_qsSel.quantity) || 0;
+    var per = qsBaseUnitsPerSellUnit();
+    return per > 0 ? Math.floor(baseStock / per) : baseStock;
   }
 
   function changeQsQty(delta) {
     if (!_qsSel) return;
-    var baseStock = Number(_qsSel.quantity) || 999;
-    var maxSellUnits;
-    if (_qsUnitType === 'pack' && _qsSel.tabs_per_pack) {
-      maxSellUnits = Math.max(1, Math.floor(baseStock / _qsSel.tabs_per_pack));
-    } else if (_qsUnitType === 'box' && _qsSel.tabs_per_pack && _qsSel.packs_per_box) {
-      maxSellUnits = Math.max(1, Math.floor(baseStock / (_qsSel.tabs_per_pack * _qsSel.packs_per_box)));
-    } else {
-      maxSellUnits = baseStock;
-    }
-    _qsQty = Math.max(1, Math.min(_qsQty + delta, maxSellUnits));
+    var max = qsMaxUnits();                 // real whole units in stock (may be 0)
+    if (max >= 1) _qsQty = Math.max(1, Math.min(_qsQty + delta, max));
+    else _qsQty = 1;                        // can't sell even 1 — Sell stays disabled
     _qsTotalOverride = null;
     var ti = document.getElementById('qsTotalInput');
     if (ti) ti.value = qsCurrentTotal();
