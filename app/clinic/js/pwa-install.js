@@ -21,10 +21,15 @@
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function () {
       navigator.serviceWorker.register('clinic-sw.js', { scope: './' }).then(function (reg) {
-        // Check for a newer version every time the app opens (and periodically),
-        // so staff are never stuck on old code.
-        try { reg.update(); } catch (e) {}
-        setInterval(function () { try { reg.update(); } catch (e) {} }, 60 * 60 * 1000);
+        // Check for a newer version every time the app opens, whenever it
+        // returns to the foreground, and periodically — so staff are never
+        // stuck on old code for long.
+        var check = function () { try { reg.update(); } catch (e) {} };
+        check();
+        setInterval(check, 15 * 60 * 1000);
+        document.addEventListener('visibilitychange', function () {
+          if (!document.hidden) check();
+        });
       }).catch(function () {});
     });
 

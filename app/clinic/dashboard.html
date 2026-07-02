@@ -134,6 +134,10 @@
     @keyframes spin { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }
 
     /* ── Quick Sale POS ── */
+    /* No long-press text selection anywhere in the POS sheet — on Android a
+       long press was selecting label text and popping the "Search" toolbar. */
+    #qsSheet, #qsSellBtn { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+    #qsSheet input { user-select: text; -webkit-user-select: text; }
     .qs-drug-card {
       background: #F8F9FA; border: 2px solid transparent; border-radius: 14px;
       padding: 14px 10px 12px; text-align: center; cursor: pointer;
@@ -3472,10 +3476,26 @@
     });
 
     var totalInput = document.getElementById('qsTotalInput');
-    if (totalInput) totalInput.addEventListener('input', function() {
-      var v = parseFloat(totalInput.value);
-      _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
-    });
+    if (totalInput) {
+      totalInput.addEventListener('input', function() {
+        var v = parseFloat(totalInput.value);
+        _qsTotalOverride = (isFinite(v) && v >= 0) ? v : null;
+      });
+      // ABSOLUTE keyboard guarantee: the amount box is read-only until a finger
+      // actually touches IT. Android never opens a keyboard for a read-only
+      // input, so no ghost click / stray focus can ever pop the keyboard —
+      // only a deliberate tap on the box itself can.
+      totalInput.setAttribute('readonly', 'readonly');
+      totalInput.addEventListener('pointerdown', function() {
+        totalInput.removeAttribute('readonly');
+      });
+      totalInput.addEventListener('touchstart', function() {   // pre-Pointer WebViews
+        totalInput.removeAttribute('readonly');
+      }, { passive: true });
+      totalInput.addEventListener('blur', function() {
+        totalInput.setAttribute('readonly', 'readonly');
+      });
+    }
 
     // Drug cards (dynamically injected) via delegation + the same tap logic.
     bindTap(document.getElementById('qsDrugGrid'),
@@ -3974,8 +3994,16 @@
         return { ok: true, stockAfter: null };
       }
       if (ins.error) {
+        var insMsg = ins.error.message || '';
+        // Auth/RLS failures (expired login, token not yet refreshed) are
+        // temporary — NEVER drop a money record for them. Keep it queued; it
+        // syncs after the session refreshes or the staff signs in again.
+        if (/row-level security|violates|permission|denied|JWT|expired|unauthoriz|401|403/i.test(insMsg)) {
+          console.warn('quick sale kept queued (auth):', insMsg);
+          return { ok: false, network: true };
+        }
         if (window.ClinicOffline && ClinicOffline.isNetworkErr(ins.error)) return { ok: false, network: true };
-        console.warn('clinic_quick_sales:', ins.error.message);
+        console.warn('clinic_quick_sales:', insMsg);
       }
       var stockAfter = null;
       try {
@@ -4400,6 +4428,6 @@
   loadTopConditions();
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/pwa-install.js?v=20260702"></script>
+<script src="js/pwa-install.js?v=20260703"></script>
 </body>
 </html>
