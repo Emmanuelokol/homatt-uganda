@@ -121,27 +121,53 @@
   // dashboard, a consultation from any page that loaded clinic.js, etc.
   function registerSyncHandler(type, fn) { _handlers[type] = fn; if (!isOffline()) flush(); }
 
+  var _retryTimer = null;
+  function _scheduleRetry(ms) {
+    if (_retryTimer) return;
+    _retryTimer = setTimeout(function () { _retryTimer = null; flush(); }, ms || 30000);
+  }
+
   async function flush() {
     if (_syncing || isOffline()) return;
     var list = outbox();
     if (!list.length) { updateIndicator(); return; }
     if (!Object.keys(_handlers).length) return;
     _syncing = true;
+    var anyFailed = false;
     try {
       for (var i = 0; i < list.length; i++) {
         var item = list[i];
         var h = _handlers[item.type];
         if (!h) continue;                 // no handler here — leave for later
         var ok = false;
-        try { ok = await h(item); } catch (e) { ok = false; }
+        try {
+          // Cap each push at 20s so a request stalled on very slow internet can
+          // never wedge the queue with _syncing stuck true. Handlers return the
+          // boolean true when done; a timeout token object is NOT true → retry.
+          var r = await withTimeout(h(item), 20000);
+          ok = (r === true);
+        } catch (e) { ok = false; }
         if (ok) saveOutbox(outbox().filter(function (x) { return x.id !== item.id; }));
+        else anyFailed = true;
         // keep failures; they retry on the next flush (order within a type holds)
       }
     } finally {
       _syncing = false;
       updateIndicator();
+      // Slow-but-online connections: keep retrying automatically until the
+      // queue drains — the user never has to do anything.
+      if (anyFailed && !isOffline()) _scheduleRetry(30000);
     }
   }
+
+  // Safety nets: retry every 60s while anything is pending, and whenever the
+  // app returns to the foreground.
+  setInterval(function () { if (pendingCount() > 0) flush(); }, 60000);
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && pendingCount() > 0) flush();
+    });
+  } catch (e) {}
 
   // ── Offline / sync status banner ─────────────────────────────────────────
   function updateIndicator() {

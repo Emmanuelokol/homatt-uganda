@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v9';
+const CACHE = 'homatt-clinic-v10';
 
 // Cross-origin libraries the pages need to even boot.
 const VENDOR = [
@@ -30,7 +30,7 @@ const SHELL = [
   'clinic.webmanifest',
   'css/clinic.css?v=20260627',
   'js/clinic.js?v=20260703',
-  'js/clinic-offline.js?v=6',
+  'js/clinic-offline.js?v=7',
   'js/new-order-wizard.js?v=20260627',
   'js/pwa-install.js?v=20260702',
   '../js/config.js',

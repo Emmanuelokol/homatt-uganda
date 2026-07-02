@@ -900,7 +900,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=6"></script>
+<script src="js/clinic-offline.js?v=7"></script>
 <script src="js/clinic.js?v=20260703"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -3929,21 +3929,29 @@
   //  ok:false + network:true  → transient/offline, caller should queue it.
   //  ok:true                  → recorded (or a non-network server error we log).
   async function _pushQuickSale(sale, deduct) {
+    var TO = function(p, ms) { return window.ClinicOffline ? ClinicOffline.withTimeout(p, ms) : p; };
     try {
-      var ins = await supabase.from('clinic_quick_sales').insert(sale);
+      // Cap the insert at 12s: on very slow internet a stalled request resolves
+      // as a timeout and the sale is retried later — the client-generated id
+      // makes that retry a duplicate, so it can never double-record.
+      var ins = await TO(supabase.from('clinic_quick_sales').insert(sale), 12000);
+      if (ins && ins._timeout) return { ok: false, network: true };
       if (ins.error && /duplicate|already exists/i.test(ins.error.message || '')) {
         // A previous push already recorded this exact sale (client-generated id)
         // — treat as done and DO NOT deduct the stock a second time.
         return { ok: true, stockAfter: null };
       }
-      if (ins.error) { console.warn('clinic_quick_sales:', ins.error.message); }
+      if (ins.error) {
+        if (window.ClinicOffline && ClinicOffline.isNetworkErr(ins.error)) return { ok: false, network: true };
+        console.warn('clinic_quick_sales:', ins.error.message);
+      }
       var stockAfter = null;
       try {
-        var adj = await supabase.rpc('adjust_inventory', {
+        var adj = await TO(supabase.rpc('adjust_inventory', {
           p_clinic_id: deduct.clinic_id, p_inventory_id: deduct.inventory_id,
           p_qty_change: -deduct.base_deduct, p_txn_type: 'deduction',
           p_notes: 'Quick Sale — ' + deduct.qty + ' × ' + deduct.unit_label
-        });
+        }), 12000);
         if (!adj.error && adj.data && typeof adj.data.quantity_after !== 'undefined') {
           stockAfter = Number(adj.data.quantity_after);
         }
