@@ -656,7 +656,7 @@
       <div style="display:flex;gap:6px;align-items:center">
         <button id="qsAddDrugBtn" type="button"
           style="background:#E8F5E9;border:1.5px solid #A5D6A7;color:#1B5E20;border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
-          <span class="material-icons-outlined" style="font-size:16px">add</span> New Drug
+          <span class="material-icons-outlined" style="font-size:16px">add</span> New Item
         </button>
         <button id="qsCloseBtn" type="button" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
           <span class="material-icons-outlined">close</span>
@@ -667,7 +667,7 @@
     <!-- Search -->
     <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
       <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
-      <input id="qsSearch" type="text" placeholder="Search drug…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
         oninput="filterQsDrugs(this.value)"
         style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
     </div>
@@ -784,10 +784,11 @@
       <div>
         <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Type *</label>
         <select id="siType" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
-          <option value="medicine">Medicine</option>
-          <option value="material">Material</option>
-          <option value="consumable">Consumable</option>
+          <option value="medicine">Medicine — sold in Quick Sale</option>
+          <option value="consumable">Other item you sell (pampers, condoms…) — Quick Sale</option>
+          <option value="material">Material — used in the clinic, not sold</option>
         </select>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Medicines &amp; sellable items appear in Quick Sale. “Material” is for internal supplies (drip sets, gloves) used during consultations.</div>
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
@@ -3469,7 +3470,10 @@
           .from('clinic_inventory')
           .select(cols.join(','))
           .eq('clinic_id', clinicId)
-          .eq('item_type', 'medicine')
+          // Sellable items only: medicines + consumables (pampers, condoms,
+          // etc.). Internal 'material' supplies (drip sets, gloves…) are used in
+          // consultations, not sold over the counter, so they're hidden here.
+          .neq('item_type', 'material')
           .eq('is_active', true)
           .gt('quantity', 0)
           .order('item_name');
@@ -3513,6 +3517,8 @@
       {id:'qs-d4',item_name:'Metronidazole 400mg', unit:'tab',unit_cost_ugx:800, selling_price_ugx:1200,quantity:150,category:'Digestive',     tabs_per_pack:10,packs_per_box:10,pack_selling_price_ugx:10500,box_selling_price_ugx:98000,_isDemo:true},
       {id:'qs-d5',item_name:'Ibuprofen 400mg',     unit:'tab',unit_cost_ugx:600, selling_price_ugx:1000,quantity:120,category:'Pain / Fever',  tabs_per_pack:10,packs_per_box:10,pack_selling_price_ugx:8500,box_selling_price_ugx:80000,_isDemo:true},
       {id:'qs-d6',item_name:'Cotrimoxazole 480mg', unit:'tab',unit_cost_ugx:500, selling_price_ugx:800, quantity:90, category:'Antibiotics',   tabs_per_pack:10,packs_per_box:5, pack_selling_price_ugx:7000,box_selling_price_ugx:33000,_isDemo:true},
+      {id:'qs-d7',item_name:'Pampers (M)',         unit:'piece',unit_cost_ugx:800,selling_price_ugx:1200,quantity:60, category:'Consumable',    tabs_per_pack:10,packs_per_box:null,pack_selling_price_ugx:11000,box_selling_price_ugx:null,_isDemo:true},
+      {id:'qs-d8',item_name:'Condoms',             unit:'piece',unit_cost_ugx:200,selling_price_ugx:500, quantity:120,category:'Consumable',    tabs_per_pack:3, packs_per_box:null,pack_selling_price_ugx:1200,box_selling_price_ugx:null,_isDemo:true},
     ];
     renderQsGrid(_qsDrugs);
     renderQsCategoryChips();
@@ -3524,7 +3530,7 @@
     if (!items.length) {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:#9AA0A6;font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:36px;display:block;margin-bottom:10px;color:#CFD8DC">inventory_2</span>'
-        + 'No drugs in stock yet. Tap <strong style="color:#1B5E20">+ New Drug</strong> above to add your first item.'
+        + 'No sellable items in stock yet. Tap <strong style="color:#1B5E20">+ New Item</strong> above to add medicines or other items you sell (pampers, condoms…).'
         + '</div>';
       return;
     }
