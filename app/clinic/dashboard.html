@@ -959,7 +959,9 @@
   // section registers into _svRenderers below (script runs top-to-bottom —
   // registering into an uninitialised registry aborted the whole script).
   // ═══════════════════════════════════════════════════════
-  var _svRenderers = {};   // key -> { title, render(bodyEl, query) }
+  // Window-backed and self-initialising AT EVERY USE SITE, so no code ordering
+  // (in this or any cached copy of the page) can ever crash on registration.
+  var _svRenderers = window._svRenderers = window._svRenderers || {};
   var _svCurrentKey = null;
 
   // Re-render the open full view after data reloads (e.g. a restock or a
@@ -2835,7 +2837,7 @@
   }
 
   // FULL VIEW: every pending payment, searchable by name / phone / diagnosis.
-  _svRenderers.payments = { title: 'Pending Payments', render: function(body, q) {
+  (window._svRenderers = window._svRenderers || {}).payments = { title: 'Pending Payments', render: function(body, q) {
     var rows = (_payRows || []).filter(function(r) {
       if (!q) return true;
       return (String(r.patient_name||'') + ' ' + String(r.patient_phone||'') + ' ' + String(r.confirmed_diagnosis||''))
@@ -3193,7 +3195,7 @@
   }
 
   // FULL VIEW: every item, grouped by type, filtered by the search box.
-  _svRenderers.stock = { title: 'Stock Tracker', render: function(body, q) {
+  (window._svRenderers = window._svRenderers || {}).stock = { title: 'Stock Tracker', render: function(body, q) {
     var items = (_stockItems || []).filter(function(i) {
       return !q || String(i.item_name).toLowerCase().indexOf(q) >= 0;
     });
@@ -4395,7 +4397,7 @@
   }
 
   // FULL VIEW: every condition in the period, searchable by name.
-  _svRenderers.conditions = { title: 'Conditions & Treatments', render: function(body, q) {
+  (window._svRenderers = window._svRenderers || {}).conditions = { title: 'Conditions & Treatments', render: function(body, q) {
     var d = _condData;
     if (!d || !d.all.length) {
       _svSetCount('');

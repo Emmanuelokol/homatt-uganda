@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v14';
+const CACHE = 'homatt-clinic-v15';
 
 // Cross-origin libraries the pages need to even boot.
 const VENDOR = [
