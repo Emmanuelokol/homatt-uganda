@@ -953,6 +953,63 @@
     });
   }
 
+  // ═══════════════════════════════════════════════════════
+  // SECTION FULL VIEWS — Home shows top-N summaries; "View all" (or the
+  // sidebar) opens a full-screen searchable list. MUST be defined before any
+  // section registers into _svRenderers below (script runs top-to-bottom —
+  // registering into an uninitialised registry aborted the whole script).
+  // ═══════════════════════════════════════════════════════
+  var _svRenderers = {};   // key -> { title, render(bodyEl, query) }
+  var _svCurrentKey = null;
+
+  // Re-render the open full view after data reloads (e.g. a restock or a
+  // recorded payment), so it never shows stale rows.
+  function refreshSectionView() {
+    var ov = document.getElementById('svOverlay');
+    if (!ov || ov.style.display === 'none' || !ov.style.display || !_svCurrentKey) return;
+    var cfg = _svRenderers[_svCurrentKey];
+    if (!cfg) return;
+    var si = document.getElementById('svSearch');
+    cfg.render(document.getElementById('svBody'), ((si && si.value) || '').trim().toLowerCase());
+  }
+
+  function openSectionView(key) {
+    var cfg = _svRenderers[key];
+    var ov  = document.getElementById('svOverlay');
+    if (!cfg || !ov) return;
+    _svCurrentKey = key;
+    document.getElementById('svTitle').textContent = cfg.title;
+    var si = document.getElementById('svSearch');
+    si.value = '';
+    ov.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    var body = document.getElementById('svBody');
+    var doRender = function() { cfg.render(body, (si.value || '').trim().toLowerCase()); };
+    si.oninput = doRender;
+    doRender();
+    // Close the sidebar if the view was opened from the hamburger menu
+    var sb = document.querySelector('.admin-sidebar');
+    if (sb) sb.classList.remove('open');
+    var so = document.getElementById('_sidebarOverlay');
+    if (so) so.classList.remove('active');
+  }
+  function closeSectionView() {
+    var ov = document.getElementById('svOverlay');
+    if (ov) ov.style.display = 'none';
+    document.body.style.overflow = '';
+    _svCurrentKey = null;
+  }
+  function _svViewAllBtn(key, label) {
+    return '<button onclick="openSectionView(\'' + key + '\')" '
+      + 'style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:#F5F7FA;'
+      + 'color:#1B5E20;border:1.5px solid #C8E6C9;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">'
+      + label + ' <span class="material-icons-outlined" style="font-size:16px">arrow_forward</span></button>';
+  }
+  function _svSetCount(txt) {
+    var c = document.getElementById('svCount');
+    if (c) c.textContent = txt || '';
+  }
+
   // Refresh the staff role straight from the DB so changes the owner makes
   // take effect on next load (and sessions created before roles existed get
   // their real role). Fail-safe: on any error we keep the current role.
@@ -3012,62 +3069,6 @@
       .subscribe();
   }
   setupRealtime();
-
-  // ═══════════════════════════════════════════════════════
-  // SECTION FULL VIEWS — Home shows top-N summaries; "View all" (or the
-  // sidebar) opens a full-screen searchable list. Sections will grow to
-  // hundreds of rows, so the home page stays a quick overview.
-  // ═══════════════════════════════════════════════════════
-  var _svRenderers = {};   // key -> { title, render(bodyEl, query) }
-  var _svCurrentKey = null;
-
-  // Re-render the open full view after data reloads (e.g. a restock or a
-  // recorded payment), so it never shows stale rows.
-  function refreshSectionView() {
-    var ov = document.getElementById('svOverlay');
-    if (!ov || ov.style.display === 'none' || !ov.style.display || !_svCurrentKey) return;
-    var cfg = _svRenderers[_svCurrentKey];
-    if (!cfg) return;
-    var si = document.getElementById('svSearch');
-    cfg.render(document.getElementById('svBody'), ((si && si.value) || '').trim().toLowerCase());
-  }
-
-  function openSectionView(key) {
-    var cfg = _svRenderers[key];
-    var ov  = document.getElementById('svOverlay');
-    if (!cfg || !ov) return;
-    _svCurrentKey = key;
-    document.getElementById('svTitle').textContent = cfg.title;
-    var si = document.getElementById('svSearch');
-    si.value = '';
-    ov.style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-    var body = document.getElementById('svBody');
-    var doRender = function() { cfg.render(body, (si.value || '').trim().toLowerCase()); };
-    si.oninput = doRender;
-    doRender();
-    // Close the sidebar if the view was opened from the hamburger menu
-    var sb = document.querySelector('.admin-sidebar');
-    if (sb) sb.classList.remove('open');
-    var so = document.getElementById('_sidebarOverlay');
-    if (so) so.classList.remove('active');
-  }
-  function closeSectionView() {
-    var ov = document.getElementById('svOverlay');
-    if (ov) ov.style.display = 'none';
-    document.body.style.overflow = '';
-    _svCurrentKey = null;
-  }
-  function _svViewAllBtn(key, label) {
-    return '<button onclick="openSectionView(\'' + key + '\')" '
-      + 'style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:#F5F7FA;'
-      + 'color:#1B5E20;border:1.5px solid #C8E6C9;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">'
-      + label + ' <span class="material-icons-outlined" style="font-size:16px">arrow_forward</span></button>';
-  }
-  function _svSetCount(txt) {
-    var c = document.getElementById('svCount');
-    if (c) c.textContent = txt || '';
-  }
 
   // ═══════════════════════════════════════════════════════
   // INVENTORY & STOCK TRACKER
