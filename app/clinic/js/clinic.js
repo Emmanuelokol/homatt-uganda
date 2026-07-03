@@ -326,3 +326,38 @@ async function _replayConsultation(bundle) {
 if (window.ClinicOffline) {
   ClinicOffline.registerSyncHandler('consultation', function (item) { return _replayConsultation(item.payload); });
 }
+
+/* ── Generic offline RPC replay ────────────────────────────────────────────
+ * Any queued { fn, args } (Record Payment, Restock, etc.) replays here once
+ * online. args carry a client p_op_id and the server has idempotent 6-arg
+ * overloads, so a retry after a lost ack returns the first result instead of
+ * applying the write twice. If those overloads aren't deployed yet, we retry
+ * once without p_op_id so the write still lands (idempotency resumes when the
+ * migration applies).
+ */
+async function _replayRpc(payload) {
+  var supa = _getClinicSupabase();
+  if (!supa || !payload || !payload.fn) return !supa ? false : true;
+  var fn = payload.fn, args = payload.args || {};
+  try {
+    var r = await supa.rpc(fn, args);
+    if (r.error && ('p_op_id' in args) &&
+        /could not find the function|p_op_id|does not exist|without parameters/i.test(r.error.message || '')) {
+      var a2 = {};
+      for (var k in args) { if (k !== 'p_op_id' && Object.prototype.hasOwnProperty.call(args, k)) a2[k] = args[k]; }
+      r = await supa.rpc(fn, a2);
+    }
+    if (r.error) return false;                 // transport/db/auth error → keep & retry
+    if (r.data && r.data.ok === false) {       // server ran but rejected → permanent, drop
+      console.warn('replay rpc rejected:', fn, r.data.error);
+      return true;
+    }
+    return true;                               // ok (or idempotent duplicate) → done
+  } catch (e) {
+    return false;                              // network threw → keep & retry
+  }
+}
+
+if (window.ClinicOffline) {
+  ClinicOffline.registerSyncHandler('rpc', function (item) { return _replayRpc(item.payload); });
+}

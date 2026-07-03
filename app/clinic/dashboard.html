@@ -949,8 +949,8 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=8"></script>
-<script src="js/clinic.js?v=20260703"></script>
+<script src="js/clinic-offline.js?v=9"></script>
+<script src="js/clinic.js?v=20260704"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -1973,31 +1973,27 @@
         Object.assign(current, ur.data || {});
       }
 
-      // Optional payment — uses the same RPC the existing payment modal uses
+      // Optional payment — same idempotent/offline-safe path as the payment modal.
       if (paymentAmt > 0) {
-        var pr = await supabase.rpc('record_payment', {
-          p_diagnosis_id: current.id,
-          p_amount:       paymentAmt,
-          p_method:       paymentMtd,
-          p_reference:    null,
-          p_notes:        'Follow-up payment',
-        });
-        if (pr.error) throw pr.error;
+        var prRes = await recordPaymentSafe(current.id, paymentAmt, paymentMtd, null, 'Follow-up payment');
         current.amount_paid = (Number(current.amount_paid) || 0) + paymentAmt;
         if (current.amount_paid >= (Number(current.total_charged_ugx) || 0)) {
           current.payment_status = 'paid';
         }
-        // Send the patient a receipt push (fire-and-forget) like the payment modal
-        var prData = pr.data || {};
-        supabase.functions.invoke('payment-notify', {
-          body: {
-            diagnosisId:    current.id,
-            amountReceived: paymentAmt,
-            balance:        Number(prData.balance) || 0,
-            fullyPaid:      Boolean(prData.fully_paid),
-            method:         paymentMtd,
-          },
-        }).catch(function(e){ console.warn('[payment-notify] follow-up receipt failed', e); });
+        // Send the patient a receipt push (fire-and-forget), only when it went
+        // through online — a queued offline payment sends its receipt on sync.
+        if (!prRes.queued) {
+          var prData = prRes.data || {};
+          supabase.functions.invoke('payment-notify', {
+            body: {
+              diagnosisId:    current.id,
+              amountReceived: paymentAmt,
+              balance:        Number(prData.balance) || 0,
+              fullyPaid:      Boolean(prData.fully_paid),
+              method:         paymentMtd,
+            },
+          }).catch(function(e){ console.warn('[payment-notify] follow-up receipt failed', e); });
+        }
       }
 
       showToast('Follow-up saved', 'success');
@@ -2732,6 +2728,10 @@
     return new Date(iso).toLocaleDateString('en-UG', { day:'numeric', month:'short' });
   }
 
+  // Cache key for the pending-payments list; set on each load so offline
+  // payment writes can optimistically fold themselves into the same cache.
+  var _pendingPayKey = null;
+
   async function loadPendingPayments() {
     var listEl  = document.getElementById('pendingPaymentsList');
     var totalEl = document.getElementById('pendingPaymentsTotal');
@@ -2744,43 +2744,79 @@
       return;
     }
 
-    // Try the RPC first; fall back to a direct query if not deployed yet
-    var rows = [];
-    var res = await supabase.rpc('get_pending_payments', { p_clinic_id: clinicId });
-    if (res.error && (res.error.message||'').toLowerCase().indexOf('could not find the function') !== -1) {
-      var fallback = await supabase
-        .from('clinic_diagnoses')
-        .select('id,patient_name,patient_phone,confirmed_diagnosis,total_charged_ugx,amount_paid,payment_status,created_at')
-        .eq('clinic_id', clinicId)
-        .in('payment_status', ['pending','partial','credit'])
-        .order('created_at', { ascending: false });
-      if (fallback.error) {
-        listEl.innerHTML =
-          '<div style="padding:20px;margin:8px 14px;background:#FFF8E1;border:1.5px solid #FFE082;border-radius:10px;color:#5D4037;font-size:13px;line-height:1.55">'
-          +'<strong>Migration needed:</strong> Run <code style="font-size:11px">20260518_clinic_payments.sql</code> in Supabase SQL Editor to enable installment tracking.'
-          +'</div>';
-        if (totalEl) totalEl.textContent = '';
-        if (countEl) countEl.textContent = '';
-        return;
-      }
-      rows = (fallback.data || []).map(function(d){
-        var bal = Math.max(0, (Number(d.total_charged_ugx)||0) - (Number(d.amount_paid)||0));
-        return {
-          id: d.id, patient_name: d.patient_name, patient_phone: d.patient_phone,
-          confirmed_diagnosis: d.confirmed_diagnosis,
-          total_charged_ugx: d.total_charged_ugx, amount_paid: d.amount_paid || 0,
-          balance_ugx: bal, payment_status: d.payment_status,
-          created_at: d.created_at, last_payment_at: null,
-        };
-      }).filter(function(d){ return d.balance_ugx > 0; });
-    } else if (res.error) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading payments: '+esc(res.error.message)+'</div>';
-      return;
-    } else {
-      rows = res.data || [];
+    var CO = window.ClinicOffline;
+    var cacheKey = 'pending_payments_' + clinicId;
+    _pendingPayKey = cacheKey;
+
+    function offlinePlaceholder() {
+      listEl.innerHTML = CO
+        ? CO.offlineHtml('Outstanding balances will show here once loaded online.')
+        : '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Offline.</div>';
+      if (totalEl) totalEl.textContent = '';
+      if (countEl) countEl.textContent = '';
     }
 
-    if (!rows.length) {
+    var rows = null;
+
+    // Offline → serve the last cached list immediately (never hit the network).
+    if (CO && CO.isOffline()) {
+      rows = CO.get(cacheKey, null);
+      if (rows == null) { offlinePlaceholder(); return; }
+    } else {
+      // Try the RPC first; fall back to a direct query if not deployed yet.
+      var res = await (CO
+        ? CO.withTimeout(supabase.rpc('get_pending_payments', { p_clinic_id: clinicId }))
+        : supabase.rpc('get_pending_payments', { p_clinic_id: clinicId }));
+      if (res.error && (res.error.message||'').toLowerCase().indexOf('could not find the function') !== -1) {
+        var fallback = await supabase
+          .from('clinic_diagnoses')
+          .select('id,patient_name,patient_phone,confirmed_diagnosis,total_charged_ugx,amount_paid,payment_status,created_at')
+          .eq('clinic_id', clinicId)
+          .in('payment_status', ['pending','partial','credit'])
+          .order('created_at', { ascending: false });
+        if (fallback.error) {
+          // A dropped connection mid-request → fall back to the cache, not an error.
+          if (CO && CO.isNetworkErr(fallback.error)) {
+            rows = CO.get(cacheKey, null);
+            if (rows == null) { offlinePlaceholder(); return; }
+          } else {
+            listEl.innerHTML =
+              '<div style="padding:20px;margin:8px 14px;background:#FFF8E1;border:1.5px solid #FFE082;border-radius:10px;color:#5D4037;font-size:13px;line-height:1.55">'
+              +'<strong>Migration needed:</strong> Run <code style="font-size:11px">20260518_clinic_payments.sql</code> in Supabase SQL Editor to enable installment tracking.'
+              +'</div>';
+            if (totalEl) totalEl.textContent = '';
+            if (countEl) countEl.textContent = '';
+            return;
+          }
+        } else {
+          rows = (fallback.data || []).map(function(d){
+            var bal = Math.max(0, (Number(d.total_charged_ugx)||0) - (Number(d.amount_paid)||0));
+            return {
+              id: d.id, patient_name: d.patient_name, patient_phone: d.patient_phone,
+              confirmed_diagnosis: d.confirmed_diagnosis,
+              total_charged_ugx: d.total_charged_ugx, amount_paid: d.amount_paid || 0,
+              balance_ugx: bal, payment_status: d.payment_status,
+              created_at: d.created_at, last_payment_at: null,
+            };
+          }).filter(function(d){ return d.balance_ugx > 0; });
+        }
+      } else if (res.error) {
+        // Network error while "online" (e.g. timeout) → serve cache if we have it.
+        if (CO && CO.isNetworkErr(res.error)) {
+          rows = CO.get(cacheKey, null);
+          if (rows == null) { offlinePlaceholder(); return; }
+        } else {
+          listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading payments: '+esc(res.error.message)+'</div>';
+          return;
+        }
+      } else {
+        rows = res.data || [];
+      }
+      // Cache the fresh list so it's available on the next offline open.
+      if (rows != null && CO) CO.set(cacheKey, rows);
+    }
+
+    if (!rows || !rows.length) {
       listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '0';
@@ -2879,6 +2915,74 @@
     _wirePayButtons(body);
   }};
 
+  // Fold a payment into the cached pending-payments list so the balance drops
+  // instantly (and survives a reload) even while the write is only queued.
+  function _applyPaymentToCache(diagnosisId, amount) {
+    var CO = window.ClinicOffline;
+    if (!CO || !_pendingPayKey) return;
+    var rows = CO.get(_pendingPayKey, null);
+    if (rows == null) return;
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var d = rows[i];
+      if (d.id === diagnosisId) {
+        var paid  = (Number(d.amount_paid) || 0) + amount;
+        var total = Number(d.total_charged_ugx) || 0;
+        var bal   = Math.max(0, total - paid);
+        d = Object.assign({}, d, {
+          amount_paid: paid, balance_ugx: bal,
+          payment_status: bal <= 0 ? 'paid' : 'partial',
+        });
+        if (bal <= 0) continue;   // fully paid → drops off the pending list
+      }
+      out.push(d);
+    }
+    CO.set(_pendingPayKey, out);
+  }
+
+  // Record a payment online (idempotently, via the op-id overload) or, when
+  // there's no connection, queue it for sync and apply it locally. Returns
+  // { queued: bool, data: {...} }. A dropped connection is never an error here —
+  // it means "saved, will sync", exactly like Google Docs offline edits.
+  async function recordPaymentSafe(diagnosisId, amount, method, reference, notes) {
+    var CO = window.ClinicOffline;
+    var opId = CO ? CO.uuid() : null;
+    var base = {
+      p_diagnosis_id: diagnosisId, p_amount: amount, p_method: method,
+      p_reference: reference || null, p_notes: notes || null,
+    };
+
+    // Offline → straight to the outbox, optimistic local update.
+    if (CO && CO.isOffline()) {
+      CO.enqueueRpc('record_payment', Object.assign({ p_op_id: opId }, base));
+      _applyPaymentToCache(diagnosisId, amount);
+      return { queued: true, data: { ok: true } };
+    }
+
+    // Online → idempotent 6-arg call; fall back to the 5-arg form if the
+    // op-id overload isn't deployed on this DB yet.
+    var withOp = Object.assign({ p_op_id: opId }, base);
+    var r = CO ? await CO.withTimeout(supabase.rpc('record_payment', withOp))
+               : await supabase.rpc('record_payment', withOp);
+    if (r.error && /could not find the function|p_op_id|without parameters|does not exist/i.test(r.error.message || '')) {
+      r = CO ? await CO.withTimeout(supabase.rpc('record_payment', base))
+             : await supabase.rpc('record_payment', base);
+    }
+    if (r.error) {
+      // Lost the connection mid-request → queue it with the SAME op id, so if it
+      // did reach the server the replay won't charge twice.
+      if (CO && CO.isNetworkErr(r.error)) {
+        CO.enqueueRpc('record_payment', Object.assign({ p_op_id: opId }, base));
+        _applyPaymentToCache(diagnosisId, amount);
+        return { queued: true, data: { ok: true } };
+      }
+      throw r.error;
+    }
+    var data = r.data || {};
+    if (data.ok === false) throw new Error(data.error || 'Failed to record payment');
+    return { queued: false, data: data };
+  }
+
   function openPaymentModal(diagnosisId, patientName, total, paid, balance) {
     _paymentContext = {
       diagnosisId: diagnosisId, patientName: patientName,
@@ -2934,16 +3038,22 @@
     btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
 
     try {
-      var r = await supabase.rpc('record_payment', {
-        p_diagnosis_id: _paymentContext.diagnosisId,
-        p_amount:       amount,
-        p_method:       method,
-        p_reference:    ref,
-        p_notes:        notes,
-      });
-      if (r.error) throw r.error;
-      var data = r.data || {};
-      if (data.ok === false) throw new Error(data.error || 'Failed to record payment');
+      var result = await recordPaymentSafe(_paymentContext.diagnosisId, amount, method, ref, notes);
+
+      // Saved offline (or lost the connection mid-request) — it's queued and the
+      // balance already updated locally. Close up and let it sync in the
+      // background; no receipt push is possible without a connection.
+      if (result.queued) {
+        showDischargeToast('Payment of UGX '+fmtUGX(amount)+' saved offline — it will sync and send the receipt when you reconnect.', 'success');
+        document.getElementById('paymentModal').style.display = 'none';
+        loadPendingPayments();
+        loadRevenue();
+        loadFinancial(_finPeriod);
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">payments</span> Record Payment';
+        return;
+      }
+      var data = result.data;
 
       // Push receipt to patient (fire-and-forget but surface result)
       var notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' recorded.';
@@ -3104,6 +3214,10 @@
   // INVENTORY & STOCK TRACKER
   // ═══════════════════════════════════════════════════════
 
+  // Cache key for the stock list; set on each load so offline restocks can
+  // optimistically fold themselves into the same cache.
+  var _stockCacheKey = null;
+
   async function loadInventory() {
     var listEl   = document.getElementById('stockList');
     var banner   = document.getElementById('lowStockBanner');
@@ -3117,38 +3231,68 @@
       return;
     }
 
+    var CO = window.ClinicOffline;
+    _stockCacheKey = 'stock_' + clinicId;
+
     try {
-      // Try the RPC first; fall back to direct table query if migration not yet applied
-      var res = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
       var items;
-      if (res.error && (res.error.message.includes('get_clinic_stock') || res.error.message.includes('Could not find the function') || res.error.message.includes('clinic_inventory'))) {
-        // Migration not applied yet — direct table query with client-side flag computation
-        var direct = await supabase
-          .from('clinic_inventory')
-          .select('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx')
-          .eq('clinic_id', clinicId)
-          .eq('is_active', true)
-          .order('item_name');
-        if (direct.error) {
-          // clinic_inventory table itself doesn't exist yet
-          listEl.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 16px;margin:12px 16px;font-size:13px;color:#5D4037;display:flex;align-items:flex-start;gap:10px">'
-            +'<span class="material-icons-outlined" style="font-size:20px;color:#F9A825;flex-shrink:0">info</span>'
-            +'<div><strong>Apply migrations to enable Stock Tracker.</strong><br>Run both files in Supabase SQL Editor:<br>'
-            +'<code style="font-size:11px">20260516_patch_discharged_at.sql</code><br>'
-            +'<code style="font-size:11px">20260516_clinic_inventory.sql</code></div>'
-            +'</div>';
+
+      // Offline → serve the last cached stock immediately.
+      if (CO && CO.isOffline()) {
+        items = CO.get(_stockCacheKey, null);
+        if (items == null) {
+          listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.');
+          if (banner) banner.style.display = 'none';
           return;
         }
-        items = (direct.data || []).map(function(i) {
-          return Object.assign({}, i, {
-            is_low_stock: Number(i.quantity) <= Number(i.min_threshold),
-            is_critical:  Number(i.quantity) === 0,
-          });
-        });
-      } else if (res.error) {
-        throw res.error;
       } else {
-        items = res.data || [];
+        // Try the RPC first; fall back to direct table query if migration not yet applied
+        var res = await (CO
+          ? CO.withTimeout(supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId }))
+          : supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId }));
+        if (res.error && (res.error.message.includes('get_clinic_stock') || res.error.message.includes('Could not find the function') || res.error.message.includes('clinic_inventory'))) {
+          // Migration not applied yet — direct table query with client-side flag computation
+          var direct = await supabase
+            .from('clinic_inventory')
+            .select('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx')
+            .eq('clinic_id', clinicId)
+            .eq('is_active', true)
+            .order('item_name');
+          if (direct.error) {
+            if (CO && CO.isNetworkErr(direct.error)) {
+              items = CO.get(_stockCacheKey, null);
+              if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; return; }
+            } else {
+              // clinic_inventory table itself doesn't exist yet
+              listEl.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 16px;margin:12px 16px;font-size:13px;color:#5D4037;display:flex;align-items:flex-start;gap:10px">'
+                +'<span class="material-icons-outlined" style="font-size:20px;color:#F9A825;flex-shrink:0">info</span>'
+                +'<div><strong>Apply migrations to enable Stock Tracker.</strong><br>Run both files in Supabase SQL Editor:<br>'
+                +'<code style="font-size:11px">20260516_patch_discharged_at.sql</code><br>'
+                +'<code style="font-size:11px">20260516_clinic_inventory.sql</code></div>'
+                +'</div>';
+              return;
+            }
+          } else {
+            items = (direct.data || []).map(function(i) {
+              return Object.assign({}, i, {
+                is_low_stock: Number(i.quantity) <= Number(i.min_threshold),
+                is_critical:  Number(i.quantity) === 0,
+              });
+            });
+          }
+        } else if (res.error) {
+          // Network error (timeout on a slow link) → serve cache if we have it.
+          if (CO && CO.isNetworkErr(res.error)) {
+            items = CO.get(_stockCacheKey, null);
+            if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; return; }
+          } else {
+            throw res.error;
+          }
+        } else {
+          items = res.data || [];
+        }
+        // Cache the fresh list for the next offline open.
+        if (items != null && CO) CO.set(_stockCacheKey, items);
       }
 
       // Banner
@@ -3368,6 +3512,25 @@
     if (e.target === this) this.style.display = 'none';
   });
 
+  // Fold a stock change into the cached stock list so the quantity updates
+  // instantly (and survives a reload) while the write is only queued.
+  function _applyStockDeltaToCache(inventoryId, delta) {
+    var CO = window.ClinicOffline;
+    if (!CO || !_stockCacheKey) return;
+    var items = CO.get(_stockCacheKey, null);
+    if (items == null) return;
+    var out = items.map(function(i) {
+      if (i.id !== inventoryId) return i;
+      var q = Math.max(0, (Number(i.quantity) || 0) + delta);
+      return Object.assign({}, i, {
+        quantity: q,
+        is_low_stock: q <= Number(i.min_threshold),
+        is_critical:  q === 0,
+      });
+    });
+    CO.set(_stockCacheKey, out);
+  }
+
   document.getElementById('restockSaveBtn').onclick = async function() {
     var btn   = this;
     var errEl = document.getElementById('restockError');
@@ -3377,18 +3540,46 @@
     if (!qty || qty <= 0) { errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
     var clinicId = await resolveClinicId();
     if (!clinicId || !_restockItemId) return;
+    var itemId = _restockItemId;
     btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Saving…';
     try {
-      var r = await supabase.rpc('adjust_inventory', {
+      var CO = window.ClinicOffline;
+      var base = {
         p_clinic_id:    clinicId,
-        p_inventory_id: _restockItemId,
+        p_inventory_id: itemId,
         p_qty_change:   qty,
         p_txn_type:     'addition',
         p_notes:        notes || null,
-      });
-      if (r.error) throw r.error;
-      document.getElementById('restockModal').style.display = 'none';
-      loadInventory();
+      };
+
+      // Offline → queue it and update the local stock immediately.
+      if (CO && CO.isOffline()) {
+        CO.enqueueRpc('adjust_inventory', base);
+        _applyStockDeltaToCache(itemId, qty);
+        document.getElementById('restockModal').style.display = 'none';
+        loadInventory();
+      } else {
+        var opId  = CO ? CO.uuid() : null;
+        var withOp = Object.assign({ p_op_id: opId }, base);
+        var r = CO ? await CO.withTimeout(supabase.rpc('adjust_inventory', withOp))
+                   : await supabase.rpc('adjust_inventory', withOp);
+        if (r.error && /could not find the function|p_op_id|without parameters|does not exist/i.test(r.error.message || '')) {
+          r = CO ? await CO.withTimeout(supabase.rpc('adjust_inventory', base))
+                 : await supabase.rpc('adjust_inventory', base);
+        }
+        if (r.error) {
+          // Lost the connection mid-request → queue with the same op id so the
+          // replay can't add the stock twice.
+          if (CO && CO.isNetworkErr(r.error)) {
+            CO.enqueueRpc('adjust_inventory', Object.assign({ p_op_id: opId }, base));
+            _applyStockDeltaToCache(itemId, qty);
+          } else {
+            throw r.error;
+          }
+        }
+        document.getElementById('restockModal').style.display = 'none';
+        loadInventory();
+      }
     } catch(e) { errEl.textContent = 'Error: ' + e.message; errEl.style.display = 'block'; }
     btn.disabled = false;
     btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock';

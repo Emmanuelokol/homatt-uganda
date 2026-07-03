@@ -115,6 +115,15 @@
     return list.length;
   }
 
+  // Queue a Supabase RPC to run when online. A client op id is added so the
+  // idempotent server overloads never apply it twice on a retry.
+  function enqueueRpc(fn, args) {
+    var a = {};
+    for (var k in (args || {})) { if (Object.prototype.hasOwnProperty.call(args, k)) a[k] = args[k]; }
+    if (a.p_op_id == null) a.p_op_id = uuid();
+    return enqueue('rpc', { fn: fn, args: a });
+  }
+
   // Register a replay handler for one op type. Multiple types can be registered
   // (from different modules/pages), so a queued item syncs wherever a handler
   // for its type is loaded — a sale queued offline still syncs from the
@@ -222,7 +231,7 @@
   window.ClinicOffline = {
     set: set, get: get, age: age, isOffline: isOffline, cachedQuery: cachedQuery,
     enqueue: enqueue, pendingCount: pendingCount, registerSyncHandler: registerSyncHandler,
-    flush: flush, updateIndicator: updateIndicator, uuid: uuid,
+    flush: flush, updateIndicator: updateIndicator, uuid: uuid, enqueueRpc: enqueueRpc,
     isNetworkErr: isNetworkErr, offlineHtml: offlineHtml, withTimeout: withTimeout,
   };
 })();
