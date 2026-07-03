@@ -181,7 +181,12 @@
       if (!document.body) return;
       bar = document.createElement('div');
       bar.id = '_clinicOfflineBar';
-      bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:11000;' +
+      // pointer-events:none is CRITICAL: this bar sits fixed over the bottom of
+      // the screen, exactly where the Quick Sale Sell button lives. Without it,
+      // taps landing on the bar died silently — staff had to press Sell many
+      // times whenever a sync was pending. The bar is informational only, so
+      // every tap must pass straight through it.
+      bar.style.cssText = 'pointer-events:none;position:fixed;left:0;right:0;bottom:0;z-index:11000;' +
         'color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;' +
         'text-align:center;padding:7px 12px;display:flex;align-items:center;justify-content:center;gap:6px;' +
         'box-shadow:0 -2px 10px rgba(0,0,0,0.2)';

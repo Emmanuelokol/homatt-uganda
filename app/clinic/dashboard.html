@@ -904,7 +904,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=7"></script>
+<script src="js/clinic-offline.js?v=8"></script>
 <script src="js/clinic.js?v=20260703"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -3455,6 +3455,24 @@
       sellBtn.addEventListener('pointercancel', clearFx);
       sellBtn.addEventListener('pointerleave',  clearFx);
       sellBtn.addEventListener('click',         fireSell);   // legacy WebView fallback
+
+      // FAILSAFE: hit-test at the document level. If any overlay (sync banner,
+      // toast, future element) sits on top of the Sell button and steals the
+      // tap, the button's own listeners never fire. This capture-phase handler
+      // fires the sale for ANY pointer that lands inside the button's rectangle
+      // while it's enabled — no overlay can ever eat a Sell press again.
+      // (fireSell's dedupe window prevents double-firing with the listeners
+      // above when the tap DOES reach the button normally.)
+      document.addEventListener('pointerdown', function(e) {
+        if (sellBtn.disabled) return;
+        var ov = document.getElementById('qsOverlay');
+        if (!ov || ov.style.display === 'none' || !ov.style.display) return;
+        var r = sellBtn.getBoundingClientRect();
+        if (r.width && e.clientX >= r.left && e.clientX <= r.right &&
+            e.clientY >= r.top && e.clientY <= r.bottom) {
+          fireSell(e);
+        }
+      }, true);
     }
 
     bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
