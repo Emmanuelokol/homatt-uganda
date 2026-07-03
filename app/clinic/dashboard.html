@@ -187,6 +187,15 @@
       <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations">
         <span class="material-icons-outlined">medical_services</span> New Consultation
       </a>
+      <a href="#" class="sidebar-link" onclick="openSectionView('stock');return false;">
+        <span class="material-icons-outlined">inventory_2</span> Stock — full list
+      </a>
+      <a href="#" class="sidebar-link" onclick="openSectionView('payments');return false;">
+        <span class="material-icons-outlined">payments</span> Pending Payments
+      </a>
+      <a href="#" class="sidebar-link" onclick="openSectionView('conditions');return false;">
+        <span class="material-icons-outlined">biotech</span> Conditions &amp; Treatments
+      </a>
       <a href="settings.html" class="sidebar-link" data-nav-cap="settings">
         <span class="material-icons-outlined">tune</span> Clinic Profile
       </a>
@@ -872,6 +881,23 @@
       <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
     </div>
   </div>
+</div>
+
+<!-- ── Section full view: Home shows summaries; this shows everything ── -->
+<div id="svOverlay" style="display:none;position:fixed;inset:0;background:#F5F7FA;z-index:550;flex-direction:column">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fff;border-bottom:1px solid #E0E0E0;flex-shrink:0">
+    <button onclick="closeSectionView()" style="background:#F5F5F5;border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;flex-shrink:0">
+      <span class="material-icons-outlined">arrow_back</span>
+    </button>
+    <div id="svTitle" style="font-size:17px;font-weight:800;color:#202124;flex:1;min-width:0"></div>
+    <div id="svCount" style="font-size:12px;color:#9AA0A6;white-space:nowrap"></div>
+  </div>
+  <div id="svSearchWrap" style="padding:10px 14px;background:#fff;border-bottom:1px solid #EEE;flex-shrink:0;position:relative">
+    <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+    <input id="svSearch" type="text" placeholder="Search…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+  </div>
+  <div id="svBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 30px;background:#fff"></div>
 </div>
 
 <!-- Restock Modal -->
@@ -2678,7 +2704,20 @@
     if (totalEl) totalEl.textContent = 'UGX ' + fmtUGX(totalOut) + ' outstanding';
     if (countEl) countEl.textContent = String(rows.length);
 
-    listEl.innerHTML = rows.map(function(r){
+    _payRows = rows;
+
+    // HOME SUMMARY: biggest balances first, top 4 + View all.
+    var PAY_N = 4;
+    var top = rows.slice().sort(function(a,b){ return (Number(b.balance_ugx)||0) - (Number(a.balance_ugx)||0); }).slice(0, PAY_N);
+    listEl.innerHTML = top.map(_payRowHtml).join('')
+      + (rows.length > PAY_N ? _svViewAllBtn('payments', 'View all ' + rows.length + ' pending payments') : '');
+    _wirePayButtons(listEl);
+    refreshSectionView();
+  }
+
+  var _payRows = [];
+
+  function _payRowHtml(r) {
       var statusBadge = r.payment_status === 'partial'
         ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PARTIAL</span>'
         : r.payment_status === 'credit'
@@ -2717,10 +2756,10 @@
               +'style="flex:1;font-size:12px;padding:7px 10px;background:transparent;color:#5F6368;border:1.5px solid #E0E0E0;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit">History</button>'
           +'</div>'
         +'</div>';
-    }).join('');
+  }
 
-    // Wire up buttons
-    listEl.querySelectorAll('.record-pay-btn').forEach(function(b){
+  function _wirePayButtons(container) {
+    container.querySelectorAll('.record-pay-btn').forEach(function(b){
       b.onclick = function() {
         openPaymentModal(
           b.getAttribute('data-id'),
@@ -2731,12 +2770,27 @@
         );
       };
     });
-    listEl.querySelectorAll('.view-pay-history-btn').forEach(function(b){
+    container.querySelectorAll('.view-pay-history-btn').forEach(function(b){
       b.onclick = function() {
         showPaymentHistory(b.getAttribute('data-id'), b.getAttribute('data-name'));
       };
     });
   }
+
+  // FULL VIEW: every pending payment, searchable by name / phone / diagnosis.
+  _svRenderers.payments = { title: 'Pending Payments', render: function(body, q) {
+    var rows = (_payRows || []).filter(function(r) {
+      if (!q) return true;
+      return (String(r.patient_name||'') + ' ' + String(r.patient_phone||'') + ' ' + String(r.confirmed_diagnosis||''))
+        .toLowerCase().indexOf(q) >= 0;
+    });
+    var total = rows.reduce(function(s,r){ return s + (Number(r.balance_ugx)||0); }, 0);
+    _svSetCount(rows.length + ' owing · UGX ' + fmtUGX(total));
+    body.innerHTML = rows.length
+      ? rows.map(_payRowHtml).join('')
+      : '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No pending payments match.</div>';
+    _wirePayButtons(body);
+  }};
 
   function openPaymentModal(diagnosisId, patientName, total, paid, balance) {
     _paymentContext = {
@@ -2960,6 +3014,62 @@
   setupRealtime();
 
   // ═══════════════════════════════════════════════════════
+  // SECTION FULL VIEWS — Home shows top-N summaries; "View all" (or the
+  // sidebar) opens a full-screen searchable list. Sections will grow to
+  // hundreds of rows, so the home page stays a quick overview.
+  // ═══════════════════════════════════════════════════════
+  var _svRenderers = {};   // key -> { title, render(bodyEl, query) }
+  var _svCurrentKey = null;
+
+  // Re-render the open full view after data reloads (e.g. a restock or a
+  // recorded payment), so it never shows stale rows.
+  function refreshSectionView() {
+    var ov = document.getElementById('svOverlay');
+    if (!ov || ov.style.display === 'none' || !ov.style.display || !_svCurrentKey) return;
+    var cfg = _svRenderers[_svCurrentKey];
+    if (!cfg) return;
+    var si = document.getElementById('svSearch');
+    cfg.render(document.getElementById('svBody'), ((si && si.value) || '').trim().toLowerCase());
+  }
+
+  function openSectionView(key) {
+    var cfg = _svRenderers[key];
+    var ov  = document.getElementById('svOverlay');
+    if (!cfg || !ov) return;
+    _svCurrentKey = key;
+    document.getElementById('svTitle').textContent = cfg.title;
+    var si = document.getElementById('svSearch');
+    si.value = '';
+    ov.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    var body = document.getElementById('svBody');
+    var doRender = function() { cfg.render(body, (si.value || '').trim().toLowerCase()); };
+    si.oninput = doRender;
+    doRender();
+    // Close the sidebar if the view was opened from the hamburger menu
+    var sb = document.querySelector('.admin-sidebar');
+    if (sb) sb.classList.remove('open');
+    var so = document.getElementById('_sidebarOverlay');
+    if (so) so.classList.remove('active');
+  }
+  function closeSectionView() {
+    var ov = document.getElementById('svOverlay');
+    if (ov) ov.style.display = 'none';
+    document.body.style.overflow = '';
+    _svCurrentKey = null;
+  }
+  function _svViewAllBtn(key, label) {
+    return '<button onclick="openSectionView(\'' + key + '\')" '
+      + 'style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:#F5F7FA;'
+      + 'color:#1B5E20;border:1.5px solid #C8E6C9;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">'
+      + label + ' <span class="material-icons-outlined" style="font-size:16px">arrow_forward</span></button>';
+  }
+  function _svSetCount(txt) {
+    var c = document.getElementById('svCount');
+    if (c) c.textContent = txt || '';
+  }
+
+  // ═══════════════════════════════════════════════════════
   // INVENTORY & STOCK TRACKER
   // ═══════════════════════════════════════════════════════
 
@@ -3037,40 +3147,71 @@
       var groups = { medicine: [], material: [], consumable: [] };
       items.forEach(function(i){ (groups[i.item_type] || groups.consumable).push(i); });
 
-      var html = '';
-      ['medicine','material','consumable'].forEach(function(type) {
-        if (!groups[type].length) return;
-        var label = { medicine:'Medicines', material:'Materials', consumable:'Consumables' }[type];
-        html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
-        groups[type].forEach(function(item) {
-          var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
-          var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
-          var badge = item.is_critical
-            ? '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">OUT OF STOCK</span>'
-            : item.is_low_stock
-            ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
-            : '';
-          var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
-          html += '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
-            +'<div style="flex:1;min-width:0">'
-              +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
-              +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+'</div>'
-              +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
-                +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
-              +'</div>'
-            +'</div>'
-            +'<div style="display:flex;gap:6px;flex-shrink:0">'
-              +'<button onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')" '
-                +'style="font-size:11px;padding:5px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">+ Restock</button>'
-            +'</div>'
-          +'</div>';
-        });
+      _stockItems = items;
+
+      // HOME SUMMARY: most-urgent 8 (out-of-stock → low → rest A-Z) + View all.
+      var SUMMARY_N = 8;
+      var urgency = function(i) { return i.is_critical ? 0 : i.is_low_stock ? 1 : 2; };
+      var sorted = items.slice().sort(function(a, b) {
+        return urgency(a) - urgency(b) || String(a.item_name).localeCompare(String(b.item_name));
       });
-      listEl.innerHTML = html;
+      listEl.innerHTML = sorted.slice(0, SUMMARY_N).map(_stockRowHtml).join('')
+        + (items.length > SUMMARY_N
+            ? _svViewAllBtn('stock', 'View all ' + items.length + ' items')
+            : '');
+      refreshSectionView();
     } catch(e) {
       listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error loading stock: ' + esc(e.message) + '</div>';
     }
   }
+
+  var _stockItems = [];
+
+  function _stockRowHtml(item) {
+    var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
+    var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
+    var badge = item.is_critical
+      ? '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">OUT OF STOCK</span>'
+      : item.is_low_stock
+      ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
+      : '';
+    var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
+    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
+      +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
+        +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+'</div>'
+        +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
+          +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
+        +'</div>'
+      +'</div>'
+      +'<div style="display:flex;gap:6px;flex-shrink:0">'
+        +'<button onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')" '
+          +'style="font-size:11px;padding:5px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">+ Restock</button>'
+      +'</div>'
+    +'</div>';
+  }
+
+  // FULL VIEW: every item, grouped by type, filtered by the search box.
+  _svRenderers.stock = { title: 'Stock Tracker', render: function(body, q) {
+    var items = (_stockItems || []).filter(function(i) {
+      return !q || String(i.item_name).toLowerCase().indexOf(q) >= 0;
+    });
+    _svSetCount(items.length + ' of ' + (_stockItems || []).length + ' items');
+    if (!items.length) {
+      body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No items match.</div>';
+      return;
+    }
+    var groups = { medicine: [], material: [], consumable: [] };
+    items.forEach(function(i){ (groups[i.item_type] || groups.consumable).push(i); });
+    var html = '';
+    ['medicine','material','consumable'].forEach(function(type) {
+      if (!groups[type].length) return;
+      var label = { medicine:'Medicines', material:'Materials', consumable:'Consumables' }[type];
+      html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
+      html += groups[type].map(_stockRowHtml).join('');
+    });
+    body.innerHTML = html;
+  }};
 
   // ── Add Stock Item Modal ──
   function openAddStockModal() {
@@ -4193,57 +4334,81 @@
       });
     });
 
-    // Sort by frequency, take top 8
-    var top = Object.entries(dxCount)
-      .sort(function(a,b){ return b[1]-a[1]; })
-      .slice(0, 8);
+    // Rank by frequency; keep everything for the full view.
+    var all = Object.entries(dxCount).sort(function(a,b){ return b[1]-a[1]; });
 
-    if (top.length === 0) {
+    if (all.length === 0) {
       body.innerHTML = '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses with confirmed names yet.</div>';
       return;
     }
 
     var totalCases = Object.values(dxCount).reduce(function(s,n){ return s+n; }, 0);
-    var maxCount = top[0][1];
+    _condData = { all: all, drugsByDx: drugsByDx, totalCases: totalCases, maxCount: all[0][1] };
 
-    var html = '<div style="display:flex;flex-direction:column;gap:14px">';
-    top.forEach(function(entry, idx) {
-      var key = entry[0], count = entry[1];
-      var label = key.charAt(0).toUpperCase() + key.slice(1);
-      var pct = Math.round(count / totalCases * 100);
-      var barW = Math.round(count / maxCount * 100);
-      var bgClr = ['#E8F5E9','#E0F2F1','#E3F2FD','#F3E5F5','#FFF3E0','#FCE4EC','#E8EAF6','#F1F8E9'][idx] || '#F5F5F5';
-      var txtClr = ['#1B5E20','#00695C','#1565C0','#4A148C','#E65100','#880E4F','#1A237E','#33691E'][idx] || '#424242';
-
-      // Top 3 drugs
-      var drugs = Object.entries(drugsByDx[key] || {})
-        .sort(function(a,b){ return b[1]-a[1]; })
-        .slice(0, 3)
-        .map(function(d){ return d[0].charAt(0).toUpperCase()+d[0].slice(1); });
-
-      var drugHtml = drugs.length
-        ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">'
-          + drugs.map(function(dr){
-              return '<span style="background:'+ bgClr+';color:'+txtClr+';font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;border:1px solid '+txtClr+'33">💊 '+esc(dr)+'</span>';
-            }).join('')
-          + '</div>'
-        : '<div style="font-size:11px;color:#9AA0A6;margin-top:5px">No prescriptions recorded</div>';
-
-      html += '<div style="background:#FAFAFA;border-radius:12px;padding:12px 14px">'
-        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-        +   '<div style="font-size:13px;font-weight:700;color:#202124">'+(idx+1)+'. '+esc(label)+'</div>'
-        +   '<div style="font-size:12px;font-weight:700;color:'+txtClr+'">'+count+' case'+(count!==1?'s':'')+' · '+pct+'%</div>'
-        + '</div>'
-        + '<div style="background:#E0E0E0;border-radius:4px;height:5px;overflow:hidden;margin-bottom:6px">'
-        +   '<div style="background:'+txtClr+';width:'+barW+'%;height:100%;border-radius:4px;transition:width .4s"></div>'
-        + '</div>'
-        + drugHtml
-        + '</div>';
-    });
-    html += '</div>'
-      + '<div style="font-size:11px;color:#9AA0A6;padding:10px 0 0;text-align:right">'+totalCases+' total consultations in last '+_condPeriodDays+' days</div>';
+    // HOME SUMMARY: top 5 conditions + View all.
+    var COND_N = 5;
+    var html = '<div style="display:flex;flex-direction:column;gap:14px">'
+      + all.slice(0, COND_N).map(function(entry, idx) { return _condCardHtml(entry, idx); }).join('')
+      + '</div>'
+      + '<div style="font-size:11px;color:#9AA0A6;padding:10px 0 0;text-align:right">'+totalCases+' total consultations in last '+_condPeriodDays+' days</div>'
+      + (all.length > COND_N ? _svViewAllBtn('conditions', 'View all ' + all.length + ' conditions') : '');
     body.innerHTML = html;
+    refreshSectionView();
   }
+
+  var _condData = null;
+
+  function _condCardHtml(entry, idx) {
+    var key = entry[0], count = entry[1];
+    var d = _condData || { drugsByDx: {}, totalCases: 1, maxCount: 1 };
+    var label = key.charAt(0).toUpperCase() + key.slice(1);
+    var pct = Math.round(count / (d.totalCases || 1) * 100);
+    var barW = Math.round(count / (d.maxCount || 1) * 100);
+    var bgClr = ['#E8F5E9','#E0F2F1','#E3F2FD','#F3E5F5','#FFF3E0','#FCE4EC','#E8EAF6','#F1F8E9'][idx % 8] || '#F5F5F5';
+    var txtClr = ['#1B5E20','#00695C','#1565C0','#4A148C','#E65100','#880E4F','#1A237E','#33691E'][idx % 8] || '#424242';
+
+    // Top 3 drugs
+    var drugs = Object.entries(d.drugsByDx[key] || {})
+      .sort(function(a,b){ return b[1]-a[1]; })
+      .slice(0, 3)
+      .map(function(x){ return x[0].charAt(0).toUpperCase()+x[0].slice(1); });
+
+    var drugHtml = drugs.length
+      ? '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:7px">'
+        + drugs.map(function(dr){
+            return '<span style="background:'+ bgClr+';color:'+txtClr+';font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;border:1px solid '+txtClr+'33">💊 '+esc(dr)+'</span>';
+          }).join('')
+        + '</div>'
+      : '<div style="font-size:11px;color:#9AA0A6;margin-top:5px">No prescriptions recorded</div>';
+
+    return '<div style="background:#FAFAFA;border-radius:12px;padding:12px 14px">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+      +   '<div style="font-size:13px;font-weight:700;color:#202124">'+(idx+1)+'. '+esc(label)+'</div>'
+      +   '<div style="font-size:12px;font-weight:700;color:'+txtClr+'">'+count+' case'+(count!==1?'s':'')+' · '+pct+'%</div>'
+      + '</div>'
+      + '<div style="background:#E0E0E0;border-radius:4px;height:5px;overflow:hidden;margin-bottom:6px">'
+      +   '<div style="background:'+txtClr+';width:'+barW+'%;height:100%;border-radius:4px;transition:width .4s"></div>'
+      + '</div>'
+      + drugHtml
+      + '</div>';
+  }
+
+  // FULL VIEW: every condition in the period, searchable by name.
+  _svRenderers.conditions = { title: 'Conditions & Treatments', render: function(body, q) {
+    var d = _condData;
+    if (!d || !d.all.length) {
+      _svSetCount('');
+      body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No diagnoses recorded in this period yet.</div>';
+      return;
+    }
+    var list = d.all.filter(function(e){ return !q || e[0].indexOf(q) >= 0; });
+    _svSetCount(list.length + ' condition' + (list.length !== 1 ? 's' : '') + ' · last ' + _condPeriodDays + ' days');
+    body.innerHTML = list.length
+      ? '<div style="display:flex;flex-direction:column;gap:14px">'
+        + list.map(function(entry, idx) { return _condCardHtml(entry, idx); }).join('')
+        + '</div>'
+      : '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No conditions match.</div>';
+  }};
 
   // ── Monthly Reports ──────────────────────────────────────
 
