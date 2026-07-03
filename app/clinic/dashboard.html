@@ -2340,34 +2340,77 @@
     var clinicId = await resolveClinicId();
     if (!clinicId) { renderMedsDemo(el); return; }
 
-    var { data, error } = await supabase
+    // Medicines leave the clinic through TWO doors: consultation prescriptions
+    // (clinic_diagnoses.prescription_items) and over-the-counter Quick Sales
+    // (clinic_quick_sales). Count both. Each query goes through the offline
+    // cache so it's timeout-capped and shows last-known data on bad networks.
+    var dayKey = since.slice(0, 10);
+    var _dxQ = function() { return supabase
       .from('clinic_diagnoses')
       .select('prescription_items,created_at')
       .eq('clinic_id', clinicId)
       .gte('created_at', since)
-      .not('prescription_items', 'is', null);
+      .not('prescription_items', 'is', null); };
+    var _qsQ = function() { return supabase
+      .from('clinic_quick_sales')
+      .select('drug_name,quantity,unit,created_at')
+      .eq('clinic_id', clinicId)
+      .gte('created_at', since); };
 
-    if (error || !data) {
+    var results = await Promise.all([
+      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_dx_' + clinicId + '_' + _medsPeriod + '_' + dayKey, _dxQ) : _dxQ(),
+      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_qs_' + clinicId + '_' + _medsPeriod + '_' + dayKey, _qsQ) : _qsQ(),
+    ]);
+    var dxRes = results[0], qsRes = results[1];
+    var data   = (dxRes && !dxRes.error && Array.isArray(dxRes.data)) ? dxRes.data : null;
+    var qsRows = (qsRes && !qsRes.error && Array.isArray(qsRes.data)) ? qsRes.data : [];
+
+    // Sales still waiting in the sync outbox (just sold, or made offline)
+    // haven't reached the server yet — count them too so the card is live.
+    try {
+      if (window.ClinicOffline) {
+        var seenIds = {};
+        qsRows.forEach(function(r) { if (r.id) seenIds[r.id] = 1; });
+        (ClinicOffline.get('outbox', []) || []).forEach(function(op) {
+          var s = op && op.type === 'quick_sale' && op.payload && op.payload.sale;
+          if (s && s.clinic_id === clinicId && (s.created_at || '') >= since && !seenIds[s.id]) {
+            qsRows.push(s);
+          }
+        });
+      }
+    } catch(e) {}
+
+    if (!data && !qsRows.length) {
       el.innerHTML = '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
       return;
     }
+    data = data || [];
 
-    // Tally drugs from prescription_items JSONB
-    var tally = {}; // { drugName: { patients, totalDays } }
+    // Tally drugs: prescriptions add patients + treatment days; Quick Sales add
+    // over-the-counter transactions.
+    var tally = {}; // { drugName: { patients, totalDays, sales } }
     data.forEach(function(row) {
       var items = Array.isArray(row.prescription_items) ? row.prescription_items : [];
       var seen = new Set(); // count each drug once per consultation
       items.forEach(function(item) {
         var name = (item.drug_name || item.name || item.drug || '').trim();
         if (!name) return;
-        if (!tally[name]) tally[name] = { patients: 0, totalDays: 0 };
+        if (!tally[name]) tally[name] = { patients: 0, totalDays: 0, sales: 0 };
         if (!seen.has(name)) { tally[name].patients++; seen.add(name); }
         tally[name].totalDays += (parseInt(item.duration || item.durationDays, 10) || 0);
       });
     });
+    qsRows.forEach(function(row) {
+      var name = (row.drug_name || '').trim();
+      if (!name) return;
+      if (!tally[name]) tally[name] = { patients: 0, totalDays: 0, sales: 0 };
+      tally[name].sales++;
+    });
 
-    var keys = Object.keys(tally).sort(function(a,b){ return tally[b].patients - tally[a].patients; });
+    function reach(t) { return t.patients + t.sales; } // people served, either door
+    var keys = Object.keys(tally).sort(function(a,b){ return reach(tally[b]) - reach(tally[a]); });
     var totalConsults = data.length;
+    var totalQs = qsRows.length;
 
     if (!keys.length) {
       var periodLabel = { day:'today', week:'this week', month:'this month', year:'this year' }[_medsPeriod] || _medsPeriod;
@@ -2377,23 +2420,31 @@
       return;
     }
 
-    var maxPts = tally[keys[0]].patients;
+    var maxReach = reach(tally[keys[0]]) || 1;
     var topKeys = keys.slice(0, 12);
+
+    var headParts = [];
+    if (totalConsults) headParts.push(totalConsults + ' consultation' + (totalConsults !== 1 ? 's' : ''));
+    if (totalQs)       headParts.push(totalQs + ' quick sale' + (totalQs !== 1 ? 's' : ''));
+    headParts.push('top ' + topKeys.length + ' drugs');
 
     el.innerHTML = '<div style="padding:12px 16px 8px">'
       + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">'
-      + totalConsults + ' consultation' + (totalConsults !== 1 ? 's' : '') + ' · top ' + topKeys.length + ' drugs</div>'
+      + headParts.join(' · ') + '</div>'
       + topKeys.map(function(name, i) {
           var t = tally[name];
-          var pct = Math.round((t.patients / maxPts) * 100);
+          var pct = Math.round((reach(t) / maxReach) * 100);
           var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
           var textColor = i < 3 ? '#006064' : '#424242';
+          var parts = [];
+          if (t.patients)      parts.push(t.patients + ' patient' + (t.patients !== 1 ? 's' : ''));
+          if (t.totalDays > 0) parts.push(t.totalDays + 'd total');
+          if (t.sales)         parts.push(t.sales + ' quick sale' + (t.sales !== 1 ? 's' : ''));
           return '<div style="margin-bottom:10px">'
             + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
             + '<span style="font-size:13px;font-weight:600;color:' + textColor + '">' + esc(name) + '</span>'
             + '<span style="font-size:12px;color:#9AA0A6;margin-left:8px;white-space:nowrap">'
-            + t.patients + ' patient' + (t.patients !== 1 ? 's' : '')
-            + (t.totalDays > 0 ? ' · ' + t.totalDays + 'd total' : '') + '</span>'
+            + parts.join(' · ') + '</span>'
             + '</div>'
             + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
             + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width .4s ease"></div>'
@@ -4085,7 +4136,10 @@
         if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> Sell'; }
         if (ti)  ti.value = '';
         loadQsDrugs();   // cache-first → repaints instantly with updated stock
-        setTimeout(function() { loadFinancial(_finPeriod); loadRevenue(); }, 300);
+        setTimeout(function() {
+          loadFinancial(_finPeriod); loadRevenue();
+          try { loadMedsDispensed(); } catch(e) {}   // sale appears in Medicines Dispensed
+        }, 300);
       }, 1100);
     }
   }
