@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v12';
+const CACHE = 'homatt-clinic-v13';
 
 // Cross-origin libraries the pages need to even boot.
 const VENDOR = [
@@ -39,6 +39,8 @@ const SHELL = [
   'icons/clinic-512.png?v=2',
 ];
 
+let _lastSelfUpdateCheck = 0;
+
 function isVendor(url) {
   return url.hostname.indexOf('cdn.jsdelivr.net') >= 0 ||
          url.hostname.indexOf('fonts.googleapis.com') >= 0 ||
@@ -58,11 +60,31 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    // Was this an UPGRADE (an older clinic cache existed) or a first install?
+    const hadOld = keys.some((k) => k !== CACHE && k.indexOf('homatt-clinic-') === 0);
+    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
+    await self.clients.claim();
+
+    if (hadOld) {
+      // CRITICAL DELIVERY FIX. Android restores tabs from memory without
+      // re-navigating, so a page loaded under an old version can keep running
+      // stale JS for DAYS — old enough pages don't even have the
+      // controllerchange auto-reload. The service worker is the only thing the
+      // browser still updates independently, so when a new version activates
+      // we force-refresh the open clinic pages ourselves. Skip pages with
+      // long forms (consultation/settings) so no typed work is ever lost —
+      // they refresh on their next natural navigation instead.
+      const cs = await self.clients.matchAll({ type: 'window' });
+      cs.forEach((c) => {
+        try {
+          if (/new-order\.html|settings\.html/.test(c.url)) return;
+          if (c.navigate) c.navigate(c.url);
+        } catch (e) {}
+      });
+    }
+  })());
 });
 
 self.addEventListener('fetch', (event) => {
@@ -94,6 +116,14 @@ self.addEventListener('fetch', (event) => {
   // reached"): every path returns a real Response — the requested page, another
   // cached clinic page, or a friendly offline page.
   if (req.mode === 'navigate') {
+    // Opportunistic self-update: pages running OLD code never ask for updates,
+    // so the worker checks for a newer version of itself on navigations
+    // (throttled). This is how stuck devices eventually receive fixes.
+    const now = Date.now();
+    if (now - _lastSelfUpdateCheck > 30 * 60 * 1000) {
+      _lastSelfUpdateCheck = now;
+      try { self.registration.update().catch(() => {}); } catch (e) {}
+    }
     event.respondWith((async () => {
       try {
         const res = await fetch(req);
