@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v13';
+const CACHE = 'homatt-clinic-v14';
 
 // Cross-origin libraries the pages need to even boot.
 const VENDOR = [
@@ -126,7 +126,11 @@ self.addEventListener('fetch', (event) => {
     }
     event.respondWith((async () => {
       try {
-        const res = await fetch(req);
+        // cache:'no-cache' bypasses the HTTP cache and revalidates with the
+        // server (GitHub Pages sends max-age=600 — without this, a reload up
+        // to 10 minutes after a deploy re-served the previous, possibly buggy,
+        // HTML). ETag revalidation keeps unchanged loads cheap (304).
+        const res = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' });
         if (res && res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
