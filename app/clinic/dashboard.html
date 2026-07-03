@@ -124,8 +124,25 @@
       .home-hero { padding: 22px 20px; flex-direction: column; align-items: stretch }
       .home-hero h1 { font-size: 19px }
       .home-cta { justify-content: center; padding: 14px 18px }
+      /* Cards on phones: the identity/details column takes the FULL width
+         beside the avatar, and the right column (status badge + action
+         buttons) drops to its own row underneath. Without this, the right
+         column squeezed the text into a one-word-per-line sliver.
+         !important beats the inline flex-direction:column some cards set. */
       .order-card { flex-wrap: wrap }
-      .order-right { margin-left: auto }
+      .order-info { flex: 1 1 calc(100% - 60px); min-width: calc(100% - 60px) }
+      .order-right {
+        flex-basis: 100% !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: flex-end !important;
+        gap: 8px !important;
+        margin-left: 0 !important;
+        margin-top: 8px;
+        text-align: right;
+      }
+      .order-right .order-status { margin-bottom: 0 }
       /* Inline verify panel — stack vertically on mobile */
       #qvGrid { grid-template-columns: 1fr !important }
       #quickVerifyPanel { padding: 18px 16px 16px !important }
@@ -2267,22 +2284,31 @@
       var dueLabel = isToday ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : '');
       var ini = (c.patient_name || c.patient_phone || 'P').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
       var phone = c.patient_phone || '';
-      return '<div style="display:flex;align-items:center;gap:12px;padding:11px 16px;border-bottom:1px solid #FFF3E0">'
-        + '<div style="width:36px;height:36px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
-        + '<div style="flex:1;min-width:0">'
-        +   '<div style="font-size:13px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
-        +   '<div style="font-size:12px;color:' + urgColor + ';font-weight:600">' + dueLabel + '</div>'
-        +   (phone ? '<div style="font-size:11px;color:#5F6368;margin-top:1px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> ' + esc(phone) + '</div>' : '')
-        +   (c.follow_up_reason ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
+      // Two-row card: identity (avatar + full-width name + due) on top, then
+      // details, then full-width buttons. A single flex row crushed the name to
+      // one letter and wrapped "Overdue by N days" word-by-word on phones.
+      return '<div style="padding:12px 16px;border-bottom:1px solid #FFF3E0">'
+        + '<div style="display:flex;align-items:center;gap:10px">'
+        +   '<div style="width:38px;height:38px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
+        +   '<div style="flex:1;min-width:0">'
+        +     '<div style="font-size:14px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
+        +     '<div style="font-size:12px;color:' + urgColor + ';font-weight:700;white-space:nowrap">' + dueLabel + '</div>'
+        +   '</div>'
         + '</div>'
-        + '<div style="display:flex;gap:6px;flex-shrink:0">'
+        + ((phone || c.follow_up_reason)
+            ? '<div style="margin:6px 0 0 48px">'
+              + (phone ? '<div style="font-size:12px;color:#5F6368"><span class="material-icons-outlined" style="font-size:12px;vertical-align:-2px">phone</span> ' + esc(phone) + '</div>' : '')
+              + (c.follow_up_reason ? '<div style="font-size:12px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
+              + '</div>'
+            : '')
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
         +   '<button type="button" onclick="openReminderSheet(\'' + esc(c.id) + '\')" title="Contact patient" '
-        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
-        +     '<span class="material-icons-outlined" style="font-size:14px">contact_phone</span>Contact'
+        +     'style="touch-action:manipulation;padding:9px 8px;font-size:13px;font-weight:700;border:1.5px solid #E65100;color:#E65100;background:#FFF8F6;border-radius:9px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">'
+        +     '<span class="material-icons-outlined" style="font-size:15px">contact_phone</span>Contact'
         +   '</button>'
         +   '<button type="button" onclick="openActivePatientDetail(\'' + esc(c.id) + '\')" title="Record return visit" '
-        +     'style="touch-action:manipulation;padding:6px 10px;font-size:12px;font-weight:600;border:none;background:#1565C0;color:#fff;border-radius:8px;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px">'
-        +     '<span class="material-icons-outlined" style="font-size:14px">edit_note</span>Record'
+        +     'style="touch-action:manipulation;padding:9px 8px;font-size:13px;font-weight:700;border:none;background:#1565C0;color:#fff;border-radius:9px;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:5px">'
+        +     '<span class="material-icons-outlined" style="font-size:15px">edit_note</span>Record'
         +   '</button>'
         + '</div>'
         + '</div>';
