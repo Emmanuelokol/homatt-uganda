@@ -130,7 +130,9 @@
          column squeezed the text into a one-word-per-line sliver.
          !important beats the inline flex-direction:column some cards set. */
       .order-card { flex-wrap: wrap }
-      .order-info { flex: 1 1 calc(100% - 60px); min-width: calc(100% - 60px) }
+      /* 54px = 42px mobile avatar + 12px gap, so avatar and info share row 1
+         exactly; anything wider pushed the info below the avatar. */
+      .order-info { flex: 1 1 calc(100% - 54px); min-width: calc(100% - 54px) }
       .order-right {
         flex-basis: 100% !important;
         display: flex !important;
