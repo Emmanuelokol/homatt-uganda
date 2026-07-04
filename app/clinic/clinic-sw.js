@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v25';
+const CACHE = 'homatt-clinic-v26';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -45,6 +45,69 @@ const SHELL = [
 ];
 
 let _lastSelfUpdateCheck = 0;
+
+// ── IndexedDB shell store ────────────────────────────────────────────────────
+// A SECOND, independent copy of the app shell. Some phones (Samsung cleaners,
+// "free up space" tools) wipe Cache Storage while leaving site data intact —
+// which left the cache empty ("Saved pages: 0") no matter how it was filled.
+// IndexedDB lives in the protected site-data class (like localStorage, which
+// demonstrably survives on those phones), so the app can boot from it when the
+// cache has been wiped. Keys are absolute pathnames (no query).
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('homatt-shell', 1);
+    r.onupgradeneeded = () => { try { r.result.createObjectStore('files'); } catch (e) {} };
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbGet(key) {
+  try {
+    const db = await idbOpen();
+    return await new Promise((res) => {
+      const rq = db.transaction('files', 'readonly').objectStore('files').get(key);
+      rq.onsuccess = () => res(rq.result || null);
+      rq.onerror = () => res(null);
+    });
+  } catch (e) { return null; }
+}
+async function idbPut(key, rec) {
+  try {
+    const db = await idbOpen();
+    await new Promise((res, rej) => {
+      const tx = db.transaction('files', 'readwrite');
+      tx.objectStore('files').put(rec, key);
+      tx.oncomplete = res;
+      tx.onerror = () => rej(tx.error);
+    });
+    return true;
+  } catch (e) { return false; }
+}
+function idbKeyFor(u) {
+  try { return new URL(u, self.registration.scope).pathname; } catch (e) { return null; }
+}
+function ctFor(path) {
+  if (/\.html($|\?)|\/$/.test(path)) return 'text/html; charset=utf-8';
+  if (/\.js($|\?)/.test(path)) return 'application/javascript; charset=utf-8';
+  if (/\.css($|\?)/.test(path)) return 'text/css; charset=utf-8';
+  if (/\.webmanifest($|\?)/.test(path)) return 'application/manifest+json';
+  return 'text/plain; charset=utf-8';
+}
+// Serve a stored file as a Response, or null.
+async function idbServe(pathname) {
+  const rec = await idbGet(pathname);
+  if (!rec || rec.body == null) return null;
+  return new Response(rec.body, { headers: { 'Content-Type': rec.ct || ctFor(pathname) } });
+}
+// Find ANY stored page (for navigation fallback).
+async function idbAnyPage() {
+  const scope = new URL(self.registration.scope).pathname;
+  for (const p of ['dashboard.html', 'index.html', 'new-order.html', 'settings.html']) {
+    const hit = await idbServe(scope + p);
+    if (hit) return hit;
+  }
+  return null;
+}
 
 function isVendor(url) {
   return url.hostname.indexOf('cdn.jsdelivr.net') >= 0 ||
@@ -106,9 +169,22 @@ async function ensureShellCached(cache, force) {
   _shellEnsuredAt = now;
   await Promise.all(SHELL.map(async (u) => {
     try {
-      if (!force && await cache.match(u)) return;   // forced → refresh even if present
+      const cached = !force && await cache.match(u);
+      if (cached) return;
       const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
-      if (r && r.ok && !r.redirected) await cache.put(u, r.clone());
+      if (r && r.ok && !r.redirected) {
+        await cache.put(u, r.clone());
+        // Dual-write text files into the IndexedDB shell store (second copy —
+        // survives cleaners that wipe Cache Storage). Icons skipped: binary,
+        // non-essential for booting.
+        if (!/\.png($|\?)/.test(u)) {
+          try {
+            const key = idbKeyFor(u);
+            const body = await r.clone().text();
+            if (key && body) await idbPut(key, { body: body, ct: r.headers.get('Content-Type') || ctFor(u) });
+          } catch (e) {}
+        }
+      }
     } catch (e) {}
   }));
 }
@@ -134,12 +210,14 @@ function offlineFallbackResponse() {
     'var st=function(t){var e=document.getElementById("st");if(e)e.textContent=t;};' +
     'var big=function(h){var e=document.getElementById("bigmsg");if(e){e.style.display="block";e.innerHTML=h;}};' +
     'function core(){return ["index.html","dashboard.html","new-order.html","settings.html","./"];}' +
-    'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}return n;}' +
+    'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}' +
+    'try{n+=await new Promise(function(res){var q=indexedDB.open("homatt-shell",1);q.onupgradeneeded=function(){try{q.result.createObjectStore("files")}catch(e){}};q.onsuccess=function(){try{var rq=q.result.transaction("files","readonly").objectStore("files").getAllKeys();rq.onsuccess=function(){var m=0;(rq.result||[]).forEach(function(k){if(/\\.html$|\\/$/.test(String(k)))m++;});res(m);};rq.onerror=function(){res(0);};}catch(e){res(0)}};q.onerror=function(){res(0)};});}catch(e){}' +
+    'return n;}' +
     // Test whether this device can WRITE to cache storage at all, and report the
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v25"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v26"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -340,6 +418,12 @@ self.addEventListener('fetch', (event) => {
       const hit = await matchAnyCache(req);
       if (hit) return hit;
 
+      // Cache wiped (cleaner apps) → boot from the IndexedDB shell copy.
+      const idbHit = (await idbServe(url.pathname)) ||
+                     (await idbServe(url.pathname.replace(/\/$/, '/index.html'))) ||
+                     (await idbAnyPage());
+      if (idbHit) return idbHit;
+
       // Nothing cached yet: give the network the rest of its time, else the
       // (rare) first-run placeholder.
       const late = await net;
@@ -349,7 +433,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin assets → stale-while-revalidate.
+  // Same-origin assets → stale-while-revalidate, then the IndexedDB shell copy
+  // as the deep fallback (cache wiped + offline → scripts/CSS still load).
   event.respondWith(
     caches.match(req).then((cached) => {
       const network = fetch(req)
@@ -360,7 +445,7 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(() => cached);
+        .catch(() => cached || idbServe(url.pathname).then((r) => r || Response.error()));
       return cached || network;
     })
   );
