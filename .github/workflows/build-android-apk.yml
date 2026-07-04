@@ -89,3 +89,21 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 90
+
+      - name: Rename APK for release
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk HomattHealth.apk
+
+      # Publish the APK at a PERMANENT public link so the portal can offer a
+      # one-tap "Download Android app" — no GitHub account or Actions digging:
+      #   https://github.com/<owner>/<repo>/releases/download/android-latest/HomattHealth.apk
+      - name: Publish APK to the android-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Homatt Health — Android app (latest)
+          body: |
+            Latest Homatt Health Android app. Download HomattHealth.apk below and
+            open it on your phone to install/update. Built automatically from the
+            most recent code.
+          files: HomattHealth.apk
+          make_latest: true

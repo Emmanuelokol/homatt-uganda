@@ -116,6 +116,7 @@
       'display:flex;align-items:center;justify-content:center;padding:22px;font-family:inherit';
 
     var canCopy = !isIOS; // iOS path doesn't need it
+    var APK_URL = 'https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk';
     ov.innerHTML =
       '<div style="background:#fff;border-radius:16px;max-width:430px;width:100%;padding:22px">' +
         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
@@ -123,6 +124,7 @@
           '<div style="font-size:17px;font-weight:800;color:#111">Add Homatt Health</div>' +
         '</div>' +
         '<p style="font-size:14px;color:#333;line-height:1.6;margin:0 0 18px">' + guidanceHTML() + '</p>' +
+        (!isIOS ? '<a href="' + APK_URL + '" style="display:block;text-align:center;width:100%;box-sizing:border-box;padding:12px;background:#F1F8E9;color:#1B5E20;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;margin-bottom:8px;text-decoration:none">Or download the Android app (APK)</a>' : '') +
         (canCopy ? '<button id="_homattCopy" style="width:100%;padding:12px;background:#fff;color:#1B5E20;border:1.5px solid #1B5E20;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">Copy link</button>' : '') +
         '<button id="_homattHelpOk" style="width:100%;padding:13px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Got it</button>' +
       '</div>';
