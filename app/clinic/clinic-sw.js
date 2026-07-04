@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v20';
+const CACHE = 'homatt-clinic-v21';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -123,16 +123,39 @@ self.addEventListener('message', (event) => {
 });
 
 function offlineFallbackResponse() {
+  // This page is a genuine last resort (empty cache). It is NOT a dead-end: it
+  // repairs itself. It (1) checks whether pages are actually cached and, if so,
+  // jumps straight into the app; (2) when online, fetches the core pages into
+  // the cache DIRECTLY (independent of the worker) and then opens the app; and
+  // (3) shows a small diagnostic line so the real state is visible.
+  var script =
+    '(function(){' +
+    'var st=function(t){var e=document.getElementById("st");if(e)e.textContent=t;};' +
+    'function core(){return ["index.html","dashboard.html","new-order.html","settings.html","./"];}' +
+    'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}return n;}' +
+    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v21"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
+    'async function run(){' +
+    'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
+    'var pages=await countPages();' +
+    'if(pages>0&&tries<2){try{sessionStorage.setItem("_healTries",String(tries+1));}catch(e){}location.replace("dashboard.html");return;}' +
+    'if(navigator.onLine){st("Finishing setup…");var ok=await healOnline();if(ok){try{sessionStorage.removeItem("_healTries");}catch(e){}location.replace("dashboard.html");return;}}' +
+    'st(navigator.onLine?("Connected. Saved pages: "+pages+" — tap Retry."):("Offline. Saved pages: "+pages+". Connect once to finish."));' +
+    '}' +
+    'addEventListener("online",function(){run();});' +
+    'setInterval(function(){if(navigator.onLine)run();},4000);' +
+    'run();' +
+    '})();';
   return new Response(
     '<!doctype html><html><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<title>Homatt Health — Offline</title>' +
-    '<script>addEventListener("online",function(){location.reload()});setInterval(function(){if(navigator.onLine)location.reload()},4000);</scr' + 'ipt>' +
+    '<scr' + 'ipt>' + script + '</scr' + 'ipt>' +
     '</head>' +
     '<body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 24px;color:#37474F">' +
     '<div style="font-size:44px">📴</div>' +
     '<h2 style="color:#1B5E20">Setting up…</h2>' +
     '<p style="max-width:320px;margin:8px auto;line-height:1.5">Homatt Health needs an internet connection just once to finish installing. It will reconnect and finish automatically — or tap Retry.</p>' +
+    '<p id="st" style="max-width:320px;margin:8px auto;font-size:12px;color:#9AA0A6"></p>' +
     '<button onclick="location.reload()" style="margin-top:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700">Retry</button>' +
     '</body></html>',
     { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
