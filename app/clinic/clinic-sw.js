@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v18';
+const CACHE = 'homatt-clinic-v19';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -34,7 +34,7 @@ const SHELL = [
   'clinic.webmanifest',
   'css/clinic.css?v=20260627',
   'js/clinic.js?v=20260704b',
-  'js/clinic-offline.js?v=9',
+  'js/clinic-offline.js?v=10',
   'js/new-order-wizard.js?v=20260704',
   'js/pwa-install.js?v=20260703',
   '../js/config.js',
@@ -75,6 +75,22 @@ async function matchAnyCache(req) {
       } catch (e) {}
     }
   }
+  // LAST RESORT: return ANY cached HTML page from any clinic cache. Opening the
+  // "wrong" clinic page is still far better than a dead-end — the app's own
+  // routing/nav takes over from there. This is what guarantees the portal opens
+  // offline as long as it was EVER loaded online, even once.
+  for (const key of clinicKeys) {
+    try {
+      const c = await caches.open(key);
+      const reqs = await c.keys();
+      for (const rq of reqs) {
+        if (rq.mode === 'navigate' || /\.html($|\?)/i.test(rq.url) || /\/clinic\/(\?|$)/.test(rq.url)) {
+          const hit = await c.match(rq);
+          if (hit) return hit;
+        }
+      }
+    } catch (e) {}
+  }
   return null;
 }
 
@@ -114,12 +130,8 @@ self.addEventListener('activate', (event) => {
       } catch (e) {}
     }
 
-    // 2) Now safe to drop every non-current cache.
-    await Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)));
-
-    // 3) REPAIR: guarantee the core pages are present. A flaky precache during
-    //    install used to leave a fresh device unable to open offline. Best-effort
-    //    and silently skipped when there's no connection.
+    // 2) REPAIR first (before deleting anything): make sure the core pages are
+    //    present in the new cache. Best-effort and silently skipped offline.
     await Promise.all(CORE_PAGES.map(async (u) => {
       try {
         if (await target.match(u)) return;
@@ -127,6 +139,18 @@ self.addEventListener('activate', (event) => {
         if (r && r.ok) await target.put(u, r.clone());
       } catch (e) {}
     }));
+
+    // 3) Only drop the OLD clinic caches once the new cache can actually serve
+    //    the shell offline. If a device updated while offline and the migration
+    //    couldn't carry the shell across, we KEEP the old caches so matchAnyCache
+    //    can still open the app from them — never leaving it with no shell at all.
+    const shellReady = (await target.match('dashboard.html')) ||
+                       (await target.match('index.html')) ||
+                       (await target.match('./'));
+    const dropKeys = shellReady
+      ? keys.filter((k) => k !== CACHE)                                     // safe: drop all others
+      : keys.filter((k) => k !== CACHE && k.indexOf('homatt-clinic-') !== 0); // keep old clinic caches as fallback
+    await Promise.all(dropKeys.map((k) => caches.delete(k)));
 
     await self.clients.claim();
 

@@ -133,7 +133,20 @@
   var _retryTimer = null;
   function _scheduleRetry(ms) {
     if (_retryTimer) return;
-    _retryTimer = setTimeout(function () { _retryTimer = null; flush(); }, ms || 30000);
+    _retryTimer = setTimeout(function () { _retryTimer = null; flush(); }, ms || 8000);
+  }
+
+  // On reconnect, retry a few times over the first ~20s instead of just once. A
+  // single attempt often fires a moment before the connection is truly ready
+  // (or before the auth session refreshes), which is why syncing used to need a
+  // manual page refresh. The _syncing guard makes overlapping calls safe.
+  var _burstTimers = [];
+  function burstFlush() {
+    _burstTimers.forEach(function (t) { clearTimeout(t); });
+    _burstTimers = [300, 2000, 5000, 10000, 20000].map(function (ms) {
+      return setTimeout(function () { if (pendingCount() > 0 && !isOffline()) flush(); }, ms);
+    });
+    if (!isOffline()) flush();
   }
 
   async function flush() {
@@ -165,16 +178,25 @@
       updateIndicator();
       // Slow-but-online connections: keep retrying automatically until the
       // queue drains — the user never has to do anything.
-      if (anyFailed && !isOffline()) _scheduleRetry(30000);
+      if (anyFailed && !isOffline()) _scheduleRetry(8000);
+      // When the queue finishes draining, tell the page so it can refresh its
+      // figures from the server (replacing the optimistic offline deltas) with
+      // no manual reload.
+      if (list.length && pendingCount() === 0) {
+        try { window.dispatchEvent(new CustomEvent('clinic-synced')); } catch (e) {}
+      }
     }
   }
 
-  // Safety nets: retry every 60s while anything is pending, and whenever the
-  // app returns to the foreground.
-  setInterval(function () { if (pendingCount() > 0) flush(); }, 60000);
+  // Safety nets: retry every 15s while anything is pending, and whenever the
+  // app returns to the foreground or is restored from the back/forward cache.
+  setInterval(function () { if (pendingCount() > 0) flush(); }, 15000);
   try {
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden && pendingCount() > 0) flush();
+      if (!document.hidden && pendingCount() > 0) burstFlush();
+    });
+    window.addEventListener('pageshow', function () {
+      if (!isOffline() && pendingCount() > 0) burstFlush();
     });
   } catch (e) {}
 
@@ -212,7 +234,7 @@
     }
   }
 
-  window.addEventListener('online', function () { updateIndicator(); setTimeout(flush, 600); });
+  window.addEventListener('online', function () { updateIndicator(); burstFlush(); });
   window.addEventListener('offline', updateIndicator);
   if (document.readyState !== 'loading') updateIndicator();
   else document.addEventListener('DOMContentLoaded', updateIndicator);

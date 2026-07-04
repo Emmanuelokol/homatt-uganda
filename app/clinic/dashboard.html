@@ -949,7 +949,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
-<script src="js/clinic-offline.js?v=9"></script>
+<script src="js/clinic-offline.js?v=10"></script>
 <script src="js/clinic.js?v=20260704b"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -1268,29 +1268,80 @@
   }
 
   // ── Revenue stats ──
+  // Sum of money-moving changes still waiting in the offline outbox, so revenue
+  // and financial figures update in REAL TIME offline (not only after sync).
+  // Queued items are removed on sync, so this self-corrects to 0 once drained.
+  function _offlineFinDelta(clinicId) {
+    var d = { payments: 0, quickSales: 0, consultBilled: 0, patients: 0 };
+    var CO = window.ClinicOffline;
+    if (!CO) return d;
+    var box = CO.get('outbox', []) || [];
+    box.forEach(function(it) {
+      if (!it || !it.payload) return;
+      if (it.type === 'rpc' && it.payload.fn === 'record_payment') {
+        d.payments += Number(it.payload.args && it.payload.args.p_amount) || 0;
+      } else if (it.type === 'quick_sale' && it.payload.sale) {
+        if (!clinicId || it.payload.sale.clinic_id === clinicId) d.quickSales += Number(it.payload.sale.total_ugx) || 0;
+      } else if (it.type === 'consultation' && it.payload.dxPayload) {
+        if (!clinicId || it.payload.dxPayload.clinic_id === clinicId) {
+          d.consultBilled += Number(it.payload.dxPayload.total_charged_ugx) || 0;
+          d.patients += 1;
+        }
+      }
+    });
+    return d;
+  }
+
   async function loadRevenue() {
     var todayEl = document.getElementById('statRevToday');
     var monthEl = document.getElementById('statRevMonth');
     var clinicId = await resolveClinicId();
     if (!clinicId || !supabase) return;
+    var CO = window.ClinicOffline;
+    var cacheKey = 'revenue_' + clinicId;
+
+    function paint(base) {
+      // Billings queued offline (new consultations + quick sales) show at once.
+      var delta = _offlineFinDelta(clinicId);
+      var extra = delta.consultBilled + delta.quickSales;
+      if (todayEl) todayEl.textContent = 'UGX ' + fmtUGX(base.day + extra);
+      if (monthEl) monthEl.textContent = 'UGX ' + fmtUGX(base.month + extra);
+    }
+
+    // Offline → last cached totals + live queued delta.
+    if (CO && CO.isOffline()) {
+      var offBase = CO.get(cacheKey, null);
+      if (offBase) paint(offBase);
+      else { if (todayEl) todayEl.textContent = '—'; if (monthEl) monthEl.textContent = '—'; }
+      return;
+    }
+
     try {
       var startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
       var startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
-      var results = await Promise.all([
+      var runAll = Promise.all([
         supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
         supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
         supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
         supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
       ]);
+      var results = CO ? await CO.withTimeout(runAll, 12000) : await runAll;
+      if (!Array.isArray(results)) {           // timeout/network → serve cache
+        var cb = CO && CO.get(cacheKey, null);
+        if (cb) paint(cb); else { if (todayEl) todayEl.textContent = '—'; if (monthEl) monthEl.textContent = '—'; }
+        return;
+      }
       var qsDayTot = (results[2] && !results[2].error && results[2].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
       var qsMonTot = (results[3] && !results[3].error && results[3].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
       var dayTotal = (results[0].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsDayTot;
       var monTotal = (results[1].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsMonTot;
-      if (todayEl) todayEl.textContent = 'UGX ' + fmtUGX(dayTotal);
-      if (monthEl) monthEl.textContent = 'UGX ' + fmtUGX(monTotal);
+      var base = { day: dayTotal, month: monTotal };
+      if (CO) CO.set(cacheKey, base);
+      paint(base);
     } catch(e) {
-      if (todayEl) todayEl.textContent = '—';
-      if (monthEl) monthEl.textContent = '—';
+      var cb2 = CO && CO.get(cacheKey, null);
+      if (cb2) paint(cb2);
+      else { if (todayEl) todayEl.textContent = '—'; if (monthEl) monthEl.textContent = '—'; }
     }
   }
 
@@ -2025,6 +2076,21 @@
   // Cache the loaded active treatments so the search box can filter without re-querying.
   var _activeRows = [];
   var _activeMigrationNeeded = false;
+  var _activeCacheKey = null;   // set on each load; used for offline optimistic removal
+
+  // Remove a just-discharged patient from the active-treatments list AND its
+  // offline cache, then re-render — so the card disappears immediately (and
+  // stays gone, and drops off missed-return-visits) without waiting for sync.
+  function _removeActiveTreatmentFromCache(diagnosisId) {
+    _activeRows = (_activeRows || []).filter(function(r){ return r.id !== diagnosisId; });
+    var CO = window.ClinicOffline;
+    if (CO && _activeCacheKey) {
+      var cached = CO.get(_activeCacheKey, null);
+      if (cached) CO.set(_activeCacheKey, cached.filter(function(r){ return r.id !== diagnosisId; }));
+    }
+    renderActiveTreatments();
+    renderOverdueFollowups();
+  }
 
   async function loadActiveTreatments() {
     var el = document.getElementById('activeTreatmentsList');
@@ -2053,6 +2119,7 @@
     var hardError = null;
     var useDischargeFilter = true;
     var _atKey = 'active_treatments_' + clinicId;
+    _activeCacheKey = _atKey;
 
     // Offline: render the last-saved active treatments; skip the network loop.
     if (window.ClinicOffline && ClinicOffline.isOffline()) {
@@ -2669,12 +2736,18 @@
       var CO = window.ClinicOffline;
       var dischargeArgs = { p_diagnosis_id: _dischargeContext.diagnosisId, p_notes: notes || null };
 
+      var _diagId = _dischargeContext.diagnosisId;
+
       // Offline → queue the discharge (it's naturally idempotent) and finish
-      // locally. The patient notification is sent when it syncs.
+      // locally: drop the patient from the list & cache NOW so they don't come
+      // back on the next re-render and leave missed-return-visits at once. The
+      // patient notification is sent when it syncs.
       if (CO && CO.isOffline()) {
         CO.enqueue('rpc', { fn: 'discharge_patient', args: dischargeArgs });
         showDischargeToast('Discharged offline — it will sync and notify the patient when you reconnect.', 'success');
-        _dischargeCardOut();
+        document.getElementById('dischargeModal').style.display = 'none';
+        _removeActiveTreatmentFromCache(_diagId);
+        loadRevenue();
         _resetDischargeBtn();
         return;
       }
@@ -2687,7 +2760,9 @@
         if (CO && CO.isNetworkErr(r.error)) {
           CO.enqueue('rpc', { fn: 'discharge_patient', args: dischargeArgs });
           showDischargeToast('Discharged offline — it will sync when you reconnect.', 'success');
-          _dischargeCardOut();
+          document.getElementById('dischargeModal').style.display = 'none';
+          _removeActiveTreatmentFromCache(_diagId);
+          loadRevenue();
           _resetDischargeBtn();
           return;
         }
@@ -3217,6 +3292,9 @@
   // interfere with the operator's scroll position. visibilitychange covers the
   // app-returns-from-background case already.
   window.addEventListener('pageshow', function(e) { if (e.persisted) refreshAll(); });
+  // When the offline outbox finishes syncing, pull fresh server figures so the
+  // optimistic offline numbers are replaced by the real ones — no manual reload.
+  window.addEventListener('clinic-synced', function() { try { refreshAll(); } catch(e) {} });
 
   // ── Supabase Realtime ──
   async function setupRealtime() {
@@ -3750,8 +3828,46 @@
       start = new Date(now.getFullYear(), now.getMonth(), 1);
     }
 
+    var CO = window.ClinicOffline;
+    var cacheKey = 'financial_' + clinicId + '_' + period;
+
+    // Paint the six headline figures from a base snapshot, folding in any money
+    // still queued offline so the numbers are LIVE, not stale until sync.
+    function paintFinancial(base) {
+      var delta = _offlineFinDelta(clinicId);
+      var patients    = base.patients    + delta.patients;
+      var billed      = base.billed      + delta.consultBilled + delta.quickSales;
+      var collected   = base.collected   + delta.payments + delta.quickSales;
+      var outstanding = Math.max(0, base.outstanding + delta.consultBilled - delta.payments);
+      var stockCost   = base.stockCost;
+      var margin      = collected - stockCost;
+
+      var pEl  = document.getElementById('finPatients');
+      var rEl  = document.getElementById('finRevenue');
+      var cEl  = document.getElementById('finCollected');
+      var oEl  = document.getElementById('finOutstanding');
+      var scEl = document.getElementById('finStockCost');
+      var mEl  = document.getElementById('finMargin');
+      if (pEl)  pEl.textContent  = patients;
+      if (rEl)  rEl.textContent  = fmtUGX(billed);
+      if (cEl)  cEl.textContent  = fmtUGX(collected);
+      if (oEl)  oEl.textContent  = fmtUGX(outstanding);
+      if (scEl) scEl.textContent = fmtUGX(stockCost);
+      if (mEl) {
+        mEl.textContent  = fmtUGX(margin);
+        mEl.style.color  = margin < 0 ? '#C62828' : '#E65100';
+      }
+    }
+
+    // Offline → paint from the last cached snapshot + live queued delta, done.
+    if (CO && CO.isOffline()) {
+      var offBase = CO.get(cacheKey, null);
+      if (offBase) paintFinancial(offBase);
+      return;
+    }
+
     try {
-      var [dxRes, txnRes, payRes, qsRes] = await Promise.all([
+      var runAll = Promise.all([
         supabase.from('clinic_diagnoses')
           .select('id,total_charged_ugx,amount_paid,payment_status')
           .eq('clinic_id', clinicId)
@@ -3770,6 +3886,13 @@
           .eq('clinic_id', clinicId)
           .gte('created_at', start.toISOString()),
       ]);
+      var raced = CO ? await CO.withTimeout(runAll, 12000) : await runAll;
+      if (!Array.isArray(raced)) {             // timeout/network → cached snapshot
+        var cbase = CO && CO.get(cacheKey, null);
+        if (cbase) paintFinancial(cbase);
+        return;
+      }
+      var dxRes = raced[0], txnRes = raced[1], payRes = raced[2], qsRes = raced[3];
 
       // Graceful fallback: if amount_paid column isn't migrated yet, the whole
       // diagnoses query fails. Refetch with only guaranteed columns so Patients
@@ -3804,24 +3927,11 @@
         : dxPaidTotal) + qsTotal;
       var outstanding = Math.max(0, billed - qsTotal - dxPaidTotal);
       var stockCost = txns.reduce(function(s,t){ return s + (Math.abs(t.quantity_change) * (Number(t.unit_cost_ugx)||0)); }, 0);
-      // Margin uses Collected (real income) minus stock cost so it reflects actual cash position
-      var margin    = collected - stockCost;
 
-      var pEl  = document.getElementById('finPatients');
-      var rEl  = document.getElementById('finRevenue');
-      var cEl  = document.getElementById('finCollected');
-      var oEl  = document.getElementById('finOutstanding');
-      var scEl = document.getElementById('finStockCost');
-      var mEl  = document.getElementById('finMargin');
-      if (pEl)  pEl.textContent  = patients;
-      if (rEl)  rEl.textContent  = fmtUGX(billed);
-      if (cEl)  cEl.textContent  = fmtUGX(collected);
-      if (oEl)  oEl.textContent  = fmtUGX(outstanding);
-      if (scEl) scEl.textContent = fmtUGX(stockCost);
-      if (mEl) {
-        mEl.textContent  = fmtUGX(margin);
-        mEl.style.color  = margin < 0 ? '#C62828' : '#E65100';
-      }
+      // Snapshot the server-side base, then paint (paint adds any offline delta).
+      var base = { patients: patients, billed: billed, collected: collected, outstanding: outstanding, stockCost: stockCost };
+      if (CO) CO.set(cacheKey, base);
+      paintFinancial(base);
 
       // Top items used
       var usage = {};
@@ -3845,6 +3955,9 @@
       }
     } catch(e) {
       console.warn('Financial overview error:', e.message);
+      // Network failed → show the last snapshot + live queued delta.
+      var cErr = CO && CO.get(cacheKey, null);
+      if (cErr) paintFinancial(cErr);
     }
   }
 
