@@ -3500,6 +3500,7 @@
         _stashStockExtras();
         CO.enqueue('table_insert', { table: 'clinic_inventory', row: insertData, stripUnknownColumns: true });
         _addStockItemToCache(insertData);
+        _syncQsCacheForItem(insertData);   // sellable in Quick Sale right away
       }
 
       // Offline → queue it and show it in the Stock Tracker immediately.
@@ -3601,6 +3602,45 @@
     CO.set(_stockCacheKey, items);
   }
 
+  // Keep the Quick Sale cache in step with an offline stock change so a newly
+  // added — or restocked — item is immediately sellable without waiting for a
+  // sync. Mirrors loadQsDrugs: an item is sellable when it isn't an internal
+  // material (or has a selling price) AND has stock on hand.
+  function _syncQsCacheForItem(row) {
+    var CO = window.ClinicOffline;
+    if (!CO || !row || !row.id) return;
+    var cid = (session && session.clinicId) || _qsClinicId || _clinicId || row.clinic_id;
+    if (!cid) return;
+    var key = 'qs_inventory_' + cid;
+    var list = CO.get(key, null);
+    if (list == null) return;   // Quick Sale not seeded yet (needs one online open)
+
+    var qty = Number(row.quantity) || 0;
+    var sellable = (row.item_type !== 'material' || Number(row.selling_price_ugx) > 0) && qty > 0;
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) { if (list[i].id === row.id) { idx = i; break; } }
+
+    if (!sellable) {                       // out of stock / internal material → not shown
+      if (idx >= 0) { list.splice(idx, 1); CO.set(key, list); }
+      return;
+    }
+    var qsRow = {
+      id: row.id, item_name: row.item_name, item_type: row.item_type, unit: row.unit,
+      quantity: qty,
+      unit_cost_ugx:          row.unit_cost_ugx != null ? row.unit_cost_ugx : null,
+      selling_price_ugx:      row.selling_price_ugx != null ? row.selling_price_ugx : null,
+      min_threshold:          row.min_threshold != null ? row.min_threshold : null,
+      category:               row.category != null ? row.category : null,
+      tabs_per_pack:          row.tabs_per_pack != null ? row.tabs_per_pack : null,
+      packs_per_box:          row.packs_per_box != null ? row.packs_per_box : null,
+      pack_selling_price_ugx: row.pack_selling_price_ugx != null ? row.pack_selling_price_ugx : null,
+      box_selling_price_ugx:  row.box_selling_price_ugx != null ? row.box_selling_price_ugx : null,
+    };
+    if (idx >= 0) list[idx] = Object.assign({}, list[idx], qsRow);
+    else list.push(qsRow);
+    CO.set(key, list);
+  }
+
   // Fold a stock change into the cached stock list so the quantity updates
   // instantly (and survives a reload) while the write is only queued.
   function _applyStockDeltaToCache(inventoryId, delta) {
@@ -3608,16 +3648,21 @@
     if (!CO || !_stockCacheKey) return;
     var items = CO.get(_stockCacheKey, null);
     if (items == null) return;
+    var updated = null;
     var out = items.map(function(i) {
       if (i.id !== inventoryId) return i;
       var q = Math.max(0, (Number(i.quantity) || 0) + delta);
-      return Object.assign({}, i, {
+      updated = Object.assign({}, i, {
         quantity: q,
         is_low_stock: q <= Number(i.min_threshold),
         is_critical:  q === 0,
       });
+      return updated;
     });
     CO.set(_stockCacheKey, out);
+    // Reflect the new quantity in Quick Sale too (adds the item back if a
+    // restock brought it from zero, keeps it in step otherwise).
+    if (updated) _syncQsCacheForItem(updated);
   }
 
   document.getElementById('restockSaveBtn').onclick = async function() {
