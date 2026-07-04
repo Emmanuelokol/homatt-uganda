@@ -51,10 +51,15 @@
   }
   if (isStandalone()) return; // already installed
 
-  try {
-    var snooze = parseInt(localStorage.getItem('_homattInstallSnooze') || '0', 10);
-    if (snooze && Date.now() < snooze) return;
-  } catch (e) {}
+  // Snoozing (tapping ×) only hides the BIG banner for a while — it must never
+  // hide the small always-visible Install pill. (An early return here used to
+  // remove every install entry point for 3 days, so users saw no way to install.)
+  function bannerSnoozed() {
+    try {
+      var snooze = parseInt(localStorage.getItem('_homattInstallSnooze') || '0', 10);
+      return !!(snooze && Date.now() < snooze);
+    } catch (e) { return false; }
+  }
 
   var ICON = 'icons/clinic-192.png?v=2';
   var deferredPrompt = null;
@@ -158,9 +163,48 @@
       showGuidance();
     }
   }
+  // Let any page (e.g. a menu item) trigger the install flow.
+  window.HomattInstall = { install: onInstallClick };
+
+  // ── Always-visible install pill ────────────────────────────────────────────
+  // The dismissible banner alone wasn't discoverable (it can be snoozed and
+  // only appears briefly). This small fixed "Install app" pill is ALWAYS shown
+  // while the portal runs in a browser tab (never once installed), so a user
+  // who opens the link can immediately tap Install.
+  function showPill() {
+    if (isStandalone()) return;
+    if (document.getElementById('_homattInstallPill')) return;
+    if (!document.body) return;
+    var pill = document.createElement('button');
+    pill.id = '_homattInstallPill';
+    pill.setAttribute('aria-label', 'Install Homatt Health app');
+    // z-index 400: above page content, BELOW every sheet/modal/overlay (z≥500)
+    // so it can never cover the Quick Sale Sell button or any dialog.
+    pill.style.cssText =
+      'position:fixed;right:12px;bottom:76px;z-index:400;' +
+      'display:flex;align-items:center;gap:7px;' +
+      'background:#1B5E20;color:#fff;border:none;border-radius:24px;' +
+      'padding:11px 16px;font-size:13.5px;font-weight:700;font-family:inherit;' +
+      'box-shadow:0 6px 18px rgba(0,0,0,0.3);cursor:pointer';
+    pill.innerHTML =
+      '<span class="material-icons-outlined" style="font-size:17px">install_mobile</span>Install app';
+    pill.onclick = onInstallClick;
+    document.body.appendChild(pill);
+  }
+  window.addEventListener('appinstalled', function () {
+    var p = document.getElementById('_homattInstallPill');
+    if (p) p.remove();
+  });
+  function armPill() {
+    showPill();
+    // Re-add if a page script rebuilt the body content.
+    setInterval(showPill, 5000);
+  }
+  if (document.readyState === 'complete' || document.readyState === 'interactive') armPill();
+  else window.addEventListener('DOMContentLoaded', armPill);
 
   function showBanner() {
-    if (document.getElementById('_homattInstallBar') || isStandalone()) return;
+    if (document.getElementById('_homattInstallBar') || isStandalone() || bannerSnoozed()) return;
     var bar = document.createElement('div');
     bar.id = '_homattInstallBar';
     bar.style.cssText =

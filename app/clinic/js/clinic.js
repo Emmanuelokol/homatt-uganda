@@ -388,7 +388,64 @@ async function _replayTableInsert(payload) {
   }
 }
 
+// Replay a queued table UPDATE (e.g. clinic settings saved offline). Naturally
+// idempotent — applying the same patch twice gives the same row. If the live DB
+// lacks a newer column, strip it and retry so the rest still saves.
+async function _replayTableUpdate(payload) {
+  var supa = _getClinicSupabase();
+  if (!supa) return false;
+  if (!payload || !payload.table || !payload.patch || !payload.match) return true;  // malformed → drop
+  var patch = {};
+  for (var k in payload.patch) { if (Object.prototype.hasOwnProperty.call(payload.patch, k)) patch[k] = payload.patch[k]; }
+  try {
+    var q = function () { return supa.from(payload.table).update(patch).match(payload.match); };
+    var r = await q();
+    var guard = 0;
+    while (r.error && guard++ < 10) {
+      var m = (r.error.message || '').match(/Could not find the '([^']+)' column|column \S*?\.?"?([a-z_]+)"? does not exist/i);
+      var bad = m && (m[1] || m[2]);
+      if (!bad || !(bad in patch)) break;
+      delete patch[bad];
+      if (!Object.keys(patch).length) return true;   // nothing left to save
+      r = await q();
+    }
+    if (r.error) { console.warn('replay update (will retry):', payload.table, r.error.message); return false; }
+    return true;
+  } catch (e) { return false; }
+}
+
+// Replay a queued UPSERT (rows carry client ids → idempotent).
+async function _replayTableUpsert(payload) {
+  var supa = _getClinicSupabase();
+  if (!supa) return false;
+  if (!payload || !payload.table || !payload.rows || !payload.rows.length) return true;
+  try {
+    var r = await supa.from(payload.table).upsert(payload.rows, { onConflict: payload.onConflict || 'id' });
+    if (r.error) {
+      if (/duplicate|already exists/i.test(r.error.message || '')) return true;
+      console.warn('replay upsert (will retry):', payload.table, r.error.message);
+      return false;
+    }
+    return true;
+  } catch (e) { return false; }
+}
+
+// Replay a queued DELETE by ids (idempotent — deleting again is a no-op).
+async function _replayTableDelete(payload) {
+  var supa = _getClinicSupabase();
+  if (!supa) return false;
+  if (!payload || !payload.table || !payload.ids || !payload.ids.length) return true;
+  try {
+    var r = await supa.from(payload.table).delete().in('id', payload.ids);
+    if (r.error) { console.warn('replay delete (will retry):', payload.table, r.error.message); return false; }
+    return true;
+  } catch (e) { return false; }
+}
+
 if (window.ClinicOffline) {
   ClinicOffline.registerSyncHandler('rpc', function (item) { return _replayRpc(item.payload); });
   ClinicOffline.registerSyncHandler('table_insert', function (item) { return _replayTableInsert(item.payload); });
+  ClinicOffline.registerSyncHandler('table_update', function (item) { return _replayTableUpdate(item.payload); });
+  ClinicOffline.registerSyncHandler('table_upsert', function (item) { return _replayTableUpsert(item.payload); });
+  ClinicOffline.registerSyncHandler('table_delete', function (item) { return _replayTableDelete(item.payload); });
 }

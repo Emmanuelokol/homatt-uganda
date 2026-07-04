@@ -529,7 +529,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=11" defer></script>
-<script src="js/clinic.js?v=20260704b" defer></script>
+<script src="js/clinic.js?v=20260705" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -632,7 +632,9 @@ async function loadStaffList() {
     return;
   }
 
-  var res = await _supa.rpc('get_clinic_staff');
+  var CO = window.ClinicOffline;
+  var runStaff = function() { return _supa.rpc('get_clinic_staff'); };
+  var res = CO ? await CO.cachedQuery('clinic_staff_' + (_clinicId || 'me'), runStaff) : await runStaff();
   if (res.error) {
     // RPC not deployed yet, or not an owner — hide the card cleanly
     if (card) card.style.display = 'none';
@@ -988,7 +990,11 @@ function getHours() {
 
 /* ── Load clinic profile ── */
 async function loadClinicProfile() {
-  var res = await _supa.from('clinics').select('*').eq('id', _clinicId).single();
+  // Cached read: loads instantly offline, and any successful online load keeps
+  // the cache fresh (an offline save merges into the same cache — see below).
+  var CO = window.ClinicOffline;
+  var run = function() { return _supa.from('clinics').select('*').eq('id', _clinicId).single(); };
+  var res = CO ? await CO.cachedQuery('clinic_profile_' + _clinicId, run) : await run();
   if (res.error) {
     console.error('[settings] loadClinicProfile error:', res.error);
     showToast('Could not load clinic data: ' + res.error.message, 'error');
@@ -1085,10 +1091,14 @@ function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).repla
 /* ── Condition-Based Fees ── */
 async function loadCondFees() {
   if (!_supa || !_clinicId) return;
-  var res = await _supa.from('clinic_condition_fees')
-    .select('id,condition_name,fee,notes')
-    .eq('clinic_id', _clinicId)
-    .order('created_at', { ascending: true });
+  var CO = window.ClinicOffline;
+  var run = function() {
+    return _supa.from('clinic_condition_fees')
+      .select('id,condition_name,fee,notes')
+      .eq('clinic_id', _clinicId)
+      .order('created_at', { ascending: true });
+  };
+  var res = CO ? await CO.cachedQuery('cond_fees_' + _clinicId, run) : await run();
   condFeeDbRows = res.data || [];
   condFeeData = condFeeDbRows.map(function(r) {
     return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '', _delete: false };
@@ -1348,13 +1358,55 @@ async function saveSettings() {
     return;
   }
 
+  var CO = window.ClinicOffline;
+
+  // Queue the whole settings save for background sync and fold it into the
+  // local caches, so everything reflects immediately (and after a reload)
+  // exactly as if it had saved online — then syncs automatically.
+  function queueSettingsOffline() {
+    CO.enqueue('table_update', {
+      table: 'clinics', match: { id: _clinicId },
+      patch: Object.assign({}, payload, { diagnostic_tests: testsData }),
+    });
+    var offDelete = condFeeData.filter(function(r){ return r._delete && r.id; }).map(function(r){ return r.id; });
+    if (offDelete.length) CO.enqueue('table_delete', { table: 'clinic_condition_fees', ids: offDelete });
+    var offUpsert = condFeeData.filter(function(r){ return !r._delete && r.condition_name && (r.fee !== '' && r.fee !== null); }).map(function(r) {
+      if (!r.id) r.id = CO.uuid();   // client id → shows correctly now, syncs idempotently
+      return { id: r.id, clinic_id: _clinicId, condition_name: r.condition_name.trim(), fee: Number(r.fee), notes: r.notes || null, updated_at: new Date().toISOString() };
+    });
+    if (offUpsert.length) CO.enqueue('table_upsert', { table: 'clinic_condition_fees', rows: offUpsert, onConflict: 'id' });
+
+    // Local caches: profile + fees now match what was queued.
+    var cachedProfile = CO.get('clinic_profile_' + _clinicId, null) || {};
+    CO.set('clinic_profile_' + _clinicId, Object.assign({}, cachedProfile, payload, { diagnostic_tests: testsData }));
+    condFeeData = condFeeData.filter(function(r){ return !r._delete; });
+    var feeCacheRows = condFeeData.map(function(r){ return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '' }; });
+    CO.set('cond_fees_' + _clinicId, feeCacheRows);
+    condFeeDbRows = feeCacheRows;
+    renderCondFeeTable();
+
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+    msg.style.color = '#33691E';
+    msg.textContent = 'Saved offline — will sync automatically when you reconnect.';
+    showToast('Settings saved offline — will sync automatically', 'success');
+  }
+
+  // Offline → queue + local cache, done. Works exactly like an online save.
+  if (CO && CO.isOffline()) { queueSettingsOffline(); return; }
+
   // Use .select() so PostgREST returns the updated row — this is the ONLY reliable
   // way to detect a "silent RLS rejection" (0 rows updated, no error returned).
-  var { data: savedRows, error } = await _supa
+  var upd = _supa
     .from('clinics')
     .update(payload)
     .eq('id', _clinicId)
     .select('id, name, front_photo_url, latitude, longitude, address, updated_at');
+  var updRes = CO ? await CO.withTimeout(upd, 15000) : await upd;
+  var savedRows = updRes.data, error = updRes.error;
+
+  // Connection dropped / timed out mid-save → save offline instead of failing.
+  if (error && CO && CO.isNetworkErr(error)) { queueSettingsOffline(); return; }
 
   if (!error) {
     await saveCondFees();
@@ -1364,6 +1416,11 @@ async function saveSettings() {
     try {
       await _supa.from('clinics').update({ diagnostic_tests: testsData }).eq('id', _clinicId);
     } catch(e) {}
+    // Keep the offline cache in step with what just saved online.
+    if (CO) {
+      var cp = CO.get('clinic_profile_' + _clinicId, null) || {};
+      CO.set('clinic_profile_' + _clinicId, Object.assign({}, cp, payload, { diagnostic_tests: testsData }));
+    }
   }
 
   btn.disabled = false;
@@ -1453,6 +1510,6 @@ async function changePassword() {
 }
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/pwa-install.js?v=20260703"></script>
+<script src="js/pwa-install.js?v=20260705"></script>
 </body>
 </html>

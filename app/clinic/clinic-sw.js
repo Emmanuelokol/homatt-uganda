@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v21';
+const CACHE = 'homatt-clinic-v22';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -33,10 +33,10 @@ const SHELL = [
   'settings.html',
   'clinic.webmanifest',
   'css/clinic.css?v=20260627',
-  'js/clinic.js?v=20260704b',
+  'js/clinic.js?v=20260705',
   'js/clinic-offline.js?v=11',
   'js/new-order-wizard.js?v=20260704',
-  'js/pwa-install.js?v=20260703',
+  'js/pwa-install.js?v=20260705',
   '../js/config.js',
   '../js/native-bridge.js',
   'icons/clinic-192.png?v=2',
@@ -133,7 +133,7 @@ function offlineFallbackResponse() {
     'var st=function(t){var e=document.getElementById("st");if(e)e.textContent=t;};' +
     'function core(){return ["index.html","dashboard.html","new-order.html","settings.html","./"];}' +
     'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}return n;}' +
-    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v21"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
+    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v22"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
