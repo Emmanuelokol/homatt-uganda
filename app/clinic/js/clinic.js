@@ -358,6 +358,37 @@ async function _replayRpc(payload) {
   }
 }
 
+// Replay a queued table insert (e.g. a stock item added offline). The row
+// carries a client-generated id, so a duplicate means it already landed — that
+// counts as success. If the live DB is missing a newer column, strip it and
+// retry so the row still saves (mirrors the online add-stock fallback).
+async function _replayTableInsert(payload) {
+  var supa = _getClinicSupabase();
+  if (!supa) return false;
+  if (!payload || !payload.table || !payload.row) return true;   // malformed → drop
+  var row = {};
+  for (var k in payload.row) { if (Object.prototype.hasOwnProperty.call(payload.row, k)) row[k] = payload.row[k]; }
+  try {
+    var r = await supa.from(payload.table).insert(row);
+    var guard = 0;
+    while (r.error && payload.stripUnknownColumns && guard++ < 8) {
+      var m = (r.error.message || '').match(/Could not find the '([^']+)' column/);
+      if (!m || !(m[1] in row)) break;
+      delete row[m[1]];
+      r = await supa.from(payload.table).insert(row);
+    }
+    if (r.error) {
+      if (/duplicate|already exists/i.test(r.error.message || '')) return true;  // already saved
+      console.warn('replay insert (will retry):', payload.table, r.error.message);
+      return false;                            // transport/db/auth error → keep & retry
+    }
+    return true;
+  } catch (e) {
+    return false;                              // network threw → keep & retry
+  }
+}
+
 if (window.ClinicOffline) {
   ClinicOffline.registerSyncHandler('rpc', function (item) { return _replayRpc(item.payload); });
+  ClinicOffline.registerSyncHandler('table_insert', function (item) { return _replayTableInsert(item.payload); });
 }

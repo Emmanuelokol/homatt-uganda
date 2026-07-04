@@ -1797,9 +1797,9 @@
     };
 
     // ── OFFLINE: queue the entire consultation and sync when back online ──
-    // We only intercept when the device is definitely offline, so the normal
-    // online path below is left completely untouched.
-    if (window.ClinicOffline && navigator.onLine === false) {
+    // Used both when the device is plainly offline AND when an online save hits
+    // a network error/timeout on a flaky link — so a consultation is NEVER lost.
+    function queueConsultationOffline() {
       const cid = ClinicOffline.uuid();
       dxPayload.id = cid;                          // client id links all rows
       const epx = items.length ? {
@@ -1843,26 +1843,39 @@
       if (successRemindersEl) successRemindersEl.innerHTML = '<div style="font-size:12px;color:#2E7D32;padding:3px 0"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Prescription &amp; reminders will be scheduled once it syncs.</div>';
       const successSheet = document.getElementById('successSheet');
       if (successSheet) successSheet.style.display = 'flex';
+    }
+
+    if (window.ClinicOffline && navigator.onLine === false) {
+      queueConsultationOffline();
       return;
     }
 
+    // ONLINE: save directly, but cap the request so a stalled connection can't
+    // hang the wizard — and if it fails for network reasons, fall back to the
+    // offline queue instead of losing the consultation.
+    const _saveTO = (p) => (window.ClinicOffline ? ClinicOffline.withTimeout(p, 15000) : p);
     let dx, dxError;
-    ({ data: dx, error: dxError } = await supabase
+    ({ data: dx, error: dxError } = await _saveTO(supabase
       .from('clinic_diagnoses')
       .insert(dxPayload)
-      .select().single());
+      .select().single()));
 
     // Graceful fallback if follow_up_reason column not yet migrated
     if (dxError && dxError.message && dxError.message.includes('follow_up_reason')) {
       const compatPayload = Object.assign({}, dxPayload);
       delete compatPayload.follow_up_reason;
-      ({ data: dx, error: dxError } = await supabase
+      ({ data: dx, error: dxError } = await _saveTO(supabase
         .from('clinic_diagnoses')
         .insert(compatPayload)
-        .select().single());
+        .select().single()));
     }
 
     if (dxError) {
+      // Lost/again-flaky connection while "online" → queue it, don't fail.
+      if (window.ClinicOffline && ClinicOffline.isNetworkErr(dxError)) {
+        queueConsultationOffline();
+        return;
+      }
       showToast('Save failed: ' + dxError.message, 'error');
       resetBtn();
       return;

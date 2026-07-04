@@ -950,7 +950,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../js/config.js?v=20260502"></script>
 <script src="js/clinic-offline.js?v=9"></script>
-<script src="js/clinic.js?v=20260704"></script>
+<script src="js/clinic.js?v=20260704b"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -2644,12 +2644,55 @@
     if (!_dischargeContext.diagnosisId) return;
     btn.disabled = true;
     btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px;animation:spin 1s linear infinite">hourglass_empty</span> Discharging…';
+
+    // Slide the card out, refresh, close the modal — shared by both the online
+    // and offline paths.
+    function _dischargeCardOut() {
+      var cardEl = _dischargeContext.cardEl;
+      if (cardEl) {
+        cardEl.style.transition = 'opacity .3s,transform .3s';
+        cardEl.style.opacity = '0';
+        cardEl.style.transform = 'translateX(60px)';
+        setTimeout(function() { cardEl.remove(); loadActiveTreatments(); loadRevenue(); }, 320);
+      } else {
+        loadActiveTreatments();
+        loadRevenue();
+      }
+      document.getElementById('dischargeModal').style.display = 'none';
+    }
+    function _resetDischargeBtn() {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify';
+    }
+
     try {
-      var r = await supabase.rpc('discharge_patient', {
-        p_diagnosis_id: _dischargeContext.diagnosisId,
-        p_notes: notes || null,
-      });
-      if (r.error) throw r.error;
+      var CO = window.ClinicOffline;
+      var dischargeArgs = { p_diagnosis_id: _dischargeContext.diagnosisId, p_notes: notes || null };
+
+      // Offline → queue the discharge (it's naturally idempotent) and finish
+      // locally. The patient notification is sent when it syncs.
+      if (CO && CO.isOffline()) {
+        CO.enqueue('rpc', { fn: 'discharge_patient', args: dischargeArgs });
+        showDischargeToast('Discharged offline — it will sync and notify the patient when you reconnect.', 'success');
+        _dischargeCardOut();
+        _resetDischargeBtn();
+        return;
+      }
+
+      var r = CO
+        ? await CO.withTimeout(supabase.rpc('discharge_patient', dischargeArgs))
+        : await supabase.rpc('discharge_patient', dischargeArgs);
+      if (r.error) {
+        // Lost the connection mid-request → queue it instead of failing.
+        if (CO && CO.isNetworkErr(r.error)) {
+          CO.enqueue('rpc', { fn: 'discharge_patient', args: dischargeArgs });
+          showDischargeToast('Discharged offline — it will sync when you reconnect.', 'success');
+          _dischargeCardOut();
+          _resetDischargeBtn();
+          return;
+        }
+        throw r.error;
+      }
 
       // Notify the patient — surface result so clinic knows what happened
       var notifyMsg = '';
@@ -2686,25 +2729,12 @@
         console.warn('[discharge-notify] threw', e);
       }
       showDischargeToast(notifyMsg, notifyKind);
-
-      // Animate card out
-      var cardEl = _dischargeContext.cardEl;
-      if (cardEl) {
-        cardEl.style.transition = 'opacity .3s,transform .3s';
-        cardEl.style.opacity = '0';
-        cardEl.style.transform = 'translateX(60px)';
-        setTimeout(function() { cardEl.remove(); loadActiveTreatments(); loadRevenue(); }, 320);
-      } else {
-        loadActiveTreatments();
-        loadRevenue();
-      }
-      document.getElementById('dischargeModal').style.display = 'none';
+      _dischargeCardOut();
     } catch(e) {
       errEl.textContent = 'Error: ' + e.message;
       errEl.style.display = 'block';
     }
-    btn.disabled = false;
-    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify';
+    _resetDischargeBtn();
   };
 
   // Close on backdrop click
@@ -3453,7 +3483,51 @@
       var category = catEl ? (catEl.value || '').trim() : '';
       if (category) insertData.category = category;
 
-      var r = await supabase.from('clinic_inventory').insert(insertData);
+      var CO = window.ClinicOffline;
+      // Client-generated primary key → replaying the insert is idempotent (a
+      // duplicate id means it already landed, so it's never created twice).
+      if (CO) insertData.id = CO.uuid();
+
+      // Fields from newer migrations kept on-device so Quick Sale has prices
+      // even before the row syncs (and even if the DB lacks those columns).
+      function _stashStockExtras() {
+        var extras = {};
+        ['selling_price_ugx','tabs_per_pack','pack_selling_price_ugx','packs_per_box','box_selling_price_ugx','category']
+          .forEach(function(kk){ if (insertData[kk] != null) extras[kk] = insertData[kk]; });
+        if (Object.keys(extras).length) _saveInvExtras(clinicId, name, extras);
+      }
+      function _queueStockInsert() {
+        _stashStockExtras();
+        CO.enqueue('table_insert', { table: 'clinic_inventory', row: insertData, stripUnknownColumns: true });
+        _addStockItemToCache(insertData);
+      }
+
+      // Offline → queue it and show it in the Stock Tracker immediately.
+      if (CO && CO.isOffline()) {
+        _queueStockInsert();
+        if (typeof showToast === 'function') showToast('"' + name + '" added offline — syncs when you reconnect.', 'success');
+        document.getElementById('stockItemModal').style.display = 'none';
+        loadInventory();
+        if (typeof loadQsDrugs === 'function') loadQsDrugs();
+        btn.disabled = false; btn.textContent = 'Save Item';
+        return;
+      }
+
+      var r = await (CO
+        ? CO.withTimeout(supabase.from('clinic_inventory').insert(insertData))
+        : supabase.from('clinic_inventory').insert(insertData));
+
+      // Lost the connection mid-insert → queue it (same client id, so it can't
+      // create a duplicate row) instead of losing the item.
+      if (r.error && CO && CO.isNetworkErr(r.error)) {
+        _queueStockInsert();
+        if (typeof showToast === 'function') showToast('"' + name + '" saved offline — syncs when you reconnect.', 'success');
+        document.getElementById('stockItemModal').style.display = 'none';
+        loadInventory();
+        if (typeof loadQsDrugs === 'function') loadQsDrugs();
+        btn.disabled = false; btn.textContent = 'Save Item';
+        return;
+      }
 
       // If the live DB is missing newer columns (selling_price_ugx, category,
       // packaging — added by later migrations), PostgREST rejects the WHOLE
@@ -3511,6 +3585,21 @@
   document.getElementById('restockModal').addEventListener('click', function(e){
     if (e.target === this) this.style.display = 'none';
   });
+
+  // Add a brand-new stock item to the cached stock list so it shows in the
+  // Stock Tracker at once, before the insert has synced.
+  function _addStockItemToCache(row) {
+    var CO = window.ClinicOffline;
+    if (!CO || !_stockCacheKey) return;
+    var items = CO.get(_stockCacheKey, null);
+    if (items == null) items = [];
+    var q = Number(row.quantity) || 0;
+    items = items.concat([Object.assign({}, row, {
+      is_low_stock: q <= Number(row.min_threshold),
+      is_critical:  q === 0,
+    })]);
+    CO.set(_stockCacheKey, items);
+  }
 
   // Fold a stock change into the cached stock list so the quantity updates
   // instantly (and survives a reload) while the write is only queued.
