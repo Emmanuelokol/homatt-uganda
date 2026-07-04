@@ -4,7 +4,6 @@
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://homatt-uganda-emmanuelokols-projects.vercel.app",
     "androidScheme": "https",
     "allowNavigation": [
       "*.supabase.co",
