@@ -1292,6 +1292,39 @@
     return d;
   }
 
+  // Consultations saved offline and still waiting in the outbox. Every dashboard
+  // section folds these in so a consultation made with no connection appears
+  // EVERYWHERE it should (patients, pending payments, meds, conditions, stock)
+  // exactly like an online one — not only in the financial totals. Self-clears
+  // as the queue syncs.
+  function _pendingOfflineConsults(clinicId) {
+    var CO = window.ClinicOffline;
+    if (!CO) return [];
+    var box = CO.get('outbox', []) || [];
+    var out = [];
+    box.forEach(function(it) {
+      if (!it || it.type !== 'consultation' || !it.payload || !it.payload.dxPayload) return;
+      var dx = it.payload.dxPayload;
+      if (clinicId && dx.clinic_id !== clinicId) return;
+      out.push({ dx: dx, invItems: it.payload.invItems || [] });
+    });
+    return out;
+  }
+  // Normalize a queued consultation's dxPayload into a pending-payment row.
+  function _offlineConsultAsPayRow(dx) {
+    var total = Number(dx.total_charged_ugx) || 0;
+    var paid  = Number(dx.amount_paid) || (dx.payment_status === 'paid' ? total : 0);
+    var bal   = Math.max(0, total - paid);
+    return {
+      id: dx.id, patient_name: dx.patient_name, patient_phone: dx.patient_phone,
+      confirmed_diagnosis: dx.confirmed_diagnosis,
+      total_charged_ugx: total, amount_paid: paid, balance_ugx: bal,
+      payment_status: dx.payment_status || (bal > 0 ? 'pending' : 'paid'),
+      created_at: dx.created_at || new Date().toISOString(), last_payment_at: null,
+      _offline: true,
+    };
+  }
+
   async function loadRevenue() {
     var todayEl = document.getElementById('statRevToday');
     var monthEl = document.getElementById('statRevMonth');
@@ -1370,6 +1403,16 @@
         ? await ClinicOffline.cachedQuery('consultations_today_' + clinicId, _consultQ)
         : await _consultQ();
       var rows2 = res2.data || [];
+      // Fold in today's offline consultations so they count as patients and
+      // appear in the list before sync.
+      var startIso = start.toISOString();
+      var _offToday = _pendingOfflineConsults(clinicId)
+        .filter(function(o){ return (o.dx.created_at || '') >= startIso; });
+      if (_offToday.length) {
+        var _seen2 = {}; rows2.forEach(function(r){ _seen2[r.id] = 1; });
+        _offToday.forEach(function(o){ if (!_seen2[o.dx.id]) rows2.unshift(o.dx); });
+        rows2.sort(function(a,b){ return new Date(b.created_at||0) - new Date(a.created_at||0); });
+      }
       var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
       var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
       var sd = document.getElementById('statDispatched'); if (sd) sd.textContent = inpatient;
@@ -2233,6 +2276,13 @@
       } catch(_) { /* non-fatal — fall back to CLN-XXX code */ }
     }
 
+    // Fold in offline consultations — they are active treatments too.
+    var _offAct = _pendingOfflineConsults(clinicId);
+    if (_offAct.length) {
+      var _seenAct = {}; rows.forEach(function(r){ _seenAct[r.id] = 1; });
+      _offAct.forEach(function(o){ if (!_seenAct[o.dx.id]) rows.unshift(o.dx); });
+    }
+
     _activeRows = rows;
     renderActiveTreatments();
     renderOverdueFollowups();
@@ -2605,13 +2655,21 @@
       }
     } catch(e) {}
 
-    if (!data && !qsRows.length) {
+    var _offMeds = _pendingOfflineConsults(clinicId).filter(function(o){ return (o.dx.created_at || '') >= since; });
+    if (!data && !qsRows.length && !_offMeds.length) {
       el.innerHTML = (window.ClinicOffline && (ClinicOffline.isOffline() || ClinicOffline.isNetworkErr(dxRes && dxRes.error)))
         ? ClinicOffline.offlineHtml('Dispensing data will show here once loaded online.')
         : '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
       return;
     }
     data = data || [];
+    // Fold in offline consultations dated within the period — their prescribed
+    // medicines count as dispensed right away.
+    _offMeds.forEach(function(o) {
+      if ((o.dx.created_at || '') < since) return;
+      if (data.some(function(r){ return r._id === o.dx.id; })) return;
+      data.push({ prescription_items: o.dx.prescription_items || [], created_at: o.dx.created_at, _id: o.dx.id });
+    });
 
     // Tally drugs: prescriptions add patients + treatment days; Quick Sales add
     // over-the-counter transactions.
@@ -2972,7 +3030,19 @@
       if (rows != null && CO) CO.set(cacheKey, rows);
     }
 
-    if (!rows || !rows.length) {
+    rows = rows || [];
+    // Fold in consultations made offline that still owe a balance — they belong
+    // in Pending Payments immediately, not only after sync.
+    var _offPay = _pendingOfflineConsults(clinicId)
+      .map(function(o){ return _offlineConsultAsPayRow(o.dx); })
+      .filter(function(r){ return r.balance_ugx > 0; });
+    if (_offPay.length) {
+      var _haveId = {};
+      rows.forEach(function(r){ _haveId[r.id] = 1; });
+      _offPay.forEach(function(r){ if (!_haveId[r.id]) rows.unshift(r); });
+    }
+
+    if (!rows.length) {
       listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '0';
@@ -3452,6 +3522,22 @@
         }
         // Cache the fresh list for the next offline open.
         if (items != null && CO) CO.set(_stockCacheKey, items);
+      }
+
+      // Reflect stock used by offline consultations (medicines + materials) that
+      // haven't synced yet, so the Stock Tracker shows the real remaining count.
+      var _offInv = {};
+      _pendingOfflineConsults(clinicId).forEach(function(o) {
+        (o.invItems || []).forEach(function(it) {
+          if (it && it.item_id) _offInv[it.item_id] = (_offInv[it.item_id] || 0) + (Number(it.qty) || 0);
+        });
+      });
+      if (items && Object.keys(_offInv).length) {
+        items = items.map(function(i) {
+          if (!_offInv[i.id]) return i;
+          var q = Math.max(0, (Number(i.quantity) || 0) - _offInv[i.id]);
+          return Object.assign({}, i, { quantity: q, is_low_stock: q <= Number(i.min_threshold), is_critical: q === 0 });
+        });
       }
 
       // Banner
@@ -4842,7 +4928,15 @@
       ? await CO.cachedQuery('top_conditions_' + clinicId + '_' + _condPeriodDays, _condQ)
       : await _condQ();
 
-    if (res.error || !res.data || res.data.length === 0) {
+    // Fold in offline consultations within the period.
+    var condData = (res && res.data) ? res.data.slice() : [];
+    _pendingOfflineConsults(clinicId).forEach(function(o) {
+      if ((o.dx.created_at || '') >= since && o.dx.confirmed_diagnosis) {
+        condData.push({ confirmed_diagnosis: o.dx.confirmed_diagnosis, prescription_items: o.dx.prescription_items || [] });
+      }
+    });
+
+    if ((res.error && !condData.length) || condData.length === 0) {
       body.innerHTML = (CO && (CO.isOffline() || CO.isNetworkErr(res.error)))
         ? CO.offlineHtml('Conditions will show here once loaded online.')
         : '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses recorded in this period.</div>';
@@ -4851,7 +4945,7 @@
 
     // Count diagnoses and aggregate drugs per condition
     var dxCount = {}, drugsByDx = {};
-    res.data.forEach(function(d) {
+    condData.forEach(function(d) {
       var dx = (d.confirmed_diagnosis || '').trim();
       if (!dx) return;
       var key = dx.toLowerCase();

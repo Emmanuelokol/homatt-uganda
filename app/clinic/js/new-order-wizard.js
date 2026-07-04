@@ -937,27 +937,52 @@
 
   async function loadFormulary() {
     if (!supabase) { state.formulary = FALLBACK_FORMULARY; return; }
+    const CO = window.ClinicOffline;
+    const run = () => supabase
+      .from('formulary')
+      .select('name, generic_name, category, default_dosage, common_dosages, default_days')
+      .order('name');
     try {
-      const { data } = await supabase
-        .from('formulary')
-        .select('name, generic_name, category, default_dosage, common_dosages, default_days')
-        .order('name');
-      state.formulary = data?.length ? data : FALLBACK_FORMULARY;
+      // Cached: the drug list is available offline so the wizard is fully usable
+      // with no connection (was empty offline → looked broken).
+      const res = CO ? await CO.cachedQuery('formulary_global', run) : await run();
+      state.formulary = (res.data && res.data.length) ? res.data : FALLBACK_FORMULARY;
     } catch(e) { state.formulary = FALLBACK_FORMULARY; }
   }
 
   async function loadClinicInventory() {
     if (!supabase) return;
+    const CO = window.ClinicOffline;
     try {
       const clinicId = await resolveClinicId(supabase, session);
       if (!clinicId) return;
-      const { data } = await supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
-      state.clinicInventory = data || [];
+      // Reuse the dashboard's stock cache key so the wizard shows your real stock
+      // offline (to prescribe from it and deduct correctly).
+      const run = () => supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId });
+      const res = CO ? await CO.cachedQuery('stock_' + clinicId, run) : await run();
+      state.clinicInventory = res.data || [];
     } catch(e) {}
   }
 
   loadFormulary();
   loadClinicInventory();
+
+  // Opening the app should land on Home — not a blank New Consultation that the
+  // OS resumed. If the app is brought back and this wizard is completely
+  // untouched, go to the dashboard. ANY entered work (patient, diagnosis, meds,
+  // labs, or a booking) keeps the user here so nothing is ever lost.
+  (function () {
+    let _hiddenAt = 0;
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) { _hiddenAt = Date.now(); return; }
+      const untouched = state.step === 1 && !state.patient && !state.bookingId &&
+        !state.confirmedDx && !(state.medications && state.medications.length) &&
+        !(state.labTests && state.labTests.length) && !(state.materialsUsed && state.materialsUsed.length);
+      if (untouched && _hiddenAt && (Date.now() - _hiddenAt > 2500)) {
+        window.location.replace('dashboard.html');
+      }
+    });
+  })();
 
   const DEFAULT_TIMES = {
     1: ['08:00'],
@@ -1802,6 +1827,9 @@
     function queueConsultationOffline() {
       const cid = ClinicOffline.uuid();
       dxPayload.id = cid;                          // client id links all rows
+      // Stamp the real consultation time so every dashboard section can place
+      // it correctly (today's patients, revenue period, sorting) before sync.
+      if (!dxPayload.created_at) dxPayload.created_at = new Date().toISOString();
       const epx = items.length ? {
         diagnosis_id: cid,
         patient_id: state.patient.id || null,
