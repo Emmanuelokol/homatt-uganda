@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v22';
+const CACHE = 'homatt-clinic-v23';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -133,7 +133,7 @@ function offlineFallbackResponse() {
     'var st=function(t){var e=document.getElementById("st");if(e)e.textContent=t;};' +
     'function core(){return ["index.html","dashboard.html","new-order.html","settings.html","./"];}' +
     'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}return n;}' +
-    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v22"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
+    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v23"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -168,8 +168,22 @@ self.addEventListener('install', (event) => {
       // Vendor libraries (CDN/fonts) are cached best-effort in the background so
       // a slow/blocked CDN can never delay or break installing the app shell.
       Promise.allSettled(VENDOR.map((u) => c.add(u).catch(() => {})));
-      // The app SHELL is what offline navigation needs — wait for it.
-      return Promise.allSettled(SHELL.map((u) => c.add(u).catch(() => {})));
+      // Non-core shell assets: best-effort.
+      Promise.allSettled(
+        SHELL.filter((u) => CORE_PAGES.indexOf(u) < 0).map((u) => c.add(u).catch(() => {}))
+      );
+      // CORE PAGES ARE STRICT. This install MUST fail if they can't be cached —
+      // a failed install keeps the previous worker (and its cache) in place and
+      // the browser retries later. The old code swallowed every failure and
+      // called skipWaiting() regardless, so on a flaky connection each new
+      // version "installed" with an EMPTY cache ("Saved pages: 0") and the
+      // portal could not open offline. Never again: a version only ever
+      // activates WITH its pages cached.
+      return Promise.all(CORE_PAGES.map(async (u) => {
+        const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
+        if (!r || !r.ok) throw new Error('precache failed: ' + u);
+        await c.put(u, r);
+      }));
     }).then(() => self.skipWaiting())
   );
 });

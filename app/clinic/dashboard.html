@@ -1413,6 +1413,68 @@
     var clinicId = await resolveClinicId();
     if (!clinicId) { res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Account not linked to a clinic.</div>'; return; }
     res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Searching…</div>';
+
+    var CO = window.ClinicOffline;
+    var poolKey = 'hist_pool_' + clinicId;
+
+    // Every successful online search feeds a local pool, so previously loaded
+    // patients stay searchable OFFLINE (and on failed/slow connections).
+    function searchPool(term) {
+      var pool = (CO && CO.get(poolKey, [])) || [];
+      var lq = term.toLowerCase();
+      return pool.filter(function(row) {
+        return String(row.patient_name || '').toLowerCase().indexOf(lq) >= 0 ||
+               String(row.patient_phone || '').indexOf(term) >= 0;
+      }).sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); });
+    }
+    function mergeIntoPool(rows) {
+      if (!CO) return;
+      try {
+        var pool = CO.get(poolKey, []) || [];
+        var byId = {};
+        pool.forEach(function(r){ byId[r.id] = r; });
+        rows.forEach(function(r){ byId[r.id] = r; });
+        var merged = Object.keys(byId).map(function(id){ return byId[id]; })
+          .sort(function(a, b){ return new Date(b.created_at) - new Date(a.created_at); })
+          .slice(0, 400);   // keep the pool bounded
+        CO.set(poolKey, merged);
+      } catch(e) {}
+    }
+    function renderHist(rows, fromCache) {
+      if (!rows.length) {
+        res.innerHTML = fromCache
+          ? '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">cloud_off</span>You’re offline — no saved records match "'+esc(q)+'".<br><span style="font-size:12px">Patients you opened before are searchable offline.</span></div>'
+          : '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">search_off</span>No records found for "'+esc(q)+'".</div>';
+        return;
+      }
+      var groups = {};
+      rows.forEach(function(row) {
+        var key = (row.patient_name||row.patient_phone||'Unknown').toLowerCase().trim();
+        if (!groups[key]) groups[key] = { name: row.patient_name||row.patient_phone||'Unknown', phone: row.patient_phone||'', records: [] };
+        groups[key].records.push(row);
+      });
+      window._histGroups = groups;
+      res.innerHTML = (fromCache ? '<div style="font-size:11px;color:#9AA0A6;text-align:center;padding:4px 0 10px">Offline — showing saved records.</div>' : '')
+        + Object.keys(groups).map(function(k) {
+        var g = groups[k];
+        var latest = g.records[0];
+        var count = g.records.length;
+        var ini = (g.name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        return '<div class="order-card" style="cursor:pointer;margin-bottom:8px" onclick="openHistModal(\''+esc(k)+'\')">'
+          +'<div class="order-avatar" style="background:#E3F2FD;color:#1565C0">'+ini+'</div>'
+          +'<div class="order-info">'
+            +'<div class="order-patient">'+esc(g.name)+'</div>'
+            +'<div class="order-drug">'+esc(latest.confirmed_diagnosis||'Pending')+'</div>'
+            +'<div class="order-meta"><span>'+count+' visit'+(count!==1?'s':'')+'</span>'+(g.phone?'<span>'+esc(g.phone)+'</span>':'')+'</div>'
+          +'</div>'
+          +'<div class="order-right"><span class="material-icons-outlined" style="color:#9AA0A6;font-size:20px">chevron_right</span></div>'
+          +'</div>';
+      }).join('');
+    }
+
+    // Offline → search the saved pool directly; never hit the network.
+    if (CO && CO.isOffline()) { renderHist(searchPool(q), true); return; }
+
     try {
       var isPhone = /^[\d\+]/.test(q);
       // Rich column set for the full clinical + financial detail view. Some
@@ -1429,39 +1491,20 @@
           .limit(60);
         return isPhone ? x.ilike('patient_phone', '%'+q+'%') : x.ilike('patient_name', '%'+q+'%');
       }
-      var r = await buildHistQuery(RICH_COLS);
+      var r = CO ? await CO.withTimeout(buildHistQuery(RICH_COLS)) : await buildHistQuery(RICH_COLS);
       if (r.error && /does not exist/i.test(r.error.message || '')) {
-        r = await buildHistQuery(SAFE_COLS);
+        r = CO ? await CO.withTimeout(buildHistQuery(SAFE_COLS)) : await buildHistQuery(SAFE_COLS);
       }
-      if (r.error) throw r.error;
+      if (r.error) {
+        // Connection dropped/timed out → serve the saved pool instead of an error.
+        if (CO && CO.isNetworkErr(r.error)) { renderHist(searchPool(q), true); return; }
+        throw r.error;
+      }
       var rows = r.data || [];
-      if (!rows.length) {
-        res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">search_off</span>No records found for "'+esc(q)+'".</div>';
-        return;
-      }
-      var groups = {};
-      rows.forEach(function(row) {
-        var key = (row.patient_name||row.patient_phone||'Unknown').toLowerCase().trim();
-        if (!groups[key]) groups[key] = { name: row.patient_name||row.patient_phone||'Unknown', phone: row.patient_phone||'', records: [] };
-        groups[key].records.push(row);
-      });
-      window._histGroups = groups;
-      res.innerHTML = Object.keys(groups).map(function(k) {
-        var g = groups[k];
-        var latest = g.records[0];
-        var count = g.records.length;
-        var ini = (g.name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
-        return '<div class="order-card" style="cursor:pointer;margin-bottom:8px" onclick="openHistModal(\''+esc(k)+'\')">'
-          +'<div class="order-avatar" style="background:#E3F2FD;color:#1565C0">'+ini+'</div>'
-          +'<div class="order-info">'
-            +'<div class="order-patient">'+esc(g.name)+'</div>'
-            +'<div class="order-drug">'+esc(latest.confirmed_diagnosis||'Pending')+'</div>'
-            +'<div class="order-meta"><span>'+count+' visit'+(count!==1?'s':'')+'</span>'+(g.phone?'<span>'+esc(g.phone)+'</span>':'')+'</div>'
-          +'</div>'
-          +'<div class="order-right"><span class="material-icons-outlined" style="color:#9AA0A6;font-size:20px">chevron_right</span></div>'
-          +'</div>';
-      }).join('');
+      mergeIntoPool(rows);
+      renderHist(rows, false);
     } catch(e) {
+      if (CO && CO.isNetworkErr(e)) { renderHist(searchPool(q), true); return; }
       res.innerHTML = '<div style="color:#C62828;text-align:center;padding:16px 0">Error: ' + esc(e.message) + '</div>';
     }
   }
@@ -2520,7 +2563,6 @@
     // (clinic_diagnoses.prescription_items) and over-the-counter Quick Sales
     // (clinic_quick_sales). Count both. Each query goes through the offline
     // cache so it's timeout-capped and shows last-known data on bad networks.
-    var dayKey = since.slice(0, 10);
     var _dxQ = function() { return supabase
       .from('clinic_diagnoses')
       .select('prescription_items,created_at')
@@ -2533,13 +2575,20 @@
       .eq('clinic_id', clinicId)
       .gte('created_at', since); };
 
+    // NOTE: the cache key must NOT include the date — a dated key stops
+    // matching the moment the day/week rolls over, which made this card show
+    // "Unable to load dispensing data" offline. One snapshot per period,
+    // filtered by the time window client-side, stays correct forever.
     var results = await Promise.all([
-      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_dx_' + clinicId + '_' + _medsPeriod + '_' + dayKey, _dxQ) : _dxQ(),
-      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_qs_' + clinicId + '_' + _medsPeriod + '_' + dayKey, _qsQ) : _qsQ(),
+      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_dx_' + clinicId + '_' + _medsPeriod, _dxQ) : _dxQ(),
+      window.ClinicOffline ? ClinicOffline.cachedQuery('meds_qs_' + clinicId + '_' + _medsPeriod, _qsQ) : _qsQ(),
     ]);
     var dxRes = results[0], qsRes = results[1];
     var data   = (dxRes && !dxRes.error && Array.isArray(dxRes.data)) ? dxRes.data : null;
     var qsRows = (qsRes && !qsRes.error && Array.isArray(qsRes.data)) ? qsRes.data : [];
+    // A cached snapshot may predate the current window — keep only rows inside it.
+    if (data)   data   = data.filter(function(r){ return !r.created_at || r.created_at >= since; });
+    if (qsRows) qsRows = qsRows.filter(function(r){ return !r.created_at || r.created_at >= since; });
 
     // Sales still waiting in the sync outbox (just sold, or made offline)
     // haven't reached the server yet — count them too so the card is live.
@@ -2557,7 +2606,9 @@
     } catch(e) {}
 
     if (!data && !qsRows.length) {
-      el.innerHTML = '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
+      el.innerHTML = (window.ClinicOffline && (ClinicOffline.isOffline() || ClinicOffline.isNetworkErr(dxRes && dxRes.error)))
+        ? ClinicOffline.offlineHtml('Dispensing data will show here once loaded online.')
+        : '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
       return;
     }
     data = data || [];
@@ -4776,15 +4827,25 @@
     body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading…</div>';
 
     var since = new Date(Date.now() - _condPeriodDays * 86400000).toISOString();
-    var res = await supabase
-      .from('clinic_diagnoses')
-      .select('confirmed_diagnosis,prescription_items')
-      .eq('clinic_id', clinicId)
-      .gte('created_at', since)
-      .not('confirmed_diagnosis', 'is', null);
+    var CO = window.ClinicOffline;
+    var _condQ = function() {
+      return supabase
+        .from('clinic_diagnoses')
+        .select('confirmed_diagnosis,prescription_items')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', since)
+        .not('confirmed_diagnosis', 'is', null);
+    };
+    // Cached read: instant offline, refreshed on every good online load. The
+    // key is per period so 30/90-day tabs each keep their own snapshot.
+    var res = CO
+      ? await CO.cachedQuery('top_conditions_' + clinicId + '_' + _condPeriodDays, _condQ)
+      : await _condQ();
 
     if (res.error || !res.data || res.data.length === 0) {
-      body.innerHTML = '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses recorded in this period.</div>';
+      body.innerHTML = (CO && (CO.isOffline() || CO.isNetworkErr(res.error)))
+        ? CO.offlineHtml('Conditions will show here once loaded online.')
+        : '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses recorded in this period.</div>';
       return;
     }
 
@@ -4905,12 +4966,15 @@
     if (!clinicId) return;
     var container = document.getElementById('mrPastList');
     if (!container) return;
-    var res = await supabase.from('clinic_monthly_summaries')
-      .select('year,month,total_revenue_ugx,generated_at')
-      .eq('clinic_id', clinicId)
-      .order('year', { ascending: false })
-      .order('month', { ascending: false })
-      .limit(24);
+    var _mrQ = function() {
+      return supabase.from('clinic_monthly_summaries')
+        .select('year,month,total_revenue_ugx,generated_at')
+        .eq('clinic_id', clinicId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+        .limit(24);
+    };
+    var res = window.ClinicOffline ? await ClinicOffline.cachedQuery('monthly_reports_' + clinicId, _mrQ) : await _mrQ();
     if (!res.data || !res.data.length) {
       container.innerHTML = '<span style="font-size:12px;color:#9AA0A6;padding:6px 0">No reports yet — generates automatically on the last day of each month.</span>';
       return;
