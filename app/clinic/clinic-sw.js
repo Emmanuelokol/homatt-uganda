@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v23';
+const CACHE = 'homatt-clinic-v24';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -34,7 +34,7 @@ const SHELL = [
   'clinic.webmanifest',
   'css/clinic.css?v=20260627',
   'js/clinic.js?v=20260705',
-  'js/clinic-offline.js?v=11',
+  'js/clinic-offline.js?v=12',
   'js/new-order-wizard.js?v=20260704',
   'js/pwa-install.js?v=20260705',
   '../js/config.js',
@@ -131,15 +131,29 @@ function offlineFallbackResponse() {
   var script =
     '(function(){' +
     'var st=function(t){var e=document.getElementById("st");if(e)e.textContent=t;};' +
+    'var big=function(h){var e=document.getElementById("bigmsg");if(e){e.style.display="block";e.innerHTML=h;}};' +
     'function core(){return ["index.html","dashboard.html","new-order.html","settings.html","./"];}' +
     'async function countPages(){var n=0;try{var ks=await caches.keys();for(var i=0;i<ks.length;i++){if(ks[i].indexOf("homatt-clinic-")!==0)continue;var c=await caches.open(ks[i]);var rs=await c.keys();for(var j=0;j<rs.length;j++){if(/\\.html($|\\?)|\\/clinic\\/(\\?|$)/.test(rs[j].url))n++;}}}catch(e){}return n;}' +
-    'async function healOnline(){try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v23"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok)await c.put(cs[j],r.clone());}catch(e){}}}return true;}catch(e){return false;}}' +
+    // Test whether this device can WRITE to cache storage at all, and report the
+    // exact failure. QuotaExceededError = phone storage is full — the one cause
+    // no code can work around, but the user can fix in a minute.
+    'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v24"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
     'if(pages>0&&tries<2){try{sessionStorage.setItem("_healTries",String(tries+1));}catch(e){}location.replace("dashboard.html");return;}' +
-    'if(navigator.onLine){st("Finishing setup…");var ok=await healOnline();if(ok){try{sessionStorage.removeItem("_healTries");}catch(e){}location.replace("dashboard.html");return;}}' +
-    'st(navigator.onLine?("Connected. Saved pages: "+pages+" — tap Retry."):("Offline. Saved pages: "+pages+". Connect once to finish."));' +
+    'var w=await testWrite();' +
+    'if(!w.ok){' +
+      'var quota=/quota/i.test(w.err);' +
+      'big(quota' +
+        '?"<b>Your phone\\u2019s storage is full.</b><br>Homatt Health cannot save the app for offline use until some space is freed.<br><br>Please delete a few photos, videos or unused apps, then open Homatt Health once with internet \\u2014 offline will work from then on."' +
+        ':"<b>This phone is blocking offline storage.</b><br>Technical detail: "+w.err+"<br><br>Check: not an Incognito/private tab, and site data is allowed for this site.");' +
+      'st("Storage test failed: "+w.err);' +
+      'return;' +
+    '}' +
+    'if(navigator.onLine){st("Finishing setup\\u2026");var ok=await healOnline();if(ok){try{sessionStorage.removeItem("_healTries");}catch(e){}location.replace("dashboard.html");return;}st("Connected but could not download pages \\u2014 check the connection and tap Retry.");return;}' +
+    'st("Offline. Saved pages: "+pages+". Storage is OK \\u2014 connect once and the app will finish setting up by itself.");' +
     '}' +
     'addEventListener("online",function(){run();});' +
     'setInterval(function(){if(navigator.onLine)run();},4000);' +
@@ -155,6 +169,7 @@ function offlineFallbackResponse() {
     '<div style="font-size:44px">📴</div>' +
     '<h2 style="color:#1B5E20">Setting up…</h2>' +
     '<p style="max-width:320px;margin:8px auto;line-height:1.5">Homatt Health needs an internet connection just once to finish installing. It will reconnect and finish automatically — or tap Retry.</p>' +
+    '<p id="bigmsg" style="display:none;max-width:340px;margin:14px auto;line-height:1.6;font-size:14px;color:#B71C1C;background:#FFEBEE;border-radius:12px;padding:14px 16px;text-align:left"></p>' +
     '<p id="st" style="max-width:320px;margin:8px auto;font-size:12px;color:#9AA0A6"></p>' +
     '<button onclick="location.reload()" style="margin-top:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700">Retry</button>' +
     '</body></html>',

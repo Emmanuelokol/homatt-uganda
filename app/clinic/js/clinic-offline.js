@@ -40,7 +40,69 @@
         var sw = reg.active || (navigator.serviceWorker.controller);
         if (sw) sw.postMessage({ type: 'ensureShell' });
       }).catch(function () {});
+      // VERIFY the pages really got saved (10s later, while still online). If
+      // the cache is still empty, the device is refusing storage writes — the
+      // one failure that must be surfaced NOW (while online and fixable), not
+      // discovered later when the clinic is offline and stuck.
+      setTimeout(verifyShellSaved, 10000);
     } catch (e) {}
+  }
+  async function verifyShellSaved() {
+    try {
+      if (navigator.onLine === false || !window.caches) return;
+      var pages = 0;
+      var keys = await caches.keys();
+      for (var i = 0; i < keys.length; i++) {
+        if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
+        var c = await caches.open(keys[i]);
+        var rs = await c.keys();
+        for (var j = 0; j < rs.length; j++) {
+          if (/\.html($|\?)|\/clinic\/(\?|$)/.test(rs[j].url)) pages++;
+        }
+      }
+      if (pages > 0) return;                       // all good — offline will work
+      // Nothing saved: probe WHY and tell the user in plain words.
+      var reason = '';
+      try {
+        var pc = await caches.open('homatt-clinic-probe');
+        await pc.put('__probe__', new Response('ok'));
+        var hit = await pc.match('__probe__');
+        await caches.delete('homatt-clinic-probe');
+        if (!hit) reason = 'writes do not persist';
+      } catch (e) { reason = (e && e.name) || 'write failed'; }
+      if (!reason) {
+        // Writes work but pages missing — ask the worker again and re-check once.
+        warmShellOnceMore();
+        return;
+      }
+      var quota = /quota/i.test(reason);
+      showStorageWarning(quota
+        ? 'This phone’s storage is full — Homatt Health can’t save the app for offline use. Free up some space (photos/videos/apps), then reopen with internet.'
+        : 'This phone is blocking offline storage (' + reason + '). Offline mode won’t work until site storage is allowed.');
+    } catch (e) {}
+  }
+  var _warmRetried = false;
+  function warmShellOnceMore() {
+    if (_warmRetried) return;
+    _warmRetried = true;
+    warmShell();
+  }
+  function showStorageWarning(text) {
+    if (document.getElementById('_coStorageWarn')) return;
+    if (!document.body) return;
+    var d = document.createElement('div');
+    d.id = '_coStorageWarn';
+    d.style.cssText = 'position:fixed;left:10px;right:10px;top:10px;z-index:11500;background:#B71C1C;color:#fff;' +
+      'border-radius:12px;padding:12px 40px 12px 14px;font-size:13px;font-weight:600;line-height:1.5;' +
+      'box-shadow:0 6px 18px rgba(0,0,0,0.3);font-family:inherit';
+    d.textContent = text;
+    var x = document.createElement('button');
+    x.textContent = '×';
+    x.setAttribute('aria-label', 'Dismiss');
+    x.style.cssText = 'position:absolute;right:6px;top:6px;background:transparent;border:none;color:#fff;font-size:20px;line-height:1;padding:4px 8px;cursor:pointer';
+    x.onclick = function () { d.remove(); };
+    d.appendChild(x);
+    document.body.appendChild(d);
   }
   warmShell();
   window.addEventListener('online', warmShell);
