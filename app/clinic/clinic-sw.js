@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v19';
+const CACHE = 'homatt-clinic-v20';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -34,7 +34,7 @@ const SHELL = [
   'clinic.webmanifest',
   'css/clinic.css?v=20260627',
   'js/clinic.js?v=20260704b',
-  'js/clinic-offline.js?v=10',
+  'js/clinic-offline.js?v=11',
   'js/new-order-wizard.js?v=20260704',
   'js/pwa-install.js?v=20260703',
   '../js/config.js',
@@ -92,6 +92,51 @@ async function matchAnyCache(req) {
     } catch (e) {}
   }
   return null;
+}
+
+// Opportunistically cache the WHOLE app shell from a single successful online
+// load. The install/activate precache can fail on a flaky connection (and older
+// buggy versions could wipe the cache) — this makes ANY good online page load
+// re-populate everything, so the app reliably opens offline afterwards.
+let _shellEnsuredAt = 0;
+async function ensureShellCached(cache, force) {
+  const now = Date.now();
+  if (!force && now - _shellEnsuredAt < 45 * 1000) return;   // throttle unless forced
+  _shellEnsuredAt = now;
+  await Promise.all(SHELL.map(async (u) => {
+    try {
+      if (!force && await cache.match(u)) return;   // forced → refresh even if present
+      const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
+      if (r && r.ok && !r.redirected) await cache.put(u, r.clone());
+    } catch (e) {}
+  }));
+}
+
+// Let a page explicitly ask the worker to (re)cache the whole shell. This is
+// the most reliable path — it doesn't depend on fetch-interception timing — so
+// every online page load guarantees the app can be opened offline afterwards.
+self.addEventListener('message', (event) => {
+  const data = event.data;
+  if (data && data.type === 'ensureShell') {
+    event.waitUntil(caches.open(CACHE).then((c) => ensureShellCached(c, true)).catch(() => {}));
+  }
+});
+
+function offlineFallbackResponse() {
+  return new Response(
+    '<!doctype html><html><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<title>Homatt Health — Offline</title>' +
+    '<script>addEventListener("online",function(){location.reload()});setInterval(function(){if(navigator.onLine)location.reload()},4000);</scr' + 'ipt>' +
+    '</head>' +
+    '<body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 24px;color:#37474F">' +
+    '<div style="font-size:44px">📴</div>' +
+    '<h2 style="color:#1B5E20">Setting up…</h2>' +
+    '<p style="max-width:320px;margin:8px auto;line-height:1.5">Homatt Health needs an internet connection just once to finish installing. It will reconnect and finish automatically — or tap Retry.</p>' +
+    '<button onclick="location.reload()" style="margin-top:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700">Retry</button>' +
+    '</body></html>',
+    { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
+  );
 }
 
 self.addEventListener('install', (event) => {
@@ -212,37 +257,41 @@ self.addEventListener('fetch', (event) => {
       try { self.registration.update().catch(() => {}); } catch (e) {}
     }
     event.respondWith((async () => {
-      try {
-        // cache:'no-cache' bypasses the HTTP cache and revalidates with the
-        // server (GitHub Pages sends max-age=600 — without this, a reload up
-        // to 10 minutes after a deploy re-served the previous, possibly buggy,
-        // HTML). ETag revalidation keeps unchanged loads cheap (304).
-        const res = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' });
-        if (res && res.ok) {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-        }
-        return res;
-      } catch (e) {
-        // Serve the real cached UI from ANY clinic cache so the app opens
-        // offline like Google Docs. The placeholder below is a genuine
-        // last resort — only ever seen before the very first online open.
-        const hit = await matchAnyCache(req);
-        return hit || new Response(
-          '<!doctype html><html><head><meta charset="utf-8">' +
-          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
-          '<title>Homatt Health — Offline</title>' +
-          '<script>addEventListener("online",function(){location.reload()});setInterval(function(){if(navigator.onLine)location.reload()},4000);</scr' + 'ipt>' +
-          '</head>' +
-          '<body style="font-family:system-ui,sans-serif;text-align:center;padding:48px 24px;color:#37474F">' +
-          '<div style="font-size:44px">📴</div>' +
-          '<h2 style="color:#1B5E20">Setting up…</h2>' +
-          '<p style="max-width:320px;margin:8px auto;line-height:1.5">Homatt Health needs an internet connection just once to finish installing. It will reconnect and finish automatically — or tap Retry.</p>' +
-          '<button onclick="location.reload()" style="margin-top:14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;padding:12px 20px;font-size:15px;font-weight:700">Retry</button>' +
-          '</body></html>',
-          { headers: { 'Content-Type': 'text/html; charset=utf-8' } }
-        );
-      }
+      // Kick off the network request. cache:'no-cache' revalidates with the
+      // server (GitHub Pages sends max-age=600). On success we cache this page
+      // AND opportunistically cache the whole shell, so one good online load is
+      // enough to make the app open offline afterwards. Never rejects.
+      const net = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        .then((res) => {
+          if (res && res.ok && !res.redirected) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => {
+              c.put(req, copy).catch(() => {});
+              ensureShellCached(c);
+            }).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => null);
+
+      // Cap the wait: on a stalled/offline link, fall back to the cached shell
+      // FAST (≈4s) instead of hanging — this is what makes it feel instant and
+      // reliably open offline.
+      const timeout = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 4000));
+      const first = await Promise.race([net, timeout]);
+
+      if (first && first !== 'TIMEOUT' && first.ok && !first.redirected) return first;
+
+      // Network failed / timed out / unusable → serve the real cached UI from
+      // ANY clinic cache so the app opens like Google Docs.
+      const hit = await matchAnyCache(req);
+      if (hit) return hit;
+
+      // Nothing cached yet: give the network the rest of its time, else the
+      // (rare) first-run placeholder.
+      const late = await net;
+      if (late && (late.ok || late.type === 'opaqueredirect' || late.type === 'opaque')) return late;
+      return offlineFallbackResponse();
     })());
     return;
   }

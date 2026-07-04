@@ -27,6 +27,24 @@
     }
   } catch (e) {}
 
+  // Whenever a page is open online, explicitly ask the service worker to cache
+  // the whole app shell. This is the reliable path that guarantees the portal
+  // can be opened offline afterwards — it doesn't depend on the worker happening
+  // to intercept the right navigation, and it self-heals a cache an older buggy
+  // version may have wiped. Fires on load and on every reconnect.
+  function warmShell() {
+    try {
+      if (navigator.onLine === false) return;
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        var sw = reg.active || (navigator.serviceWorker.controller);
+        if (sw) sw.postMessage({ type: 'ensureShell' });
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  warmShell();
+  window.addEventListener('online', warmShell);
+
   function k(key) { return PREFIX + key; }
   function set(key, value) {
     try { localStorage.setItem(k(key), JSON.stringify({ ts: Date.now(), v: value })); } catch (e) {}
