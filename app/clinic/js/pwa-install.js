@@ -17,6 +17,31 @@
 (function () {
   'use strict';
 
+  function isNativeApp() {
+    return !!(window.Capacitor && (
+      (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+      window.Capacitor.isNative ||
+      window.Capacitor.platform === 'android' || window.Capacitor.platform === 'ios'
+    ));
+  }
+
+  // NATIVE ANDROID APP: pages are served directly from the APK bundle (always
+  // present, offline by construction). A service worker here is not just
+  // unnecessary — it INTERCEPTS navigation and, if its cache is empty, can serve
+  // the "Setting up/offline" placeholder INSTEAD of the bundled page. So in the
+  // native app we register no SW and actively unregister any stale one, letting
+  // the bundle serve every page. (No install UI either — it's already an app.)
+  if (isNativeApp()) {
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
+        }).catch(function () {});
+      }
+    } catch (e) {}
+    return;
+  }
+
   // Register the clinic service worker IMMEDIATELY (not on window 'load'). It
   // must be active and controlling before Chrome decides whether to mint a real
   // installable app (WebAPK) — registering late can make Chrome fall back to a
