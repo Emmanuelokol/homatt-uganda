@@ -49,27 +49,19 @@
   if ('serviceWorker' in navigator) {
     (function registerSW() {
       navigator.serviceWorker.register('clinic-sw.js', { scope: './' }).then(function (reg) {
-        // Check for a newer version every time the app opens, whenever it
-        // returns to the foreground, and periodically — so staff are never
-        // stuck on old code for long.
+        // Check for a newer version quietly in the background. Any update is
+        // DOWNLOADED now but APPLIED on the next launch — like WhatsApp / Google
+        // Docs — so the app never reloads itself in the user's face.
         var check = function () { try { reg.update(); } catch (e) {} };
         check();
-        setInterval(check, 15 * 60 * 1000);
-        document.addEventListener('visibilitychange', function () {
-          if (!document.hidden) check();
-        });
+        setInterval(check, 30 * 60 * 1000);
       }).catch(function () {});
     })();
 
-    // When a NEW service worker takes control (a fresh version was deployed),
-    // reload once so the latest code/UI is shown immediately. Guarded so it
-    // fires only on an actual update, never in a loop.
-    var _swReloaded = false;
-    navigator.serviceWorker.addEventListener('controllerchange', function () {
-      if (_swReloaded) return;
-      _swReloaded = true;
-      window.location.reload();
-    });
+    // NOTE: no auto-reload on controllerchange. Reloading on every update was
+    // what made the app "keep loading to update" on each open. A new version
+    // now takes over silently and is shown the next time the app is opened —
+    // instant, native-feeling launches every time (online AND offline).
   }
 
   function isStandalone() {
