@@ -10,7 +10,7 @@
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link href="fonts/material-icons.css?v=1" rel="stylesheet">
-  <link rel="manifest" href="clinic.webmanifest">
+  <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1B5E20">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -73,7 +73,7 @@
   // Visible build marker — so we can confirm which version a device is running
   // (and whether it's the native app or the browser). Bump BUILD on each change.
   (function () {
-    var BUILD = 'v42';
+    var BUILD = 'v43';
     try {
       var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
       var standalone = window.matchMedia('(display-mode: standalone)').matches;
