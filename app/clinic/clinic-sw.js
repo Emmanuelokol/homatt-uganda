@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v39';
+const CACHE = 'homatt-clinic-v40';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -221,7 +221,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v39"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v40"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -262,26 +262,25 @@ function offlineFallbackResponse() {
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((c) => {
-      // Vendor libraries (CDN/fonts) are cached best-effort in the background so
-      // a slow/blocked CDN can never delay or break installing the app shell.
+    caches.open(CACHE).then(async (c) => {
+      // The install MUST NOT throw. A failed install means the worker never
+      // activates — and with no active worker the BROWSER shows its own dark
+      // "You're offline" page on launch (exactly the bug we're chasing). So
+      // cache the core pages as hard as we can but NEVER fail the install; the
+      // activate-repair step, opportunistic per-load caching and the IndexedDB
+      // mirror fill any gaps. An always-active worker is what keeps the app's
+      // own offline handling in control instead of the browser's.
+      await Promise.allSettled(CORE_PAGES.map(async (u) => {
+        try {
+          const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
+          if (r && r.ok && !r.redirected) await c.put(u, r);
+        } catch (e) {}
+      }));
+      // Vendor + non-core assets: best-effort in the background.
       Promise.allSettled(VENDOR.map((u) => c.add(u).catch(() => {})));
-      // Non-core shell assets: best-effort.
       Promise.allSettled(
         SHELL.filter((u) => CORE_PAGES.indexOf(u) < 0).map((u) => c.add(u).catch(() => {}))
       );
-      // CORE PAGES ARE STRICT. This install MUST fail if they can't be cached —
-      // a failed install keeps the previous worker (and its cache) in place and
-      // the browser retries later. The old code swallowed every failure and
-      // called skipWaiting() regardless, so on a flaky connection each new
-      // version "installed" with an EMPTY cache ("Saved pages: 0") and the
-      // portal could not open offline. Never again: a version only ever
-      // activates WITH its pages cached.
-      return Promise.all(CORE_PAGES.map(async (u) => {
-        const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
-        if (!r || !r.ok) throw new Error('precache failed: ' + u);
-        await c.put(u, r);
-      }));
     }).then(() => self.skipWaiting())
   );
 });
