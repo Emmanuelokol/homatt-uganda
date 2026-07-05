@@ -3,7 +3,7 @@
   "name": "Homatt Clinic",
   "short_name": "Homatt Clinic",
   "description": "Homatt Health clinic portal — consultations, prescriptions and patient history. Works fully offline.",
-  "start_url": "dashboard.html",
+  "start_url": "index.html",
   "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
