@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v29';
+const CACHE = 'homatt-clinic-v30';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -219,7 +219,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v29"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v30"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -376,10 +376,16 @@ self.addEventListener('fetch', (event) => {
   // Any other cross-origin (Supabase API, WhatsApp, etc.): don't intercept.
   if (url.origin !== self.location.origin) return;
 
-  // HTML navigations → network-first, cache fallback (works offline).
-  // Must NEVER resolve to undefined (that shows as ERR_FAILED / "can't be
-  // reached"): every path returns a real Response — the requested page, another
-  // cached clinic page, or a friendly offline page.
+  // HTML navigations → CACHE-FIRST (app-shell model).
+  //
+  // Why cache-first and not network-first: on an installed PWA/WebAPK launch,
+  // network-first leaves a window where the OS/browser shows its OWN dark
+  // "You're offline" screen before our cache fallback runs. Serving the saved
+  // page INSTANTLY from cache closes that window entirely — the app opens
+  // immediately, online or offline, every launch. Auth lives in localStorage
+  // (not the HTML), so a cached shell is always safe; we revalidate in the
+  // background to stay fresh, and the worker's own update + reload path applies
+  // any new code.
   if (req.mode === 'navigate') {
     // Opportunistic self-update: pages running OLD code never ask for updates,
     // so the worker checks for a newer version of itself on navigations
@@ -390,11 +396,9 @@ self.addEventListener('fetch', (event) => {
       try { self.registration.update().catch(() => {}); } catch (e) {}
     }
     event.respondWith((async () => {
-      // Kick off the network request. cache:'no-cache' revalidates with the
-      // server (GitHub Pages sends max-age=600). On success we cache this page
-      // AND opportunistically cache the whole shell, so one good online load is
-      // enough to make the app open offline afterwards. Never rejects.
-      const net = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+      // Background revalidate — never blocks the response; refreshes the cache
+      // (and the whole shell) for next time. Never rejects.
+      const netUpdate = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
         .then((res) => {
           if (res && res.ok && !res.redirected) {
             const copy = res.clone();
@@ -407,29 +411,20 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => null);
 
-      // Cap the wait: on a stalled/offline link, fall back to the cached shell
-      // FAST (≈4s) instead of hanging — this is what makes it feel instant and
-      // reliably open offline.
-      const timeout = new Promise((resolve) => setTimeout(() => resolve('TIMEOUT'), 4000));
-      const first = await Promise.race([net, timeout]);
+      // 1) Cache first — instant, reliable, no browser offline screen.
+      const cachedHit = await matchAnyCache(req);
+      if (cachedHit) return cachedHit;
 
-      if (first && first !== 'TIMEOUT' && first.ok && !first.redirected) return first;
-
-      // Network failed / timed out / unusable → serve the real cached UI from
-      // ANY clinic cache so the app opens like Google Docs.
-      const hit = await matchAnyCache(req);
-      if (hit) return hit;
-
-      // Cache wiped (cleaner apps) → boot from the IndexedDB shell copy.
+      // 2) IndexedDB shell copy — survives cleaners that wipe Cache Storage.
       const idbHit = (await idbServe(url.pathname)) ||
                      (await idbServe(url.pathname.replace(/\/$/, '/index.html'))) ||
                      (await idbAnyPage());
       if (idbHit) return idbHit;
 
-      // Nothing cached yet: give the network the rest of its time, else the
-      // (rare) first-run placeholder.
-      const late = await net;
-      if (late && (late.ok || late.type === 'opaqueredirect' || late.type === 'opaque')) return late;
+      // 3) Never cached yet (true first run) → wait for the network, then the
+      //    self-healing placeholder.
+      const net = await netUpdate;
+      if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) return net;
       return offlineFallbackResponse();
     })());
     return;
