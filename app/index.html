@@ -5,7 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Homatt Health</title>
   <style>html,body{margin:0;height:100%;background:#0A1628}</style>
-  <script>window.location.replace('welcome.html');</script>
+  <script>
+    // The native Android app (Capacitor) serves these files from INSIDE the
+    // APK — read-only, cleaner-proof, and available with no connection. Route
+    // it straight to the clinic portal so the installed app is a real offline
+    // clinic app. The web/PWA build keeps going to the patient welcome page.
+    (function () {
+      var native = !!(window.Capacitor && (
+        (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+        window.Capacitor.isNative
+      ));
+      window.location.replace(native ? 'clinic/index.html' : 'welcome.html');
+    })();
+  </script>
 </head>
 <body></body>
 </html>

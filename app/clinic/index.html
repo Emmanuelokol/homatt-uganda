@@ -56,6 +56,15 @@
       Open Demo Dashboard
     </button>
 
+    <a id="apkDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:#1B5E20;color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">android</span>
+      Get the Android app (best offline — installs from a file)
+    </a>
+    <div id="apkHint" style="display:none;font-size:11px;color:#9AA0A6;text-align:center;margin-top:6px;line-height:1.5">
+      Opens fully offline on any phone. After downloading, tap the file and allow install.
+    </div>
+
     <div class="login-error" id="loginError"></div>
   </div>
 </div>
@@ -74,6 +83,22 @@
       }
     } catch(e) {}
     localStorage.removeItem('clinic_session');
+  })();
+
+  // Offer the native Android app (best offline) on Android web browsers only —
+  // not inside an already-installed app, and not on desktop.
+  (function() {
+    try {
+      var isAndroid = /Android/i.test(navigator.userAgent || '');
+      var inApp = window.matchMedia('(display-mode: standalone)').matches ||
+                  !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      if (isAndroid && !inApp) {
+        var a = document.getElementById('apkDownload');
+        var h = document.getElementById('apkHint');
+        if (a) a.style.display = 'flex';
+        if (h) h.style.display = 'block';
+      }
+    } catch(e) {}
   })();
 
   const cfg = window.HOMATT_CONFIG || {};
