@@ -66,8 +66,23 @@
     </div>
 
     <div class="login-error" id="loginError"></div>
+    <div id="buildMarker" style="text-align:center;margin-top:14px;font-size:10px;color:#B0BEC5;letter-spacing:.3px"></div>
   </div>
 </div>
+<script>
+  // Visible build marker — so we can confirm which version a device is running
+  // (and whether it's the native app or the browser). Bump BUILD on each change.
+  (function () {
+    var BUILD = 'v38';
+    try {
+      var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      var standalone = window.matchMedia('(display-mode: standalone)').matches;
+      var mode = native ? 'app' : (standalone ? 'installed' : 'browser');
+      var el = document.getElementById('buildMarker');
+      if (el) el.textContent = 'Homatt Clinic • build ' + BUILD + ' • ' + mode;
+    } catch (e) {}
+  })();
+</script>
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
