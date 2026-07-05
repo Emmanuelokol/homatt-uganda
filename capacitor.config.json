@@ -1,6 +1,6 @@
 {
   "appId": "ug.homatt.health",
-  "appName": "Homatt Health",
+  "appName": "Homatt Clinic",
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
