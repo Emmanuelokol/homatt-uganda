@@ -17,9 +17,12 @@
 (function () {
   'use strict';
 
-  // Register the clinic service worker (needed for the install prompt + offline).
+  // Register the clinic service worker IMMEDIATELY (not on window 'load'). It
+  // must be active and controlling before Chrome decides whether to mint a real
+  // installable app (WebAPK) — registering late can make Chrome fall back to a
+  // plain shortcut that opens in a browser tab and fails offline.
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function () {
+    (function registerSW() {
       navigator.serviceWorker.register('clinic-sw.js', { scope: './' }).then(function (reg) {
         // Check for a newer version every time the app opens, whenever it
         // returns to the foreground, and periodically — so staff are never
@@ -31,7 +34,7 @@
           if (!document.hidden) check();
         });
       }).catch(function () {});
-    });
+    })();
 
     // When a NEW service worker takes control (a fresh version was deployed),
     // reload once so the latest code/UI is shown immediately. Guarded so it
