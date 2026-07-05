@@ -49,8 +49,14 @@
 
   function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
+           window.matchMedia('(display-mode: minimal-ui)').matches ||
            window.navigator.standalone === true ||
-           document.referrer.indexOf('android-app://') === 0;
+           document.referrer.indexOf('android-app://') === 0 ||
+           // Inside the native Capacitor app it's already "installed".
+           !!(window.Capacitor && (
+             (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
+             window.Capacitor.isNative
+           ));
   }
   if (isStandalone()) return; // already installed
 
