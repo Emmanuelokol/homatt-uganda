@@ -1,8 +1,8 @@
 {
   "id": "homatt-health-clinic",
-  "name": "Homatt Health",
-  "short_name": "Homatt Health",
-  "description": "Homatt Health clinic portal — consultations, prescriptions and patient history.",
+  "name": "Homatt Clinic",
+  "short_name": "Homatt Clinic",
+  "description": "Homatt Health clinic portal — consultations, prescriptions and patient history. Works fully offline.",
   "start_url": "index.html",
   "scope": "./",
   "display": "standalone",

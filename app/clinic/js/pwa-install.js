@@ -116,15 +116,13 @@
       'display:flex;align-items:center;justify-content:center;padding:22px;font-family:inherit';
 
     var canCopy = !isIOS; // iOS path doesn't need it
-    var APK_URL = 'https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk';
     ov.innerHTML =
       '<div style="background:#fff;border-radius:16px;max-width:430px;width:100%;padding:22px">' +
         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
           '<img src="' + ICON + '" alt="" width="46" height="46" style="border-radius:11px">' +
-          '<div style="font-size:17px;font-weight:800;color:#111">Add Homatt Health</div>' +
+          '<div style="font-size:17px;font-weight:800;color:#111">Add Homatt Clinic</div>' +
         '</div>' +
         '<p style="font-size:14px;color:#333;line-height:1.6;margin:0 0 18px">' + guidanceHTML() + '</p>' +
-        (!isIOS ? '<a href="' + APK_URL + '" style="display:block;text-align:center;width:100%;box-sizing:border-box;padding:12px;background:#F1F8E9;color:#1B5E20;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-weight:700;font-family:inherit;margin-bottom:8px;text-decoration:none">Or download the Android app (APK)</a>' : '') +
         (canCopy ? '<button id="_homattCopy" style="width:100%;padding:12px;background:#fff;color:#1B5E20;border:1.5px solid #1B5E20;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">Copy link</button>' : '') +
         '<button id="_homattHelpOk" style="width:100%;padding:13px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Got it</button>' +
       '</div>';
@@ -189,7 +187,7 @@
       'padding:11px 16px;font-size:13.5px;font-weight:700;font-family:inherit;' +
       'box-shadow:0 6px 18px rgba(0,0,0,0.3);cursor:pointer';
     pill.innerHTML =
-      '<span class="material-icons-outlined" style="font-size:17px">install_mobile</span>Install app';
+      '<span class="material-icons-outlined" style="font-size:17px">install_mobile</span>Install Clinic app';
     pill.onclick = onInstallClick;
     document.body.appendChild(pill);
   }
@@ -217,8 +215,8 @@
     bar.innerHTML =
       '<img src="' + ICON + '" alt="" width="44" height="44" style="border-radius:10px;flex-shrink:0">' +
       '<div style="flex:1;min-width:0">' +
-        '<div style="font-size:14px;font-weight:700;color:#111">Install Homatt Health</div>' +
-        '<div style="font-size:12px;color:#5F6368;margin-top:1px">Add it to your home screen — opens like an app.</div>' +
+        '<div style="font-size:14px;font-weight:700;color:#111">Install Homatt Clinic</div>' +
+        '<div style="font-size:12px;color:#5F6368;margin-top:1px">Works offline. Opens straight to your clinic.</div>' +
       '</div>' +
       '<button id="_homattInstallBtn" style="background:#1B5E20;color:#fff;border:none;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Install</button>' +
       '<button id="_homattInstallX" aria-label="Dismiss" style="background:transparent;border:none;color:#9AA0A6;cursor:pointer;font-size:20px;line-height:1;padding:4px 6px">&times;</button>';
