@@ -3380,9 +3380,35 @@
     if (modal) modal.style.display = 'flex';
   }
 
+  // Proactively cache recent patients so Patient History is searchable OFFLINE
+  // for everyone seen recently — not only patients you happened to search while
+  // online. Merges into the same 'hist_pool_<clinic>' the search box reads.
+  async function _prefetchHistoryPool(clinicId) {
+    var CO = window.ClinicOffline;
+    if (!CO || CO.isOffline() || !supabase || !clinicId) return;
+    try {
+      var RICH = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at';
+      var SAFE = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,total_charged_ugx,payment_status,created_at';
+      var q = function(cols){ return supabase.from('clinic_diagnoses').select(cols).eq('clinic_id', clinicId).order('created_at', {ascending:false}).limit(300); };
+      var r = await CO.withTimeout(q(RICH), 10000);
+      if (r && r.error && /does not exist/i.test(r.error.message || '')) r = await CO.withTimeout(q(SAFE), 10000);
+      if (r && !r.error && Array.isArray(r.data) && r.data.length) {
+        var key = 'hist_pool_' + clinicId;
+        var pool = CO.get(key, []) || [];
+        var byId = {};
+        pool.forEach(function(x){ byId[x.id] = x; });
+        r.data.forEach(function(x){ byId[x.id] = x; });
+        var merged = Object.keys(byId).map(function(id){ return byId[id]; })
+          .sort(function(a,b){ return new Date(b.created_at||0) - new Date(a.created_at||0); })
+          .slice(0, 500);
+        CO.set(key, merged);
+      }
+    } catch(e) {}
+  }
+
   // ── Initial load ──
   async function loadAll() {
-    await resolveClinicId();
+    var _cid = await resolveClinicId();
     loadBookings();
     loadActiveTreatments();
     loadPendingPayments();
@@ -3391,6 +3417,8 @@
     loadInventory();
     loadFinancial(_finPeriod);
     loadMedsDispensed();
+    if (typeof loadTopConditions === 'function') loadTopConditions();
+    _prefetchHistoryPool(_cid);
   }
   loadAll();
 
@@ -4914,20 +4942,25 @@
     body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading…</div>';
 
     var since = new Date(Date.now() - _condPeriodDays * 86400000).toISOString();
+    // Always fetch the WIDEST window (90d) and cache it under ONE key, then
+    // filter to the selected period client-side. A per-period key meant the
+    // 90-day tab was empty offline unless it had been opened online — this one
+    // snapshot covers both tabs offline.
+    var sinceMax = new Date(Date.now() - 90 * 86400000).toISOString();
     var CO = window.ClinicOffline;
     var _condQ = function() {
       return supabase
         .from('clinic_diagnoses')
-        .select('confirmed_diagnosis,prescription_items')
+        .select('confirmed_diagnosis,prescription_items,created_at')
         .eq('clinic_id', clinicId)
-        .gte('created_at', since)
+        .gte('created_at', sinceMax)
         .not('confirmed_diagnosis', 'is', null);
     };
-    // Cached read: instant offline, refreshed on every good online load. The
-    // key is per period so 30/90-day tabs each keep their own snapshot.
     var res = CO
-      ? await CO.cachedQuery('top_conditions_' + clinicId + '_' + _condPeriodDays, _condQ)
+      ? await CO.cachedQuery('top_conditions_' + clinicId, _condQ)
       : await _condQ();
+    // Keep only rows within the selected period.
+    if (res && res.data) res = { data: res.data.filter(function(d){ return (d.created_at || '') >= since; }), error: res.error };
 
     // Fold in offline consultations within the period.
     var condData = (res && res.data) ? res.data.slice() : [];

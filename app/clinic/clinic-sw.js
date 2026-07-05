@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v30';
+const CACHE = 'homatt-clinic-v31';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -219,7 +219,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v30"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v31"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
