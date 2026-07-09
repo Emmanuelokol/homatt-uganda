@@ -217,7 +217,8 @@
           <strong>Clinicians</strong> and <strong>nurses</strong> get consultations,
           patient history, bookings, quick sale and stock — but not financial
           reports. <strong>Receptionists</strong> handle the front desk — bookings,
-          history, payments and quick sales only.
+          history, payments and quick sales. <strong>Sales / Drug shop</strong>
+          attendants get only quick sale and stock — ideal for a drug shop.
         </p>
         <button type="button" onclick="openAddStaffModal()"
                 style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
@@ -560,7 +561,7 @@
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=12" defer></script>
-<script src="js/clinic.js?v=20260706" defer></script>
+<script src="js/clinic.js?v=20260709" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -651,6 +652,7 @@ var STAFF_ROLE_OPTIONS = [
   { value: 'clinician',    label: 'Clinician — consultations, quick sale, stock' },
   { value: 'nurse',        label: 'Nurse — consultations, quick sale, stock' },
   { value: 'receptionist', label: 'Receptionist — front desk, payments, quick sale' },
+  { value: 'salesperson',  label: 'Sales / Drug shop — quick sale + stock only' },
 ];
 
 async function loadStaffList() {

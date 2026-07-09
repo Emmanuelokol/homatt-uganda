@@ -744,6 +744,22 @@
           <span class="material-icons-outlined" style="font-size:18px">refresh</span>
         </button>
       </div>
+      <!-- Add-another: builds a multi-item sale. Selling ONE item stays one tap
+           on Sell; tap this to keep adding items to the same sale. -->
+      <button id="qsAddMoreBtn" type="button"
+        style="margin-top:10px;width:100%;padding:11px;background:#E8F5E9;color:#1B5E20;border:1.5px solid #A5D6A7;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <span class="material-icons-outlined" style="font-size:18px">add_shopping_cart</span>
+        Add &amp; pick another item
+      </button>
+    </div>
+
+    <!-- Cart: the items in the current sale (shown once you Add another) -->
+    <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid #E8F5E9;background:#FBFEFC">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:11px;font-weight:800;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">This sale</span>
+        <button id="qsClearCart" type="button" style="background:none;border:none;color:#C62828;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Clear</button>
+      </div>
+      <div id="qsCartList"></div>
     </div>
 
     <!-- Sell button -->
@@ -951,7 +967,7 @@
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=12"></script>
-<script src="js/clinic.js?v=20260706"></script>
+<script src="js/clinic.js?v=20260709"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -4141,6 +4157,122 @@
   var _qsUserId   = null;
   var _qsCategoryFilter = 'all'; // active category chip ('all' = no filter)
   var _qsUnitType = 'tab'; // 'tab' | 'pack' | 'box' — what the clinician is selling
+  // Multi-item cart — each entry is a fully-built sale line { sale, deduct,
+  // display } captured at "Add another" time. Selling ONE item never needs it;
+  // it fills up only when the seller adds more items to the same sale.
+  var _qsCart = [];
+
+  // Base units already committed to the cart for one inventory item — so the
+  // stock/qty maths in the panel accounts for what's already being sold.
+  function _qsCartBaseUsed(invId) {
+    var used = 0;
+    _qsCart.forEach(function(l) { if (l.deduct && l.deduct.inventory_id === invId) used += Number(l.deduct.base_deduct) || 0; });
+    return used;
+  }
+
+  // Build a sale line from the CURRENT selection. Returns null if invalid.
+  // clinic_id is filled in at record time (may still be resolving).
+  function _qsBuildLine() {
+    if (!_qsSel || _qsSel._isDemo) return null;
+    var price      = qsUnitPrice();
+    var total      = qsCurrentTotal();
+    var baseDeduct = _qsQty * qsBaseUnitsPerSellUnit();
+    if (baseDeduct <= 0) return null;
+    var unit = _qsSel.unit || 'unit';
+    var saleUnitLabel = _qsUnitType === 'pack'
+      ? (_qsSel.tabs_per_pack ? 'pack (' + _qsSel.tabs_per_pack + ' ' + qsPlural(unit, Number(_qsSel.tabs_per_pack)) + ')' : 'pack')
+      : _qsUnitType === 'box'
+      ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
+      : unit;
+    var sale = {
+      clinic_id: null, drug_id: _qsSel.id, drug_name: _qsSel.item_name,
+      unit: saleUnitLabel, quantity: _qsQty, unit_price_ugx: price, total_ugx: total,
+      payment_method: _qsPm, sold_by: _qsUserId, created_at: new Date().toISOString(),
+    };
+    if (window.ClinicOffline && ClinicOffline.uuid) sale.id = ClinicOffline.uuid();
+    var deduct = { clinic_id: null, inventory_id: _qsSel.id, base_deduct: baseDeduct, unit_label: saleUnitLabel, qty: _qsQty };
+    return {
+      sale: sale, deduct: deduct,
+      display: { name: _qsSel.item_name, qty: _qsQty, unitType: _qsUnitType, unitLabel: saleUnitLabel, total: total },
+    };
+  }
+
+  function qsCartTotal() {
+    return _qsCart.reduce(function(s, l) { return s + (Number(l.sale.total_ugx) || 0); }, 0);
+  }
+
+  // Clear the selection panel back to "pick an item" state.
+  function _qsClearSelection() {
+    _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsUnitType = 'tab';
+    document.querySelectorAll('#qsDrugGrid .qs-drug-card').forEach(function(c){ c.classList.remove('selected'); });
+    var panel = document.getElementById('qsSelectedPanel');
+    var urow  = document.getElementById('qsUnitTypeRow');
+    var ti    = document.getElementById('qsTotalInput');
+    if (panel) panel.style.display = 'none';
+    if (urow)  urow.style.display = 'none';
+    if (ti)    ti.value = '';
+  }
+
+  // "Add & pick another" — commit the current line to the cart, then return to
+  // the grid so the seller can pick the next item.
+  function addToQsCart() {
+    var line = _qsBuildLine();
+    if (!line) { showToast('Pick an item and quantity first', 'error'); return; }
+    _qsCart.push(line);
+    _qsClearSelection();
+    renderQsCart();
+    // Scroll the grid back to the top so the next item is easy to find.
+    var grid = document.getElementById('qsDrugGrid');
+    if (grid) grid.scrollTop = 0;
+  }
+
+  function removeQsCartLine(idx) {
+    if (idx >= 0 && idx < _qsCart.length) _qsCart.splice(idx, 1);
+    renderQsCart();
+    if (_qsSel) updateQsPanel();   // re-check stock now that some is freed
+  }
+  window.removeQsCartLine = removeQsCartLine;
+
+  function renderQsCart() {
+    var wrap = document.getElementById('qsCartWrap');
+    var list = document.getElementById('qsCartList');
+    if (!wrap || !list) return;
+    if (!_qsCart.length) {
+      wrap.style.display = 'none';
+      list.innerHTML = '';
+      qsUpdateSellButton();
+      return;
+    }
+    wrap.style.display = 'block';
+    list.innerHTML = _qsCart.map(function(l, i) {
+      var d = l.display;
+      var unitTxt = d.unitType === 'tab' ? '' : ' (' + d.unitType + ')';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #EEF5EF">'
+        + '<div style="flex:1;min-width:0">'
+        +   '<div style="font-size:13.5px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(d.name) + '</div>'
+        +   '<div style="font-size:11.5px;color:#5F6368">' + d.qty + ' × ' + esc(d.unitLabel) + unitTxt + '</div>'
+        + '</div>'
+        + '<div style="font-size:14px;font-weight:800;color:#1B5E20;white-space:nowrap">UGX ' + fmtUGX(d.total) + '</div>'
+        + '<button type="button" onclick="removeQsCartLine(' + i + ')" title="Remove" style="background:none;border:none;color:#C62828;cursor:pointer;font-size:20px;line-height:1;padding:2px 4px;touch-action:manipulation">×</button>'
+        + '</div>';
+    }).join('');
+    qsUpdateSellButton();
+  }
+
+  // Keep the Sell button label + enabled state in sync with the cart + current
+  // selection. Enabled whenever there is at least one thing to sell.
+  function qsUpdateSellButton() {
+    var btn = document.getElementById('qsSellBtn');
+    if (!btn) return;
+    var hasCurrent = !!_qsSel && !_qsSel._isDemo && qsMaxUnits() >= 1 && _qsQty <= qsMaxUnits();
+    var lineTotal  = hasCurrent ? qsCurrentTotal() : 0;
+    var count = _qsCart.length + (hasCurrent ? 1 : 0);
+    var grand = qsCartTotal() + lineTotal;
+    btn.disabled = count < 1;
+    var label = count <= 1 ? 'Sell' : ('Sell all (' + count + ')');
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:20px">sell</span> ' + label
+      + (grand > 0 ? ' &nbsp;·&nbsp; UGX ' + fmtUGX(grand) : '');
+  }
 
   function openQuickSale() {
     var el = document.getElementById('qsOverlay');
@@ -4151,6 +4283,8 @@
     // sheet button as a scroll gesture rather than a click.
     document.body.style.overflow = 'hidden';
     _qsSel = null; _qsQty = 1; _qsTotalOverride = null; _qsCategoryFilter = 'all'; _qsUnitType = 'tab';
+    _qsCart = [];
+    renderQsCart();
     var panel = document.getElementById('qsSelectedPanel');
     var btn   = document.getElementById('qsSellBtn');
     var si    = document.getElementById('qsSearch');
@@ -4174,6 +4308,8 @@
     var el = document.getElementById('qsOverlay');
     if (el) el.style.display = 'none';
     document.body.style.overflow = ''; // restore scrolling
+    _qsCart = [];
+    renderQsCart();
   }
 
   // ── Wire up Quick Sale controls ────────────────────────────────────────────
@@ -4341,6 +4477,15 @@
         totalInput.setAttribute('readonly', 'readonly');
       });
     }
+
+    // "Add another item" — commit the current line to the cart, return to grid.
+    bindTap(document.getElementById('qsAddMoreBtn'), function() { addToQsCart(); });
+    // "Clear" the whole cart.
+    bindTap(document.getElementById('qsClearCart'), function() {
+      _qsCart = [];
+      renderQsCart();
+      if (_qsSel) updateQsPanel();   // stock frees back up
+    });
 
     // Drug cards (dynamically injected) via delegation + the same tap logic.
     bindTap(document.getElementById('qsDrugGrid'),
@@ -4678,8 +4823,9 @@
     if (nameEl) nameEl.textContent = d.item_name;
     if (qtyEl)  qtyEl.textContent  = _qsQty;
 
-    // Stock shown precisely in the SELECTED unit (boxes/packs/pieces).
-    var baseStock = Number(d.quantity) || 0;
+    // Stock shown precisely in the SELECTED unit (boxes/packs/pieces), minus
+    // whatever is already in the cart for this same item.
+    var baseStock = Math.max(0, (Number(d.quantity) || 0) - _qsCartBaseUsed(d.id));
     var per       = qsBaseUnitsPerSellUnit();          // base units per sell unit
     var availUnits = per > 0 ? Math.floor(baseStock / per) : baseStock;
     var uname = _qsUnitType === 'pack' ? 'pack' : _qsUnitType === 'box' ? 'box' : unit;
@@ -4730,13 +4876,17 @@
       warn = 'Only ' + availUnits + ' ' + qsPlural(uname, availUnits) + ' in stock.';
     }
     if (warnEl) { warnEl.style.display = enough ? 'none' : 'block'; warnEl.innerHTML = warn; }
-    if (sellBtn) sellBtn.disabled = !enough;
+    // Sell-button state now depends on BOTH the current line and the cart.
+    qsUpdateSellButton();
+    var addBtn = document.getElementById('qsAddMoreBtn');
+    if (addBtn) addBtn.disabled = !enough;
   }
 
-  // Whole sellable units of the current unit type that are actually in stock.
+  // Whole sellable units of the current unit type that are actually in stock —
+  // minus whatever is already committed to the cart for this same item.
   function qsMaxUnits() {
     if (!_qsSel) return 0;
-    var baseStock = Number(_qsSel.quantity) || 0;
+    var baseStock = Math.max(0, (Number(_qsSel.quantity) || 0) - _qsCartBaseUsed(_qsSel.id));
     var per = qsBaseUnitsPerSellUnit();
     return per > 0 ? Math.floor(baseStock / per) : baseStock;
   }
@@ -4761,65 +4911,54 @@
     if (momo) momo.classList.toggle('selected', pm === 'momo');
   }
 
-  // LOCAL-FIRST sale: one tap → success flash IMMEDIATELY. The sale is written
-  // to the local outbox and pushed to the server in the background, so a slow
-  // connection never makes the Sell button feel dead (which is what made people
-  // tap it many times while it silently awaited the network).
+  // LOCAL-FIRST sale: one tap → success flash IMMEDIATELY. Records the CURRENT
+  // selection PLUS everything already in the cart, each as its own quick-sale
+  // line (idempotent client id, own stock deduction). The sale is written to the
+  // local outbox and pushed in the background, so a slow connection never makes
+  // the Sell button feel dead.
   function submitQuickSale() {
-    if (!_qsSel) return;
     var btn = document.getElementById('qsSellBtn');
     if (!btn || btn.disabled) return;
-    btn.disabled = true;
 
-    // Capture everything NOW — the UI resets while the background write runs.
-    var price     = qsUnitPrice();
-    var total     = qsCurrentTotal();
-    // Always deduct in base units (tabs/caps/ml) regardless of sell unit type
-    var baseDeduct = _qsQty * qsBaseUnitsPerSellUnit();
-    var stockAfter = Math.max(0, Number(_qsSel.quantity) - baseDeduct);
-    var saleUnitLabel = _qsUnitType === 'pack'
-      ? (_qsSel.tabs_per_pack ? 'pack (' + _qsSel.tabs_per_pack + ' ' + qsPlural(_qsSel.unit||'unit', Number(_qsSel.tabs_per_pack)) + ')' : 'pack')
-      : _qsUnitType === 'box'
-      ? (_qsSel.packs_per_box ? 'box (' + _qsSel.packs_per_box + ' packs)' : 'box')
-      : (_qsSel.unit || 'unit');
-    var isDemo   = !!_qsSel._isDemo;
-    var invId    = _qsSel.id;
-    var itemName = _qsSel.item_name;
-    var unitName = _qsSel.unit || '';
-    var qty      = _qsQty;
-    var userId   = _qsUserId;
-    var offlineNow = !!(window.ClinicOffline && ClinicOffline.isOffline());
-
-    if (!isDemo) {
-      var sale = {
-        clinic_id: null, drug_id: invId, drug_name: itemName,
-        unit: saleUnitLabel, quantity: qty, unit_price_ugx: price, total_ugx: total,
-        payment_method: _qsPm, sold_by: userId, created_at: new Date().toISOString()
-      };
-      // Client-generated id makes retries idempotent: if a push half-completed,
-      // the replay's insert fails as a duplicate and stock is NOT deducted twice.
-      if (window.ClinicOffline && ClinicOffline.uuid) sale.id = ClinicOffline.uuid();
-
-      var finishWrite = function(cid) {
-        if (!cid) return;                 // no clinic linked — nothing to record
-        sale.clinic_id = cid;
-        var deduct = { clinic_id: cid, inventory_id: invId, base_deduct: baseDeduct, unit_label: saleUnitLabel, qty: qty };
-        _applyLocalStockDeduction(invId, baseDeduct, cid);
-        if (window.ClinicOffline) {
-          // Queue first, then drain in the background: the outbox pushes it now
-          // when online, retries on reconnect otherwise. Nothing is ever lost.
-          ClinicOffline.enqueue('quick_sale', { sale: sale, deduct: deduct });
-          ClinicOffline.flush();
-        } else if (supabase && navigator.onLine !== false) {
-          _pushQuickSale(sale, deduct);   // best effort without the offline layer
-        }
-      };
-      var cidNow = _qsClinicId || (session && session.clinicId) || _clinicId || null;
-      if (cidNow) finishWrite(cidNow);
-      else resolveClinicId().then(finishWrite).catch(function(){});
+    // Gather lines: the item on screen (if any) + the cart.
+    var lines = _qsCart.slice();
+    var currentLine = _qsBuildLine();       // null if nothing selected
+    var demoSelected = !!(_qsSel && _qsSel._isDemo);
+    if (currentLine) lines.push(currentLine);
+    if (!lines.length) {
+      // Demo item with nothing else — just flash so the button feels alive.
+      if (demoSelected) {
+        showQsSaleSuccess(1, qsCurrentTotal(), false);
+      }
+      return;
     }
 
-    showQsSuccess(itemName, qty, total, stockAfter, unitName, offlineNow);
+    btn.disabled = true;
+    var grand = lines.reduce(function(s, l){ return s + (Number(l.sale.total_ugx) || 0); }, 0);
+    var count = lines.length;
+    var offlineNow = !!(window.ClinicOffline && ClinicOffline.isOffline());
+
+    var finishWrite = function(cid) {
+      if (!cid) return;                     // no clinic linked — nothing to record
+      lines.forEach(function(l) {
+        l.sale.clinic_id = cid;
+        l.deduct.clinic_id = cid;
+        _applyLocalStockDeduction(l.deduct.inventory_id, l.deduct.base_deduct, cid);
+        if (window.ClinicOffline) {
+          ClinicOffline.enqueue('quick_sale', { sale: l.sale, deduct: l.deduct });
+        } else if (supabase && navigator.onLine !== false) {
+          _pushQuickSale(l.sale, l.deduct);
+        }
+      });
+      if (window.ClinicOffline) ClinicOffline.flush();
+    };
+    var cidNow = _qsClinicId || (session && session.clinicId) || _clinicId || null;
+    if (cidNow) finishWrite(cidNow);
+    else resolveClinicId().then(finishWrite).catch(function(){});
+
+    // Clear the cart NOW (lines are captured above) so the flash resets clean.
+    _qsCart = [];
+    showQsSaleSuccess(count, grand, offlineNow);
   }
 
   // Perform the sale against Supabase. Returns {ok, stockAfter, network}.
@@ -4884,6 +5023,36 @@
         }
       }
     } catch(e){}
+  }
+
+  // Multi-item success flash. Shows one confirmation for the whole sale
+  // (current item + everything that was in the cart), then fully resets the
+  // sheet — selection AND cart — and refreshes stock + financials.
+  function showQsSaleSuccess(count, grand, offlineNow) {
+    var flash = document.getElementById('qsSuccessFlash');
+    var ft    = document.getElementById('qsFlashText');
+    var fs    = document.getElementById('qsFlashSub');
+    var itemWord = count === 1 ? 'item' : 'items';
+    if (ft) ft.textContent = 'Sold ' + count + ' ' + itemWord;
+    if (fs) {
+      var pay = _qsPm === 'momo' ? 'Mobile Money' : 'Cash';
+      fs.innerHTML = 'UGX ' + fmtUGX(grand) + ' &middot; ' + pay
+        + (offlineNow ? '<br><span style="font-size:12px;opacity:.9"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Saved offline — will sync when online</span>' : '');
+    }
+    if (flash) {
+      flash.style.display = 'flex';
+      setTimeout(function() {
+        flash.style.display = 'none';
+        _qsCart = [];
+        _qsClearSelection();
+        renderQsCart();   // hides the cart panel + re-labels the Sell button
+        loadQsDrugs();    // cache-first → repaints instantly with updated stock
+        setTimeout(function() {
+          loadFinancial(_finPeriod); loadRevenue();
+          try { loadMedsDispensed(); } catch(e) {}   // sale appears in Medicines Dispensed
+        }, 300);
+      }, 1100);
+    }
   }
 
   function showQsSuccess(name, qty, total, stockAfter, unit, queued) {

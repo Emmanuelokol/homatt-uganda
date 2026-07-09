@@ -21,7 +21,7 @@ const CORS = {
   "Content-Type": "application/json",
 };
 
-const ROLES = ["owner", "clinician", "nurse", "receptionist"];
+const ROLES = ["owner", "clinician", "nurse", "receptionist", "salesperson"];
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: CORS });

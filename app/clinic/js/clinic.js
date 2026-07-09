@@ -202,6 +202,10 @@ var CLINIC_ROLE_CAPS = {
   // Receptionists: the front desk — bookings, history, recording payments and
   // quick sales. No clinical notes, no stock, no finances, no settings.
   receptionist: ['bookings', 'history', 'payments', 'quicksale'],
+  // Salesperson / drug-shop attendant: ONLY quick sale + stock (view, restock,
+  // add item). No consultations, no history, no payments ledger, no finances,
+  // no settings. Perfect for a drug shop that just sells.
+  salesperson:  ['quicksale', 'stock'],
 };
 
 var CLINIC_ROLE_LABELS = {
@@ -209,6 +213,7 @@ var CLINIC_ROLE_LABELS = {
   clinician:    'Clinician (Doctor)',
   nurse:        'Nurse',
   receptionist: 'Receptionist',
+  salesperson:  'Sales / Drug shop',
 };
 
 function clinicRole() {
