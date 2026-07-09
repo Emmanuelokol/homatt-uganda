@@ -212,16 +212,46 @@
           <span class="material-icons-outlined">badge</span> Staff &amp; Access
         </div>
         <p style="font-size:13px;color:#5F6368;margin:-6px 0 16px;line-height:1.5">
-          Choose what each staff member can see in the portal.
-          <strong>Owners</strong> access everything. <strong>Clinicians</strong> and
-          <strong>nurses</strong> see consultations, patient history and bookings.
-          <strong>Receptionists</strong> handle the front desk — bookings, history,
-          payments and quick sales — but not financial reports, stock or settings.
+          Create logins for your team and choose what each person can see.
+          <strong>Owners</strong> access everything — finances, stock, settings.
+          <strong>Clinicians</strong> and <strong>nurses</strong> get consultations,
+          patient history, bookings, quick sale and stock — but not financial
+          reports. <strong>Receptionists</strong> handle the front desk — bookings,
+          history, payments and quick sales only.
         </p>
+        <button type="button" onclick="openAddStaffModal()"
+                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+          <span class="material-icons-outlined" style="font-size:17px">person_add</span>
+          Add staff account
+        </button>
         <div id="staffList">
           <div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading staff…</div>
         </div>
         <div id="staffStatus" style="font-size:12px;color:#555;min-height:16px;margin-top:8px"></div>
+      </div>
+
+      <!-- Add Staff modal -->
+      <div id="addStaffModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+        <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px;max-height:90vh;overflow-y:auto">
+          <div style="font-size:17px;font-weight:800;color:#111;margin-bottom:4px">Add staff account</div>
+          <p style="font-size:12.5px;color:#5F6368;margin:0 0 16px;line-height:1.5">
+            Creates a login for a team member at your clinic. Share the email and
+            password with them — they can change the password later in Settings.
+          </p>
+          <label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Full name</label>
+          <input id="asName" class="form-input" type="text" placeholder="e.g. Nakato Brenda" style="width:100%;margin-bottom:12px">
+          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Email (their login)</label>
+          <input id="asEmail" class="form-input" type="email" placeholder="nurse@yourclinic.ug" autocapitalize="none" style="width:100%;margin-bottom:12px">
+          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Password (min 8 characters)</label>
+          <input id="asPassword" class="form-input" type="text" placeholder="Set a starting password" autocapitalize="none" style="width:100%;margin-bottom:12px">
+          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Role — what they can access</label>
+          <select id="asRole" class="form-input" style="width:100%;margin-bottom:14px"></select>
+          <div id="asError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
+            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
+          </div>
+        </div>
       </div>
 
       <!-- Location -->
@@ -530,7 +560,7 @@
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=12" defer></script>
-<script src="js/clinic.js?v=20260705" defer></script>
+<script src="js/clinic.js?v=20260706" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -617,10 +647,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
 /* ── Staff & Access ────────────────────────────────────────── */
 var STAFF_ROLE_OPTIONS = [
-  { value: 'owner',        label: 'Owner / Manager (full access)' },
-  { value: 'clinician',    label: 'Clinician (consultations + history)' },
-  { value: 'nurse',        label: 'Nurse (consultations + history)' },
-  { value: 'receptionist', label: 'Receptionist (front desk)' },
+  { value: 'owner',        label: 'Owner / Manager — everything incl. finances' },
+  { value: 'clinician',    label: 'Clinician — consultations, quick sale, stock' },
+  { value: 'nurse',        label: 'Nurse — consultations, quick sale, stock' },
+  { value: 'receptionist', label: 'Receptionist — front desk, payments, quick sale' },
 ];
 
 async function loadStaffList() {
@@ -652,18 +682,122 @@ async function loadStaffList() {
       return '<option value="' + o.value + '"' + (o.value === s.staff_role ? ' selected' : '') + '>' + o.label + '</option>';
     }).join('');
     var name = (s.full_name || s.email || 'Staff member');
-    return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #F5F5F5">'
-      + '<div style="flex:1;min-width:160px">'
+    var active = s.is_active !== false;
+    var activeBadge = active
+      ? ''
+      : ' <span style="font-size:10px;color:#C62828;background:#FFEBEE;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:1px">DEACTIVATED</span>';
+    var toggleBtn = s.is_self ? '' :
+      '<button type="button" onclick="changeStaffActive(\'' + s.id + '\', ' + (active ? 'false' : 'true') + ', this)" '
+      + 'style="flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid ' + (active ? '#EF9A9A' : '#A5D6A7') + ';'
+      + 'background:' + (active ? '#FFF5F5' : '#F1F8E9') + ';color:' + (active ? '#C62828' : '#1B5E20') + ';font-weight:700;cursor:pointer;font-family:inherit">'
+      + (active ? 'Deactivate' : 'Activate') + '</button>';
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #F5F5F5;' + (active ? '' : 'opacity:.65') + '">'
+      + '<div style="flex:1;min-width:150px">'
       +   '<div style="font-weight:600;color:#202124;font-size:14px">' + escHtml(name)
-      +     (s.is_self ? ' <span style="font-size:11px;color:#1B5E20;font-weight:700">(you)</span>' : '') + '</div>'
+      +     (s.is_self ? ' <span style="font-size:11px;color:#1B5E20;font-weight:700">(you)</span>' : '') + activeBadge + '</div>'
       +   (s.email ? '<div style="font-size:12px;color:#9AA0A6">' + escHtml(s.email) + '</div>' : '')
       + '</div>'
       + '<select onchange="changeStaffRole(\'' + s.id + '\', this.value, this)" '
       +   (s.is_self ? 'disabled title="You cannot change your own role" ' : '')
       +   'class="form-input" style="max-width:280px;flex:0 0 auto">' + opts + '</select>'
+      + toggleBtn
       + '</div>';
   }).join('');
 }
+
+async function changeStaffActive(targetId, active, btn) {
+  var status = document.getElementById('staffStatus');
+  if (active === false && !confirm('Deactivate this account? They will no longer be able to use the clinic portal until you reactivate them.')) return;
+  if (btn) btn.disabled = true;
+  if (status) { status.style.color = '#555'; status.textContent = 'Saving…'; }
+  var res = await _supa.rpc('set_staff_active', { p_target_id: targetId, p_active: active });
+  if (btn) btn.disabled = false;
+  if (res.error || (res.data && res.data.ok === false)) {
+    var msg = (res.data && res.data.error) || (res.error && res.error.message) || 'Could not update';
+    if (status) { status.style.color = '#C62828'; status.textContent = msg; }
+    return;
+  }
+  if (status) { status.style.color = '#1B5E20'; status.textContent = active ? 'Account reactivated ✓' : 'Account deactivated ✓'; }
+  setTimeout(function() { if (status) status.textContent = ''; }, 2500);
+  loadStaffList();
+}
+
+/* ── Add staff account (owner creates a login for a team member) ── */
+function openAddStaffModal() {
+  var m = document.getElementById('addStaffModal');
+  if (!m) return;
+  if (_sessionIsDemo) { showToast('Demo mode — sign in as a clinic owner to add staff', 'info'); return; }
+  if (window.ClinicOffline && ClinicOffline.isOffline()) {
+    showToast('Creating staff accounts needs an internet connection', 'error');
+    return;
+  }
+  ['asName','asEmail','asPassword'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
+  var sel = document.getElementById('asRole');
+  if (sel) sel.innerHTML = STAFF_ROLE_OPTIONS
+    .map(function(o){ return '<option value="' + o.value + '"' + (o.value === 'clinician' ? ' selected' : '') + '>' + o.label + '</option>'; })
+    .join('');
+  var err = document.getElementById('asError'); if (err) err.style.display = 'none';
+  m.style.display = 'flex';
+}
+
+(function wireAddStaff() {
+  var m = document.getElementById('addStaffModal');
+  if (!m) return;
+  m.addEventListener('click', function(e){ if (e.target === m) m.style.display = 'none'; });
+  var cancel = document.getElementById('asCancelBtn');
+  if (cancel) cancel.onclick = function() { m.style.display = 'none'; };
+  var create = document.getElementById('asCreateBtn');
+  if (!create) return;
+  create.onclick = async function() {
+    var errEl = document.getElementById('asError');
+    function fail(msg) { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
+    if (errEl) errEl.style.display = 'none';
+
+    var fullName = (document.getElementById('asName').value || '').trim();
+    var email    = (document.getElementById('asEmail').value || '').trim().toLowerCase();
+    var password = document.getElementById('asPassword').value || '';
+    var role     = document.getElementById('asRole').value;
+    if (!fullName) return fail('Enter the staff member’s full name.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email address.');
+    if (password.length < 8) return fail('Password must be at least 8 characters.');
+    if (navigator.onLine === false) return fail('You’re offline — creating accounts needs a connection.');
+
+    create.disabled = true;
+    create.textContent = 'Creating…';
+    try {
+      var r = await _supa.functions.invoke('create-staff', {
+        body: { fullName: fullName, email: email, password: password, staffRole: role },
+      });
+      // supabase-js surfaces non-2xx as error with the response in context —
+      // pull the function's own message out so the owner sees the real reason.
+      if (r.error) {
+        var msg = 'Could not create the account.';
+        try {
+          var ctx = r.error.context;
+          if (ctx && typeof ctx.json === 'function') {
+            var body = await ctx.json();
+            if (body && body.error) msg = body.error;
+          } else if (r.error.message) msg = r.error.message;
+        } catch (_) { if (r.error.message) msg = r.error.message; }
+        if (/not deployed|Failed to send|relay/i.test(msg)) {
+          msg = 'The create-staff function is not deployed yet — deploy it from the repo (supabase/functions/create-staff) and retry.';
+        }
+        return fail(msg);
+      }
+      var data = r.data || {};
+      if (data.ok === false) return fail(data.error || 'Could not create the account.');
+
+      m.style.display = 'none';
+      showToast('Account created for ' + fullName + ' — share the email & password with them', 'success');
+      loadStaffList();
+    } catch (e) {
+      fail('Error: ' + (e.message || e));
+    } finally {
+      create.disabled = false;
+      create.textContent = 'Create account';
+    }
+  };
+})();
 
 async function changeStaffRole(targetId, role, selectEl) {
   var status = document.getElementById('staffStatus');

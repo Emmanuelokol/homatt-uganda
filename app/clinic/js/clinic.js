@@ -193,9 +193,14 @@ async function resolveClinicId(supabase, session) {
  * access) so a missing column or older session never locks anyone out.
  * ────────────────────────────────────────────────────────── */
 var CLINIC_ROLE_CAPS = {
+  // Owner/Manager: everything — finances, stock, settings, staff accounts.
   owner:        ['*'],
-  clinician:    ['consultations', 'history', 'bookings', 'meds'],
-  nurse:        ['consultations', 'history', 'bookings', 'meds'],
+  // Clinicians & nurses: clinical work + selling + stock (view/restock/add
+  // item) — but NOT financial reports, payments ledger or settings.
+  clinician:    ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock'],
+  nurse:        ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock'],
+  // Receptionists: the front desk — bookings, history, recording payments and
+  // quick sales. No clinical notes, no stock, no finances, no settings.
   receptionist: ['bookings', 'history', 'payments', 'quicksale'],
 };
 
