@@ -70,17 +70,39 @@
   </div>
 </div>
 <script>
-  // Visible build marker — so we can confirm which version a device is running
-  // (and whether it's the native app or the browser). Bump BUILD on each change.
+  // Visible build + LIVE DIAGNOSTICS marker. Tells us, from one screenshot,
+  // exactly why offline is or isn't working: the version, the launch mode, and
+  // — critically — whether the offline service worker is active and how many
+  // files it has actually cached. "SW:active cache:20" = offline will work;
+  // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v44';
-    try {
-      var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-      var standalone = window.matchMedia('(display-mode: standalone)').matches;
-      var mode = native ? 'app' : (standalone ? 'installed' : 'browser');
-      var el = document.getElementById('buildMarker');
-      if (el) el.textContent = 'Homatt Clinic • build ' + BUILD + ' • ' + mode;
-    } catch (e) {}
+    var BUILD = 'v45';
+    var el = document.getElementById('buildMarker');
+    function set(t) { if (el) el.textContent = t; }
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    var standalone = window.matchMedia('(display-mode: standalone)').matches;
+    var mode = native ? 'app' : (standalone ? 'installed' : 'browser');
+    set('Homatt Clinic • ' + BUILD + ' • ' + mode);
+    (async function () {
+      var sw = 'no-SW-support', pages = 0;
+      try {
+        if ('serviceWorker' in navigator) {
+          var reg = await navigator.serviceWorker.getRegistration();
+          sw = !reg ? 'none' : (reg.active ? 'active' : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'reg')));
+        }
+      } catch (e) { sw = 'err'; }
+      try {
+        if (window.caches) {
+          var keys = await caches.keys();
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
+            var c = await caches.open(keys[i]);
+            pages += (await c.keys()).length;
+          }
+        }
+      } catch (e) {}
+      set('Homatt Clinic • ' + BUILD + ' • ' + mode + ' • SW:' + sw + ' • cache:' + pages);
+    })();
   })();
 </script>
 
