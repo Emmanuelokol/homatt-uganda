@@ -326,6 +326,16 @@
         <div id="lowStockList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
       </div>
 
+      <!-- Expiry alert banner (hidden until stock loads) -->
+      <div id="expiryBanner" data-cap="stock" style="display:none;background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:12px;padding:12px 16px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span class="material-icons-outlined" style="color:#E65100;font-size:20px">schedule</span>
+          <strong style="color:#E65100;font-size:14px">Expiry Alert</strong>
+          <span id="expiryCount" style="background:#E65100;color:#fff;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:700"></span>
+        </div>
+        <div id="expiryList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+
       <!-- Pending bookings (patients who booked but haven't been seen) -->
       <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
         <div class="table-header">
@@ -865,6 +875,11 @@
         <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
           style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Expiry Date <span style="font-weight:400;color:#9AA0A6;text-transform:none">(optional — enables expiry alerts)</span></label>
+        <input id="siExpiry" type="date"
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      </div>
       <div style="grid-column:1/-1">
         <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Category / Illness <span style="font-weight:400;color:#9AA0A6;text-transform:none">what it treats — used for Quick Sale filter</span></label>
         <input id="siCategory" type="text" list="siCategoryList" placeholder="e.g. Malaria, Antibiotics, Pain / Fever…" autocomplete="off"
@@ -949,6 +964,9 @@
     <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Quantity to Add *</label>
     <input id="restockQty" type="number" min="1" step="1" placeholder="Enter quantity"
       style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">New Expiry Date <span style="font-weight:400;color:#9AA0A6;text-transform:none">(optional — new batch)</span></label>
+    <input id="restockExpiry" type="date"
+      style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
     <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes (optional)</label>
     <input id="restockNotes" type="text" placeholder="e.g. Supplier delivery" autocomplete="off"
       style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px">
@@ -3497,6 +3515,7 @@
     var banner   = document.getElementById('lowStockBanner');
     var bList    = document.getElementById('lowStockList');
     var bCount   = document.getElementById('lowStockCount');
+    var expBanner = document.getElementById('expiryBanner');
     if (!listEl || !supabase) return;
 
     var clinicId = await resolveClinicId();
@@ -3516,7 +3535,7 @@
         items = CO.get(_stockCacheKey, null);
         if (items == null) {
           listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.');
-          if (banner) banner.style.display = 'none';
+          if (banner) banner.style.display = 'none'; if (expBanner) expBanner.style.display = 'none';
           return;
         }
       } else {
@@ -3526,16 +3545,19 @@
           : supabase.rpc('get_clinic_stock', { p_clinic_id: clinicId }));
         if (res.error && (res.error.message.includes('get_clinic_stock') || res.error.message.includes('Could not find the function') || res.error.message.includes('clinic_inventory'))) {
           // Migration not applied yet — direct table query with client-side flag computation
-          var direct = await supabase
-            .from('clinic_inventory')
-            .select('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx')
-            .eq('clinic_id', clinicId)
-            .eq('is_active', true)
-            .order('item_name');
+          var _directQ = function(cols) {
+            return supabase.from('clinic_inventory').select(cols)
+              .eq('clinic_id', clinicId).eq('is_active', true).order('item_name');
+          };
+          var direct = await _directQ('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx,expiry_date');
+          // Older DB without the expiry column → retry without it.
+          if (direct.error && /expiry_date/i.test(direct.error.message || '')) {
+            direct = await _directQ('id,item_name,item_type,unit,quantity,min_threshold,reorder_level,unit_cost_ugx');
+          }
           if (direct.error) {
             if (CO && CO.isNetworkErr(direct.error)) {
               items = CO.get(_stockCacheKey, null);
-              if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; return; }
+              if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; if (expBanner) expBanner.style.display = 'none'; return; }
             } else {
               // clinic_inventory table itself doesn't exist yet
               listEl.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:14px 16px;margin:12px 16px;font-size:13px;color:#5D4037;display:flex;align-items:flex-start;gap:10px">'
@@ -3558,7 +3580,7 @@
           // Network error (timeout on a slow link) → serve cache if we have it.
           if (CO && CO.isNetworkErr(res.error)) {
             items = CO.get(_stockCacheKey, null);
-            if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; return; }
+            if (items == null) { listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.'); if (banner) banner.style.display = 'none'; if (expBanner) expBanner.style.display = 'none'; return; }
           } else {
             throw res.error;
           }
@@ -3585,6 +3607,10 @@
         });
       }
 
+      // Expiry flags are ALWAYS recomputed client-side: server flags in the
+      // offline cache go stale as days pass, and "today" must be today.
+      items = items.map(_withExpiryFlags);
+
       // Banner
       var lowItems = items.filter(function(i){ return i.is_low_stock; });
       if (lowItems.length) {
@@ -3598,6 +3624,30 @@
         if (banner) { banner.style.display = 'block'; }
       } else {
         if (banner) banner.style.display = 'none';
+      }
+
+      // Expiry banner — expired first, then soonest to expire. Only items with
+      // stock on the shelf matter (qty 0 has nothing to remove).
+      var expItems = items.filter(function(i) {
+        return (i.is_expired || i.is_expiring_soon) && Number(i.quantity) > 0;
+      }).sort(function(a, b) { return (a._days_to_expiry || 0) - (b._days_to_expiry || 0); });
+      if (expItems.length && expBanner) {
+        var eCount = document.getElementById('expiryCount');
+        var eList  = document.getElementById('expiryList');
+        if (eCount) eCount.textContent = expItems.length + ' item' + (expItems.length !== 1 ? 's' : '');
+        if (eList) eList.innerHTML = expItems.map(function(i) {
+          var expiredNow = i.is_expired;
+          var bg = expiredNow ? '#C62828' : '#E65100';
+          var when = expiredNow
+            ? 'expired ' + _fmtExpDate(i.expiry_date)
+            : (i._days_to_expiry === 0 ? 'expires today' : i._days_to_expiry + ' day' + (i._days_to_expiry !== 1 ? 's' : '') + ' left');
+          return '<span style="background:'+bg+';color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:4px">'
+            +'<span class="material-icons-outlined" style="font-size:12px">'+(expiredNow?'block':'schedule')+'</span>'
+            +esc(i.item_name)+' — '+when+'</span>';
+        }).join('');
+        expBanner.style.display = 'block';
+      } else if (expBanner) {
+        expBanner.style.display = 'none';
       }
 
       if (!items.length) {
@@ -3616,7 +3666,7 @@
 
       // HOME SUMMARY: most-urgent 8 (out-of-stock → low → rest A-Z) + View all.
       var SUMMARY_N = 8;
-      var urgency = function(i) { return i.is_critical ? 0 : i.is_low_stock ? 1 : 2; };
+      var urgency = function(i) { return i.is_critical ? 0 : i.is_low_stock ? 1 : i.is_expired ? 2 : i.is_expiring_soon ? 3 : 4; };
       var sorted = items.slice().sort(function(a, b) {
         return urgency(a) - urgency(b) || String(a.item_name).localeCompare(String(b.item_name));
       });
@@ -3632,6 +3682,29 @@
 
   var _stockItems = [];
 
+  // Recompute expiry flags from expiry_date against TODAY (never trust flags
+  // stored in the offline cache — they age). "Soon" = within 60 days.
+  function _withExpiryFlags(i) {
+    var exp = i && i.expiry_date ? String(i.expiry_date).slice(0, 10) : null;
+    if (!exp) return Object.assign({}, i, { is_expired: false, is_expiring_soon: false, _days_to_expiry: null });
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var d = new Date(exp + 'T00:00:00');
+    var days = Math.round((d - today) / 86400000);
+    if (!isFinite(days)) return Object.assign({}, i, { is_expired: false, is_expiring_soon: false, _days_to_expiry: null });
+    return Object.assign({}, i, {
+      is_expired:       days < 0,
+      is_expiring_soon: days >= 0 && days < 60,
+      _days_to_expiry:  days,
+    });
+  }
+
+  function _fmtExpDate(exp) {
+    try {
+      var d = new Date(String(exp).slice(0, 10) + 'T00:00:00');
+      return d.toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) { return String(exp); }
+  }
+
   function _stockRowHtml(item) {
     var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
     var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
@@ -3640,11 +3713,17 @@
       : item.is_low_stock
       ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
       : '';
+    if (item.is_expired) {
+      badge += '<span style="background:#C62828;color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">EXPIRED</span>';
+    } else if (item.is_expiring_soon) {
+      badge += '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">EXPIRES SOON</span>';
+    }
     var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
+    var expTxt = item.expiry_date ? ' · Exp: '+_fmtExpDate(item.expiry_date) : '';
     return '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
       +'<div style="flex:1;min-width:0">'
         +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
-        +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+'</div>'
+        +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+expTxt+'</div>'
         +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
           +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
         +'</div>'
@@ -3680,7 +3759,7 @@
 
   // ── Add Stock Item Modal ──
   function openAddStockModal() {
-    ['siName','siUnit','siQty','siThreshold','siCost','siSellPrice','siCategory',
+    ['siName','siUnit','siQty','siThreshold','siCost','siSellPrice','siCategory','siExpiry',
      'siTabsPerPack','siPackPrice','siPacksPerBox','siBoxPrice'].forEach(function(id){
       var el = document.getElementById(id); if (el) el.value = '';
     });
@@ -3742,6 +3821,9 @@
       var catEl = document.getElementById('siCategory');
       var category = catEl ? (catEl.value || '').trim() : '';
       if (category) insertData.category = category;
+      var expEl = document.getElementById('siExpiry');
+      var expiry = expEl ? (expEl.value || '').trim() : '';   // yyyy-mm-dd from <input type=date>
+      if (expiry) insertData.expiry_date = expiry;
 
       var CO = window.ClinicOffline;
       // Client-generated primary key → replaying the insert is idempotent (a
@@ -3752,7 +3834,7 @@
       // even before the row syncs (and even if the DB lacks those columns).
       function _stashStockExtras() {
         var extras = {};
-        ['selling_price_ugx','tabs_per_pack','pack_selling_price_ugx','packs_per_box','box_selling_price_ugx','category']
+        ['selling_price_ugx','tabs_per_pack','pack_selling_price_ugx','packs_per_box','box_selling_price_ugx','category','expiry_date']
           .forEach(function(kk){ if (insertData[kk] != null) extras[kk] = insertData[kk]; });
         if (Object.keys(extras).length) _saveInvExtras(clinicId, name, extras);
       }
@@ -3838,6 +3920,7 @@
     document.getElementById('restockCurrentQty').textContent = 'Current stock: ' + currentQty + ' ' + unit;
     document.getElementById('restockQty').value = '';
     document.getElementById('restockNotes').value = '';
+    var rex = document.getElementById('restockExpiry'); if (rex) rex.value = '';
     var re = document.getElementById('restockError'); if (re) re.style.display = 'none';
     document.getElementById('restockModal').style.display = 'flex';
     setTimeout(function(){ document.getElementById('restockQty').focus(); }, 80);
@@ -3925,12 +4008,38 @@
     if (updated) _syncQsCacheForItem(updated);
   }
 
+  // New-batch expiry set during a restock. Writes clinic_inventory.expiry_date
+  // (queued offline via table_update, which strips the column if the DB
+  // predates the expiry migration) and patches the cached stock list so the
+  // badge/banner update without a round trip.
+  function _saveRestockExpiry(itemId, clinicId, expiry) {
+    var CO = window.ClinicOffline;
+    if (CO && _stockCacheKey) {
+      var items = CO.get(_stockCacheKey, null);
+      if (items != null) {
+        CO.set(_stockCacheKey, items.map(function(i) {
+          return i.id === itemId ? Object.assign({}, i, { expiry_date: expiry }) : i;
+        }));
+      }
+    }
+    var payload = { table: 'clinic_inventory', patch: { expiry_date: expiry }, match: { id: itemId, clinic_id: clinicId } };
+    if (CO && CO.isOffline()) { CO.enqueue('table_update', payload); return; }
+    var doUpdate = supabase.from('clinic_inventory').update({ expiry_date: expiry }).eq('id', itemId).eq('clinic_id', clinicId);
+    (CO ? CO.withTimeout(doUpdate) : doUpdate).then(function(r) {
+      if (r && r.error) {
+        if (CO && CO.isNetworkErr(r.error)) CO.enqueue('table_update', payload);
+        else console.warn('expiry update:', r.error.message);   // e.g. column missing — migration not applied
+      }
+    }).catch(function(){ if (CO) CO.enqueue('table_update', payload); });
+  }
+
   document.getElementById('restockSaveBtn').onclick = async function() {
     var btn   = this;
     var errEl = document.getElementById('restockError');
     errEl.style.display = 'none';
     var qty   = parseFloat(document.getElementById('restockQty').value);
     var notes = (document.getElementById('restockNotes').value||'').trim();
+    var newExpiry = (document.getElementById('restockExpiry') ? document.getElementById('restockExpiry').value : '') || '';
     if (!qty || qty <= 0) { errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
     var clinicId = await resolveClinicId();
     if (!clinicId || !_restockItemId) return;
@@ -3945,6 +4054,8 @@
         p_txn_type:     'addition',
         p_notes:        notes || null,
       };
+
+      if (newExpiry) _saveRestockExpiry(itemId, clinicId, newExpiry);
 
       // Offline → queue it and update the local stock immediately.
       if (CO && CO.isOffline()) {
