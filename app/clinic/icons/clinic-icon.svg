@@ -1,15 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
-  <!-- Homatt Health clinic app icon — wordmark on brand green.
-       Rounded here for reference; the PNGs are full-bleed so Android masks
-       them. Edit the text/cross below and re-run the rasteriser to regenerate
-       clinic-512.png / clinic-192.png. -->
-  <rect width="512" height="512" rx="112" fill="#1B5E20"/>
-  <g fill="#FFFFFF">
-    <!-- Health cross -->
-    <rect x="232" y="104" width="48" height="128" rx="14"/>
-    <rect x="192" y="144" width="128" height="48" rx="14"/>
-    <!-- Wordmark -->
-    <text x="256" y="352" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="98">Homatt</text>
-    <text x="256" y="410" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="600" font-size="40" letter-spacing="8">HEALTH</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <g fill="none" stroke="#131A16" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Helper (left): standing, bent forward -->
+    <path d="M 206 168 C 172 212, 148 264, 140 318"/>
+    <path d="M 140 318 L 94 438"/>
+    <path d="M 140 318 L 228 386 L 212 462"/>
+    <path d="M 216 184 L 332 294"/>
+    <!-- Seated figure (right): leaning back, being helped up -->
+    <path d="M 416 270 C 438 314, 452 372, 456 430"/>
+    <path d="M 408 286 L 332 294"/>
+    <path d="M 456 430 L 350 378 L 302 458"/>
   </g>
+  <circle cx="196" cy="102" r="49" fill="#131A16"/>
+  <circle cx="404" cy="214" r="45" fill="#131A16"/>
 </svg>

@@ -44,8 +44,9 @@ const SHELL = [
   'js/pwa-install.js?v=20260705g',
   '../js/config.js',
   '../js/native-bridge.js',
-  'icons/clinic-192.png?v=2',
-  'icons/clinic-512.png?v=2',
+  'icons/clinic-192.png?v=3',
+  'icons/clinic-512.png?v=3',
+  'icons/logo-mark.svg?v=1',
 ];
 
 let _lastSelfUpdateCheck = 0;

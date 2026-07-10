@@ -72,7 +72,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .admin-login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0B1626 0%,#0D2137 100%)}
 .admin-login-card{background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
 .admin-login-logo{text-align:center;margin-bottom:28px}
-.admin-login-logo-mark{width:56px;height:56px;background:linear-gradient(135deg,#1565C0,#42A5F5);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#fff}
+.admin-login-logo-mark{width:56px;height:56px;background:linear-gradient(135deg,#1B5E20,#43A047);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#fff}
 .admin-login-title{font-size:20px;font-weight:700}
 .admin-login-sub{font-size:13px;color:var(--text-lt);margin-top:4px}
 .login-field{margin-bottom:16px}
