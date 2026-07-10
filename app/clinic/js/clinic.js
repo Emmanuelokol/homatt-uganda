@@ -241,6 +241,107 @@ function applyRoleGating() {
   } catch (e) { /* never let gating break the page */ }
 }
 
+/* ──────────────────────────────────────────────────────────
+ * Subscription tiers (Schedule B) — basic | premium
+ *
+ * Premium-only features are tagged data-tier-feature="<feature>" in
+ * the HTML. Unlike role gating (which HIDES), tier gating LOCKS the
+ * section — dimmed with an upgrade chip — so basic clinics can see
+ * what premium offers.
+ *
+ * FAIL-OPEN: unknown / missing tier (older DB, network error, demo)
+ * → premium, so a paying clinic is never locked out by a glitch.
+ * During the 30-day free period every clinic is premium.
+ * ────────────────────────────────────────────────────────── */
+var CLINIC_TIER_FEATURES = {
+  basic:   ['stock', 'quicksale', 'alerts', 'consultations', 'history', 'bookings', 'payments', 'meds'],
+  premium: ['*'],
+};
+
+function clinicTrialDaysLeft() {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+    if (!s || !s.trialEndsAt) return 0;
+    var end = new Date(String(s.trialEndsAt).slice(0, 10) + 'T23:59:59');
+    var days = Math.ceil((end - new Date()) / 86400000);
+    return days > 0 ? days : 0;
+  } catch (e) { return 0; }
+}
+
+function clinicTier() {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+    if (clinicTrialDaysLeft() > 0) return 'premium';   // free period = full access
+    if (s && s.tier && CLINIC_TIER_FEATURES[s.tier]) return s.tier;
+  } catch (e) {}
+  return 'premium';   // fail-open: never lock out on missing data
+}
+
+function clinicHasFeature(f) {
+  var feats = CLINIC_TIER_FEATURES[clinicTier()] || ['*'];
+  return feats.indexOf('*') !== -1 || feats.indexOf(f) !== -1;
+}
+
+// Lock every [data-tier-feature] section the clinic's tier doesn't include:
+// dim it, disable interaction, and show an upgrade chip. Re-runs safely.
+function applyTierGating() {
+  try {
+    document.querySelectorAll('[data-tier-feature]').forEach(function (el) {
+      var ok = clinicHasFeature(el.getAttribute('data-tier-feature'));
+      var chip = el.querySelector(':scope > .tier-lock-chip');
+      if (ok) {
+        el.style.opacity = ''; el.style.pointerEvents = ''; el.style.position = '';
+        if (chip) chip.remove();
+        return;
+      }
+      el.style.opacity = '0.5';
+      el.style.pointerEvents = 'none';
+      if (!/relative|absolute|fixed/.test(getComputedStyle(el).position)) el.style.position = 'relative';
+      if (!chip) {
+        chip = document.createElement('div');
+        chip.className = 'tier-lock-chip';
+        chip.style.cssText = 'position:absolute;top:10px;right:10px;z-index:5;background:#37474F;color:#fff;'
+          + 'font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px;display:flex;align-items:center;'
+          + 'gap:4px;pointer-events:none;box-shadow:0 2px 8px rgba(0,0,0,0.25)';
+        chip.innerHTML = '<span class="material-icons-outlined" style="font-size:13px">lock</span> Premium plan';
+        el.appendChild(chip);
+      }
+    });
+    // Trial banner — filled if the page has a #trialBanner slot.
+    var tb = document.getElementById('trialBanner');
+    if (tb) {
+      var days = clinicTrialDaysLeft();
+      if (days > 0) {
+        tb.innerHTML = '<span class="material-icons-outlined" style="font-size:16px;vertical-align:-3px">card_giftcard</span> '
+          + '<strong>Free onboarding period</strong> — full access, ' + days + ' day' + (days !== 1 ? 's' : '') + ' left.';
+        tb.style.display = 'block';
+      } else {
+        tb.style.display = 'none';
+      }
+    }
+  } catch (e) { /* never let gating break the page */ }
+}
+
+// Fetch the clinic's tier in the background and re-apply gating. Separate
+// from the login query on purpose: an un-migrated DB (missing columns)
+// must never break sign-in — this just quietly leaves the tier unknown.
+async function refreshClinicTier(supabase, session) {
+  try {
+    if (!supabase || !session || session.demo || !session.clinicId) return;
+    var res = await supabase.from('clinics')
+      .select('subscription_tier, trial_ends_at')
+      .eq('id', session.clinicId)
+      .single();
+    if (res.error || !res.data) return;                 // column missing / offline → keep fail-open
+    var updated = Object.assign({}, session, {
+      tier:        res.data.subscription_tier || 'premium',
+      trialEndsAt: res.data.trial_ends_at || null,
+    });
+    localStorage.setItem('clinic_session', JSON.stringify(updated));
+    applyTierGating();
+  } catch (e) { /* offline — cached tier (or fail-open) stands */ }
+}
+
 // Page-level guard: redirect to the dashboard if the role lacks a capability.
 // Call at the top of a protected page (e.g. new-order requires 'consultations').
 function requireClinicCap(cap) {

@@ -32,7 +32,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260627">
+  <link rel="stylesheet" href="css/clinic.css?v=20260711">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -319,6 +319,9 @@
         </div>
       </div>
 
+      <!-- 30-day free onboarding banner (filled by applyTierGating) -->
+      <div id="trialBanner" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:13.5px;color:#1B5E20"></div>
+
       <!-- Low-stock alert banner (hidden until stock loads) -->
       <div id="lowStockBanner" data-cap="stock" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
@@ -374,7 +377,7 @@
       </div>
 
       <!-- ── Overdue Follow-up Tracker ── -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
@@ -535,7 +538,7 @@
       </div>
 
       <!-- Monthly Reports -->
-      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
+      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
@@ -988,7 +991,7 @@
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=12"></script>
-<script src="js/clinic.js?v=20260709"></script>
+<script src="js/clinic.js?v=20260711"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -999,7 +1002,9 @@
   var session = requireClinic();
   setupClinicLogout();
   applyRoleGating();   // hide sections this staff role can't access
+  applyTierGating();   // lock premium sections on the basic plan
   var supabase = _getClinicSupabase();
+  try { refreshClinicTier(supabase, session); } catch(e) {}
 
   // Replay Quick Sales made offline — now (if online) and on every reconnect.
   if (window.ClinicOffline) {
