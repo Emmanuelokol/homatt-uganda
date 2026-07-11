@@ -65,7 +65,7 @@
         </div>
         <table class="admin-table">
           <thead>
-            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>Consultation Fee</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>Consultation Fee</th><th>Plan</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
           </thead>
           <tbody id="clinicsBody">
             <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
@@ -227,6 +227,17 @@
                 <option value="pending">Pending</option>
                 <option value="rejected">Rejected</option>
               </select>
+            </div>
+            <div class="admin-form-group">
+              <label>Subscription Plan</label>
+              <select id="clinicTier">
+                <option value="basic">Basic — stock, quick sale, alerts, consultations, bookings, payments</option>
+                <option value="premium">Premium — everything incl. reports, follow-up care, lab services</option>
+              </select>
+            </div>
+            <div class="admin-form-group">
+              <label>Free trial ends <span style="font-weight:400;color:#9AA0A6">(clear = no trial)</span></label>
+              <input type="date" id="clinicTrialEnds">
             </div>
             <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
               <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
@@ -569,6 +580,21 @@ async function loadClinics() {
   renderClinics();
 }
 
+// Subscription plan badge: Premium (green), Basic (grey), plus trial
+// days remaining while the 30-day free onboarding is running.
+function planBadgeHtml(c) {
+  if (!('subscription_tier' in (c || {})) || !c.subscription_tier) return '—';
+  var tier = c.subscription_tier === 'premium' ? 'Premium' : 'Basic';
+  var color = c.subscription_tier === 'premium' ? '#1B5E20' : '#616161';
+  var bg    = c.subscription_tier === 'premium' ? '#E8F5E9' : '#F5F5F5';
+  var html = '<span style="background:' + bg + ';color:' + color + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">' + tier + '</span>';
+  if (c.trial_ends_at) {
+    var days = Math.ceil((new Date(String(c.trial_ends_at).slice(0,10) + 'T23:59:59') - new Date()) / 86400000);
+    if (days > 0) html += '<div style="font-size:10px;color:#E65100;font-weight:600;margin-top:2px">free trial · ' + days + 'd left</div>';
+  }
+  return html;
+}
+
 function renderClinics() {
   var statusF = document.getElementById('filterStatus').value;
   var searchF = document.getElementById('searchClinics').value.toLowerCase();
@@ -577,7 +603,7 @@ function renderClinics() {
   });
   var tbody = document.getElementById('clinicsBody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(function(c) {
@@ -587,6 +613,7 @@ function renderClinics() {
       '<td>' + ([c.district,c.city].filter(Boolean).join(', ')||'—') + '</td>' +
       '<td style="font-size:12px">' + (c.phone||'—') + '</td>' +
       '<td style="font-size:12px;font-weight:600;color:#1B5E20">' + fee + '</td>' +
+      '<td>' + planBadgeHtml(c) + '</td>' +
       '<td>' + (c.verified ? '<span class="status-badge resolved">Verified</span>' : '<span class="status-badge open">Unverified</span>') + '</td>' +
       '<td><span class="status-badge ' + (c.status||'approved') + '">' + (c.status||'approved') + '</span></td>' +
       '<td style="font-size:12px;color:#9AA0A6">' + formatShortDate(c.created_at) + '</td>' +
@@ -621,6 +648,10 @@ function openModal(id) {
   document.getElementById('clinicAddress').value = c?.address || '';
   document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
   document.getElementById('clinicStatus').value = c?.status || 'approved';
+  document.getElementById('clinicTier').value = c?.subscription_tier || 'basic';
+  document.getElementById('clinicTrialEnds').value = c?.trial_ends_at ? String(c.trial_ends_at).slice(0,10) : '';
+  window._origTier      = c?.subscription_tier || 'basic';
+  window._origTrialEnds = c?.trial_ends_at ? String(c.trial_ends_at).slice(0,10) : '';
   document.getElementById('clinicVerified').checked = c?.verified || false;
   document.getElementById('clinicActive').checked = c?.active !== false;
   document.getElementById('clinicNotes').value = c?.notes || '';
@@ -705,6 +736,25 @@ async function saveClinic() {
   btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">save</span> Save Clinic';
 
   if (result.error) { showAdminToast('Save failed: ' + result.error.message, 'error'); return; }
+
+  // Subscription plan goes through an admin-only RPC (a DB trigger blocks
+  // direct tier edits). Only called when the plan or trial date changed.
+  var newTier  = document.getElementById('clinicTier').value;
+  var newTrial = document.getElementById('clinicTrialEnds').value || null;
+  if (id && (newTier !== window._origTier || (newTrial || '') !== (window._origTrialEnds || ''))) {
+    var tierRes = await supa.rpc('admin_set_clinic_tier', {
+      p_clinic_id: id, p_tier: newTier, p_trial_ends: newTrial,
+    });
+    var tierErr = tierRes.error ? tierRes.error.message
+      : (tierRes.data && tierRes.data.ok === false ? tierRes.data.error : null);
+    if (tierErr) {
+      showAdminToast('Clinic saved, but the plan was NOT changed: ' + tierErr
+        + (/could not find the function/i.test(tierErr) ? ' — run the subscription tier SQL first.' : ''), 'error');
+      await loadClinics();
+      return;
+    }
+  }
+
   closeModal();
   await loadClinics();
   showAdminToast(id ? 'Clinic updated!' : 'Clinic added!', 'success');

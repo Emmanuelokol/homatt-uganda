@@ -63,3 +63,68 @@ create trigger trg_protect_clinic_tier
 
 -- Verify
 select 'subscription tiers ready' as result;
+
+-- ── 3. Admin portal can manage tiers ────────────────────────────
+-- The Homatt admin portal signs in as a normal authenticated user
+-- (profiles.is_admin = true), which the protection trigger blocks.
+-- This RPC verifies the caller IS a Homatt admin, then flags the
+-- transaction so the trigger lets the change through.
+create or replace function public.protect_clinic_tier()
+returns trigger
+language plpgsql
+as $$
+declare
+  v_role text := coalesce(current_setting('request.jwt.claims', true)::jsonb->>'role', '');
+begin
+  if (new.subscription_tier is distinct from old.subscription_tier
+      or new.trial_ends_at is distinct from old.trial_ends_at)
+     and v_role not in ('', 'service_role')
+     and coalesce(current_setting('homatt.tier_admin', true), '') <> 'on' then
+    raise exception 'Subscription tier can only be changed by Homatt Health';
+  end if;
+  return new;
+end;
+$$;
+
+create or replace function public.admin_set_clinic_tier(
+  p_clinic_id  uuid,
+  p_tier       text,
+  p_trial_ends date default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_tier not in ('basic','premium') then
+    return jsonb_build_object('ok', false, 'error', 'invalid tier');
+  end if;
+
+  -- Caller must be a Homatt admin
+  if not exists (
+    select 1 from public.profiles
+     where id = auth.uid() and is_admin = true
+  ) then
+    return jsonb_build_object('ok', false, 'error', 'only Homatt admins can change plans');
+  end if;
+
+  -- Transaction-local flag the trigger trusts
+  perform set_config('homatt.tier_admin', 'on', true);
+
+  update public.clinics
+     set subscription_tier = p_tier,
+         trial_ends_at     = p_trial_ends,
+         updated_at        = now()
+   where id = p_clinic_id;
+
+  if not found then
+    return jsonb_build_object('ok', false, 'error', 'clinic not found');
+  end if;
+
+  return jsonb_build_object('ok', true, 'clinic_id', p_clinic_id,
+                            'tier', p_tier, 'trial_ends', p_trial_ends);
+end;
+$$;
+
+grant execute on function public.admin_set_clinic_tier(uuid, text, date) to authenticated;
