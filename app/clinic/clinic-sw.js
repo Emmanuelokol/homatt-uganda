@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v52';
+const CACHE = 'homatt-clinic-v53';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -197,7 +197,22 @@ async function ensureShellCached(cache, force) {
   await Promise.all(SHELL.map(async (u) => {
     try {
       const cached = !force && await cache.match(u);
-      if (cached) return;
+      if (cached) {
+        // Cache already has it — make sure the IndexedDB mirror does too, by
+        // copying the CACHED body across (no network). Without this the mirror
+        // stayed empty on healthy devices, so when a cleaner later wiped Cache
+        // Storage there was no second copy to boot from.
+        if (!/\.(png|woff2?|ttf|otf)($|\?)/i.test(u)) {
+          try {
+            const key = idbKeyFor(u);
+            if (key && !(await idbGet(key))) {
+              const body = await cached.clone().text();
+              if (body) await idbPut(key, { body: body, ct: cached.headers.get('Content-Type') || ctFor(u) });
+            }
+          } catch (e) {}
+        }
+        return;
+      }
       const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
       if (r && r.ok && !r.redirected) {
         await cache.put(u, r.clone());
@@ -244,7 +259,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v52"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v53"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -349,6 +364,20 @@ self.addEventListener('activate', (event) => {
       } catch (e) {}
     }));
 
+    // 2b) Mirror the core pages into the IndexedDB second copy too, straight
+    //     from the cache — every UPDATE now guarantees the backup exists.
+    await Promise.all(CORE_PAGES.map(async (u) => {
+      try {
+        const hit = await target.match(u);
+        if (!hit) return;
+        const key = idbKeyFor(u);
+        if (key && !(await idbGet(key))) {
+          const body = await hit.clone().text();
+          if (body) await idbPut(key, { body: body, ct: hit.headers.get('Content-Type') || ctFor(u) });
+        }
+      } catch (e) {}
+    }));
+
     // 3) Only drop the OLD clinic caches once the new cache can actually serve
     //    the shell offline. If a device updated while offline and the migration
     //    couldn't carry the shell across, we KEEP the old caches so matchAnyCache
@@ -375,16 +404,29 @@ self.addEventListener('fetch', (event) => {
   let url;
   try { url = new URL(req.url); } catch (_) { return; }
 
-  // CDN + fonts (cross-origin): cache-first so they work offline.
+  // CDN + fonts (cross-origin): cache-first so they work offline. Two guards
+  // learned the hard way:
+  //   • never respondWith(undefined) — it leaves the request hanging forever
+  //     and stalls the page's load event offline;
+  //   • cap the network wait at 8s — a black-hole connection (dead upstream,
+  //     captive portal) would otherwise stall page load just as badly.
+  // Falling back to an empty stylesheet is safe: fonts/icons are also bundled
+  // locally (fonts/*.css in the shell).
   if (isVendor(url)) {
+    const emptyCss = () => new Response('/* offline */', { status: 200, headers: { 'Content-Type': 'text/css' } });
+    const timedFetch = new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('vendor fetch timeout')), 8000);
+      fetch(req).then((r) => { clearTimeout(t); resolve(r); }, (e) => { clearTimeout(t); reject(e); });
+    });
     event.respondWith(
-      caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      caches.match(req).then((hit) => hit || timedFetch.then((res) => {
         if (res && (res.status === 200 || res.type === 'opaque')) {
           const copy = res.clone();
           caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
         }
         return res;
-      }).catch(() => hit))
+      }).catch(() => hit || emptyCss()))
+      .catch(() => emptyCss())
     );
     return;
   }

@@ -76,7 +76,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v52';
+    var BUILD = 'v53';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -101,7 +101,29 @@
           }
         }
       } catch (e) {}
-      set('Homatt Clinic • ' + BUILD + ' • ' + mode + ' • SW:' + sw + ' • cache:' + pages);
+      // The IndexedDB SECOND copy of the shell (survives cache wipes) and
+      // whether the OS granted persistent storage (protects against cleaners).
+      var idbN = 0, keep = '?';
+      try {
+        idbN = await new Promise(function (res) {
+          var q = indexedDB.open('homatt-shell', 1);
+          q.onupgradeneeded = function () { try { q.result.createObjectStore('files'); } catch (e) {} };
+          q.onsuccess = function () {
+            try {
+              var rq = q.result.transaction('files', 'readonly').objectStore('files').getAllKeys();
+              rq.onsuccess = function () { res((rq.result || []).length); };
+              rq.onerror = function () { res(0); };
+            } catch (e) { res(0); }
+          };
+          q.onerror = function () { res(0); };
+        });
+      } catch (e) {}
+      try {
+        if (navigator.storage && navigator.storage.persisted) {
+          keep = (await navigator.storage.persisted()) ? 'yes' : 'no';
+        }
+      } catch (e) {}
+      set('Homatt Clinic • ' + BUILD + ' • ' + mode + ' • SW:' + sw + ' • cache:' + pages + ' • idb:' + idbN + ' • keep:' + keep);
     })();
   })();
 </script>
