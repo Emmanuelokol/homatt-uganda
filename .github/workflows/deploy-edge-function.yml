@@ -77,6 +77,14 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      # ── Deploy create-staff (owner creates staff logins) ─────────────────
+      - name: Deploy create-staff function
+        run: |
+          supabase functions deploy create-staff \
+            --project-ref kgkdiykzmqjougwzzewi
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       # ── Deploy relworx-payment ────────────────────────────────────────────
       - name: Deploy relworx-payment function
         run: |

@@ -675,13 +675,22 @@ async function loadStaffList() {
   var runStaff = function() { return _supa.rpc('get_clinic_staff'); };
   var res = CO ? await CO.cachedQuery('clinic_staff_' + (_clinicId || 'me'), runStaff) : await runStaff();
   if (res.error) {
-    // RPC not deployed yet, or not an owner — hide the card cleanly
-    if (card) card.style.display = 'none';
+    // This page is owner-only (requireClinicCap above), so never hide the
+    // card silently — say WHY it can't load so the problem is fixable.
+    var m = (res.error.message || '') + '';
+    var why = /could not find the function|does not exist|schema cache/i.test(m)
+      ? 'Staff accounts need a database update — run <code>20260608_staff_roles.sql</code> in the Supabase SQL Editor (or re-run the Apply DB Migrations workflow).'
+      : (CO && CO.isNetworkErr && CO.isNetworkErr(res.error))
+      ? 'You\'re offline — staff accounts will appear when you reconnect.'
+      : 'Could not load staff: ' + m;
+    list.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:12px 14px;font-size:13px;color:#5D4037">' + why + '</div>';
     return;
   }
   var staff = res.data || [];
   if (!staff.length) {
-    if (card) card.style.display = 'none';   // non-owners get an empty set
+    // Empty set = the RPC says this login is not the clinic owner.
+    list.innerHTML = '<div style="font-size:13px;color:#9AA0A6;padding:8px 0">Only the clinic owner\'s account can manage staff logins. You\'re signed in as <strong>'
+      + ((session && session.email) || 'a staff member') + '</strong>.</div>';
     return;
   }
 
