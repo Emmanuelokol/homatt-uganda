@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v51';
+const CACHE = 'homatt-clinic-v52';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -120,11 +120,33 @@ function isVendor(url) {
          url.hostname.indexOf('fonts.gstatic.com') >= 0;
 }
 
+// A response that is SAFE to hand to a navigation. Serving a response whose
+// `redirected` flag is set (or an opaqueredirect from cache) to a navigation is
+// a spec-level network error — Chrome then shows ITS OWN dark "You're offline"
+// screen even though we "responded". Rebuilding the response from its body
+// strips the flag. Old caches can contain such poisoned entries (they predate
+// the !r.redirected guards and are migrated forward on update), so every page
+// served to a navigation passes through here.
+async function navSafe(resp) {
+  try {
+    if (!resp) return resp;
+    if (!resp.redirected && resp.type !== 'opaqueredirect') return resp;
+    const body = await resp.clone().blob();
+    return new Response(body, {
+      status: 200,
+      headers: { 'Content-Type': resp.headers.get('Content-Type') || 'text/html; charset=utf-8' },
+    });
+  } catch (e) { return resp; }
+}
+
 // Find a cached page across EVERY clinic cache (current + any not-yet-deleted
 // older version), most-specific first. This is what lets the portal always open
 // to its real UI offline — like Google Docs — instead of a dead-end page.
 async function matchAnyCache(req) {
-  const keys = await caches.keys();
+  // caches.keys() can itself throw on some devices (storage pressure, cleaner
+  // mid-wipe). A throw here must degrade to "no hit", never to a crash.
+  let keys = [];
+  try { keys = await caches.keys(); } catch (e) {}
   const clinicKeys = [CACHE].concat(
     keys.filter((k) => k !== CACHE && k.indexOf('homatt-clinic-') === 0)
   );
@@ -222,7 +244,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v51"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v52"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -303,9 +325,16 @@ self.addEventListener('activate', (event) => {
         const old = await caches.open(key);
         const reqs = await old.keys();
         for (const rq of reqs) {
-          if (await target.match(rq)) continue;   // keep the fresher copy
-          const resp = await old.match(rq);
-          if (resp) await target.put(rq, resp.clone());
+          try {
+            if (await target.match(rq)) continue;   // keep the fresher copy
+            const resp = await old.match(rq);
+            if (!resp) continue;
+            // CLEANSE while migrating: a response with the `redirected` flag is
+            // fatal when later served to a navigation (Chrome treats it as a
+            // network error and shows its own offline screen). Rebuild those
+            // from their body so the poison never travels forward.
+            await target.put(rq, await navSafe(resp.clone()));
+          } catch (e) {}
         }
       } catch (e) {}
     }
@@ -316,7 +345,7 @@ self.addEventListener('activate', (event) => {
       try {
         if (await target.match(u)) return;
         const r = await fetch(u, { cache: 'no-cache' });
-        if (r && r.ok) await target.put(u, r.clone());
+        if (r && r.ok && !r.redirected) await target.put(u, r.clone());
       } catch (e) {}
     }));
 
@@ -383,36 +412,46 @@ self.addEventListener('fetch', (event) => {
       try { self.registration.update().catch(() => {}); } catch (e) {}
     }
     event.respondWith((async () => {
-      // Background revalidate — never blocks the response; refreshes the cache
-      // (and the whole shell) for next time. Never rejects.
-      const netUpdate = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
-        .then((res) => {
-          if (res && res.ok && !res.redirected) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => {
-              c.put(req, copy).catch(() => {});
-              ensureShellCached(c);
-            }).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => null);
+      // ABSOLUTE RULE: this function must ALWAYS resolve with a Response. A
+      // rejection (or a redirected response reaching the navigation) makes
+      // Chrome show ITS OWN dark "You're offline" screen — the exact dead end
+      // this worker exists to prevent. Hence the outer try/catch and navSafe().
+      try {
+        // Background revalidate — never blocks the response; refreshes the cache
+        // (and the whole shell) for next time. Never rejects.
+        const netUpdate = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+          .then((res) => {
+            if (res && res.ok && !res.redirected) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => {
+                c.put(req, copy).catch(() => {});
+                ensureShellCached(c);
+              }).catch(() => {});
+            }
+            return res;
+          })
+          .catch(() => null);
 
-      // 1) Cache first — instant, reliable, no browser offline screen.
-      const cachedHit = await matchAnyCache(req);
-      if (cachedHit) return cachedHit;
+        // 1) Cache first — instant, reliable, no browser offline screen.
+        const cachedHit = await matchAnyCache(req);
+        if (cachedHit) return await navSafe(cachedHit);
 
-      // 2) IndexedDB shell copy — survives cleaners that wipe Cache Storage.
-      const idbHit = (await idbServe(url.pathname)) ||
-                     (await idbServe(url.pathname.replace(/\/$/, '/index.html'))) ||
-                     (await idbAnyPage());
-      if (idbHit) return idbHit;
+        // 2) IndexedDB shell copy — survives cleaners that wipe Cache Storage.
+        const idbHit = (await idbServe(url.pathname)) ||
+                       (await idbServe(url.pathname.replace(/\/$/, '/index.html'))) ||
+                       (await idbAnyPage());
+        if (idbHit) return idbHit;
 
-      // 3) Never cached yet (true first run) → wait for the network, then the
-      //    self-healing placeholder.
-      const net = await netUpdate;
-      if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) return net;
-      return offlineFallbackResponse();
+        // 3) Never cached yet (true first run) → wait for the network, then the
+        //    self-healing placeholder.
+        const net = await netUpdate;
+        if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) return net;
+        return offlineFallbackResponse();
+      } catch (e) {
+        // Whatever broke above, the user still gets OUR page, never Chrome's.
+        try { return offlineFallbackResponse(); }
+        catch (e2) { return new Response('Homatt Health — reload to continue', { headers: { 'Content-Type': 'text/plain' } }); }
+      }
     })());
     return;
   }

@@ -76,7 +76,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v51';
+    var BUILD = 'v52';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
