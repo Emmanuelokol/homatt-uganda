@@ -782,6 +782,23 @@ function openAddStaffModal() {
     create.disabled = true;
     create.textContent = 'Creating…';
     try {
+      // PRIMARY ROUTE: the create_staff_account database function — installed
+      // by migrations alone, no separate edge-function deploy to go wrong.
+      var rpc = await _supa.rpc('create_staff_account', {
+        p_full_name: fullName, p_email: email, p_password: password, p_role: role,
+      });
+      var rpcMissing = rpc.error && /could not find the function|schema cache|does not exist/i.test(rpc.error.message || '');
+      if (!rpcMissing) {
+        if (rpc.error) return fail(rpc.error.message || 'Could not create the account.');
+        var d = rpc.data || {};
+        if (d.ok === false) return fail(d.error || 'Could not create the account.');
+        m.style.display = 'none';
+        showToast('Account created for ' + fullName + ' — share the email & password with them', 'success');
+        loadStaffList();
+        return;
+      }
+
+      // FALLBACK: the create-staff edge function (older DBs without the RPC).
       var r = await _supa.functions.invoke('create-staff', {
         body: { fullName: fullName, email: email, password: password, staffRole: role },
       });
@@ -797,7 +814,7 @@ function openAddStaffModal() {
           } else if (r.error.message) msg = r.error.message;
         } catch (_) { if (r.error.message) msg = r.error.message; }
         if (/not deployed|Failed to send|relay/i.test(msg)) {
-          msg = 'The create-staff function is not deployed yet — deploy it from the repo (supabase/functions/create-staff) and retry.';
+          msg = 'Staff creation needs a database update — run 20260712_create_staff_rpc.sql in the Supabase SQL Editor and retry.';
         }
         return fail(msg);
       }
