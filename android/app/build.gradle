@@ -10,8 +10,11 @@ android {
         // CI bumps the version code every build (APK_VERSION_CODE = run number)
         // so each published APK installs as an UPDATE over the previous one —
         // preserving the clinic's offline data instead of forcing an uninstall.
-        versionCode (System.getenv("APK_VERSION_CODE") ?: "2").toInteger()
-        versionName (System.getenv("APK_VERSION_NAME") ?: "1.1.0")
+        // Plain `=` assignments: `versionCode (x).toInteger()` is parsed by
+        // Groovy as `(versionCode(x)).toInteger()` and fails with "Value is null".
+        def ciVersionCode = System.getenv("APK_VERSION_CODE")
+        versionCode = (ciVersionCode != null && ciVersionCode.isInteger()) ? ciVersionCode.toInteger() : 2
+        versionName = System.getenv("APK_VERSION_NAME") ?: "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
