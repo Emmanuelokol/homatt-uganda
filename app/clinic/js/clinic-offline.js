@@ -192,6 +192,10 @@
       type: type, payload: payload, ts: Date.now(),
     });
     saveOutbox(list);
+    // Arm the OS-level reconnect trigger: the service worker's Background Sync
+    // fires the instant connectivity returns and tells us to flush — no
+    // refresh, no waiting for an 'online' event that may never come.
+    try { requestBackgroundSync(); } catch (e) {}
     return list.length;
   }
 
@@ -229,8 +233,8 @@
     if (!isOffline()) flush();
   }
 
-  async function flush() {
-    if (_syncing || isOffline()) return;
+  async function flush(force) {
+    if (_syncing || (isOffline() && !force)) return;
     var list = outbox();
     if (!list.length) { updateIndicator(); return; }
     if (!Object.keys(_handlers).length) return;
@@ -268,9 +272,27 @@
     }
   }
 
+  // Is the network REALLY reachable? navigator.onLine is unreliable on
+  // Android (data returns but the flag stays false, or vice versa), so when
+  // changes are stuck we ask the network itself: a tiny same-origin fetch.
+  function probeOnline() {
+    return withTimeout(
+      fetch('manifest.json?probe=' + Date.now(), { cache: 'no-store', credentials: 'same-origin' })
+        .then(function (r) { return !!(r && (r.ok || r.status === 304)); })
+        .catch(function () { return false; }),
+      6000
+    ).then(function (ok) { return ok === true; });
+  }
+
   // Safety nets: retry every 15s while anything is pending, and whenever the
   // app returns to the foreground or is restored from the back/forward cache.
-  setInterval(function () { if (pendingCount() > 0) flush(); }, 15000);
+  // When navigator.onLine SAYS offline but changes are pending, probe reality
+  // every cycle — the instant real data is back, sync starts by itself.
+  setInterval(function () {
+    if (pendingCount() === 0) return;
+    if (!isOffline()) { flush(); return; }
+    probeOnline().then(function (ok) { if (ok) { updateIndicator(); flush(true); } });
+  }, 15000);
   try {
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden && pendingCount() > 0) burstFlush();
@@ -316,6 +338,27 @@
 
   window.addEventListener('online', function () { updateIndicator(); burstFlush(); });
   window.addEventListener('offline', updateIndicator);
+
+  // ── Real-time reconnect sync (no refresh needed) ─────────────────────────
+  // The service worker's Background Sync fires the moment the OS regains
+  // connectivity — even when the page never receives an 'online' event. The
+  // worker then messages every open page to flush its outbox immediately.
+  function requestBackgroundSync() {
+    try {
+      if (!('serviceWorker' in navigator)) return;
+      navigator.serviceWorker.ready.then(function (reg) {
+        if (reg.sync && reg.sync.register) reg.sync.register('homatt-outbox').catch(function () {});
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  try {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', function (e) {
+        if (e.data && e.data.type === 'flushOutbox') { updateIndicator(); burstFlush(); }
+      });
+    }
+  } catch (e) {}
+  if (pendingCount() > 0) requestBackgroundSync();   // queued from a previous session
   if (document.readyState !== 'loading') updateIndicator();
   else document.addEventListener('DOMContentLoaded', updateIndicator);
 
