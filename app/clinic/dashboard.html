@@ -200,13 +200,13 @@
       <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations">
         <span class="material-icons-outlined">medical_services</span> New Consultation
       </a>
-      <a href="#" class="sidebar-link" onclick="openSectionView('stock');return false;">
+      <a href="#" class="sidebar-link" data-nav-cap="stock" onclick="openSectionView('stock');return false;">
         <span class="material-icons-outlined">inventory_2</span> Stock — full list
       </a>
-      <a href="#" class="sidebar-link" onclick="openSectionView('payments');return false;">
+      <a href="#" class="sidebar-link" data-nav-cap="payments" onclick="openSectionView('payments');return false;">
         <span class="material-icons-outlined">payments</span> Pending Payments
       </a>
-      <a href="#" class="sidebar-link" onclick="openSectionView('conditions');return false;">
+      <a href="#" class="sidebar-link" data-nav-cap="consultations" onclick="openSectionView('conditions');return false;">
         <span class="material-icons-outlined">biotech</span> Conditions &amp; Treatments
       </a>
       <a href="settings.html" class="sidebar-link" data-nav-cap="settings">
@@ -1027,7 +1027,16 @@
     cfg.render(document.getElementById('svBody'), ((si && si.value) || '').trim().toLowerCase());
   }
 
+  // Section → required role capability. openSectionView is reachable from the
+  // sidebar, View-all buttons and console — the check must live HERE, not just
+  // on the (hideable) links, so a sub-account can never open a section its
+  // role doesn't include.
+  var SV_CAPS = { stock: 'stock', payments: 'payments', conditions: 'consultations' };
   function openSectionView(key) {
+    if (SV_CAPS[key] && typeof clinicCan === 'function' && !clinicCan(SV_CAPS[key])) {
+      if (typeof showToast === 'function') showToast('Your role does not have access to this section', 'error');
+      return;
+    }
     var cfg = _svRenderers[key];
     var ov  = document.getElementById('svOverlay');
     if (!cfg || !ov) return;

@@ -12,6 +12,7 @@
   setupClinicLogout();
   // Consultations are clinical — receptionists are sent back to the dashboard.
   if (!requireClinicCap('consultations')) return;
+  try { applyRoleGating(); } catch (e) {}   // hide nav links this role can't use
   const supabase = _getClinicSupabase();
 
   document.getElementById('clinicUserDate').textContent =

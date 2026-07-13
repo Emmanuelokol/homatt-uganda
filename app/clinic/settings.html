@@ -151,7 +151,7 @@
     </div>
     <nav class="sidebar-nav">
       <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
-      <a href="new-order.html" class="sidebar-link"><span class="material-icons-outlined">medical_services</span> New Consultation</a>
+      <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations"><span class="material-icons-outlined">medical_services</span> New Consultation</a>
       <a href="settings.html" class="sidebar-link active"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
     </nav>
     <div class="sidebar-footer">
@@ -611,6 +611,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
   }
 
+  applyRoleGating();   // hide nav links this staff role can't use
   applyTierGating();   // lock premium sections on the basic plan
   try { refreshClinicTier(_supa, session); } catch(e) {}
 
