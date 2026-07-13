@@ -1117,6 +1117,11 @@
   // ── Resolve clinic ID (cached) ──
   var _clinicId = null;
   async function resolveClinicId() {
+    // DEMO ISOLATION: a demo session must NEVER resolve a real clinic. Without
+    // this guard, demo mode fell through to supabase.auth.getSession() — and
+    // because the real login's auth token is still in this browser, the demo
+    // dashboard loaded the REAL clinic's stock and money. Demo = demo data only.
+    if (session && session.demo) return null;
     if (_clinicId) return _clinicId;
     if (session && session.clinicId) { _clinicId = session.clinicId; return _clinicId; }
     if (!supabase) return null;
@@ -3517,19 +3522,29 @@
     if (!listEl || !supabase) return;
 
     var clinicId = await resolveClinicId();
-    if (!clinicId) {
+    var demoMode = !!(session && session.demo);
+    if (!clinicId && !demoMode) {
       listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
       return;
     }
 
     var CO = window.ClinicOffline;
-    _stockCacheKey = 'stock_' + clinicId;
+    _stockCacheKey = demoMode ? null : 'stock_' + clinicId;
 
     try {
       var items;
 
+      // DEMO: fixed sample stock — never the real clinic's inventory.
+      if (demoMode) {
+        items = [
+          { id:'demo-amox',  item_name:'Amoxicillin 500mg', item_type:'medicine',   unit:'tabs',   quantity:229, min_threshold:50,  reorder_level:100, unit_cost_ugx:200, is_low_stock:false, is_critical:false },
+          { id:'demo-coart', item_name:'Coartem',           item_type:'medicine',   unit:'tabs',   quantity:24,  min_threshold:30,  reorder_level:60,  unit_cost_ugx:500, is_low_stock:true,  is_critical:false },
+          { id:'demo-para',  item_name:'Paracetamol 500mg', item_type:'medicine',   unit:'tabs',   quantity:480, min_threshold:100, reorder_level:200, unit_cost_ugx:50,  is_low_stock:false, is_critical:false },
+          { id:'demo-glove', item_name:'Gloves',            item_type:'consumable', unit:'pieces', quantity:0,   min_threshold:20,  reorder_level:40,  unit_cost_ugx:300, is_low_stock:true,  is_critical:true },
+        ];
+      }
       // Offline → serve the last cached stock immediately.
-      if (CO && CO.isOffline()) {
+      else if (CO && CO.isOffline()) {
         items = CO.get(_stockCacheKey, null);
         if (items == null) {
           listEl.innerHTML = CO.offlineHtml('Stock will show here once loaded online.');
@@ -3586,7 +3601,7 @@
           items = res.data || [];
         }
         // Cache the fresh list for the next offline open.
-        if (items != null && CO) CO.set(_stockCacheKey, items);
+        if (items != null && CO && _stockCacheKey) CO.set(_stockCacheKey, items);
       }
 
       // Reflect stock used by offline consultations (medicines + materials) that

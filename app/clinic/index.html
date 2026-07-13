@@ -76,7 +76,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v54';
+    var BUILD = 'v55';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -241,7 +241,11 @@
     window.location.href = 'dashboard.html';
   });
 
-  document.getElementById('demoBtn').addEventListener('click', () => {
+  document.getElementById('demoBtn').addEventListener('click', async () => {
+    // The demo is for showing OTHER people — it must never carry the real
+    // account's access with it. Sign the real login out first so nothing in
+    // demo mode can reach the clinic's actual data.
+    try { if (_supa) await Promise.race([_supa.auth.signOut(), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
     localStorage.setItem('clinic_session', JSON.stringify({
       staffName: 'Dr. Demo',
       clinicName: 'Kampala Medical Centre',
