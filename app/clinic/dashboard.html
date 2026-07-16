@@ -461,7 +461,7 @@
       </div>
 
       <!-- Patient History Search -->
-      <div class="admin-table-wrap" data-cap="history" data-slide="patients" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" data-slide="patients" data-slide-order="1" style="padding:0;margin-bottom:24px">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">manage_search</span>
@@ -1055,11 +1055,16 @@
         panels[sl.key] = p;
         wrap.appendChild(p);
       });
-      // Move every tagged section into its panel (document order preserved)
-      content.querySelectorAll('[data-slide]').forEach(function (el) {
-        var p = panels[el.getAttribute('data-slide')];
-        if (p) p.appendChild(el);
-      });
+      // Move every tagged section into its panel. Order inside a panel:
+      // explicit data-slide-order first (ascending), then document order.
+      var tagged = Array.prototype.slice.call(content.querySelectorAll('[data-slide]'));
+      tagged
+        .map(function (el, i) { return { el: el, ord: parseFloat(el.getAttribute('data-slide-order')) || (100 + i) }; })
+        .sort(function (a, b) { return a.ord - b.ord; })
+        .forEach(function (it) {
+          var p = panels[it.el.getAttribute('data-slide')];
+          if (p) p.appendChild(it.el);
+        });
       // Tab bar
       var bar = document.createElement('div');
       bar.id = 'slideTabs';
@@ -4631,7 +4636,7 @@
         });
         return;
       }
-      var sx = 0, sy = 0, t0 = 0, downTarget = null, active = false;
+      var sx = 0, sy = 0, t0 = 0, downTarget = null, active = false, lastHandled = 0;
       el.addEventListener('pointerdown', function(e) {
         if (e.button && e.button !== 0) return;       // ignore non-primary
         active = true;
@@ -4646,15 +4651,27 @@
         if (Date.now() - t0 > TAP_TIME) return;       // long press, ignore
         var t = downTarget || (matchFn ? matchFn(e.target) : el);
         if (!t) return;
+        lastHandled = Date.now();
         e.preventDefault();                           // suppress the late ghost click
         e.stopPropagation();
         armClickSwallow(e);                           // …and catch it if it fires anyway
         handler(t, e);
       });
       el.addEventListener('pointercancel', function() { active = false; });
-      // Swallow the ghost click so nothing double-fires.
+      // The click is a deduped FALLBACK, not just a ghost to swallow. On some
+      // phones the browser fires pointercancel for a light tap inside the
+      // scrollable grid (reclassified as a scroll) — the pointerup path never
+      // runs, and swallowing the click meant the tap did NOTHING: staff tapped
+      // a drug and the Sell button never lit up. If the pointer path already
+      // handled this tap (<700ms ago) the click is a ghost and dies here;
+      // otherwise it IS the tap and runs the handler.
       el.addEventListener('click', function(e) {
-        if (matchFn ? matchFn(e.target) : true) e.stopPropagation();
+        var t = matchFn ? matchFn(e.target) : el;
+        if (!t) return;
+        e.stopPropagation();
+        if (Date.now() - lastHandled < 700) return;   // ghost of a handled tap
+        lastHandled = Date.now();
+        handler(t, e);
       });
     }
 

@@ -560,7 +560,18 @@
           </div>
           <div id="labSelectedTray" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:10px 12px;background:#F1F8F1;border:1px dashed #A5D6A7;border-radius:10px"></div>
           <div id="labNoMatch" style="display:none;padding:14px 12px;margin-bottom:12px;background:#FFF8E1;border-radius:10px;text-align:center;color:#5D4037;font-size:12px">
-            No test matches. You can still record it in the Findings box below.
+            <div style="margin-bottom:8px">No test matches "<strong id="labNoMatchQ"></strong>".</div>
+            <button id="labAddNewBtn" type="button"
+              style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              <span class="material-icons-outlined" style="font-size:16px">add</span>
+              Add it as a new test
+            </button>
+          </div>
+
+          <!-- YOUR CLINIC'S OWN TESTS (added from consultations; offline-safe) -->
+          <div class="lab-group" id="customLabGroup" style="display:none">
+            <div class="lab-group-title"><span class="lgt-icon">⭐</span> Your Clinic's Tests</div>
+            <div class="lab-chips" id="customLabChips"></div>
           </div>
 
           <!-- MALARIA -->
@@ -654,10 +665,14 @@
         </div>
 
         <!-- ── Continue ── -->
-        <div class="wiz-nav">
+        <div class="wiz-nav" style="gap:10px;flex-wrap:wrap">
           <button class="wiz-btn wiz-btn-next" id="step1Next" disabled>
             Treatment &amp; Bill
             <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
+          </button>
+          <button type="button" class="wiz-btn wiz-btn-back" id="referOutBtn" style="justify-content:center">
+            <span class="material-icons-outlined" style="font-size:18px">alt_route</span>
+            Refer to partner clinic
           </button>
         </div>
       </section>
@@ -946,7 +961,64 @@
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=13"></script>
 <script src="js/clinic.js?v=20260716"></script>
-<script src="js/new-order-wizard.js?v=20260713"></script>
+<script src="js/new-order-wizard.js?v=20260718"></script>
 <script src="js/pwa-install.js?v=20260705g"></script>
+
+<!-- ── Refer to partner clinic (works offline; queued + auto-synced) ── -->
+<div id="refModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:640;align-items:center;justify-content:center;padding:18px">
+  <div style="background:var(--surface,#fff);border-radius:18px;max-width:430px;width:100%;padding:22px;max-height:92vh;overflow-y:auto">
+    <div style="font-size:17px;font-weight:800;margin-bottom:2px">Refer patient</div>
+    <div id="refPatientLine" style="font-size:13px;color:#5F6368;margin-bottom:14px"></div>
+
+    <label class="field-label">Send to clinic</label>
+    <select id="refClinicSel" class="field-input" style="width:100%;margin-bottom:12px">
+      <option value="">Loading partner clinics…</option>
+    </select>
+
+    <label class="field-label">Why refer?</label>
+    <div id="refReasons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      <button type="button" class="ref-reason" data-r="Medicine out of stock">Medicine out of stock</button>
+      <button type="button" class="ref-reason" data-r="Lab test not available">Lab test not available</button>
+      <button type="button" class="ref-reason" data-r="Needs specialist">Needs specialist</button>
+      <button type="button" class="ref-reason" data-r="Needs admission">Needs admission</button>
+      <button type="button" class="ref-reason" data-r="Other">Other</button>
+    </div>
+    <input id="refNeededItem" class="field-input" type="text" style="width:100%;margin-bottom:12px;display:none"
+           placeholder="Which medicine / test does the patient need?">
+    <label class="field-label">Notes for the receiving clinic (optional)</label>
+    <textarea id="refNotes" class="field-input" rows="2" style="width:100%;margin-bottom:12px"
+              placeholder="e.g. Started on quinine, needs full course of Coartem…"></textarea>
+
+    <div id="refError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
+
+    <div id="refDone" style="display:none;background:#E8F5E9;border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:800;color:#1B5E20;margin-bottom:4px">Referral sent ✔</div>
+      <div style="font-size:13px;color:#33473A;margin-bottom:10px">
+        Code <strong id="refCodeOut"></strong>. The receiving clinic has been notified.
+        Give the patient these details:
+      </div>
+      <div id="refClinicDetails" style="font-size:13px;background:#fff;border-radius:8px;padding:10px;margin-bottom:10px;color:#202124"></div>
+      <a id="refWhatsBtn" target="_blank" rel="noopener"
+         style="display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:700;text-decoration:none">
+        <span class="material-icons-outlined" style="font-size:18px">send</span>
+        Send details to patient on WhatsApp
+      </a>
+    </div>
+
+    <div style="display:flex;gap:10px">
+      <button type="button" id="refCancelBtn" class="wiz-btn wiz-btn-back" style="flex:1;justify-content:center">Close</button>
+      <button type="button" id="refCreateBtn" class="wiz-btn wiz-btn-next" style="flex:2;justify-content:center">
+        <span class="material-icons-outlined" style="font-size:18px">alt_route</span> Send referral
+      </button>
+    </div>
+  </div>
+</div>
+<style>
+  .ref-reason{padding:8px 12px;border-radius:18px;border:1.5px solid #D7E4D9;background:transparent;color:#33473A;
+    font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+  .ref-reason.active{background:#1B5E20;border-color:#1B5E20;color:#fff}
+  html[data-theme="dark"] .ref-reason{border-color:#3A4A40;color:#C2D3C6}
+  html[data-theme="dark"] .ref-reason.active{background:#2E7D32;border-color:#2E7D32;color:#fff}
+</style>
 </body>
 </html>

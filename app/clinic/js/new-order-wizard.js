@@ -826,6 +826,88 @@
     };
   });
 
+  // ── Custom lab tests (added by clinicians, per clinic, offline-safe) ──
+  // Stored in clinic_custom_lab_tests; a local copy lives in ClinicOffline so
+  // the chips render (and new ones can be ADDED) with no connection at all.
+  function _customLabKey() { return 'custom_labs_' + (_clinicId || 'me'); }
+
+  function wireLabChip(b) {
+    b.onclick = () => {
+      b.classList.toggle('active');
+      const lab = b.dataset.lab;
+      const i = state.labTests.indexOf(lab);
+      if (i === -1) state.labTests.push(lab); else state.labTests.splice(i, 1);
+      renderLabSelectedTray();
+    };
+  }
+
+  function renderCustomLabChips(names) {
+    const group = document.getElementById('customLabGroup');
+    const box   = document.getElementById('customLabChips');
+    if (!group || !box) return;
+    if (!names.length) { group.style.display = 'none'; box.innerHTML = ''; return; }
+    group.style.display = '';
+    box.innerHTML = names.map(n =>
+      `<button type="button" class="lab-chip${state.labTests.indexOf(n) >= 0 ? ' active' : ''}" data-lab="${esc(n)}">${esc(n)}</button>`
+    ).join('');
+    box.querySelectorAll('.lab-chip').forEach(wireLabChip);
+  }
+
+  function loadCustomLabTests() {
+    const CO = window.ClinicOffline;
+    let names = (CO && CO.get(_customLabKey(), [])) || [];
+    renderCustomLabChips(names);
+    if (!supabase || !_clinicId || (CO && CO.isOffline())) return;
+    supabase.from('clinic_custom_lab_tests').select('test_name')
+      .eq('clinic_id', _clinicId).order('test_name')
+      .then(res => {
+        if (res.error || !res.data) return;
+        const fresh = res.data.map(r => r.test_name);
+        // Keep local-only names queued offline that haven't synced yet
+        const merged = fresh.concat(names.filter(n =>
+          !fresh.some(x => x.toLowerCase() === n.toLowerCase())));
+        if (CO) CO.set(_customLabKey(), merged);
+        renderCustomLabChips(merged);
+      }).catch(() => {});
+  }
+  // Clinic id can resolve late — try now and again shortly after boot.
+  loadCustomLabTests();
+  setTimeout(loadCustomLabTests, 2500);
+
+  function addCustomLabTest(raw) {
+    const name = (raw || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+    if (name.length < 2) { showToast('Type the test name in the search box first', 'error'); return; }
+    // Already exists anywhere (built-in or custom)? Just select it.
+    const all = Array.from(document.querySelectorAll('.lab-chip'));
+    const dup = all.find(c => (c.dataset.lab || '').toLowerCase() === name.toLowerCase());
+    if (dup) {
+      if (!dup.classList.contains('active')) dup.click();
+    } else {
+      const CO = window.ClinicOffline;
+      const list = (CO && CO.get(_customLabKey(), [])) || [];
+      list.push(name);
+      if (CO) CO.set(_customLabKey(), list);
+      renderCustomLabChips(list);
+      // Select it immediately
+      state.labTests.push(name);
+      renderLabSelectedTray();
+      renderCustomLabChips(list);
+      // Register in the backend — queued offline, synced automatically.
+      const row = { clinic_id: _clinicId, test_name: name };
+      if (CO) {
+        row.id = CO.uuid();
+        CO.enqueue('table_insert', { table: 'clinic_custom_lab_tests', row: row, stripUnknownColumns: true });
+        CO.flush();
+      } else if (supabase && _clinicId) {
+        supabase.from('clinic_custom_lab_tests').insert(row).then(() => {}).catch(() => {});
+      }
+    }
+    const se = document.getElementById('labSearch');
+    if (se) { se.value = ''; }
+    applyLabFilter();
+    showToast('"' + name + '" added to your clinic\'s tests', 'success');
+  }
+
   // ── Lab search / filter ──────────────────────────────────────────
   const labSearchEl   = document.getElementById('labSearch');
   const labSearchClr  = document.getElementById('labSearchClear');
@@ -833,6 +915,8 @@
 
   function applyLabFilter() {
     const q = (labSearchEl?.value || '').trim().toLowerCase();
+    const qEl = document.getElementById('labNoMatchQ');
+    if (qEl) qEl.textContent = (labSearchEl?.value || '').trim();
     if (labSearchClr) labSearchClr.style.display = q ? 'block' : 'none';
     let anyVisible = false;
     document.querySelectorAll('.lab-chip').forEach(chip => {
@@ -863,8 +947,129 @@
     };
   }
 
+  const labAddBtn = document.getElementById('labAddNewBtn');
+  if (labAddBtn) labAddBtn.onclick = () => addCustomLabTest(labSearchEl ? labSearchEl.value : '');
+
   document.getElementById('labResults').addEventListener('input', e => {
     state.labResults = e.target.value;
+  });
+
+  // ── Refer to a partner clinic (offline-safe, auto-notifies them) ──
+  let _refReason = '';
+  const _refKey = () => 'partner_clinics';
+
+  function loadPartnerClinics() {
+    const sel = document.getElementById('refClinicSel');
+    if (!sel) return;
+    const CO = window.ClinicOffline;
+    const paint = (rows) => {
+      if (!rows || !rows.length) {
+        sel.innerHTML = '<option value="">No partner clinics found yet</option>';
+        return;
+      }
+      sel.innerHTML = '<option value="">Choose a clinic…</option>' + rows.map(c =>
+        `<option value="${esc(c.id)}" data-phone="${esc(c.phone || '')}" data-place="${esc([c.district, c.address].filter(Boolean).join(', '))}">${esc(c.name)}${c.district ? ' — ' + esc(c.district) : ''}</option>`
+      ).join('');
+    };
+    const cached = CO && CO.get(_refKey(), null);
+    if (cached) paint(cached);
+    if (!supabase || (CO && CO.isOffline())) { if (!cached) paint([]); return; }
+    supabase.from('clinics').select('id,name,phone,district,address')
+      .neq('id', _clinicId || '00000000-0000-0000-0000-000000000000')
+      .eq('active', true).order('name').limit(150)
+      .then(res => {
+        if (res.error || !res.data) return;
+        if (CO) CO.set(_refKey(), res.data);
+        paint(res.data);
+      }).catch(() => {});
+  }
+
+  function openReferralModal() {
+    if (!state.patient) { showToast('Select or register the patient first', 'error'); return; }
+    const m = document.getElementById('refModal');
+    if (!m) return;
+    document.getElementById('refPatientLine').textContent =
+      state.patient.name + (state.patient.phone ? ' · ' + state.patient.phone : '');
+    document.getElementById('refDone').style.display = 'none';
+    document.getElementById('refError').style.display = 'none';
+    document.getElementById('refCreateBtn').style.display = '';
+    document.getElementById('refNotes').value = '';
+    document.getElementById('refNeededItem').value = '';
+    document.getElementById('refNeededItem').style.display = 'none';
+    _refReason = '';
+    document.querySelectorAll('.ref-reason').forEach(b => b.classList.remove('active'));
+    loadPartnerClinics();
+    m.style.display = 'flex';
+  }
+
+  document.getElementById('referOutBtn')?.addEventListener('click', openReferralModal);
+  document.getElementById('refCancelBtn')?.addEventListener('click', () => {
+    document.getElementById('refModal').style.display = 'none';
+  });
+  document.getElementById('refModal')?.addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
+  });
+  document.querySelectorAll('.ref-reason').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.ref-reason').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      _refReason = b.dataset.r;
+      // Ask WHICH item when the reason is a missing drug or test
+      const ni = document.getElementById('refNeededItem');
+      const wants = /medicine|lab/i.test(_refReason);
+      ni.style.display = wants ? '' : 'none';
+      if (wants) ni.focus();
+    });
+  });
+
+  document.getElementById('refCreateBtn')?.addEventListener('click', () => {
+    const errEl = document.getElementById('refError');
+    const fail = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
+    errEl.style.display = 'none';
+    const sel = document.getElementById('refClinicSel');
+    const toId = sel.value;
+    if (!toId) return fail('Choose the clinic to refer to.');
+    if (!_refReason) return fail('Pick a reason.');
+    const opt = sel.options[sel.selectedIndex];
+    const CO = window.ClinicOffline;
+    const code = 'RF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const row = {
+      from_clinic_id: _clinicId,
+      to_clinic_id: toId,
+      patient_name: state.patient.name,
+      patient_phone: state.patient.phone || null,
+      reason: _refReason,
+      needed_item: (document.getElementById('refNeededItem').value || '').trim() || null,
+      notes: (document.getElementById('refNotes').value || '').trim() || null,
+      referral_code: code,
+    };
+    if (!_clinicId) return fail('Your account is not linked to a clinic yet — reconnect once and retry.');
+    if (CO) {
+      row.id = CO.uuid();
+      CO.enqueue('table_insert', { table: 'clinic_referrals', row: row, stripUnknownColumns: true });
+      CO.flush();
+    } else if (supabase) {
+      supabase.from('clinic_referrals').insert(row).then(() => {}).catch(() => {});
+    }
+    // Success view + WhatsApp handoff for the patient
+    const clinicName  = opt.textContent;
+    const clinicPhone = opt.dataset.phone || '';
+    const clinicPlace = opt.dataset.place || '';
+    document.getElementById('refCodeOut').textContent = code;
+    document.getElementById('refClinicDetails').innerHTML =
+      '<strong>' + esc(clinicName) + '</strong><br>' +
+      (clinicPlace ? esc(clinicPlace) + '<br>' : '') +
+      (clinicPhone ? '📞 ' + esc(clinicPhone) : '');
+    const msg = 'Hello ' + state.patient.name + ', you have been referred to ' + clinicName
+      + (clinicPlace ? ' (' + clinicPlace + ')' : '')
+      + (clinicPhone ? ', tel ' + clinicPhone : '')
+      + '. Your referral code is ' + code + '. Please show this message when you arrive. — Homatt Health';
+    const waTarget = (state.patient.phone || '').replace(/[^0-9]/g, '').replace(/^0/, '256');
+    document.getElementById('refWhatsBtn').href =
+      'https://wa.me/' + (waTarget || '') + '?text=' + encodeURIComponent(msg);
+    document.getElementById('refDone').style.display = 'block';
+    document.getElementById('refCreateBtn').style.display = 'none';
+    showToast('Referral sent' + ((CO && CO.isOffline()) ? ' — will sync when online' : ''), 'success');
   });
 
   // ── Care level toggle ────────────────────────────────────────────

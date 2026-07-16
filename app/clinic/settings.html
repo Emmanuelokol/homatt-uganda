@@ -381,33 +381,11 @@
         </div>
       </div>
 
-      <!-- Diagnostic Tests & Lab Services -->
-      <div class="settings-card" data-tier-feature="lab_services">
-        <div class="settings-card-title">
-          <span class="material-icons-outlined">biotech</span> Diagnostic Tests &amp; Lab Services
-        </div>
-        <div class="cond-fee-hint">
-          <span class="material-icons-outlined" style="font-size:18px">info</span>
-          <span>Add the tests and lab services your clinic offers — patients will see these when choosing your clinic. Use <strong>Fill from Specialties</strong> to auto-populate from the conditions you treat, or add tests manually.</span>
-        </div>
-        <table class="diag-table">
-          <thead><tr><th>Test / Service Name</th><th>Disease / Condition</th><th>Price (UGX)</th><th></th></tr></thead>
-          <tbody id="diagTestsBody">
-            <tr><td colspan="4" class="cond-fee-empty">No tests added yet. Use the buttons below.</td></tr>
-          </tbody>
-        </table>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
-          <button onclick="addTestRow()" style="background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Test</button>
-          <button onclick="populateTestsFromConditions()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
-            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
-          </button>
-        </div>
-        <div id="testSuggestionsWrap" style="margin-top:14px;display:none">
-          <div style="font-size:12px;font-weight:600;color:#5F6368;margin-bottom:8px">Suggested tests for your conditions:</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px" id="testSuggestions"></div>
-        </div>
-      </div>
-
+      <!-- Diagnostic Tests are now managed FROM the consultation wizard:
+           when a test isn't in the list, the clinician adds it on the spot
+           (clinic_custom_lab_tests, offline-safe). The old management table
+           lived here; testsData still loads + saves so patient-facing lists
+           are untouched. -->
       <!-- Condition-Based Fees -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -1381,6 +1359,7 @@ var TEST_SUGGESTIONS = {
 
 function renderTestsTable() {
   var tbody = document.getElementById('diagTestsBody');
+  if (!tbody) return;   // management UI removed — tests are added from the wizard
   if (!testsData.length) {
     tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No tests added yet. Use the buttons below.</td></tr>';
     return;
@@ -1410,6 +1389,7 @@ window.removeTest = function(i) {
 
 function buildTestSuggestions() {
   var wrap = document.getElementById('testSuggestionsWrap');
+  if (!wrap) return;    // management UI removed
   var container = document.getElementById('testSuggestions');
   if (!wrap || !container) return;
 
