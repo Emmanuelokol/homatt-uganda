@@ -270,34 +270,16 @@
     <div class="admin-content">
 
       <!-- BIG inline patient code entry — always visible, no modal -->
-      <div id="quickVerifyPanel" data-cap="bookings" data-slide="patients" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
-          <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
-          <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
+      <!-- Verify-codes panel removed for now (2026-07) at the clinic's request.
+           Its JS (qvCode/qvPin/qvSubmitBtn) is null-guarded, so restoring is
+           just re-adding the panel markup from git history. -->
+      <!-- Refer a patient to a partner clinic (no consultation needed) -->
+      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:16px 20px;margin-bottom:24px;border-left:4px solid #6A1B9A;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:15px;font-weight:700"><span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#6A1B9A">alt_route</span> Refer a Patient</div>
+          <div style="font-size:12.5px;color:#5F6368;margin-top:3px">Send a patient to a partner clinic — they get notified instantly, the patient gets the details on WhatsApp.</div>
         </div>
-        <p style="font-size:13px;color:#5D4037;margin:0 0 16px;line-height:1.5">Patient shows you the <strong>Booking Code</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HO-928</span>) and <strong>PIN</strong> (e.g. <span style="font-family:monospace;background:#fff;padding:2px 6px;border-radius:4px">HK-AEK26W</span>) from their Homatt app.</p>
-
-        <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end" id="qvGrid">
-          <div>
-            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Booking Code</label>
-            <input id="qvCode" type="text" placeholder="HO-928" autocomplete="off"
-              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:20px;font-weight:800;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center;min-height:54px">
-          </div>
-          <div>
-            <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">PIN</label>
-            <input id="qvPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
-              style="width:100%;padding:14px;border:2px solid #FFC107;background:#fff;border-radius:10px;font-size:18px;font-weight:700;font-family:monospace;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center;min-height:54px">
-          </div>
-          <div>
-            <button id="qvSubmitBtn"
-              style="background:#1565C0;color:#fff;border:none;padding:14px 22px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;white-space:nowrap">
-              <span class="material-icons-outlined">arrow_forward</span>
-              Verify &amp; Start
-            </button>
-          </div>
-        </div>
-        <div id="qvError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
-        <div id="qvSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:12px;font-weight:600"></div>
+        <button type="button" onclick="openDashReferral()" style="padding:11px 18px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Refer now</button>
       </div>
 
       <!-- Hero with New Consultation CTA -->
@@ -1009,6 +991,35 @@
   </div>
 </div>
 
+<!-- ── Refer a patient (standalone; offline-queued) ── -->
+<div id="dashRefModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:640;align-items:center;justify-content:center;padding:18px">
+  <div style="background:#fff;border-radius:18px;max-width:430px;width:100%;padding:22px;max-height:92vh;overflow-y:auto">
+    <div style="font-size:17px;font-weight:800;margin-bottom:12px">Refer a patient</div>
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Patient name *</label>
+    <input id="drName" type="text" autocomplete="off" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Patient phone</label>
+    <input id="drPhone" type="tel" autocomplete="off" placeholder="07…" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Send to clinic *</label>
+    <select id="drClinic" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+      <option value="">Loading partner clinics…</option>
+    </select>
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Why refer? *</label>
+    <div id="drReasons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+    <input id="drItem" type="text" autocomplete="off" placeholder="Which medicine / test does the patient need?" style="display:none;width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+    <div id="drError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
+    <div id="drDone" style="display:none;background:#E8F5E9;border-radius:12px;padding:14px;margin-bottom:12px">
+      <div style="font-weight:800;color:#1B5E20;margin-bottom:4px">Referral sent ✔ &nbsp;<span id="drCode" style="font-weight:800"></span></div>
+      <a id="drWhats" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:700;text-decoration:none;margin-top:8px">
+        <span class="material-icons-outlined" style="font-size:18px">send</span> Send details to patient on WhatsApp
+      </a>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button type="button" onclick="document.getElementById('dashRefModal').style.display='none'" style="flex:1;padding:12px;background:transparent;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:inherit">Close</button>
+      <button type="button" id="drSendBtn" style="flex:2;padding:12px;background:#6A1B9A;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Send referral</button>
+    </div>
+  </div>
+</div>
+
 <div id="clinicToast" class="admin-toast"></div>
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
@@ -1028,6 +1039,113 @@
   applyTierGating();   // lock premium sections on the basic plan
   var supabase = _getClinicSupabase();
   try { refreshClinicTier(supabase, session); } catch(e) {}
+
+  // ═══ REFER A PATIENT (standalone, Patients slide) ═══════════════════════
+  var _drReason = '';
+  var DR_REASONS = ['Medicine out of stock', 'Lab test not available', 'Needs specialist', 'Needs admission', 'Other'];
+
+  function _drLoadClinics() {
+    var sel = document.getElementById('drClinic');
+    if (!sel) return;
+    var CO = window.ClinicOffline;
+    var paint = function (rows) {
+      if (!rows || !rows.length) { sel.innerHTML = '<option value="">No partner clinics found yet</option>'; return; }
+      sel.innerHTML = '<option value="">Choose a clinic…</option>' + rows.map(function (c) {
+        var place = [c.district, c.address].filter(Boolean).join(', ');
+        return '<option value="' + esc(c.id) + '" data-phone="' + esc(c.phone || '') + '" data-place="' + esc(place) + '">'
+          + esc(c.name) + (c.district ? ' — ' + esc(c.district) : '') + '</option>';
+      }).join('');
+    };
+    var cached = CO && CO.get('partner_clinics', null);
+    if (cached) paint(cached);
+    if (!supabase || (CO && CO.isOffline())) { if (!cached) paint([]); return; }
+    resolveClinicId().then(function (cid) {
+      supabase.from('clinics').select('id,name,phone,district,address')
+        .neq('id', cid || '00000000-0000-0000-0000-000000000000')
+        .eq('active', true).order('name').limit(150)
+        .then(function (res) {
+          if (res.error || !res.data) return;
+          if (CO) CO.set('partner_clinics', res.data);
+          paint(res.data);
+        }).catch(function () {});
+    }).catch(function () {});
+  }
+
+  function openDashReferral() {
+    var m = document.getElementById('dashRefModal');
+    if (!m) return;
+    ['drName', 'drPhone', 'drItem'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    document.getElementById('drItem').style.display = 'none';
+    document.getElementById('drError').style.display = 'none';
+    document.getElementById('drDone').style.display = 'none';
+    document.getElementById('drSendBtn').style.display = '';
+    _drReason = '';
+    var rz = document.getElementById('drReasons');
+    rz.innerHTML = DR_REASONS.map(function (r) {
+      return '<button type="button" class="ref-reason" data-r="' + esc(r) + '" style="padding:8px 12px;border-radius:18px;border:1.5px solid #D7CCE4;background:transparent;color:#4A3762;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">' + esc(r) + '</button>';
+    }).join('');
+    rz.querySelectorAll('.ref-reason').forEach(function (b) {
+      b.addEventListener('click', function () {
+        rz.querySelectorAll('.ref-reason').forEach(function (x) { x.style.background = 'transparent'; x.style.color = '#4A3762'; });
+        b.style.background = '#6A1B9A'; b.style.color = '#fff';
+        _drReason = b.dataset.r;
+        var ni = document.getElementById('drItem');
+        var wants = /medicine|lab/i.test(_drReason);
+        ni.style.display = wants ? '' : 'none';
+        if (wants) ni.focus();
+      });
+    });
+    _drLoadClinics();
+    m.style.display = 'flex';
+  }
+  window.openDashReferral = openDashReferral;
+
+  (function wireDashReferral() {
+    var m = document.getElementById('dashRefModal');
+    if (!m) return;
+    m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+    document.getElementById('drSendBtn').addEventListener('click', function () {
+      var errEl = document.getElementById('drError');
+      var fail = function (msg) { errEl.textContent = msg; errEl.style.display = 'block'; };
+      errEl.style.display = 'none';
+      var name = (document.getElementById('drName').value || '').trim();
+      var phone = (document.getElementById('drPhone').value || '').trim();
+      var sel = document.getElementById('drClinic');
+      if (!name) return fail('Enter the patient\u2019s name.');
+      if (!sel.value) return fail('Choose the clinic to refer to.');
+      if (!_drReason) return fail('Pick a reason.');
+      resolveClinicId().then(function (cid) {
+        if (!cid) return fail('Your account is not linked to a clinic yet — reconnect once and retry.');
+        var CO = window.ClinicOffline;
+        var code = 'RF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
+        var row = {
+          from_clinic_id: cid, to_clinic_id: sel.value,
+          patient_name: name, patient_phone: phone || null,
+          reason: _drReason,
+          needed_item: (document.getElementById('drItem').value || '').trim() || null,
+          notes: null, referral_code: code,
+        };
+        if (CO) {
+          row.id = CO.uuid();
+          CO.enqueue('table_insert', { table: 'clinic_referrals', row: row, stripUnknownColumns: true });
+          CO.flush();
+        } else if (supabase) {
+          supabase.from('clinic_referrals').insert(row).then(function(){}).catch(function(){});
+        }
+        var opt = sel.options[sel.selectedIndex];
+        var msg = 'Hello ' + name + ', you have been referred to ' + opt.textContent
+          + (opt.dataset.place ? ' (' + opt.dataset.place + ')' : '')
+          + (opt.dataset.phone ? ', tel ' + opt.dataset.phone : '')
+          + '. Your referral code is ' + code + '. Please show this message when you arrive. — Homatt Health';
+        var wa = (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '256');
+        document.getElementById('drWhats').href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(msg);
+        document.getElementById('drCode').textContent = code;
+        document.getElementById('drDone').style.display = 'block';
+        document.getElementById('drSendBtn').style.display = 'none';
+        showToast('Referral sent' + ((CO && CO.isOffline()) ? ' — will sync when online' : ''), 'success');
+      }).catch(function () { fail('Could not resolve your clinic — try again.'); });
+    });
+  })();
 
   // ═══ WHATSAPP-STYLE SLIDES ═════════════════════════════════════════════
   // Groups the dashboard into swipeable panels — Home | Patients | Money |
