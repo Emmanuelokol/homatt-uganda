@@ -284,3 +284,52 @@ button,a.cbn-link,.sidebar-link,.btn-admin,.login-btn,.demo-btn{min-height:40px}
 
 /* Make order-card buttons inside more touchable */
 .order-card button{min-height:36px;padding:8px 14px}
+
+/* ═══ DARK MODE ════════════════════════════════════════════════════════
+   Set <html data-theme="dark"> (boot script on each page). Structure is
+   variable-driven, so flipping the variables re-themes cards, topbar,
+   inputs and tables. The [style*=...] rules catch the recurring HARDCODED
+   inline colors so text never sits dark-on-dark. */
+html[data-theme="dark"]{
+  --primary:#43A047; --primary-d:#2E7D32; --accent:#26A69A;
+  --surface:#151E18; --bg:#0B110D;
+  --sidebar:#080D0A; --sidebar-hv:#152119;
+  --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
+}
+html[data-theme="dark"] body{background:var(--bg);color:var(--text)}
+html[data-theme="dark"] .admin-topbar{background:var(--surface)}
+html[data-theme="dark"] .slide-tab{background:var(--surface);border-color:var(--border);color:var(--text-lt)}
+html[data-theme="dark"] .slide-tab.active{background:#2E7D32;border-color:#2E7D32;color:#fff}
+html[data-theme="dark"] #slideTabs{background:var(--bg)}
+html[data-theme="dark"] input:not([type=checkbox]):not([type=radio]),
+html[data-theme="dark"] select, html[data-theme="dark"] textarea{
+  background:rgba(255,255,255,.06) !important; color:var(--text) !important;
+  border-color:var(--border) !important;
+}
+html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder{color:var(--text-lt)}
+/* Recurring hardcoded inline styles → readable on dark */
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:#FFFFFF"],
+html[data-theme="dark"] [style*="background:#FAFFFE"],
+html[data-theme="dark"] [style*="background:#FBFEFC"],
+html[data-theme="dark"] [style*="background:#FAFAFA"]{background:var(--surface) !important}
+html[data-theme="dark"] [style*="color:#202124"],
+html[data-theme="dark"] [style*="color:#111"],
+html[data-theme="dark"] [style*="color:#333"],
+html[data-theme="dark"] [style*="color:#1A1A1A"]{color:var(--text) !important}
+html[data-theme="dark"] [style*="color:#424242"],
+html[data-theme="dark"] [style*="color:#5F6368"],
+html[data-theme="dark"] [style*="color:#555"]{color:#C2D3C6 !important}
+html[data-theme="dark"] [style*="color:#9AA0A6"]{color:#93A697 !important}
+html[data-theme="dark"] [style*="border-bottom:1px solid #F5F5F5"],
+html[data-theme="dark"] [style*="border-bottom:1px solid #EEF5EF"]{border-bottom-color:var(--border) !important}
+html[data-theme="dark"] [style*="background:#E8F5E9"]{background:rgba(67,160,71,.16) !important}
+html[data-theme="dark"] [style*="background:#F3F4F6"]{background:rgba(255,255,255,.07) !important}
+/* Theme toggle button in the topbar */
+.theme-toggle-top{
+  width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);
+  background:transparent;color:var(--text-lt);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;margin-right:8px;-webkit-tap-highlight-color:transparent;flex-shrink:0;
+}
+.theme-toggle-top .material-icons-outlined{font-size:19px}

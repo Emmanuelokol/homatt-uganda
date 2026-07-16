@@ -11,6 +11,12 @@
        the service worker and DELETED EVERY CACHE on each dashboard visit — the
        root cause of the app losing its offline copy over and over. Never bring
        it back: the worker versions itself via the CACHE name and self-updates. -->
+  <script>
+    // Apply saved (or system) theme before first paint — no flash.
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link href="fonts/material-icons.css?v=1" rel="stylesheet">
@@ -22,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260711">
+  <link rel="stylesheet" href="css/clinic.css?v=20260716">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -33,6 +39,33 @@
     }
 
     /* Home-specific polish */
+    /* ── WhatsApp-style slides ─────────────────────────────────────── */
+    /* Until the framework marks itself ready, everything renders stacked
+       exactly as before — a JS failure can never blank the dashboard. */
+    #slideTabs{display:none}
+    .slides-ready #slideTabs{
+      display:flex;gap:8px;position:sticky;top:0;z-index:60;
+      padding:10px 2px 12px;margin:-6px -2px 10px;
+      background:var(--bg,#F1F3F4);
+    }
+    .slide-tab{
+      flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+      padding:10px 6px;border-radius:22px;border:1.5px solid #DCE5DD;
+      background:#fff;color:#5F6368;font-size:13px;font-weight:700;
+      font-family:inherit;cursor:pointer;touch-action:manipulation;
+      -webkit-tap-highlight-color:transparent;transition:background .15s,color .15s;
+      min-height:44px;white-space:nowrap;
+    }
+    .slide-tab .material-icons-outlined{font-size:17px}
+    .slide-tab.active{background:#1B5E20;border-color:#1B5E20;color:#fff}
+    .slides-ready .hslide{display:none;min-height:60vh}
+    .slides-ready .hslide.active{display:block}
+    @keyframes slideL{from{opacity:.35;transform:translateX(44px)}to{opacity:1;transform:none}}
+    @keyframes slideR{from{opacity:.35;transform:translateX(-44px)}to{opacity:1;transform:none}}
+    .slides-ready .hslide.slide-in-right{animation:slideL .22s ease-out}
+    .slides-ready .hslide.slide-in-left{animation:slideR .22s ease-out}
+    @media (prefers-reduced-motion: reduce){.slides-ready .hslide{animation:none !important}}
+
     .home-hero {
       background: linear-gradient(135deg, #0B1626 0%, #1565C0 100%);
       color: #fff;
@@ -237,7 +270,7 @@
     <div class="admin-content">
 
       <!-- BIG inline patient code entry — always visible, no modal -->
-      <div id="quickVerifyPanel" data-cap="bookings" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
+      <div id="quickVerifyPanel" data-cap="bookings" data-slide="patients" style="background:linear-gradient(135deg,#FFF3E0 0%,#FFFDE7 100%);border:2px solid #FFC107;border-radius:16px;padding:22px 22px 20px;margin-bottom:18px;box-shadow:0 4px 14px rgba(255,193,7,0.15)">
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
           <span class="material-icons-outlined" style="color:#E65100;font-size:26px">qr_code_scanner</span>
           <h2 style="font-size:18px;font-weight:800;margin:0;color:#1B5E20">Patient at the desk? Enter their codes</h2>
@@ -268,7 +301,7 @@
       </div>
 
       <!-- Hero with New Consultation CTA -->
-      <div class="home-hero">
+      <div class="home-hero" data-slide="home">
         <div>
           <h1 id="heroGreeting">Good morning</h1>
           <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
@@ -286,7 +319,7 @@
       </div>
 
       <!-- Outcomes mini-stats -->
-      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:24px">
+      <div class="stats-grid" data-slide="home" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:24px">
         <div class="stat-card">
           <div class="stat-icon blue"><span class="material-icons-outlined">medical_services</span></div>
           <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Today's Patients</div></div>
@@ -310,10 +343,10 @@
       </div>
 
       <!-- 30-day free onboarding banner (filled by applyTierGating) -->
-      <div id="trialBanner" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:13.5px;color:#1B5E20"></div>
+      <div id="trialBanner" data-slide="home" style="display:none;background:#E8F5E9;border:1.5px solid #A5D6A7;border-radius:12px;padding:11px 16px;margin-bottom:18px;font-size:13.5px;color:#1B5E20"></div>
 
       <!-- Low-stock alert banner (hidden until stock loads) -->
-      <div id="lowStockBanner" data-cap="stock" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
+      <div id="lowStockBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
           <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
@@ -323,7 +356,7 @@
       </div>
 
       <!-- Expiry alert banner (hidden until stock loads) -->
-      <div id="expiryBanner" data-cap="stock" style="display:none;background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:12px;padding:12px 16px;margin-bottom:18px">
+      <div id="expiryBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:12px;padding:12px 16px;margin-bottom:18px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#E65100;font-size:20px">schedule</span>
           <strong style="color:#E65100;font-size:14px">Expiry Alert</strong>
@@ -333,7 +366,7 @@
       </div>
 
       <!-- Pending bookings (patients who booked but haven't been seen) -->
-      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107">
+      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
@@ -347,7 +380,7 @@
       </div>
 
       <!-- Active treatments — open cases that have not been discharged yet -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
@@ -367,7 +400,7 @@
       </div>
 
       <!-- ── Overdue Follow-up Tracker ── -->
-      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100" data-slide="patients">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
@@ -381,7 +414,7 @@
       </div>
 
       <!-- Pending Payments / Outstanding Balances -->
-      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100">
+      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
@@ -398,7 +431,7 @@
       </div>
 
       <!-- Today's consultations list -->
-      <div class="admin-table-wrap" data-cap="history" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" data-slide="patients" style="padding:0;margin-bottom:24px">
         <div class="table-header">
           <div class="table-title">Today's Consultations</div>
           <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
@@ -409,7 +442,7 @@
       </div>
 
       <!-- ── Medicines Dispensed Tracker ── -->
-      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4">
+      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
@@ -428,7 +461,7 @@
       </div>
 
       <!-- Patient History Search -->
-      <div class="admin-table-wrap" data-cap="history" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" data-slide="patients" style="padding:0;margin-bottom:24px">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">manage_search</span>
@@ -451,7 +484,7 @@
       </div>
 
       <!-- Top Conditions & Treatments -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #00796B" id="topConditionsSection">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #00796B" id="topConditionsSection" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00796B">biotech</span>
@@ -468,7 +501,7 @@
       </div>
 
       <!-- Stock Tracker -->
-      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B">
+      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B" data-slide="stock">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
@@ -486,7 +519,7 @@
       </div>
 
       <!-- Financial Overview -->
-      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2">
+      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #7B1FA2" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#7B1FA2">analytics</span>
@@ -528,7 +561,7 @@
       </div>
 
       <!-- Monthly Reports -->
-      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection">
+      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection" data-slide="money">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
@@ -981,7 +1014,7 @@
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=13"></script>
-<script src="js/clinic.js?v=20260711"></script>
+<script src="js/clinic.js?v=20260716"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -995,6 +1028,106 @@
   applyTierGating();   // lock premium sections on the basic plan
   var supabase = _getClinicSupabase();
   try { refreshClinicTier(supabase, session); } catch(e) {}
+
+  // ═══ WHATSAPP-STYLE SLIDES ═════════════════════════════════════════════
+  // Groups the dashboard into swipeable panels — Home | Patients | Money |
+  // Stock — with a sticky tab bar. Pure client-side (works fully offline),
+  // role-aware (a tab whose sections are all hidden disappears), and
+  // fail-safe: if anything here throws, the classic stacked layout remains.
+  (function buildSlides() {
+    try {
+      var content = document.querySelector('.admin-content');
+      if (!content) return;
+      var SLIDES = [
+        { key: 'home',     label: 'Home',     icon: 'home' },
+        { key: 'patients', label: 'Patients', icon: 'groups' },
+        { key: 'money',    label: 'Money',    icon: 'payments' },
+        { key: 'stock',    label: 'Stock',    icon: 'inventory_2' },
+      ];
+      var order = SLIDES.map(function (x) { return x.key; });
+      var wrap = document.createElement('div');
+      wrap.id = 'slidesWrap';
+      var panels = {};
+      SLIDES.forEach(function (sl) {
+        var p = document.createElement('div');
+        p.className = 'hslide';
+        p.dataset.slideKey = sl.key;
+        panels[sl.key] = p;
+        wrap.appendChild(p);
+      });
+      // Move every tagged section into its panel (document order preserved)
+      content.querySelectorAll('[data-slide]').forEach(function (el) {
+        var p = panels[el.getAttribute('data-slide')];
+        if (p) p.appendChild(el);
+      });
+      // Tab bar
+      var bar = document.createElement('div');
+      bar.id = 'slideTabs';
+      SLIDES.forEach(function (sl) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'slide-tab'; b.dataset.key = sl.key;
+        b.innerHTML = '<span class="material-icons-outlined">' + sl.icon + '</span><span>' + sl.label + '</span>';
+        b.addEventListener('click', function () { show(sl.key); });
+        bar.appendChild(b);
+      });
+      content.insertBefore(bar, content.firstChild);
+      content.appendChild(wrap);
+
+      // A tab disappears when the role can't see ANY of its sections.
+      function refreshTabs() {
+        SLIDES.forEach(function (sl) {
+          var any = false;
+          for (var i = 0; i < panels[sl.key].children.length; i++) {
+            if (panels[sl.key].children[i].style.display !== 'none') { any = true; break; }
+          }
+          var tab = bar.querySelector('[data-key="' + sl.key + '"]');
+          if (tab) tab.style.display = any ? '' : 'none';
+          if (any) delete panels[sl.key].dataset.empty;
+          else panels[sl.key].dataset.empty = '1';
+        });
+      }
+      window._refreshSlideTabs = refreshTabs;
+      refreshTabs();
+
+      function visibleKeys() { return order.filter(function (k) { return !panels[k].dataset.empty; }); }
+      var current = null;
+      function show(key) {
+        if (!panels[key] || panels[key].dataset.empty) key = visibleKeys()[0] || 'home';
+        if (key === current) return;
+        var toRight = current !== null && order.indexOf(key) > order.indexOf(current);
+        var first = current === null;
+        order.forEach(function (k) { panels[k].classList.remove('active', 'slide-in-right', 'slide-in-left'); });
+        panels[key].classList.add('active');
+        if (!first) panels[key].classList.add(toRight ? 'slide-in-right' : 'slide-in-left');
+        current = key;
+        bar.querySelectorAll('.slide-tab').forEach(function (t) {
+          t.classList.toggle('active', t.dataset.key === key);
+        });
+        try { sessionStorage.setItem('homatt_slide', key); } catch (e) {}
+        window.scrollTo(0, 0);
+      }
+      window.showSlide = show;
+
+      // Swipe left/right anywhere in the content — like WhatsApp.
+      var sx = 0, sy = 0, st = 0;
+      wrap.addEventListener('touchstart', function (e) {
+        var t = e.touches[0]; sx = t.clientX; sy = t.clientY; st = Date.now();
+      }, { passive: true });
+      wrap.addEventListener('touchend', function (e) {
+        var t = e.changedTouches[0];
+        var dx = t.clientX - sx, dy = t.clientY - sy;
+        if (Date.now() - st > 600) return;                       // slow drag = scroll
+        if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.7) return;
+        var keys = visibleKeys(); var i = keys.indexOf(current);
+        var next = dx < 0 ? keys[i + 1] : keys[i - 1];
+        if (next) show(next);
+      }, { passive: true });
+
+      content.classList.add('slides-ready');
+      var saved = null; try { saved = sessionStorage.getItem('homatt_slide'); } catch (e) {}
+      show(saved || 'home');
+    } catch (e) { /* keep the classic stacked layout */ }
+  })();
 
   // Replay Quick Sales made offline — now (if online) and on every reconnect.
   if (window.ClinicOffline) {

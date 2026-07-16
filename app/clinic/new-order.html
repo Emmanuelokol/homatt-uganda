@@ -7,6 +7,12 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Homatt Clinic — New Consultation</title>
+  <script>
+    // Apply saved (or system) theme before first paint — no flash.
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link href="fonts/material-icons.css?v=1" rel="stylesheet">
@@ -18,7 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260711">
+  <link rel="stylesheet" href="css/clinic.css?v=20260716">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -939,7 +945,7 @@
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=13"></script>
-<script src="js/clinic.js?v=20260711"></script>
+<script src="js/clinic.js?v=20260716"></script>
 <script src="js/new-order-wizard.js?v=20260713"></script>
 <script src="js/pwa-install.js?v=20260705g"></script>
 </body>

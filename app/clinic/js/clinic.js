@@ -119,6 +119,26 @@ function setupClinicLogout() {
 
 function _injectClinicTopbarExit() {
   const right = document.querySelector('.admin-topbar-right');
+  // Light/dark toggle — same preference as the login page (homatt_theme).
+  try {
+    if (right && !document.getElementById('themeToggleTop')) {
+      const tt = document.createElement('button');
+      tt.type = 'button'; tt.id = 'themeToggleTop'; tt.className = 'theme-toggle-top';
+      tt.setAttribute('aria-label', 'Switch between light and dark mode');
+      const paint = () => {
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        tt.innerHTML = '<span class="material-icons-outlined">' + (dark ? 'light_mode' : 'dark_mode') + '</span>';
+      };
+      tt.addEventListener('click', () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        try { localStorage.setItem('homatt_theme', next); } catch (e) {}
+        paint();
+      });
+      paint();
+      right.insertBefore(tt, right.firstChild);
+    }
+  } catch (e) {}
   if (!right || document.getElementById('clinicTopbarExitBtn')) return;
 
   let session = null;
