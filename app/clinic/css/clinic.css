@@ -348,8 +348,8 @@ html[data-theme="dark"] .wiz-section-label{color:var(--text-lt)}
 html[data-theme="dark"] .patient-pill{background:rgba(67,160,71,.14); border-color:rgba(102,187,106,.4)}
 html[data-theme="dark"] .care-opt{background:var(--surface); border-color:var(--border); color:var(--text)}
 html[data-theme="dark"] .care-opt.active{background:rgba(67,160,71,.18); border-color:var(--primary)}
-html[data-theme="dark"] .sev-chip{background:var(--surface); border-color:var(--border); color:var(--text)}
-html[data-theme="dark"] .lab-chip{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] :where(.sev-chip){background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] :where(.lab-chip){background:var(--surface); border-color:var(--border); color:var(--text)}
 html[data-theme="dark"] .lab-chip:hover{background:rgba(67,160,71,.12)}
 html[data-theme="dark"] .wiz-btn-back{background:var(--surface); color:var(--text-lt); border-color:var(--border)}
 html[data-theme="dark"] .wiz-dot{background:var(--surface); border-color:var(--border)}
@@ -359,7 +359,7 @@ html[data-theme="dark"] .autocomplete-item:hover{background:rgba(67,160,71,.14)}
 html[data-theme="dark"] .med-row{background:var(--surface); border-color:var(--border)}
 html[data-theme="dark"] .settings-card{background:var(--surface); box-shadow:0 2px 8px rgba(0,0,0,.4); color:var(--text)}
 html[data-theme="dark"] .settings-card-title{color:var(--text)}
-html[data-theme="dark"] .facility-btn{background:var(--surface); border-color:var(--border); color:var(--text-lt)}
+html[data-theme="dark"] :where(.facility-btn){background:var(--surface); border-color:var(--border); color:var(--text-lt)}
 html[data-theme="dark"] .qs-drug-card{background:var(--surface) !important; border-color:var(--border) !important; color:var(--text)}
 html[data-theme="dark"] #qsSheet{background:var(--surface) !important}
 html[data-theme="dark"] .pp-alert{background:rgba(255,193,7,.12); color:#FFD54F}
@@ -382,8 +382,12 @@ html[data-theme="dark"] *{scrollbar-color:#3B4F41 transparent}
 html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3B4F41}
 html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#527A5C}
 
-/* Soft page entrance — content settles in rather than popping */
-@keyframes pg-in{from{opacity:.6; transform:translateY(6px)}to{opacity:1; transform:none}}
+/* Soft page entrance — OPACITY ONLY. Animating transform on <body> makes it
+   the containing block for every position:fixed element (modals, the Quick
+   Sale sheet, referral dialogs), anchoring them to the PAGE instead of the
+   screen — they appeared wherever you'd scrolled and their buttons missed
+   taps. Never add transform here. */
+@keyframes pg-in{from{opacity:.65}to{opacity:1}}
 
 /* Dark-mode legibility fixes found by rendered-screenshot review */
 html[data-theme="dark"] .qs-drug-name{color:var(--text)}
@@ -391,3 +395,19 @@ html[data-theme="dark"] .qs-drug-card:hover{background:rgba(67,160,71,.14); bord
 html[data-theme="dark"] .qs-drug-card.selected{background:rgba(67,160,71,.2)}
 html[data-theme="dark"] .care-opt div, html[data-theme="dark"] .care-opt-label{color:var(--text)}
 html[data-theme="dark"] .care-opt div:last-child{color:var(--text-lt)}
+
+/* Dark mode: SELECTED/ACTIVE states must outrank the dark base rules —
+   without these, severity and lab chips looked like they "didn't click"
+   (they selected fine, the highlight was just invisible). */
+/* Active chip colors come from each page's own rules (green severity,
+   orange severe / red critical, blue lab chips) — visible on dark because
+   the :where() base rules above no longer outrank them. */
+
+/* Dark mode: drug/patient autocomplete text was near-invisible */
+html[data-theme="dark"] .ac-name{color:var(--text) !important}
+html[data-theme="dark"] .ac-cat{color:var(--text-lt)}
+html[data-theme="dark"] .autocomplete-list, html[data-theme="dark"] .autocomplete-menu{background:var(--surface); border-color:var(--border)}
+
+/* Dark mode: Active Treatments / booking cards were still white (class bg) */
+html[data-theme="dark"] .order-card{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .order-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.5)}
