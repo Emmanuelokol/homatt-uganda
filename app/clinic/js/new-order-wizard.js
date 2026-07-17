@@ -206,6 +206,33 @@
   async function searchPatients(q) {
     if (!supabase) { renderPatientMenu([], q); return; }
 
+    // SUB-ACCOUNT SAFE PATH: the search_clinic_patients RPC runs with
+    // definer rights after verifying the caller is active clinic staff —
+    // so clinicians/nurses/receptionists find the clinic's patients even
+    // where legacy row security blocked their direct reads. Falls back to
+    // the original direct queries if the RPC isn't installed yet.
+    try {
+      const r = await supabase.rpc('search_clinic_patients', { p_q: q });
+      if (!r.error && Array.isArray(r.data)) {
+        const seen = new Set();
+        const rows = [];
+        for (const x of r.data) {
+          const key = (x.phone || '') + '|' + (x.full_name || '');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          rows.push({
+            id: x.profile_id || null,
+            clinicPatientId: x.clinic_patient_id || null,
+            registered: !!x.registered,
+            name: x.full_name || 'Unnamed',
+            phone: x.phone || '',
+          });
+        }
+        renderPatientMenu(rows, q);
+        return;
+      }
+    } catch (e) { /* fall through to direct queries */ }
+
     const { data: profiles } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, phone_number, phone')

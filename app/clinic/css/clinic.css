@@ -303,8 +303,8 @@ html[data-theme="dark"] .slide-tab.active{background:#2E7D32;border-color:#2E7D3
 html[data-theme="dark"] #slideTabs{background:var(--bg)}
 html[data-theme="dark"] input:not([type=checkbox]):not([type=radio]),
 html[data-theme="dark"] select, html[data-theme="dark"] textarea{
-  background:rgba(255,255,255,.06) !important; color:var(--text) !important;
-  border-color:var(--border) !important;
+  background:rgba(255,255,255,.06) !important; color:#E8F0EA !important;
+  border-color:#293630 !important;
 }
 html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder{color:var(--text-lt)}
 /* Recurring hardcoded inline styles → readable on dark */
@@ -313,17 +313,17 @@ html[data-theme="dark"] [style*="background: #fff"],
 html[data-theme="dark"] [style*="background:#FFFFFF"],
 html[data-theme="dark"] [style*="background:#FAFFFE"],
 html[data-theme="dark"] [style*="background:#FBFEFC"],
-html[data-theme="dark"] [style*="background:#FAFAFA"]{background:var(--surface) !important}
+html[data-theme="dark"] [style*="background:#FAFAFA"]{background:#151E18 !important}
 html[data-theme="dark"] [style*="color:#202124"],
 html[data-theme="dark"] [style*="color:#111"],
 html[data-theme="dark"] [style*="color:#333"],
-html[data-theme="dark"] [style*="color:#1A1A1A"]{color:var(--text) !important}
+html[data-theme="dark"] [style*="color:#1A1A1A"]{color:#E8F0EA !important}
 html[data-theme="dark"] [style*="color:#424242"],
 html[data-theme="dark"] [style*="color:#5F6368"],
 html[data-theme="dark"] [style*="color:#555"]{color:#C2D3C6 !important}
 html[data-theme="dark"] [style*="color:#9AA0A6"]{color:#93A697 !important}
 html[data-theme="dark"] [style*="border-bottom:1px solid #F5F5F5"],
-html[data-theme="dark"] [style*="border-bottom:1px solid #EEF5EF"]{border-bottom-color:var(--border) !important}
+html[data-theme="dark"] [style*="border-bottom:1px solid #EEF5EF"]{border-bottom-color:#293630 !important}
 html[data-theme="dark"] [style*="background:#E8F5E9"]{background:rgba(67,160,71,.16) !important}
 html[data-theme="dark"] [style*="background:#F3F4F6"]{background:rgba(255,255,255,.07) !important}
 /* Theme toggle button in the topbar */
@@ -360,8 +360,8 @@ html[data-theme="dark"] .med-row{background:var(--surface); border-color:var(--b
 html[data-theme="dark"] .settings-card{background:var(--surface); box-shadow:0 2px 8px rgba(0,0,0,.4); color:var(--text)}
 html[data-theme="dark"] .settings-card-title{color:var(--text)}
 html[data-theme="dark"] :where(.facility-btn){background:var(--surface); border-color:var(--border); color:var(--text-lt)}
-html[data-theme="dark"] .qs-drug-card{background:var(--surface) !important; border-color:var(--border) !important; color:var(--text)}
-html[data-theme="dark"] #qsSheet{background:var(--surface) !important}
+html[data-theme="dark"] .qs-drug-card{background:#151E18 !important; border-color:#293630 !important; color:var(--text)}
+html[data-theme="dark"] #qsSheet{background:#151E18 !important}
 html[data-theme="dark"] .pp-alert{background:rgba(255,193,7,.12); color:#FFD54F}
 
 /* ═══ SMOOTH, UNIQUE NAVIGATION (Android + Windows) ═════════════════════ */
@@ -404,10 +404,17 @@ html[data-theme="dark"] .care-opt div:last-child{color:var(--text-lt)}
    the :where() base rules above no longer outrank them. */
 
 /* Dark mode: drug/patient autocomplete text was near-invisible */
-html[data-theme="dark"] .ac-name{color:var(--text) !important}
+html[data-theme="dark"] .ac-name{color:#E8F0EA !important}
 html[data-theme="dark"] .ac-cat{color:var(--text-lt)}
 html[data-theme="dark"] .autocomplete-list, html[data-theme="dark"] .autocomplete-menu{background:var(--surface); border-color:var(--border)}
 
 /* Dark mode: Active Treatments / booking cards were still white (class bg) */
 html[data-theme="dark"] .order-card{background:var(--surface); border-color:var(--border); color:var(--text)}
 html[data-theme="dark"] .order-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.5)}
+
+/* Quick Sale dark: the amount box and Add-another button carry inline
+   light styling — concrete overrides (no var+!important, Chromium quirk) */
+html[data-theme="dark"] #qsTotalInput{background:rgba(255,255,255,.08) !important; color:#E8F0EA !important; border-color:#3B4F41 !important}
+html[data-theme="dark"] #qsAddMoreBtn{background:rgba(67,160,71,.18) !important; color:#A5D6A7 !important; border-color:rgba(102,187,106,.45) !important}
+html[data-theme="dark"] #qsCartWrap{background:#12190F !important; border-color:#293630 !important}
+html[data-theme="dark"] #qsSelectedPanel{background:#101812 !important; border-color:#293630 !important}
