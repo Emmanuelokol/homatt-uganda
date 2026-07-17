@@ -333,3 +333,61 @@ html[data-theme="dark"] [style*="background:#F3F4F6"]{background:rgba(255,255,25
   cursor:pointer;margin-right:8px;-webkit-tap-highlight-color:transparent;flex-shrink:0;
 }
 .theme-toggle-top .material-icons-outlined{font-size:19px}
+
+/* ═══ DARK MODE · consultation wizard + settings surfaces ═══════════════
+   These pages style their cards via their OWN classes (not inline styles),
+   so they need explicit dark variants. Kept together here so every page
+   that loads clinic.css gets them. */
+html[data-theme="dark"] .wiz-card{
+  background:var(--surface); box-shadow:0 1px 4px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.05); color:var(--text);
+}
+html[data-theme="dark"] .field-input{background:rgba(255,255,255,.06); color:var(--text); border-color:var(--border)}
+html[data-theme="dark"] .field-input::placeholder{color:var(--text-lt)}
+html[data-theme="dark"] .field-label,
+html[data-theme="dark"] .wiz-section-label{color:var(--text-lt)}
+html[data-theme="dark"] .patient-pill{background:rgba(67,160,71,.14); border-color:rgba(102,187,106,.4)}
+html[data-theme="dark"] .care-opt{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .care-opt.active{background:rgba(67,160,71,.18); border-color:var(--primary)}
+html[data-theme="dark"] .sev-chip{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .lab-chip{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .lab-chip:hover{background:rgba(67,160,71,.12)}
+html[data-theme="dark"] .wiz-btn-back{background:var(--surface); color:var(--text-lt); border-color:var(--border)}
+html[data-theme="dark"] .wiz-dot{background:var(--surface); border-color:var(--border)}
+html[data-theme="dark"] .wiz-dot-line{background:var(--border)}
+html[data-theme="dark"] .autocomplete-item{background:var(--surface); color:var(--text)}
+html[data-theme="dark"] .autocomplete-item:hover{background:rgba(67,160,71,.14)}
+html[data-theme="dark"] .med-row{background:var(--surface); border-color:var(--border)}
+html[data-theme="dark"] .settings-card{background:var(--surface); box-shadow:0 2px 8px rgba(0,0,0,.4); color:var(--text)}
+html[data-theme="dark"] .settings-card-title{color:var(--text)}
+html[data-theme="dark"] .facility-btn{background:var(--surface); border-color:var(--border); color:var(--text-lt)}
+html[data-theme="dark"] .qs-drug-card{background:var(--surface) !important; border-color:var(--border) !important; color:var(--text)}
+html[data-theme="dark"] #qsSheet{background:var(--surface) !important}
+html[data-theme="dark"] .pp-alert{background:rgba(255,193,7,.12); color:#FFD54F}
+
+/* ═══ SMOOTH, UNIQUE NAVIGATION (Android + Windows) ═════════════════════ */
+html{scroll-behavior:smooth}
+body{overscroll-behavior-y:none}                 /* no rubber-band jolt */
+.admin-content, .hslide, #svBody, #qsDrugGrid, .admin-table-wrap{
+  -webkit-overflow-scrolling:touch;              /* momentum scrolling on Android */
+}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+
+/* Slim brand scrollbars — the default grey Windows bars look foreign */
+*{scrollbar-width:thin; scrollbar-color:#9CB8A0 transparent}
+::-webkit-scrollbar{width:9px; height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#AFC7B3; border-radius:8px; border:2px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#7FA386; border:2px solid transparent; background-clip:content-box}
+html[data-theme="dark"] *{scrollbar-color:#3B4F41 transparent}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3B4F41}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#527A5C}
+
+/* Soft page entrance — content settles in rather than popping */
+@keyframes pg-in{from{opacity:.6; transform:translateY(6px)}to{opacity:1; transform:none}}
+
+/* Dark-mode legibility fixes found by rendered-screenshot review */
+html[data-theme="dark"] .qs-drug-name{color:var(--text)}
+html[data-theme="dark"] .qs-drug-card:hover{background:rgba(67,160,71,.14); border-color:#2E7D32}
+html[data-theme="dark"] .qs-drug-card.selected{background:rgba(67,160,71,.2)}
+html[data-theme="dark"] .care-opt div, html[data-theme="dark"] .care-opt-label{color:var(--text)}
+html[data-theme="dark"] .care-opt div:last-child{color:var(--text-lt)}
