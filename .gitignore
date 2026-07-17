@@ -17,3 +17,6 @@ android/.gradle/
 android/build/
 android/app/build/
 .capacitor/
+desktop/app
+desktop/dist
+desktop/node_modules

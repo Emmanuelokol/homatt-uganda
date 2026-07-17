@@ -187,6 +187,15 @@
       Opens fully offline on any phone. After downloading, tap the file and allow install.
     </div>
 
+    <a id="pcDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/desktop-latest/HomattClinic-Setup.exe"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:#1B5E20;color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">computer</span>
+      Get the Windows app (works fully offline)
+    </a>
+    <div id="pcHint" style="display:none;font-size:11px;color:#9AA0A6;text-align:center;margin-top:6px;line-height:1.5">
+      Or install from the browser: Chrome / Edge menu → "Install Homatt Clinic".
+    </div>
+
     <div class="login-error" id="loginError"></div>
     <div id="buildMarker" style="text-align:center;margin-top:14px;font-size:10px;color:#B0BEC5;letter-spacing:.3px"></div>
   </div>
@@ -198,7 +207,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v60';
+    var BUILD = 'v61';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -298,6 +307,16 @@
         var h = document.getElementById('apkHint');
         if (a) a.style.display = 'flex';
         if (h) h.style.display = 'block';
+      }
+      // Desktop browser (not a phone, not already installed/native, not the
+      // desktop app itself which runs from file:) → offer the Windows app.
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      var isFile = location.protocol === 'file:';
+      if (!isMobile && !inApp && !isFile) {
+        var p = document.getElementById('pcDownload');
+        var ph = document.getElementById('pcHint');
+        if (p) p.style.display = 'flex';
+        if (ph) ph.style.display = 'block';
       }
     } catch(e) {}
   })();
