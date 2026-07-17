@@ -1020,6 +1020,8 @@
     <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Why refer? *</label>
     <div id="drReasons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
     <input id="drItem" type="text" autocomplete="off" placeholder="Which medicine / test does the patient need?" style="display:none;width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
+    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Doctor's referral notes <span style="font-weight:400;color:#9AA0A6;text-transform:none">(what was done / found)</span></label>
+    <textarea id="drNotes" rows="3" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;resize:vertical" placeholder="e.g. Malaria RDT positive, started on quinine injection today, needs full Coartem course. BP 120/80."></textarea>
     <div id="drError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
     <div id="drDone" style="display:none;background:#E8F5E9;border-radius:12px;padding:14px;margin-bottom:12px">
       <div style="font-weight:800;color:#1B5E20;margin-bottom:4px">Referral sent ✔ &nbsp;<span id="drCode" style="font-weight:800"></span></div>
@@ -1088,7 +1090,7 @@
   function openDashReferral() {
     var m = document.getElementById('dashRefModal');
     if (!m) return;
-    ['drName', 'drPhone', 'drItem'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
+    ['drName', 'drPhone', 'drItem', 'drNotes'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
     document.getElementById('drItem').style.display = 'none';
     document.getElementById('drError').style.display = 'none';
     document.getElementById('drDone').style.display = 'none';
@@ -1137,7 +1139,8 @@
           patient_name: name, patient_phone: phone || null,
           reason: _drReason,
           needed_item: (document.getElementById('drItem').value || '').trim() || null,
-          notes: null, referral_code: code,
+          notes: (document.getElementById('drNotes').value || '').trim() || null,
+          referral_code: code,
         };
         if (CO) {
           row.id = CO.uuid();
