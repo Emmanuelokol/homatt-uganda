@@ -1844,7 +1844,7 @@
       // deployments may not have every column migrated yet (e.g. follow_up_reason),
       // so if the rich select fails with "column does not exist" we transparently
       // retry with the minimal set that is guaranteed to exist.
-      var RICH_COLS = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at';
+      var RICH_COLS = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,ward,clinician_name,clinical_findings,lab_tests_ordered,lab_results,prescription_items,treatment_plan,patient_instructions,expected_recovery,follow_up_days,follow_up_reason,consultation_fee_ugx,lab_fee_ugx,meds_fee_ugx,total_charged_ugx,amount_paid,payment_status,created_at';
       var SAFE_COLS = 'id,patient_name,patient_phone,confirmed_diagnosis,severity,patient_type,total_charged_ugx,payment_status,created_at';
       function buildHistQuery(cols) {
         var x = supabase.from('clinic_diagnoses')
@@ -1999,6 +1999,7 @@
         +(c.patient_type?'<span style="background:#ECEFF1;color:#37474F;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">'+esc(c.patient_type)+(c.ward?' · '+esc(c.ward):'')+'</span>':'')
         +courseChip
       +'</div>'
+      + sect('Seen by', c.clinician_name)
       + sect('Clinical findings / what was found', c.clinical_findings)
       + sect('Lab tests ordered', c.lab_tests_ordered)
       + sect('Lab results', labResultsTxt)

@@ -624,11 +624,19 @@
         const dateStr = d.toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' });
         const meds    = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
         const noShow  = h.missed;
+        // A visit from ANOTHER clinic shows where it happened (name + place);
+        // a visit here just says "This clinic".
+        const foreign = h.clinic_id && _clinicId && h.clinic_id !== _clinicId;
+        const place   = [h.clinic_district, h.clinic_address].filter(Boolean).join(', ');
+        const whereTxt = foreign
+          ? esc(h.clinic_name || 'Partner clinic') + (place ? ' <span style="color:#9AA0A6">(' + esc(place) + ')</span>' : '')
+          : esc(h.clinic_name && h.clinic_id !== _clinicId ? h.clinic_name : 'This clinic');
         html += `<div class="pp-row">
           <span class="pp-row-label" style="font-size:12px">${i === 0 ? 'Last visit' : dateStr}</span>
           <span class="pp-row-value" style="font-size:12px">
-            ${i === 0 ? '<strong>' + esc(dateStr) + '</strong> · ' : ''}${esc(h.clinic_name || 'This clinic')}
+            ${i === 0 ? '<strong>' + esc(dateStr) + '</strong> · ' : ''}${whereTxt}
             <br><span style="color:#5F6368">${esc(h.confirmed_diagnosis || 'Pending')}${noShow ? ' <span style="color:#C62828;font-weight:700"> · No-show</span>' : ''}</span>
+            ${h.clinician_name ? `<br><span style="color:#00796B">Seen by ${esc(h.clinician_name)}</span>` : ''}
             ${meds ? `<br><span style="color:#1565C0">${meds} med${meds !== 1 ? 's' : ''} prescribed</span>` : ''}
           </span>
         </div>`;
@@ -2028,6 +2036,7 @@
     const dxPayload = {
       clinic_id: _clinicId,
       clinician_id: session?.userId || null,
+      clinician_name: session?.staffName || null,
       booking_id: state.bookingId || null,
       patient_name: state.patient.name || null,
       patient_phone: state.patient.phone,
