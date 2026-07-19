@@ -235,10 +235,7 @@
                 <option value="premium">Premium — everything incl. reports, follow-up care, lab services</option>
               </select>
             </div>
-            <div class="admin-form-group">
-              <label>Free trial ends <span style="font-weight:400;color:#9AA0A6">(clear = no trial)</span></label>
-              <input type="date" id="clinicTrialEnds">
-            </div>
+
             <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
               <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
                 <input type="checkbox" id="clinicVerified" style="width:18px;height:18px;accent-color:#1B5E20"> Verified by Homatt
@@ -588,10 +585,6 @@ function planBadgeHtml(c) {
   var color = c.subscription_tier === 'premium' ? '#1B5E20' : '#616161';
   var bg    = c.subscription_tier === 'premium' ? '#E8F5E9' : '#F5F5F5';
   var html = '<span style="background:' + bg + ';color:' + color + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">' + tier + '</span>';
-  if (c.trial_ends_at) {
-    var days = Math.ceil((new Date(String(c.trial_ends_at).slice(0,10) + 'T23:59:59') - new Date()) / 86400000);
-    if (days > 0) html += '<div style="font-size:10px;color:#E65100;font-weight:600;margin-top:2px">free trial · ' + days + 'd left</div>';
-  }
   return html;
 }
 
@@ -649,9 +642,7 @@ function openModal(id) {
   document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
   document.getElementById('clinicStatus').value = c?.status || 'approved';
   document.getElementById('clinicTier').value = c?.subscription_tier || 'basic';
-  document.getElementById('clinicTrialEnds').value = c?.trial_ends_at ? String(c.trial_ends_at).slice(0,10) : '';
-  window._origTier      = c?.subscription_tier || 'basic';
-  window._origTrialEnds = c?.trial_ends_at ? String(c.trial_ends_at).slice(0,10) : '';
+  window._origTier = c?.subscription_tier || 'basic';
   document.getElementById('clinicVerified').checked = c?.verified || false;
   document.getElementById('clinicActive').checked = c?.active !== false;
   document.getElementById('clinicNotes').value = c?.notes || '';
@@ -739,11 +730,10 @@ async function saveClinic() {
 
   // Subscription plan goes through an admin-only RPC (a DB trigger blocks
   // direct tier edits). Only called when the plan or trial date changed.
-  var newTier  = document.getElementById('clinicTier').value;
-  var newTrial = document.getElementById('clinicTrialEnds').value || null;
-  if (id && (newTier !== window._origTier || (newTrial || '') !== (window._origTrialEnds || ''))) {
+  var newTier = document.getElementById('clinicTier').value;
+  if (id && newTier !== window._origTier) {
     var tierRes = await supa.rpc('admin_set_clinic_tier', {
-      p_clinic_id: id, p_tier: newTier, p_trial_ends: newTrial,
+      p_clinic_id: id, p_tier: newTier, p_trial_ends: null,
     });
     var tierErr = tierRes.error ? tierRes.error.message
       : (tierRes.data && tierRes.data.ok === false ? tierRes.data.error : null);
@@ -956,13 +946,29 @@ async function toggleClinicStatus(id, newStatus) {
 }
 
 async function removeClinic(id) {
-  if (!confirm('Remove this clinic from the platform? Users will no longer be able to book appointments.')) return;
+  // PERMANENT delete: the clinic, all its records, and its staff logins.
+  // (To merely take a clinic offline, use Suspend — that's reversible.)
+  var c = allClinics.find(function(x){ return x.id === id; });
+  var name = c ? c.name : 'this clinic';
+  if (!confirm('PERMANENTLY DELETE "' + name + '"?\n\nThis wipes the clinic, ALL its records (consultations, stock, sales, referrals) and its staff login accounts. Patients keep their own booking history.\n\nThis CANNOT be undone. To take a clinic offline temporarily, use Suspend instead.')) return;
+  var typed = prompt('Type the clinic name to confirm permanent deletion:');
+  if ((typed || '').trim().toLowerCase() !== String(name).trim().toLowerCase()) {
+    showAdminToast('Name did not match — nothing was deleted', 'default');
+    return;
+  }
   var supa = adminSupa();
-  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
-  var { error } = await supa.from('clinics').update({ status: 'removed', active: false, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  if (!supa) { showAdminToast('Demo mode — cannot delete', 'default'); return; }
+  var r = await supa.rpc('admin_delete_clinic', { p_clinic_id: id });
+  var err = r.error ? r.error.message : (r.data && r.data.ok === false ? r.data.error : null);
+  if (err) {
+    showAdminToast(/could not find the function/i.test(err)
+      ? 'Run the delete-clinic SQL (20260726) first, then retry.'
+      : 'Delete failed: ' + err, 'error');
+    return;
+  }
   await loadClinics();
-  showAdminToast('Clinic removed from platform', 'default');
+  showAdminToast('"' + name + '" permanently deleted' +
+    (r.data && r.data.staff_logins_removed ? ' (' + r.data.staff_logins_removed + ' staff login' + (r.data.staff_logins_removed !== 1 ? 's' : '') + ' removed)' : ''), 'default');
 }
 </script>
 </body>

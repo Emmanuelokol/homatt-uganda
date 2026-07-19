@@ -278,20 +278,13 @@ var CLINIC_TIER_FEATURES = {
   premium: ['*'],
 };
 
-function clinicTrialDaysLeft() {
-  try {
-    var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
-    if (!s || !s.trialEndsAt) return 0;
-    var end = new Date(String(s.trialEndsAt).slice(0, 10) + 'T23:59:59');
-    var days = Math.ceil((end - new Date()) / 86400000);
-    return days > 0 ? days : 0;
-  } catch (e) { return 0; }
-}
+// Free-onboarding period REMOVED (2026-07): clinics run on their assigned
+// tier from day one. Kept as a stub so older cached pages can't crash.
+function clinicTrialDaysLeft() { return 0; }
 
 function clinicTier() {
   try {
     var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
-    if (clinicTrialDaysLeft() > 0) return 'premium';   // free period = full access
     if (s && s.tier && CLINIC_TIER_FEATURES[s.tier]) return s.tier;
   } catch (e) {}
   return 'premium';   // fail-open: never lock out on missing data
