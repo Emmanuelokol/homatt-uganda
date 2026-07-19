@@ -471,14 +471,14 @@ async function _replayRpc(payload) {
       for (var k in args) { if (k !== 'p_op_id' && Object.prototype.hasOwnProperty.call(args, k)) a2[k] = args[k]; }
       r = await supa.rpc(fn, a2);
     }
-    if (r.error) return false;                 // transport/db/auth error → keep & retry
+    if (r.error) return _replayDropOnPermanent('rpc ' + fn, r.error);
     if (r.data && r.data.ok === false) {       // server ran but rejected → permanent, drop
       console.warn('replay rpc rejected:', fn, r.data.error);
       return true;
     }
     return true;                               // ok (or idempotent duplicate) → done
   } catch (e) {
-    return false;                              // network threw → keep & retry
+    return _replayDropOnPermanent('rpc ' + fn, e);
   }
 }
 
@@ -486,6 +486,24 @@ async function _replayRpc(payload) {
 // carries a client-generated id, so a duplicate means it already landed — that
 // counts as success. If the live DB is missing a newer column, strip it and
 // retry so the row still saves (mirrors the online add-stock fallback).
+// Classify a failed replay so the outbox never spins "Syncing…" forever.
+//   returns false        → NETWORK/offline error: keep & retry indefinitely
+//                          (never counts against the give-up cap).
+//   returns 'permanent'  → the server ran and REJECTED it (missing table /
+//                          column, RLS, constraint, validation). Retrying
+//                          can't help; the flush loop drops it after a few
+//                          quick attempts (so a transient blip can't lose
+//                          data, but a truly stuck write clears itself).
+function _replayDropOnPermanent(label, err) {
+  var CO = window.ClinicOffline;
+  if (CO && CO.isNetworkErr && CO.isNetworkErr(err)) {
+    console.warn('replay ' + label + ' (offline — will retry):', err && err.message);
+    return false;
+  }
+  console.error('replay ' + label + ' rejected by server:', (err && err.message) || err);
+  return 'permanent';
+}
+
 async function _replayTableInsert(payload) {
   var supa = _getClinicSupabase();
   if (!supa) return false;
@@ -503,12 +521,11 @@ async function _replayTableInsert(payload) {
     }
     if (r.error) {
       if (/duplicate|already exists/i.test(r.error.message || '')) return true;  // already saved
-      console.warn('replay insert (will retry):', payload.table, r.error.message);
-      return false;                            // transport/db/auth error → keep & retry
+      return _replayDropOnPermanent('insert ' + payload.table, r.error);
     }
     return true;
   } catch (e) {
-    return false;                              // network threw → keep & retry
+    return _replayDropOnPermanent('insert ' + payload.table, e);
   }
 }
 
@@ -533,9 +550,9 @@ async function _replayTableUpdate(payload) {
       if (!Object.keys(patch).length) return true;   // nothing left to save
       r = await q();
     }
-    if (r.error) { console.warn('replay update (will retry):', payload.table, r.error.message); return false; }
+    if (r.error) return _replayDropOnPermanent('update ' + payload.table, r.error);
     return true;
-  } catch (e) { return false; }
+  } catch (e) { return _replayDropOnPermanent('update ' + payload.table, e); }
 }
 
 // Replay a queued UPSERT (rows carry client ids → idempotent).
@@ -547,11 +564,10 @@ async function _replayTableUpsert(payload) {
     var r = await supa.from(payload.table).upsert(payload.rows, { onConflict: payload.onConflict || 'id' });
     if (r.error) {
       if (/duplicate|already exists/i.test(r.error.message || '')) return true;
-      console.warn('replay upsert (will retry):', payload.table, r.error.message);
-      return false;
+      return _replayDropOnPermanent('upsert ' + payload.table, r.error);
     }
     return true;
-  } catch (e) { return false; }
+  } catch (e) { return _replayDropOnPermanent('upsert ' + payload.table, e); }
 }
 
 // Replay a queued DELETE by ids (idempotent — deleting again is a no-op).
@@ -561,9 +577,9 @@ async function _replayTableDelete(payload) {
   if (!payload || !payload.table || !payload.ids || !payload.ids.length) return true;
   try {
     var r = await supa.from(payload.table).delete().in('id', payload.ids);
-    if (r.error) { console.warn('replay delete (will retry):', payload.table, r.error.message); return false; }
+    if (r.error) return _replayDropOnPermanent('delete ' + payload.table, r.error);
     return true;
-  } catch (e) { return false; }
+  } catch (e) { return _replayDropOnPermanent('delete ' + payload.table, e); }
 }
 
 if (window.ClinicOffline) {

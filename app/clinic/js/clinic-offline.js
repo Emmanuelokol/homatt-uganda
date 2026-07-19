@@ -239,23 +239,48 @@
     if (!list.length) { updateIndicator(); return; }
     if (!Object.keys(_handlers).length) return;
     _syncing = true;
-    var anyFailed = false;
+    var anyFailed = false, anyDropped = 0;
+    var PERM_MAX_TRIES = 4;   // permanent rejections give up after this many
     try {
       for (var i = 0; i < list.length; i++) {
         var item = list[i];
         var h = _handlers[item.type];
         if (!h) continue;                 // no handler here — leave for later
-        var ok = false;
+        var r;
         try {
           // Cap each push at 20s so a request stalled on very slow internet can
-          // never wedge the queue with _syncing stuck true. Handlers return the
-          // boolean true when done; a timeout token object is NOT true → retry.
-          var r = await withTimeout(h(item), 20000);
-          ok = (r === true);
-        } catch (e) { ok = false; }
-        if (ok) saveOutbox(outbox().filter(function (x) { return x.id !== item.id; }));
-        else anyFailed = true;
-        // keep failures; they retry on the next flush (order within a type holds)
+          // never wedge the queue with _syncing stuck true.
+          r = await withTimeout(h(item), 20000);
+        } catch (e) { r = false; }        // threw → treat as retryable
+
+        if (r === true) {
+          // Success — remove it.
+          saveOutbox(outbox().filter(function (x) { return x.id !== item.id; }));
+        } else if (r === 'permanent') {
+          // The server RAN and rejected it. Retrying can't help — but give it a
+          // few quick attempts first so a one-off blip can't discard real data.
+          var tries = (item.tries || 0) + 1;
+          if (tries >= PERM_MAX_TRIES) {
+            saveOutbox(outbox().filter(function (x) { return x.id !== item.id; }));
+            anyDropped++;
+          } else {
+            saveOutbox(outbox().map(function (x) {
+              return x.id === item.id ? Object.assign({}, x, { tries: tries }) : x;
+            }));
+            anyFailed = true;
+          }
+        } else {
+          // Network/offline error (or timeout token) → keep & retry forever.
+          // Does NOT count toward the give-up cap.
+          anyFailed = true;
+        }
+      }
+      if (anyDropped) {
+        try {
+          showToast(anyDropped + ' offline change' + (anyDropped > 1 ? 's' : '') +
+            ' could not be saved and ' + (anyDropped > 1 ? 'were' : 'was') +
+            ' discarded. Please try again.', 'error');
+        } catch (e) {}
       }
     } finally {
       _syncing = false;
