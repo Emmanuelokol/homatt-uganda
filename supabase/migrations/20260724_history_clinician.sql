@@ -15,6 +15,14 @@
 alter table public.clinic_diagnoses
   add column if not exists clinician_name text;
 
+-- The view joins bookings for the missed-appointment flag and the appointment
+-- time. Those columns come from OLDER migrations (20260516 / 20260420) that
+-- may not have run on every database — add them defensively so this migration
+-- is fully self-sufficient and never fails on a missing column.
+alter table public.bookings
+  add column if not exists no_show        boolean default false,
+  add column if not exists preferred_time text;
+
 -- Backfill old records from the staff table
 update public.clinic_diagnoses cd
    set clinician_name = pu.full_name
