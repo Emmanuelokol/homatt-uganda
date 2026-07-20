@@ -290,7 +290,14 @@ function clinicTier() {
   return 'premium';   // fail-open: never lock out on missing data
 }
 
+// PREMIUM GATING SWITCH — OFF for now. Every clinic sees ALL features; no
+// "Premium plan" locks anywhere. The admin's Basic/Premium selector still
+// records each clinic's plan, so flip this to true to switch the locks back
+// on later without any other change.
+var TIER_GATING_ENABLED = false;
+
 function clinicHasFeature(f) {
+  if (!TIER_GATING_ENABLED) return true;   // gating disabled → everything unlocked
   var feats = CLINIC_TIER_FEATURES[clinicTier()] || ['*'];
   return feats.indexOf('*') !== -1 || feats.indexOf(f) !== -1;
 }

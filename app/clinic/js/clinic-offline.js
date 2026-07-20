@@ -124,7 +124,7 @@
   // Race a promise against a timeout so a stalled request on a poor connection
   // can NEVER hang the UI. Resolves with a supabase-style error result on
   // timeout (never rejects).
-  var NET_TIMEOUT_MS = 10000;
+  var NET_TIMEOUT_MS = 7000;
   function withTimeout(promise, ms) {
     return Promise.race([
       Promise.resolve(promise).catch(function (e) { return { data: null, error: e || { message: 'request failed' } }; }),
@@ -137,26 +137,40 @@
   }
 
   // run() should return a Promise resolving to a supabase-style {data, error}.
-  // Every call is capped at NET_TIMEOUT_MS so a slow connection falls back to
-  // the cache instead of hanging forever.
+  //
+  // CACHE-FIRST (instant on very slow internet). If we already have saved data
+  // for this key, return it IMMEDIATELY — online or offline — so the screen
+  // paints at once instead of waiting on a crawling connection. When online and
+  // the cache is a little stale, a background refresh (capped by the timeout)
+  // updates it for the next read. Only the very first load with NO cache waits
+  // on the network.
+  var _revalidating = {};
   async function cachedQuery(key, run) {
-    // Offline: serve cache immediately if we have it.
-    if (isOffline()) {
-      var c = raw(key);
-      if (c) return { data: c.v, error: null, fromCache: true, cachedAt: c.ts };
+    var c = raw(key);
+    if (c) {
+      if (!isOffline()) {
+        var age = Date.now() - (c.ts || 0);
+        // Throttle: don't hammer a slow link — refresh at most every ~12s/key.
+        if (age > 12000 && !_revalidating[key]) {
+          _revalidating[key] = true;
+          withTimeout(run())
+            .then(function (res) { if (res && !res.error && res.data != null) set(key, res.data); })
+            .catch(function () {})
+            .then(function () { _revalidating[key] = false; });
+        }
+      }
+      return { data: c.v, error: null, fromCache: true, cachedAt: c.ts };
     }
+    // No saved data yet (first-ever load) → must wait for the network.
+    if (isOffline()) return { data: null, error: { message: 'offline — no saved data yet' } };
     try {
       var res = await withTimeout(run());
       if (res && !res.error && res.data != null) {
         set(key, res.data);
         return { data: res.data, error: null, fromCache: false };
       }
-      var cc = raw(key);                    // errored / timed out → cache
-      if (cc) return { data: cc.v, error: null, fromCache: true, cachedAt: cc.ts };
       return res || { data: null, error: { message: 'No data' } };
     } catch (e) {
-      var c2 = raw(key);                    // threw (offline) → cache
-      if (c2) return { data: c2.v, error: null, fromCache: true, cachedAt: c2.ts };
       return { data: null, error: e };
     }
   }

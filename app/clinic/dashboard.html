@@ -1057,8 +1057,8 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=14"></script>
-<script src="js/clinic.js?v=20260728"></script>
+<script src="js/clinic-offline.js?v=15"></script>
+<script src="js/clinic.js?v=20260729"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -3640,12 +3640,19 @@
           var isNotDeployed = httpStatus === 404 ||
             (errLow.indexOf('function') !== -1 && errLow.indexOf('not found') !== -1) ||
             errLow.indexOf('relay_error') !== -1;
-          if (isNotDeployed) {
+          var isNetErr = window.ClinicOffline && ClinicOffline.isNetworkErr && ClinicOffline.isNetworkErr(nr.error);
+          if (isNetErr) {
+            // Slow / dropped connection — the PAYMENT is safely saved; only the
+            // patient receipt push couldn't go out. Reassure, don't alarm.
+            notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. Receipt will send once the connection improves.';
+            notifyKind = 'success';
+          } else if (isNotDeployed) {
             notifyMsg = 'Payment of UGX '+fmtUGX(amount)+' saved. (Push receipt not yet deployed — deploy payment-notify edge function.)';
+            notifyKind = 'warning';
           } else {
-            notifyMsg = 'Payment saved. Push failed: ' + (nr.error.message || 'unknown error');
+            notifyMsg = 'Payment saved. Receipt push failed: ' + (nr.error.message || 'unknown error');
+            notifyKind = 'warning';
           }
-          notifyKind = 'warning';
           console.warn('[payment-notify] HTTP ' + httpStatus + ' error:', nr.error.message);
         } else {
           var nd = nr.data || {};
