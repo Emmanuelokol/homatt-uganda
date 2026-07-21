@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Homatt Clinic — Messages</title>
+  <script>
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  </script>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20260723">
+  <style>
+    .msg-wrap{display:flex;flex-direction:column;height:calc(100vh - 60px);max-height:calc(100vh - 60px)}
+    @media (max-width:768px){ .msg-wrap{height:calc(100vh - 60px)} .admin-content{padding:60px 0 0 !important} }
+    .admin-content{padding:0;display:flex;flex-direction:column;flex:1;overflow:hidden}
+
+    /* Inbox / threads */
+    #inboxView{display:flex;flex-direction:column;height:100%}
+    .msg-head{padding:14px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .msg-head h2{font-size:18px;font-weight:800;margin:0;flex:1}
+    .new-msg-btn{display:inline-flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:22px;padding:9px 16px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
+    #threadList{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .thread{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border);cursor:pointer;touch-action:manipulation}
+    .thread:active{background:rgba(0,0,0,0.04)}
+    html[data-theme="dark"] .thread:active{background:rgba(255,255,255,0.05)}
+    .thr-avatar{width:46px;height:46px;border-radius:50%;background:#1B5E20;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;flex-shrink:0}
+    .thr-main{flex:1;min-width:0}
+    .thr-name{font-size:14.5px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .thr-clinic{font-size:11px;color:var(--text-lt)}
+    .thr-last{font-size:12.5px;color:var(--text-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+    .thr-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
+    .thr-time{font-size:11px;color:var(--text-lt)}
+    .thr-badge{background:#1B5E20;color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+
+    /* Conversation */
+    #convView{display:none;flex-direction:column;height:100%}
+    .conv-head{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+    .conv-back{background:none;border:none;color:var(--text);cursor:pointer;padding:4px;display:flex}
+    .conv-title{flex:1;min-width:0}
+    .conv-name{font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .conv-sub{font-size:11.5px;color:var(--text-lt)}
+    #msgList{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+    .bubble{max-width:78%;padding:9px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative}
+    .bubble .b-time{font-size:10px;opacity:.65;margin-top:3px;text-align:right}
+    .bubble.me{align-self:flex-end;background:#1B5E20;color:#fff;border-bottom-right-radius:5px}
+    .bubble.them{align-self:flex-start;background:var(--surface);color:var(--text);border:1px solid var(--border);border-bottom-left-radius:5px}
+    .bubble img{max-width:100%;border-radius:10px;display:block;cursor:pointer}
+    .bubble audio{max-width:220px;display:block}
+    .b-tick{font-size:12px;vertical-align:-2px;margin-left:3px;opacity:.8}
+    .conv-empty{color:var(--text-lt);text-align:center;font-size:13px;margin:auto;padding:30px}
+
+    /* Composer */
+    .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface)}
+    .composer textarea{flex:1;resize:none;border:1.5px solid var(--border);border-radius:20px;padding:10px 14px;font-size:14px;font-family:inherit;max-height:100px;background:var(--bg);color:var(--text);outline:none;line-height:1.3}
+    .comp-btn{width:44px;height:44px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation}
+    .comp-icon{background:transparent;color:var(--text-lt)}
+    .comp-send{background:#1B5E20;color:#fff}
+    .comp-rec{background:#C62828;color:#fff}
+    .rec-bar{display:none;align-items:center;gap:10px;flex:1;color:#C62828;font-weight:700;font-size:14px}
+    .rec-dot{width:11px;height:11px;border-radius:50%;background:#C62828;animation:recpulse 1s infinite}
+    @keyframes recpulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+    /* Contact picker */
+    #contactModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:640;align-items:flex-end;justify-content:center}
+    .cm-sheet{background:var(--surface);width:100%;max-width:480px;max-height:82vh;border-radius:18px 18px 0 0;display:flex;flex-direction:column;overflow:hidden}
+    .cm-head{padding:16px;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+    #contactList{overflow-y:auto;-webkit-overflow-scrolling:touch}
+    .cm-group{padding:10px 16px 4px;font-size:11px;font-weight:800;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px}
+    .cm-item{display:flex;align-items:center;gap:12px;padding:12px 16px;cursor:pointer;touch-action:manipulation}
+    .cm-item:active{background:rgba(0,0,0,0.05)}
+    html[data-theme="dark"] .cm-item:active{background:rgba(255,255,255,0.05)}
+    .cm-av{width:40px;height:40px;border-radius:50%;background:#00796B;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}
+    .img-lightbox{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.9);z-index:700;align-items:center;justify-content:center;padding:20px}
+    .img-lightbox img{max-width:100%;max-height:100%;border-radius:8px}
+  </style>
+</head>
+<body>
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo" style="display:flex;align-items:center;gap:11px">
+      <img src="icons/logo-mark.svg?v=1" alt="" style="width:34px;height:34px;flex-shrink:0" draggable="false">
+      <div style="min-width:0">
+        <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+        <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations"><span class="material-icons-outlined">add_circle</span> New Consultation</a>
+      <a href="messages.html" class="sidebar-link active"><span class="material-icons-outlined">forum</span> Messages</a>
+      <a href="settings.html" class="sidebar-link" data-nav-cap="settings"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">
+        <a href="dashboard.html" style="color:#5F6368;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+          <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
+        </a>
+        Messages
+      </div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip"><div class="admin-user-avatar" id="clinicUserAvatar">C</div><span id="clinicUserNameTop">Clinic</span></div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+      <div class="msg-wrap">
+        <!-- Inbox -->
+        <div id="inboxView">
+          <div class="msg-head">
+            <h2>Chats</h2>
+            <button class="new-msg-btn" id="newMsgBtn"><span class="material-icons-outlined" style="font-size:18px">edit</span> New</button>
+          </div>
+          <div id="threadList">
+            <div style="text-align:center;padding:30px;color:#9AA0A6;font-size:13px">Loading chats…</div>
+          </div>
+        </div>
+
+        <!-- Conversation -->
+        <div id="convView">
+          <div class="conv-head">
+            <button class="conv-back" id="convBack"><span class="material-icons-outlined">arrow_back</span></button>
+            <div class="thr-avatar" id="convAvatar" style="width:38px;height:38px;font-size:15px">?</div>
+            <div class="conv-title">
+              <div class="conv-name" id="convName">Clinician</div>
+              <div class="conv-sub" id="convSub"></div>
+            </div>
+          </div>
+          <div id="msgList"></div>
+          <div class="composer">
+            <input type="file" id="photoInput" accept="image/*" style="display:none">
+            <button class="comp-btn comp-icon" id="photoBtn" title="Send photo"><span class="material-icons-outlined">photo_camera</span></button>
+            <textarea id="msgInput" rows="1" placeholder="Message…"></textarea>
+            <button class="comp-btn comp-icon" id="micBtn" title="Record voice note"><span class="material-icons-outlined">mic</span></button>
+            <button class="comp-btn comp-send" id="sendBtn" style="display:none" title="Send"><span class="material-icons-outlined">send</span></button>
+            <div class="rec-bar" id="recBar">
+              <span class="rec-dot"></span><span id="recTime">0:00</span>
+              <button class="comp-btn comp-icon" id="recCancel" style="width:36px;height:36px;color:#C62828" title="Cancel"><span class="material-icons-outlined">delete</span></button>
+              <button class="comp-btn comp-send" id="recStop" style="width:36px;height:36px" title="Send voice note"><span class="material-icons-outlined">send</span></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Contact picker -->
+  <div id="contactModal">
+    <div class="cm-sheet">
+      <div class="cm-head"><span>New message</span><button style="background:none;border:none;cursor:pointer;color:var(--text-lt)" id="cmClose"><span class="material-icons-outlined">close</span></button></div>
+      <div id="contactList"><div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading clinicians…</div></div>
+    </div>
+  </div>
+  <div class="img-lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+  <div id="clinicToast" class="admin-toast"></div>
+
+  <script src="js/vendor/supabase.min.js?v=2110"></script>
+  <script src="../js/config.js"></script>
+  <script src="js/clinic-offline.js?v=15"></script>
+  <script src="js/clinic.js?v=20260729"></script>
+  <script src="js/messages.js?v=20260728"></script>
+  <script src="js/pwa-install.js?v=20260705g"></script>
+</body>
+</html>
