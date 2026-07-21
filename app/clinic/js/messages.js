@@ -247,6 +247,29 @@
   var input = document.getElementById('msgInput');
   var sendBtn = document.getElementById('sendBtn');
   var micBtn = document.getElementById('micBtn');
+
+  // ONE-TAP buttons. Plain 'click' on Android is unreliable next to an open
+  // keyboard: the keyboard-dismiss reflow moves the button between touchstart
+  // and click, so the click lands elsewhere and the user must tap many times.
+  // Fire on POINTERDOWN (the first instant of the touch, before any reflow),
+  // with pointerup + click as deduped fallbacks — the exact pattern that fixed
+  // the Quick Sale Sell button.
+  function instantTap(btn, handler) {
+    if (!btn) return;
+    var last = 0;
+    function fire(e) {
+      var now = Date.now();
+      if (now - last < 700) return;        // dedupe the down/up/click trio
+      last = now;
+      if (e && e.cancelable) e.preventDefault();  // keep focus (and keyboard) where it is
+      handler(e);
+    }
+    btn.addEventListener('pointerdown', fire);
+    btn.addEventListener('pointerup', fire);
+    btn.addEventListener('click', fire);
+    btn.addEventListener('touchstart', fire, { passive: false });  // pre-Pointer WebViews
+  }
+
   input.addEventListener('input', function () {
     input.style.height = 'auto';
     input.style.height = Math.min(100, input.scrollHeight) + 'px';
@@ -254,7 +277,7 @@
     sendBtn.style.display = has ? 'flex' : 'none';
     micBtn.style.display = has ? 'none' : 'flex';
   });
-  sendBtn.addEventListener('click', sendText);
+  instantTap(sendBtn, sendText);
   input.addEventListener('keydown', function (e) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendText(); }
   });
@@ -303,7 +326,7 @@
   }
 
   // ── Photo ──────────────────────────────────────────────────────────
-  document.getElementById('photoBtn').addEventListener('click', function () {
+  instantTap(document.getElementById('photoBtn'), function () {
     if (navigator.onLine === false) { toast('Photos need a connection', 'error'); return; }
     document.getElementById('photoInput').click();
   });
@@ -331,9 +354,9 @@
 
   // ── Voice note ─────────────────────────────────────────────────────
   var _rec = null, _chunks = [], _recStart = 0, _recTimer = null;
-  micBtn.addEventListener('click', startRecording);
-  document.getElementById('recStop').addEventListener('click', function () { stopRecording(true); });
-  document.getElementById('recCancel').addEventListener('click', function () { stopRecording(false); });
+  instantTap(micBtn, startRecording);
+  instantTap(document.getElementById('recStop'), function () { stopRecording(true); });
+  instantTap(document.getElementById('recCancel'), function () { stopRecording(false); });
 
   async function startRecording() {
     if (navigator.onLine === false) { toast('Voice notes need a connection', 'error'); return; }
@@ -425,6 +448,31 @@
     d.innerHTML = inner + '<div class="b-time">' + fmtTime(m.created_at) + '</div>';
     box.appendChild(d); box.scrollTop = box.scrollHeight;
   }
+
+  // ── Keyboard-aware layout ──────────────────────────────────────────
+  // Android keyboards OVERLAY the page: with a fixed 100vh layout the compose
+  // bar ends up hidden underneath and the user has to scroll to find it. Track
+  // the visual viewport (the part actually visible above the keyboard) and size
+  // the chat to it, so the compose bar always sits right on top of the keyboard
+  // and the newest messages stay in view.
+  (function keyboardFit() {
+    var wrap = document.querySelector('.msg-wrap');
+    if (!wrap || !window.visualViewport) return;
+    var vv = window.visualViewport;
+    function fit() {
+      // 60 = fixed topbar height; keep the wrap exactly in the visible area.
+      var h = Math.max(220, Math.round(vv.height) - 60);
+      wrap.style.height = h + 'px';
+      wrap.style.maxHeight = h + 'px';
+      var list = document.getElementById('msgList');
+      if (list) list.scrollTop = list.scrollHeight;
+    }
+    vv.addEventListener('resize', fit);
+    vv.addEventListener('scroll', fit);
+    input.addEventListener('focus', function () { setTimeout(fit, 250); setTimeout(fit, 600); });
+    input.addEventListener('blur', function () { setTimeout(fit, 250); });
+    fit();
+  })();
 
   // When our queued messages finish syncing, refresh so ticks/read update.
   window.addEventListener('clinic-synced', function () { if (current) loadMessages(); else loadThreads(); });
