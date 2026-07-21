@@ -254,13 +254,17 @@
   // Fire on POINTERDOWN (the first instant of the touch, before any reflow),
   // with pointerup + click as deduped fallbacks — the exact pattern that fixed
   // the Quick Sale Sell button.
+  // The dedupe timestamp is SHARED across all composer buttons: sendText()
+  // swaps Send→Mic in the same spot while the finger is still down, so the
+  // follow-up pointerup/click lands on the Mic and would start a recording.
+  // A global window means the ghost events hit a still-warm dedupe and die.
+  var _lastTap = 0;
   function instantTap(btn, handler) {
     if (!btn) return;
-    var last = 0;
     function fire(e) {
       var now = Date.now();
-      if (now - last < 700) return;        // dedupe the down/up/click trio
-      last = now;
+      if (now - _lastTap < 700) return;    // dedupe the trio + ghost taps on swapped-in buttons
+      _lastTap = now;
       if (e && e.cancelable) e.preventDefault();  // keep focus (and keyboard) where it is
       handler(e);
     }
@@ -323,6 +327,16 @@
     d.className = 'bubble me';
     d.innerHTML = inner + '<div class="b-time">' + fmtTime(row.created_at) + '<span class="material-icons-outlined b-tick">schedule</span></div>';
     box.appendChild(d); box.scrollTop = box.scrollHeight;
+    return d;
+  }
+
+  function markSent(bubble) {
+    var t = bubble && bubble.querySelector('.b-tick');
+    if (t) t.textContent = 'done';
+  }
+  function markFailed(bubble) {
+    var t = bubble && bubble.querySelector('.b-tick');
+    if (t) { t.textContent = 'error_outline'; t.style.color = '#e57373'; }
   }
 
   // ── Photo ──────────────────────────────────────────────────────────
@@ -334,11 +348,12 @@
     var file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file || !current) return;
-    toast('Sending photo…');
+    var row = baseRow(); row.media_type = 'image';
+    var bubble = appendOptimistic(Object.assign({}, row, { media_url: URL.createObjectURL(file) }));
     var url = await uploadMedia(file, 'jpg');
-    if (!url) { toast('Photo upload failed', 'error'); return; }
-    var row = baseRow(); row.media_url = url; row.media_type = 'image';
-    persist(row); appendOptimistic(row);
+    if (!url) { markFailed(bubble); toast('Photo failed — check connection and try again', 'error'); return; }
+    row.media_url = url;
+    persist(row); markSent(bubble);
   });
 
   async function uploadMedia(blob, ext) {
@@ -391,22 +406,19 @@
     if (!_rec) { resetRecUI(); return; }
     var dur = Date.now() - _recStart;
     var rec = _rec; _rec = null;
-    if (!send) { try { rec.stop(); } catch (e) {} resetRecUI(); return; }
-    rec.onstop = async function () {
-      try { rec.stream && rec.stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
-    };
     var done = new Promise(function (resolve) {
       rec.addEventListener('stop', function () { resolve(new Blob(_chunks, { type: 'audio/webm' })); });
     });
     try { rec.stop(); } catch (e) {}
-    resetRecUI();
-    if (dur < 500) return;                     // too short
-    toast('Sending voice note…');
-    var blob = await done;
+    resetRecUI();                              // timer + bar disappear the instant you tap
+    if (!send || dur < 500) return;
+    var blob = await done;                     // ms — just the recorder flushing its buffer
+    var row = baseRow(); row.media_type = 'audio'; row.duration_ms = dur;
+    var bubble = appendOptimistic(Object.assign({}, row, { media_url: URL.createObjectURL(blob) }));
     var url = await uploadMedia(blob, 'webm');
-    if (!url) { toast('Voice note failed', 'error'); return; }
-    var row = baseRow(); row.media_url = url; row.media_type = 'audio'; row.duration_ms = dur;
-    persist(row); appendOptimistic(row);
+    if (!url) { markFailed(bubble); toast('Voice note failed — check connection and try again', 'error'); return; }
+    row.media_url = url;
+    persist(row); markSent(bubble);
   }
 
   // ── Realtime ───────────────────────────────────────────────────────
