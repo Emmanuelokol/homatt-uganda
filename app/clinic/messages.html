@@ -22,8 +22,16 @@
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="stylesheet" href="css/clinic.css?v=20260723">
   <style>
-    .msg-wrap{display:flex;flex-direction:column;height:calc(100vh - 60px);height:calc(100dvh - 60px);max-height:calc(100dvh - 60px)}
-    @media (max-width:768px){ .admin-content{padding:60px 0 0 !important} }
+    /* --msg-top is set by JS to the MEASURED topbar height (it's not 60px on
+       every phone — the fixed topbar sizes to its buttons). On mobile the chat
+       is pinned between the topbar and the bottom of the layout viewport, so
+       the composer is always on screen; the keyboard shrinks the viewport
+       (interactive-widget=resizes-content) and bottom:0 rides on top of it. */
+    .msg-wrap{display:flex;flex-direction:column;height:calc(100vh - var(--msg-top,60px));height:calc(100dvh - var(--msg-top,60px));max-height:calc(100dvh - var(--msg-top,60px))}
+    @media (max-width:768px){
+      .admin-content{padding:60px 0 0 !important}
+      .msg-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--msg-top,60px);height:auto;max-height:none}
+    }
     .admin-content{padding:0;display:flex;flex-direction:column;flex:1;overflow:hidden}
 
     /* Inbox / threads */
@@ -177,7 +185,7 @@
   <script src="../js/config.js"></script>
   <script src="js/clinic-offline.js?v=15"></script>
   <script src="js/clinic.js?v=20260729"></script>
-  <script src="js/messages.js?v=20260801"></script>
+  <script src="js/messages.js?v=20260802"></script>
   <script src="js/pwa-install.js?v=20260705g"></script>
 </body>
 </html>

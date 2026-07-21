@@ -515,6 +515,21 @@
     if (e.target === _composer) { e.preventDefault(); input.focus(); }
   });
 
+  // Measure the real topbar height into --msg-top (the chat is pinned right
+  // below it). The topbar sizes to its buttons and differs per phone; assuming
+  // 60px left the composer pushed off-screen on taller topbars.
+  (function msgTop() {
+    function set() {
+      var tb = document.querySelector('.admin-topbar');
+      var h = tb ? Math.ceil(tb.getBoundingClientRect().height) : 60;
+      if (h > 0) document.documentElement.style.setProperty('--msg-top', h + 'px');
+    }
+    set();
+    window.addEventListener('resize', set);
+    window.addEventListener('load', set);
+    setTimeout(set, 400);   // after fonts/topbar buttons settle
+  })();
+
   // When our queued messages finish syncing, refresh so ticks/read update.
   window.addEventListener('clinic-synced', function () { if (current) loadMessages(); else loadThreads(); });
 })();
