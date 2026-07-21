@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <!-- interactive-widget=resizes-content: the keyboard shrinks the LAYOUT
+       viewport, so the 100dvh chat column re-lays out with the composer pinned
+       above the keyboard — stationary, no JS resizing. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <title>Homatt Clinic — Messages</title>
   <script>
@@ -48,7 +51,7 @@
     .conv-title{flex:1;min-width:0}
     .conv-name{font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .conv-sub{font-size:11.5px;color:var(--text-lt)}
-    #msgList{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
+    #msgList{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:14px 12px;display:flex;flex-direction:column;gap:8px;background:var(--bg)}
     .bubble{max-width:78%;padding:9px 12px;border-radius:16px;font-size:14px;line-height:1.4;word-wrap:break-word;position:relative}
     .bubble .b-time{font-size:10px;opacity:.65;margin-top:3px;text-align:right}
     .bubble.me{align-self:flex-end;background:#1B5E20;color:#fff;border-bottom-right-radius:5px}
@@ -59,8 +62,8 @@
     .conv-empty{color:var(--text-lt);text-align:center;font-size:13px;margin:auto;padding:30px}
 
     /* Composer */
-    .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface)}
-    .composer textarea{flex:1;resize:none;border:1.5px solid var(--border);border-radius:20px;padding:10px 14px;font-size:14px;font-family:inherit;max-height:100px;background:var(--bg);color:var(--text);outline:none;line-height:1.3}
+    .composer{display:flex;align-items:flex-end;gap:8px;padding:8px 10px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface);touch-action:manipulation}
+    .composer textarea{flex:1;resize:none;border:1.5px solid var(--border);border-radius:20px;padding:10px 14px;font-size:14px;font-family:inherit;max-height:100px;background:var(--bg);color:var(--text);outline:none;line-height:1.3;touch-action:manipulation}
     .comp-btn{width:44px;height:44px;border-radius:50%;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;touch-action:manipulation}
     .comp-icon{background:transparent;color:var(--text-lt)}
     .comp-send{background:#1B5E20;color:#fff}
@@ -174,7 +177,7 @@
   <script src="../js/config.js"></script>
   <script src="js/clinic-offline.js?v=15"></script>
   <script src="js/clinic.js?v=20260729"></script>
-  <script src="js/messages.js?v=20260731"></script>
+  <script src="js/messages.js?v=20260801"></script>
   <script src="js/pwa-install.js?v=20260705g"></script>
 </body>
 </html>

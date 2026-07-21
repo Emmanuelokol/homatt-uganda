@@ -186,8 +186,20 @@
     };
     var res = CO ? await CO.cachedQuery(key, run) : await run();
     var rows = res.data || [];
-    // fold in any of MY messages to this person still queued offline
-    (pendingToThis()).forEach(function (p) { rows.push(p); });
+    // Fold in my messages the cached query doesn't have yet, deduped by id:
+    // server copy wins, then still-queued outbox rows, then this session's echo.
+    var have = {};
+    rows.forEach(function (r) { if (r.id) have[r.id] = 1; });
+    pendingToThis().forEach(function (p) {
+      if (p.id && have[p.id]) return;
+      if (p.id) have[p.id] = 1;
+      rows.push(p);
+    });
+    echoToThis().forEach(function (p) {
+      if (p.id && have[p.id]) return;
+      if (p.id) have[p.id] = 1;
+      rows.push(p);
+    });
     rows.sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
     renderMessages(rows);
     if (name_isPlaceholder()) refreshHeaderName(rows);
@@ -214,7 +226,11 @@
       } else {
         inner = _esc(m.body || '');
       }
-      var tick = mine ? '<span class="material-icons-outlined b-tick">' + (m.read_at ? 'done_all' : (m._pending ? 'schedule' : 'done')) + '</span>' : '';
+      var tick = mine
+        ? (m._failed
+            ? '<span class="material-icons-outlined b-tick" style="color:#e57373">error_outline</span>'
+            : '<span class="material-icons-outlined b-tick">' + (m.read_at ? 'done_all' : (m._pending ? 'schedule' : 'done')) + '</span>')
+        : '';
       return '<div class="bubble ' + (mine ? 'me' : 'them') + '">' + inner
         + '<div class="b-time">' + _esc(fmtTime(m.created_at)) + tick + '</div></div>';
     }).join('');
@@ -293,7 +309,19 @@
       created_at: new Date().toISOString(),
     };
     if (window.ClinicOffline && ClinicOffline.uuid) row.id = ClinicOffline.uuid();
+    else if (window.crypto && crypto.randomUUID) row.id = crypto.randomUUID();
     return row;
+  }
+
+  // Everything sent this session, kept in memory. loadMessages() re-renders
+  // from a CACHED query (fresh data arrives later), so without this a just-sent
+  // message vanishes on the first 'clinic-synced' re-render — the outbox no
+  // longer has it and the cache doesn't yet. Folded in (deduped by id) until
+  // the server copy shows up.
+  var _echo = [];
+  function rememberEcho(row) { _echo.push(row); }
+  function echoToThis() {
+    return current ? _echo.filter(function (r) { return r.to_user === current.user; }) : [];
   }
 
   function persist(row) {
@@ -311,6 +339,7 @@
     var text = input.value.trim();
     if (!text) return;
     var row = baseRow(); row.body = text;
+    rememberEcho(row);
     persist(row);
     input.value = ''; input.style.height = 'auto';
     sendBtn.style.display = 'none'; micBtn.style.display = 'flex';
@@ -349,9 +378,11 @@
     e.target.value = '';
     if (!file || !current) return;
     var row = baseRow(); row.media_type = 'image';
-    var bubble = appendOptimistic(Object.assign({}, row, { media_url: URL.createObjectURL(file) }));
+    row.media_url = URL.createObjectURL(file);   // local preview; swapped after upload
+    rememberEcho(row);
+    var bubble = appendOptimistic(row);
     var url = await uploadMedia(file, 'jpg');
-    if (!url) { markFailed(bubble); toast('Photo failed — check connection and try again', 'error'); return; }
+    if (!url) { row._failed = true; markFailed(bubble); toast('Photo failed — check connection and try again', 'error'); return; }
     row.media_url = url;
     persist(row); markSent(bubble);
   });
@@ -414,9 +445,11 @@
     if (!send || dur < 500) return;
     var blob = await done;                     // ms — just the recorder flushing its buffer
     var row = baseRow(); row.media_type = 'audio'; row.duration_ms = dur;
-    var bubble = appendOptimistic(Object.assign({}, row, { media_url: URL.createObjectURL(blob) }));
+    row.media_url = URL.createObjectURL(blob); // playable locally; swapped after upload
+    rememberEcho(row);
+    var bubble = appendOptimistic(row);
     var url = await uploadMedia(blob, 'webm');
-    if (!url) { markFailed(bubble); toast('Voice note failed — check connection and try again', 'error'); return; }
+    if (!url) { row._failed = true; markFailed(bubble); toast('Voice note failed — check connection and try again', 'error'); return; }
     row.media_url = url;
     persist(row); markSent(bubble);
   }
@@ -462,29 +495,25 @@
   }
 
   // ── Keyboard-aware layout ──────────────────────────────────────────
-  // Android keyboards OVERLAY the page: with a fixed 100vh layout the compose
-  // bar ends up hidden underneath and the user has to scroll to find it. Track
-  // the visual viewport (the part actually visible above the keyboard) and size
-  // the chat to it, so the compose bar always sits right on top of the keyboard
-  // and the newest messages stay in view.
-  (function keyboardFit() {
-    var wrap = document.querySelector('.msg-wrap');
-    if (!wrap || !window.visualViewport) return;
-    var vv = window.visualViewport;
-    function fit() {
-      // 60 = fixed topbar height; keep the wrap exactly in the visible area.
-      var h = Math.max(220, Math.round(vv.height) - 60);
-      wrap.style.height = h + 'px';
-      wrap.style.maxHeight = h + 'px';
+  // The compose bar is kept above the keyboard by the BROWSER, not by JS:
+  // the viewport meta declares interactive-widget=resizes-content, so when
+  // the keyboard opens the layout viewport shrinks and the 100dvh flex
+  // column re-lays out with the composer pinned at its bottom. (The old
+  // visualViewport resize/scroll JS made the composer bounce while
+  // scrolling — vv 'scroll' fires constantly — and moved it mid-tap, which
+  // is why taps on the text box kept missing. Don't bring it back.)
+  // All that's left to do: keep the newest messages in view when the
+  // keyboard opens, and focus the input when the composer padding is hit.
+  input.addEventListener('focus', function () {
+    setTimeout(function () {
       var list = document.getElementById('msgList');
       if (list) list.scrollTop = list.scrollHeight;
-    }
-    vv.addEventListener('resize', fit);
-    vv.addEventListener('scroll', fit);
-    input.addEventListener('focus', function () { setTimeout(fit, 250); setTimeout(fit, 600); });
-    input.addEventListener('blur', function () { setTimeout(fit, 250); });
-    fit();
-  })();
+    }, 300);
+  });
+  var _composer = document.querySelector('.composer');
+  if (_composer) _composer.addEventListener('pointerdown', function (e) {
+    if (e.target === _composer) { e.preventDefault(); input.focus(); }
+  });
 
   // When our queued messages finish syncing, refresh so ticks/read update.
   window.addEventListener('clinic-synced', function () { if (current) loadMessages(); else loadThreads(); });
