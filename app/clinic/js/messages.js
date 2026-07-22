@@ -178,7 +178,9 @@
     return supabase.from('clinic_messages')
       .select('id,from_user,body,media_url,media_type,duration_ms,created_at,read_at')
       .or('and(from_user.eq.' + ME + ',to_user.eq.' + current.user + '),and(from_user.eq.' + current.user + ',to_user.eq.' + ME + ')')
-      .order('created_at', { ascending: true }).limit(200);
+      // newest first + limit, so a long chat can never push new messages out
+      // of the window; every consumer re-sorts ascending for display.
+      .order('created_at', { ascending: false }).limit(200);
   }
   function convKey() { return '_co_msg_conv_' + ME + '_' + current.user; }
 
@@ -202,7 +204,14 @@
       rows.push(p);
     });
     echoToThis().forEach(function (p) {
-      if (p.id && have[p.id]) return;
+      if (p.id && have[p.id]) {
+        // Server/outbox copy of media I sent this session: keep the LOCAL
+        // blob on screen so re-renders never re-download the photo/voice.
+        if (p.media_url && p.media_url.indexOf('blob:') === 0) {
+          rows.forEach(function (r) { if (r.id === p.id && r.media_url) r.media_url = p.media_url; });
+        }
+        return;
+      }
       if (p.id) have[p.id] = 1;
       rows.push(p);
     });
@@ -416,8 +425,11 @@
     var bubble = appendOptimistic(row);
     var url = await uploadMedia(file, 'jpg');
     if (!url) { row._failed = true; markFailed(bubble); toast('Photo failed — check connection and try again', 'error'); return; }
-    row.media_url = url;
-    persist(row); markSent(bubble);
+    // Send the uploaded URL to the server, but KEEP the local blob on screen:
+    // swapping the bubble to the remote URL made the photo vanish for seconds
+    // while it re-downloaded on slow internet.
+    persist(Object.assign({}, row, { media_url: url }));
+    markSent(bubble);
   });
 
   async function uploadMedia(blob, ext) {
@@ -483,8 +495,9 @@
     var bubble = appendOptimistic(row);
     var url = await uploadMedia(blob, 'webm');
     if (!url) { row._failed = true; markFailed(bubble); toast('Voice note failed — check connection and try again', 'error'); return; }
-    row.media_url = url;
-    persist(row); markSent(bubble);
+    // server gets the uploaded URL; the on-screen bubble keeps the local blob
+    persist(Object.assign({}, row, { media_url: url }));
+    markSent(bubble);
   }
 
   // ── Real-time delivery ─────────────────────────────────────────────
@@ -524,6 +537,15 @@
   }
   var _rtRetry = 0;
 
+  // Every awaited request is raced against a hard timeout: a fetch that hangs
+  // on a dying mobile socket would otherwise leave _pollBusy stuck true and
+  // silently kill ALL future polls — the "no updates until I reopen" bug.
+  function raced(p, ms) {
+    return Promise.race([p, new Promise(function (_, rej) {
+      setTimeout(function () { rej(new Error('poll timeout')); }, ms);
+    })]);
+  }
+
   var _pollBusy = false, _fullTick = 0;
   function cachedConvRows() {
     try { return ((JSON.parse(localStorage.getItem(convKey()) || 'null') || {}).v) || []; }
@@ -537,20 +559,30 @@
     try {
       _fullTick++;
       var cached = cachedConvRows();
-      var newest = cached.length ? cached[cached.length - 1].created_at : null;
+      // newest = MAX created_at (order-agnostic), then overlap the cursor by
+      // 15 minutes: created_at is stamped by each phone's clock, and a fast
+      // clock on one phone must never filter out the other phone's replies.
+      // The id-dedupe below makes the overlap free of duplicates.
+      var newest = cached.reduce(function (m, r) {
+        return (!m || (r.created_at && r.created_at > m)) ? r.created_at : m;
+      }, null);
       var incremental = !!newest && !force && _fullTick % 6 !== 0;
       var q = convQuery();
-      if (incremental) q = q.gt('created_at', newest);
-      var res = await q;
+      if (incremental) {
+        var since = new Date(Math.max(0, new Date(newest).getTime() - 15 * 60000)).toISOString();
+        q = q.gt('created_at', since);
+      }
+      var res = await raced(q, 12000);
       if (!res || res.error || !res.data) return;
       var rows;
       if (incremental) {
-        if (!res.data.length) return;                  // nothing new
         var have = {};
         cached.forEach(function (r) { if (r.id) have[r.id] = 1; });
-        rows = cached.concat(res.data.filter(function (r) { return !have[r.id]; }));
+        var fresh = res.data.filter(function (r) { return !have[r.id]; });
+        if (!fresh.length) return;                     // nothing new
+        rows = cached.concat(fresh);
       } else {
-        rows = res.data;
+        rows = res.data.slice();
       }
       rows.sort(byCreated);
       try { localStorage.setItem(convKey(), JSON.stringify({ ts: Date.now(), v: rows })); } catch (e) {}
@@ -568,7 +600,7 @@
     if (document.getElementById('inboxView').style.display === 'none') return;
     _thrBusy = true;
     try {
-      var res = await supabase.rpc('message_threads');
+      var res = await raced(supabase.rpc('message_threads'), 12000);
       if (!res || res.error || !res.data) return;
       var key = '_co_msg_threads_' + ME;
       var next = JSON.stringify({ ts: Date.now(), v: res.data });
