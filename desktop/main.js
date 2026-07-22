@@ -9,6 +9,10 @@
 const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 
+// Windows toasts (new-message alerts from the pages' Notification API) only
+// show when the app declares its AppUserModelId — must match build.appId.
+app.setAppUserModelId('ug.homatt.clinic.desktop');
+
 // One window only — a second launch focuses the existing one.
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
