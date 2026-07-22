@@ -185,6 +185,8 @@
     try {
       var s = await supabase.auth.getSession();
       ME = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+      // authorize the realtime socket (RLS tables deliver nothing to anon)
+      try { supabase.realtime.setAuth(s.data.session.access_token); } catch (e2) {}
     } catch (e) {}
     if (!ME) ME = session.userId;
     if (!ME) return;

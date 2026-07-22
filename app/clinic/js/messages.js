@@ -42,6 +42,9 @@
     try {
       var s = await supabase.auth.getSession();
       ME = s && s.data && s.data.session && s.data.session.user && s.data.session.user.id;
+      // Explicitly authorize the realtime socket — postgres_changes on an
+      // RLS table delivers nothing if the socket only carries the anon key.
+      try { supabase.realtime.setAuth(s.data.session.access_token); } catch (e2) {}
     } catch (e) {}
     if (!ME) { ME = session && session.userId; }
     if (!ME) {
@@ -180,7 +183,8 @@
       .or('and(from_user.eq.' + ME + ',to_user.eq.' + current.user + '),and(from_user.eq.' + current.user + ',to_user.eq.' + ME + ')')
       // newest first + limit, so a long chat can never push new messages out
       // of the window; every consumer re-sorts ascending for display.
-      .order('created_at', { ascending: false }).limit(200);
+      // 100 rows keeps the full re-sync payload small on 2G/3G links.
+      .order('created_at', { ascending: false }).limit(100);
   }
   function convKey() { return '_co_msg_conv_' + ME + '_' + current.user; }
 
@@ -560,16 +564,19 @@
       _fullTick++;
       var cached = cachedConvRows();
       // newest = MAX created_at (order-agnostic), then overlap the cursor by
-      // 15 minutes: created_at is stamped by each phone's clock, and a fast
+      // 5 minutes: created_at is stamped by each phone's clock, and a fast
       // clock on one phone must never filter out the other phone's replies.
-      // The id-dedupe below makes the overlap free of duplicates.
+      // The id-dedupe below makes the overlap free of duplicates. Keep the
+      // overlap SMALL — during active chatting it's re-fetched every poll,
+      // and a heavy window congests the very link it's polling on. Bigger
+      // skew than 5 minutes is caught by the periodic full re-sync.
       var newest = cached.reduce(function (m, r) {
         return (!m || (r.created_at && r.created_at > m)) ? r.created_at : m;
       }, null);
-      var incremental = !!newest && !force && _fullTick % 6 !== 0;
+      var incremental = !!newest && !force && _fullTick % 24 !== 0;
       var q = convQuery();
       if (incremental) {
-        var since = new Date(Math.max(0, new Date(newest).getTime() - 15 * 60000)).toISOString();
+        var since = new Date(Math.max(0, new Date(newest).getTime() - 5 * 60000)).toISOString();
         q = q.gt('created_at', since);
       }
       var res = await raced(q, 12000);
@@ -589,7 +596,7 @@
       foldAndRender(rows.slice());
     } catch (e) {} finally { _pollBusy = false; }
   }
-  setInterval(function () { pollConversation(false); }, 3500);
+  setInterval(function () { pollConversation(false); }, 2500);
 
   // Inbox: keep the thread list fresh too (only re-renders when it changed).
   var _thrBusy = false;
