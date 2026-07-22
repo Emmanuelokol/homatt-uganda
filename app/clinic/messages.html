@@ -20,7 +20,7 @@
   <meta name="theme-color" content="#1B5E20">
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260723">
+  <link rel="stylesheet" href="css/clinic.css?v=20260803">
   <style>
     /* --msg-top is set by JS to the MEASURED topbar height (it's not 60px on
        every phone — the fixed topbar sizes to its buttons). On mobile the chat
@@ -32,6 +32,13 @@
       .admin-content{padding:60px 0 0 !important}
       .msg-wrap{position:fixed;left:0;right:0;bottom:0;top:var(--msg-top,60px);height:auto;max-height:none}
     }
+    /* The floating "Install app" pill/banner sit exactly where the composer
+       lives and STEAL its taps (the banner's × lands on the Send/Mic button —
+       that was "I have to press many times"). Never show them on this page.
+       The sync bar is pointer-events:none but visually covered Send; lift it
+       above the composer. Stylesheet !important beats their inline styles. */
+    #_homattInstallPill,#_homattInstallBar{display:none !important}
+    #_clinicOfflineBar{bottom:62px !important}
     .admin-content{padding:0;display:flex;flex-direction:column;flex:1;overflow:hidden}
 
     /* Inbox / threads */
@@ -186,6 +193,6 @@
   <script src="js/clinic-offline.js?v=15"></script>
   <script src="js/clinic.js?v=20260729"></script>
   <script src="js/messages.js?v=20260802"></script>
-  <script src="js/pwa-install.js?v=20260705g"></script>
+  <script src="js/pwa-install.js?v=20260803"></script>
 </body>
 </html>

@@ -69,6 +69,10 @@
            window.matchMedia('(display-mode: minimal-ui)').matches ||
            window.navigator.standalone === true ||
            document.referrer.indexOf('android-app://') === 0 ||
+           // Android WebView (the APK app): UA carries "; wv)". window.Capacitor
+           // isn't reliably present there, and the install pill/banner floated
+           // over real buttons (they stole the messenger composer's taps).
+           /; wv\)/.test(navigator.userAgent || '') ||
            // Inside the native Capacitor app it's already "installed".
            !!(window.Capacitor && (
              (typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) ||
