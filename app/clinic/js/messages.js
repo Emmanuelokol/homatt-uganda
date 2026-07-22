@@ -55,6 +55,15 @@
     if (!MY_CLINIC) { try { MY_CLINIC = await resolveClinicId(); } catch (e) {} }
     loadThreads();
     subscribeRealtime();
+    // Retention: erase chat older than 60 days (server + media) to keep the
+    // messenger light. At most once per day per device, quietly.
+    try {
+      var purgedAt = parseInt(localStorage.getItem('_msg_purged_at') || '0', 10);
+      if (Date.now() - purgedAt > 86400000 && navigator.onLine !== false) {
+        localStorage.setItem('_msg_purged_at', String(Date.now()));
+        supabase.rpc('purge_old_messages').then(function () {}).catch(function () {});
+      }
+    } catch (e) {}
     // open a conversation if arrived via ?from=<uid> (push tap)
     try {
       var q = new URLSearchParams(location.search);

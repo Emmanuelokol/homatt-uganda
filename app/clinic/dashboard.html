@@ -347,11 +347,11 @@
         </div>
         <div class="stat-card" data-cap="financials">
           <div class="stat-icon green"><span class="material-icons-outlined">payments</span></div>
-          <div><div class="stat-number" id="statRevToday" style="font-size:15px">—</div><div class="stat-label">Today's Revenue</div></div>
+          <div><div class="stat-number" id="statRevToday" style="font-size:15px">—</div><div class="stat-label">Today's Money In</div></div>
         </div>
         <div class="stat-card" data-cap="financials">
           <div class="stat-icon teal"><span class="material-icons-outlined">bar_chart</span></div>
-          <div><div class="stat-number" id="statRevMonth" style="font-size:15px">—</div><div class="stat-label">This Month</div></div>
+          <div><div class="stat-number" id="statRevMonth" style="font-size:15px">—</div><div class="stat-label">Money In This Month</div></div>
         </div>
         <div class="stat-card">
           <div class="stat-icon blue" style="background:#E3F2FD"><span class="material-icons-outlined" style="color:#1565C0">schedule</span></div>
@@ -551,16 +551,19 @@
             <div id="finPatients" style="font-size:22px;font-weight:700;color:#4A148C">—</div>
           </div>
           <div style="background:#E8F5E9;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Billed (UGX)</div>
+            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Demanded / Billed (UGX)</div>
             <div id="finRevenue" style="font-size:18px;font-weight:700;color:#1B5E20">—</div>
+            <div style="font-size:10.5px;color:#1B5E20;opacity:.75;margin-top:3px">Total charged to patients</div>
           </div>
           <div style="background:#E0F2F1;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#00695C;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Collected (UGX)</div>
             <div id="finCollected" style="font-size:18px;font-weight:700;color:#00695C">—</div>
+            <div style="font-size:10.5px;color:#00695C;opacity:.75;margin-top:3px">Actual money received — cash / MoMo</div>
           </div>
           <div style="background:#FFEBEE;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#C62828;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Outstanding (UGX)</div>
             <div id="finOutstanding" style="font-size:18px;font-weight:700;color:#C62828">—</div>
+            <div style="font-size:10.5px;color:#C62828;opacity:.75;margin-top:3px">Still being demanded from patients</div>
           </div>
           <div style="background:#E3F2FD;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stock Used (UGX)</div>
@@ -569,6 +572,7 @@
           <div style="background:#FFF8E1;border-radius:12px;padding:14px">
             <div style="font-size:11px;color:#E65100;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Net Margin (UGX)</div>
             <div id="finMargin" style="font-size:18px;font-weight:700;color:#E65100">—</div>
+            <div style="font-size:10.5px;color:#E65100;opacity:.75;margin-top:3px">Collected minus stock used</div>
           </div>
         </div>
         <div id="finTopItems" style="padding:0 16px 16px"></div>
@@ -1673,9 +1677,11 @@
     var cacheKey = 'revenue_' + clinicId;
 
     function paint(base) {
-      // Billings queued offline (new consultations + quick sales) show at once.
+      // Revenue = ACTUAL money in (payments + quick-sale cash). Amounts merely
+      // billed are demand, not revenue — they show under Billed/Outstanding.
+      // Offline: fold in queued payments + quick sales (real money taken).
       var delta = _offlineFinDelta(clinicId);
-      var extra = delta.consultBilled + delta.quickSales;
+      var extra = delta.payments + delta.quickSales;
       if (todayEl) todayEl.textContent = 'UGX ' + fmtUGX(base.day + extra);
       if (monthEl) monthEl.textContent = 'UGX ' + fmtUGX(base.month + extra);
     }
@@ -1691,11 +1697,13 @@
     try {
       var startOfDay = new Date(); startOfDay.setHours(0,0,0,0);
       var startOfMonth = new Date(); startOfMonth.setDate(1); startOfMonth.setHours(0,0,0,0);
+      var dayIso = startOfDay.toISOString();
+      // One month-window query per source; today is derived client-side from
+      // created_at — half the requests, small payloads for slow links.
       var runAll = Promise.all([
-        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
-        supabase.from('clinic_diagnoses').select('total_charged_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
-        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfDay.toISOString()),
-        supabase.from('clinic_quick_sales').select('total_ugx').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+        supabase.from('clinic_payments').select('amount_ugx,created_at').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+        supabase.from('clinic_quick_sales').select('total_ugx,created_at').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
+        supabase.from('clinic_diagnoses').select('total_charged_ugx,amount_paid,payment_status,created_at').eq('clinic_id', clinicId).gte('created_at', startOfMonth.toISOString()),
       ]);
       var results = CO ? await CO.withTimeout(runAll, 12000) : await runAll;
       if (!Array.isArray(results)) {           // timeout/network → serve cache
@@ -1703,11 +1711,23 @@
         if (cb) paint(cb); else { if (todayEl) todayEl.textContent = '—'; if (monthEl) monthEl.textContent = '—'; }
         return;
       }
-      var qsDayTot = (results[2] && !results[2].error && results[2].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
-      var qsMonTot = (results[3] && !results[3].error && results[3].data || []).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
-      var dayTotal = (results[0].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsDayTot;
-      var monTotal = (results[1].data||[]).reduce(function(s,r){ return s + (Number(r.total_charged_ugx)||0); }, 0) + qsMonTot;
-      var base = { day: dayTotal, month: monTotal };
+      var pays = (results[0] && !results[0].error && results[0].data) || null;
+      var qs   = (results[1] && !results[1].error && results[1].data) || [];
+      var dxs  = (results[2] && !results[2].error && results[2].data) || [];
+      function inDay(r) { return (r.created_at || '') >= dayIso; }
+      function dxPaid(r) {
+        if (r.amount_paid !== undefined && r.amount_paid !== null) return Number(r.amount_paid) || 0;
+        return r.payment_status === 'paid' ? (Number(r.total_charged_ugx) || 0) : 0;
+      }
+      // Consultation money in: the payments ledger when available, otherwise
+      // the amount_paid recorded on each consultation.
+      var payMon = pays ? pays.reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
+                        : dxs.reduce(function(s,r){ return s + dxPaid(r); }, 0);
+      var payDay = pays ? pays.filter(inDay).reduce(function(s,p){ return s + (Number(p.amount_ugx)||0); }, 0)
+                        : dxs.filter(inDay).reduce(function(s,r){ return s + dxPaid(r); }, 0);
+      var qsMonTot = qs.reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var qsDayTot = qs.filter(inDay).reduce(function(s,r){ return s + (Number(r.total_ugx)||0); }, 0);
+      var base = { day: payDay + qsDayTot, month: payMon + qsMonTot };
       if (CO) CO.set(cacheKey, base);
       paint(base);
     } catch(e) {
