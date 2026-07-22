@@ -173,21 +173,27 @@
     markRead();
   }
 
+  function byCreated(a, b) { return new Date(a.created_at) - new Date(b.created_at); }
+  function convQuery() {
+    return supabase.from('clinic_messages')
+      .select('id,from_user,body,media_url,media_type,duration_ms,created_at,read_at')
+      .or('and(from_user.eq.' + ME + ',to_user.eq.' + current.user + '),and(from_user.eq.' + current.user + ',to_user.eq.' + ME + ')')
+      .order('created_at', { ascending: true }).limit(200);
+  }
+  function convKey() { return '_co_msg_conv_' + ME + '_' + current.user; }
+
   async function loadMessages() {
     if (!current) return;
-    var box = document.getElementById('msgList');
     var CO = window.ClinicOffline;
     var key = 'msg_conv_' + ME + '_' + current.user;
-    var run = function () {
-      return supabase.from('clinic_messages')
-        .select('id,from_user,body,media_url,media_type,duration_ms,created_at,read_at')
-        .or('and(from_user.eq.' + ME + ',to_user.eq.' + current.user + '),and(from_user.eq.' + current.user + ',to_user.eq.' + ME + ')')
-        .order('created_at', { ascending: true }).limit(200);
-    };
-    var res = CO ? await CO.cachedQuery(key, run) : await run();
-    var rows = res.data || [];
-    // Fold in my messages the cached query doesn't have yet, deduped by id:
-    // server copy wins, then still-queued outbox rows, then this session's echo.
+    var res = CO ? await CO.cachedQuery(key, convQuery) : await convQuery();
+    foldAndRender((res.data || []).slice());
+  }
+
+  // Fold in my messages the base rows don't have yet, deduped by id:
+  // server copy wins, then still-queued outbox rows, then this session's echo.
+  function foldAndRender(rows) {
+    if (!current) return;
     var have = {};
     rows.forEach(function (r) { if (r.id) have[r.id] = 1; });
     pendingToThis().forEach(function (p) {
@@ -200,9 +206,21 @@
       if (p.id) have[p.id] = 1;
       rows.push(p);
     });
-    rows.sort(function (a, b) { return new Date(a.created_at) - new Date(b.created_at); });
+    rows.sort(byCreated);
     renderMessages(rows);
-    if (name_isPlaceholder()) refreshHeaderName(rows);
+    maybeMarkRead(rows);
+  }
+
+  // Tell the sender their message was seen — once per message.
+  var _markedIds = {};
+  function maybeMarkRead(rows) {
+    if (!current) return;
+    var fresh = rows.filter(function (r) {
+      return r.from_user === current.user && !r.read_at && r.id && !_markedIds[r.id];
+    });
+    if (!fresh.length) return;
+    fresh.forEach(function (r) { _markedIds[r.id] = 1; });
+    markRead();
   }
 
   function name_isPlaceholder() { return current && (current.name === 'Clinician' || !current.name); }
@@ -212,9 +230,24 @@
     // from_name isn't selected here; leave as-is. Header will correct on inbox reload.
   }
 
+  // Signature guard: rebuilding innerHTML resets a playing voice note and
+  // flickers images, so with the poll running every few seconds we only
+  // redraw when a message was added or a tick actually changed.
+  var _lastSig = '';
+  function msgSig(rows) {
+    return rows.map(function (m) {
+      return (m.id || m.created_at) + ':' + (m.read_at ? 1 : 0) + (m._pending ? 'p' : '') + (m._failed ? 'f' : '');
+    }).join('|');
+  }
+
   function renderMessages(rows) {
     var box = document.getElementById('msgList');
-    if (!rows.length) { box.innerHTML = '<div class="conv-empty">No messages yet. Say hello 👋</div>'; return; }
+    if (!rows.length) { _lastSig = ''; box.innerHTML = '<div class="conv-empty">No messages yet. Say hello 👋</div>'; return; }
+    var sig = msgSig(rows);
+    if (sig === _lastSig) return;
+    _lastSig = sig;
+    // keep the reader's place unless they're already at the newest messages
+    var nearBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 140 || !box.childElementCount;
     box.innerHTML = rows.map(function (m) {
       var mine = m.from_user === ME;
       var inner = '';
@@ -234,7 +267,7 @@
       return '<div class="bubble ' + (mine ? 'me' : 'them') + '">' + inner
         + '<div class="b-time">' + _esc(fmtTime(m.created_at)) + tick + '</div></div>';
     }).join('');
-    box.scrollTop = box.scrollHeight;
+    if (nearBottom) box.scrollTop = box.scrollHeight;
   }
   window._msgLightbox = function (src) {
     document.getElementById('lightboxImg').src = src;
@@ -454,32 +487,101 @@
     persist(row); markSent(bubble);
   }
 
-  // ── Realtime ───────────────────────────────────────────────────────
+  // ── Real-time delivery ─────────────────────────────────────────────
+  // Two layers, because a websocket alone dies silently on flaky 4G:
+  //  1. Supabase realtime — instant when it works, and it RESUBSCRIBES
+  //     itself with backoff whenever the channel errors or closes.
+  //  2. A relentless incremental poll — every few seconds, fetch only the
+  //     messages newer than the newest one we have (tiny on slow links; a
+  //     full re-sync every ~6th tick refreshes read ticks). Rendering is
+  //     signature-guarded, so quiet polls repaint nothing.
+  var _rtGen = 0;
   function subscribeRealtime() {
     try {
       if (!supabase.channel) return;
+      var mine = ++_rtGen;
+      if (_rtChannel) { try { supabase.removeChannel(_rtChannel); } catch (e) {} _rtChannel = null; }
       _rtChannel = supabase.channel('clinic_messages_rt')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clinic_messages' }, function (payload) {
           var m = payload.new;
           if (!m) return;
           if (m.to_user !== ME && m.from_user !== ME) return;   // not mine
           if (current && (m.from_user === current.user || m.to_user === current.user)) {
-            // in the open conversation → append + mark read
-            if (m.from_user === ME && document.querySelector('#msgList .bubble.me:last-child')) {
-              // our own echo — already shown optimistically; skip dup
-            } else {
-              appendIncoming(m);
-              if (m.from_user === current.user) markRead();
-            }
+            pollConversation(true);   // fetch + render now (dedupes by id)
           } else if (m.to_user === ME) {
             toast((m.from_name || 'Clinician') + ': ' + (m.media_type === 'image' ? '📷 Photo' : m.media_type === 'audio' ? '🎤 Voice note' : (m.body || 'New message')), 'info');
           }
-          // refresh inbox counts if visible
-          if (document.getElementById('inboxView').style.display !== 'none') loadThreads();
+          if (document.getElementById('inboxView').style.display !== 'none') pollThreads(true);
         })
-        .subscribe();
+        .subscribe(function (status) {
+          if (mine !== _rtGen) return;            // superseded subscription
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            var wait = Math.min(30000, 3000 * Math.pow(2, Math.min(_rtRetry++, 4)));
+            setTimeout(function () { if (mine === _rtGen) subscribeRealtime(); }, wait);
+          } else if (status === 'SUBSCRIBED') _rtRetry = 0;
+        });
     } catch (e) {}
   }
+  var _rtRetry = 0;
+
+  var _pollBusy = false, _fullTick = 0;
+  function cachedConvRows() {
+    try { return ((JSON.parse(localStorage.getItem(convKey()) || 'null') || {}).v) || []; }
+    catch (e) { return []; }
+  }
+  async function pollConversation(force) {
+    if (!current || !ME || _pollBusy) return;
+    if (!force && document.hidden) return;
+    if (navigator.onLine === false) return;
+    _pollBusy = true;
+    try {
+      _fullTick++;
+      var cached = cachedConvRows();
+      var newest = cached.length ? cached[cached.length - 1].created_at : null;
+      var incremental = !!newest && !force && _fullTick % 6 !== 0;
+      var q = convQuery();
+      if (incremental) q = q.gt('created_at', newest);
+      var res = await q;
+      if (!res || res.error || !res.data) return;
+      var rows;
+      if (incremental) {
+        if (!res.data.length) return;                  // nothing new
+        var have = {};
+        cached.forEach(function (r) { if (r.id) have[r.id] = 1; });
+        rows = cached.concat(res.data.filter(function (r) { return !have[r.id]; }));
+      } else {
+        rows = res.data;
+      }
+      rows.sort(byCreated);
+      try { localStorage.setItem(convKey(), JSON.stringify({ ts: Date.now(), v: rows })); } catch (e) {}
+      foldAndRender(rows.slice());
+    } catch (e) {} finally { _pollBusy = false; }
+  }
+  setInterval(function () { pollConversation(false); }, 3500);
+
+  // Inbox: keep the thread list fresh too (only re-renders when it changed).
+  var _thrBusy = false;
+  async function pollThreads(force) {
+    if (!ME || _thrBusy || current) return;
+    if (!force && document.hidden) return;
+    if (navigator.onLine === false) return;
+    if (document.getElementById('inboxView').style.display === 'none') return;
+    _thrBusy = true;
+    try {
+      var res = await supabase.rpc('message_threads');
+      if (!res || res.error || !res.data) return;
+      var key = '_co_msg_threads_' + ME;
+      var next = JSON.stringify({ ts: Date.now(), v: res.data });
+      var prev = '';
+      try { prev = JSON.stringify(((JSON.parse(localStorage.getItem(key) || 'null') || {}).v) || []); } catch (e) {}
+      try { localStorage.setItem(key, next); } catch (e) {}
+      if (JSON.stringify(res.data) !== prev) loadThreads();
+    } catch (e) {} finally { _thrBusy = false; }
+  }
+  setInterval(function () { pollThreads(false); }, 9000);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { pollConversation(true); pollThreads(true); }
+  });
 
   function appendIncoming(m) {
     var box = document.getElementById('msgList');
