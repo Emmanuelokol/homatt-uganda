@@ -1,8 +1,10 @@
 /* Homatt Health — new-message alerts (dashboard / any clinic page)
  * Shows: (1) an unread badge on the sidebar Messages link, (2) a tappable
- * "new messages" alert card on the dashboard Home slide, (3) a system
- * notification (Windows toast in the desktop app, Android heads-up while the
- * app is open — background Android push comes from the OneSignal trigger).
+ * "new messages" alert card on the dashboard Home slide naming the senders
+ * and their clinics, (3) a pop-up toast + system notification (Windows toast
+ * in the desktop app, Android heads-up while the app is open) the moment a
+ * message arrives — driven by BOTH realtime and a 12s hard-timeout poll, so
+ * alerts still fire when the websocket silently dies on mobile internet.
  * The messages page handles its own alerts and is skipped here.
  */
 (function () {
@@ -19,12 +21,24 @@
 
   var ME = null;
   var UNREAD = 0;
+  var FROMS = [];          // [{name, clinic}] senders with unread, newest first
 
-  // ── Badge UI ───────────────────────────────────────────────────────
+  function raced(p, ms) {
+    return Promise.race([p, new Promise(function (_, rej) {
+      setTimeout(function () { rej(new Error('timeout')); }, ms);
+    })]);
+  }
+
+  // Once-per-message memory (persists across pages/reloads).
+  var SEEN_KEY = '_msg_alerts_seen';
+  function seen() { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || '{}'); } catch (e) { return {}; } }
+  function saveSeen(s) { try { localStorage.setItem(SEEN_KEY, JSON.stringify(s)); } catch (e) {} }
+
+  // ── Badge + card UI ────────────────────────────────────────────────
   var css = document.createElement('style');
   css.textContent =
     '.msg-badge{display:inline-flex;align-items:center;justify-content:center;' +
-    'min-width:20px;height:20px;border-radius:10px;background:#25D366;color:#063;' +
+    'min-width:20px;height:20px;border-radius:10px;background:#25D366;' +
     'color:#0b3d1f;font-size:11px;font-weight:800;padding:0 6px;margin-left:auto}' +
     '#msgAlertCard{display:flex;align-items:center;gap:12px;background:#1B5E20;color:#fff;' +
     'border-radius:14px;padding:13px 16px;margin:0 0 14px;cursor:pointer;' +
@@ -32,14 +46,11 @@
     '#msgAlertCard .mac-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.18);' +
     'display:flex;align-items:center;justify-content:center;flex-shrink:0}' +
     '#msgAlertCard .mac-title{font-size:14.5px;font-weight:800}' +
-    '#msgAlertCard .mac-sub{font-size:12px;opacity:.85;margin-top:1px}';
+    '#msgAlertCard .mac-sub{font-size:12px;opacity:.85;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
   document.head.appendChild(css);
 
-  function sidebarLink() { return document.querySelector('.sidebar-nav a[href="messages.html"]'); }
-
   function render() {
-    // sidebar badge
-    var link = sidebarLink();
+    var link = document.querySelector('.sidebar-nav a[href="messages.html"]');
     if (link) {
       var b = link.querySelector('.msg-badge');
       if (UNREAD > 0) {
@@ -47,7 +58,6 @@
         b.textContent = UNREAD > 99 ? '99+' : String(UNREAD);
       } else if (b) b.remove();
     }
-    // dashboard Home-slide alert card
     var card = document.getElementById('msgAlertCard');
     if (UNREAD > 0) {
       if (!card) {
@@ -59,33 +69,26 @@
         card.addEventListener('click', function () { location.href = 'messages.html'; });
         anchor.parentNode.insertBefore(card, anchor);
       }
+      var who = FROMS.slice(0, 2).map(function (f) {
+        return f.name + (f.clinic ? ' — ' + f.clinic : '');
+      }).join(' · ');
+      if (FROMS.length > 2) who += ' +' + (FROMS.length - 2) + ' more';
+      var esc = function (s) { return String(s || '').replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
       card.innerHTML =
         '<div class="mac-icon"><span class="material-icons-outlined">forum</span></div>' +
         '<div style="flex:1;min-width:0"><div class="mac-title">' +
         (UNREAD > 1 ? UNREAD + ' new messages' : '1 new message') +
-        '</div><div class="mac-sub">Tap to open your chats</div></div>' +
+        '</div><div class="mac-sub">' + (who ? 'From ' + esc(who) : 'Tap to open your chats') + '</div></div>' +
         '<span class="material-icons-outlined">chevron_right</span>';
     } else if (card) card.remove();
   }
 
-  // ── Unread count (shares the messages page cache key) ──────────────
-  async function refreshBadge() {
-    if (!ME) return;
-    try {
-      var CO = window.ClinicOffline;
-      var run = function () { return supabase.rpc('message_threads'); };
-      var res = CO && CO.cachedQuery ? await CO.cachedQuery('msg_threads_' + ME, run) : await run();
-      var rows = (res && res.data) || [];
-      UNREAD = rows.reduce(function (n, t) { return n + (parseInt(t.unread, 10) || 0); }, 0);
-      render();
-    } catch (e) {}
-  }
-
   // ── System notification (Electron toast / Android heads-up) ────────
-  function sysNotify(fromName, body, fromUser) {
+  function sysNotify(title, body, fromUser) {
     try {
       if (!('Notification' in window) || Notification.permission !== 'granted') return;
-      var n = new Notification('💬 ' + (fromName || 'Clinician'), {
+      var n = new Notification('💬 ' + title, {
         body: body, tag: 'homatt-msg', icon: 'icons/clinic-192.png?v=3',
       });
       n.onclick = function () {
@@ -94,8 +97,6 @@
       };
     } catch (e) {}
   }
-  // Ask for permission once, on the first tap anywhere (needs a user gesture
-  // on Android; the desktop app grants it silently).
   (function armPermission() {
     if (!('Notification' in window) || Notification.permission !== 'default') return;
     var ask = function () {
@@ -105,22 +106,77 @@
     document.addEventListener('pointerdown', ask);
   })();
 
-  // ── Realtime ───────────────────────────────────────────────────────
+  function preview(t) {
+    return t.last_media === 'image' ? '📷 Photo'
+      : t.last_media === 'audio' ? '🎤 Voice note' : (t.last_body || 'New message');
+  }
+
+  // Alert once per new incoming message, naming sender + clinic.
+  function fireAlerts(rows) {
+    var s = seen(), changed = false;
+    rows.forEach(function (t) {
+      if (!t.unread || t.last_from_me) return;
+      var prev = s[t.other_user];
+      if (prev && !(t.last_at > prev)) return;      // already alerted for this
+      s[t.other_user] = t.last_at; changed = true;
+      var title = (t.other_name || 'Clinician') + (t.other_clinic ? ' — ' + t.other_clinic : '');
+      try { showToast('💬 ' + title + ': ' + preview(t), 'info'); } catch (e) {}
+      sysNotify(title, preview(t), t.other_user);
+    });
+    if (changed) saveSeen(s);
+  }
+
+  function applyThreads(rows, alertNew) {
+    UNREAD = rows.reduce(function (n, t) { return n + (parseInt(t.unread, 10) || 0); }, 0);
+    FROMS = rows.filter(function (t) { return (parseInt(t.unread, 10) || 0) > 0; })
+      .map(function (t) { return { name: t.other_name || 'Clinician', clinic: t.other_clinic || '' }; });
+    render();
+    if (alertNew) fireAlerts(rows);
+  }
+
+  function cachedThreads() {
+    try { return ((JSON.parse(localStorage.getItem('_co_msg_threads_' + ME) || 'null') || {}).v) || []; }
+    catch (e) { return []; }
+  }
+
+  // ── Poll (works even when realtime can't connect) ──────────────────
+  var _busy = false;
+  async function refresh(alertNew) {
+    if (!ME || _busy) return;
+    _busy = true;
+    try {
+      if (navigator.onLine === false) { applyThreads(cachedThreads(), false); return; }
+      var res = await raced(supabase.rpc('message_threads'), 12000);
+      if (res && !res.error && res.data) {
+        try { localStorage.setItem('_co_msg_threads_' + ME, JSON.stringify({ ts: Date.now(), v: res.data })); } catch (e) {}
+        applyThreads(res.data, alertNew);
+      } else {
+        applyThreads(cachedThreads(), false);
+      }
+    } catch (e) { applyThreads(cachedThreads(), false); }
+    finally { _busy = false; }
+  }
+
+  // ── Realtime (instant when it works; the poll is the safety net) ───
+  var _rtGen = 0, _rtRetry = 0, _rtChannel = null;
   function subscribe() {
     try {
       if (!supabase.channel) return;
-      supabase.channel('clinic_messages_alerts')
+      var mine = ++_rtGen;
+      if (_rtChannel) { try { supabase.removeChannel(_rtChannel); } catch (e) {} _rtChannel = null; }
+      _rtChannel = supabase.channel('clinic_messages_alerts')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clinic_messages' }, function (payload) {
           var m = payload.new;
           if (!m || m.to_user !== ME) return;
-          UNREAD++;
-          render();
-          var preview = m.media_type === 'image' ? '📷 Photo'
-            : m.media_type === 'audio' ? '🎤 Voice note' : (m.body || 'New message');
-          try { showToast((m.from_name || 'Clinician') + ': ' + preview, 'info'); } catch (e) {}
-          sysNotify(m.from_name, preview, m.from_user);
+          refresh(true);                            // fetch names/clinics + alert
         })
-        .subscribe();
+        .subscribe(function (status) {
+          if (mine !== _rtGen) return;
+          if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+            var wait = Math.min(30000, 3000 * Math.pow(2, Math.min(_rtRetry++, 4)));
+            setTimeout(function () { if (mine === _rtGen) subscribe(); }, wait);
+          } else if (status === 'SUBSCRIBED') _rtRetry = 0;
+        });
     } catch (e) {}
   }
 
@@ -132,12 +188,13 @@
     } catch (e) {}
     if (!ME) ME = session.userId;
     if (!ME) return;
-    refreshBadge();
+    applyThreads(cachedThreads(), false);           // instant paint from cache
+    refresh(true);
     subscribe();
-    window.addEventListener('clinic-synced', refreshBadge);
+    window.addEventListener('clinic-synced', function () { refresh(true); });
     document.addEventListener('visibilitychange', function () {
-      if (!document.hidden) refreshBadge();
+      if (!document.hidden) refresh(true);
     });
-    setInterval(refreshBadge, 90000);   // fallback when realtime can't connect
+    setInterval(function () { if (!document.hidden) refresh(true); }, 12000);
   })();
 })();
