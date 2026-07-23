@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260803">
+  <link rel="stylesheet" href="css/clinic.css?v=20260812">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -1668,7 +1668,9 @@
     };
   }
 
+  var _revGen = 0;
   async function loadRevenue() {
+    var myGen = ++_revGen;
     var todayEl = document.getElementById('statRevToday');
     var monthEl = document.getElementById('statRevMonth');
     var clinicId = await resolveClinicId();
@@ -1677,6 +1679,7 @@
     var cacheKey = 'revenue_' + clinicId;
 
     function paint(base) {
+      if (myGen !== _revGen) return;          // a newer load already painted
       // Revenue = ACTUAL money in (payments + quick-sale cash). Amounts merely
       // billed are demand, not revenue — they show under Billed/Outstanding.
       // Offline: fold in queued payments + quick sales (real money taken).
@@ -3879,26 +3882,37 @@
     }).catch(function(){});
   };
 
+  var _lastFullRefresh = 0;
   function refreshAll() {
+    _lastFullRefresh = Date.now();
     loadBookings(); loadActiveTreatments(); loadPendingPayments();
     loadConsultations(); loadRevenue();
     loadInventory(); loadFinancial(_finPeriod);
     loadMedsDispensed();
     try { loadReferralsIn(); } catch (e) {}
   }
-  setInterval(refreshAll, 25000);
+  // LIGHT refresh: only the money/stock FIGURES (painted via textContent, so no
+  // list is torn down and rebuilt). Used when the app simply becomes visible
+  // again — this is what stops the "blink like a refresh" every time you return
+  // to the app (or the keyboard/notification shade toggles visibility).
+  function refreshFigures() {
+    loadRevenue(); loadFinancial(_finPeriod);
+  }
+  setInterval(refreshAll, 45000);
 
-  // Refresh the instant the dashboard becomes visible again — returning from a
-  // consultation, switching back to the app, or bfcache restore — so the
-  // operator never has to manually reload to see fresh financials and stock.
+  // Returning to the app: repaint just the figures (no blink). A FULL refresh
+  // only if it's been a while (>60s) since one — so a quick app-switch is
+  // instant, but coming back after real time away still pulls everything.
   document.addEventListener('visibilitychange', function() {
-    if (document.visibilityState === 'visible') refreshAll();
+    if (document.visibilityState !== 'visible') return;
+    if (Date.now() - _lastFullRefresh > 60000) refreshAll();
+    else refreshFigures();
   });
   // Note: window 'focus' is intentionally omitted — on Android WebView it fires
-  // when the keyboard opens/closes, triggering constant refreshAll() calls that
+  // when the keyboard opens/closes, triggering constant refresh calls that
   // interfere with the operator's scroll position. visibilitychange covers the
   // app-returns-from-background case already.
-  window.addEventListener('pageshow', function(e) { if (e.persisted) refreshAll(); });
+  window.addEventListener('pageshow', function(e) { if (e.persisted) refreshFigures(); });
   // When the offline outbox finishes syncing, pull fresh server figures so the
   // optimistic offline numbers are replaced by the real ones — no manual reload.
   window.addEventListener('clinic-synced', function() { try { refreshAll(); } catch(e) {} });
@@ -4540,7 +4554,13 @@
     loadFinancial(period);
   }
 
+  var _finGen = 0;
   async function loadFinancial(period) {
+    // Generation guard: refreshes can fire this several times in quick
+    // succession; without it a slow cached-zero response could land AFTER a
+    // fresh non-zero one and blank the real figures back to 0. Only the newest
+    // call is allowed to paint.
+    var myGen = ++_finGen;
     var clinicId = await resolveClinicId();
     if (!clinicId || !supabase) return;
 
@@ -4560,6 +4580,7 @@
     // Paint the six headline figures from a base snapshot, folding in any money
     // still queued offline so the numbers are LIVE, not stale until sync.
     function paintFinancial(base) {
+      if (myGen !== _finGen) return;          // a newer load already painted
       var delta = _offlineFinDelta(clinicId);
       var patients    = base.patients    + delta.patients;
       var billed      = base.billed      + delta.consultBilled + delta.quickSales;
