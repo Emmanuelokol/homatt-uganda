@@ -116,6 +116,40 @@
     .home-cta:active { transform: scale(.98) }
     .home-cta .material-icons-outlined { font-size: 22px }
 
+    /* ── Money slide: soft ring tiles ── */
+    .fin-wrap{padding:16px}
+    .fin-hero{background:linear-gradient(140deg,#0B3D2E 0%,#10855F 60%,#17A46F 100%);border-radius:var(--radius-lg,24px);padding:18px 20px;color:#fff;box-shadow:0 14px 30px rgba(14,124,90,.28);margin-bottom:13px;position:relative;overflow:hidden}
+    .fin-hero::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.15),transparent 70%)}
+    .fin-hero .l{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;opacity:.85}
+    .fin-hero .b{font-size:29px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:2px 0;line-height:1.05}
+    .fin-hero .s{font-size:12px;opacity:.9}
+    .fin-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+    .fin-tile{background:var(--surface,#fff);border-radius:var(--radius,18px);box-shadow:var(--shadow);padding:13px;display:flex;align-items:center;gap:11px}
+    .fin-ring{position:relative;flex:none;width:48px;height:48px}
+    .fin-ring svg{transform:rotate(-90deg);display:block}
+    .fin-ring .frt{stroke:var(--border,#E7EBF4)}
+    .fin-ring .frv{transition:stroke-dashoffset .9s cubic-bezier(.4,0,.1,1)}
+    .fin-info{min-width:0}
+    .fin-num{font-size:17px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1.1;color:var(--text)}
+    .fin-lbl{font-size:12px;font-weight:700;color:var(--text)}
+    .fin-sub{font-size:10px;color:var(--text-lt);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    /* ── Stock slide: soft cards ── */
+    .stock-card{background:var(--surface,#fff);border-radius:var(--radius,18px);box-shadow:var(--shadow);padding:14px;margin:0 0 11px}
+    .stock-top{display:flex;align-items:center;gap:12px}
+    .stock-ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:var(--accent-v-tint,#ECE9FF);color:var(--accent-v,#6C5CE7)}
+    .stock-ic.material{background:#DBEFFB;color:#1565C0}
+    .stock-ic .material-icons-outlined{font-size:22px}
+    .stock-name{flex:1;min-width:0;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.01em;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+    .stock-restock{font-size:11.5px;padding:8px 13px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border:none;border-radius:11px;cursor:pointer;font-weight:800;font-family:inherit;white-space:nowrap;flex:none}
+    .stock-meta{font-size:11.5px;color:var(--text-lt);margin-top:8px}
+    .stock-bar{height:7px;border-radius:999px;background:var(--border,#E8EAED);margin-top:9px;overflow:hidden}
+    .stock-bar i{display:block;height:100%;border-radius:999px;transition:width .5s ease}
+    .pill-s{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+    .pill-s.crit{background:#FBE1DE;color:#C62828}
+    .pill-s.warn{background:#FCEFCF;color:#C77E06}
+    .pill-s.exp-crit{background:#E0454B;color:#fff}
+
     .order-card {
       background: var(--surface, #fff);
       border: none;
@@ -303,7 +337,7 @@
            Its JS (qvCode/qvPin/qvSubmitBtn) is null-guarded, so restoring is
            just re-adding the panel markup from git history. -->
       <!-- Refer a patient to a partner clinic (no consultation needed) -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:16px 20px;margin-bottom:24px;border-left:4px solid #6A1B9A;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
           <div style="font-size:15px;font-weight:700"><span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#6A1B9A">alt_route</span> Refer a Patient</div>
           <div style="font-size:12.5px;color:#5F6368;margin-top:3px">Send a patient to a partner clinic — they get notified instantly, the patient gets the details on WhatsApp.</div>
@@ -312,7 +346,7 @@
       </div>
 
       <!-- Referrals received from partner clinics -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="3" style="padding:0;margin-bottom:24px;border-left:4px solid #00838F">
+      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="3" style="padding:0;margin-bottom:24px;">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00838F">call_received</span>
@@ -368,7 +402,7 @@
       </div>
 
       <!-- Low-stock alert banner (hidden until stock loads) -->
-      <div id="lowStockBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFEBEE;border:1.5px solid #EF9A9A;border-radius:12px;padding:12px 16px;margin-bottom:18px;display:none">
+      <div id="lowStockBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFEBEE;border:none;border-radius:16px;box-shadow:var(--shadow);padding:12px 16px;margin-bottom:18px;display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
           <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
@@ -378,7 +412,7 @@
       </div>
 
       <!-- Expiry alert banner (hidden until stock loads) -->
-      <div id="expiryBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFF3E0;border:1.5px solid #FFB74D;border-radius:12px;padding:12px 16px;margin-bottom:18px">
+      <div id="expiryBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFF3E0;border:none;border-radius:16px;box-shadow:var(--shadow);padding:12px 16px;margin-bottom:18px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#E65100;font-size:20px">schedule</span>
           <strong style="color:#E65100;font-size:14px">Expiry Alert</strong>
@@ -388,7 +422,7 @@
       </div>
 
       <!-- Pending bookings (patients who booked but haven't been seen) -->
-      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;border-left:4px solid #FFC107" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
@@ -402,7 +436,7 @@
       </div>
 
       <!-- Active treatments — open cases that have not been discharged yet -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #1565C0" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
@@ -422,7 +456,7 @@
       </div>
 
       <!-- ── Overdue Follow-up Tracker ── -->
-      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;" data-slide="patients">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
@@ -436,7 +470,7 @@
       </div>
 
       <!-- Pending Payments / Outstanding Balances -->
-      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;border-left:4px solid #E65100" data-slide="money">
+      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
@@ -464,7 +498,7 @@
       </div>
 
       <!-- ── Medicines Dispensed Tracker ── -->
-      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;border-left:4px solid #00BCD4" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
@@ -506,7 +540,7 @@
       </div>
 
       <!-- Top Conditions & Treatments -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;border-left:4px solid #00796B" id="topConditionsSection" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;" id="topConditionsSection" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00796B">biotech</span>
@@ -523,8 +557,8 @@
       </div>
 
       <!-- Stock Tracker -->
-      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;border-left:4px solid #00897B" data-slide="stock">
-        <div class="table-header" style="justify-content:space-between">
+      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;background:none;box-shadow:none" data-slide="stock">
+        <div class="table-header" style="justify-content:space-between;border-bottom:none;padding-left:2px;padding-right:2px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
             Stock Tracker
@@ -541,7 +575,7 @@
       </div>
 
       <!-- Financial Overview -->
-      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px;border-left:4px solid #0E7C5A" data-slide="money">
+      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0E7C5A">analytics</span>
@@ -553,41 +587,40 @@
             <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;padding:16px">
-          <div style="background:#F3E5F5;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#0E7C5A;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Patients</div>
-            <div id="finPatients" style="font-size:22px;font-weight:700;color:#4A148C">—</div>
+        <div class="fin-wrap">
+          <div class="fin-hero">
+            <div class="l">Money in · <span id="finPeriodLbl">today</span></div>
+            <div class="b" id="finCollected">—</div>
+            <div class="s">Actual money received — cash / MoMo</div>
           </div>
-          <div style="background:#E8F5E9;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#1B5E20;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Demanded / Billed (UGX)</div>
-            <div id="finRevenue" style="font-size:18px;font-weight:700;color:#1B5E20">—</div>
-            <div style="font-size:10.5px;color:#1B5E20;opacity:.75;margin-top:3px">Total charged to patients</div>
+          <div class="fin-grid">
+            <div class="fin-tile">
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringDemanded" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#2AA3DC"/></svg></div>
+              <div class="fin-info"><div class="fin-num" id="finRevenue">—</div><div class="fin-lbl">Demanded</div><div class="fin-sub">Total billed</div></div>
+            </div>
+            <div class="fin-tile">
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringOutstanding" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#E2960A"/></svg></div>
+              <div class="fin-info"><div class="fin-num" id="finOutstanding">—</div><div class="fin-lbl">Outstanding</div><div class="fin-sub">Still owed</div></div>
+            </div>
+            <div class="fin-tile">
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringMargin" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#6C5CE7"/></svg></div>
+              <div class="fin-info"><div class="fin-num" id="finMargin">—</div><div class="fin-lbl">Net margin</div><div class="fin-sub">After stock</div></div>
+            </div>
+            <div class="fin-tile">
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringStock" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#1565C0"/></svg></div>
+              <div class="fin-info"><div class="fin-num" id="finStockCost">—</div><div class="fin-lbl">Stock used</div><div class="fin-sub">Cost of meds</div></div>
+            </div>
+            <div class="fin-tile" style="grid-column:1 / -1">
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringPatients" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#0E7C5A"/></svg></div>
+              <div class="fin-info"><div class="fin-num" id="finPatients">—</div><div class="fin-lbl">Patients seen</div><div class="fin-sub">This period</div></div>
+            </div>
           </div>
-          <div style="background:#E0F2F1;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#00695C;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Collected (UGX)</div>
-            <div id="finCollected" style="font-size:18px;font-weight:700;color:#00695C">—</div>
-            <div style="font-size:10.5px;color:#00695C;opacity:.75;margin-top:3px">Actual money received — cash / MoMo</div>
-          </div>
-          <div style="background:#FFEBEE;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#C62828;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Outstanding (UGX)</div>
-            <div id="finOutstanding" style="font-size:18px;font-weight:700;color:#C62828">—</div>
-            <div style="font-size:10.5px;color:#C62828;opacity:.75;margin-top:3px">Still being demanded from patients</div>
-          </div>
-          <div style="background:#E3F2FD;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#1565C0;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Stock Used (UGX)</div>
-            <div id="finStockCost" style="font-size:18px;font-weight:700;color:#1565C0">—</div>
-          </div>
-          <div style="background:#FFF8E1;border-radius:12px;padding:14px">
-            <div style="font-size:11px;color:#E65100;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Net Margin (UGX)</div>
-            <div id="finMargin" style="font-size:18px;font-weight:700;color:#E65100">—</div>
-            <div style="font-size:10.5px;color:#E65100;opacity:.75;margin-top:3px">Collected minus stock used</div>
-          </div>
+          <div id="finTopItems" style="margin-top:14px"></div>
         </div>
-        <div id="finTopItems" style="padding:0 16px 16px"></div>
       </div>
 
       <!-- Monthly Reports -->
-      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;border-left:4px solid #0277BD" id="monthlyReportsSection" data-slide="money">
+      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;" id="monthlyReportsSection" data-slide="money">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
@@ -2035,7 +2068,7 @@
     // already render the structured medicines block above.
     var planTxt = (Array.isArray(c.prescription_items) && c.prescription_items.length) ? '' : c.treatment_plan;
 
-    return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(isLatest?';border-left:4px solid #1565C0':'')+'">'
+    return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(isLatest?';':'')+'">'
       +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">'
         +'<div style="font-weight:700;font-size:14px">Visit '+visitNum+' — '+esc(dateStr)
           +'<div style="font-size:11px;color:#9AA0A6;font-weight:500">'+esc(timeStr)+'</div></div>'
@@ -4162,31 +4195,25 @@
 
   function _stockRowHtml(item) {
     var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
-    var barClr= item.is_critical ? '#D32F2F' : item.is_low_stock ? '#E65100' : '#00897B';
-    var badge = item.is_critical
-      ? '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">OUT OF STOCK</span>'
-      : item.is_low_stock
-      ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">LOW</span>'
-      : '';
-    if (item.is_expired) {
-      badge += '<span style="background:#C62828;color:#fff;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">EXPIRED</span>';
-    } else if (item.is_expiring_soon) {
-      badge += '<span style="background:#FFF3E0;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">EXPIRES SOON</span>';
-    }
-    var cost = item.unit_cost_ugx ? ' · UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
-    var expTxt = item.expiry_date ? ' · Exp: '+_fmtExpDate(item.expiry_date) : '';
-    return '<div style="display:flex;align-items:center;gap:12px;padding:10px 20px;border-bottom:1px solid #F5F5F5">'
-      +'<div style="flex:1;min-width:0">'
-        +'<div style="font-size:13px;font-weight:600;color:#202124">'+esc(item.item_name)+badge+'</div>'
-        +'<div style="font-size:11px;color:#9AA0A6;margin-top:2px">'+item.quantity+' '+esc(item.unit)+' remaining'+cost+expTxt+'</div>'
-        +'<div style="margin-top:6px;height:5px;background:#E8EAED;border-radius:3px;overflow:hidden">'
-          +'<div style="height:100%;width:'+pct+'%;background:'+barClr+';border-radius:3px;transition:width .4s"></div>'
-        +'</div>'
+    var barClr= item.is_critical ? '#E0454B' : item.is_low_stock ? '#E2960A' : '#0E7C5A';
+    var pills = '';
+    if (item.is_critical)      pills += '<span class="pill-s crit">OUT</span>';
+    else if (item.is_low_stock) pills += '<span class="pill-s warn">LOW</span>';
+    if (item.is_expired)            pills += '<span class="pill-s exp-crit">EXPIRED</span>';
+    else if (item.is_expiring_soon) pills += '<span class="pill-s warn">EXP SOON</span>';
+    var isMed = item.item_type === 'medicine';
+    var icon  = isMed ? 'medication' : 'inventory_2';
+    var cost  = item.unit_cost_ugx ? 'UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
+    var expTxt= item.expiry_date ? 'Exp '+_fmtExpDate(item.expiry_date) : '';
+    var meta  = item.quantity+' '+esc(item.unit)+' left'+(cost?' · '+cost:'')+(expTxt?' · '+expTxt:'');
+    return '<div class="stock-card">'
+      +'<div class="stock-top">'
+        +'<div class="stock-ic '+(isMed?'med':'material')+'"><span class="material-icons-outlined">'+icon+'</span></div>'
+        +'<div class="stock-name">'+esc(item.item_name)+' '+pills+'</div>'
+        +'<button class="stock-restock" onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')">+ Restock</button>'
       +'</div>'
-      +'<div style="display:flex;gap:6px;flex-shrink:0">'
-        +'<button onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')" '
-          +'style="font-size:11px;padding:5px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">+ Restock</button>'
-      +'</div>'
+      +'<div class="stock-meta">'+meta+'</div>'
+      +'<div class="stock-bar"><i style="width:'+pct+'%;background:'+barClr+'"></i></div>'
     +'</div>';
   }
 
@@ -4562,6 +4589,15 @@
     loadFinancial(period);
   }
 
+  // Fill a money-tile ring to a 0..1 ratio (r=19 → circumference ≈119.38).
+  function _finRing(id, ratio) {
+    var c = document.getElementById(id); if (!c) return;
+    var C = 2 * Math.PI * 19;
+    ratio = Math.max(0, Math.min(1, ratio || 0));
+    c.style.strokeDasharray = C;
+    c.style.strokeDashoffset = C * (1 - ratio);
+  }
+
   var _finGen = 0;
   async function loadFinancial(period) {
     // Generation guard: refreshes can fire this several times in quick
@@ -4610,8 +4646,18 @@
       if (scEl) scEl.textContent = fmtUGX(stockCost);
       if (mEl) {
         mEl.textContent  = fmtUGX(margin);
-        mEl.style.color  = margin < 0 ? '#C62828' : '#E65100';
+        mEl.style.color  = margin < 0 ? '#E0454B' : '';   // red only when negative; else brand text
       }
+      // Ring fills reflect real ratios (guarded so they can never break figures).
+      try {
+        var pl = document.getElementById('finPeriodLbl');
+        if (pl) pl.textContent = period === 'day' ? 'today' : period === 'week' ? 'this week' : 'this month';
+        _finRing('ringDemanded',    billed > 0 ? 1 : 0);
+        _finRing('ringOutstanding', billed > 0 ? outstanding / billed : 0);
+        _finRing('ringMargin',      collected > 0 ? Math.max(0, margin) / collected : 0);
+        _finRing('ringStock',       collected > 0 ? stockCost / collected : (billed > 0 ? stockCost / billed : 0));
+        _finRing('ringPatients',    Math.min(1, (patients || 0) / 20));
+      } catch (e) {}
     }
 
     // Offline → paint from the last cached snapshot + live queued delta, done.
