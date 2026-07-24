@@ -2,8 +2,8 @@
    Homatt Health — Clinic Portal Styles
    ============================================ */
 :root {
-  --primary:   #1565C0;
-  --primary-d: #0D47A1;
+  --primary:   #0E7C5A;   /* Homatt emerald — unifies topbar, buttons, avatar with the brand */
+  --primary-d: #0A5C43;
   --accent:    #00897B;
   --surface:   #FFFFFF;
   --bg:        #F0F4F9;
@@ -16,8 +16,12 @@
   --success:   #2E7D32;
   --warning:   #E65100;
   --info:      #1565C0;
-  --radius:    12px;
-  --shadow:    0 2px 8px rgba(0,0,0,0.08);
+  --radius:    18px;
+  --radius-lg: 24px;
+  --shadow:    0 6px 18px rgba(20,24,43,0.07), 0 1px 4px rgba(20,24,43,0.05);
+  --shadow-lg: 0 16px 38px rgba(20,24,43,0.13), 0 4px 10px rgba(20,24,43,0.06);
+  --accent-v:      #6C5CE7;   /* violet — interactive highlights */
+  --accent-v-tint: #ECE9FF;
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{touch-action:manipulation}
@@ -53,7 +57,7 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 
 /* ── Main ── */
 .admin-main{margin-left:240px;flex:1;display:flex;flex-direction:column;overflow-x:hidden}
-.admin-topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;box-shadow:var(--shadow)}
+.admin-topbar{background:var(--surface);border-bottom:none;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(20,24,43,0.05)}
 .admin-topbar-title{font-size:18px;font-weight:700}
 .admin-topbar-right{display:flex;align-items:center;gap:14px}
 .admin-user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-lt)}
@@ -97,15 +101,17 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 
 /* ── Stats ── */
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:28px}
-.stat-card{background:var(--surface);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);display:flex;align-items:flex-start;gap:14px}
-.stat-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.stat-icon.green{background:#E8F5E9;color:#2E7D32}
+.stat-card{background:var(--surface);border:none;border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;transition:transform .12s ease}
+.stat-card:active{transform:scale(.985)}
+.stat-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-icon .material-icons-outlined{font-size:23px}
+.stat-icon.green{background:#DBF4EA;color:#0E7C5A}
 .stat-icon.blue{background:#E3F2FD;color:#1565C0}
-.stat-icon.orange{background:#FFF3E0;color:#E65100}
-.stat-icon.red{background:#FFEBEE;color:#C62828}
+.stat-icon.orange{background:#FCEFCF;color:#C77E06}
+.stat-icon.red{background:#FBE1DE;color:#C62828}
 .stat-icon.teal{background:#E0F2F1;color:#00695C}
-.stat-number{font-size:24px;font-weight:700;line-height:1;margin-bottom:4px}
-.stat-label{font-size:12px;color:var(--text-lt)}
+.stat-number{font-size:24px;font-weight:800;line-height:1;margin-bottom:4px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat-label{font-size:12px;color:var(--text-lt);font-weight:500}
 
 /* ── Table ── */
 .admin-table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
@@ -132,7 +138,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .status-badge.active,.status-badge.available{background:#E3F2FD;color:#1565C0}
 
 /* ── Buttons ── */
-.btn-admin{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+.btn-admin{display:inline-flex;align-items:center;gap:6px;padding:9px 17px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
 .btn-admin.primary{background:var(--primary);color:#fff}
 .btn-admin.primary:hover{background:var(--primary-d)}
 .btn-admin.secondary{background:#F3F4F6;color:var(--text);border:1px solid var(--border)}
