@@ -270,7 +270,7 @@
       cursor: pointer; touch-action: manipulation; font-family: inherit; transition: all .1s;
     }
     .qs-pm-chip.selected { background: #1B5E20; color: #fff; border-color: #1B5E20; }
-    #qsSellBtn:disabled  { background: #BDBDBD !important; cursor: not-allowed; }
+    #qsSellBtn:disabled  { background: #BDBDBD !important; box-shadow: none !important; cursor: not-allowed; }
     @media (max-width: 480px) {
       #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
     }
@@ -862,7 +862,7 @@
 
     <!-- Sell button -->
     <button id="qsSellBtn" type="button" disabled
-      style="margin:10px 16px;margin-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding:16px;background:#1B5E20;color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;transition:opacity .15s">
+      style="margin:10px 16px;margin-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding:16px;background:linear-gradient(135deg,#17936B,#0C6A4C);color:#fff;border:none;border-radius:15px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;box-shadow:0 10px 22px rgba(14,124,90,.34);transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
     </button>
@@ -4893,6 +4893,16 @@
       + (grand > 0 ? ' &nbsp;·&nbsp; UGX ' + fmtUGX(grand) : '');
   }
 
+  // Why is Sell greyed out? Tapping a disabled Sell shows this so the
+  // clinician is never left guessing.
+  function _qsSellHint() {
+    if (_qsCart.length) return '';
+    if (!_qsSel) return 'Search and pick an item to sell first';
+    if (_qsSel._isDemo) return 'This is sample data — add your real stock with “+ New Item”';
+    if (qsMaxUnits() < 1) return 'Not enough stock for this size — pick a smaller unit (e.g. a single ' + (_qsSel.unit || 'unit') + ') or restock';
+    return 'Pick an item and quantity first';
+  }
+
   function openQuickSale() {
     var el = document.getElementById('qsOverlay');
     if (!el) return;
@@ -5034,7 +5044,12 @@
       var _qsLastFire = 0;
       var clearFx = function() { sellBtn.style.filter = ''; };
       function fireSell(e) {
-        if (sellBtn.disabled) return;
+        if (sellBtn.disabled) {
+          // Explain WHY it won't sell instead of doing nothing (deduped).
+          var tn = Date.now();
+          if (tn - _qsLastFire >= 900) { _qsLastFire = tn; var h = _qsSellHint(); if (h) showToast(h, 'error'); }
+          return;
+        }
         var now = Date.now();
         if (now - _qsLastFire < 900) return;   // dedupe down/up/ghost-click trio
         _qsLastFire = now;
@@ -5160,7 +5175,7 @@
       clinicId = cidRace && cidRace.data;
     }
     if (!clinicId || !supabase) {
-      if (!hadInstant) renderQsDemo();
+      if (!hadInstant) { if (session && session.demo) renderQsDemo(); else renderQsGrid([]); }
       return;
     }
     var _coKey = 'qs_inventory_' + clinicId;
@@ -5199,7 +5214,12 @@
             : '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Slow connection — reopen Quick Sale to retry.</div>';
           return;
         }
-        renderQsDemo(); return;
+        // Real account with no stock: show the empty state that prompts
+        // "+ New Item" — NEVER demo items (they are _isDemo and can't be
+        // sold, so the Sell button would stay dead). Demo sample stock is
+        // for the demo account only.
+        if (session && session.demo) renderQsDemo(); else renderQsGrid([]);
+        return;
       }
 
       // Merge any locally-kept extras (prices/category saved on this device
@@ -5236,7 +5256,8 @@
       if (cachedErr && cachedErr.length) {
         _qsDrugs = cachedErr; renderQsGrid(_qsDrugs); renderQsCategoryChips(); return;
       }
-      renderQsDemo();
+      // Real account → empty state (+ New Item), never unsellable demo stock.
+      if (session && session.demo) renderQsDemo(); else renderQsGrid([]);
     }
   }
 
