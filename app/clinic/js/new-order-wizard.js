@@ -203,8 +203,33 @@
     phoneTimer = setTimeout(() => searchPatients(q), 220);
   });
 
+  // Search the locally-cached patient pool (built by the dashboard from recent
+  // consultations). Instant, works fully offline — no network at all.
+  function searchLocalPatients(q) {
+    const CO = window.ClinicOffline;
+    if (!CO || !_clinicId) return [];
+    const pool = CO.get('hist_pool_' + _clinicId, []) || [];
+    const needle = q.toLowerCase();
+    const seen = new Set(), rows = [];
+    for (const x of pool) {
+      const name = x.patient_name || '', phone = x.patient_phone || '';
+      if (name.toLowerCase().indexOf(needle) < 0 && phone.indexOf(q) < 0) continue;
+      const key = phone + '|' + name;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rows.push({ id: null, clinicPatientId: null, registered: false, name: name || 'Unnamed', phone });
+      if (rows.length >= 8) break;
+    }
+    return rows;
+  }
+
   async function searchPatients(q) {
     if (!supabase) { renderPatientMenu([], q); return; }
+
+    const CO = window.ClinicOffline;
+    // OFFLINE: never touch the network (it hangs the whole search for the full
+    // timeout in airplane mode). Answer instantly from the cached pool.
+    if (CO && CO.isOffline()) { renderPatientMenu(searchLocalPatients(q), q); return; }
 
     // SUB-ACCOUNT SAFE PATH: the search_clinic_patients RPC runs with
     // definer rights after verifying the caller is active clinic staff —
@@ -212,7 +237,11 @@
     // where legacy row security blocked their direct reads. Falls back to
     // the original direct queries if the RPC isn't installed yet.
     try {
-      const r = await supabase.rpc('search_clinic_patients', { p_q: q });
+      const rpc = supabase.rpc('search_clinic_patients', { p_q: q });
+      // Cap the wait so a slow link fails fast to the local cache instead of
+      // freezing the search box.
+      const r = CO ? await CO.withTimeout(rpc, 6000) : await rpc;
+      if (r && r._timeout) { renderPatientMenu(searchLocalPatients(q), q); return; }
       if (!r.error && Array.isArray(r.data)) {
         const seen = new Set();
         const rows = [];
@@ -233,21 +262,24 @@
       }
     } catch (e) { /* fall through to direct queries */ }
 
-    const { data: profiles } = await supabase
+    const _cap = (p) => CO ? CO.withTimeout(p, 6000) : p;
+    const profRes = await _cap(supabase
       .from('profiles')
       .select('id, first_name, last_name, phone_number, phone')
       .or(`phone_number.ilike.%${q}%,phone.ilike.%${q}%`)
-      .limit(5);
+      .limit(5));
+    if (profRes && profRes._timeout) { renderPatientMenu(searchLocalPatients(q), q); return; }
+    const profiles = profRes && profRes.data;
 
     let stubs = [];
     if (_clinicId) {
-      const { data: cp } = await supabase
+      const cpRes = await _cap(supabase
         .from('clinic_patients')
         .select('id, full_name, phone')
         .eq('clinic_id', _clinicId)
         .ilike('phone', `%${q}%`)
-        .limit(5);
-      stubs = cp || [];
+        .limit(5));
+      stubs = (cpRes && !cpRes._timeout && cpRes.data) || [];
     }
 
     const seenPhones = new Set((profiles||[]).map(p => p.phone_number || p.phone).filter(Boolean));
@@ -779,36 +811,70 @@
     const btn = document.getElementById('registerBtn');
     btn.disabled = true;
 
-    if (!_clinicId && supabase && !session?.demo) {
+    const CO = window.ClinicOffline;
+    const offline = CO ? CO.isOffline() : (navigator.onLine === false);
+
+    // Resolve the clinic id with NO network round-trip when we already know it
+    // (we almost always do). Only look it up online, never while offline —
+    // resolveClinicId awaits getSession(), which hangs for the full timeout in
+    // airplane mode and was a big part of the ~1-minute wait.
+    if (!_clinicId && session?.clinicId) _clinicId = session.clinicId;
+    if (!_clinicId && !offline && supabase && !session?.demo) {
       _clinicId = await resolveClinicId(supabase, session);
     }
 
+    // Queue the patient write offline with a local id, so the wizard proceeds
+    // instantly and the row syncs later.
+    function queueLocally() {
+      if (!CO || !_clinicId) return null;
+      const id = CO.uuid();
+      CO.enqueue('table_upsert', {
+        table: 'clinic_patients',
+        rows: [{ id, clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null }],
+        onConflict: 'clinic_id,phone'
+      });
+      CO.flush();
+      return id;
+    }
+
+    function finish(clinicPatientId, msg) {
+      selectPatient({ id: null, clinicPatientId, name, phone, registered: false });
+      regModal.style.display = 'none';
+      btn.disabled = false;
+      showToast(msg, 'success');
+      // SMS invite is fire-and-forget and ONLINE-only — never await it (it hung
+      // the whole flow for a minute in airplane mode).
+      if (supabase && !offline) {
+        try {
+          supabase.functions.invoke('send-sms-invite', {
+            body: { phone, name, clinicName: session?.clinicName || 'Clinic' }
+          }).catch(() => {});
+        } catch (e) {}
+      }
+    }
+
+    // OFFLINE (or no clinic/supabase): instant local save, no network at all.
+    if (offline || !supabase || !_clinicId) {
+      finish(queueLocally(), offline ? 'Patient saved — will sync when online' : 'Patient registered');
+      return;
+    }
+
+    // ONLINE: race the upsert against a short timeout so a slow link can't wedge
+    // the wizard; on timeout/failure fall back to the offline queue instantly.
     let clinicPatientId = null;
-    if (supabase && _clinicId) {
-      try {
-        const { data: cp } = await supabase
-          .from('clinic_patients')
-          .upsert(
-            { clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null },
-            { onConflict: 'clinic_id,phone' }
-          )
-          .select('id').single();
-        if (cp) clinicPatientId = cp.id;
-      } catch(e) {}
+    try {
+      const up = supabase.from('clinic_patients')
+        .upsert({ clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null },
+                { onConflict: 'clinic_id,phone' })
+        .select('id').single();
+      const res = CO ? await CO.withTimeout(up, 6000) : await up;
+      if (res && res._timeout) throw new Error('timeout');
+      if (res && res.data) clinicPatientId = res.data.id;
+      else if (res && res.error) throw res.error;
+    } catch (e) {
+      clinicPatientId = queueLocally();       // couldn't reach server → queue
     }
-
-    selectPatient({ id: null, clinicPatientId, name, phone, registered: false });
-    regModal.style.display = 'none';
-    btn.disabled = false;
-
-    if (supabase) {
-      try {
-        await supabase.functions.invoke('send-sms-invite', {
-          body: { phone, name, clinicName: session?.clinicName || 'Clinic' }
-        });
-      } catch(e) {}
-    }
-    showToast('Patient registered', 'success');
+    finish(clinicPatientId, 'Patient registered');
   };
 
   // ── Diagnosis input ──────────────────────────────────────────────
