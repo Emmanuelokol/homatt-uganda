@@ -344,37 +344,30 @@
     });
   } catch (e) {}
 
-  // ── Offline / sync status banner ─────────────────────────────────────────
+  // ── Offline status chip ───────────────────────────────────────────────────
+  // Syncing is SILENT — it happens in the background and the optimistic UI
+  // already shows the change, so there is NO persistent "Syncing N offline
+  // change…" banner (it used to linger, especially when a change was slow to
+  // push, and staff found it distracting). The only indicator is a small,
+  // unobtrusive "Offline" chip shown ONLY when there is genuinely no
+  // connection, so staff understand why figures aren't moving; it vanishes the
+  // instant they're back online and the queue drains on its own. A change that
+  // truly can't be saved still surfaces a one-time toast from the flush loop.
   function updateIndicator() {
     var bar = document.getElementById('_clinicOfflineBar');
-    var off = isOffline();
-    var pending = pendingCount();
-    var show = off || pending > 0;
-
-    if (!show) { if (bar) bar.remove(); return; }
+    if (!isOffline()) { if (bar) bar.remove(); return; }   // online → nothing at all
     if (!bar) {
       if (!document.body) return;
       bar = document.createElement('div');
       bar.id = '_clinicOfflineBar';
-      // pointer-events:none is CRITICAL: this bar sits fixed over the bottom of
-      // the screen, exactly where the Quick Sale Sell button lives. Without it,
-      // taps landing on the bar died silently — staff had to press Sell many
-      // times whenever a sync was pending. The bar is informational only, so
-      // every tap must pass straight through it.
-      bar.style.cssText = 'pointer-events:none;position:fixed;left:0;right:0;bottom:0;z-index:11000;' +
-        'color:#fff;font-family:inherit;font-size:12.5px;font-weight:600;' +
-        'text-align:center;padding:7px 12px;display:flex;align-items:center;justify-content:center;gap:6px;' +
-        'box-shadow:0 -2px 10px rgba(0,0,0,0.2)';
+      // pointer-events:none so a tap can never die on it (it once sat over the
+      // Quick Sale Sell button). Small pill, bottom-left, out of the way.
+      bar.style.cssText = 'pointer-events:none;position:fixed;left:12px;bottom:12px;z-index:11000;' +
+        'background:rgba(45,58,64,0.92);color:#fff;font-family:inherit;font-size:12px;font-weight:700;' +
+        'border-radius:999px;padding:6px 12px;display:flex;align-items:center;gap:6px;' +
+        'box-shadow:0 4px 14px rgba(0,0,0,0.28)';
+      bar.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">cloud_off</span>Offline';
       document.body.appendChild(bar);
-    }
-    if (off) {
-      bar.style.background = '#37474F';
-      bar.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">cloud_off</span>' +
-        'Offline — showing saved data.' + (pending ? ' ' + pending + ' change' + (pending > 1 ? 's' : '') + ' will sync.' : ' Changes sync when you reconnect.');
-    } else {
-      bar.style.background = '#1B5E20';
-      bar.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">sync</span>' +
-        'Syncing ' + pending + ' offline change' + (pending > 1 ? 's' : '') + '…';
     }
   }
 
