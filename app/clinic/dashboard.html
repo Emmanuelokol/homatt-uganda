@@ -1977,6 +1977,59 @@
     bodyEl.innerHTML = g.records.map(function(c, i) {
       return renderHistVisitCard(c, g.records.length - i, i === 0);
     }).join('');
+    // Referral history for this patient (what was referred, when, by whom) —
+    // fetched in the background with a hard timeout so it can never hang the
+    // modal, and prepended above the visits when it arrives.
+    _loadPatientReferralHistory(g.phone);
+  }
+
+  async function _loadPatientReferralHistory(phone) {
+    if (!phone || !supabase) return;
+    try {
+      var cid = await resolveClinicId();
+      if (!cid) return;
+      var CO = window.ClinicOffline;
+      var q = supabase.from('clinic_referrals')
+        .select('id,from_clinic_id,to_clinic_id,reason,needed_item,notes,referral_code,status,created_at')
+        .eq('patient_phone', phone)
+        .or('from_clinic_id.eq.' + cid + ',to_clinic_id.eq.' + cid)
+        .order('created_at', { ascending: false }).limit(20);
+      var rr = CO ? await CO.withTimeout(q, 7000) : await q;
+      if (!rr || rr._timeout || rr.error || !rr.data || !rr.data.length) return;
+      var modal = document.getElementById('histModal');
+      var body = document.getElementById('histModalBody');
+      if (!body || !modal || modal.style.display !== 'flex') return;   // modal closed meanwhile
+      var names = (CO && CO.get('clinic_names', {})) || {};
+      // Resolve any unknown partner-clinic names (best effort, timed out).
+      var need = rr.data.map(function(r){ return r.from_clinic_id === cid ? r.to_clinic_id : r.from_clinic_id; })
+        .filter(function(id, i, a){ return id && !names[id] && a.indexOf(id) === i; });
+      if (need.length && !(CO && CO.isOffline())) {
+        try {
+          var nq = supabase.from('clinics').select('id,name').in('id', need);
+          var nr = CO ? await CO.withTimeout(nq, 5000) : await nq;
+          if (nr && !nr._timeout && nr.data) { nr.data.forEach(function(c){ names[c.id]=c.name; }); if (CO) CO.set('clinic_names', names); }
+        } catch (e) {}
+      }
+      var rowsHtml = rr.data.map(function(r){
+        var out = r.from_clinic_id === cid;
+        var other = out ? r.to_clinic_id : r.from_clinic_id;
+        var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '';
+        return '<div style="font-size:12.5px;color:#4A148C;padding:7px 0;border-top:1px solid #E1BEE7">'
+          + '<strong>' + (out ? 'Referred OUT' : 'Referred IN') + '</strong> · ' + when
+          + ' · ' + (out ? 'to ' : 'from ') + esc(names[other] || 'partner clinic')
+          + (r.reason ? ' · ' + esc(r.reason) : '')
+          + (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
+          + ' · <span style="text-transform:uppercase;font-weight:800;font-size:10.5px">' + esc(r.status) + '</span>'
+          + (r.notes ? '<div style="font-style:italic;margin-top:2px">“' + esc(r.notes) + '”</div>' : '')
+        + '</div>';
+      }).join('');
+      var html = '<div style="background:#F3E5F5;border-radius:12px;padding:12px 14px;margin-bottom:12px">'
+        + '<div style="font-size:11px;font-weight:800;color:#6A1B9A;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">'
+        +   '<span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">alt_route</span> Referrals</div>'
+        + rowsHtml
+        + '</div>';
+      body.insertAdjacentHTML('afterbegin', html);
+    } catch (e) {}
   }
 
   // Full clinical + financial detail for one past visit in the Patient History modal.
@@ -3858,25 +3911,41 @@
           : 'Could not load referrals.') + '</div>';
       return;
     }
-    var rows = res.data || [];
+    var all = res.data || [];
+    // ONLY active referrals stay in the inbox. Once the patient is marked
+    // 'seen' (approved/attended), the referral leaves this list and lives on in
+    // the patient's history (Patient History → the referral shows there). So the
+    // inbox only ever shows what still needs action.
+    var rows = all.filter(function (r) { return r.status === 'pending' || r.status === 'received'; });
     var cEl = document.getElementById('refInCount');
-    var open = rows.filter(function (r) { return r.status === 'pending' || r.status === 'received'; }).length;
-    if (cEl) { cEl.textContent = open + ' open'; cEl.style.display = open ? '' : 'none'; }
+    if (cEl) { cEl.textContent = rows.length + ' open'; cEl.style.display = rows.length ? '' : 'none'; }
     if (!rows.length) {
       list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">No referrals yet. When a partner clinic refers a patient to you, they appear here instantly.</div>';
       return;
     }
-    // Resolve sender clinic names (cached for offline)
+    // RENDER NOW with whatever sender names we already have — NEVER block the
+    // list on the names lookup. That lookup had no timeout and hung the whole
+    // "Referrals Received" section on "Loading…" on slow internet.
     var names = (CO && CO.get('clinic_names', {})) || {};
+    _renderRefRows(list, rows, names);
+    // Fill missing sender names in the background with a HARD timeout, then
+    // re-render — a slow link can never wedge the list again.
     var missing = rows.map(function (r) { return r.from_clinic_id; })
       .filter(function (id, i, a) { return id && !names[id] && a.indexOf(id) === i; });
     if (missing.length && !(CO && CO.isOffline())) {
       try {
-        var nr = await supabase.from('clinics').select('id,name').in('id', missing);
-        (nr.data || []).forEach(function (c) { names[c.id] = c.name; });
-        if (CO) CO.set('clinic_names', names);
+        var q = supabase.from('clinics').select('id,name').in('id', missing);
+        var nr = CO ? await CO.withTimeout(q, 7000) : await q;
+        if (nr && !nr._timeout && nr.data) {
+          nr.data.forEach(function (c) { names[c.id] = c.name; });
+          if (CO) CO.set('clinic_names', names);
+          _renderRefRows(list, rows, names);
+        }
       } catch (e) {}
     }
+  }
+
+  function _renderRefRows(list, rows, names) {
     list.innerHTML = rows.map(function (r) {
       var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
       var stColor = r.status === 'pending' ? '#E65100' : r.status === 'received' ? '#00838F' : '#2E7D32';
@@ -3884,7 +3953,7 @@
       if (r.status === 'pending') {
         actions = '<button onclick="setReferralStatus(\'' + esc(r.id) + '\',\'received\')" style="font-size:11px;padding:6px 12px;background:#E0F7FA;color:#006064;border:1px solid #4DD0E1;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Mark received</button>';
       } else if (r.status === 'received') {
-        actions = '<button onclick="setReferralStatus(\'' + esc(r.id) + '\',\'seen\')" style="font-size:11px;padding:6px 12px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Patient seen ✓</button>';
+        actions = '<button onclick="setReferralStatus(\'' + esc(r.id) + '\',\'seen\')" style="font-size:11px;padding:6px 12px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:8px;cursor:pointer;font-weight:700;font-family:inherit">Patient seen ✓ — file to history</button>';
       }
       return '<div style="padding:12px 20px;border-bottom:1px solid #F5F5F5">'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
