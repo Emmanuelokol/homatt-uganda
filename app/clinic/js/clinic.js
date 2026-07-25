@@ -595,4 +595,20 @@ if (window.ClinicOffline) {
   ClinicOffline.registerSyncHandler('table_update', function (item) { return _replayTableUpdate(item.payload); });
   ClinicOffline.registerSyncHandler('table_upsert', function (item) { return _replayTableUpsert(item.payload); });
   ClinicOffline.registerSyncHandler('table_delete', function (item) { return _replayTableDelete(item.payload); });
+
+  // Called by the offline outbox BEFORE each flush. After a spell offline the
+  // auth token often expires; every queued write then fails on auth and stays
+  // queued forever ("Syncing 1 offline change…" that only clears on a manual
+  // reload — because reloading re-inits Supabase and refreshes the token).
+  // getSession() refreshes an expired token, and we re-authorize the realtime
+  // socket with the fresh token so live updates resume too.
+  window._clinicEnsureAuth = async function () {
+    try {
+      var supa = _getClinicSupabase();
+      if (!supa) return;
+      var s = await supa.auth.getSession();
+      var tok = s && s.data && s.data.session && s.data.session.access_token;
+      if (tok && supa.realtime && supa.realtime.setAuth) supa.realtime.setAuth(tok);
+    } catch (e) {}
+  };
 }

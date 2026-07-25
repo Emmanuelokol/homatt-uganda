@@ -1103,8 +1103,8 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=15"></script>
-<script src="js/clinic.js?v=20260729"></script>
+<script src="js/clinic-offline.js?v=16"></script>
+<script src="js/clinic.js?v=20260816"></script>
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -3959,11 +3959,26 @@
   window.addEventListener('clinic-synced', function() { try { refreshAll(); } catch(e) {} });
 
   // ── Supabase Realtime ──
+  // CRITICAL: an anon-key-only socket receives NOTHING from RLS tables, so the
+  // socket MUST be authorized with the logged-in token (setAuth) — without it
+  // every subscription below is silently dead and online changes never stream
+  // live (the user had to refresh). The channel also RESUBSCRIBES itself with
+  // backoff when it errors/closes (flaky 4G drops it), and re-auths whenever the
+  // app returns to the foreground. clinic_referrals is included so a referral
+  // reaches the receiving clinic in real time (like the messenger).
+  var _rtChannel = null, _rtGen = 0, _rtRetry = 0;
   async function setupRealtime() {
     if (!supabase) return;
     var clinicId = await resolveClinicId();
     if (!clinicId) return;
-    supabase.channel('dashboard-' + clinicId)
+    try {
+      var s = await supabase.auth.getSession();
+      var tok = s && s.data && s.data.session && s.data.session.access_token;
+      if (tok && supabase.realtime && supabase.realtime.setAuth) supabase.realtime.setAuth(tok);
+    } catch (e) {}
+    var mine = ++_rtGen;
+    if (_rtChannel) { try { supabase.removeChannel(_rtChannel); } catch (e) {} _rtChannel = null; }
+    _rtChannel = supabase.channel('dashboard-' + clinicId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
         function() { loadBookings(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
@@ -3976,9 +3991,23 @@
         function() { loadInventory(); loadFinancial(_finPeriod); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_quick_sales', filter: 'clinic_id=eq.' + clinicId },
         function() { loadRevenue(); loadFinancial(_finPeriod); loadInventory(); })
-      .subscribe();
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'to_clinic_id=eq.' + clinicId },
+        function() { try { loadReferralsIn(); } catch (e) {} try { refreshFigures(); } catch (e) {} })
+      .subscribe(function(status) {
+        if (mine !== _rtGen) return;
+        if (status === 'SUBSCRIBED') { _rtRetry = 0; }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          var wait = Math.min(30000, 3000 * Math.pow(2, Math.min(_rtRetry++, 4)));
+          setTimeout(function() { if (mine === _rtGen) setupRealtime(); }, wait);
+        }
+      });
   }
   setupRealtime();
+  // Re-auth + resubscribe when returning to the foreground (token may have
+  // refreshed while backgrounded, and the socket may have been dropped).
+  document.addEventListener('visibilitychange', function() {
+    if (!document.hidden) { try { setupRealtime(); } catch (e) {} }
+  });
 
   // ═══════════════════════════════════════════════════════
   // INVENTORY & STOCK TRACKER

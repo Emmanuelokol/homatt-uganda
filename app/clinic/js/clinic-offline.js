@@ -255,6 +255,9 @@
     _syncing = true;
     var anyFailed = false, anyDropped = 0;
     var PERM_MAX_TRIES = 4;   // permanent rejections give up after this many
+    // Refresh a possibly-expired auth token first — otherwise every queued
+    // write fails on auth and the queue never drains until a manual reload.
+    if (window._clinicEnsureAuth) { try { await window._clinicEnsureAuth(); } catch (e) {} }
     try {
       for (var i = 0; i < list.length; i++) {
         var item = list[i];
