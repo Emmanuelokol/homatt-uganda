@@ -76,6 +76,37 @@
   </main>
 </div>
 
+<!-- Delete facility confirmation (in-page: window.prompt is disabled in some
+     WebViews, which silently blocked the old typed-name confirmation) -->
+<div class="admin-modal-overlay" id="deleteClinicModal" style="display:none">
+  <div class="admin-modal" style="max-width:460px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" style="color:#C62828">Delete facility permanently</div>
+      <button class="admin-modal-close" onclick="closeDeleteClinicModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div style="padding:18px 20px">
+      <p style="font-size:14px;color:#333;margin-bottom:10px">
+        This permanently deletes <strong id="dcName">this clinic</strong>, all of its records
+        (consultations, stock, sales, referrals) and its staff logins. Patients keep their own
+        booking history.
+      </p>
+      <p style="font-size:13px;color:#C62828;font-weight:700;margin-bottom:14px">
+        This cannot be undone. To take a facility offline temporarily, use Suspend instead.
+      </p>
+      <label style="display:block;font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+        Type the facility name to confirm
+      </label>
+      <input id="dcInput" type="text" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1.5px solid #E0E0E0;border-radius:12px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box">
+      <div id="dcError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn-admin secondary" style="flex:1;justify-content:center" onclick="closeDeleteClinicModal()">Cancel</button>
+        <button id="dcConfirmBtn" class="btn-admin danger" style="flex:1;justify-content:center" disabled>Delete permanently</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Add/Edit Clinic Modal -->
 <div class="admin-modal-overlay" id="clinicModal" style="display:none">
   <div class="admin-modal" style="max-width:640px">
@@ -945,30 +976,93 @@ async function toggleClinicStatus(id, newStatus) {
   showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
 }
 
-async function removeClinic(id) {
-  // PERMANENT delete: the clinic, all its records, and its staff logins.
-  // (To merely take a clinic offline, use Suspend — that's reversible.)
+// PERMANENT delete of a facility. Uses an IN-PAGE confirmation dialog rather
+// than window.confirm/prompt: Android WebViews commonly disable prompt()
+// (it returns null instantly), which made the typed-name check always fail —
+// that is why "delete was not working". Falls back through three levels so the
+// admin can always remove a facility:
+//   1. admin_delete_clinic RPC  → full wipe incl. staff logins  (best)
+//   2. client-side cascade      → deletes the clinic's rows then the clinic
+//   3. soft delete              → marks it removed so it leaves the live list
+function removeClinic(id) {
   var c = allClinics.find(function(x){ return x.id === id; });
   var name = c ? c.name : 'this clinic';
-  if (!confirm('PERMANENTLY DELETE "' + name + '"?\n\nThis wipes the clinic, ALL its records (consultations, stock, sales, referrals) and its staff login accounts. Patients keep their own booking history.\n\nThis CANNOT be undone. To take a clinic offline temporarily, use Suspend instead.')) return;
-  var typed = prompt('Type the clinic name to confirm permanent deletion:');
-  if ((typed || '').trim().toLowerCase() !== String(name).trim().toLowerCase()) {
-    showAdminToast('Name did not match — nothing was deleted', 'default');
-    return;
-  }
+  var ov = document.getElementById('deleteClinicModal');
+  document.getElementById('dcName').textContent = name;
+  document.getElementById('dcInput').value = '';
+  document.getElementById('dcError').style.display = 'none';
+  var btn = document.getElementById('dcConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Delete permanently';
+  document.getElementById('dcInput').oninput = function() {
+    btn.disabled = this.value.trim().toLowerCase() !== String(name).trim().toLowerCase();
+  };
+  btn.onclick = function() { _doDeleteClinic(id, name); };
+  ov.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('dcInput').focus(); }, 80);
+}
+function closeDeleteClinicModal() {
+  var ov = document.getElementById('deleteClinicModal');
+  if (ov) ov.style.display = 'none';
+}
+
+async function _doDeleteClinic(id, name) {
   var supa = adminSupa();
-  if (!supa) { showAdminToast('Demo mode — cannot delete', 'default'); return; }
+  var btn = document.getElementById('dcConfirmBtn');
+  var errBox = document.getElementById('dcError');
+  function fail(msg) {
+    errBox.textContent = msg;
+    errBox.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Delete permanently';
+  }
+  if (!supa) { fail('Demo mode — cannot delete.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  // 1. Proper server-side wipe.
   var r = await supa.rpc('admin_delete_clinic', { p_clinic_id: id });
   var err = r.error ? r.error.message : (r.data && r.data.ok === false ? r.data.error : null);
-  if (err) {
-    showAdminToast(/could not find the function/i.test(err)
-      ? 'Run the delete-clinic SQL (20260726) first, then retry.'
-      : 'Delete failed: ' + err, 'error');
+  if (!err) {
+    closeDeleteClinicModal();
+    await loadClinics();
+    showAdminToast('"' + name + '" permanently deleted' +
+      (r.data && r.data.staff_logins_removed ? ' (' + r.data.staff_logins_removed + ' staff login' + (r.data.staff_logins_removed !== 1 ? 's' : '') + ' removed)' : ''), 'default');
     return;
   }
-  await loadClinics();
-  showAdminToast('"' + name + '" permanently deleted' +
-    (r.data && r.data.staff_logins_removed ? ' (' + r.data.staff_logins_removed + ' staff login' + (r.data.staff_logins_removed !== 1 ? 's' : '') + ' removed)' : ''), 'default');
+
+  // 2. RPC not installed on this database → delete what we can from the client.
+  var rpcMissing = /could not find the function|does not exist|schema cache/i.test(err);
+  if (rpcMissing) {
+    var tables = ['clinic_referrals','clinic_quick_sales','clinic_inventory_txns','clinic_inventory',
+                  'clinic_payments','clinic_followups','e_prescriptions','clinic_diagnoses',
+                  'clinic_patients','clinic_staff_invites','portal_users'];
+    var blocked = [];
+    for (var i = 0; i < tables.length; i++) {
+      try {
+        var d = await supa.from(tables[i]).delete().eq('clinic_id', id);
+        if (d.error && !/does not exist|schema cache/i.test(d.error.message || '')) blocked.push(tables[i]);
+      } catch (e) { blocked.push(tables[i]); }
+    }
+    var dc = await supa.from('clinics').delete().eq('id', id);
+    if (!dc.error) {
+      closeDeleteClinicModal();
+      await loadClinics();
+      showAdminToast('"' + name + '" deleted' + (blocked.length ? ' (some records were protected — run the delete-clinic SQL for a full wipe)' : ''), 'default');
+      return;
+    }
+    // 3. Even the clinic row is protected → soft delete so it leaves the list.
+    var sd = await supa.from('clinics').update({ status: 'removed' }).eq('id', id);
+    if (!sd.error) {
+      closeDeleteClinicModal();
+      await loadClinics();
+      showAdminToast('"' + name + '" removed from the live list. Run the delete-clinic SQL (20260726) in Supabase for a full permanent wipe.', 'default');
+      return;
+    }
+    fail('Could not delete: ' + (dc.error.message || sd.error.message) + ' — run the delete-clinic SQL (20260726) in Supabase, then retry.');
+    return;
+  }
+  fail('Delete failed: ' + err);
 }
 </script>
 </body>

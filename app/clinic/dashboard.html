@@ -4042,7 +4042,7 @@
         _refOutRows = outCached;
         var lo = document.getElementById('refOutList');
         var co = document.getElementById('refOutCount');
-        var waiting = outCached.filter(function (r) { return r.status === 'pending' || r.status === 'received'; }).length;
+        var waiting = outCached.filter(function (r) { return !r.attended && (r.status === 'pending' || r.status === 'received'); }).length;
         if (co) { co.textContent = waiting + ' awaiting'; co.style.display = waiting ? '' : 'none'; }
         if (lo) _renderRefOutRows(lo, outCached.slice(0, N), _refNames, outCached.length);
       }
@@ -4064,10 +4064,23 @@
       return;
     }
     var CO = window.ClinicOffline;
+    // Prefer referrals_sent(): it reports the REAL outcome (was the patient
+    // actually treated at the destination, when, for what, by whom) instead of
+    // only the referral's own status — which stays 'pending' unless someone at
+    // the other clinic taps a button. Falls back to the plain table query when
+    // the RPC isn't installed on this database yet.
     var run = function () {
-      return supabase.from('clinic_referrals')
-        .select('id,to_clinic_id,patient_name,patient_phone,reason,needed_item,status,referral_code,created_at')
-        .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
+      var plain = function () {
+        return supabase.from('clinic_referrals')
+          .select('id,to_clinic_id,patient_name,patient_phone,reason,needed_item,status,referral_code,created_at')
+          .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
+      };
+      // ANY failure of the RPC (not installed, RLS, network, timeout) falls back
+      // to the plain table query — the safe baseline that always works. Only a
+      // successful RPC result is preferred, for its outcome columns.
+      return supabase.rpc('referrals_sent', { p_limit: 200 })
+        .then(function (r) { return (r && !r.error && r.data) ? r : plain(); })
+        .catch(function () { return plain(); });
     };
     var res = CO ? await CO.cachedQuery('referrals_out_' + clinicId, run) : await run();
     if (res.error && !(res.data || []).length) {
@@ -4080,7 +4093,7 @@
     }
     var rows = res.data || [];
     var cEl = document.getElementById('refOutCount');
-    var waiting = rows.filter(function (r) { return r.status === 'pending' || r.status === 'received'; }).length;
+    var waiting = rows.filter(function (r) { return !r.attended && (r.status === 'pending' || r.status === 'received'); }).length;
     if (cEl) { cEl.textContent = waiting + ' awaiting'; cEl.style.display = waiting ? '' : 'none'; }
     if (!rows.length) {
       list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">You haven’t referred anyone yet. Use <strong>Refer now</strong> above to send a patient to a partner clinic.</div>';
@@ -4110,10 +4123,24 @@
     list.innerHTML = rows.map(function (r) {
       var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
       // Plain-language status the sender actually cares about.
-      var st = r.status === 'pending'  ? { t: 'Waiting for them',  c: '#E65100', bg: '#FCEFCF' }
+      // The outcome from the destination clinic wins over the raw status: if they
+      // treated the patient, it says so even if nobody tapped a button there.
+      var st = (r.attended || r.status === 'seen')
+                                       ? { t: 'Attended \u2713',    c: '#0E7C5A', bg: '#DBF4EA' }
              : r.status === 'received' ? { t: 'Patient on the way', c: '#00838F', bg: '#DBEFFB' }
-             : r.status === 'seen'     ? { t: 'Attended ✓',    c: '#0E7C5A', bg: '#DBF4EA' }
-             :                           { t: r.status || '—', c: '#5F6368', bg: '#EEEEEE' };
+             : r.status === 'pending'  ? { t: 'Waiting for them',  c: '#E65100', bg: '#FCEFCF' }
+             :                           { t: r.status || '\u2014', c: '#5F6368', bg: '#EEEEEE' };
+      // What actually happened over there — what they were treated for and by whom.
+      var outcome = '';
+      if (r.attended) {
+        var aWhen = r.attended_at ? new Date(r.attended_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
+        outcome = '<div style="font-size:12px;color:#0E7C5A;margin-top:4px;background:#DBF4EA;border-radius:8px;padding:6px 9px">'
+          + '<span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> Seen'
+          + (aWhen ? ' ' + aWhen : '')
+          + (r.outcome_diagnosis ? ' \u00B7 ' + esc(r.outcome_diagnosis) : '')
+          + (r.outcome_clinician ? ' \u00B7 by ' + esc(r.outcome_clinician) : '')
+          + '</div>';
+      }
       return '<div style="padding:12px 20px;border-bottom:1px solid #F5F5F5">'
         + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
         +   '<strong style="font-size:14px">' + esc(r.patient_name || 'Patient') + '</strong>'
@@ -4121,10 +4148,11 @@
         +   '<span style="font-size:11px;color:#9AA0A6;margin-left:auto">' + when + '</span>'
         + '</div>'
         + '<div style="font-size:12.5px;color:#5F6368;margin-top:4px">'
-        +   'To <strong>' + esc(names[r.to_clinic_id] || 'partner clinic') + '</strong>'
+        +   'To <strong>' + esc(r.to_clinic_name || names[r.to_clinic_id] || 'partner clinic') + '</strong>'
         +   (r.reason ? ' · ' + esc(r.reason) : '')
         +   (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
         + '</div>'
+        + outcome
       + '</div>';
     }).join('')
     + ((total && total > rows.length) ? _svViewAllBtn('referrals_out', 'View all ' + total + ' sent') : '');
