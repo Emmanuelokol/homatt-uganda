@@ -795,9 +795,11 @@
 
   // ── Quick-register modal ─────────────────────────────────────────
   const regModal = document.getElementById('registerModal');
-  function openRegisterModal(prefillPhone) {
+  function openRegisterModal(prefillPhone, prefillName) {
     document.getElementById('regPhone').value = prefillPhone || phoneInput.value;
-    document.getElementById('regName').value = '';
+    // A referred patient arrives with their name already known — prefill it so
+    // registering is a single tap.
+    document.getElementById('regName').value = prefillName || '';
     regModal.style.display = 'flex';
     setTimeout(() => document.getElementById('regName').focus(), 100);
   }
@@ -1198,6 +1200,75 @@
     showStep(2);
   };
 
+  // Resolve a phone number against the clinic's patients. Returns the matching
+  // patient row (with their real ids so history links up) or null. Used when a
+  // REFERRED patient is opened from the dashboard: if they're already in the
+  // system we skip straight to the assessment; if not, we register them first.
+  async function _resolvePatientByPhone(phone) {
+    const q = normPhone(phone);
+    if (!q || q.length < 4) return null;
+    const CO = window.ClinicOffline;
+    const pick = (rows) => {
+      if (!rows || !rows.length) return null;
+      const exact = rows.find(r => normPhone(r.phone) === q);
+      return exact || rows[0];
+    };
+    // Offline → the saved patient pool only (never touch the network).
+    if (CO && CO.isOffline()) return pick(searchLocalPatients(q));
+    try {
+      const rpc = supabase.rpc('search_clinic_patients', { p_q: q });
+      const r = CO ? await CO.withTimeout(rpc, 6000) : await rpc;
+      if (r && !r._timeout && !r.error && Array.isArray(r.data) && r.data.length) {
+        return pick(r.data.map(x => ({
+          id: x.profile_id || null,
+          clinicPatientId: x.clinic_patient_id || null,
+          registered: !!x.registered,
+          name: x.full_name || '',
+          phone: x.phone || '',
+        })));
+      }
+    } catch (e) {}
+    // Fallback: this clinic's own patient stubs.
+    try {
+      if (_clinicId) {
+        const cq = supabase.from('clinic_patients').select('id, full_name, phone')
+          .eq('clinic_id', _clinicId).ilike('phone', '%' + q + '%').limit(5);
+        const cr = CO ? await CO.withTimeout(cq, 6000) : await cq;
+        if (cr && !cr._timeout && cr.data && cr.data.length) {
+          return pick(cr.data.map(s => ({
+            id: null, clinicPatientId: s.id, registered: false,
+            name: s.full_name || '', phone: s.phone || '',
+          })));
+        }
+      }
+    } catch (e) {}
+    // Last resort: locally cached pool (may know them from a past visit).
+    return pick(searchLocalPatients(q));
+  }
+
+  // A referral opened from the dashboard: mark it attended once the
+  // consultation is saved, so it leaves "Referrals Received" by itself.
+  function _closeReferralIfAny() {
+    const rid = state.referralId;
+    if (!rid) return;
+    state.referralId = null;                      // once only
+    try {
+      const CO = window.ClinicOffline;
+      if (CO) {
+        CO.enqueue('table_update', { table: 'clinic_referrals', patch: { status: 'seen' }, match: { id: rid } });
+        CO.flush();
+        // Keep the cached inbox in step so it disappears immediately.
+        try {
+          const key = 'referrals_in_' + _clinicId;
+          const cached = CO.get(key, null);
+          if (cached) CO.set(key, cached.map(r => r.id === rid ? Object.assign({}, r, { status: 'seen' }) : r));
+        } catch (e) {}
+      } else if (supabase) {
+        supabase.from('clinic_referrals').update({ status: 'seen' }).eq('id', rid).then(() => {}).catch(() => {});
+      }
+    } catch (e) {}
+  }
+
   // ── Pre-fill from URL params ─────────────────────────────────────
   (function preFillFromURL() {
     const p = new URLSearchParams(window.location.search);
@@ -1207,10 +1278,45 @@
     const cpId        = p.get('clinic_patient_id');
     const bookingId   = p.get('booking_id');
     const bookingCode = p.get('booking_code');
+    const referralId  = p.get('referral_id');
+    const lookup      = p.get('lookup') === '1' || !!referralId;
 
     if (bookingId) {
       state.bookingId   = bookingId;
       state.bookingCode = bookingCode || null;
+    }
+    if (referralId) state.referralId = referralId;
+
+    // REFERRED PATIENT: resolve them against the system first.
+    //  • already in the system → select them and go straight to the assessment
+    //  • not in the system     → open Register (prefilled) so one tap adds them,
+    //                            then the same assessment steps continue
+    if (lookup && phone) {
+      phoneInput.value = phone;
+      const hint = document.getElementById('patientResults');
+      if (hint) {
+        hint.style.display = 'block';
+        hint.innerHTML = '<div style="padding:12px;color:#5F6368;font-size:13px">Checking if this patient is already in your system…</div>';
+      }
+      (async () => {
+        let found = null;
+        try { found = await _resolvePatientByPhone(phone); } catch (e) {}
+        if (hint) { hint.style.display = 'none'; hint.innerHTML = ''; }
+        if (found) {
+          selectPatient({
+            id: found.id || null,
+            clinicPatientId: found.clinicPatientId || null,
+            name: found.name || name || 'Patient',
+            phone: found.phone || phone,
+            registered: !!found.registered,
+          });
+          try { showToast('Referred patient found — continue the consultation', 'success'); } catch (e) {}
+        } else {
+          openRegisterModal(phone, name || '');
+          try { showToast('New patient — register them to continue', 'info'); } catch (e) {}
+        }
+      })();
+      return;
     }
 
     if (name && (phone || bookingId)) {
@@ -2179,6 +2285,7 @@
       if (successRemindersEl) successRemindersEl.innerHTML = '<div style="font-size:12px;color:#2E7D32;padding:3px 0"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Prescription &amp; reminders will be scheduled once it syncs.</div>';
       const successSheet = document.getElementById('successSheet');
       if (successSheet) successSheet.style.display = 'flex';
+      _closeReferralIfAny();   // referral handled → leaves the inbox
     }
 
     if (window.ClinicOffline && navigator.onLine === false) {
@@ -2341,6 +2448,7 @@
     }
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
+    _closeReferralIfAny();     // referral handled → leaves the inbox
 
     } catch (fatalErr) {
       console.error('submitBtn fatal:', fatalErr);
