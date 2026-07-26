@@ -359,6 +359,20 @@
         </div>
       </div>
 
+      <!-- Referrals I sent — did the patient arrive and get seen? -->
+      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="4" style="padding:0;margin-bottom:24px;">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#6A1B9A">call_made</span>
+            Referrals I Sent
+          </div>
+          <span id="refOutCount" style="font-size:11px;color:#fff;background:#6A1B9A;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
+        </div>
+        <div id="refOutList" style="padding:8px 0">
+          <div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
       <!-- Hero with New Consultation CTA -->
       <div class="home-hero" data-slide="home">
         <div>
@@ -3880,6 +3894,7 @@
     loadInventory();
     loadFinancial(_finPeriod);
     loadMedsDispensed();
+    try { loadReferralsOut(); } catch (e) {}
     if (typeof loadTopConditions === 'function') loadTopConditions();
     _prefetchHistoryPool(_cid);
   }
@@ -3988,6 +4003,83 @@
     }).join('');
   }
 
+  // ── Referrals I SENT: did the patient arrive and get seen? ──────────────
+  // Closes the loop for the referring clinician: every referral they sent with
+  // its live status (Waiting → On the way → Attended), which partner clinic it
+  // went to, and when. Same non-blocking pattern as the inbox: render from the
+  // cache first, fill partner names in the background with a hard timeout.
+  async function loadReferralsOut() {
+    var list = document.getElementById('refOutList');
+    if (!list) return;
+    var clinicId = await resolveClinicId();
+    if (!clinicId || !supabase) {
+      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
+        + (session && session.demo ? 'Demo mode — your referrals appear here for real clinics.' : 'Not linked to a clinic.') + '</div>';
+      return;
+    }
+    var CO = window.ClinicOffline;
+    var run = function () {
+      return supabase.from('clinic_referrals')
+        .select('id,to_clinic_id,patient_name,patient_phone,reason,needed_item,status,referral_code,created_at')
+        .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(20);
+    };
+    var res = CO ? await CO.cachedQuery('referrals_out_' + clinicId, run) : await run();
+    if (res.error && !(res.data || []).length) {
+      var m = (res.error.message || '');
+      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
+        + (/clinic_referrals|does not exist|schema cache/i.test(m)
+          ? 'Referrals need a database update — run 20260718_clinic_referrals.sql.'
+          : 'Could not load your referrals.') + '</div>';
+      return;
+    }
+    var rows = res.data || [];
+    var cEl = document.getElementById('refOutCount');
+    var waiting = rows.filter(function (r) { return r.status === 'pending' || r.status === 'received'; }).length;
+    if (cEl) { cEl.textContent = waiting + ' awaiting'; cEl.style.display = waiting ? '' : 'none'; }
+    if (!rows.length) {
+      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">You haven’t referred anyone yet. Use <strong>Refer now</strong> above to send a patient to a partner clinic.</div>';
+      return;
+    }
+    var names = (CO && CO.get('clinic_names', {})) || {};
+    _renderRefOutRows(list, rows, names);
+    var missing = rows.map(function (r) { return r.to_clinic_id; })
+      .filter(function (id, i, a) { return id && !names[id] && a.indexOf(id) === i; });
+    if (missing.length && !(CO && CO.isOffline())) {
+      try {
+        var q = supabase.from('clinics').select('id,name').in('id', missing);
+        var nr = CO ? await CO.withTimeout(q, 7000) : await q;
+        if (nr && !nr._timeout && nr.data) {
+          nr.data.forEach(function (c) { names[c.id] = c.name; });
+          if (CO) CO.set('clinic_names', names);
+          _renderRefOutRows(list, rows, names);
+        }
+      } catch (e) {}
+    }
+  }
+
+  function _renderRefOutRows(list, rows, names) {
+    list.innerHTML = rows.map(function (r) {
+      var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
+      // Plain-language status the sender actually cares about.
+      var st = r.status === 'pending'  ? { t: 'Waiting for them',  c: '#E65100', bg: '#FCEFCF' }
+             : r.status === 'received' ? { t: 'Patient on the way', c: '#00838F', bg: '#DBEFFB' }
+             : r.status === 'seen'     ? { t: 'Attended ✓',    c: '#0E7C5A', bg: '#DBF4EA' }
+             :                           { t: r.status || '—', c: '#5F6368', bg: '#EEEEEE' };
+      return '<div style="padding:12px 20px;border-bottom:1px solid #F5F5F5">'
+        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
+        +   '<strong style="font-size:14px">' + esc(r.patient_name || 'Patient') + '</strong>'
+        +   '<span style="font-size:10.5px;background:' + st.bg + ';color:' + st.c + ';padding:2px 9px;border-radius:10px;font-weight:800">' + st.t + '</span>'
+        +   '<span style="font-size:11px;color:#9AA0A6;margin-left:auto">' + when + '</span>'
+        + '</div>'
+        + '<div style="font-size:12.5px;color:#5F6368;margin-top:4px">'
+        +   'To <strong>' + esc(names[r.to_clinic_id] || 'partner clinic') + '</strong>'
+        +   (r.reason ? ' · ' + esc(r.reason) : '')
+        +   (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
+        + '</div>'
+      + '</div>';
+    }).join('');
+  }
+
   // Tap a referral → start that patient's consultation. The wizard resolves the
   // phone against the clinic's patients: already in the system → straight to the
   // assessment steps; not in the system → Register (name + phone prefilled) then
@@ -4031,6 +4123,7 @@
     loadInventory(); loadFinancial(_finPeriod);
     loadMedsDispensed();
     try { loadReferralsIn(); } catch (e) {}
+    try { loadReferralsOut(); } catch (e) {}
   }
   // LIGHT refresh: only the money/stock FIGURES (painted via textContent, so no
   // list is torn down and rebuilt). Used when the app simply becomes visible
@@ -4093,6 +4186,20 @@
         function() { loadRevenue(); loadFinancial(_finPeriod); loadInventory(); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'to_clinic_id=eq.' + clinicId },
         function() { try { loadReferralsIn(); } catch (e) {} try { refreshFigures(); } catch (e) {} })
+      // Referrals I SENT: stream status changes back so the sender sees the
+      // patient arrive and get attended, live — and gets told when it happens.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'from_clinic_id=eq.' + clinicId },
+        function(payload) {
+          try { loadReferralsOut(); } catch (e) {}
+          try {
+            var n = payload && payload.new, o = payload && payload.old;
+            if (n && n.status === 'seen' && (!o || o.status !== 'seen')) {
+              showToast('✓ ' + (n.patient_name || 'Your referred patient') + ' was attended at the partner clinic', 'success');
+            } else if (n && n.status === 'received' && (!o || o.status !== 'received')) {
+              showToast((n.patient_name || 'Your referred patient') + ' is on the way to the partner clinic', 'info');
+            }
+          } catch (e) {}
+        })
       .subscribe(function(status) {
         if (mine !== _rtGen) return;
         if (status === 'SUBSCRIBED') { _rtRetry = 0; }
