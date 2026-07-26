@@ -1382,7 +1382,7 @@
   // sidebar, View-all buttons and console — the check must live HERE, not just
   // on the (hideable) links, so a sub-account can never open a section its
   // role doesn't include.
-  var SV_CAPS = { stock: 'stock', payments: 'payments', conditions: 'consultations' };
+  var SV_CAPS = { stock: 'stock', payments: 'payments', conditions: 'consultations', referrals_in: 'consultations', referrals_out: 'consultations' };
   function openSectionView(key) {
     if (SV_CAPS[key] && typeof clinicCan === 'function' && !clinicCan(SV_CAPS[key])) {
       if (typeof showToast === 'function') showToast('Your role does not have access to this section', 'error');
@@ -3885,6 +3885,12 @@
 
   // ── Initial load ──
   async function loadAll() {
+    // Referrals FIRST and un-awaited: they used to be missing from loadAll
+    // entirely, so the card sat on "Loading…" until the 45s refresh cycle ran.
+    // (Both paint instantly from cache before any network — see _refPaintCached.)
+    try { _refPaintCached(); } catch (e) {}     // 0-await paint from cache
+    try { loadReferralsIn(); } catch (e) {}
+    try { loadReferralsOut(); } catch (e) {}
     var _cid = await resolveClinicId();
     loadBookings();
     loadActiveTreatments();
@@ -3894,7 +3900,6 @@
     loadInventory();
     loadFinancial(_finPeriod);
     loadMedsDispensed();
-    try { loadReferralsOut(); } catch (e) {}
     if (typeof loadTopConditions === 'function') loadTopConditions();
     _prefetchHistoryPool(_cid);
   }
@@ -3915,7 +3920,7 @@
     var run = function () {
       return supabase.from('clinic_referrals')
         .select('id,from_clinic_id,patient_name,patient_phone,reason,needed_item,notes,referral_code,status,created_at')
-        .eq('to_clinic_id', clinicId).order('created_at', { ascending: false }).limit(25);
+        .eq('to_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
     };
     var res = CO ? await CO.cachedQuery('referrals_in_' + clinicId, run) : await run();
     if (res.error && !(res.data || []).length) {
@@ -3942,7 +3947,8 @@
     // list on the names lookup. That lookup had no timeout and hung the whole
     // "Referrals Received" section on "Loading…" on slow internet.
     var names = (CO && CO.get('clinic_names', {})) || {};
-    _renderRefRows(list, rows, names);
+    _refInRows = rows; _refNames = names;
+    _renderRefRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
     // Fill missing sender names in the background with a HARD timeout, then
     // re-render — a slow link can never wedge the list again.
     var missing = rows.map(function (r) { return r.from_clinic_id; })
@@ -3954,13 +3960,15 @@
         if (nr && !nr._timeout && nr.data) {
           nr.data.forEach(function (c) { names[c.id] = c.name; });
           if (CO) CO.set('clinic_names', names);
-          _renderRefRows(list, rows, names);
+          _refNames = names;
+          _renderRefRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
+          refreshSectionView();
         }
       } catch (e) {}
     }
   }
 
-  function _renderRefRows(list, rows, names) {
+  function _renderRefRows(list, rows, names, total) {
     list.innerHTML = rows.map(function (r) {
       var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
       var stColor = r.status === 'pending' ? '#E65100' : r.status === 'received' ? '#00838F' : '#2E7D32';
@@ -4000,7 +4008,45 @@
         + (r.notes ? '<div style="font-size:12px;color:#5F6368;margin-top:3px;font-style:italic">\u201C' + esc(r.notes) + '\u201D</div>' : '')
         + (actions ? '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + actions + '</div>' : '')
       + '</div>';
-    }).join('');
+    }).join('')
+    + ((total && total > rows.length) ? _svViewAllBtn('referrals_in', 'View all ' + total + ' referrals') : '');
+  }
+
+  // Referrals loaded this session, kept for the searchable "View all" screens.
+  var _refInRows = [], _refOutRows = [], _refNames = {};
+  var REF_SUMMARY_N = 6;    // show the newest few; the rest live behind View all
+
+  // INSTANT paint: render referrals straight from the offline cache with NO
+  // awaits at all (not even resolveClinicId), so the cards are filled the
+  // moment the dashboard opens. The network refresh then updates them in place.
+  function _refPaintCached() {
+    try {
+      var cid = (session && session.clinicId) || null;
+      var CO = window.ClinicOffline;
+      if (!cid || !CO) return;
+      // REF_SUMMARY_N is a `var` assigned later in this script; this function
+      // runs synchronously BEFORE that line executes, so fall back to 6.
+      var N = REF_SUMMARY_N || 6;
+      _refNames = CO.get('clinic_names', {}) || {};
+      var inCached = CO.get('referrals_in_' + cid, null);
+      if (Array.isArray(inCached)) {
+        var act = inCached.filter(function (r) { return r.status === 'pending' || r.status === 'received'; });
+        _refInRows = act;
+        var li = document.getElementById('refInList');
+        var ci = document.getElementById('refInCount');
+        if (ci) { ci.textContent = act.length + ' open'; ci.style.display = act.length ? '' : 'none'; }
+        if (li && act.length) _renderRefRows(li, act.slice(0, N), _refNames, act.length);
+      }
+      var outCached = CO.get('referrals_out_' + cid, null);
+      if (Array.isArray(outCached) && outCached.length) {
+        _refOutRows = outCached;
+        var lo = document.getElementById('refOutList');
+        var co = document.getElementById('refOutCount');
+        var waiting = outCached.filter(function (r) { return r.status === 'pending' || r.status === 'received'; }).length;
+        if (co) { co.textContent = waiting + ' awaiting'; co.style.display = waiting ? '' : 'none'; }
+        if (lo) _renderRefOutRows(lo, outCached.slice(0, N), _refNames, outCached.length);
+      }
+    } catch (e) {}
   }
 
   // ── Referrals I SENT: did the patient arrive and get seen? ──────────────
@@ -4021,7 +4067,7 @@
     var run = function () {
       return supabase.from('clinic_referrals')
         .select('id,to_clinic_id,patient_name,patient_phone,reason,needed_item,status,referral_code,created_at')
-        .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(20);
+        .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
     };
     var res = CO ? await CO.cachedQuery('referrals_out_' + clinicId, run) : await run();
     if (res.error && !(res.data || []).length) {
@@ -4041,7 +4087,8 @@
       return;
     }
     var names = (CO && CO.get('clinic_names', {})) || {};
-    _renderRefOutRows(list, rows, names);
+    _refOutRows = rows; _refNames = names;
+    _renderRefOutRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
     var missing = rows.map(function (r) { return r.to_clinic_id; })
       .filter(function (id, i, a) { return id && !names[id] && a.indexOf(id) === i; });
     if (missing.length && !(CO && CO.isOffline())) {
@@ -4051,13 +4098,15 @@
         if (nr && !nr._timeout && nr.data) {
           nr.data.forEach(function (c) { names[c.id] = c.name; });
           if (CO) CO.set('clinic_names', names);
-          _renderRefOutRows(list, rows, names);
+          _refNames = names;
+          _renderRefOutRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
+          refreshSectionView();
         }
       } catch (e) {}
     }
   }
 
-  function _renderRefOutRows(list, rows, names) {
+  function _renderRefOutRows(list, rows, names, total) {
     list.innerHTML = rows.map(function (r) {
       var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
       // Plain-language status the sender actually cares about.
@@ -4077,8 +4126,41 @@
         +   (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
         + '</div>'
       + '</div>';
-    }).join('');
+    }).join('')
+    + ((total && total > rows.length) ? _svViewAllBtn('referrals_out', 'View all ' + total + ' sent') : '');
   }
+
+  // Full-screen searchable views for when there are MANY referrals.
+  (window._svRenderers = window._svRenderers || {}).referrals_in = {
+    title: 'Referrals Received',
+    render: function (body, q) {
+      var rows = (_refInRows || []).filter(function (r) {
+        if (!q) return true;
+        return String(r.patient_name || '').toLowerCase().indexOf(q) >= 0
+          || String(r.patient_phone || '').indexOf(q) >= 0
+          || String(r.reason || '').toLowerCase().indexOf(q) >= 0
+          || String(_refNames[r.from_clinic_id] || '').toLowerCase().indexOf(q) >= 0;
+      });
+      _svSetCount(rows.length + ' of ' + (_refInRows || []).length);
+      if (!rows.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No referrals match.</div>'; return; }
+      _renderRefRows(body, rows, _refNames);
+    }
+  };
+  (window._svRenderers = window._svRenderers || {}).referrals_out = {
+    title: 'Referrals I Sent',
+    render: function (body, q) {
+      var rows = (_refOutRows || []).filter(function (r) {
+        if (!q) return true;
+        return String(r.patient_name || '').toLowerCase().indexOf(q) >= 0
+          || String(r.patient_phone || '').indexOf(q) >= 0
+          || String(r.reason || '').toLowerCase().indexOf(q) >= 0
+          || String(_refNames[r.to_clinic_id] || '').toLowerCase().indexOf(q) >= 0;
+      });
+      _svSetCount(rows.length + ' of ' + (_refOutRows || []).length);
+      if (!rows.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No referrals match.</div>'; return; }
+      _renderRefOutRows(body, rows, _refNames);
+    }
+  };
 
   // Tap a referral → start that patient's consultation. The wizard resolves the
   // phone against the clinic's patients: already in the system → straight to the
