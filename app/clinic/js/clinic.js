@@ -406,6 +406,53 @@ function homattPatientId(phoneOrPatient, fallback) {
 }
 window.homattPatientId = homattPatientId;
 
+// ── Which version is this phone actually running? ─────────────────────────
+// The build marker used to live only on the sign-in page, so once a clinician
+// was signed in there was no way to tell whether a fix had reached them. On the
+// Android app the web files are packaged INSIDE the APK, so a new APK has to be
+// installed before any change appears — and until now that was invisible.
+// This line is added to the side menu on every page.
+var HOMATT_BUILD = 'v110';
+window.HOMATT_BUILD = HOMATT_BUILD;
+
+function homattBuildLine() {
+  var foot = document.querySelector('.sidebar-footer');
+  if (!foot) return;
+  var el = document.getElementById('homattBuildLine');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'homattBuildLine';
+    el.style.cssText = 'font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.42);' +
+      'margin-top:10px;letter-spacing:.2px;word-break:break-word';
+    foot.appendChild(el);
+  }
+  var native = !!(window.Capacitor && window.Capacitor.isNativePlatform &&
+                  window.Capacitor.isNativePlatform());
+  var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+  var mode = native ? 'android app' : (standalone ? 'installed' : 'browser');
+  el.textContent = 'Version ' + HOMATT_BUILD + ' · ' + mode;
+
+  // Add the service-worker state once it is known — that is what tells us
+  // whether an old copy of the app is still being served from the cache.
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.getRegistration().then(function (reg) {
+    var sw = !reg ? 'no offline cache'
+      : reg.waiting ? 'UPDATE READY — fully close and reopen the app'
+      : reg.active ? 'offline cache on' : 'starting';
+    el.textContent = 'Version ' + HOMATT_BUILD + ' · ' + mode + ' · ' + sw;
+    // A waiting worker means a newer version is sitting there unused. Take it.
+    try { if (reg && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+    try { if (reg && reg.update) reg.update(); } catch (e) {}
+  }).catch(function () {});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', homattBuildLine);
+} else {
+  homattBuildLine();
+}
+window.homattBuildLine = homattBuildLine;
+
 function showToast(msg, type = 'success') {
   let t = document.getElementById('clinicToast');
   if (!t) { t = document.createElement('div'); t.id = 'clinicToast'; t.className = 'admin-toast'; document.body.appendChild(t); }

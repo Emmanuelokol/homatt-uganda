@@ -563,7 +563,7 @@
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=20260823b" defer></script>
-<script src="js/clinic.js?v=20260823" defer></script>
+<script src="js/clinic.js?v=20260824" defer></script>
 <script src="js/msg-alerts.js?v=20260809" defer></script>
 <script>
 var _clinicId = null;
@@ -691,8 +691,12 @@ async function loadStaffList() {
   var staff = res.data || [];
   if (!staff.length) {
     // Empty set = the RPC says this login is not the clinic owner.
+    // `session` is local to the init handler, not in scope here — reading it
+    // directly threw and killed the rest of this render.
+    var _ses = {};
+    try { _ses = JSON.parse(localStorage.getItem('clinic_session') || '{}'); } catch (e) {}
     list.innerHTML = '<div style="font-size:13px;color:#9AA0A6;padding:8px 0">Only the clinic owner\'s account can manage staff logins. You\'re signed in as <strong>'
-      + ((session && session.email) || 'a staff member') + '</strong>.</div>';
+      + ((_ses && (_ses.email || _ses.staffName)) || 'a staff member') + '</strong>.</div>';
     return;
   }
 
