@@ -158,19 +158,36 @@
   // for this key, return it IMMEDIATELY — online or offline — so the screen
   // paints at once instead of waiting on a crawling connection. When online and
   // the cache is a little stale, a background refresh (capped by the timeout)
-  // updates it for the next read. Only the very first load with NO cache waits
-  // on the network.
+  // updates it. Only the very first load with NO cache waits on the network.
+  //
+  // CRUCIAL: when that background refresh brings back something DIFFERENT, the
+  // page is told ('clinic-fresh') so it can repaint. Without this the screen
+  // kept showing the old copy until the next scheduled reload — a consultation
+  // saved on another phone (or by realtime) could sit invisible for a minute or
+  // more, which looked exactly like "the app is not updating".
   var _revalidating = {};
+  function _announce(key) {
+    try { window.dispatchEvent(new CustomEvent('clinic-fresh', { detail: { key: key } })); }
+    catch (e) {}
+  }
   async function cachedQuery(key, run) {
     var c = raw(key);
     if (c) {
       if (!isOffline()) {
         var age = Date.now() - (c.ts || 0);
-        // Throttle: don't hammer a slow link — refresh at most every ~12s/key.
-        if (age > 12000 && !_revalidating[key]) {
+        // Throttle: don't hammer a slow link — refresh at most every ~6s/key.
+        if (age > 6000 && !_revalidating[key]) {
           _revalidating[key] = true;
+          var was = null;
+          try { was = JSON.stringify(c.v); } catch (e) {}
           withTimeout(run())
-            .then(function (res) { if (res && !res.error && res.data != null) set(key, res.data); })
+            .then(function (res) {
+              if (!res || res.error || res.data == null) return;
+              set(key, res.data);
+              var now = null;
+              try { now = JSON.stringify(res.data); } catch (e) {}
+              if (was === null || now === null || now !== was) _announce(key);
+            })
             .catch(function () {})
             .then(function () { _revalidating[key] = false; });
         }

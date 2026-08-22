@@ -1118,7 +1118,7 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=18"></script>
+<script src="js/clinic-offline.js?v=20260823b"></script>
 <script src="js/clinic.js?v=20260823"></script>
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script>
@@ -4298,6 +4298,48 @@
     }).catch(function(){});
   };
 
+  // ── Repaint when the background refresh brings back something new ────────
+  // Every panel reads its cached copy first so the screen paints instantly on a
+  // slow link. ClinicOffline then re-checks the server; when the answer differs
+  // it fires 'clinic-fresh' and we repaint just that panel. Before this, a
+  // consultation recorded on another phone stayed invisible until the next
+  // 45-second sweep — which is what "the app is not updating" looked like.
+  var _FRESH_MAP = [
+    ['consultations_today_', function(){ loadConsultations(); }],
+    ['bookings_',            function(){ loadBookings(); }],
+    ['meds_dx_',             function(){ loadMedsDispensed(); }],
+    ['meds_qs_',             function(){ loadMedsDispensed(); }],
+    ['pending_payments_',    function(){ loadPendingPayments(); }],
+    ['revenue_',             function(){ loadRevenue(); }],
+    ['financial_',           function(){ loadFinancial(_finPeriod); }],
+    ['top_conditions_',      function(){ try { loadTopConditions(); } catch(e){} }],
+    ['referrals_in_',        function(){ try { loadReferralsIn(); } catch(e){} }],
+    ['referrals_out_',       function(){ try { loadReferralsOut(); } catch(e){} }],
+    ['qs_inventory_',        function(){ loadInventory(); }]
+  ];
+  var _freshBusy = {};
+  window.addEventListener('clinic-fresh', function(e) {
+    var key = (e && e.detail && e.detail.key) || '';
+    for (var i = 0; i < _FRESH_MAP.length; i++) {
+      if (key.indexOf(_FRESH_MAP[i][0]) !== 0) continue;
+      if (_freshBusy[key]) return;              // one repaint per burst
+      _freshBusy[key] = true;
+      setTimeout(function(){ _freshBusy[key] = false; }, 1500);
+      try { _FRESH_MAP[i][1](); } catch (err) {}
+      return;
+    }
+  });
+
+  // A realtime event means the server ALREADY has newer data, so reading the
+  // cached copy first would just repaint the same stale screen. Drop those keys
+  // so the loaders below fetch for real.
+  function _rtReload(prefixes, fn) {
+    try {
+      if (window.ClinicOffline && ClinicOffline.invalidate) ClinicOffline.invalidate(prefixes);
+    } catch (e) {}
+    try { fn(); } catch (e) {}
+  }
+
   var _lastFullRefresh = 0;
   function refreshAll() {
     _lastFullRefresh = Date.now();
@@ -4316,6 +4358,20 @@
     loadRevenue(); loadFinancial(_finPeriod);
   }
   setInterval(refreshAll, 45000);
+
+  // TODAY sweep: the panels that change while the clinic is working. Realtime
+  // is the fast path, but it needs 20260815_realtime_dashboard.sql applied AND
+  // a live socket — neither is guaranteed on a village link, so these panels
+  // also check on their own. Each call reads the cached copy (instant, no
+  // flicker); ClinicOffline re-checks the server behind it and fires
+  // 'clinic-fresh' only when something actually changed, so this is one small
+  // query — not a redraw — every cycle.
+  setInterval(function() {
+    if (document.visibilityState !== 'visible') return;   // no traffic in the pocket
+    loadConsultations();
+    loadActiveTreatments();
+    loadMedsDispensed();
+  }, 20000);
 
   // Returning to the app: repaint just the figures (no blink). A FULL refresh
   // only if it's been a while (>60s) since one — so a quick app-switch is
@@ -4356,17 +4412,21 @@
     if (_rtChannel) { try { supabase.removeChannel(_rtChannel); } catch (e) {} _rtChannel = null; }
     _rtChannel = supabase.channel('dashboard-' + clinicId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadBookings(); })
+        function() { _rtReload(['bookings_'], function(){ loadBookings(); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_diagnoses', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); loadPendingPayments(); })
+        function() { _rtReload(
+          ['consultations_today_','meds_dx_','revenue_','financial_','pending_payments_','top_conditions_','hist_pool_'],
+          function(){ loadActiveTreatments(); loadConsultations(); loadRevenue(); loadFinancial(_finPeriod); loadPendingPayments(); loadMedsDispensed(); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_payments', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadPendingPayments(); loadRevenue(); loadFinancial(_finPeriod); })
+        function() { _rtReload(['pending_payments_','revenue_','financial_'],
+          function(){ loadPendingPayments(); loadRevenue(); loadFinancial(_finPeriod); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadInventory(); loadFinancial(_finPeriod); })
+        function() { _rtReload(['qs_inventory_','financial_'], function(){ loadInventory(); loadFinancial(_finPeriod); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_inventory_txns', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadInventory(); loadFinancial(_finPeriod); })
+        function() { _rtReload(['qs_inventory_','financial_'], function(){ loadInventory(); loadFinancial(_finPeriod); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_quick_sales', filter: 'clinic_id=eq.' + clinicId },
-        function() { loadRevenue(); loadFinancial(_finPeriod); loadInventory(); })
+        function() { _rtReload(['revenue_','financial_','meds_qs_','qs_inventory_'],
+          function(){ loadRevenue(); loadFinancial(_finPeriod); loadInventory(); loadMedsDispensed(); }); })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'to_clinic_id=eq.' + clinicId },
         function() { try { loadReferralsIn(); } catch (e) {} try { refreshFigures(); } catch (e) {} })
       // Referrals I SENT: stream status changes back so the sender sees the
