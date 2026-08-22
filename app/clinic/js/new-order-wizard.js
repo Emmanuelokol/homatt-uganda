@@ -2178,9 +2178,11 @@
       intake_time: firstTime,
     });
 
-    state.medications.forEach(m => {
+    // Skip the blank starter row — otherwise the patient gets reminders telling
+    // them to take "undefined".
+    state.medications.filter(m => (m.drug || '').trim()).forEach(m => {
       const days = m.durationDays;
-      m.intakeTimes.forEach(time => {
+      (m.intakeTimes || []).forEach(time => {
         for (let d = 0; d < days; d++) {
           rows.push({
             diagnosis_id: diagnosisId,
@@ -2213,6 +2215,24 @@
   // ════════════════════════════════════════════════════════════════
   // Submit
   // ════════════════════════════════════════════════════════════════
+  // Something is stopping the save — put it on screen and KEEP it there, next
+  // to the button the clinician just pressed, and scroll it into view. The old
+  // toast faded after a few seconds and was being missed entirely.
+  function blockSubmit(msg) {
+    const box = document.getElementById('submitBlock');
+    const txt = document.getElementById('submitBlockText');
+    if (txt) txt.textContent = msg;
+    if (box) {
+      box.style.display = 'block';
+      try { box.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    }
+    showToast(msg, 'error');
+  }
+  function clearSubmitBlock() {
+    const box = document.getElementById('submitBlock');
+    if (box) box.style.display = 'none';
+  }
+
   document.getElementById('submitBtn').onclick = async () => {
     const btn = document.getElementById('submitBtn');
     const resetBtn = () => {
@@ -2229,27 +2249,43 @@
     }
 
     if (!supabase || !_clinicId) {
-      showToast('Demo mode — not saved. Connect a clinic to save.', 'error');
+      blockSubmit('This account is not linked to a clinic, so the consultation cannot be saved. Ask your admin to link you, then try again.');
       resetBtn();
       return;
     }
 
-    // Validate medications
-    if (!state.medications.length) {
-      showToast('Add at least one medication', 'error');
+    // ── Medications ────────────────────────────────────────────────────────
+    // The form always starts with one blank drug row. An untouched row is not a
+    // mistake — it is just that blank line — so drop it before checking.
+    //
+    // A consultation may legitimately dispense NOTHING: prophylaxis advice, a
+    // counselling visit, a lab-only visit, a dressing change, a review, or a
+    // referral straight on. Refusing to save those was silently throwing away
+    // real consultations, which is why the dashboard stayed empty.
+    // Only what the clinician actually TYPED counts as intent. A fresh row
+    // already carries default intake times and a default duration, so those
+    // prove nothing — judging by them is what kept the blank row "filled in".
+    const _touched = (m) => !!((m.drug || '').trim() || (m.dosage || '').trim());
+    const meds = state.medications.filter(_touched);
+
+    // A HALF-filled row is still an error — but say so where it cannot be missed.
+    const badIdx = meds.findIndex(m =>
+      !(m.drug || '').trim() || !(m.dosage || '').trim() ||
+      !(m.intakeTimes || []).length || !(m.intakeTimes || []).every(t => t));
+    if (badIdx !== -1) {
+      const which = meds[badIdx];
+      blockSubmit('Medicine ' + (badIdx + 1) +
+        (which.drug ? ' (' + which.drug + ')' : '') +
+        ' is incomplete — it needs a drug name, a dosage and an intake time. ' +
+        'Fill it in, or delete the row if nothing is being given.');
       resetBtn();
       return;
     }
-    const medsOk = state.medications.every(m => m.drug && m.dosage && m.intakeTimes.every(t => t));
-    if (!medsOk) {
-      showToast('Fill in drug name, dosage and intake times for each medication', 'error');
-      resetBtn();
-      return;
-    }
+    clearSubmitBlock();
 
     if (!state.expectedRecovery) autoSetExpectedRecovery();
 
-    const items = state.medications.map(m => ({
+    const items = meds.map(m => ({
       drug_name:    m.drug,
       strength:     m.dosage,
       frequency:    m.timesPerDay + 'x_daily',
@@ -2314,7 +2350,7 @@
       } : null;
       const followups = buildFollowupRows(cid);
       const invItems = [
-        ...state.medications.filter(m => m.inventoryItemId && m.qtyToDeduct > 0).map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
+        ...meds.filter(m => m.inventoryItemId && m.qtyToDeduct > 0).map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
         ...state.materialsUsed.filter(m => m.item_id && m.qty > 0).map(m => ({ item_id: m.item_id, qty: m.qty })),
       ];
       ClinicOffline.enqueue('consultation', {
@@ -2373,7 +2409,7 @@
         queueConsultationOffline();
         return;
       }
-      showToast('Save failed: ' + dxError.message, 'error');
+      blockSubmit('The consultation was NOT saved. ' + dxError.message);
       resetBtn();
       return;
     }
@@ -2381,7 +2417,7 @@
     // 1b. Auto-deduct clinic inventory (fire-and-forget)
     try {
       const invItems = [
-        ...state.medications
+        ...meds
           .filter(m => m.inventoryItemId && m.qtyToDeduct > 0)
           .map(m => ({ item_id: m.inventoryItemId, qty: m.qtyToDeduct })),
         ...state.materialsUsed
@@ -2472,7 +2508,7 @@
     }
 
     // 6. Show success sheet
-    const allTimes  = state.medications.flatMap(m => m.intakeTimes).sort();
+    const allTimes  = meds.flatMap(m => m.intakeTimes).sort();
     const uniqTimes = [...new Set(allTimes)];
 
     const successMsgEl = document.getElementById('successMsg');
