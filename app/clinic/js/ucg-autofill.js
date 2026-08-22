@@ -18,11 +18,15 @@
   'use strict';
 
   var DB_URL = 'data/uganda_clinical_guidelines_2023.db';
+  var EM_URL = 'data/emhslu_2023.db';       // national essential medicines list
   var db = null, loading = null;
+  var emdb = null, emLoading = null;
   var state = null;              // the wizard's state object
   var pkg = null;                // the package being edited
   var srcPkg = null;             // what was auto-filled (to detect edits)
   var ctx = { conditionId: null, title: '', severity: '', page: null, learned: false };
+
+  var LEVELS = ['HC1', 'HC2', 'HC3', 'HC4', 'H', 'RR', 'NR'];
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -45,6 +49,36 @@
     })();
     return loading;
   }
+  // The Essential Medicines & Health Supplies List for Uganda (EMHSLU 2023) is
+  // the national formulary: official name, form, strength, the LEVEL of facility
+  // allowed to stock it, and its VEN class (Vital/Essential/Necessary).
+  function openEm() {
+    if (emdb) return Promise.resolve(emdb);
+    if (emLoading) return emLoading;
+    emLoading = (async function () {
+      var SQL = await initSqlJs({ locateFile: function (f) { return 'js/vendor/' + f; } });
+      var res = await fetch(EM_URL);
+      if (!res.ok) throw new Error('EMHSLU database not found');
+      emdb = new SQL.Database(new Uint8Array(await res.arrayBuffer()));
+      return emdb;
+    })();
+    return emLoading;
+  }
+  function emRows(sql, params) {
+    if (!emdb) return [];
+    var st = emdb.prepare(sql), out = [];
+    try { st.bind(params || []); while (st.step()) out.push(st.getAsObject()); }
+    finally { st.free(); }
+    return out;
+  }
+  // What level is this clinic? Used to flag drugs above the facility's level.
+  function myLevel() {
+    try {
+      var s = JSON.parse(localStorage.getItem('clinic_session') || '{}');
+      return (s.level || s.facilityLevel || '').toUpperCase() || null;
+    } catch (e) { return null; }
+  }
+
   function rows(sql, params) {
     if (!db) return [];
     var st = db.prepare(sql), out = [];
@@ -226,6 +260,12 @@
       '.ucg-ask-card p{font-size:13px;color:var(--text-lt);line-height:1.5;margin-bottom:10px}',
       '.ucg-diff{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--text);margin-bottom:14px;max-height:180px;overflow-y:auto}',
       '.ucg-diff div{padding:2px 0}',
+      '.em-tag{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;vertical-align:1px}',
+      '.em-tag.warn{background:#FCEFCF;color:#8A5A06}',
+      '.em-tag.ven-V{background:#FBE1DE;color:#B3261E}',
+      '.em-tag.ven-E{background:#DBEFFB;color:#0B5C8A}',
+      '.em-tag.ven-N{background:var(--bg);color:var(--text-lt)}',
+      '.em-src{float:right;font-size:9.5px;font-weight:800;color:var(--text-lt);letter-spacing:.06em;margin-top:3px}',
       '.ucg-det{border-radius:12px;background:var(--bg);margin-bottom:7px;overflow:hidden}',
       '.ucg-det summary{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;color:var(--text)}',
       '.ucg-det summary::-webkit-details-marker{display:none}',
@@ -457,10 +497,34 @@
       clearTimeout(t);
       var q = inp.value.trim();
       if (q.length < 2) { box.style.display = 'none'; return; }
-      t = setTimeout(function () {
-        var found = rows(
-          'SELECT DISTINCT name, dose, unit, route, frequency, duration FROM medicines ' +
-          'WHERE name LIKE ? ORDER BY length(name) LIMIT 14', [q + '%']);
+      t = setTimeout(async function () {
+        // 1) The national formulary (EMHSLU 2023) — official name, form,
+        //    strength, facility level and VEN class.
+        var found = [];
+        try {
+          await openEm();
+          found = emRows(
+            'SELECT name, dosage_form, strength, level_of_care, ven_class ' +
+            'FROM emhslu_items WHERE item_type=\'medicine\' AND name LIKE ? ' +
+            'ORDER BY length(name), name LIMIT 16', [q + '%']);
+          if (!found.length) {
+            found = emRows(
+              'SELECT name, dosage_form, strength, level_of_care, ven_class ' +
+              'FROM emhslu_items WHERE item_type=\'medicine\' AND name LIKE ? ' +
+              'ORDER BY length(name), name LIMIT 16', ['%' + q + '%']);
+          }
+          found = found.map(function (r) {
+            return { name: r.name, dose: r.strength || '', unit: '', route: '',
+                     frequency: '', duration: '', form: r.dosage_form || '',
+                     level: r.level_of_care, ven: r.ven_class, src: 'EMHSLU' };
+          });
+        } catch (e) { found = []; }
+        // 2) Fall back to the doses mentioned in the clinical guideline.
+        if (!found.length) {
+          found = rows(
+            'SELECT DISTINCT name, dose, unit, route, frequency, duration FROM medicines ' +
+            'WHERE name LIKE ? ORDER BY length(name) LIMIT 14', [q + '%']);
+        }
         if (!found.length) {
           found = rows('SELECT DISTINCT name, dose, unit, route, frequency, duration FROM medicines ' +
             'WHERE name LIKE ? ORDER BY length(name) LIMIT 14', ['%' + q + '%']);
@@ -472,10 +536,17 @@
           box.firstChild.onclick = function () { askDosage({ name: q, dose: '', unit: '' }); };
           return;
         }
+        var lvl = myLevel();
         box.innerHTML = found.map(function (m, i) {
+          var venTxt = { V: 'Vital', E: 'Essential', N: 'Necessary' }[m.ven] || '';
+          var above = lvl && m.level && LEVELS.indexOf(m.level) > LEVELS.indexOf(lvl);
           return '<div data-i="' + i + '"><b>' + esc(m.name) + '</b>' +
             (m.dose ? ' <span style="color:#0E7C5A;font-weight:700">' + esc(m.dose + (m.unit || '')) + '</span>' : '') +
+            (m.form ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.form) + '</span>' : '') +
             (m.route ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.route) + '</span>' : '') +
+            (m.level ? '<span class="em-tag' + (above ? ' warn' : '') + '">' + esc(m.level) + '</span>' : '') +
+            (venTxt ? '<span class="em-tag ven-' + esc(m.ven) + '" title="' + venTxt + '">' + esc(m.ven) + '</span>' : '') +
+            (m.src ? '<span class="em-src">EMHSLU</span>' : '') +
             '</div>';
         }).join('');
         box.style.display = 'block';
@@ -510,7 +581,8 @@
     document.getElementById('ucgAskYes').onclick = function () {
       pkg.drugs.push({
         drug: m.name + (m.dose ? ' ' + m.dose + (m.unit || '') : ''),
-        dosage: (m.dose ? m.dose + (m.unit || '') : '') + (m.route ? ' ' + m.route : ''),
+        dosage: (m.dose ? m.dose + (m.unit || '') : '') +
+                (m.form ? ' ' + m.form : '') + (m.route ? ' ' + m.route : ''),
         timesPerDay: Number(f.value) || 2,
         durationDays: Number(d.value) || 5,
         qty: Number(q.value) || 0,

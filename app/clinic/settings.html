@@ -472,6 +472,19 @@
         <button onclick="addFeeRow()" style="margin-top:12px;background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Custom Service</button>
       </div>
 
+      <!-- Facility level (drives the national essential medicines list) -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_hospital</span> Facility Level
+        </div>
+        <div style="font-size:12px;color:#5F6368;margin:-4px 0 12px">
+          Your level decides which medicines and supplies you may stock and prescribe,
+          under the national <b>Essential Medicines &amp; Health Supplies List (EMHSLU 2023)</b>.
+          The one-tap package warns you when a drug is above your level.
+        </div>
+        <div class="facilities-grid" id="levelGrid"></div>
+      </div>
+
       <!-- Facilities -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -550,7 +563,7 @@
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=18" defer></script>
-<script src="js/clinic.js?v=20260816" defer></script>
+<script src="js/clinic.js?v=20260822b" defer></script>
 <script src="js/msg-alerts.js?v=20260809" defer></script>
 <script>
 var _clinicId = null;
@@ -625,6 +638,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Build UI sections
   buildFeeTable(DEFAULT_FEES);
+  buildLevels();
   buildFacilities([]);
   buildHours({});
   buildSuggestedSpecs();
@@ -896,6 +910,40 @@ function renderFeeTable() {
 }
 window.addFeeRow = function() { feesData.push({type:'',fee:'',notes:''}); renderFeeTable(); };
 window.removeFeeRow = function(i) { feesData.splice(i,1); renderFeeTable(); };
+
+/* ── Facility level (EMHSLU) ──
+   Stored in the local session so it works offline and needs no migration. */
+var LEVELS_LIST = [
+  ['HC1', 'HC I — Village health team'],
+  ['HC2', 'HC II — Health Centre II'],
+  ['HC3', 'HC III — Health Centre III'],
+  ['HC4', 'HC IV — Health Centre IV'],
+  ['H',   'General Hospital'],
+  ['RR',  'Regional Referral Hospital'],
+  ['NR',  'National Referral Hospital']
+];
+function currentLevel() {
+  try { return (JSON.parse(localStorage.getItem('clinic_session') || '{}').level || '').toUpperCase(); }
+  catch (e) { return ''; }
+}
+function buildLevels() {
+  var cur = currentLevel();
+  var el = document.getElementById('levelGrid');
+  if (!el) return;
+  el.innerHTML = LEVELS_LIST.map(function(L) {
+    return '<button class="facility-btn' + (L[0] === cur ? ' active' : '') +
+           '" onclick="setLevel(this,\'' + L[0] + '\')" title="' + L[1] + '">' + L[1] + '</button>';
+  }).join('');
+}
+window.setLevel = function(btn, code) {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || '{}');
+    s.level = code;
+    localStorage.setItem('clinic_session', JSON.stringify(s));
+  } catch (e) {}
+  buildLevels();
+  if (typeof showToast === 'function') showToast('Facility level set to ' + code);
+};
 
 /* ── Facilities ── */
 function buildFacilities(existing) {

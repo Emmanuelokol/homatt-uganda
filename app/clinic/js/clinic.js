@@ -371,6 +371,41 @@ function requireClinicCap(cap) {
   return false;
 }
 
+/* ── Stable patient identifier ───────────────────────────────────────────────
+ * Every patient needs ONE id that is the same on every visit, on every device
+ * and offline — so a clinician can quote it, search it, and follow the person
+ * through Patient History and Active Treatments. (The old CLN-xxxx code was
+ * derived from the visit id, so it changed with every consultation.)
+ *
+ * Derived deterministically from the patient's phone number (the key this app
+ * already groups patients by), so no server round-trip and no storage: the same
+ * phone always yields the same id, in this clinic and any other.
+ */
+function homattPatientId(phoneOrPatient, fallback) {
+  var src = phoneOrPatient;
+  if (src && typeof src === 'object') {
+    src = src.patient_phone || src.phone || src.clinic_patient_id || src.id || '';
+  }
+  var key = String(src || '').replace(/\D/g, '');
+  // The same phone gets written 0788…, +256788…, 256788… or 788… — they are one
+  // patient, so reduce every Ugandan form to the bare 9-digit subscriber number.
+  key = key.replace(/^0+/, '').replace(/^256/, '');
+  if (key.length > 9) key = key.slice(-9);
+  if (key.length < 6) {
+    key = String(src || fallback || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  }
+  if (!key) return '';
+  // FNV-1a — tiny, stable, no dependencies.
+  var h = 0x811c9dc5;
+  for (var i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  var code = h.toString(36).toUpperCase().padStart(6, '0').slice(-6);
+  return 'HP-' + code;
+}
+window.homattPatientId = homattPatientId;
+
 function showToast(msg, type = 'success') {
   let t = document.getElementById('clinicToast');
   if (!t) { t = document.createElement('div'); t.id = 'clinicToast'; t.className = 'admin-toast'; document.body.appendChild(t); }
