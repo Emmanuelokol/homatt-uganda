@@ -286,9 +286,10 @@
           '<div class="ucg-tags" id="ucgTags"></div>' +
         '</div>' +
         '<div class="ucg-body" id="ucgBody"></div>' +
-        '<div class="ucg-foot">' +
-          '<button class="ucg-btn ghost" id="ucgCancel">Cancel</button>' +
-          '<button class="ucg-btn go" id="ucgApply">Apply to consultation</button>' +
+        '<div class="ucg-foot" style="flex-wrap:wrap">' +
+          '<button class="ucg-btn ghost" id="ucgCancel" style="flex:0 0 auto;padding-left:16px;padding-right:16px">Cancel</button>' +
+          '<button class="ucg-btn ghost" id="ucgApply" style="flex:1 1 40%">Apply &amp; review</button>' +
+          '<button class="ucg-btn go" id="ucgSave" style="flex:1 1 100%">Save consultation</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -310,6 +311,69 @@
     document.getElementById('ucgCancel').onclick = close;
     ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
     document.getElementById('ucgApply').onclick = apply;
+    document.getElementById('ucgSave').onclick = applyAndSave;
+  }
+
+  // "Save consultation" — the whole point of a one-tap package. Apply it and
+  // record the consultation, without walking back through the wizard. The
+  // package fills the tests, the drugs, the doses and the charges; the only
+  // thing it cannot know is WHO the patient is.
+  function applyAndSave() {
+    applyToWizard();
+    close();
+    var haveP = !!(state && state.patient && (state.patient.phone || '').trim());
+    if (!haveP) {
+      // Nothing is lost — the package stays applied. Send them to the one field
+      // that is still missing, and say so where they are looking.
+      toast('Package applied. Now choose the patient — then press Save.', 'error');
+      try { if (window._showStep) window._showStep(1); } catch (e) {}
+      var ph = document.getElementById('patientPhone') ||
+               document.querySelector('#patientSearchBlock input');
+      if (ph) {
+        try { ph.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+        setTimeout(function () { try { ph.focus(); } catch (e) {} }, 350);
+      }
+      return;
+    }
+    // The clinic still gets asked whether to learn the changes — but the
+    // consultation is saved either way, so the question can never swallow it.
+    var changes = changeSummary();
+    if (!changes.length) { _finishSave(); return; }
+    askToLearn(changes, _finishSave);
+  }
+
+  function _finishSave() {
+    try { if (window._showStep) window._showStep(2); } catch (e) {}
+    var btn = document.getElementById('submitBtn');
+    if (!btn) { toast('Could not find the save button — press Send below.', 'error'); return; }
+    try { btn.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+    setTimeout(function () { try { btn.click(); } catch (e) {} }, 250);
+  }
+
+  // The learn prompt, shared by "Apply & review" and "Save consultation".
+  // `then` runs after either answer.
+  function askToLearn(changes, then) {
+    var ask = document.getElementById('ucgAsk');
+    document.getElementById('ucgAskTitle').textContent =
+      ctx.learned ? 'Update your clinic standard?' : 'Save as your clinic standard?';
+    document.getElementById('ucgAskText').textContent =
+      'You changed this package for ' + ctx.title +
+      (ctx.severity ? ' (' + ctx.severity + ')' : '') +
+      '. Should the app auto-fill it this way next time?';
+    document.getElementById('ucgAskDiff').innerHTML =
+      changes.map(function (c) { return '<div>' + esc(c) + '</div>'; }).join('');
+    document.getElementById('ucgAskYes').textContent = ctx.learned ? 'Update standard' : 'Save standard';
+    ask.style.display = 'flex';
+    document.getElementById('ucgAskNo').onclick = function () {
+      ask.style.display = 'none';
+      if (then) then();
+    };
+    document.getElementById('ucgAskYes').onclick = function () {
+      saveLearned(ctx.conditionId, ctx.severity, pkg);
+      ask.style.display = 'none';
+      toast('Saved — this is now your standard for ' + ctx.title, 'success');
+      if (then) then();
+    };
   }
 
   function close() { var o = document.getElementById('ucgOverlay'); if (o) o.style.display = 'none'; }
@@ -767,28 +831,16 @@
     var changes = changeSummary();
     applyToWizard();
     close();
-    toast('Package applied — ' + pkg.drugs.length + ' medicine' + (pkg.drugs.length !== 1 ? 's' : '') +
-      ', ' + pkg.tests.length + ' test' + (pkg.tests.length !== 1 ? 's' : ''), 'success');
+    // "Package applied" on its own read as "consultation recorded" — it is not,
+    // nothing is saved until the consultation is sent. Say what is still needed.
+    var _need = (state && state.patient && (state.patient.phone || '').trim())
+      ? 'Not saved yet — press Send at the bottom to record it.'
+      : 'Not saved yet — choose the patient, then press Send.';
+    toast('Package applied (' + pkg.drugs.length + ' medicine' + (pkg.drugs.length !== 1 ? 's' : '') +
+      ', ' + pkg.tests.length + ' test' + (pkg.tests.length !== 1 ? 's' : '') + '). ' + _need, 'success');
 
     if (!changes.length) return;                 // nothing to learn
-    // ASK before changing what the app auto-fills next time.
-    var ask = document.getElementById('ucgAsk');
-    document.getElementById('ucgAskTitle').textContent =
-      ctx.learned ? 'Update your clinic standard?' : 'Save as your clinic standard?';
-    document.getElementById('ucgAskText').textContent =
-      'You changed this package for ' + ctx.title +
-      (ctx.severity ? ' (' + ctx.severity + ')' : '') +
-      '. Should the app auto-fill it this way next time?';
-    document.getElementById('ucgAskDiff').innerHTML =
-      changes.map(function (c) { return '<div>' + esc(c) + '</div>'; }).join('');
-    document.getElementById('ucgAskYes').textContent = ctx.learned ? 'Update standard' : 'Save standard';
-    ask.style.display = 'flex';
-    document.getElementById('ucgAskNo').onclick = function () { ask.style.display = 'none'; };
-    document.getElementById('ucgAskYes').onclick = function () {
-      saveLearned(ctx.conditionId, ctx.severity, pkg);
-      ask.style.display = 'none';
-      toast('Saved — this is now your standard for ' + ctx.title, 'success');
-    };
+    askToLearn(changes, null);   // ASK before changing what auto-fills next time
   }
 
   // ── Public entry: find the condition for the typed diagnosis, then open ──
