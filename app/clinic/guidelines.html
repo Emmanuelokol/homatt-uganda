@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Homatt Clinic — Clinical Guidelines</title>
+  <script>
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+  </script>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0E7C5A">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20260814">
+  <style>
+    .g-wrap{max-width:820px;margin:0 auto;padding-bottom:60px}
+
+    /* Disclaimer — always visible, never dismissible */
+    .g-disclaimer{display:flex;gap:11px;align-items:flex-start;background:#FCEFCF;
+      border-radius:14px;padding:13px 15px;margin-bottom:16px;box-shadow:var(--shadow)}
+    .g-disclaimer .material-icons-outlined{color:#C77E06;font-size:20px;flex:none}
+    .g-disclaimer div{font-size:12.5px;color:#7A5206;line-height:1.5}
+    html[data-theme="dark"] .g-disclaimer{background:#372C11}
+    html[data-theme="dark"] .g-disclaimer div{color:#F2D79A}
+
+    /* Search */
+    .g-searchwrap{position:relative;margin-bottom:12px}
+    .g-searchbox{display:flex;align-items:center;gap:10px;background:var(--surface);
+      border-radius:16px;padding:14px 16px;box-shadow:var(--shadow)}
+    .g-searchbox .material-icons-outlined{color:var(--text-lt)}
+    .g-searchbox input{flex:1;border:none;background:none;outline:none;font:inherit;
+      font-size:16px;color:var(--text)}
+    .g-searchbox input::placeholder{color:var(--text-lt)}
+    #gResults{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:50;
+      background:var(--surface);border-radius:14px;box-shadow:var(--shadow-lg);overflow:hidden;
+      max-height:60vh;overflow-y:auto}
+    .g-ac-item{display:flex;align-items:baseline;gap:9px;padding:11px 15px;cursor:pointer;
+      border-bottom:1px solid var(--border)}
+    .g-ac-item:last-child{border-bottom:none}
+    .g-ac-item:hover,.g-ac-item.active{background:var(--brand-tint,#DBF4EA)}
+    .g-ac-num{font-size:11px;font-weight:800;color:#0E7C5A;min-width:44px}
+    .g-ac-title{font-size:14px;font-weight:700;color:var(--text);flex:1}
+    .g-ac-ch{font-size:11px;color:var(--text-lt);white-space:nowrap;overflow:hidden;
+      text-overflow:ellipsis;max-width:38%}
+    .g-ac-empty{padding:14px 16px;font-size:13px;color:var(--text-lt)}
+
+    /* Severity */
+    .g-sevrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}
+    .g-sevrow .lbl{font-size:12px;font-weight:800;color:var(--text-lt);
+      text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
+    .g-sev-btn{border:none;font:inherit;font-size:13px;font-weight:700;padding:9px 16px;
+      border-radius:999px;background:var(--surface);color:var(--text-lt);
+      box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation}
+    .g-sev-btn.on[data-sev="mild"]{background:#0E7C5A;color:#fff}
+    .g-sev-btn.on[data-sev="moderate"]{background:#E2960A;color:#fff}
+    .g-sev-btn.on[data-sev="severe"]{background:#E0454B;color:#fff}
+
+    #gStatus{font-size:13px;color:var(--text-lt);padding:10px 2px}
+    .g-empty{text-align:center;padding:44px 20px;color:var(--text-lt)}
+    .g-empty .material-icons-outlined{font-size:44px;color:var(--border);display:block;margin-bottom:10px}
+
+    /* Card */
+    #gCard{display:none}
+    .g-head{background:linear-gradient(140deg,#0B3D2E 0%,#10855F 60%,#17A46F 100%);
+      color:#fff;border-radius:var(--radius-lg,24px);padding:20px;margin-bottom:14px;
+      box-shadow:0 14px 30px rgba(14,124,90,.28)}
+    .g-head-num{font-size:12px;font-weight:800;opacity:.85;letter-spacing:.08em}
+    .g-head h2{font-size:22px;font-weight:800;letter-spacing:-.02em;margin:3px 0 10px;line-height:1.15}
+    .g-chips{display:flex;flex-wrap:wrap;gap:7px}
+    .g-chip{font-size:11px;font-weight:700;background:rgba(255,255,255,.18);
+      padding:4px 10px;border-radius:999px}
+    .g-chip.icd{background:#fff;color:#0A5C43}
+    .g-chip.sev{background:#FFE0B2;color:#7A4F01;text-transform:capitalize}
+
+    .g-sec{background:var(--surface);border-radius:var(--radius,18px);padding:16px 18px;
+      margin-bottom:11px;box-shadow:var(--shadow)}
+    .g-sec h3{font-size:14px;font-weight:800;color:var(--text);margin-bottom:9px;
+      letter-spacing:-.01em}
+    .g-text{font-size:14px;color:var(--text);line-height:1.55;white-space:pre-line}
+    .g-sevbox{background:var(--brand-tint,#DBF4EA)}
+    html[data-theme="dark"] .g-sevbox{background:#123529}
+    .g-sevnote{font-size:11.5px;color:var(--text-lt);margin-top:8px;font-style:italic}
+    .g-mark{background:#FFE082;color:#5D4037;border-radius:3px;padding:0 2px}
+
+    .g-collapse summary{font-size:14px;font-weight:800;cursor:pointer;list-style:none;
+      display:flex;align-items:center;justify-content:space-between;color:var(--text)}
+    .g-collapse summary::after{content:'expand_more';font-family:'Material Icons Outlined';
+      font-size:20px;color:var(--text-lt)}
+    .g-collapse[open] summary::after{content:'expand_less'}
+    .g-collapse .g-body{margin-top:10px}
+
+    /* Levels of care */
+    .g-loc{margin-bottom:12px}
+    .g-loc:last-child{margin-bottom:0}
+    .g-loc-h{display:flex;align-items:center;justify-content:space-between;gap:8px;
+      font-size:12px;font-weight:800;color:#0A5C43;background:var(--brand-tint,#DBF4EA);
+      padding:7px 11px;border-radius:10px;margin-bottom:7px}
+    html[data-theme="dark"] .g-loc-h{background:#123529;color:#8CEFCD}
+    .g-loc-n{font-weight:700;opacity:.75;white-space:nowrap}
+    .g-steps{margin:0;padding-left:20px}
+    .g-steps li{font-size:13.5px;color:var(--text);line-height:1.5;margin-bottom:6px}
+
+    /* Medicines table */
+    .g-tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .g-table{width:100%;border-collapse:collapse;font-size:13px;min-width:520px}
+    .g-table th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.4px;
+      color:var(--text-lt);padding:7px 9px;border-bottom:1.5px solid var(--border)}
+    .g-table td{padding:9px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top}
+    .g-table tr:last-child td{border-bottom:none}
+    .g-md-name{font-weight:700}
+    .g-md-dose{font-weight:700;color:#0E7C5A;white-space:nowrap}
+    html[data-theme="dark"] .g-md-dose{color:#28D29B}
+    .g-verify{font-size:11.5px;color:#C77E06;margin-top:9px;font-weight:600}
+
+    /* Source panel */
+    .g-source{border:1.5px solid var(--brand-tint,#DBF4EA)}
+    .g-srcnote{font-size:11.5px;color:var(--text-lt);margin-bottom:9px}
+    .g-src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+      line-height:1.55;color:var(--text);background:var(--bg);border-radius:10px;
+      padding:12px;max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0}
+    @media (max-width:768px){ .admin-content{padding:70px 12px 20px} }
+  </style>
+</head>
+<body>
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo" style="display:flex;align-items:center;gap:11px">
+      <img src="icons/logo-mark.svg?v=1" alt="" style="width:34px;height:34px;flex-shrink:0" draggable="false">
+      <div style="min-width:0">
+        <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+        <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link"><span class="material-icons-outlined">medical_services</span> New Consultation</a>
+      <a href="guidelines.html" class="sidebar-link active"><span class="material-icons-outlined">menu_book</span> Clinical Guidelines</a>
+      <a href="messages.html" class="sidebar-link"><span class="material-icons-outlined">forum</span> Messages</a>
+      <a href="settings.html" class="sidebar-link"><span class="material-icons-outlined">settings</span> Clinic Profile</a>
+    </nav>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <button class="sidebar-hamburger" aria-label="Menu"><span class="material-icons-outlined">menu</span></button>
+      <div class="admin-topbar-title">Clinical Guidelines</div>
+      <div class="admin-topbar-right"></div>
+    </div>
+
+    <div class="admin-content">
+      <div class="g-wrap">
+        <div class="g-disclaimer">
+          <span class="material-icons-outlined">warning_amber</span>
+          <div><strong>Reference only — not a prescribing authority.</strong> These entries are a
+          parsed mirror of the <strong>Uganda Clinical Guidelines 2023</strong> (Ministry of Health).
+          Parsed fields are produced by automatic text extraction and may be incomplete.
+          <strong>Always verify dosages and treatment against the source guideline text</strong>
+          (shown at the bottom of every card) before prescribing.</div>
+        </div>
+
+        <div class="g-searchwrap">
+          <div class="g-searchbox">
+            <span class="material-icons-outlined">search</span>
+            <input id="gSearch" type="text" placeholder="Type a disease or condition — e.g. malaria, pneumonia…"
+              autocomplete="off" spellcheck="false" disabled>
+          </div>
+          <div id="gResults"></div>
+        </div>
+
+        <div class="g-sevrow">
+          <span class="lbl">Severity</span>
+          <button class="g-sev-btn" data-sev="mild">Mild</button>
+          <button class="g-sev-btn" data-sev="moderate">Moderate</button>
+          <button class="g-sev-btn" data-sev="severe">Severe</button>
+          <span id="gDbInfo" style="margin-left:auto;font-size:11px;color:var(--text-lt)"></span>
+        </div>
+
+        <div id="gStatus"></div>
+
+        <div id="gEmpty" class="g-empty">
+          <span class="material-icons-outlined">menu_book</span>
+          Search a condition to open its consultation summary.<br>
+          <span style="font-size:12px">Works fully offline — the guideline is stored on this device.</span>
+        </div>
+
+        <div id="gCard"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/vendor/sql-wasm.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="js/clinic.js?v=20260816"></script>
+  <script src="js/guidelines.js?v=20260820"></script>
+</body>
+</html>
