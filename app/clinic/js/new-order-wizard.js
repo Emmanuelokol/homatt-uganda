@@ -2261,6 +2261,23 @@
       return;
     }
 
+    // The one-tap package sits beside the diagnosis on screen 1, so it is easy
+    // to build the whole package before picking the patient. Without a patient
+    // there is nobody to record the consultation against — say so plainly
+    // instead of letting the save fail somewhere the clinician cannot see.
+    if (!state.patient || !(state.patient.phone || '').trim()) {
+      blockSubmit('No patient chosen yet. Go back to the first screen and find ' +
+        'the patient by phone or name (or register a new one) — the package you ' +
+        'built is kept.');
+      resetBtn();
+      return;
+    }
+    if (!(state.confirmedDx || '').trim()) {
+      blockSubmit('No diagnosis entered. Go back and type the confirmed condition.');
+      resetBtn();
+      return;
+    }
+
     // ── Medications ────────────────────────────────────────────────────────
     // The form always starts with one blank drug row. An untouched row is not a
     // mistake — it is just that blank line — so drop it before checking.

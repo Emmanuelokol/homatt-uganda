@@ -3563,16 +3563,27 @@
   var _payRows = [];
 
   function _payRowHtml(r) {
-      var statusBadge = r.payment_status === 'partial'
-        ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PARTIAL</span>'
-        : r.payment_status === 'credit'
-          ? '<span style="background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">CREDIT</span>'
-          : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">UNPAID</span>';
+      var _bill = Number(r.total_charged_ugx) || 0;
+      var _paid = Number(r.amount_paid) || 0;
+      var _owed = Number(r.balance_ugx);
+      if (!isFinite(_owed)) _owed = Math.max(0, _bill - _paid);
+      // The badge follows the MONEY, not just the stored word. A visit marked
+      // "credit" that has since been part-paid is really partial, and saying
+      // otherwise is how the clinic loses track of who owes what.
+      var _state = _paid <= 0 ? (r.payment_status === 'credit' ? 'credit' : 'unpaid')
+                 : (_owed > 0 ? 'partial' : 'paid');
+      var statusBadge = _state === 'partial'
+        ? '<span style="background:#FFF3E0;color:#E65100;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PART-PAID</span>'
+        : _state === 'credit'
+          ? '<span style="background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">ON CREDIT</span>'
+          : _state === 'paid'
+            ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PAID</span>'
+            : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">NOT PAID</span>';
       var ageDays = (Date.now() - new Date(r.created_at).getTime()) / 86400000;
       var ageBg = ageDays > 7 ? '#FFEBEE' : ageDays > 2 ? '#FFF3E0' : '#F5F5F5';
       var ageColor = ageDays > 7 ? '#C62828' : ageDays > 2 ? '#E65100' : '#5F6368';
       var lastPay = r.last_payment_at ? 'Last paid '+timeAgo(r.last_payment_at) : 'No payments yet';
-      var pct = r.total_charged_ugx > 0 ? Math.min(100, Math.round((r.amount_paid / r.total_charged_ugx) * 100)) : 0;
+      var pct = _bill > 0 ? Math.min(100, Math.round((_paid / _bill) * 100)) : 0;
       return ''
         +'<div style="padding:12px 16px;border-bottom:1px solid #F1F3F4">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'
@@ -3582,12 +3593,17 @@
               +(r.patient_phone ? '<div style="font-size:11px;color:#9AA0A6;margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
             +'</div>'
             +'<div style="text-align:right;flex-shrink:0">'
-              +'<div style="font-size:15px;font-weight:700;color:#C62828">UGX '+fmtUGX(r.balance_ugx)+'</div>'
-              +'<div style="font-size:10px;color:'+ageColor+';background:'+ageBg+';padding:2px 7px;border-radius:10px;display:inline-block;margin-top:2px">'+timeAgo(r.created_at)+'</div>'
+              +'<div style="font-size:9.5px;font-weight:800;color:#9AA0A6;letter-spacing:.5px">STILL OWED</div>'
+              +'<div style="font-size:17px;font-weight:800;color:#C62828;line-height:1.15">UGX '+fmtUGX(_owed)+'</div>'
+              +'<div style="font-size:10px;color:'+ageColor+';background:'+ageBg+';padding:2px 7px;border-radius:10px;display:inline-block;margin-top:3px">'+timeAgo(r.created_at)+'</div>'
             +'</div>'
           +'</div>'
-          +'<div style="display:flex;justify-content:space-between;font-size:11px;color:#5F6368;margin-bottom:4px">'
-            +'<span>Paid UGX '+fmtUGX(r.amount_paid)+' / '+fmtUGX(r.total_charged_ugx)+'</span>'
+          // Spelled out, because "UGX 10,000" on its own was being read as the
+          // whole bill when it was only the part still outstanding.
+          +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:11.5px;color:#5F6368;margin-bottom:5px">'
+            +'<span>Bill <b style="color:#202124">UGX '+fmtUGX(_bill)+'</b>'
+              +' · Paid <b style="color:#1B5E20">UGX '+fmtUGX(_paid)+'</b>'
+              +' · Owing <b style="color:#C62828">UGX '+fmtUGX(_owed)+'</b></span>'
             +'<span>'+esc(lastPay)+'</span>'
           +'</div>'
           +'<div style="height:5px;background:#F1F3F4;border-radius:3px;overflow:hidden;margin-bottom:8px">'
