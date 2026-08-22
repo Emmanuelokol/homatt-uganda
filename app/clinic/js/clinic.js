@@ -406,13 +406,57 @@ function homattPatientId(phoneOrPatient, fallback) {
 }
 window.homattPatientId = homattPatientId;
 
+// ── Case number — the label the clinic actually says out loud ─────────────
+// Example: #001M2208O
+//     001   the visit's number for this clinic that day (resets each morning)
+//     M     first letter of the diagnosis (M for Malaria)
+//     2208  day and month (22 August)
+//     O     Outpatient — I for Inpatient
+//
+// It exists so a patient can be identified from the very first moment, before
+// anyone has taken a phone number or even a name. Those can be filled in later
+// and the case number never changes.
+function homattCaseCode(opts) {
+  opts = opts || {};
+  var d = opts.date ? new Date(opts.date) : new Date();
+  if (isNaN(d.getTime())) d = new Date();
+  var seq = Math.max(1, parseInt(opts.seq, 10) || 1);
+  if (seq > 999) seq = ((seq - 1) % 999) + 1;
+  var dxLetter = String(opts.diagnosis || '').trim().replace(/[^A-Za-z]/g, '').charAt(0);
+  var pad2 = function (n) { return (n < 10 ? '0' : '') + n; };
+  return '#' + String(seq).padStart(3, '0') +
+         (dxLetter ? dxLetter.toUpperCase() : 'X') +
+         pad2(d.getDate()) + pad2(d.getMonth() + 1) +
+         (String(opts.patientType || '').toLowerCase() === 'inpatient' ? 'I' : 'O');
+}
+window.homattCaseCode = homattCaseCode;
+
+// The next number for today, per clinic. Kept locally so it works with no
+// network at all; the day is part of the key so it resets each morning by
+// itself and old days fall away.
+function homattNextCaseSeq(clinicId) {
+  var d = new Date();
+  var day = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+  var key = 'homatt_case_seq_' + (clinicId || 'local');
+  var cur = { day: day, n: 0 };
+  try {
+    var raw = JSON.parse(localStorage.getItem(key) || 'null');
+    if (raw && raw.day === day) cur = raw;
+  } catch (e) {}
+  cur.n = (parseInt(cur.n, 10) || 0) + 1;
+  cur.day = day;
+  try { localStorage.setItem(key, JSON.stringify(cur)); } catch (e) {}
+  return cur.n;
+}
+window.homattNextCaseSeq = homattNextCaseSeq;
+
 // ── Which version is this phone actually running? ─────────────────────────
 // The build marker used to live only on the sign-in page, so once a clinician
 // was signed in there was no way to tell whether a fix had reached them. On the
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v111';
+var HOMATT_BUILD = 'v112';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {

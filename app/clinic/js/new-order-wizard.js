@@ -916,6 +916,9 @@
   // ── Diagnosis input ──────────────────────────────────────────────
   document.getElementById('confirmedDx').addEventListener('input', e => {
     state.confirmedDx = e.target.value;
+    // The diagnosis alone is enough to continue — the phone can come later.
+    const nx = document.getElementById('step1Next');
+    if (nx) nx.disabled = !state.confirmedDx.trim();
   });
 
   // ── Severity chips ───────────────────────────────────────────────
@@ -1225,7 +1228,9 @@
 
   // ── Step 1 → Step 2 ─────────────────────────────────────────────
   document.getElementById('step1Next').onclick = () => {
-    if (!state.patient) { showToast('Select a patient first', 'error'); return; }
+    // The phone number is NOT required. A walk-in can be seen, treated and
+    // billed before anyone has taken their details — the case number identifies
+    // them from the first moment, and the name and contact are filled in later.
     if (!state.confirmedDx.trim()) {
       showToast('Enter the confirmed diagnosis', 'error');
       document.getElementById('confirmedDx').focus();
@@ -2265,13 +2270,6 @@
     // to build the whole package before picking the patient. Without a patient
     // there is nobody to record the consultation against — say so plainly
     // instead of letting the save fail somewhere the clinician cannot see.
-    if (!state.patient || !(state.patient.phone || '').trim()) {
-      blockSubmit('No patient chosen yet. Go back to the first screen and find ' +
-        'the patient by phone or name (or register a new one) — the package you ' +
-        'built is kept.');
-      resetBtn();
-      return;
-    }
     if (!(state.confirmedDx || '').trim()) {
       blockSubmit('No diagnosis entered. Go back and type the confirmed condition.');
       resetBtn();
@@ -2317,15 +2315,32 @@
       intake_times: m.intakeTimes,
     }));
 
+    // Every consultation gets its case number the moment it is recorded — the
+    // label the clinic says out loud (#001M2208O) while the patient's name and
+    // phone are still unknown. Never regenerated, so it stays put.
+    if (!state.caseCode) {
+      state.caseCode = (typeof homattCaseCode === 'function')
+        ? homattCaseCode({
+            seq: (typeof homattNextCaseSeq === 'function') ? homattNextCaseSeq(_clinicId) : 1,
+            diagnosis: state.confirmedDx,
+            patientType: state.patientType,
+          })
+        : '';
+    }
+
     // 1. Insert clinic_diagnoses
     const dxPayload = {
+      case_code: state.caseCode || null,
       clinic_id: _clinicId,
       clinician_id: session?.userId || null,
       clinician_name: session?.staffName || null,
       booking_id: state.bookingId || null,
-      patient_name: state.patient.name || null,
-      patient_phone: state.patient.phone,
-      clinic_patient_id: state.patient.clinicPatientId || null,
+      // A walk-in may have no name and no phone yet. The case number is the
+      // identity until someone fills those in — the record is still complete
+      // enough to treat, bill and follow up on.
+      patient_name: (state.patient && state.patient.name) || null,
+      patient_phone: (state.patient && state.patient.phone) || null,
+      clinic_patient_id: (state.patient && state.patient.clinicPatientId) || null,
       confirmed_diagnosis: state.confirmedDx,
       severity: state.severity,
       patient_type: state.patientType,
@@ -2359,8 +2374,8 @@
       if (!dxPayload.created_at) dxPayload.created_at = new Date().toISOString();
       const epx = items.length ? {
         diagnosis_id: cid,
-        patient_id: state.patient.id || null,
-        clinic_patient_id: state.patient.clinicPatientId || null,
+        patient_id: (state.patient && state.patient.id) || null,
+        clinic_patient_id: (state.patient && state.patient.clinicPatientId) || null,
         clinic_id: _clinicId,
         issued_by: session?.userId || null,
         items,
@@ -2417,14 +2432,23 @@
       .insert(dxPayload)
       .select().single()));
 
-    // Graceful fallback if follow_up_reason column not yet migrated
-    if (dxError && dxError.message && dxError.message.includes('follow_up_reason')) {
+    // A column this build writes may not be migrated on this clinic's database
+    // yet. Losing the whole consultation over that is far worse than losing the
+    // one field, so drop the named column and try again. Retried in order, so a
+    // database missing several still saves.
+    const OPTIONAL_COLS = ['case_code', 'follow_up_reason'];
+    for (let i = 0; i < OPTIONAL_COLS.length && dxError && dxError.message; i++) {
+      const col = OPTIONAL_COLS[i];
+      if (!dxError.message.includes(col)) continue;
       const compatPayload = Object.assign({}, dxPayload);
-      delete compatPayload.follow_up_reason;
+      delete compatPayload[col];
+      Object.assign(dxPayload, compatPayload);
+      OPTIONAL_COLS.forEach((c) => { if (!(c in compatPayload)) delete dxPayload[c]; });
       ({ data: dx, error: dxError } = await _saveTO(supabase
         .from('clinic_diagnoses')
         .insert(compatPayload)
         .select().single()));
+      i = -1;                       // a second missing column can surface now
     }
 
     if (dxError) {
@@ -2467,8 +2491,8 @@
     if (items.length) {
       const epx = {
         diagnosis_id: dx.id,
-        patient_id: state.patient.id || null,
-        clinic_patient_id: state.patient.clinicPatientId || null,
+        patient_id: (state.patient && state.patient.id) || null,
+        clinic_patient_id: (state.patient && state.patient.clinicPatientId) || null,
         clinic_id: _clinicId,
         issued_by: session?.userId || null,
         items,
