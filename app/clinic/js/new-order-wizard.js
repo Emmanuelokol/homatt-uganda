@@ -879,6 +879,40 @@
     finish(clinicPatientId, 'Patient registered');
   };
 
+  // ── One-tap standard package (UCG auto-fill) ─────────────────────
+  // Pulls tests, medicines (dose · frequency · duration · quantity),
+  // follow-up and charges into this consultation. Everything stays editable
+  // in the wizard afterwards; the package panel itself is fully editable too.
+  const _otBtn = document.getElementById('ucgOneTap');
+  if (_otBtn) _otBtn.addEventListener('click', () => {
+    const dx = (document.getElementById('confirmedDx').value || state.confirmedDx || '').trim();
+    if (!dx) { showToast('Type the diagnosis first, then tap the package', 'error'); return; }
+    if (!window.UCGPackage) { showToast('Guideline package is still loading…', 'info'); return; }
+    window.UCGPackage.start(dx, state.severity, state);
+  });
+
+  // Called by the package after it writes into state, so the wizard shows the
+  // new tests / medicines / fees without the clinician re-entering anything.
+  window._wizRefreshAfterAutofill = function () {
+    try { renderLabSelectedTray(); } catch (e) {}
+    try {
+      document.querySelectorAll('.lab-chip').forEach(c => {
+        c.classList.toggle('active', state.labTests.indexOf(c.dataset.lab) >= 0);
+      });
+    } catch (e) {}
+    try { renderMeds(); } catch (e) {}
+    ['feeConsult:' + state.feeConsult, 'feeLab:' + state.feeLab, 'feeMeds:' + state.feeMeds]
+      .forEach(pair => {
+        const [id, val] = pair.split(':');
+        const el = document.getElementById(id);
+        if (el) el.value = val;
+      });
+    const fu = document.getElementById('followUpDays');
+    if (fu) fu.value = state.followUpDays;
+    try { recalcFees(); } catch (e) {}
+    try { updateBill(); } catch (e) {}
+  };
+
   // ── Diagnosis input ──────────────────────────────────────────────
   document.getElementById('confirmedDx').addEventListener('input', e => {
     state.confirmedDx = e.target.value;

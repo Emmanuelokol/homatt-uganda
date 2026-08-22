@@ -222,7 +222,15 @@ STOP_WORDS = {'The', 'This', 'If', 'In', 'Give', 'Do', 'For', 'All', 'Not', 'And
               'Patient', 'Pregnant', 'Women', 'Weight', 'Age', 'Total', 'Maximum',
               'Repeat', 'Continue', 'Alternative', 'First', 'Second', 'Third', 'Then',
               'Treatment', 'Management', 'Duration', 'Follow', 'Refer', 'Severe', 'Mild'}
-LEADING_CONNECTOR = re.compile(r'^(?:plus|and|or|with|then|also|add|give|use)\s+', re.I)
+LEADING_CONNECTOR = re.compile(r'^(?:plus|and|or|with|then|also|add|give|use|dosage\s+of|dose\s+of|dosing\s+of|preparation\s+of|dilution\s+of)\s+', re.I)
+# Clinical findings / vitals / lab readings get caught by the "name + number +
+# unit" pattern ("Renal failure Urine output 12 ml"). They are NOT drugs and
+# must never be offered as a prescription.
+NON_DRUG = re.compile(
+    r'\b(failure|output|pressure|rate|level|count|volume|weight|temperature|'
+    r'saturation|h[ae]moglobin|score|index|status|deficit|intake|urine|stool|'
+    r'glucose|sugar|haematocrit|hematocrit|circumference|diameter|size|'
+    r'duration|interval|age|height|bmi|pulse|respiration|oxygen|dilution|preparation|administration)\b', re.I)
 
 
 def parse_medicines(text):
@@ -234,6 +242,11 @@ def parse_medicines(text):
         for m in MED_RE.finditer(line):
             name = re.sub(r'\s+', ' ', m.group(1)).strip(' -/')
             name = LEADING_CONNECTOR.sub('', name).strip(' -/')
+            # "Hyperpyrexia Give paracetamol" → "paracetamol": the finding that
+            # triggers the drug is not part of the drug's name.
+            m2 = re.match(r'^[A-Z][A-Za-z/]+\s+(?:Give|Treat\s+with|Use)\s+(.+)$', name)
+            if m2:
+                name = m2.group(1).strip()
             if not name or len(name) < 4:
                 continue
             first = name.split()[0]
@@ -241,6 +254,8 @@ def parse_medicines(text):
                 continue
             # a real drug name starts with a letter and isn't a bare number/unit
             if not re.match(r'^[A-Za-z]', name):
+                continue
+            if NON_DRUG.search(name):
                 continue
             dose, unit = m.group(2).replace(',', '.'), m.group(3)
             route = (ROUTE_RE.search(line) or [None])
