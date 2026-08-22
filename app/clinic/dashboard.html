@@ -1797,6 +1797,7 @@
   }
 
   // ── Today's consultations ──
+  var _dxNoCaseCode = false;   // set once the database tells us the column is absent
   async function loadConsultations() {
     var el = document.getElementById('ordersList');
     if (!el) return;
@@ -1810,12 +1811,26 @@
     }
     try {
       var start = new Date(); start.setHours(0,0,0,0);
+      // case_code may not be migrated on this clinic's database yet. Asking for
+      // a column that isn't there fails the WHOLE query, so fall back to the
+      // list without it rather than showing no consultations at all.
+      var _COLS_BASE = 'id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status';
       var _consultQ = function() {
-        return supabase.from('clinic_diagnoses')
-          .select('id,confirmed_diagnosis,severity,created_at,patient_phone,patient_name,patient_type,total_charged_ugx,payment_status')
-          .eq('clinic_id', clinicId)
-          .gte('created_at', start.toISOString())
-          .order('created_at', {ascending:false});
+        var run = function(cols) {
+          return supabase.from('clinic_diagnoses')
+            .select(cols)
+            .eq('clinic_id', clinicId)
+            .gte('created_at', start.toISOString())
+            .order('created_at', {ascending:false});
+        };
+        if (_dxNoCaseCode) return run(_COLS_BASE);
+        return run(_COLS_BASE + ',case_code').then(function(res) {
+          if (res && res.error && /case_code/.test(res.error.message || '')) {
+            _dxNoCaseCode = true;
+            return run(_COLS_BASE);
+          }
+          return res;
+        });
       };
       var res2 = window.ClinicOffline
         ? await ClinicOffline.cachedQuery('consultations_today_' + clinicId, _consultQ)
@@ -1839,7 +1854,9 @@
         return;
       }
       el.innerHTML = rows2.map(function(c) {
-        var ini2 = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var ini2 = (c.patient_name||c.patient_phone||'')
+          ? (c.patient_name||c.patient_phone).split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase()
+          : '#';
         var t2   = new Date(c.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
         var paid = c.payment_status==='paid'
           ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
@@ -1850,7 +1867,10 @@
         return '<div class="order-card">'
           +'<div class="order-avatar">'+ini2+'</div>'
           +'<div class="order-info">'
-            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Patient')+'</div>'
+            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Not named yet')
+              // The case number IS the identity until a name is taken.
+              +(c.case_code?' <span style="font-size:11px;font-weight:800;color:#6C5CE7;background:#EFEBFF;padding:2px 7px;border-radius:8px;letter-spacing:.3px">'+esc(c.case_code)+'</span>':'')
+              +'</div>'
             +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
             +'<div class="order-meta"><span>'+t2+'</span>'+(fee?'<span>'+esc(fee)+'</span>':'')+(c.patient_phone?'<span>'+esc(c.patient_phone)+'</span>':'')+'</div>'
           +'</div>'
