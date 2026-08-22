@@ -563,7 +563,7 @@
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
 <script src="js/clinic-offline.js?v=18" defer></script>
-<script src="js/clinic.js?v=20260822b" defer></script>
+<script src="js/clinic.js?v=20260823" defer></script>
 <script src="js/msg-alerts.js?v=20260809" defer></script>
 <script>
 var _clinicId = null;
@@ -943,6 +943,14 @@ window.setLevel = function(btn, code) {
   } catch (e) {}
   buildLevels();
   if (typeof showToast === 'function') showToast('Facility level set to ' + code);
+  // Share it with this clinic's other devices. Best-effort: the level already
+  // works from the line above, so a missing column or no network changes nothing.
+  try {
+    if (_supa && _clinicId) {
+      _supa.from('clinics').update({ facility_level: code }).eq('id', _clinicId)
+        .then(function () {}, function () {});
+    }
+  } catch (e) {}
 };
 
 /* ── Facilities ── */
@@ -1269,6 +1277,18 @@ async function loadClinicProfile() {
       }
     });
     buildFeeTable(existingFees);
+  }
+
+  // Facility level — the server's value wins if this device has none yet.
+  if (c.facility_level) {
+    try {
+      var ses = JSON.parse(localStorage.getItem('clinic_session') || '{}');
+      if (!ses.level) {
+        ses.level = c.facility_level;
+        localStorage.setItem('clinic_session', JSON.stringify(ses));
+      }
+    } catch (e) {}
+    buildLevels();
   }
 
   // Facilities
