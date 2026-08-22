@@ -734,11 +734,24 @@
     });
     pkg.tests.forEach(function (t) { if (state.labTests.indexOf(t) < 0) state.labTests.push(t); });
     pkg.drugs.forEach(function (d) {
+      var tpd = Math.max(1, Math.min(4, Number(d.timesPerDay) || 2));
+      // Give every row real intake times. Leaving these empty meant the
+      // consultation could never be sent — the package looked applied, the
+      // clinician pressed Send, and nothing was ever recorded.
+      var times = (typeof window._wizDefaultTimes === 'function')
+        ? window._wizDefaultTimes(tpd)
+        : ({ 1: ['08:00'], 2: ['08:00', '20:00'],
+             3: ['08:00', '14:00', '20:00'],
+             4: ['07:00', '12:00', '17:00', '22:00'] }[tpd] || ['08:00', '20:00']).slice();
       state.medications.push({
-        drug: d.drug, dosage: d.dosage || '',
-        timesPerDay: d.timesPerDay || 2,
-        intakeTimes: [],
-        durationDays: d.durationDays || 5,
+        drug: d.drug,
+        // A prescription line with no dose cannot be dispensed safely, and the
+        // wizard rightly refuses it. Fall back to the strength carried on the
+        // drug so the row arrives complete.
+        dosage: (d.dosage || d.dose || d.strength || '').toString().trim(),
+        timesPerDay: tpd,
+        intakeTimes: times,
+        durationDays: Number(d.durationDays) > 0 ? Number(d.durationDays) : 5,
         inventoryItemId: null,
         qtyToDeduct: Number(d.qty) || 0,
       });

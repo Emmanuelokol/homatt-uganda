@@ -1456,6 +1456,13 @@
     3: ['08:00','14:00','20:00'],
     4: ['07:00','12:00','17:00','22:00'],
   };
+  // The one-tap package builds its own medicine rows; it must use the SAME
+  // intake times the manual "Add drug" button uses, or those rows arrive with
+  // no times and the consultation cannot be sent.
+  window._wizDefaultTimes = function (n) {
+    var k = Math.max(1, Math.min(4, parseInt(n, 10) || 2));
+    return DEFAULT_TIMES[k].slice();
+  };
 
   // ── Smart prescription defaults ─────────────────────────────────
   // The clinician just types the drug; dose, times/day, intake times and
