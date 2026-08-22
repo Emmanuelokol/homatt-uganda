@@ -1255,7 +1255,13 @@
     try {
       const CO = window.ClinicOffline;
       if (CO) {
-        CO.enqueue('table_update', { table: 'clinic_referrals', patch: { status: 'seen' }, match: { id: rid } });
+        // Must go through the RPC: a plain UPDATE from the RECEIVING clinic is
+        // rejected by the referral RLS policy (its WITH CHECK only allows the
+        // sender's clinic), so the sending clinic would never see it attended.
+        // enqueue('rpc') not enqueueRpc(): the latter injects a p_op_id arg this
+        // function doesn't take (wasted failed call). Setting a fixed status is
+        // idempotent anyway.
+        CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: rid, p_status: 'seen' } });
         CO.flush();
         // Keep the cached inbox in step so it disappears immediately.
         try {
@@ -1264,7 +1270,7 @@
           if (cached) CO.set(key, cached.map(r => r.id === rid ? Object.assign({}, r, { status: 'seen' }) : r));
         } catch (e) {}
       } else if (supabase) {
-        supabase.from('clinic_referrals').update({ status: 'seen' }).eq('id', rid).then(() => {}).catch(() => {});
+        supabase.rpc('set_referral_status', { p_referral_id: rid, p_status: 'seen' }).then(() => {}).catch(() => {});
       }
     } catch (e) {}
   }

@@ -4207,13 +4207,20 @@
     }
   };
 
+  // Change a referral's status so BOTH clinics see it.
+  // A plain table UPDATE is not enough: the original RLS policy's WITH CHECK
+  // only allowed rows whose from_clinic_id is mine, so a RECEIVING clinic's
+  // update was rejected (or silently matched 0 rows) — the row vanished from
+  // this screen via the optimistic cache while the sender still saw "Waiting
+  // for them". We now call the set_referral_status RPC (security definer,
+  // verifies the caller is a party to the referral) and only fall back to the
+  // table update if that RPC isn't installed. The write is queued through the
+  // outbox so it also works offline and retries by itself.
   window.setReferralStatus = function (id, status) {
-    resolveClinicId().then(function (cid) {
+    resolveClinicId().then(async function (cid) {
       if (!cid) return;
       var CO = window.ClinicOffline;
-      var payload = { table: 'clinic_referrals', patch: { status: status }, match: { id: id, to_clinic_id: cid } };
-      if (CO) { CO.enqueue('table_update', payload); CO.flush(); }
-      else if (supabase) supabase.from('clinic_referrals').update({ status: status }).eq('id', id).then(function(){}).catch(function(){});
+
       // Optimistic local update so the list reflects it instantly (offline too)
       if (CO) {
         var key = 'referrals_in_' + cid;
@@ -4221,7 +4228,48 @@
         if (cached) CO.set(key, cached.map(function (r) { return r.id === id ? Object.assign({}, r, { status: status }) : r; }));
       }
       loadReferralsIn();
-      showToast('Referral marked ' + status, 'success');
+
+      // OFFLINE → queue the RPC; it replays (and reaches the other clinic) on sync.
+      if (CO && CO.isOffline()) {
+        CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: id, p_status: status } });
+        showToast('Referral marked ' + status + ' — syncs when you’re online', 'success');
+        return;
+      }
+
+      var ok = false, why = '';
+      try {
+        var rr = supabase.rpc('set_referral_status', { p_referral_id: id, p_status: status });
+        var res = CO ? await CO.withTimeout(rr, 9000) : await rr;
+        if (res && res._timeout) {
+          if (CO) { CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: id, p_status: status } }); CO.flush(); }
+          showToast('Slow connection — the update will finish in the background', 'info');
+          return;
+        }
+        if (res && !res.error && res.data && res.data.ok) ok = true;
+        else if (res && res.error && /could not find the function|does not exist|schema cache/i.test(res.error.message || '')) {
+          // RPC not installed yet → fall back to a direct update, and VERIFY it
+          // actually changed a row (RLS can match 0 rows without erroring).
+          var up = await supabase.from('clinic_referrals')
+            .update({ status: status }).eq('id', id).select('id');
+          if (!up.error && up.data && up.data.length) ok = true;
+          else why = (up.error && up.error.message) || 'blocked by database permissions';
+        } else why = (res && res.error && res.error.message) || (res && res.data && res.data.error) || 'update rejected';
+      } catch (e) { why = (e && e.message) || 'network error'; }
+
+      if (ok) {
+        showToast('Referral marked ' + status, 'success');
+        try { loadReferralsIn(); } catch (e) {}
+      } else {
+        // Put the row back — it did NOT change on the server, and the other
+        // clinic must not be left thinking nothing happened while we show done.
+        if (CO) {
+          var k2 = 'referrals_in_' + cid;
+          var c2 = CO.get(k2, null);
+          if (c2) CO.set(k2, c2.map(function (r) { return r.id === id ? Object.assign({}, r, { status: r._prevStatus || 'pending' }) : r; }));
+        }
+        try { loadReferralsIn(); } catch (e) {}
+        showToast('Could not update the referral: ' + why + ' — run 20260819_fix_referral_update_rls.sql', 'error');
+      }
     }).catch(function(){});
   };
 
