@@ -62,7 +62,12 @@
   function allLearned() {
     try { return JSON.parse(localStorage.getItem(storeKey()) || '{}'); } catch (e) { return {}; }
   }
-  function learnKey(condId, sev) { return condId + '|' + (sev || 'any'); }
+  function learnKey(condId, sev) {
+    // Free-text conditions (not in the guidelines) are keyed by their name so
+    // the clinic's own package is found again next time.
+    var base = condId ? String(condId) : 'free:' + String(ctx.title || '').toLowerCase().trim();
+    return base + '|' + (sev || 'any');
+  }
   function getLearned(condId, sev) {
     var all = allLearned();
     return all[learnKey(condId, sev)] || all[learnKey(condId, 'any')] || null;
@@ -138,8 +143,14 @@
   }
 
   function buildFromGuideline(condId, sev) {
-    var c = rows('SELECT id,title,page,investigations,full_text,management FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+    var c = rows('SELECT id,title,page,causes,clinical_features,differential,investigations,' +
+      'management,complications,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
     if (!c) return null;
+    ctx.info = {
+      causes: c.causes, clinical_features: c.clinical_features, differential: c.differential,
+      investigations: c.investigations, management: c.management, complications: c.complications,
+      prevention: c.prevention, notes: c.notes, full_text: c.full_text,
+    };
     var meds = rows('SELECT name,dose,unit,route,frequency,duration FROM medicines WHERE condition_id=? ORDER BY id LIMIT 12', [condId]);
     // Prefer medicines whose source line matches the chosen severity.
     var drugs = meds.map(function (m) {
@@ -192,7 +203,8 @@
       '.ucg-drug .nm span{font-size:11px;color:var(--text-lt)}',
       '.ucg-num{width:44px;text-align:center;border:1.5px solid var(--border);border-radius:9px;padding:6px 2px;font:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text)}',
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
-      '.ucg-add{display:inline-flex;align-items:center;gap:6px;border:none;background:var(--accent-v-tint,#ECE9FF);color:var(--accent-v,#6C5CE7);border-radius:999px;padding:8px 14px;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;margin-top:4px}',
+      '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
+      '.ucg-add:active{transform:scale(.98)}',
       '.ucg-money{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;padding:12px}',
       '.ucg-money label{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px}',
       '.ucg-money input{width:100%;border:1.5px solid var(--border);border-radius:11px;padding:10px;font:inherit;font-size:15px;font-weight:700;background:var(--surface);color:var(--text);text-align:right}',
@@ -203,9 +215,9 @@
       '.ucg-btn.ghost{background:var(--bg);color:var(--text-lt);flex:0 0 34%}',
       '.ucg-btn.go{background:linear-gradient(135deg,#17936B,#0C6A4C);color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.3)}',
       '.ucg-src{font-size:11px;color:var(--text-lt);padding:2px 2px 10px}',
-      '#ucgSearchWrap{position:relative;padding:0 12px 12px}',
+      '#ucgSearchWrap{padding:0 12px 12px}',
       '#ucgSearchWrap input{width:100%;border:1.5px solid var(--border);border-radius:12px;padding:11px 13px;font:inherit;font-size:15px;background:var(--surface);color:var(--text)}',
-      '#ucgSearchRes{position:absolute;left:12px;right:12px;top:100%;background:var(--surface);border-radius:12px;box-shadow:var(--shadow-lg);max-height:240px;overflow-y:auto;z-index:20;display:none}',
+      '#ucgSearchRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint,#DBF4EA)}',
       '#ucgSearchRes div{padding:11px 13px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--border)}',
       '#ucgSearchRes div:hover{background:var(--brand-tint,#DBF4EA)}',
       '.ucg-ask{position:fixed;inset:0;background:rgba(10,20,16,.6);z-index:950;display:none;align-items:center;justify-content:center;padding:20px}',
@@ -214,6 +226,13 @@
       '.ucg-ask-card p{font-size:13px;color:var(--text-lt);line-height:1.5;margin-bottom:10px}',
       '.ucg-diff{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--text);margin-bottom:14px;max-height:180px;overflow-y:auto}',
       '.ucg-diff div{padding:2px 0}',
+      '.ucg-det{border-radius:12px;background:var(--bg);margin-bottom:7px;overflow:hidden}',
+      '.ucg-det summary{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;color:var(--text)}',
+      '.ucg-det summary::-webkit-details-marker{display:none}',
+      '.ucg-det summary .material-icons-outlined{font-size:18px;color:#0E7C5A;flex:none}',
+      '.ucg-det summary .chev{margin-left:auto;color:var(--text-lt);transition:transform .18s}',
+      '.ucg-det[open] summary .chev{transform:rotate(180deg)}',
+      '.ucg-det-b{padding:0 13px 13px;font-size:13px;line-height:1.55;color:var(--text);white-space:pre-line;max-height:44vh;overflow-y:auto}',
     ].join('\n');
     document.head.appendChild(css);
 
@@ -292,10 +311,9 @@
                 '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
               '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button></div>';
           }).join('') : '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
-          '<div><button class="ucg-add" id="ucgAddDrug">+ Add drug</button></div>' +
         '</div>' +
-        '<div id="ucgSearchWrap" style="display:none">' +
-          '<input id="ucgDrugSearch" placeholder="Type a drug — e.g. amo…" autocomplete="off">' +
+        '<div id="ucgSearchWrap">' +
+          '<input id="ucgDrugSearch" placeholder="Search a drug to add — type e.g. amo…" autocomplete="off">' +
           '<div id="ucgSearchRes"></div>' +
         '</div></div>' +
 
@@ -311,8 +329,13 @@
           ((pkg.fees.consult || 0) + (pkg.fees.lab || 0) + (pkg.fees.meds || 0)).toLocaleString('en-UG') + '</b></div>' +
         '</div>' +
 
-      // ④ Follow-up + another condition
-      '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">4</span>' +
+      // ④ Clinical guidance from the guideline — tap to open
+      (ctx.info ? '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">4</span>' +
+        '<h4>Guideline notes for this condition</h4><span class="ucg-count">tap to open</span></div>' +
+        '<div class="ucg-rows">' + guidanceHtml() + '</div></div>' : '') +
+
+      // ⑤ Follow-up + another condition
+      '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">' + (ctx.info ? '5' : '4') + '</span>' +
         '<h4>Review &amp; next visit</h4></div>' +
         '<div class="ucg-rows" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
           '<span style="font-size:13px;color:var(--text)">Return in</span>' +
@@ -322,6 +345,30 @@
         '</div></div>';
 
     wireRows();
+  }
+
+  // Collapsible guideline detail: management, what else to check, what it could
+  // be if you're not certain, complications, and the raw source text.
+  function guidanceHtml() {
+    var i = ctx.info || {};
+    function d(title, body, icon) {
+      if (!body || !String(body).trim()) return '';
+      return '<details class="ucg-det"><summary>' +
+        '<span class="material-icons-outlined">' + icon + '</span>' + esc(title) +
+        '<span class="material-icons-outlined chev">expand_more</span></summary>' +
+        '<div class="ucg-det-b">' + esc(String(body).trim()) + '</div></details>';
+    }
+    var html =
+      d('Management (guideline)', i.management, 'medical_information') +
+      d('What to look for — clinical features', i.clinical_features, 'visibility') +
+      d('If you are not certain — other possibilities', i.differential, 'help_outline') +
+      d('Investigations in full', i.investigations, 'biotech') +
+      d('Complications to watch for', i.complications, 'warning_amber') +
+      d('Causes / risk factors', i.causes, 'coronavirus') +
+      d('Prevention & advice for the patient', i.prevention, 'health_and_safety') +
+      d('Notes & cautions', i.notes, 'sticky_note_2') +
+      d('Full guideline text (source)', i.full_text, 'menu_book');
+    return html || '<div style="font-size:12.5px;color:var(--text-lt)">No extra guideline detail for this section.</div>';
   }
 
   function recalc() {
@@ -368,12 +415,6 @@
     if (addT) addT.onclick = function () {
       var name = window.prompt ? null : null;      // prompt() is blocked in WebViews
       openInlineAdd('test');
-    };
-    var addD = document.getElementById('ucgAddDrug');
-    if (addD) addD.onclick = function () {
-      var w = document.getElementById('ucgSearchWrap');
-      w.style.display = w.style.display === 'none' ? 'block' : 'none';
-      if (w.style.display === 'block') document.getElementById('ucgDrugSearch').focus();
     };
     var addC = document.getElementById('ucgAddCond');
     if (addC) addC.onclick = function () {
@@ -483,7 +524,7 @@
   // ── Open the package ─────────────────────────────────────────────────────
   async function open(condId, title, severity, page) {
     ensurePanel();
-    ctx = { conditionId: condId, title: title, severity: severity, page: page, learned: false };
+    ctx = { conditionId: condId, title: title, severity: severity, page: page, learned: false, info: null };
     var ov = document.getElementById('ucgOverlay');
     document.getElementById('ucgTitle').textContent = title;
     document.getElementById('ucgBody').innerHTML =
@@ -500,6 +541,19 @@
     // A parent heading (e.g. "Malaria") often carries no drugs — the real
     // packages live in its subsections ("Uncomplicated Malaria", "Severe
     // Malaria"). Offer those instead of an empty package.
+    // Not in the guidelines at all → open a blank worksheet the clinician fills
+    // in (and can save as a clinic standard for next time).
+    if (!condId) {
+      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, followUpDays: 7, page: null, title: title };
+      srcPkg = JSON.parse(JSON.stringify(pkg));
+      document.getElementById('ucgKicker').textContent = 'New package · not in the guidelines';
+      document.getElementById('ucgTags').innerHTML =
+        (severity ? '<span class="ucg-tag" style="text-transform:capitalize">' + esc(severity) + '</span>' : '') +
+        '<span class="ucg-tag learn">build your own</span>';
+      render();
+      return;
+    }
+
     var self = rows('SELECT number FROM conditions WHERE id=? LIMIT 1', [condId])[0];
     var ownDrugs = rows('SELECT COUNT(*) n FROM medicines WHERE condition_id=?', [condId])[0];
     if (self && (!ownDrugs || !ownDrugs.n) && !getLearned(condId, severity)) {
@@ -511,6 +565,14 @@
     }
 
     var learned = getLearned(condId, severity);
+    if (learned && condId) {
+      // load the guideline detail for the notes block even when using a learned package
+      try {
+        var gi = rows('SELECT causes,clinical_features,differential,investigations,management,' +
+          'complications,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+        if (gi) ctx.info = gi;
+      } catch (e) {}
+    }
     if (learned) {
       ctx.learned = true;
       pkg = {
@@ -664,7 +726,12 @@
     if (!hits.length) {
       hits = rows('SELECT id,title,page FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 8', ['%' + term + '%']);
     }
-    if (!hits.length) { toast('No guideline entry for “' + term + '”', 'error'); return; }
+    if (!hits.length) {
+      // Nothing in the guidelines — still give the clinician a worksheet.
+      toast('Not in the guidelines — start a package for “' + term + '”', 'info');
+      open(null, term, severity, null);
+      return;
+    }
     // Prefer sections that actually carry a treatment package.
     hits = hits.map(function (h) {
       var n = rows('SELECT COUNT(*) n FROM medicines WHERE condition_id=?', [h.id])[0];

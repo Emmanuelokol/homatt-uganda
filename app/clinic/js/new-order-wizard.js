@@ -1282,6 +1282,19 @@
 
   // A referral opened from the dashboard: mark it attended once the
   // consultation is saved, so it leaves "Referrals Received" by itself.
+  // After a consultation is saved the dashboard's cache-first reads would keep
+  // serving the pre-save snapshot (today's patients, medicines dispensed, top
+  // conditions, money). Drop those caches so the dashboard reloads fresh.
+  function _invalidateDashboardCaches() {
+    try {
+      if (window.ClinicOffline && ClinicOffline.invalidate) {
+        ClinicOffline.invalidate(['consultations_today_', 'meds_dx_', 'meds_qs_',
+          'top_conditions_', 'revenue_', 'financial_', 'pending_payments_',
+          'bookings_', 'hist_pool_', 'qs_inventory_']);
+      }
+    } catch (e) {}
+  }
+
   function _closeReferralIfAny() {
     const rid = state.referralId;
     if (!rid) return;
@@ -2326,6 +2339,7 @@
       const successSheet = document.getElementById('successSheet');
       if (successSheet) successSheet.style.display = 'flex';
       _closeReferralIfAny();   // referral handled → leaves the inbox
+      _invalidateDashboardCaches();
     }
 
     if (window.ClinicOffline && navigator.onLine === false) {
@@ -2489,6 +2503,7 @@
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
     _closeReferralIfAny();     // referral handled → leaves the inbox
+    _invalidateDashboardCaches();
 
     } catch (fatalErr) {
       console.error('submitBtn fatal:', fatalErr);

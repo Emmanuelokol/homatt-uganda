@@ -108,6 +108,22 @@
   window.addEventListener('online', warmShell);
 
   function k(key) { return PREFIX + key; }
+  // Drop cached query results so the next read goes to the server. Used after a
+  // write (a consultation, a sale) — otherwise the cache-first reads keep
+  // serving the pre-write snapshot and the dashboard looks frozen.
+  function invalidate(prefixes) {
+    var list = Array.isArray(prefixes) ? prefixes : [prefixes];
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf(PREFIX) !== 0) continue;
+        var bare = key.slice(PREFIX.length);
+        for (var j = 0; j < list.length; j++) {
+          if (bare.indexOf(list[j]) === 0) { localStorage.removeItem(key); break; }
+        }
+      }
+    } catch (e) {}
+  }
   function set(key, value) {
     try { localStorage.setItem(k(key), JSON.stringify({ ts: Date.now(), v: value })); } catch (e) {}
   }
@@ -413,5 +429,6 @@
     enqueue: enqueue, pendingCount: pendingCount, registerSyncHandler: registerSyncHandler,
     flush: flush, updateIndicator: updateIndicator, uuid: uuid, enqueueRpc: enqueueRpc,
     isNetworkErr: isNetworkErr, offlineHtml: offlineHtml, withTimeout: withTimeout,
+    invalidate: invalidate,
   };
 })();

@@ -207,7 +207,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v102';
+    var BUILD = 'v103';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -281,7 +281,7 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=17"></script>
+<script src="js/clinic-offline.js?v=18"></script>
 <!-- clinic.js registers the offline-sync handlers. Loading it here (not just on
      the dashboard) lets the outbox process + self-heal from the LOGIN page too,
      so a queued write that can never succeed no longer shows "Syncing…" forever
