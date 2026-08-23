@@ -982,5 +982,134 @@
     pickFrom(hits, term, severity);
   }
 
-  window.UCGPackage = { start: start, open: open, close: close };
+  // ── Diagnosis suggestions ────────────────────────────────────────────────
+  // Typing the condition should offer it, not make the clinician spell it out.
+  // Three sources, cheapest first, so something useful appears on the first
+  // keystroke even before the 6 MB guideline database has finished opening:
+  //   1. what THIS clinic has diagnosed before (its own learned packages)
+  //   2. a short list of the conditions seen most in Ugandan primary care
+  //   3. the Uganda Clinical Guidelines themselves, once the database is open
+  var COMMON_DX = [
+    'Malaria', 'Malaria (uncomplicated)', 'Severe malaria', 'Typhoid fever',
+    'Upper respiratory tract infection', 'Pneumonia', 'Bronchitis', 'Asthma',
+    'Urinary tract infection', 'Diarrhoea', 'Dysentery', 'Cholera',
+    'Intestinal worms', 'Amoebiasis', 'Giardiasis', 'Peptic ulcer disease',
+    'Gastritis', 'Anaemia', 'Malnutrition', 'HIV/AIDS', 'Tuberculosis',
+    'Sexually transmitted infection', 'Syphilis', 'Gonorrhoea', 'Candidiasis',
+    'Pelvic inflammatory disease', 'Hypertension', 'Diabetes mellitus',
+    'Epilepsy', 'Otitis media', 'Tonsillitis', 'Conjunctivitis', 'Skin infection',
+    'Scabies', 'Ringworm', 'Wound infection', 'Cellulitis', 'Abscess', 'Burns',
+    'Arthritis', 'Back pain', 'Headache', 'Migraine', 'Allergic reaction',
+    'Measles', 'Chickenpox', 'Mumps', 'Meningitis', 'Hepatitis', 'Snake bite',
+    'Antenatal care', 'Malaria prophylaxis', 'Family planning', 'Immunisation',
+  ];
+
+  function learnedTitles() {
+    var out = [];
+    try {
+      var all = allLearned();
+      Object.keys(all).forEach(function (k) {
+        if (all[k] && all[k].title) out.push({ t: all[k].title, uses: all[k].uses || 0 });
+      });
+    } catch (e) {}
+    return out.sort(function (a, b) { return b.uses - a.uses; }).map(function (x) { return x.t; });
+  }
+
+  function suggestDx(q) {
+    q = String(q || '').trim().toLowerCase();
+    if (q.length < 2) return [];
+    var out = [], seen = {};
+    function add(title, tag) {
+      var t = String(title || '').trim();
+      if (!t) return;
+      var k = t.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = 1;
+      out.push({ title: t, tag: tag });
+    }
+    // 1. the clinic's own standards come first — these are its real caseload
+    learnedTitles().forEach(function (t) {
+      if (t.toLowerCase().indexOf(q) >= 0) add(t, 'your standard');
+    });
+    // 2. common conditions
+    COMMON_DX.filter(function (t) { return t.toLowerCase().indexOf(q) >= 0; })
+      .sort(function (a, b) {
+        var ap = a.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+        var bp = b.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+        return ap - bp || a.length - b.length;
+      }).forEach(function (t) { add(t, ''); });
+    // 3. the guidelines, when they are already loaded (never blocks typing)
+    if (db) {
+      try {
+        rows('SELECT title FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 10',
+             ['%' + q + '%']).forEach(function (r) { add(r.title, 'UCG 2023'); });
+      } catch (e) {}
+    }
+    return out.slice(0, 8);
+  }
+
+  function wireDxSuggest() {
+    var inp = document.getElementById('confirmedDx');
+    if (!inp || inp._ucgWired) return;
+    inp._ucgWired = true;
+
+    var box = document.createElement('div');
+    box.id = 'ucgDxRes';
+    box.style.cssText = 'display:none;margin-top:8px;background:var(--surface,#fff);' +
+      'border:1.5px solid var(--brand-tint,#DBF4EA);border-radius:12px;overflow:hidden;' +
+      'max-height:270px;overflow-y:auto;box-shadow:var(--shadow,0 6px 18px rgba(20,24,43,.07))';
+    inp.parentNode.insertBefore(box, inp.nextSibling);
+
+    // Warm the guideline database the moment the clinician starts typing, so
+    // the fuller list is ready a keystroke or two later.
+    var warmed = false;
+    function warm() { if (warmed) return; warmed = true; openDb().catch(function () {}); }
+
+    var t, justPicked = false;
+    function paint() {
+      if (justPicked) { justPicked = false; return; }
+      var hits = suggestDx(inp.value);
+      if (!hits.length) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      box.innerHTML = hits.map(function (h, i) {
+        return '<div data-d="' + i + '" style="padding:11px 13px;font-size:14px;cursor:pointer;' +
+          'border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">' +
+          '<b style="font-weight:600;color:var(--text)">' + esc(h.title) + '</b>' +
+          (h.tag ? '<span style="font-size:10.5px;font-weight:800;color:var(--text-lt);' +
+            'letter-spacing:.3px;white-space:nowrap;align-self:center">' + esc(h.tag) + '</span>' : '') +
+          '</div>';
+      }).join('');
+      box.style.display = 'block';
+      box.querySelectorAll('[data-d]').forEach(function (el) {
+        el.onclick = function () {
+          inp.value = hits[Number(el.dataset.d)].title;
+          // Tell the wizard the value changed, but do NOT let that re-open the
+          // list we just picked from.
+          justPicked = true;
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+          clearTimeout(t);
+          box.style.display = 'none';
+          box.innerHTML = '';
+        };
+      });
+    }
+
+    inp.addEventListener('input', function () {
+      warm();
+      clearTimeout(t);
+      if (justPicked) { justPicked = false; return; }
+      t = setTimeout(paint, 110);
+    });
+    inp.addEventListener('focus', warm);
+    document.addEventListener('click', function (e) {
+      if (e.target !== inp && !box.contains(e.target)) box.style.display = 'none';
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', wireDxSuggest);
+  } else {
+    wireDxSuggest();
+  }
+
+  window.UCGPackage = { start: start, open: open, close: close, suggestDx: suggestDx };
 })();

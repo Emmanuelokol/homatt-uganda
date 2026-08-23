@@ -457,60 +457,9 @@
            SCREEN 1 — Patient & Assessment
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
-        <div class="wiz-screen-title">Patient &amp; Assessment</div>
-        <div class="wiz-screen-sub">Find the patient, confirm what's wrong, and document any tests done.</div>
+        <div class="wiz-screen-title">Assessment</div>
+        <div class="wiz-screen-sub">Start with the diagnosis. The patient's name and phone are optional — add them here or later.</div>
 
-        <!-- ── Patient ── -->
-        <div class="wiz-card">
-          <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)">
-            <button id="lookupTabPhone" class="lookup-tab active">
-              <span class="material-icons-outlined" style="font-size:16px">phone</span> Phone / Name
-            </button>
-            <button id="lookupTabCode" class="lookup-tab">
-              <span class="material-icons-outlined" style="font-size:16px">qr_code</span> Booking Code
-            </button>
-          </div>
-
-          <!-- Phone search -->
-          <div id="patientSearchBlock">
-            <label class="field-label">Patient phone number</label>
-            <div class="autocomplete-wrap">
-              <input id="patientPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
-              <div id="patientResults" class="autocomplete-menu"></div>
-            </div>
-            <div class="helper" id="patientHelper">Works for the patient's own number or a parent's number for children.</div>
-          </div>
-
-          <!-- Booking code search -->
-          <div id="bookingCodeBlock" style="display:none">
-            <label class="field-label">Homatt Booking Code</label>
-            <input id="bookingCodeInput" class="field-input" type="text" placeholder="HO-928"
-              style="text-transform:uppercase;font-weight:800;letter-spacing:2px;font-size:20px;text-align:center" autocomplete="off">
-            <button id="lookupCodeBtn"
-              style="margin-top:10px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-              <span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient
-            </button>
-            <div id="codeError" style="display:none;margin-top:8px;background:#FFEBEE;color:#C62828;border-radius:8px;padding:8px 12px;font-size:13px"></div>
-          </div>
-
-          <!-- Selected patient pill -->
-          <div id="patientPillBlock" style="display:none">
-            <div class="patient-pill">
-              <div class="avatar" id="ppAvatar">?</div>
-              <div class="info">
-                <div class="name" id="ppName"></div>
-                <div class="phone" id="ppPhone"></div>
-              </div>
-              <span class="badge" id="ppBadge">On Homatt</span>
-              <button class="change-btn" id="ppChangeBtn" title="Change patient">
-                <span class="material-icons-outlined">edit</span>
-              </button>
-            </div>
-          </div>
-
-          <!-- Patient profile alerts -->
-          <div id="patientProfileCard" style="display:none;margin-top:12px"></div>
-        </div>
 
         <!-- ── Diagnosis ── -->
         <div class="sec-label">
@@ -569,6 +518,68 @@
         </div>
 
         <!-- ── Lab tests ── -->
+        <!-- ── Patient details (optional — can be added later) ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">person</span>
+          Patient details <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional, can be added later</span>
+        </div>
+        <div class="wiz-card" style="padding-top:14px">
+          <div style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">
+            Not needed to record the consultation. The case number identifies this
+            patient; the name and phone can be filled in afterwards from the dashboard.
+          </div>
+        </div>
+        <!-- ── Patient ── -->
+        <div class="wiz-card">
+          <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)">
+            <button id="lookupTabPhone" class="lookup-tab active">
+              <span class="material-icons-outlined" style="font-size:16px">phone</span> Phone / Name
+            </button>
+            <button id="lookupTabCode" class="lookup-tab">
+              <span class="material-icons-outlined" style="font-size:16px">qr_code</span> Booking Code
+            </button>
+          </div>
+
+          <!-- Phone search -->
+          <div id="patientSearchBlock">
+            <label class="field-label">Patient phone number</label>
+            <div class="autocomplete-wrap">
+              <input id="patientPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+              <div id="patientResults" class="autocomplete-menu"></div>
+            </div>
+            <div class="helper" id="patientHelper">Works for the patient's own number or a parent's number for children.</div>
+          </div>
+
+          <!-- Booking code search -->
+          <div id="bookingCodeBlock" style="display:none">
+            <label class="field-label">Homatt Booking Code</label>
+            <input id="bookingCodeInput" class="field-input" type="text" placeholder="HO-928"
+              style="text-transform:uppercase;font-weight:800;letter-spacing:2px;font-size:20px;text-align:center" autocomplete="off">
+            <button id="lookupCodeBtn"
+              style="margin-top:10px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient
+            </button>
+            <div id="codeError" style="display:none;margin-top:8px;background:#FFEBEE;color:#C62828;border-radius:8px;padding:8px 12px;font-size:13px"></div>
+          </div>
+
+          <!-- Selected patient pill -->
+          <div id="patientPillBlock" style="display:none">
+            <div class="patient-pill">
+              <div class="avatar" id="ppAvatar">?</div>
+              <div class="info">
+                <div class="name" id="ppName"></div>
+                <div class="phone" id="ppPhone"></div>
+              </div>
+              <span class="badge" id="ppBadge">On Homatt</span>
+              <button class="change-btn" id="ppChangeBtn" title="Change patient">
+                <span class="material-icons-outlined">edit</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Patient profile alerts -->
+          <div id="patientProfileCard" style="display:none;margin-top:12px"></div>
+        </div>
         <div class="sec-label">
           <span class="material-icons-outlined" style="font-size:14px">science</span>
           Lab Tests &amp; Findings
@@ -1002,7 +1013,7 @@
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/new-order-wizard.js?v=20260824c"></script>
-<script src="js/ucg-autofill.js?v=20260824c"></script>
+<script src="js/ucg-autofill.js?v=20260824d"></script>
 <script src="js/pwa-install.js?v=20260803"></script>
 
 <!-- ── Refer to partner clinic (works offline; queued + auto-synced) ── -->

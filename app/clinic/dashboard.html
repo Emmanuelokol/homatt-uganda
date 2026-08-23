@@ -1796,6 +1796,95 @@
     }
   }
 
+  // ── Add or correct a patient's name and phone, after the fact ────────────
+  // A walk-in is recorded from the diagnosis alone, identified only by its case
+  // number. This is where the details get filled in — reachable by tapping the
+  // consultation itself, which is where a clinician looks for it.
+  window.openPatientEdit = function(d) {
+    var id = d.dxid, ov = document.getElementById('pxEditOverlay');
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'pxEditOverlay';
+      ov.style.cssText = 'position:fixed;inset:0;background:rgba(10,20,16,.6);z-index:960;'
+        + 'display:none;align-items:center;justify-content:center;padding:18px';
+      ov.innerHTML =
+        '<div style="background:var(--surface,#fff);border-radius:20px;max-width:420px;width:100%;'
+          + 'padding:20px;box-shadow:var(--shadow-lg,0 18px 50px rgba(0,0,0,.3))">'
+        + '<div style="font-size:10.5px;font-weight:800;color:#6C5CE7;letter-spacing:.6px" id="pxCase"></div>'
+        + '<h4 style="font-size:17px;font-weight:800;margin:4px 0 4px;color:var(--text,#111)">Patient details</h4>'
+        + '<p style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">'
+          + 'Fill these in whenever you have them — the case number does not change.</p>'
+        + '<label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px">Full name</label>'
+        + '<input id="pxName" type="text" autocomplete="off" placeholder="e.g. Okello John" '
+          + 'style="width:100%;padding:12px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;'
+          + 'font:inherit;font-size:15px;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#111)">'
+        + '<label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin:14px 0 6px">Phone number</label>'
+        + '<input id="pxPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="07XX XXX XXX" '
+          + 'style="width:100%;padding:12px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;'
+          + 'font:inherit;font-size:15px;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#111)">'
+        + '<div id="pxMsg" style="font-size:12.5px;margin-top:10px;min-height:16px"></div>'
+        + '<div style="display:flex;gap:9px;margin-top:12px">'
+          + '<button id="pxCancel" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border,#E0E0E0);'
+            + 'background:var(--surface,#fff);font:inherit;font-size:14px;font-weight:700;color:var(--text,#111);cursor:pointer">Cancel</button>'
+          + '<button id="pxSave" style="flex:2;padding:13px;border-radius:13px;border:none;'
+            + 'background:linear-gradient(135deg,#0E7C5A,#12A374);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer">Save details</button>'
+        + '</div></div>';
+      document.body.appendChild(ov);
+      ov.addEventListener('click', function(e){ if (e.target === ov) ov.style.display = 'none'; });
+      document.getElementById('pxCancel').onclick = function(){ ov.style.display = 'none'; };
+    }
+    document.getElementById('pxCase').textContent = d.case ? 'CASE ' + d.case : '';
+    document.getElementById('pxName').value  = d.name  || '';
+    document.getElementById('pxPhone').value = d.phone || '';
+    document.getElementById('pxMsg').textContent = '';
+    ov.style.display = 'flex';
+    setTimeout(function(){ try { document.getElementById('pxName').focus(); } catch(e){} }, 200);
+
+    document.getElementById('pxSave').onclick = async function() {
+      var btn = this, msg = document.getElementById('pxMsg');
+      var name  = (document.getElementById('pxName').value || '').trim();
+      var phone = (document.getElementById('pxPhone').value || '').trim();
+      if (!name && !phone) {
+        msg.style.color = '#C62828';
+        msg.textContent = 'Enter a name or a phone number.';
+        return;
+      }
+      btn.disabled = true; btn.textContent = 'Saving…';
+      var patch = { patient_name: name || null, patient_phone: phone || null };
+      var CO = window.ClinicOffline;
+      var done = false;
+      try {
+        if (CO && CO.isOffline()) {
+          CO.enqueue('table_update', { table:'clinic_diagnoses', patch: patch, match: { id: id } });
+          done = true;
+        } else {
+          var r = await supabase.from('clinic_diagnoses').update(patch).eq('id', id).select('id');
+          if (r.error) {
+            // Lost the connection mid-save → queue it rather than lose the edit.
+            if (CO && CO.isNetworkErr(r.error)) {
+              CO.enqueue('table_update', { table:'clinic_diagnoses', patch: patch, match: { id: id } });
+              done = true;
+            } else {
+              msg.style.color = '#C62828';
+              msg.textContent = 'Could not save: ' + r.error.message;
+            }
+          } else if (!r.data || !r.data.length) {
+            msg.style.color = '#C62828';
+            msg.textContent = 'Nothing was updated — this consultation may belong to another clinic.';
+          } else { done = true; }
+        }
+      } catch (e) {
+        if (CO) { CO.enqueue('table_update', { table:'clinic_diagnoses', patch: patch, match: { id: id } }); done = true; }
+      }
+      btn.disabled = false; btn.textContent = 'Save details';
+      if (!done) return;
+      try { if (CO && CO.invalidate) CO.invalidate(['consultations_today_','hist_pool_','pending_payments_']); } catch(e){}
+      ov.style.display = 'none';
+      showToast(name ? (name + ' saved') : 'Contact saved', 'success');
+      loadConsultations(); loadActiveTreatments(); loadPendingPayments();
+    };
+  };
+
   // ── Today's consultations ──
   var _dxNoCaseCode = false;   // set once the database tells us the column is absent
   async function loadConsultations() {
@@ -1864,7 +1953,12 @@
           ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
           : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>';
         var fee = c.total_charged_ugx ? 'UGX ' + fmtUGX(c.total_charged_ugx) : '';
-        return '<div class="order-card">'
+        // Tapping the row is how the name and phone get added later — the
+        // clinician had no idea where to do this, so say it on the row itself.
+        var needsName = !(c.patient_name || '').trim();
+        return '<div class="order-card dx-edit" style="cursor:pointer" data-dxid="'+esc(c.id)+'"'
+          +' data-name="'+esc(c.patient_name||'')+'" data-phone="'+esc(c.patient_phone||'')+'"'
+          +' data-case="'+esc(c.case_code||'')+'">'
           +'<div class="order-avatar">'+ini2+'</div>'
           +'<div class="order-info">'
             +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Not named yet')
@@ -1877,9 +1971,15 @@
           +'<div class="order-right" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">'
             +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
             +paid
+            +(needsName
+               ? '<span style="font-size:10.5px;font-weight:800;color:#6C5CE7;background:#EFEBFF;padding:3px 8px;border-radius:9px;white-space:nowrap">+ ADD NAME</span>'
+               : '<span style="font-size:10.5px;font-weight:700;color:#9AA0A6;white-space:nowrap">Tap to edit</span>')
           +'</div>'
           +'</div>';
       }).join('');
+      el.querySelectorAll('.dx-edit').forEach(function(card){
+        card.onclick = function(){ openPatientEdit(card.dataset); };
+      });
     } catch(e2) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#C62828;font-size:13px">Error: ' + esc(e2.message) + '</div>'; }
   }
 
