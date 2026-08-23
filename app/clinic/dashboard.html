@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260814">
+  <link rel="stylesheet" href="css/clinic.css?v=20260825">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -2312,12 +2312,16 @@
     var current = _activeRows.find(function(r){ return r.id === diagnosisId; });
     if (!current) return;
 
-    var code = patientCodeFor(current);
-    if (nameEl) nameEl.textContent = current.patient_name || current.patient_phone || 'Patient';
+    var caseNo = (current.case_code || '').trim() || patientCodeFor(current);
+    if (nameEl) nameEl.textContent = caseNo || 'Patient';
     if (metaEl) {
-      var apid = (typeof homattPatientId === 'function') ? homattPatientId(current) : '';
-      metaEl.innerHTML = (apid ? '<strong style="color:#0A5C43">' + esc(apid) + '</strong> · ' : '') +
-        esc((current.patient_phone ? current.patient_phone + ' · ' : '')) + esc(code ? 'Visit ' + code : '');
+      var whoTxt = (current.patient_name || '').trim();
+      var bits = [];
+      bits.push(whoTxt
+        ? '<strong>' + esc(whoTxt) + '</strong>'
+        : '<em style="opacity:.75">Not named yet — tap a consultation to add the name</em>');
+      if (current.patient_phone) bits.push(esc(current.patient_phone));
+      metaEl.innerHTML = bits.join(' · ');
     }
     modal.style.display = 'flex';
     bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6">Loading patient record…</div>';
@@ -2382,12 +2386,14 @@
       var freq = (m.frequency || '').replace('_daily','/day').replace(/_/g,' ');
       var dur  = m.duration ? (m.duration + ' day' + (m.duration!==1?'s':'')) : '';
       var sub  = [dose, freq, dur].filter(Boolean).join(' · ');
-      return '<div style="display:flex;gap:10px;padding:8px 10px;background:#F5F7F5;border-radius:8px;margin-bottom:6px;align-items:center">'
-        +'<span class="material-icons-outlined" style="font-size:18px;color:#1B5E20">medication</span>'
-        +'<div style="flex:1;min-width:0">'
-          +'<div style="font-size:13px;font-weight:600;color:#111">'+esc(name)+'</div>'
-          +(sub ? '<div style="font-size:11px;color:#5F6368;margin-top:1px">'+esc(sub)+'</div>' : '')
+      var qty = m.quantity || m.qty;
+      return '<div class="med-row">'
+        +'<span class="material-icons-outlined med-row-ic">medication</span>'
+        +'<div class="med-row-b">'
+          +'<div class="med-row-n">'+esc(name)+'</div>'
+          +(sub ? '<div class="med-row-s">'+esc(sub)+'</div>' : '')
         +'</div>'
+        +(qty ? '<span class="med-row-q">'+esc(qty)+'</span>' : '')
       +'</div>';
     }).join('');
   }
@@ -2806,7 +2812,7 @@
     var COLS = ['id','confirmed_diagnosis','severity','created_at','patient_phone',
                 'patient_name','patient_type','total_charged_ugx','amount_paid',
                 'payment_status','follow_up_days','follow_up_reason',
-                'prescription_items','clinical_findings','booking_id'];
+                'prescription_items','clinical_findings','booking_id','case_code'];
     // Never strip these — without them the card can't render
     var REQUIRED = { id:1, confirmed_diagnosis:1, created_at:1, patient_name:1, patient_phone:1 };
 
@@ -2934,7 +2940,6 @@
     }
 
     el.innerHTML = notice + rows.map(function(c) {
-      var ini = (c.patient_name||c.patient_phone||'P').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
       var d   = new Date(c.created_at);
       var ageMs = Date.now() - d.getTime();
       var ageDays = Math.floor(ageMs / 86400000);
@@ -2943,12 +2948,7 @@
       var total = Number(c.total_charged_ugx) || 0;
       var paid  = Number(c.amount_paid) || 0;
       var balance = Math.max(0, total - paid);
-      var feeBadge = total
-        ? (balance > 0
-            ? '<span style="color:#C62828;font-weight:700">UGX '+fmtUGX(balance)+' due</span>'
-            : '<span style="color:#1B5E20;font-weight:700">Paid</span>')
-        : '';
-      var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span style="background:#FFCDD2;color:#B71C1C;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700;margin-left:6px">FOLLOW-UP DUE</span>' : '';
+      var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span class="act-due">Follow-up due</span>' : '';
 
       // Return-visit line: shows due date + what the patient is coming back for
       var returnLine = '';
@@ -2962,47 +2962,62 @@
         else if (daysLeft === 1) { whenTxt = 'tomorrow'; whenColor = '#E65100'; }
         else if (daysLeft <= 3) { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#F9A825'; }
         else { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#1565C0'; }
-        var reasonTxt = c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '';
-        returnLine = '<div class="order-meta" style="margin-top:2px">'
-          + '<span style="display:inline-flex;align-items:center;gap:3px;color:' + whenColor + ';font-weight:600">'
-          + '<span class="material-icons-outlined" style="font-size:13px">event_repeat</span>'
-          + 'Returns ' + dueLabel + ' (' + whenTxt + ')'
-          + '</span>'
-          + '<span style="color:#5F6368">' + reasonTxt + '</span>'
-          + '</div>';
+        // Plain words, not "(in 7d)".
+        var whenWord = daysLeft < 0
+              ? Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)!==1?'s':'') + ' overdue'
+            : daysLeft === 0 ? 'today'
+            : daysLeft === 1 ? 'tomorrow'
+            : 'in ' + daysLeft + ' day' + (daysLeft!==1?'s':'');
+        returnLine = '<div class="act-return" style="color:' + whenColor + '">'
+          + '<span class="material-icons-outlined">event_repeat</span>'
+          + '<span><b>Returns ' + esc(dueLabel) + '</b> · ' + esc(whenWord)
+          + (c.follow_up_reason ? ' <span class="act-reason">for ' + esc(c.follow_up_reason) + '</span>' : '')
+          + '</span></div>';
       }
-      var code = patientCodeFor(c);
-      // Stable PATIENT id (same on every visit) alongside the visit code.
-      var pid = (typeof homattPatientId === 'function') ? homattPatientId(c) : '';
-      var pidBadge = pid
-        ? '<span style="background:#DBF4EA;color:#0A5C43;font-size:10px;padding:2px 8px;border-radius:20px;' +
-          'font-weight:800;letter-spacing:.4px;margin-right:5px">' + esc(pid) + '</span>'
-        : '';
-      var codeBadge = code
-        ? '<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:700;letter-spacing:.4px;font-family:monospace">'+esc(code)+'</span>'
-        : '';
-      codeBadge = pidBadge + codeBadge;
+      // The case number is the label the clinic actually uses — the one given
+      // at the door (#001T2308O). The old HP-/CLN- pair was two codes for the
+      // same person and neither was the agreed one.
+      var caseNo = (c.case_code || '').trim() || patientCodeFor(c);
+      var hasName = !!(c.patient_name || '').trim();
+      var who = hasName ? c.patient_name
+              : ((c.patient_phone || '').trim() || 'Not named yet');
+      var ini = hasName
+        ? c.patient_name.split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase()
+        : '#';
+
+      // One plain line: how long ago, how many medicines, what is owed.
+      var facts = [];
+      facts.push('<span>' + esc(ageLabel) + '</span>');
+      if (meds) facts.push('<span>' + meds + ' medicine' + (meds !== 1 ? 's' : '') + '</span>');
+      if (total) {
+        facts.push(balance > 0
+          ? '<span class="act-owing">UGX ' + fmtUGX(balance) + ' owing</span>'
+          : '<span class="act-settled">Fully paid</span>');
+      }
+
       var dischargeBtn = !_activeMigrationNeeded
-        ? '<button class="discharge-btn" style="font-size:11px;padding:5px 11px;background:#1B5E20;color:#fff;border:none;border-radius:20px;cursor:pointer;font-weight:700;font-family:inherit;white-space:nowrap;display:flex;align-items:center;gap:3px"><span class="material-icons-outlined" style="font-size:13px">task_alt</span> Discharge</button>'
+        ? '<button class="discharge-btn act-btn"><span class="material-icons-outlined">task_alt</span>Discharge</button>'
         : '';
-      return '<div class="order-card active-tap" style="margin:8px 16px;cursor:pointer" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(c.patient_name||c.patient_phone||'Patient')+'">'
-        +'<div class="order-avatar" style="background:#E3F2FD;color:#0D47A1">'+ini+'</div>'
-        +'<div class="order-info">'
-          +'<div class="order-patient" style="display:flex;align-items:center;flex-wrap:wrap;gap:6px">'+esc(c.patient_name||c.patient_phone||'Patient')+codeBadge+followDue+'</div>'
-          +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
-          +'<div class="order-meta"><span>'+ageLabel+'</span>'+(meds?'<span>'+meds+' med'+(meds!==1?'s':'')+'</span>':'')+(feeBadge?'<span>'+feeBadge+'</span>':'')+'</div>'
-          +returnLine
+
+      return '<div class="act-card active-tap" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(who)+'">'
+        +'<div class="act-head">'
+          +'<div class="act-avatar">'+esc(ini)+'</div>'
+          +'<div class="act-id">'
+            +(caseNo ? '<div class="act-case">'+esc(caseNo)+'</div>' : '')
+            +'<div class="act-who'+(hasName?'':' unnamed')+'">'+esc(who)+'</div>'
+          +'</div>'
+          +'<span class="act-sev">'+esc(c.severity||'moderate')+'</span>'
         +'</div>'
-        +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
-          +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
-          +dischargeBtn
-        +'</div>'
-        +'</div>';
+        +'<div class="act-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+followDue+'</div>'
+        +'<div class="act-facts">'+facts.join('<span class="act-dot">·</span>')+'</div>'
+        +returnLine
+        +'<div class="act-foot">'+dischargeBtn+'</div>'
+      +'</div>';
     }).join('');
 
     // Wire up: tapping a card opens the patient detail; the inner Discharge
     // button must not bubble up and trigger the detail modal too.
-    el.querySelectorAll('.order-card.active-tap').forEach(function(card) {
+    el.querySelectorAll('.act-card.active-tap').forEach(function(card) {
       card.onclick = function() {
         openActivePatientDetail(card.dataset.diagnosisId);
       };

@@ -425,3 +425,108 @@ html[data-theme="dark"] #qsTotalInput{background:rgba(255,255,255,.08) !importan
 html[data-theme="dark"] #qsAddMoreBtn{background:rgba(67,160,71,.18) !important; color:#A5D6A7 !important; border-color:rgba(102,187,106,.45) !important}
 html[data-theme="dark"] #qsCartWrap{background:#12190F !important; border-color:#293630 !important}
 html[data-theme="dark"] #qsSelectedPanel{background:#101812 !important; border-color:#293630 !important}
+
+/* ══ Active Treatments card + medication rows ═══════════════════════════════
+   Written as real classes with theme tokens. The previous cards used inline
+   colours, which a blanket dark-mode rule rewrote — it lightened the TEXT but
+   left the card background light, so drug names were white on white and could
+   not be read at all. Nothing here depends on that rule. */
+
+.med-row{
+  display:flex; align-items:center; gap:11px;
+  padding:10px 12px; margin-bottom:7px;
+  background:var(--bg,#F5F7F5); border:1px solid var(--border,#E8EAED);
+  border-radius:11px;
+}
+.med-row-ic{ font-size:19px; color:var(--primary,#1B5E20); flex-shrink:0 }
+.med-row-b { flex:1; min-width:0 }
+.med-row-n { font-size:13.5px; font-weight:700; color:var(--text,#111); line-height:1.3 }
+.med-row-s { font-size:11.5px; color:var(--text-lt,#5F6368); margin-top:2px }
+.med-row-q {
+  font-size:11px; font-weight:800; color:var(--primary,#1B5E20);
+  background:var(--brand-tint,#DBF4EA); padding:3px 9px; border-radius:9px;
+  white-space:nowrap; flex-shrink:0;
+}
+html[data-theme="dark"] .med-row{ background:#151E18; border-color:#293630 }
+html[data-theme="dark"] .med-row-n{ color:#E8F0EA }
+html[data-theme="dark"] .med-row-s{ color:#A9BCAE }
+html[data-theme="dark"] .med-row-ic{ color:#7BC98A }
+html[data-theme="dark"] .med-row-q{ background:rgba(67,160,71,.20); color:#A5D6A7 }
+
+.act-card{
+  margin:10px 16px; padding:14px 16px; cursor:pointer;
+  background:var(--surface,#fff); border:1px solid var(--border,#E8EAED);
+  border-radius:var(--radius,18px); box-shadow:var(--shadow,0 6px 18px rgba(20,24,43,.07));
+  transition:box-shadow .15s, transform .12s;
+}
+.act-card:active{ transform:scale(.995) }
+html[data-theme="dark"] .act-card{ background:#111A14; border-color:#243029 }
+
+.act-head{ display:flex; align-items:center; gap:11px; margin-bottom:9px }
+.act-avatar{
+  width:42px; height:42px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:800;
+  background:var(--brand-tint,#DBF4EA); color:var(--primary,#0A5C43);
+}
+html[data-theme="dark"] .act-avatar{ background:rgba(67,160,71,.18); color:#A5D6A7 }
+.act-id{ flex:1; min-width:0 }
+.act-case{
+  font-size:14px; font-weight:800; letter-spacing:.4px;
+  color:var(--primary,#0A5C43); font-variant-numeric:tabular-nums;
+}
+html[data-theme="dark"] .act-case{ color:#7BC98A }
+.act-who{ font-size:13px; font-weight:600; color:var(--text,#111); margin-top:1px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.act-who.unnamed{ font-weight:500; font-style:italic; color:var(--text-lt,#9AA0A6) }
+html[data-theme="dark"] .act-who{ color:#E8F0EA }
+html[data-theme="dark"] .act-who.unnamed{ color:#8FA394 }
+.act-sev{
+  flex-shrink:0; font-size:10.5px; font-weight:800; letter-spacing:.4px;
+  text-transform:uppercase; padding:4px 10px; border-radius:20px;
+  background:var(--bg,#F1F3F4); color:var(--text-lt,#5F6368);
+}
+html[data-theme="dark"] .act-sev{ background:rgba(255,255,255,.07); color:#B6C8BA }
+
+.act-dx{
+  font-size:15px; font-weight:700; color:var(--text,#111);
+  line-height:1.35; margin-bottom:7px;
+}
+html[data-theme="dark"] .act-dx{ color:#E8F0EA }
+.act-due{
+  display:inline-block; margin-left:8px; vertical-align:2px;
+  font-size:10px; font-weight:800; letter-spacing:.3px; text-transform:uppercase;
+  background:#FFEBEE; color:#B71C1C; padding:3px 8px; border-radius:20px;
+}
+html[data-theme="dark"] .act-due{ background:rgba(198,40,40,.22); color:#FFAFAF }
+
+.act-facts{
+  display:flex; flex-wrap:wrap; align-items:center; gap:7px;
+  font-size:12.5px; color:var(--text-lt,#5F6368);
+}
+html[data-theme="dark"] .act-facts{ color:#A9BCAE }
+.act-dot{ opacity:.45 }
+.act-owing{ font-weight:800; color:#C62828 }
+.act-settled{ font-weight:800; color:var(--primary,#1B5E20) }
+html[data-theme="dark"] .act-owing{ color:#FF8A80 }
+html[data-theme="dark"] .act-settled{ color:#A5D6A7 }
+
+.act-return{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  margin-top:8px; padding-top:9px; border-top:1px solid var(--border,#EEF1EE);
+  font-size:12.5px; line-height:1.4;
+}
+html[data-theme="dark"] .act-return{ border-top-color:#243029 }
+.act-return .material-icons-outlined{ font-size:15px }
+.act-reason{ color:var(--text-lt,#5F6368); font-weight:500 }
+html[data-theme="dark"] .act-reason{ color:#93A697 }
+
+.act-foot{ display:flex; justify-content:flex-end; margin-top:11px }
+.act-btn{
+  display:inline-flex; align-items:center; gap:5px;
+  font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  padding:9px 16px; border:none; border-radius:22px;
+  background:var(--primary,#1B5E20); color:#fff;
+}
+.act-btn .material-icons-outlined{ font-size:15px }
+html[data-theme="dark"] .act-btn{ background:#2E7D46 }
