@@ -2361,6 +2361,11 @@
       meds_fee_ugx:         state.feeMeds   || 0,
       total_charged_ugx:    (state.feeConsult + state.feeLab + state.feeMeds) || 0,
       payment_status:       state.paymentStatus || 'pending',
+      // Marking a visit PAID has to record the money, not just the word. This
+      // was missing, so a paid consultation left Today's Money In at zero.
+      amount_paid: (state.paymentStatus === 'paid')
+        ? ((state.feeConsult + state.feeLab + state.feeMeds) || 0)
+        : (Number(state.amountPaid) > 0 ? Number(state.amountPaid) : 0),
     };
 
     // ── OFFLINE: queue the entire consultation and sync when back online ──
@@ -2461,6 +2466,36 @@
       resetBtn();
       return;
     }
+
+    // 1a. Money received → the payments ledger.
+    // The dashboard's "Money In" reads clinic_payments, NOT the consultation
+    // row, so a visit marked PAID that writes no ledger entry shows as zero
+    // money collected. record_payment() is the same call the Record Payment
+    // button uses, so both routes agree and neither double-counts.
+    try {
+      const _paidNow = Number(dxPayload.amount_paid) || 0;
+      if (_paidNow > 0 && dx && dx.id) {
+        const _args = {
+          p_diagnosis_id: dx.id,
+          p_amount: _paidNow,
+          p_method: state.paymentMethod || 'cash',
+          p_reference: null,
+          p_notes: 'Paid at consultation',
+        };
+        const CO = window.ClinicOffline;
+        if (CO && CO.isOffline()) {
+          CO.enqueue('rpc', { fn: 'record_payment', args: _args });
+        } else {
+          const _pr = await _saveTO(supabase.rpc('record_payment', _args));
+          // Lost connection, or the payments migration is not applied yet.
+          // amount_paid on the consultation still carries the figure, and the
+          // dashboard falls back to it when the ledger is unavailable.
+          if (_pr && _pr.error && CO && CO.isNetworkErr(_pr.error)) {
+            CO.enqueue('rpc', { fn: 'record_payment', args: _args });
+          }
+        }
+      }
+    } catch (e) { /* never let the money step lose the consultation */ }
 
     // 1b. Auto-deduct clinic inventory (fire-and-forget)
     try {

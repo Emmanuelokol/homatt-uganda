@@ -28,6 +28,15 @@
 
   var LEVELS = ['HC1', 'HC2', 'HC3', 'HC4', 'H', 'RR', 'NR'];
 
+  // How the visit was settled. Mirrors the chips on the wizard's second screen
+  // so the money can be closed off without leaving the package.
+  var PAY_OPTS = [
+    { k: 'paid',    label: 'Paid',    icon: '\u2713', hint: 'Money received in full — goes into Money In today.' },
+    { k: 'pending', label: 'Pending', icon: '\u23F3', hint: 'Not paid yet — shows under Pending Payments.' },
+    { k: 'credit',  label: 'Credit',  icon: '\uD83D\uDCCB', hint: 'On credit — shows under Pending Payments until paid.' },
+    { k: 'waived',  label: 'Waived',  icon: '\uD83E\uDD1D', hint: 'No charge — nothing owed, nothing collected.' },
+  ];
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -203,6 +212,7 @@
       tests: extractTests(c.investigations, c.full_text),
       drugs: drugs,
       fees: { consult: 0, lab: 0, meds: 0 },
+      paymentStatus: 'pending',
       followUpDays: 7,
       page: c.page, title: c.title,
     };
@@ -251,9 +261,9 @@
       '.ucg-src{font-size:11px;color:var(--text-lt);padding:2px 2px 10px}',
       '#ucgSearchWrap{padding:0 12px 12px}',
       '#ucgSearchWrap input{width:100%;border:1.5px solid var(--border);border-radius:12px;padding:11px 13px;font:inherit;font-size:15px;background:var(--surface);color:var(--text)}',
-      '#ucgSearchRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint,#DBF4EA)}',
-      '#ucgSearchRes div{padding:11px 13px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--border)}',
-      '#ucgSearchRes div:hover{background:var(--brand-tint,#DBF4EA)}',
+      '#ucgSearchRes,#ucgTestRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint,#DBF4EA)}',
+      '#ucgSearchRes div,#ucgTestRes div{padding:11px 13px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--border)}',
+      '#ucgSearchRes div:hover,#ucgTestRes div:hover{background:var(--brand-tint,#DBF4EA)}',
       '.ucg-ask{position:fixed;inset:0;background:rgba(10,20,16,.6);z-index:950;display:none;align-items:center;justify-content:center;padding:20px}',
       '.ucg-ask-card{background:var(--surface);border-radius:20px;max-width:420px;width:100%;padding:20px;box-shadow:var(--shadow-lg)}',
       '.ucg-ask-card h4{font-size:16px;font-weight:800;margin-bottom:6px;color:var(--text)}',
@@ -265,6 +275,12 @@
       '.em-tag.ven-V{background:#FBE1DE;color:#B3261E}',
       '.em-tag.ven-E{background:#DBEFFB;color:#0B5C8A}',
       '.em-tag.ven-N{background:var(--bg);color:var(--text-lt)}',
+      '.ucg-paylbl{margin:14px 0 7px;font-size:10.5px;font-weight:800;color:var(--text-lt);letter-spacing:.6px;text-transform:uppercase}',
+      '.ucg-pay{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+      '.ucg-paychip{padding:12px 8px;border:1.5px solid var(--border);border-radius:14px;background:var(--surface,#fff);'
+        + 'font:inherit;font-size:13.5px;font-weight:700;color:var(--text);cursor:pointer;text-align:center}',
+      '.ucg-paychip.on{border-color:#0E7C5A;background:var(--brand-tint,#DBF4EA);color:#0A5C43;box-shadow:0 0 0 3px rgba(14,124,90,.10)}',
+      '.ucg-payhint{margin-top:8px;font-size:12px;line-height:1.45;color:var(--text-lt)}',
       '.em-src{float:right;font-size:9.5px;font-weight:800;color:var(--text-lt);letter-spacing:.06em;margin-top:3px}',
       '.ucg-det{border-radius:12px;background:var(--bg);margin-bottom:7px;overflow:hidden}',
       '.ucg-det summary{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;color:var(--text)}',
@@ -315,26 +331,15 @@
   }
 
   // "Save consultation" — the whole point of a one-tap package. Apply it and
-  // record the consultation, without walking back through the wizard. The
-  // package fills the tests, the drugs, the doses and the charges; the only
-  // thing it cannot know is WHO the patient is.
+  // record the consultation, full stop.
+  //
+  // The phone number is OPTIONAL: a walk-in is identified by the case number
+  // (#001M2208O) from the moment they are seen, and the name and contact are
+  // filled in afterwards. This used to divert to the phone box, which defeated
+  // the entire one-tap idea.
   function applyAndSave() {
     applyToWizard();
     close();
-    var haveP = !!(state && state.patient && (state.patient.phone || '').trim());
-    if (!haveP) {
-      // Nothing is lost — the package stays applied. Send them to the one field
-      // that is still missing, and say so where they are looking.
-      toast('Package applied. Now choose the patient — then press Save.', 'error');
-      try { if (window._showStep) window._showStep(1); } catch (e) {}
-      var ph = document.getElementById('patientPhone') ||
-               document.querySelector('#patientSearchBlock input');
-      if (ph) {
-        try { ph.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
-        setTimeout(function () { try { ph.focus(); } catch (e) {} }, 350);
-      }
-      return;
-    }
     // The clinic still gets asked whether to learn the changes — but the
     // consultation is saved either way, so the question can never swallow it.
     var changes = changeSummary();
@@ -431,6 +436,17 @@
         '</div>' +
         '<div class="ucg-total"><span>Total charged</span><b id="ucgTotal">UGX ' +
           ((pkg.fees.consult || 0) + (pkg.fees.lab || 0) + (pkg.fees.meds || 0)).toLocaleString('en-UG') + '</b></div>' +
+        // Saving straight from here means the money has to be settled here too.
+        // "Paid" writes to the payments ledger, so it shows in Money In at once.
+        '<div class="ucg-paylbl">Payment</div>' +
+        '<div class="ucg-pay" id="ucgPay">' +
+          PAY_OPTS.map(function (o) {
+            return '<button type="button" class="ucg-paychip' +
+              (pkg.paymentStatus === o.k ? ' on' : '') + '" data-pay="' + o.k + '">' +
+              o.icon + ' ' + o.label + '</button>';
+          }).join('') +
+        '</div>' +
+        '<div class="ucg-payhint" id="ucgPayHint"></div>' +
         '</div>' +
 
       // ④ Clinical guidance from the guideline — tap to open
@@ -512,6 +528,21 @@
       var p = pair.split(':'), el = document.getElementById('ucgFee' + p[0]);
       if (el) el.oninput = function () { pkg.fees[p[1]] = Math.max(0, Number(el.value) || 0); recalc(); };
     });
+    // Payment chips — pick how the visit was settled without leaving the panel.
+    var payHint = document.getElementById('ucgPayHint');
+    function paintPay() {
+      var opt = null;
+      PAY_OPTS.forEach(function (o) { if (o.k === pkg.paymentStatus) opt = o; });
+      body.querySelectorAll('[data-pay]').forEach(function (b) {
+        b.classList.toggle('on', b.dataset.pay === pkg.paymentStatus);
+      });
+      if (payHint) payHint.textContent = opt ? opt.hint : '';
+    }
+    body.querySelectorAll('[data-pay]').forEach(function (b) {
+      b.onclick = function () { pkg.paymentStatus = b.dataset.pay; paintPay(); };
+    });
+    paintPay();
+
     var fu = document.getElementById('ucgFollow');
     if (fu) fu.onchange = function () { pkg.followUpDays = Math.max(0, Number(fu.value) || 0); };
 
@@ -531,24 +562,89 @@
   }
 
   // Inline "add a test" (no window.prompt — blocked in Android WebViews)
+  // Every lab test name this clinic could reasonably mean: the tests the
+  // consultation form already offers, plus any the clinic added itself. Read
+  // from the page and from local storage, so suggestions work with no network.
+  function labTestNames() {
+    var out = [], seen = {};
+    function add(n) {
+      n = String(n || '').trim();
+      if (!n) return;
+      var k = n.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = 1; out.push(n);
+    }
+    try {
+      document.querySelectorAll('[data-lab]').forEach(function (c) { add(c.dataset.lab); });
+    } catch (e) {}
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf('custom_labs_') !== 0) continue;
+        var list = JSON.parse(localStorage.getItem(key) || '[]');
+        if (Array.isArray(list)) list.forEach(add);
+      }
+    } catch (e) {}
+    return out;
+  }
+
   function openInlineAdd(kind) {
     var host = document.getElementById('ucgTests');
     if (!host || host.querySelector('.ucg-inline')) return;
     var wrap = document.createElement('div');
     wrap.className = 'ucg-inline';
-    wrap.style.cssText = 'display:flex;gap:7px;margin-top:8px';
-    wrap.innerHTML = '<input id="ucgNewTest" placeholder="Test name…" ' +
-      'style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px;background:var(--surface);color:var(--text)">' +
-      '<button class="ucg-add" id="ucgNewTestOk">Add</button>';
+    wrap.style.cssText = 'margin-top:8px';
+    wrap.innerHTML =
+      '<div style="display:flex;gap:7px">' +
+        '<input id="ucgNewTest" placeholder="Type a test — e.g. mal…" autocomplete="off" ' +
+          'style="flex:1;border:1.5px solid var(--border);border-radius:10px;padding:9px 11px;font:inherit;font-size:14px;background:var(--surface);color:var(--text)">' +
+        '<button class="ucg-add" id="ucgNewTestOk">Add</button>' +
+      '</div>' +
+      '<div id="ucgTestRes"></div>';
     host.appendChild(wrap);
     var inp = document.getElementById('ucgNewTest');
+    var box = document.getElementById('ucgTestRes');
+    var names = labTestNames();
     inp.focus();
-    function commit() {
-      var v = (inp.value || '').trim();
+
+    function commit(v) {
+      v = (v == null ? (inp.value || '') : v).trim();
       if (v) { pkg.tests.push(v); render(); } else { wrap.remove(); }
     }
-    document.getElementById('ucgNewTestOk').onclick = commit;
-    inp.onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); commit(); } };
+
+    // As-you-type suggestions. Deliberately plain: match anywhere in the name,
+    // shortest first, tap to add. No network, no database — instant on a slow
+    // phone, and it still accepts anything typed that is not on the list.
+    function suggest() {
+      var q = (inp.value || '').trim().toLowerCase();
+      if (q.length < 1) { box.innerHTML = ''; box.style.display = 'none'; return; }
+      var hits = names.filter(function (n) {
+        return n.toLowerCase().indexOf(q) >= 0 && pkg.tests.indexOf(n) < 0;
+      }).sort(function (a, b) {
+        var ap = a.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+        var bp = b.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+        return ap - bp || a.length - b.length;
+      }).slice(0, 8);
+      if (!hits.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+      box.innerHTML = hits.map(function (n, i) {
+        return '<div data-t="' + i + '"><b>' + esc(n) + '</b></div>';
+      }).join('');
+      box.style.display = 'block';
+      box.querySelectorAll('[data-t]').forEach(function (el) {
+        el.onclick = function () { commit(hits[Number(el.dataset.t)]); };
+      });
+    }
+
+    inp.oninput = suggest;
+    document.getElementById('ucgNewTestOk').onclick = function () { commit(); };
+    inp.onkeydown = function (e) {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      // Enter takes the top suggestion when the box is showing, else the text.
+      var top = box.querySelector('[data-t]');
+      if (top && box.style.display !== 'none') top.click(); else commit();
+    };
+    suggest();
   }
 
   // Drug search: "amo" → Amoxicillin 250 mg / 500 mg → tap → dosage popup
@@ -680,7 +776,7 @@
     // Not in the guidelines at all → open a blank worksheet the clinician fills
     // in (and can save as a clinic standard for next time).
     if (!condId) {
-      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, followUpDays: 7, page: null, title: title };
+      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: null, title: title };
       srcPkg = JSON.parse(JSON.stringify(pkg));
       document.getElementById('ucgKicker').textContent = 'New package · not in the guidelines';
       document.getElementById('ucgTags').innerHTML =
@@ -720,7 +816,7 @@
       };
     } else {
       pkg = buildFromGuideline(condId, severity) ||
-        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, followUpDays: 7, page: page, title: title };
+        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: page, title: title };
     }
     srcPkg = JSON.parse(JSON.stringify(pkg));
     ctx.page = pkg.page || page;
@@ -823,6 +919,15 @@
     state.feeConsult = Number(pkg.fees.consult) || 0;
     state.feeLab = Number(pkg.fees.lab) || 0;
     state.feeMeds = Number(pkg.fees.meds) || 0;
+    // Carry the payment choice through, so saving from the panel settles the
+    // money too. "Paid" is what writes the amount into the payments ledger.
+    if (pkg.paymentStatus) {
+      state.paymentStatus = pkg.paymentStatus;
+      // Keep the wizard's own chips in step, so screen 2 shows the same choice.
+      document.querySelectorAll('.pay-chip[data-pay]').forEach(function (c) {
+        c.classList.toggle('active', c.dataset.pay === pkg.paymentStatus);
+      });
+    }
     if (pkg.followUpDays) state.followUpDays = pkg.followUpDays;
     try { if (typeof window._wizRefreshAfterAutofill === 'function') window._wizRefreshAfterAutofill(); } catch (e) {}
   }
@@ -833,9 +938,7 @@
     close();
     // "Package applied" on its own read as "consultation recorded" — it is not,
     // nothing is saved until the consultation is sent. Say what is still needed.
-    var _need = (state && state.patient && (state.patient.phone || '').trim())
-      ? 'Not saved yet — press Send at the bottom to record it.'
-      : 'Not saved yet — choose the patient, then press Send.';
+    var _need = 'Not saved yet — press Send at the bottom to record it.';
     toast('Package applied (' + pkg.drugs.length + ' medicine' + (pkg.drugs.length !== 1 ? 's' : '') +
       ', ' + pkg.tests.length + ' test' + (pkg.tests.length !== 1 ? 's' : '') + '). ' + _need, 'success');
 
