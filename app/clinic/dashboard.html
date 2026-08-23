@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260825">
+  <link rel="stylesheet" href="css/clinic.css?v=20260825b">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -783,6 +783,14 @@
           style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
           <span class="material-icons-outlined" style="font-size:18px">post_add</span>
           Record Follow-up Visit
+        </button>
+        <!-- Discharge moved off the list row and in here: the list has to stay
+             two lines per patient, and discharging is a decision you make after
+             looking at the record, not while scrolling past it. -->
+        <button id="histModalDischargeBtn"
+          style="display:none;width:100%;margin-top:9px;padding:13px;background:transparent;color:#1B5E20;border:1.5px solid #1B5E20;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px">
+          <span class="material-icons-outlined" style="font-size:18px">task_alt</span>
+          Discharge patient
         </button>
       </div>
     </div>
@@ -1943,39 +1951,31 @@
         return;
       }
       el.innerHTML = rows2.map(function(c) {
-        var ini2 = (c.patient_name||c.patient_phone||'')
-          ? (c.patient_name||c.patient_phone).split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase()
-          : '#';
-        var t2   = new Date(c.created_at).toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
-        var paid = c.payment_status==='paid'
-          ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
-          : c.payment_status==='waived'
-          ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
-          : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>';
-        var fee = c.total_charged_ugx ? 'UGX ' + fmtUGX(c.total_charged_ugx) : '';
-        // Tapping the row is how the name and phone get added later — the
-        // clinician had no idea where to do this, so say it on the row itself.
-        var needsName = !(c.patient_name || '').trim();
-        return '<div class="order-card dx-edit" style="cursor:pointer" data-dxid="'+esc(c.id)+'"'
-          +' data-name="'+esc(c.patient_name||'')+'" data-phone="'+esc(c.patient_phone||'')+'"'
-          +' data-case="'+esc(c.case_code||'')+'">'
-          +'<div class="order-avatar">'+ini2+'</div>'
-          +'<div class="order-info">'
-            +'<div class="order-patient">'+esc(c.patient_name||c.patient_phone||'Not named yet')
-              // The case number IS the identity until a name is taken.
-              +(c.case_code?' <span style="font-size:11px;font-weight:800;color:#6C5CE7;background:#EFEBFF;padding:2px 7px;border-radius:8px;letter-spacing:.3px">'+esc(c.case_code)+'</span>':'')
-              +'</div>'
-            +'<div class="order-drug">'+esc(c.confirmed_diagnosis||'Pending')+'</div>'
-            +'<div class="order-meta"><span>'+t2+'</span>'+(fee?'<span>'+esc(fee)+'</span>':'')+(c.patient_phone?'<span>'+esc(c.patient_phone)+'</span>':'')+'</div>'
-          +'</div>'
-          +'<div class="order-right" style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">'
-            +'<span class="status-badge in-progress">'+esc(c.severity||'moderate')+'</span>'
-            +paid
-            +(needsName
-               ? '<span style="font-size:10.5px;font-weight:800;color:#6C5CE7;background:#EFEBFF;padding:3px 8px;border-radius:9px;white-space:nowrap">+ ADD NAME</span>'
-               : '<span style="font-size:10.5px;font-weight:700;color:#9AA0A6;white-space:nowrap">Tap to edit</span>')
-          +'</div>'
-          +'</div>';
+        // One patient, two lines. Everything else waits for a tap.
+        var t2 = new Date(c.created_at).toLocaleTimeString('en-UG',
+                   { hour:'2-digit', minute:'2-digit', hour12:false });
+        var nm = (c.patient_name || '').trim();
+        var caseNo = (c.case_code || '').trim();
+        var who = nm || caseNo || (c.patient_phone || '').trim() || 'Unnamed';
+        var total = Number(c.total_charged_ugx) || 0;
+        var paid  = Number(c.amount_paid) || 0;
+        var owed  = Math.max(0, total - paid);
+        var st = c.payment_status;
+        var tag = st === 'waived' ? ['waived','Waived']
+                : st === 'credit' ? ['credit','Credit']
+                : owed <= 0 && total > 0 ? ['paid','Paid']
+                : total > 0 ? ['owing','UGX ' + fmtUGX(owed) + ' owing']
+                : ['paid','No charge'];
+        var edge = total <= 0 ? 'free' : (owed > 0 && st !== 'waived' ? 'owing' : 'settled');
+        return '<div class="pt-row '+edge+' dx-edit" data-dxid="'+esc(c.id)+'"'
+          +' data-name="'+esc(nm)+'" data-phone="'+esc(c.patient_phone||'')+'"'
+          +' data-case="'+esc(caseNo)+'">'
+          +'<span class="pt-time">'+esc(t2)+'</span>'
+          +'<span class="pt-who'+(nm?'':' code')+'">'+esc(who)+'</span>'
+          +'<span class="pt-amt">'+(total ? 'UGX '+fmtUGX(total) : '—')+'</span>'
+          +'<span class="pt-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+'</span>'
+          +'<span class="pt-tag '+tag[0]+'">'+esc(tag[1])+'</span>'
+        +'</div>';
       }).join('');
       el.querySelectorAll('.dx-edit').forEach(function(card){
         card.onclick = function(){ openPatientEdit(card.dataset); };
@@ -2349,6 +2349,21 @@
     var followupBtn = document.getElementById('histModalNewVisitBtn');
     if (footer) footer.style.display = 'block';
     if (followupBtn) followupBtn.onclick = showFollowupForm;
+
+    // Discharge lives here now, after the record has been read.
+    var dcBtn = document.getElementById('histModalDischargeBtn');
+    if (dcBtn) {
+      if (_activeMigrationNeeded) { dcBtn.style.display = 'none'; }
+      else {
+        dcBtn.style.display = 'flex';
+        dcBtn.onclick = function() {
+          var m = document.getElementById('histModal');
+          if (m) m.style.display = 'none';
+          openDischargeModal(current.id,
+            (current.patient_name || '').trim() || (current.case_code || 'this patient'), null);
+        };
+      }
+    }
   }
 
   // Patient detail context — used by the follow-up form to return to the detail view
@@ -2363,6 +2378,8 @@
 
     bodyEl.innerHTML = renderPatientDetailBody(current, history);
     if (footer) footer.style.display = 'block';
+    var _dc = document.getElementById('histModalDischargeBtn');
+    if (_dc) _dc.style.display = _activeMigrationNeeded ? 'none' : 'flex';
 
     // Wire the "Record Payment" shortcut button inside the modal
     var payBtn = bodyEl.querySelector('[data-action="record-payment"]');
@@ -2940,92 +2957,44 @@
     }
 
     el.innerHTML = notice + rows.map(function(c) {
-      var d   = new Date(c.created_at);
-      var ageMs = Date.now() - d.getTime();
-      var ageDays = Math.floor(ageMs / 86400000);
-      var ageLabel = ageDays === 0 ? 'Today' : ageDays === 1 ? '1 day ago' : ageDays + ' days ago';
-      var meds = Array.isArray(c.prescription_items) ? c.prescription_items.length : 0;
+      // Same two-line row as Today's Consultations. With a hundred open cases
+      // the list has to be scannable; the drugs, the return visit and the
+      // Discharge button all live one tap away in the patient detail.
+      var d = new Date(c.created_at);
+      var t2 = d.toLocaleTimeString('en-UG', { hour:'2-digit', minute:'2-digit', hour12:false });
+      var ageDays = Math.floor((Date.now() - d.getTime()) / 86400000);
+      var nm = (c.patient_name || '').trim();
+      var caseNo = (c.case_code || '').trim() || patientCodeFor(c);
+      var who = nm || caseNo || (c.patient_phone || '').trim() || 'Unnamed';
       var total = Number(c.total_charged_ugx) || 0;
       var paid  = Number(c.amount_paid) || 0;
-      var balance = Math.max(0, total - paid);
-      var followDue = c.follow_up_days && ageDays >= c.follow_up_days ? '<span class="act-due">Follow-up due</span>' : '';
-
-      // Return-visit line: shows due date + what the patient is coming back for
-      var returnLine = '';
-      if (c.follow_up_days && c.follow_up_days > 0) {
-        var due = new Date(d.getTime() + c.follow_up_days * 86400000);
-        var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
-        var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short' });
-        var whenTxt, whenColor;
-        if (daysLeft < 0) { whenTxt = 'overdue by ' + Math.abs(daysLeft) + 'd'; whenColor = '#C62828'; }
-        else if (daysLeft === 0) { whenTxt = 'today'; whenColor = '#E65100'; }
-        else if (daysLeft === 1) { whenTxt = 'tomorrow'; whenColor = '#E65100'; }
-        else if (daysLeft <= 3) { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#F9A825'; }
-        else { whenTxt = 'in ' + daysLeft + 'd'; whenColor = '#1565C0'; }
-        // Plain words, not "(in 7d)".
-        var whenWord = daysLeft < 0
-              ? Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)!==1?'s':'') + ' overdue'
-            : daysLeft === 0 ? 'today'
-            : daysLeft === 1 ? 'tomorrow'
-            : 'in ' + daysLeft + ' day' + (daysLeft!==1?'s':'');
-        returnLine = '<div class="act-return" style="color:' + whenColor + '">'
-          + '<span class="material-icons-outlined">event_repeat</span>'
-          + '<span><b>Returns ' + esc(dueLabel) + '</b> · ' + esc(whenWord)
-          + (c.follow_up_reason ? ' <span class="act-reason">for ' + esc(c.follow_up_reason) + '</span>' : '')
-          + '</span></div>';
-      }
-      // The case number is the label the clinic actually uses — the one given
-      // at the door (#001T2308O). The old HP-/CLN- pair was two codes for the
-      // same person and neither was the agreed one.
-      var caseNo = (c.case_code || '').trim() || patientCodeFor(c);
-      var hasName = !!(c.patient_name || '').trim();
-      var who = hasName ? c.patient_name
-              : ((c.patient_phone || '').trim() || 'Not named yet');
-      var ini = hasName
-        ? c.patient_name.split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase()
-        : '#';
-
-      // One plain line: how long ago, how many medicines, what is owed.
-      var facts = [];
-      facts.push('<span>' + esc(ageLabel) + '</span>');
-      if (meds) facts.push('<span>' + meds + ' medicine' + (meds !== 1 ? 's' : '') + '</span>');
-      if (total) {
-        facts.push(balance > 0
-          ? '<span class="act-owing">UGX ' + fmtUGX(balance) + ' owing</span>'
-          : '<span class="act-settled">Fully paid</span>');
-      }
-
-      var dischargeBtn = !_activeMigrationNeeded
-        ? '<button class="discharge-btn act-btn"><span class="material-icons-outlined">task_alt</span>Discharge</button>'
-        : '';
-
-      return '<div class="act-card active-tap" data-diagnosis-id="'+esc(c.id)+'" data-name="'+esc(who)+'">'
-        +'<div class="act-head">'
-          +'<div class="act-avatar">'+esc(ini)+'</div>'
-          +'<div class="act-id">'
-            +(caseNo ? '<div class="act-case">'+esc(caseNo)+'</div>' : '')
-            +'<div class="act-who'+(hasName?'':' unnamed')+'">'+esc(who)+'</div>'
-          +'</div>'
-          +'<span class="act-sev">'+esc(c.severity||'moderate')+'</span>'
-        +'</div>'
-        +'<div class="act-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+followDue+'</div>'
-        +'<div class="act-facts">'+facts.join('<span class="act-dot">·</span>')+'</div>'
-        +returnLine
-        +'<div class="act-foot">'+dischargeBtn+'</div>'
+      var owed  = Math.max(0, total - paid);
+      var st = c.payment_status;
+      var tag = st === 'waived' ? ['waived','Waived']
+              : st === 'credit' ? ['credit','Credit']
+              : owed <= 0 && total > 0 ? ['paid','Paid']
+              : total > 0 ? ['owing','UGX ' + fmtUGX(owed) + ' owing']
+              : ['paid','No charge'];
+      var edge = total <= 0 ? 'free' : (owed > 0 && st !== 'waived' ? 'owing' : 'settled');
+      // Days on the case replace the clock once it is no longer today, and a
+      // patient who is due back is flagged where the eye already is.
+      var whenTxt = ageDays === 0 ? t2 : (ageDays + 'd');
+      var dueBack = (c.follow_up_days && ageDays >= c.follow_up_days) ? 'DUE' : '';
+      return '<div class="pt-row '+edge+' active-tap" data-diagnosis-id="'+esc(c.id)+'"'
+        +' data-name="'+esc(who)+'">'
+        +'<span class="pt-time">'+esc(whenTxt)+'</span>'
+        +'<span class="pt-who'+(nm?'':' code')+'">'+esc(who)+'</span>'
+        +'<span class="pt-amt">'+(total ? 'UGX '+fmtUGX(total) : '—')+'</span>'
+        +(dueBack ? '<span class="pt-due">'+dueBack+'</span>' : '')
+        +'<span class="pt-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+'</span>'
+        +'<span class="pt-tag '+tag[0]+'">'+esc(tag[1])+'</span>'
       +'</div>';
     }).join('');
 
     // Wire up: tapping a card opens the patient detail; the inner Discharge
     // button must not bubble up and trigger the detail modal too.
-    el.querySelectorAll('.act-card.active-tap').forEach(function(card) {
-      card.onclick = function() {
-        openActivePatientDetail(card.dataset.diagnosisId);
-      };
-      var btn = card.querySelector('.discharge-btn');
-      if (btn) btn.onclick = function(ev) {
-        ev.stopPropagation();
-        openDischargeModal(card.dataset.diagnosisId, card.dataset.name, card);
-      };
+    el.querySelectorAll('.pt-row.active-tap').forEach(function(card) {
+      card.onclick = function() { openActivePatientDetail(card.dataset.diagnosisId); };
     });
   }
 
