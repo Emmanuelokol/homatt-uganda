@@ -66,7 +66,8 @@
 
     /* ── Step header ────────────────────────────────────────────── */
     .wiz-screen-title {
-      font-size: 24px; font-weight: 800; color: #111; margin-bottom: 4px;
+      /* was a hardcoded #111 — invisible on the dark theme the clinic uses */
+      font-size: 24px; font-weight: 800; color: var(--text, #111); margin-bottom: 4px;
     }
     .wiz-screen-sub {
       font-size: 13px; color: #5F6368; margin-bottom: 24px; line-height: 1.5;
@@ -444,7 +445,7 @@
       <div class="wiz-dots">
         <div class="wiz-dot current" data-dot="1">
           <div class="wiz-dot-circle">1</div>
-          <span class="wiz-dot-label">Patient &amp; Assessment</span>
+          <span class="wiz-dot-label">Diagnosis</span>
         </div>
         <div class="wiz-dot-line" id="dotLine"></div>
         <div class="wiz-dot" data-dot="2">
@@ -457,8 +458,8 @@
            SCREEN 1 — Patient & Assessment
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
-        <div class="wiz-screen-title">Assessment</div>
-        <div class="wiz-screen-sub">Start with the diagnosis. The patient's name and phone are optional — add them here or later.</div>
+        <div class="wiz-screen-title">Diagnosis</div>
+        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The patient's name and phone are added later — tap the consultation on the dashboard.</div>
 
 
         <!-- ── Diagnosis ── -->
@@ -518,6 +519,14 @@
         </div>
 
         <!-- ── Lab tests ── -->
+        <!-- ══ Patient details and the standalone lab-test picker ══
+             Screen 1 is now just: diagnosis → one-tap package → Continue.
+             The phone and name are optional and added later by tapping the
+             consultation on the dashboard; lab tests are chosen inside the
+             package itself, where they auto-suggest. Kept in the page but
+             hidden, because the referral flow and the booking-code lookup
+             still read these fields. -->
+        <div id="legacyPatientLab" hidden style="display:none">
         <!-- ── Patient details (optional — can be added later) ── -->
         <div class="sec-label">
           <span class="material-icons-outlined" style="font-size:14px">person</span>
@@ -705,6 +714,7 @@
           </div>
         </div>
 
+        </div><!-- /legacyPatientLab -->
         <!-- ── Continue ── -->
         <div class="wiz-nav" style="gap:10px;flex-wrap:wrap">
           <button class="wiz-btn wiz-btn-next" id="step1Next" disabled>
