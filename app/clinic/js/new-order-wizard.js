@@ -1293,9 +1293,14 @@
   function _invalidateDashboardCaches() {
     try {
       if (window.ClinicOffline && ClinicOffline.invalidate) {
-        ClinicOffline.invalidate(['consultations_today_', 'meds_dx_', 'meds_qs_',
+        var keys = ['consultations_today_', 'meds_dx_', 'meds_qs_',
           'top_conditions_', 'revenue_', 'financial_', 'pending_payments_',
-          'bookings_', 'hist_pool_', 'qs_inventory_']);
+          'bookings_', 'hist_pool_', 'qs_inventory_'];
+        // The consultation just took medicine off the shelf, so the Stock
+        // Tracker's figures are stale — but only drop them when there is a
+        // server to refetch from. Offline that cache IS the stock list.
+        if (!ClinicOffline.isOffline()) keys.push('stock_');
+        ClinicOffline.invalidate(keys);
       }
     } catch (e) {}
   }
@@ -1503,8 +1508,30 @@
         if (id) { m.inventoryItemId = id; remember(Object.assign({}, row, { id })); }
       } catch (e) { /* never let stock bookkeeping lose the consultation */ }
     }
-    // The Stock Tracker's cached list is now out of date.
-    try { if (CO) CO.invalidate(['stock_']); } catch (e) {}
+
+    // Offline there is no server to ask, so put the new medicines straight into
+    // the Stock Tracker's own cache. That is what makes them appear there — at
+    // zero, with the consultation's shortfall subtracted on top — instead of
+    // not appearing at all until the phone next finds a signal. (Online the
+    // tracker simply refetches; see _invalidateDashboardCaches.)
+    try {
+      if (!CO || !CO.isOffline()) return;
+      var key = 'stock_' + _clinicId;
+      var cached = CO.get(key, null);
+      if (!Array.isArray(cached)) return;
+      var added = false;
+      pending.forEach(function (m) {
+        if (!m.inventoryItemId) return;
+        if (cached.some(function (c) { return c.id === m.inventoryItemId; })) return;
+        var mine = (state.clinicInventory || []).find(function (c) { return c.id === m.inventoryItemId; });
+        if (!mine) return;
+        cached.push(Object.assign({}, mine, {
+          quantity: 0, is_low_stock: true, is_critical: true, is_active: true,
+        }));
+        added = true;
+      });
+      if (added) CO.set(key, cached);
+    } catch (e) {}
   }
 
   loadFormulary();

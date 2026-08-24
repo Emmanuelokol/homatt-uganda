@@ -297,7 +297,24 @@
       '.ucg-det summary .material-icons-outlined{font-size:18px;color:#0E7C5A;flex:none}',
       '.ucg-det summary .chev{margin-left:auto;color:var(--text-lt);transition:transform .18s}',
       '.ucg-det[open] summary .chev{transform:rotate(180deg)}',
-      '.ucg-det-b{padding:0 13px 13px;font-size:13px;line-height:1.55;color:var(--text);white-space:pre-line;max-height:44vh;overflow-y:auto}',
+      // The notes are real markup now (headings, paragraphs, bullets), not a
+      // pre-formatted dump, so pre-line would fight the layout.
+      '.ucg-det-b{padding:0 13px 13px;font-size:13px;line-height:1.55;color:var(--text);max-height:52vh;overflow-y:auto}',
+      // A heading is separated from what came before by a rule, so it is
+      // obvious where one point stops and the next begins.
+      '.gl-h{font-size:12.5px;font-weight:800;color:#0B6B4F;margin:15px 0 7px;padding-top:12px;border-top:1px solid var(--border);line-height:1.35}',
+      '.gl-h:first-child{margin-top:0;padding-top:0;border-top:none}',
+      '.gl-p{margin:0 0 9px;line-height:1.55}',
+      '.gl-frag{margin:0 0 9px;color:var(--text-lt);font-style:italic}',
+      '.gl-ul{margin:0 0 11px;padding:0;list-style:none}',
+      '.gl-ul li{position:relative;padding-left:17px;margin-bottom:6px;line-height:1.5}',
+      '.gl-ul li:before{content:"";position:absolute;left:4px;top:8px;width:5px;height:5px;border-radius:50%;background:#0E7C5A}',
+      '.gl-warn{display:flex;gap:8px;align-items:flex-start;background:rgba(198,40,40,.10);color:#B3261E;' +
+        'border-radius:10px;padding:9px 11px;margin:0 0 10px;font-weight:700;line-height:1.45}',
+      '.gl-warn .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
+      'html[data-theme="dark"] .gl-h{color:#5FD3A8}',
+      'html[data-theme="dark"] .gl-warn{color:#FFA79C;background:rgba(255,138,128,.13)}',
+      'html[data-theme="dark"] .gl-ul li:before{background:#5FD3A8}',
     ].join('\n');
     document.head.appendChild(css);
 
@@ -478,16 +495,160 @@
     wireRows();
   }
 
+  // ── Making the guideline readable ─────────────────────────────────────────
+  // The UCG is a printed book. What we hold is the text lifted out of its PDF,
+  // and it carries all the marks of the page it came off: headings shouted in
+  // capitals, sentences chopped wherever the column ended, bullet glyphs that
+  // came through as "~", printer's rules left behind as rows of dashes, and the
+  // running page header repeated in the middle of the text. Shown as-is it is a
+  // wall of lines with no way to tell a heading from a sentence, or to see
+  // where one point ends and the next begins.
+  //
+  // These three functions rebuild it: throw away the page furniture, stitch the
+  // broken sentences back together, then mark what is a heading, what is a
+  // bullet, and what is a warning.
+
+  // Page furniture — never clinical content, always safe to drop.
+  var GL_DROP = [
+    /^uganda clinical guidelines\s*\d{0,4}$/i,   // running header
+    /^chapter\s+\d+\s*:.{0,44}$/i,               // running header
+    /^[-—–_=|\s.]{2,}$/,                         // a rule ruled off a table
+    /^\d{1,4}$/,                                 // bare page number
+  ];
+  // "~" is what the book's bullet became in the PDF — by far the commonest.
+  var GL_BULLET = /^([~•¾»▪■◦●○*·]|--?|o|\d{1,2}[.)])\s+/;
+  var GL_WARN   = /^(do not|don't|never|caution|warning|avoid|beware)\b/i;
+
+  function glShout(s) {                 // a line printed in capitals
+    return s === s.toUpperCase() && /[A-Z]{3}/.test(s);
+  }
+
+  // The headings the book uses again and again. Matching the whole line only,
+  // so these can never swallow a sentence that merely starts the same way.
+  var GL_LABEL = new RegExp('^(' + [
+    '(first|second|third)[- ]line( (medicine|medicines|alternative|treatment|regimen|drugs?|therapy))?',
+    'pre-?referral treatment', 'referral( criteria)?', 'admission criteria',
+    'supportive (care|treatment)', 'adjunct(ive)? treatment', 'follow[- ]?up( care)?',
+    'patient education( and counselling)?', 'prevention( and control)?',
+    'treatment', 'management', 'diagnosis', 'investigations?', 'dosage',
+    'notes?', 'cautions?', 'warning', 'summary', 'definition', 'causes',
+    'clinical features', 'differential diagnosis', 'complications',
+    '(dosage|treatment|management|prevention|dose) of .{2,60}',
+    'in (children|adults|pregnancy|infants|neonates|the elderly).{0,40}',
+    'intermittent preventive treatment.{0,40}',
+  ].join('|') + ')$', 'i');
+
+  // Words from the condition's own name, used to spot the book's sub-headings:
+  // under "Complicated/Severe Malaria", a short line reading "Severe Malaria"
+  // or "Uncomplicated Malaria" is a heading, not a sentence.
+  function glTopicWords(topic) {
+    return String(topic || '').toLowerCase().split(/[^a-z]+/)
+      .filter(function (w) { return w.length >= 5; });
+  }
+
+  function glIsHeading(s, topic) {
+    var words = s.split(/\s+/);
+    // A word only counts if it is actually a word — so "DAY 1", a table
+    // column, is not mistaken for a heading, while "TREATMENT LOC" is.
+    var realWords = words.filter(function (w) { return /[A-Za-z]{2}/.test(w); }).length;
+    // "NATIONAL MALARIA TREATMENT POLICY", "DEGREE OF DEHYDRATION" — but not a
+    // lone table cell like "MILD", and not an ICD code like "Z20.3, Z23".
+    if (glShout(s) && realWords >= 2 && s.length <= 80) return true;
+    // "1.2 Trauma and Injuries"
+    if (/^\d+(\.\d+)+\s+[A-Za-z]/.test(s) && words.length <= 12) return true;
+    // A line that ends in a colon is introducing what follows — a heading.
+    if (/:$/.test(s) && s.length <= 95 && words.length <= 14) return true;
+    // The book's own recurring sub-headings, whole line only.
+    if (s.length <= 70 && GL_LABEL.test(s.replace(/[.:]$/, ''))) return true;
+    // A short, unpunctuated line naming the condition again — "Severe Malaria"
+    // sitting above the paragraph that describes how to treat it.
+    if (s.length <= 50 && words.length <= 5 && !/[.,;!?]$/.test(s) && /^[A-Z]/.test(s)) {
+      var tw = glTopicWords(topic), low = s.toLowerCase();
+      for (var k = 0; k < tw.length; k++) if (low.indexOf(tw[k]) >= 0) return true;
+    }
+    return false;
+  }
+
+  // Split into clean lines, dropping furniture and stitching the PDF's
+  // mid-sentence breaks back into whole sentences.
+  function glLines(text) {
+    var kept = [];
+    String(text || '').replace(/\r/g, '').split('\n').forEach(function (ln) {
+      var s = ln.replace(/ /g, ' ')
+                .replace(/Uganda Clinical Guidelines\s*\d{4}/gi, '')
+                .trim();
+      if (!s) return;
+      for (var i = 0; i < GL_DROP.length; i++) if (GL_DROP[i].test(s)) return;
+      kept.push(s);
+    });
+
+    var out = [];
+    kept.forEach(function (s) {
+      var prev = out.length ? out[out.length - 1] : null;
+      // Only ever join a line that plainly continues the one before it: the
+      // previous line stopped without punctuation and this one opens in
+      // lower case. A bullet or a shouted heading always starts fresh.
+      var joins = prev &&
+        !GL_BULLET.test(s) && !glShout(s) &&
+        !/[.:;!?]$/.test(prev) && !glShout(prev) &&
+        /^[a-z0-9(,;]/.test(s);
+      if (joins) {
+        out[out.length - 1] = /[a-z]-$/.test(prev) ? prev.slice(0, -1) + s : prev + ' ' + s;
+      } else {
+        out.push(s);
+      }
+    });
+    return out;
+  }
+
+  function glHtml(text, topic) {
+    var lines = glLines(text);
+    if (!lines.length) return '';
+    var html = '', inList = false;
+    function endList() { if (inList) { html += '</ul>'; inList = false; } }
+
+    lines.forEach(function (s, idx) {
+      var b = s.match(GL_BULLET);
+      if (b) {
+        if (!inList) { html += '<ul class="gl-ul">'; inList = true; }
+        html += '<li>' + esc(s.slice(b[0].length).trim()) + '</li>';
+        return;
+      }
+      endList();
+      if (GL_WARN.test(s)) {
+        html += '<div class="gl-warn"><span class="material-icons-outlined">error_outline</span>' +
+                '<span>' + esc(s) + '</span></div>';
+        return;
+      }
+      if (glIsHeading(s, topic)) {
+        html += '<h6 class="gl-h">' + esc(s.replace(/:$/, '')) + '</h6>';
+        return;
+      }
+      // The book's own heading ran across a page break, so the section opens
+      // with its tail ("of Malaria"). Keep it — nothing clinical is ever
+      // thrown away — but show it for what it is rather than as a sentence.
+      if (idx === 0 && /^[a-z]/.test(s)) {
+        html += '<p class="gl-frag">…' + esc(s) + '</p>';
+        return;
+      }
+      html += '<p class="gl-p">' + esc(s) + '</p>';
+    });
+    endList();
+    return html;
+  }
+
   // Collapsible guideline detail: management, what else to check, what it could
   // be if you're not certain, complications, and the raw source text.
   function guidanceHtml() {
     var i = ctx.info || {};
     function d(title, body, icon) {
       if (!body || !String(body).trim()) return '';
+      var inner = glHtml(body, ctx.title);
+      if (!inner) return '';
       return '<details class="ucg-det"><summary>' +
         '<span class="material-icons-outlined">' + icon + '</span>' + esc(title) +
         '<span class="material-icons-outlined chev">expand_more</span></summary>' +
-        '<div class="ucg-det-b">' + esc(String(body).trim()) + '</div></details>';
+        '<div class="ucg-det-b">' + inner + '</div></details>';
     }
     var html =
       d('Management (guideline)', i.management, 'medical_information') +
@@ -1208,5 +1369,6 @@
     wireDxSuggest();
   }
 
-  window.UCGPackage = { start: start, open: open, close: close, suggestDx: suggestDx };
+  window.UCGPackage = { start: start, open: open, close: close, suggestDx: suggestDx,
+                        formatNotes: glHtml };
 })();

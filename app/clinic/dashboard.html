@@ -4694,7 +4694,10 @@
       if (items && Object.keys(_offInv).length) {
         items = items.map(function(i) {
           if (!_offInv[i.id]) return i;
-          var q = Math.max(0, (Number(i.quantity) || 0) - _offInv[i.id]);
+          // Never clamped at zero: a medicine dispensed offline that the shelf
+          // did not have is already OWED, and the tracker has to say so rather
+          // than pretend the count is zero.
+          var q = (Number(i.quantity) || 0) - _offInv[i.id];
           return Object.assign({}, i, { quantity: q, is_low_stock: q <= Number(i.min_threshold), is_critical: q === 0 });
         });
       }
@@ -4815,7 +4818,10 @@
     var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
     var barClr= item.is_critical ? '#E0454B' : item.is_low_stock ? '#E2960A' : '#0E7C5A';
     var pills = '';
-    if (item.is_critical)      pills += '<span class="pill-s crit">OUT</span>';
+    // "OWED" is not the same as "LOW" — it means the clinic has already given
+    // out medicine it never had, so the shelf is in debt until it is restocked.
+    if (Number(item.quantity) < 0) pills += '<span class="pill-s crit">OWED</span>';
+    else if (item.is_critical)      pills += '<span class="pill-s crit">OUT</span>';
     else if (item.is_low_stock) pills += '<span class="pill-s warn">LOW</span>';
     if (item.is_expired)            pills += '<span class="pill-s exp-crit">EXPIRED</span>';
     else if (item.is_expiring_soon) pills += '<span class="pill-s warn">EXP SOON</span>';
