@@ -132,6 +132,20 @@
       'html[data-theme="dark"] .stk-known b{color:#E8F0EA}',
       '.stk-edit{background:none;border:none;color:#0E7C5A;font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;padding:0;margin-top:4px}',
       'html[data-theme="dark"] .stk-edit{color:#7BC98A}',
+      '.stk-batches{margin-top:7px;border:1px solid var(--border,#E8EAED);border-radius:12px;overflow:hidden}',
+      'html[data-theme="dark"] .stk-batches{border-color:#243029}',
+      '.stk-batch{display:flex;align-items:center;gap:10px;padding:10px 13px;font-size:13.5px;border-bottom:1px solid var(--border,#EEF1EE)}',
+      'html[data-theme="dark"] .stk-batch{border-bottom-color:#1E2822}',
+      '.stk-batch:last-child{border-bottom:none}',
+      '.stk-batch .q{font-weight:800;color:var(--text,#111);min-width:78px}',
+      'html[data-theme="dark"] .stk-batch .q{color:#E8F0EA}',
+      '.stk-batch .e{flex:1;color:var(--text-lt,#5F6368)}',
+      'html[data-theme="dark"] .stk-batch .e{color:#A9BCAE}',
+      '.stk-batch .lead{font-size:9.5px;font-weight:800;letter-spacing:.4px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;padding:2px 8px;border-radius:20px}',
+      'html[data-theme="dark"] .stk-batch .lead{background:rgba(18,163,116,.22);color:#8FE3BC}',
+      '.stk-batch.soon .e{color:#B26A00;font-weight:700}',
+      '.stk-batch.exp{background:#FDECEC}.stk-batch.exp .e{color:#B3261E;font-weight:800}',
+      'html[data-theme="dark"] .stk-batch.exp{background:rgba(229,72,77,.14)}',
     ].join('\n');
     document.head.appendChild(css);
 
@@ -275,6 +289,9 @@
       h += '<div class="stk-known">On the shelf now: <b>' +
         (cur < 0 ? 'short by ' + fmt(-cur) + ' ' + esc(st.unit) : fmt(cur) + ' ' + esc(st.unit)) +
         '</b></div>';
+      // The batches already on the shelf, soonest-expiring first, so the owner
+      // can see exactly which stock leaves next. Filled in once loaded.
+      h += '<div id="stkBatches"></div>';
     }
     h += '<div class="stk-q"><label class="stk-lbl" for="stkBoxes">How many boxes did you buy?</label>' +
          '<input id="stkBoxes" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
@@ -314,6 +331,37 @@
     if (ch) ch.onclick = function () { st.forceAsk = true; renderCount(); };
     recalc();
     setTimeout(function () { try { document.getElementById('stkBoxes').focus(); } catch (e) {} }, 120);
+    loadBatches();
+  }
+
+  // Show the existing batches (soonest expiry first) so the owner sees exactly
+  // which stock will be dispensed next. Best-effort — nothing if unavailable.
+  function loadBatches() {
+    var host = document.getElementById('stkBatches');
+    if (!host || !st.existing || !st.existing.id || typeof window.stockBatchesFor !== 'function') return;
+    window.stockBatchesFor(st.existing.id).then(function (rows) {
+      if (!Array.isArray(rows) || !rows.length) return;
+      // The soonest live batch is the one FEFO empties first.
+      var live = rows.filter(function (r) { return Number(r.quantity) > 0; });
+      if (!live.length) return;
+      var html = '<div class="stk-lbl" style="margin-top:14px">On the shelf — dispensed soonest-expiry first</div>' +
+        '<div class="stk-batches">' +
+        live.map(function (r, i) {
+          var exp = r.expiry_date ? _shortDate(r.expiry_date) : 'no expiry';
+          var cls = r.expired ? 'exp' : (r.expiring_soon ? 'soon' : '');
+          var lead = i === 0 ? '<span class="lead">NEXT OUT</span>' : '';
+          return '<div class="stk-batch ' + cls + '">' +
+            '<span class="q">' + fmt(r.quantity) + ' ' + esc(st.unit) + '</span>' +
+            '<span class="e">' + esc(exp) + '</span>' + lead + '</div>';
+        }).join('') + '</div>';
+      host.innerHTML = html;
+    }).catch(function () {});
+  }
+  function _shortDate(d) {
+    try {
+      return new Date(String(d).slice(0, 10) + 'T00:00:00')
+        .toLocaleDateString('en-UG', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch (e) { return String(d); }
   }
 
   function current() {

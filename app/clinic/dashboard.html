@@ -1131,8 +1131,8 @@
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-intake.js?v=20260825b"></script>
-<script src="js/clinic.js?v=20260824b"></script>
+<script src="js/stock-intake.js?v=20260826"></script>
+<script src="js/clinic.js?v=20260826"></script>
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -5024,6 +5024,22 @@
   // Either tops up an item that already exists, or creates it. Either way the
   // pack template (strips per box, units per strip) is stored against the item
   // so the NEXT delivery only has to answer "how many boxes?".
+  // The batches of one item, soonest expiry first — so the intake sheet can
+  // show the owner exactly what is on the shelf and what expires next. Returns
+  // [] on any database that has not deployed the batches migration.
+  window.stockBatchesFor = async function (inventoryId) {
+    try {
+      var clinicId = await resolveClinicId();
+      if (!clinicId || !inventoryId || !supabase) return [];
+      var CO = window.ClinicOffline;
+      var q = supabase.from('v_stock_batches').select('*')
+        .eq('clinic_id', clinicId).eq('inventory_id', inventoryId);
+      var r = CO ? await CO.withTimeout(q, 8000) : await q;
+      if (!r || r.error || !Array.isArray(r.data)) return [];
+      return r.data;
+    } catch (e) { return []; }
+  };
+
   window.stockIntakeCommit = async function (intake) {
     var clinicId = await resolveClinicId();
     if (!clinicId) { showToast('Account not linked to a clinic.', 'error'); return false; }
@@ -5044,36 +5060,54 @@
       _applyStockDeltaToCache(id, intake.total);
       _patchStockCache(id, tmpl);
 
-      if (newExpiry) {
+      var _notes = intake.boxes + ' box' + (intake.boxes !== 1 ? 'es' : '') +
+                   ' x ' + intake.strips + ' x ' + intake.units;
+      // Preferred: record this delivery as its own BATCH, with its own expiry,
+      // so dispensing later empties the soonest-expiring batch first (FEFO).
+      var batchArgs = {
+        p_clinic_id: clinicId, p_inventory_id: id, p_qty: intake.total,
+        p_expiry: newExpiry || null, p_boxes: intake.boxes, p_notes: _notes,
+      };
+      // Fallback for a database without the batches migration: bump the flat
+      // total, and keep the earliest expiry on the item.
+      var flatArgs = {
+        p_clinic_id: clinicId, p_inventory_id: id,
+        p_qty_change: intake.total, p_txn_type: 'addition', p_notes: _notes,
+      };
+      var tmplPayload = { table: 'clinic_inventory', patch: tmpl, match: { id: id, clinic_id: clinicId } };
+
+      function _flatExpiry() {
+        if (!newExpiry) return;
         var curExp = (intake.existing.expiry_date || '').slice(0, 10);
-        // Keep whichever expiry is earlier — the shelf is only as good as its
-        // soonest-expiring stock.
         if (!curExp || newExpiry < curExp) {
           _saveRestockExpiry(id, clinicId, newExpiry);
           _patchStockCache(id, { expiry_date: newExpiry });
         }
       }
 
-      var args = {
-        p_clinic_id: clinicId, p_inventory_id: id,
-        p_qty_change: intake.total, p_txn_type: 'addition',
-        p_notes: intake.boxes + ' box' + (intake.boxes !== 1 ? 'es' : '') +
-                 ' x ' + intake.strips + ' x ' + intake.units,
-      };
-      var tmplPayload = { table: 'clinic_inventory', patch: tmpl, match: { id: id, clinic_id: clinicId } };
-
       if (CO && CO.isOffline()) {
-        CO.enqueueRpc('adjust_inventory', args);
+        // Offline: queue the batch add; if batches aren't deployed it replays as
+        // a flat adjustment (the sync handler tries add_stock_batch, then falls
+        // back). Keep the local total and earliest expiry accurate meanwhile.
+        CO.enqueueRpc('add_stock_batch', batchArgs);
         CO.enqueue('table_update', tmplPayload);
+        _flatExpiry();
       } else {
-        var r = CO ? await CO.withTimeout(supabase.rpc('adjust_inventory', args))
-                   : await supabase.rpc('adjust_inventory', args);
-        if (r && r.error) {
-          if (CO && CO.isNetworkErr(r.error)) CO.enqueueRpc('adjust_inventory', args);
+        var r = CO ? await CO.withTimeout(supabase.rpc('add_stock_batch', batchArgs))
+                   : await supabase.rpc('add_stock_batch', batchArgs);
+        var missing = r && r.error &&
+          /add_stock_batch|could not find the function|does not exist|schema cache/i.test(r.error.message || '');
+        if (missing) {
+          // Batches not deployed on this clinic yet — flat top-up instead.
+          var fr = CO ? await CO.withTimeout(supabase.rpc('adjust_inventory', flatArgs))
+                      : await supabase.rpc('adjust_inventory', flatArgs);
+          if (fr && fr.error && CO && CO.isNetworkErr(fr.error)) CO.enqueueRpc('adjust_inventory', flatArgs);
+          _flatExpiry();
+        } else if (r && r.error) {
+          if (CO && CO.isNetworkErr(r.error)) CO.enqueueRpc('add_stock_batch', batchArgs);
           else { showToast('Could not add stock: ' + r.error.message, 'error'); return false; }
         }
-        // The template columns may not be migrated yet — never let that lose
-        // the stock that was just added.
+        // Store the pack template (best-effort; column may not be migrated).
         try {
           var tr = await supabase.from('clinic_inventory').update(tmpl)
             .eq('id', id).eq('clinic_id', clinicId);

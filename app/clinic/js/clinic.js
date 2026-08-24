@@ -456,7 +456,7 @@ window.homattNextCaseSeq = homattNextCaseSeq;
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v120';
+var HOMATT_BUILD = 'v121';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {
@@ -603,6 +603,15 @@ async function _replayRpc(payload) {
       var a2 = {};
       for (var k in args) { if (k !== 'p_op_id' && Object.prototype.hasOwnProperty.call(args, k)) a2[k] = args[k]; }
       r = await supa.rpc(fn, a2);
+    }
+    // A queued batch-add on a clinic that has not deployed the batches migration
+    // falls back to a flat top-up, so the stock is never lost waiting for it.
+    if (r.error && fn === 'add_stock_batch' &&
+        /could not find the function|does not exist|schema cache/i.test(r.error.message || '')) {
+      r = await supa.rpc('adjust_inventory', {
+        p_clinic_id: args.p_clinic_id, p_inventory_id: args.p_inventory_id,
+        p_qty_change: args.p_qty, p_txn_type: 'addition', p_notes: args.p_notes || null,
+      });
     }
     if (r.error) return _replayDropOnPermanent('rpc ' + fn, r.error);
     if (r.data && r.data.ok === false) {       // server ran but rejected → permanent, drop
