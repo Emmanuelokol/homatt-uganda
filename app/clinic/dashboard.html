@@ -420,7 +420,7 @@
       <div id="lowStockBanner" data-cap="stock" data-slide="stock" style="display:none;background:#FFEBEE;border:none;border-radius:16px;box-shadow:var(--shadow);padding:12px 16px;margin-bottom:18px;display:none">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
           <span class="material-icons-outlined" style="color:#C62828;font-size:20px">warning</span>
-          <strong style="color:#C62828;font-size:14px">Low Stock Alert</strong>
+          <strong style="color:#C62828;font-size:14px">Stock to buy</strong>
           <span id="lowStockCount" style="background:#C62828;color:#fff;font-size:11px;padding:1px 7px;border-radius:20px;font-weight:700"></span>
         </div>
         <div id="lowStockList" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -1127,6 +1127,11 @@
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
 <script src="js/clinic-offline.js?v=20260823b"></script>
+<!-- Stock intake: three questions, the app does the arithmetic. The SQLite
+     engine is only used to suggest names from the national medicines list,
+     and the database itself is fetched on demand when the sheet opens. -->
+<script src="js/vendor/sql-wasm.js"></script>
+<script src="js/stock-intake.js?v=20260825"></script>
 <script src="js/clinic.js?v=20260824b"></script>
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script>
@@ -4699,14 +4704,25 @@
       items = items.map(_withExpiryFlags);
 
       // Banner
-      var lowItems = items.filter(function(i){ return i.is_low_stock; });
+      var lowItems = items.filter(function(i){
+        return i.is_low_stock || (Number(i.quantity) || 0) < 0;
+      }).sort(function(a,b){ return (Number(a.quantity)||0) - (Number(b.quantity)||0); });
       if (lowItems.length) {
-        if (bCount) bCount.textContent = lowItems.length + ' item' + (lowItems.length !== 1 ? 's' : '');
+        var shortN = lowItems.filter(function(i){ return (Number(i.quantity)||0) < 0; }).length;
+        if (bCount) bCount.textContent = shortN
+          ? shortN + ' owed' + (lowItems.length > shortN ? ' · ' + (lowItems.length - shortN) + ' low' : '')
+          : lowItems.length + ' item' + (lowItems.length !== 1 ? 's' : '');
         if (bList) bList.innerHTML = lowItems.map(function(i) {
-          var bg = i.is_critical ? '#C62828' : '#E65100';
-          return '<span style="background:'+bg+';color:#fff;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;display:inline-flex;align-items:center;gap:4px">'
-            +'<span class="material-icons-outlined" style="font-size:12px">'+(i.is_critical?'block':'warning')+'</span>'
-            +esc(i.item_name)+' — '+i.quantity+' '+esc(i.unit)+'</span>';
+          var qn = Number(i.quantity) || 0;
+          var bg = qn < 0 ? '#8E1116' : (i.is_critical ? '#C62828' : '#E65100');
+          var txt = qn < 0 ? 'short by ' + Math.abs(qn) + ' ' + esc(i.unit)
+                           : qn + ' ' + esc(i.unit) + ' left';
+          // Tapping a pill opens the intake sheet already on that medicine.
+          return '<button data-restock="'+esc(i.id)+'" style="background:'+bg+';color:#fff;font-size:11px;'
+            +'padding:4px 11px;border:none;border-radius:20px;font-weight:700;font-family:inherit;cursor:pointer;'
+            +'display:inline-flex;align-items:center;gap:4px">'
+            +'<span class="material-icons-outlined" style="font-size:12px">'+(qn<0?'priority_high':(i.is_critical?'block':'warning'))+'</span>'
+            +esc(i.item_name)+' — '+txt+'</button>';
         }).join('');
         if (banner) { banner.style.display = 'block'; }
       } else {
@@ -4750,6 +4766,9 @@
       items.forEach(function(i){ (groups[i.item_type] || groups.consumable).push(i); });
 
       _stockItems = items;
+      // The intake sheet needs the current shelf to offer "in your stock"
+      // suggestions and to reuse each item's pack template.
+      window._stockItems = items;
 
       // HOME SUMMARY: most-urgent 8 (out-of-stock → low → rest A-Z) + View all.
       var SUMMARY_N = 8;
@@ -4804,12 +4823,18 @@
     var icon  = isMed ? 'medication' : 'inventory_2';
     var cost  = item.unit_cost_ugx ? 'UGX '+Number(item.unit_cost_ugx).toLocaleString('en-UG')+'/'+esc(item.unit) : '';
     var expTxt= item.expiry_date ? 'Exp '+_fmtExpDate(item.expiry_date) : '';
-    var meta  = item.quantity+' '+esc(item.unit)+' left'+(cost?' · '+cost:'')+(expTxt?' · '+expTxt:'');
+    // A negative quantity means the clinic dispensed medicine it did not have.
+    // Saying "short by 20" is the truth and tells the owner what to buy.
+    var qn = Number(item.quantity) || 0;
+    var qtyTxt = qn < 0
+      ? '<b style="color:#C62828">short by ' + Math.abs(qn) + ' ' + esc(item.unit) + '</b>'
+      : qn + ' ' + esc(item.unit) + ' left';
+    var meta  = qtyTxt+(cost?' · '+cost:'')+(expTxt?' · '+expTxt:'');
     return '<div class="stock-card">'
       +'<div class="stock-top">'
         +'<div class="stock-ic '+(isMed?'med':'material')+'"><span class="material-icons-outlined">'+icon+'</span></div>'
         +'<div class="stock-name">'+esc(item.item_name)+' '+pills+'</div>'
-        +'<button class="stock-restock" onclick="openRestockModal(\''+esc(item.id)+'\',\''+esc(item.item_name)+'\','+item.quantity+',\''+esc(item.unit)+'\')">+ Restock</button>'
+        +'<button class="stock-restock" data-restock="'+esc(item.id)+'">+ Restock</button>'
       +'</div>'
       +'<div class="stock-meta">'+meta+'</div>'
       +'<div class="stock-bar"><i style="width:'+pct+'%;background:'+barClr+'"></i></div>'
@@ -4994,6 +5019,131 @@
 
   // ── Restock Modal ──
   var _restockItemId = null;
+
+  // ── Stock intake: what the three-question sheet hands back ──────────────
+  // Either tops up an item that already exists, or creates it. Either way the
+  // pack template (strips per box, units per strip) is stored against the item
+  // so the NEXT delivery only has to answer "how many boxes?".
+  window.stockIntakeCommit = async function (intake) {
+    var clinicId = await resolveClinicId();
+    if (!clinicId) { showToast('Account not linked to a clinic.', 'error'); return false; }
+    var CO = window.ClinicOffline;
+    var tmpl = {
+      strips_per_box:  intake.strips,
+      units_per_strip: intake.units,
+      last_boxes:      intake.boxes,
+    };
+
+    if (intake.existing && intake.existing.id) {
+      var id = intake.existing.id;
+      // Show it on the shelf straight away — the sync can take its time.
+      _applyStockDeltaToCache(id, intake.total);
+      _patchStockCache(id, tmpl);
+
+      var args = {
+        p_clinic_id: clinicId, p_inventory_id: id,
+        p_qty_change: intake.total, p_txn_type: 'addition',
+        p_notes: intake.boxes + ' box' + (intake.boxes !== 1 ? 'es' : '') +
+                 ' x ' + intake.strips + ' x ' + intake.units,
+      };
+      var tmplPayload = { table: 'clinic_inventory', patch: tmpl, match: { id: id, clinic_id: clinicId } };
+
+      if (CO && CO.isOffline()) {
+        CO.enqueueRpc('adjust_inventory', args);
+        CO.enqueue('table_update', tmplPayload);
+      } else {
+        var r = CO ? await CO.withTimeout(supabase.rpc('adjust_inventory', args))
+                   : await supabase.rpc('adjust_inventory', args);
+        if (r && r.error) {
+          if (CO && CO.isNetworkErr(r.error)) CO.enqueueRpc('adjust_inventory', args);
+          else { showToast('Could not add stock: ' + r.error.message, 'error'); return false; }
+        }
+        // The template columns may not be migrated yet — never let that lose
+        // the stock that was just added.
+        try {
+          var tr = await supabase.from('clinic_inventory').update(tmpl)
+            .eq('id', id).eq('clinic_id', clinicId);
+          if (tr && tr.error && CO && CO.isNetworkErr(tr.error)) CO.enqueue('table_update', tmplPayload);
+        } catch (e) { if (CO) CO.enqueue('table_update', tmplPayload); }
+      }
+    } else {
+      // Brand new item.
+      var row = Object.assign({
+        clinic_id: clinicId,
+        item_name: intake.name,
+        item_type: 'medicine',
+        unit: intake.unit || 'tabs',
+        quantity: intake.total,
+        min_threshold: Math.max(1, Math.round(intake.total * 0.2)),
+        reorder_level: Math.max(2, Math.round(intake.total * 0.5)),
+        is_active: true,
+      }, tmpl);
+
+      if (CO && CO.isOffline()) {
+        row.id = CO.uuid();
+        CO.enqueue('table_insert', { table: 'clinic_inventory', rows: [row] });
+        _addStockItemToCache(row);
+      } else {
+        var ir = await supabase.from('clinic_inventory').insert(row).select().single();
+        if (ir && ir.error) {
+          var msg = ir.error.message || '';
+          // Retry without the template columns if this database has not been
+          // migrated — the stock count matters more than the template.
+          if (/strips_per_box|units_per_strip|last_boxes/.test(msg)) {
+            var bare = Object.assign({}, row);
+            delete bare.strips_per_box; delete bare.units_per_strip; delete bare.last_boxes;
+            ir = await supabase.from('clinic_inventory').insert(bare).select().single();
+          }
+          if (ir && ir.error) {
+            if (CO && CO.isNetworkErr(ir.error)) {
+              row.id = CO.uuid();
+              CO.enqueue('table_insert', { table: 'clinic_inventory', rows: [row] });
+              _addStockItemToCache(row);
+            } else { showToast('Could not add stock: ' + ir.error.message, 'error'); return false; }
+          } else if (ir.data) { _addStockItemToCache(ir.data); }
+        } else if (ir.data) { _addStockItemToCache(ir.data); }
+      }
+    }
+
+    try { if (CO && CO.invalidate) CO.invalidate(['qs_inventory_', 'stock_']); } catch (e) {}
+    loadInventory();
+    return true;
+  };
+
+  // Keep the cached copy of an item in step with a template change.
+  function _patchStockCache(itemId, patch) {
+    try {
+      var CO = window.ClinicOffline;
+      if (!CO || !_stockCacheKey) return;
+      var items = CO.get(_stockCacheKey, null);
+      if (!Array.isArray(items)) return;
+      CO.set(_stockCacheKey, items.map(function (i) {
+        return i.id === itemId ? Object.assign({}, i, patch) : i;
+      }));
+      if (Array.isArray(window._stockItems)) {
+        window._stockItems = window._stockItems.map(function (i) {
+          return i.id === itemId ? Object.assign({}, i, patch) : i;
+        });
+      }
+    } catch (e) {}
+  }
+
+  // Restock taps go to the three-question sheet, which already knows this
+  // item's pack size and so only asks how many boxes arrived.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-restock]');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    var id = b.getAttribute('data-restock');
+    var item = (window._stockItems || []).find(function (i) { return i.id === id; });
+    if (window.StockIntake) window.StockIntake.start(item || null);
+    else if (item) openRestockModal(item.id, item.item_name, item.quantity, item.unit);
+  }, true);
+
+  // "Add stock" anywhere opens the same sheet, starting from the search.
+  window.openStockIntake = function () {
+    if (window.StockIntake) window.StockIntake.start(null);
+  };
 
   function openRestockModal(itemId, itemName, currentQty, unit) {
     _restockItemId = itemId;
