@@ -1131,7 +1131,7 @@
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-intake.js?v=20260825"></script>
+<script src="js/stock-intake.js?v=20260825b"></script>
 <script src="js/clinic.js?v=20260824b"></script>
 <script src="js/msg-alerts.js?v=20260809"></script>
 <script>
@@ -5034,11 +5034,25 @@
       last_boxes:      intake.boxes,
     };
 
+    // The expiry belongs to THIS batch. If this delivery expires sooner than
+    // what is already on the shelf, that earlier date is the one that matters.
+    var newExpiry = (intake.expiry || '').trim();
+
     if (intake.existing && intake.existing.id) {
       var id = intake.existing.id;
       // Show it on the shelf straight away — the sync can take its time.
       _applyStockDeltaToCache(id, intake.total);
       _patchStockCache(id, tmpl);
+
+      if (newExpiry) {
+        var curExp = (intake.existing.expiry_date || '').slice(0, 10);
+        // Keep whichever expiry is earlier — the shelf is only as good as its
+        // soonest-expiring stock.
+        if (!curExp || newExpiry < curExp) {
+          _saveRestockExpiry(id, clinicId, newExpiry);
+          _patchStockCache(id, { expiry_date: newExpiry });
+        }
+      }
 
       var args = {
         p_clinic_id: clinicId, p_inventory_id: id,
@@ -5078,6 +5092,7 @@
         reorder_level: Math.max(2, Math.round(intake.total * 0.5)),
         is_active: true,
       }, tmpl);
+      if (newExpiry) row.expiry_date = newExpiry;
 
       if (CO && CO.isOffline()) {
         row.id = CO.uuid();
@@ -5087,11 +5102,12 @@
         var ir = await supabase.from('clinic_inventory').insert(row).select().single();
         if (ir && ir.error) {
           var msg = ir.error.message || '';
-          // Retry without the template columns if this database has not been
-          // migrated — the stock count matters more than the template.
-          if (/strips_per_box|units_per_strip|last_boxes/.test(msg)) {
+          // Retry without any column this database has not migrated yet — the
+          // stock count matters more than the template or the expiry.
+          if (/strips_per_box|units_per_strip|last_boxes|expiry_date/.test(msg)) {
             var bare = Object.assign({}, row);
             delete bare.strips_per_box; delete bare.units_per_strip; delete bare.last_boxes;
+            delete bare.expiry_date;
             ir = await supabase.from('clinic_inventory').insert(bare).select().single();
           }
           if (ir && ir.error) {

@@ -201,15 +201,52 @@
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 120);
   }
 
+  // ── Remembered pack templates ────────────────────────────────────────────
+  // The template MUST survive without the database migration. Storing it only
+  // in the strips_per_box / units_per_strip columns meant that on a clinic that
+  // has not run 20260825_stock_packs.sql, the first save silently dropped those
+  // columns and the second delivery asked all three questions again. So the
+  // template is kept locally too, keyed by clinic + item name, and read back
+  // whenever the database row does not carry one.
+  function clinicId() {
+    try { return (JSON.parse(localStorage.getItem('clinic_session') || '{}').clinicId) || 'local'; }
+    catch (e) { return 'local'; }
+  }
+  function tmplKey() { return 'stock_packs_' + clinicId(); }
+  function allTemplates() {
+    try { return JSON.parse(localStorage.getItem(tmplKey()) || '{}'); } catch (e) { return {}; }
+  }
+  function nameKey(name) { return String(name || '').toLowerCase().trim(); }
+  function getTemplate(name) { return allTemplates()[nameKey(name)] || null; }
+  function rememberTemplate(name, strips, units, boxes) {
+    if (!(num(strips) > 0 && num(units) > 0)) return;
+    try {
+      var all = allTemplates();
+      all[nameKey(name)] = {
+        strips_per_box: num(strips), units_per_strip: num(units),
+        last_boxes: num(boxes) || undefined, updated: new Date().toISOString(),
+      };
+      localStorage.setItem(tmplKey(), JSON.stringify(all));
+    } catch (e) {}
+  }
+
   function pick(hit) {
     var ex = hit.existing || matchExisting(hit.name);
+    // The database row first, then whatever the clinic saved on this device.
+    var tmpl = getTemplate(hit.name) || {};
+    var strips = ex && Number(ex.strips_per_box) > 0 ? Number(ex.strips_per_box)
+               : (Number(tmpl.strips_per_box) > 0 ? Number(tmpl.strips_per_box) : '');
+    var units  = ex && Number(ex.units_per_strip) > 0 ? Number(ex.units_per_strip)
+               : (Number(tmpl.units_per_strip) > 0 ? Number(tmpl.units_per_strip) : '');
+    var boxes  = (ex && Number(ex.last_boxes)) || Number(tmpl.last_boxes) || '';
     st = {
       name: hit.name,
       unit: (ex && ex.unit) || 'tabs',
       existing: ex || null,
-      boxes: (ex && Number(ex.last_boxes)) || '',
-      strips: ex && Number(ex.strips_per_box) > 0 ? Number(ex.strips_per_box) : '',
-      units: ex && Number(ex.units_per_strip) > 0 ? Number(ex.units_per_strip) : '',
+      boxes: boxes,
+      strips: strips,
+      units: units,
+      expiry: '',
       forceAsk: false,
     };
     renderCount();
@@ -257,6 +294,13 @@
            '<input id="stkUnits" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
            'value="' + (st.units || '') + '" placeholder="e.g. 6"></div>';
     }
+    // Each delivery is its own batch with its own expiry — different boxes,
+    // different dates. Asked here, on the batch being added.
+    h += '<div class="stk-q"><label class="stk-lbl" for="stkExpiry">Expiry date of this batch ' +
+         '<span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span></label>' +
+         '<input id="stkExpiry" class="stk-in" type="date" value="' + esc(st.expiry || '') + '">' +
+         '<div class="hint">If this delivery expires sooner than what is already on the shelf, the app tracks the earlier date.</div></div>';
+
     h += '<div class="stk-sum" id="stkSum"></div>';
     document.getElementById('stkBody').innerHTML = h;
 
@@ -264,6 +308,8 @@
       var el = document.getElementById(id);
       if (el) el.oninput = recalc;
     });
+    var xp = document.getElementById('stkExpiry');
+    if (xp) xp.onchange = function () { st.expiry = xp.value || ''; };
     var ch = document.getElementById('stkChange');
     if (ch) ch.onclick = function () { st.forceAsk = true; renderCount(); };
     recalc();
@@ -312,10 +358,15 @@
     btn.disabled = true;
     var wasLabel = btn.textContent;
     btn.textContent = 'Adding…';
+    // Remember the pack size on THIS device, whatever the database can store.
+    // Next delivery of the same medicine then asks only for boxes.
+    rememberTemplate(st.name, c.strips, c.units, c.boxes);
     try {
+      var xp = document.getElementById('stkExpiry');
       var ok = await window.stockIntakeCommit({
         name: st.name, unit: st.unit, existing: st.existing,
         boxes: c.boxes, strips: c.strips, units: c.units, total: c.total,
+        expiry: (xp && xp.value) || st.expiry || '',
       });
       if (ok === false) { btn.disabled = false; btn.textContent = wasLabel; return; }
       close();
