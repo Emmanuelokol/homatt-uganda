@@ -1435,6 +1435,78 @@
     } catch(e) {}
   }
 
+  // A drug the clinic has never stocked has no shelf slot, so dispensing it
+  // deducted from nothing and the owner never learned it had gone out. Open a
+  // slot at zero the first time it is prescribed: the deduction then drives it
+  // NEGATIVE, which is exactly the "the shelf owes this much" signal the Stock
+  // Tracker shows under low stock until the owner restocks.
+  async function ensureShelfSlots(meds) {
+    if (!supabase || !_clinicId) return;
+    const CO = window.ClinicOffline;
+    const pending = meds.filter(m =>
+      !m.inventoryItemId && (m.drug || '').trim() && Number(m.qtyToDeduct) > 0);
+    if (!pending.length) return;
+
+    const remember = (row) => {
+      if (!Array.isArray(state.clinicInventory)) state.clinicInventory = [];
+      state.clinicInventory.push(row);
+    };
+
+    for (const m of pending) {
+      const name = (m.drug || '').trim();
+      // Someone may have stocked it since this wizard loaded its shelf list.
+      const known = (state.clinicInventory || []).find(x =>
+        String(x.item_name || '').trim().toLowerCase() === name.toLowerCase());
+      if (known) { m.inventoryItemId = known.id; continue; }
+
+      // Guess the unit from the name so the shelf entry reads sensibly —
+      // the owner can change it in the Stock Tracker.
+      const n = name.toLowerCase();
+      const unit = /syrup|suspension|solution|drops?|\bml\b/.test(n) ? 'ml'
+                 : /inject|vial|\bamp\b|ampoule|infusion/.test(n) ? 'vials'
+                 : /cream|ointment|gel/.test(n) ? 'tubes'
+                 : 'tabs';
+      const row = {
+        clinic_id: _clinicId, item_name: name, item_type: 'medicine',
+        unit, quantity: 0, min_threshold: 5, reorder_level: 10,
+      };
+      // Client-generated key → replaying the queued insert can never create
+      // the same medicine twice.
+      if (CO) row.id = CO.uuid();
+
+      const queueIt = () => {
+        CO.enqueue('table_insert', { table: 'clinic_inventory', row, stripUnknownColumns: true });
+        m.inventoryItemId = row.id;
+        remember(row);
+      };
+
+      if (CO && CO.isOffline()) { queueIt(); continue; }
+
+      try {
+        const r = await (CO
+          ? CO.withTimeout(supabase.from('clinic_inventory').insert(row).select('id').single())
+          : supabase.from('clinic_inventory').insert(row).select('id').single());
+
+        if (r.error && CO && CO.isNetworkErr(r.error)) { queueIt(); continue; }
+
+        if (r.error) {
+          // Already on the shelf under a spelling the matcher didn't catch —
+          // use that row rather than refusing to deduct.
+          const ex = await supabase.from('clinic_inventory')
+            .select('id').eq('clinic_id', _clinicId).ilike('item_name', name).limit(1);
+          const hit = ex.data && ex.data[0];
+          if (hit) { m.inventoryItemId = hit.id; remember({ id: hit.id, item_name: name, item_type: 'medicine', quantity: 0 }); }
+          continue;
+        }
+
+        const id = (r.data && r.data.id) || row.id || null;
+        if (id) { m.inventoryItemId = id; remember(Object.assign({}, row, { id })); }
+      } catch (e) { /* never let stock bookkeeping lose the consultation */ }
+    }
+    // The Stock Tracker's cached list is now out of date.
+    try { if (CO) CO.invalidate(['stock_']); } catch (e) {}
+  }
+
   loadFormulary();
   loadClinicInventory();
 
@@ -2306,6 +2378,11 @@
     clearSubmitBlock();
 
     if (!state.expectedRecovery) autoSetExpectedRecovery();
+
+    // Give every medicine being dispensed somewhere to be deducted FROM before
+    // the consultation is written — online or queued offline, both paths below
+    // read m.inventoryItemId.
+    await ensureShelfSlots(meds);
 
     const items = meds.map(m => ({
       drug_name:    m.drug,

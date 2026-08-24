@@ -241,10 +241,19 @@
       '.ucg-chip{display:inline-flex;align-items:center;gap:7px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:7px 8px 7px 13px;font-size:12.5px;font-weight:700;margin:0 6px 6px 0}',
       '.ucg-x{border:none;background:rgba(0,0,0,.10);color:inherit;width:19px;height:19px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;flex:none;font-family:inherit}',
       '.ucg-x:hover{background:#E0454B;color:#fff}',
-      '.ucg-drug{display:flex;align-items:center;gap:9px;padding:9px;border-radius:12px;background:var(--bg);margin-bottom:8px}',
-      '.ucg-drug .nm{flex:1;min-width:0}',
-      '.ucg-drug .nm b{font-size:13.5px;font-weight:800;color:var(--text);display:block;line-height:1.25}',
-      '.ucg-drug .nm span{font-size:11px;color:var(--text-lt)}',
+      '.ucg-drug{display:grid;grid-template-columns:1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px}',
+      '.ucg-drug .nm{grid-column:1;grid-row:1;min-width:0}',
+      '.ucg-drug .nm b{font-size:13.5px;font-weight:800;color:var(--text);display:block;line-height:1.3;overflow-wrap:anywhere}',
+      '.ucg-drug .nm span{font-size:11px;color:var(--text-lt);display:block;margin-top:1px}',
+      '.ucg-stk{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;line-height:1.6}',
+      '.ucg-stk.ok{background:rgba(46,125,50,.14);color:#2E7D32}',
+      '.ucg-stk.no{background:rgba(230,124,15,.16);color:#B35309}',
+      // Dark mode needs the lighter end of both colours to stay readable.
+      'html[data-theme="dark"] .ucg-stk.ok{color:#8FD79B}',
+      'html[data-theme="dark"] .ucg-stk.no{color:#F5B160}',
+      '.ucg-drug .fields{grid-column:1 / -1;grid-row:2;display:flex;gap:9px;align-items:end}',
+      '.ucg-drug .fields > div{flex:0 0 auto}',
+      '.ucg-drug .ucg-x{grid-column:2;grid-row:1;align-self:start}',
       '.ucg-num{width:44px;text-align:center;border:1.5px solid var(--border);border-radius:9px;padding:6px 2px;font:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text)}',
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
       '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
@@ -411,14 +420,16 @@
           (pkg.drugs.length ? pkg.drugs.map(function (d, i) {
             return '<div class="ucg-drug">' +
               '<div class="nm"><b>' + esc(d.drug) + '</b><span>' + esc(d.dosage || '') +
-                (d.from === 'learned' ? ' · your standard' : '') + '</span></div>' +
-              '<div><span class="ucg-lbl">×/day</span>' +
-                '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
-              '<div><span class="ucg-lbl">Days</span>' +
-                '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
-              '<div><span class="ucg-lbl">Qty</span>' +
-                '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
-              '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button></div>';
+                (d.from === 'learned' ? ' · your standard' : '') + '</span>' + stockNote(d) + '</div>' +
+              '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
+              '<div class="fields">' +
+                '<div><span class="ucg-lbl">×/day</span>' +
+                  '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
+                '<div><span class="ucg-lbl">Days</span>' +
+                  '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
+                '<div><span class="ucg-lbl">Qty</span>' +
+                  '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
+              '</div></div>';
           }).join('') : '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
         '</div>' +
         '<div id="ucgSearchWrap">' +
@@ -648,6 +659,12 @@
   }
 
   // Drug search: "amo" → Amoxicillin 250 mg / 500 mg → tap → dosage popup
+  // The medicine rows now carry a stock note, so the search sits lower down the
+  // sheet. Bring its results into view rather than leaving them below the fold.
+  function revealSearch(box) {
+    try { box.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {}
+  }
+
   function wireDrugSearch() {
     var inp = document.getElementById('ucgDrugSearch');
     var box = document.getElementById('ucgSearchRes');
@@ -692,7 +709,7 @@
         if (!found.length) {
           box.innerHTML = '<div style="color:var(--text-lt)">No match — “' + esc(q) +
             '” will be added as typed.<br><b>Tap to add</b></div>';
-          box.style.display = 'block';
+          box.style.display = 'block'; revealSearch(box);
           box.firstChild.onclick = function () { askDosage({ name: q, dose: '', unit: '' }); };
           return;
         }
@@ -709,7 +726,7 @@
             (m.src ? '<span class="em-src">EMHSLU</span>' : '') +
             '</div>';
         }).join('');
-        box.style.display = 'block';
+        box.style.display = 'block'; revealSearch(box);
         box.querySelectorAll('[data-i]').forEach(function (el) {
           el.onclick = function () { askDosage(found[Number(el.dataset.i)]); };
         });
@@ -885,6 +902,81 @@
     return out;
   }
 
+  // ── Linking a package drug to what is actually on the shelf ───────────────
+  // The package names a medicine the way the guideline writes it ("Artemether/
+  // Lumefantrine 20/120mg"); the shelf may hold it as "Coartem" or plain
+  // "Artemether Lumefantrine". Compare on the bare drug name with strengths,
+  // pack words and punctuation stripped, so the two meet.
+  function stockKey(s) {
+    return String(s || '')
+      .toLowerCase()
+      // strengths: 500mg, 20/120mg, 250 mg/5ml, 1g, 100000iu, 5mcg
+      .replace(/\d+(\.\d+)?\s*\/?\s*(\d+(\.\d+)?)?\s*(mg|mcg|ug|g|ml|l|iu|units?|%)\b/g, ' ')
+      .replace(/\b(tab|tabs|tablet|tablets|cap|caps|capsule|capsules|syr|syrup|susp|suspension|inj|injection|vial|amp|ampoule|cream|ointment|drops?)\b/g, ' ')
+      .replace(/[^a-z]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function stockList() {
+    if (state && Array.isArray(state.clinicInventory) && state.clinicInventory.length) return state.clinicInventory;
+    return window._stockItems || [];
+  }
+
+  // Returns the clinic_inventory row for this drug, or null when the clinic has
+  // never stocked it. Null is not a failure — the wizard opens a shelf slot for
+  // it at save time so the dispensing still shows up (and goes negative).
+  function matchStockId(name, dosage) {
+    var row = matchStockRow(name, dosage);
+    return row ? row.id : null;
+  }
+
+  // The guideline lists ALTERNATIVES, not a combined regimen — so say, on each
+  // row, whether the clinic actually holds that drug. Anything kept here is
+  // treated as dispensed and comes off the shelf.
+  function stockNote(d) {
+    var it = matchStockRow(d.drug, d.dosage);
+    if (it) {
+      var q = Number(it.quantity);
+      return '<span class="ucg-stk ok">in stock' +
+        (isFinite(q) ? ': ' + q + ' ' + esc(it.unit || 'units') : '') + '</span>';
+    }
+    return '<span class="ucg-stk no">not in your stock — remove if you are not giving it</span>';
+  }
+
+  function matchStockRow(name, dosage) {
+    var want = stockKey(name);
+    if (!want) return null;
+    var rows = stockList().filter(function (it) {
+      return it && it.id && it.item_type !== 'material' && it.is_active !== false;
+    });
+    var keys = rows.map(function (it) { return { it: it, k: stockKey(it.item_name) }; });
+
+    var hit = keys.find(function (r) { return r.k && r.k === want; });
+    if (hit) return hit.it;
+
+    // "Coartem" on the shelf vs "Coartem 20/120mg" in the package, or the other
+    // way round — one name contained in the other, longest word first so a
+    // short word like "zinc" cannot swallow an unrelated item.
+    hit = keys.filter(function (r) {
+      return r.k && want.length >= 4 && r.k.length >= 4 &&
+             (r.k.indexOf(want) === 0 || want.indexOf(r.k) === 0);
+    }).sort(function (a, b) { return b.k.length - a.k.length; })[0];
+    if (hit) return hit.it;
+
+    // Last resort: the strength distinguishes two shelf entries of the same
+    // drug (Amoxicillin 250mg vs 500mg) — prefer the one whose name carries it.
+    var dose = String(dosage || '').toLowerCase().replace(/\s+/g, '');
+    if (dose) {
+      hit = keys.find(function (r) {
+        return r.k && want.indexOf(r.k) >= 0 &&
+               String(r.it.item_name || '').toLowerCase().replace(/\s+/g, '').indexOf(dose) >= 0;
+      });
+      if (hit) return hit.it;
+    }
+    return null;
+  }
+
   function applyToWizard() {
     if (!state) return;
     // The wizard starts with one blank medicine row — drop it so the package
@@ -912,7 +1004,12 @@
         timesPerDay: tpd,
         intakeTimes: times,
         durationDays: Number(d.durationDays) > 0 ? Number(d.durationDays) : 5,
-        inventoryItemId: null,
+        // Link the drug to the clinic's stock so dispensing DEDUCTS it. This
+        // was left null, which meant every medicine the package added was
+        // filtered out of the stock deduction and never left the shelf on
+        // paper. Names are matched loosely (the package may carry the strength
+        // in the name, the shelf may not).
+        inventoryItemId: matchStockId(d.drug, d.dosage),
         qtyToDeduct: Number(d.qty) || 0,
       });
     });
