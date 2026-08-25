@@ -414,6 +414,11 @@
       return { key: k, name: name, parts: parts };
     });
     emLexicon.sort(function (a, b) { return b.key.length - a.key.length; });
+    // Never remember an EMPTY list. This is built the first time a medicine
+    // name has to be recognised, which can happen a moment before the national
+    // medicines list has finished loading — and remembering the empty answer
+    // would have switched off drug recovery for the rest of the session.
+    if (!emLexicon.length) { var empty = emLexicon; emLexicon = null; return empty; }
     return emLexicon;
   }
 
@@ -1533,7 +1538,14 @@
       var kids = rows(
         'SELECT c.id,c.title,c.page,(SELECT COUNT(*) FROM medicines m WHERE m.condition_id=c.id) n ' +
         'FROM conditions c WHERE c.number LIKE ? AND c.id<>? ORDER BY c.number LIMIT 8',
-        [self.number + '.%', condId]).filter(function (k) { return k.n > 0; });
+        [self.number + '.%', condId])
+        .filter(function (k) { return k.n > 0 || carriesTreatment(k); })
+        .map(function (k) {
+          return Object.assign({}, k, { tests: extractTests(
+            (rows('SELECT investigations FROM conditions WHERE id=? LIMIT 1', [k.id])[0] || {}).investigations, '').length });
+        })
+        .sort(function (a, b) { return (b.n - a.n) || (b.tests - a.tests); });
+      if (kids.length === 1) { open(kids[0].id, kids[0].title, severity, kids[0].page); return; }
       if (kids.length) { pickFrom(kids, title, severity); return; }
     }
 
@@ -1584,8 +1596,15 @@
     document.getElementById('ucgAskText').textContent =
       'Sections under “' + term + '” that carry a treatment package';
     document.getElementById('ucgAskDiff').innerHTML = list.map(function (h, i) {
-      return '<div data-h="' + i + '" style="cursor:pointer;padding:10px 4px;border-bottom:1px solid var(--border);font-weight:700">' +
-        esc(h.title) + (h.n ? '<span style="float:right;font-weight:600;color:var(--text-lt)">' + h.n + ' drugs</span>' : '') +
+      // Say what is in each one, so the choice can be made without opening
+      // them all to find out.
+      var what = [];
+      if (h.n)     what.push(h.n + ' medicine' + (h.n !== 1 ? 's' : ''));
+      if (h.tests) what.push(h.tests + ' lab test' + (h.tests !== 1 ? 's' : ''));
+      return '<div data-h="' + i + '" style="cursor:pointer;padding:11px 4px;border-bottom:1px solid var(--border)">' +
+        '<div style="font-weight:700;line-height:1.35">' + esc(h.title) + '</div>' +
+        (what.length ? '<div style="font-size:11.5px;font-weight:600;color:var(--text-lt);margin-top:2px">' +
+          what.join(' · ') + '</div>' : '') +
         '</div>';
     }).join('');
     document.getElementById('ucgAskYes').style.display = 'none';
@@ -1815,11 +1834,19 @@
       open(null, term, severity, null);
       return;
     }
-    // Prefer sections that actually carry a treatment package.
+    // Only offer sections that actually carry a treatment. Typing "Malaria"
+    // used to list seven, four of them empty or holding another disease's text
+    // entirely; the clinician had to open each one to find that out.
     hits = hits.map(function (h) {
-      var n = rows('SELECT COUNT(*) n FROM medicines WHERE condition_id=?', [h.id])[0];
-      return Object.assign({}, h, { n: (n && n.n) || 0 });
-    }).sort(function (a, b) { return b.n - a.n; });
+      var p = packInfo(h.id);
+      return Object.assign({}, h, { n: p.n, tests: extractTests(
+        (rows('SELECT investigations FROM conditions WHERE id=? LIMIT 1', [h.id])[0] || {}).investigations, '').length });
+    });
+    var real = hits.filter(carriesTreatment);
+    // Never leave the clinician with nothing: if none of them carries a
+    // treatment, offer what there is rather than pretending there is nothing.
+    if (real.length) hits = real;
+    hits.sort(function (a, b) { return (b.n - a.n) || (b.tests - a.tests) || (a.title.length - b.title.length); });
     if (hits.length === 1) { open(hits[0].id, hits[0].title, severity, hits[0].page); return; }
 
     pickFrom(hits, term, severity);
@@ -1846,6 +1873,83 @@
     'Measles', 'Chickenpox', 'Mumps', 'Meningitis', 'Hepatitis', 'Snake bite',
     'Antenatal care', 'Malaria prophylaxis', 'Family planning', 'Immunisation',
   ];
+
+  // ── What each section of the book actually carries ────────────────────────
+  // Typing "Malaria" was offering seven sections, and four of them had nothing
+  // in them: "Malaria" and "Uncomplicated Malaria" carry no medicines and no
+  // management text at all, and "Malaria Prophylaxis" and "Malaria Prevention
+  // and Control" hold text about tsetse flies and trypanosomes — sleeping
+  // sickness, wrongly attached to a malaria heading when the book was
+  // extracted. Offering those wastes the clinician's time at best.
+  //
+  // One query, read once, tells us which sections are worth offering.
+  var packIndex = null;
+  function packInfo(condId) {
+    if (!packIndex) {
+      packIndex = {};
+      try {
+        rows('SELECT c.id AS id, length(coalesce(c.management,\'\')) AS mg, ' +
+             'length(coalesce(c.investigations,\'\')) AS inv, ' +
+             '(SELECT COUNT(*) FROM medicines m WHERE m.condition_id = c.id) AS n ' +
+             'FROM conditions c', [])
+          .forEach(function (r) { packIndex[r.id] = { n: r.n || 0, mg: r.mg || 0, inv: r.inv || 0 }; });
+      } catch (e) { packIndex = {}; }
+    }
+    return packIndex[condId] || { n: 0, mg: 0, inv: 0 };
+  }
+
+  // Does this section's own prose actually prescribe anything? A dose, or one
+  // of the programme abbreviations. This is what keeps "Recommended First Line
+  // Regimens" — which lists ARVs only as TDF+3TC+DTG and so has no extracted
+  // medicines and almost no management text.
+  var dosedCache = {};
+  function hasDosedProse(condId) {
+    if (dosedCache[condId] !== undefined) return dosedCache[condId];
+    var out = false;
+    try {
+      var c = rows('SELECT management,prevention,notes FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+      var prose = c ? [c.management, c.prevention, c.notes].filter(Boolean).join(' ') : '';
+      out = DOSE_ON_LINE.test(prose) || MED_ABBREV.some(function (pair) {
+        var at = prose.indexOf(pair[0]);
+        if (at < 0) return false;
+        var before = at > 0 ? prose.charAt(at - 1) : ' ';
+        var after = prose.charAt(at + pair[0].length) || ' ';
+        return !/[A-Za-z0-9]/.test(before) && !/[A-Za-z0-9]/.test(after);
+      });
+    } catch (e) {}
+    dosedCache[condId] = out;
+    return out;
+  }
+
+  // Is this section worth offering? It lists medicines, or it prescribes
+  // something in its prose, or it carries real guidance — what to do, or what
+  // to investigate. Counting investigations matters: the asthma section holds
+  // almost all of its instruction there rather than under management.
+  //
+  // This is used RELATIVELY, never as a blanket rule. A thin section is only
+  // dropped when a better one matched the same search, so a condition can
+  // never disappear just because the book is thin on it — "Ectopic Pregnancy"
+  // has barely 370 characters and must still be findable.
+  function carriesGuidance(condId) {
+    var p = packInfo(condId);
+    return p.n > 0 || (p.mg + p.inv) >= 400 || hasDosedProse(condId);
+  }
+
+  // Worth offering as a TREATMENT package, which is what the chooser is for:
+  // it must have medicines — from the book's own list, or recovered from its
+  // prose — or lab tests backed by real guidance.
+  function carriesTreatment(cond) {
+    var p = packInfo(cond.id);
+    if (p.n > 0) return true;
+    if (p.inv > 0 && (p.mg + p.inv) >= 400) return true;
+    try {
+      var c = rows('SELECT management,prevention,notes FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
+      if (!c) return false;
+      var prose = [c.management, c.prevention, c.notes].filter(Boolean).join('\n');
+      if (!prose.trim()) return false;
+      return findMissingDrugs(prose, [], rankMarkers(prose)).length > 0;
+    } catch (e) { return false; }
+  }
 
   function learnedTitles() {
     var out = [];
@@ -1918,24 +2022,54 @@
       seen[k] = 1;
       out.push({ title: t, tag: tag });
     }
+    // The same condition under two spellings is one suggestion, not two:
+    // "Malaria (uncomplicated)" from the built-in list and "Uncomplicated
+    // Malaria" from the book are the same thing.
+    var SMALL = { and: 1, the: 1, of: 1, in: 1, for: 1, with: 1, or: 1, a: 1, an: 1 };
+    var byWords = {};
+    function wordKey(t) {
+      return String(t || '').toLowerCase().split(/[^a-z0-9]+/)
+        .filter(function (w) { return w && !SMALL[w]; }).sort().join(' ');
+    }
+    function addOnce(t, tag) {
+      var wk = wordKey(t);
+      if (wk && byWords[wk]) return;
+      if (wk) byWords[wk] = 1;
+      add(t, tag);
+    }
+
     // 1. the clinic's own standards come first — these are its real caseload
     learnedTitles().forEach(function (t) {
-      if (t.toLowerCase().indexOf(q) >= 0) add(t, 'your standard');
+      if (t.toLowerCase().indexOf(q) >= 0) addOnce(t, 'your standard');
     });
-    // 2. common conditions
-    COMMON_DX.filter(function (t) { return t.toLowerCase().indexOf(q) >= 0; })
-      .sort(function (a, b) {
-        var ap = a.toLowerCase().indexOf(q) === 0 ? 0 : 1;
-        var bp = b.toLowerCase().indexOf(q) === 0 ? 0 : 1;
-        return ap - bp || a.length - b.length;
-      }).forEach(function (t) { add(t, ''); });
-    // 3. the guidelines, when they are already loaded (never blocks typing)
+
+    // 2. The book itself — but only sections that actually carry something.
+    // This is what the clinician will end up opening, so it is what should be
+    // offered; the built-in list below is only a fallback for anything the
+    // guidelines do not cover.
+    var fromBook = 0;
     if (db) {
       try {
-        rows('SELECT title FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 10',
-             ['%' + q + '%']).forEach(function (r) { add(r.title, 'UCG 2023'); });
+        var found = rows('SELECT id,title FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 24',
+                         ['%' + q + '%']);
+        var strong = found.filter(function (r) { return carriesGuidance(r.id); });
+        // Drop the thin sections only when there is something better to offer.
+        (strong.length ? strong : found).slice(0, 8)
+          .forEach(function (r) { fromBook++; addOnce(r.title, 'UCG 2023'); });
       } catch (e) {}
     }
+
+    // 3. The built-in list of everyday conditions — only when the book gave us
+    // nothing, so a clinician is never left with an empty box.
+    if (!out.length || !fromBook) {
+      COMMON_DX.filter(function (t) { return t.toLowerCase().indexOf(q) >= 0; })
+        .sort(function (a, b) {
+          var ap = a.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+          var bp = b.toLowerCase().indexOf(q) === 0 ? 0 : 1;
+          return ap - bp || a.length - b.length;
+        }).forEach(function (t) { addOnce(t, ''); });
+    }
+
     // 4. Nothing matched the letters exactly — so it was probably mistyped.
     // Only now, and only for a word long enough to be sure of, so the ordinary
     // case costs nothing.
@@ -1967,7 +2101,17 @@
     // Warm the guideline database the moment the clinician starts typing, so
     // the fuller list is ready a keystroke or two later.
     var warmed = false;
-    function warm() { if (warmed) return; warmed = true; openDb().catch(function () {}); }
+    // Open the guideline database the moment typing starts, and paint the list
+    // again once it is in — otherwise the first word a clinician types is
+    // answered from the small built-in list, and the real sections of the book
+    // only appear if they happen to type another letter.
+    function warm() {
+      if (warmed) return;
+      warmed = true;
+      openDb().then(function () {
+        if (document.activeElement === inp && String(inp.value || '').trim().length >= 2) paint();
+      }).catch(function () {});
+    }
 
     var t, justPicked = false;
     function paint() {

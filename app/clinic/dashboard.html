@@ -136,16 +136,17 @@
 
     /* ── Stock slide: soft cards ── */
     .stock-card{background:var(--surface,#fff);border-radius:var(--radius,18px);box-shadow:var(--shadow);padding:14px;margin:0 0 11px}
-    .stock-top{display:flex;align-items:center;gap:12px}
+    .stock-top{display:flex;align-items:flex-start;gap:12px}
     .stock-ic{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;flex:none;background:var(--accent-v-tint,#ECE9FF);color:var(--accent-v,#6C5CE7)}
     .stock-ic.material{background:#DBEFFB;color:#1565C0}
     .stock-ic .material-icons-outlined{font-size:22px}
-    .stock-name{flex:1;min-width:0;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.01em;display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+    .stock-name{flex:1;min-width:0;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.01em;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}
+    .stock-name .pill-s{margin-left:6px}
     .stock-restock{font-size:11.5px;padding:8px 13px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border:none;border-radius:11px;cursor:pointer;font-weight:800;font-family:inherit;white-space:nowrap;flex:none}
     .stock-meta{font-size:11.5px;color:var(--text-lt);margin-top:8px}
     .stock-bar{height:7px;border-radius:999px;background:var(--border,#E8EAED);margin-top:9px;overflow:hidden}
     .stock-bar i{display:block;height:100%;border-radius:999px;transition:width .5s ease}
-    .pill-s{font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
+    .pill-s{display:inline-block;vertical-align:2px;font-size:10px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.02em;white-space:nowrap}
     .pill-s.crit{background:#FBE1DE;color:#C62828}
     .pill-s.warn{background:#FCEFCF;color:#C77E06}
     .pill-s.exp-crit{background:#E0454B;color:#fff}
