@@ -121,7 +121,12 @@
     var prev = all[k];
     all[k] = {
       title: ctx.title, severity: sev || 'any',
-      tests: p.tests.slice(), drugs: JSON.parse(JSON.stringify(p.drugs)),
+      tests: p.tests.slice(),
+      // The standard is what this clinic actually gives — so save the ticked
+      // medicines, not the whole menu of alternatives the guideline offers.
+      drugs: JSON.parse(JSON.stringify(p.drugs.filter(function (d) {
+        return d.selected && (d.group || 'treatment') !== 'other';
+      }))),
       fees: { consult: p.fees.consult, lab: p.fees.lab, meds: p.fees.meds },
       followUpDays: p.followUpDays,
       uses: (prev && prev.uses || 0) + 1,
@@ -145,9 +150,62 @@
   }
 
   // ── Build a package from the guideline ───────────────────────────────────
-  var TEST_HINTS = ['RDT', 'smear', 'microscopy', 'culture', 'x-ray', 'xray', 'ultrasound',
-    'CBC', 'FBC', 'ESR', 'CRP', 'glucose', 'sugar', 'urinalysis', 'stool', 'HIV',
-    'widal', 'LFT', 'RFT', 'electrolyte', 'biopsy', 'ECG', 'blood', 'test', 'scan', 'count'];
+  // ── Lab tests, as opposed to the investigations text ──────────────────────
+  // These are two different things and were being confused. "Investigations" is
+  // what the guideline SAYS — prose, several sentences, worth reading. A lab
+  // test is a NAMED thing you order, print on a form and charge for.
+  //
+  // The old code took any line of the prose that happened to contain a word
+  // like "blood" and offered it as a test, which is how chips reading "A blood
+  // slide for microscopy is specifically recommended over" ended up on screen —
+  // half a sentence, ordered as a test. Now the prose is searched for the tests
+  // the clinic actually runs, and the test's own proper name is what appears.
+  // The prose itself is kept, in the guideline notes, where it belongs.
+  var LAB_MAP = [
+    [/\bm?RDT\b|rapid diagnostic test/i,                                   'Malaria RDT'],
+    [/malaria pcr/i,                                                       'Malaria PCR'],
+    [/thin (blood )?(film|smear)|speciation/i,                             'Thin Blood Smear'],
+    [/blood slide|thick (blood )?(film|smear)|blood smear|blood film|malaria microscopy/i, 'Thick Blood Smear'],
+    [/\b(CBC|FBC)\b|complete blood count|full blood count|haemogram|blood count|white cell count|platelet count/i, 'Full Blood Count (FBC)'],
+    [/\bESR\b|erythrocyte sedimentation/i,                                 'ESR'],
+    [/\bCRP\b|c-?reactive protein/i,                                       'CRP'],
+    [/blood group|grouping and cross|cross-?match|rhesus/i,                'Blood Group & Rhesus'],
+    [/hba1c|glycated h/i,                                                  'HbA1c'],
+    [/fasting blood (sugar|glucose)|\bFBS\b/i,                             'Fasting Blood Sugar'],
+    [/random blood (sugar|glucose)|\bRBS\b/i,                              'Blood Sugar (Random)'],
+    [/blood (sugar|glucose)|hypoglyca?emia|glucometer/i,                   'Blood Glucose (POC)'],
+    [/liver function|\bLFTs?\b|transaminase|\bALT\b|\bAST\b|bilirubin/i,   'Liver Function Tests (LFTs)'],
+    [/renal function|kidney function|\bRFTs?\b|creatinine|\burea\b/i,      'Kidney Function (Creatinine)'],
+    [/electrolytes?|serum sodium|serum potassium/i,                        'Serum Electrolytes'],
+    [/blood culture/i,                                                     'Blood Culture & Sensitivity'],
+    [/urine culture/i,                                                     'Urine Culture & Sensitivity'],
+    [/urine microscopy/i,                                                  'Urine Microscopy'],
+    [/urinalysis|urine dipstick|dipstick|urine for/i,                      'Urinalysis (Dipstick)'],
+    [/stool culture/i,                                                     'Stool Culture & Sensitivity'],
+    [/h\.? ?pylori/i,                                                      'H. Pylori (Stool Antigen)'],
+    [/stool (microscopy|examination|analysis)|ova and parasites|stool for/i, 'Stool Microscopy (Ova & Parasites)'],
+    [/\bCD4\b/i,                                                           'CD4 Count'],
+    [/\bHIV\b[^.]{0,30}(test|serology|screen|status)|test(ing)? for HIV/i, 'HIV Rapid Test'],
+    [/hepatitis b|hbsag/i,                                                 'Hepatitis B (HBsAg)'],
+    [/hepatitis c|\bHCV\b/i,                                               'Hepatitis C (HCV)'],
+    [/\bVDRL\b|\bRPR\b|syphilis|treponem/i,                                'Syphilis (VDRL/RPR)'],
+    [/widal/i,                                                             'Widal (Typhoid)'],
+    [/brucella/i,                                                          'Brucella Agglutination'],
+    [/gene ?xpert|\bXpert\b|MTB\/RIF/i,                                    'TB GeneXpert'],
+    [/sputum[^.]{0,30}(AFB|smear|microscopy|ZN)|acid.?fast|ziehl/i,        'TB Sputum AFB Smear'],
+    [/chest x-?ray|\bCXR\b/i,                                              'Chest X-Ray'],
+    [/x-?ray|radiograph/i,                                                 'X-Ray'],
+    [/ultra-? ?sound|\bUSS\b/i,                                            'Ultrasound'],
+    [/\bECG\b|electrocardio/i,                                             'ECG'],
+    [/pregnancy test|\bhCG\b|\bUPT\b/i,                                    'Pregnancy Test (uHCG)'],
+    [/pulse ?oxim|\bSpO2\b|oxygen saturation/i,                            'Pulse Oximetry (SpO2)'],
+    [/lumbar puncture|\bCSF\b|cerebrospinal/i,                             'Lumbar Puncture (CSF)'],
+    [/sickling|sickle cell (test|screen)|haemoglobin electrophoresis/i,    'Sickling Test'],
+    [/ha?emoglobin (level|estimation|concentration)|\bHb\b/i,              'Haemoglobin (Hb)'],
+    [/gram stain/i,                                                        'Gram Stain & Microscopy'],
+    [/high vaginal swab|\bHVS\b|wet (prep|mount|preparation)/i,            'Wet Prep / HVS'],
+    [/blood pressure|\bBP\b/i,                                             'BP Measurement'],
+  ];
 
   function extractTests(investigations, fullText) {
     var src = investigations || '';
@@ -155,18 +213,67 @@
       var m = /investigations?\s*[:\n]([\s\S]{0,700})/i.exec(fullText);
       src = m ? m[1] : '';
     }
-    var out = [], seen = {};
-    src.split('\n').forEach(function (raw) {
-      var l = raw.replace(/^[\s•~\-–•]+/, '').trim();
-      if (l.length < 3 || l.length > 90) return;
-      if (!TEST_HINTS.some(function (h) { return l.toLowerCase().indexOf(h.toLowerCase()) >= 0; })) return;
-      l = l.replace(/^(do|perform|order|take|check|obtain)\s+(a|an|the)?\s*/i, '').trim();
-      l = l.charAt(0).toUpperCase() + l.slice(1);
-      var k = l.toLowerCase();
-      if (seen[k]) return;
-      seen[k] = 1; out.push(l);
-      });
-    return out.slice(0, 8);
+    if (!src.trim()) return [];
+    // Where in the text each test is first named, so they come out in the
+    // order the guideline mentions them rather than the order of this table.
+    var found = [];
+    LAB_MAP.forEach(function (pair) {
+      var hit = pair[0].exec(src);
+      if (!hit) return;
+      if (found.some(function (f) { return f.name === pair[1]; })) return;
+      found.push({ name: pair[1], at: hit.index });
+    });
+    found.sort(function (a, b) { return a.at - b.at; });
+    return found.map(function (f) { return f.name; }).slice(0, 10);
+  }
+
+  // ── Which of the guideline's lines are really medicines ───────────────────
+  // The medicines were lifted out of the same PDF as everything else, so beside
+  // the real drugs the list carries pieces of the sentences they were printed
+  // in — "Re-assure patient", "Increase if necessary to", "Alternatives". Those
+  // are not medicines and must not be offered as ones. Everything that IS a
+  // medicine has to be shown, though: severe malaria carries thirteen, and only
+  // the first six were ever reaching the screen.
+
+  // A line that opens with an instruction is a sentence, not a drug.
+  var MED_VERB = /^(give|apply|treat|increase|decrease|reduce|start|continue|stop|repeat|re-?assure|prevent|relieve|followed?|transfuse|de-?worm|assess|monitor|refer|admit|add|use|take|check|avoid|consider|maintain|slowly|manage|correct|control|administer|ensure|advise|encourage|observe|review|do|if|for|in|with|and|or|the|a|an|about|when|where|after|before|then|also|may|can|should)\b/i;
+  // Bare labels off the page that are never the name of a medicine.
+  var MED_NOISE = /^(alternatives?|maintenance dose|toxic dose|doses?|about|elderly|initially|combination|adults?|children|infants?|neonates?|daily fluid requirements?|basic total fluid|oliguria|anuria|fibrosis|varices present|notes?|cautions?|others?|regimens?|(first|second|third) line( medicine| alternative)?|dosage|treatment|management|prevention|prophylaxis|indications?|contraindications?)$/i;
+
+  // Fluids and rehydration — the drips. They were being dropped along with
+  // everything else past the sixth medicine.
+  var MED_FLUID = /(dextrose|glucose\s*\d|sodium chloride|normal saline|\bsaline\b|ringer|hartmann|water for injection|oral rehydration|\bORS\b|sodium bicarbonate|packed cells|whole blood|plasma)/i;
+
+  function isMedicineName(name) {
+    var n = String(name || '').trim();
+    if (n.length < 3 || n.length > 60) return false;
+    if (MED_NOISE.test(n)) return false;
+    if (MED_VERB.test(n)) return false;
+    // A drug name is short. Anything running on is a sentence that lost its verb.
+    var words = n.split(/\s+/);
+    if (words.length > 4) return false;
+    // …and it has to contain a real word, not just numbers and symbols.
+    return /[A-Za-z]{4}/.test(n);
+  }
+
+  // The guideline usually prints supportive treatment as "<what for> Give <drug>"
+  // — "Convulsions Give diazepam 0.2 mg/kg". That prefix is the single most
+  // useful thing on the row, so pull it out and show it.
+  function medReason(sourceLine) {
+    var s = String(sourceLine || '').trim();
+    var m = /^(?:If\s+)?([A-Z][^.:]{2,44}?)\s*[:]\s*Give\b/.exec(s) ||
+            /^(?:If\s+)?([A-Z][A-Za-z\s\-/]{2,44}?)\s+Give\b/.exec(s) ||
+            /^If\s+([^.:]{3,44})[:.]/.exec(s);
+    if (!m) return '';
+    var r = m[1].trim().replace(/\s+/g, ' ');
+    if (!r || MED_VERB.test(r)) return '';
+    return r.charAt(0).toUpperCase() + r.slice(1);
+  }
+
+  function medGroup(name, sourceLine, reason) {
+    if (MED_FLUID.test(name)) return 'fluid';
+    if (reason) return 'supportive';
+    return 'treatment';
   }
 
   // frequency text → times/day (so quantity can be computed)
@@ -194,20 +301,50 @@
       investigations: c.investigations, management: c.management, complications: c.complications,
       prevention: c.prevention, notes: c.notes, full_text: c.full_text,
     };
-    var meds = rows('SELECT name,dose,unit,route,frequency,duration FROM medicines WHERE condition_id=? ORDER BY id LIMIT 12', [condId]);
-    // Prefer medicines whose source line matches the chosen severity.
+    // EVERY medicine the guideline lists for this condition — no cap. The old
+    // "LIMIT 12 … slice(0,6)" silently threw away the rest, which is why the
+    // drips and the treatment of complications were never on screen.
+    var meds = rows('SELECT name,dose,unit,route,frequency,duration,source_line ' +
+                    'FROM medicines WHERE condition_id=? ORDER BY id', [condId]);
     var drugs = meds.map(function (m) {
       var tpd = freqPerDay(m.frequency), dd = durDays(m.duration);
+      var reason = medReason(m.source_line);
+      // Not a drug name but a piece of the sentence it was printed in. It is
+      // still something the guideline says, so it is kept and shown as the line
+      // it came from — never dropped, never offered as a medicine to dispense.
+      if (!isMedicineName(m.name)) {
+        var line = String(m.source_line || m.name || '').trim().replace(/\s+/g, ' ');
+        return { drug: m.name, text: line, group: 'other', selected: false, from: 'guideline' };
+      }
       return {
         drug: m.name + (m.dose ? ' ' + m.dose + (m.unit || '') : ''),
         dosage: (m.dose ? m.dose + (m.unit || '') : '') + (m.route ? ' ' + m.route : ''),
         timesPerDay: tpd, durationDays: dd,
         qty: tpd * dd,
         from: 'guideline',
+        reason: reason,
+        group: medGroup(m.name, m.source_line, reason),
       };
     }).filter(function (d, i, a) {
-      return a.findIndex(function (x) { return x.drug.toLowerCase() === d.drug.toLowerCase(); }) === i;
-    }).slice(0, 6);
+      var k = (d.group === 'other' ? d.text : d.drug).toLowerCase();
+      return a.findIndex(function (x) {
+        return (x.group === 'other' ? x.text : x.drug).toLowerCase() === k;
+      }) === i;
+    }).filter(function (d) {
+      return d.group !== 'other' || (d.text && d.text.length >= 6);
+    });
+
+    // What gets prescribed is a clinical decision, and the guideline is usually
+    // offering a CHOICE ("first line … first line alternative … second line"),
+    // not a combined course. So the app ticks a medicine for you only when the
+    // guideline names exactly one treatment; otherwise everything is listed and
+    // the clinician taps what is actually being given. Supportive treatment and
+    // drips are never ticked for you — they are for if the patient needs them.
+    var mainOnes = drugs.filter(function (d) { return d.group === 'treatment'; });
+    drugs.forEach(function (d) {
+      d.selected = (mainOnes.length === 1 && d.group === 'treatment');
+    });
+
     return {
       tests: extractTests(c.investigations, c.full_text),
       drugs: drugs,
@@ -241,8 +378,28 @@
       '.ucg-chip{display:inline-flex;align-items:center;gap:7px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:7px 8px 7px 13px;font-size:12.5px;font-weight:700;margin:0 6px 6px 0}',
       '.ucg-x{border:none;background:rgba(0,0,0,.10);color:inherit;width:19px;height:19px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;flex:none;font-family:inherit}',
       '.ucg-x:hover{background:#E0454B;color:#fff}',
-      '.ucg-drug{display:grid;grid-template-columns:1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px}',
-      '.ucg-drug .nm{grid-column:1;grid-row:1;min-width:0}',
+      // Each kind of medicine under its own heading, so it is clear what is a
+      // choice of treatment and what is there for a complication.
+      '.ucg-mg{margin-bottom:12px}',
+      '.ucg-mgh{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:#0B6B4F;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 3px}',
+      '.ucg-mgh span{background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:0 7px;font-size:10px;letter-spacing:0}',
+      '.ucg-mgi{font-size:11px;color:var(--text-lt);line-height:1.4;margin-bottom:7px}',
+      '.ucg-note{font-size:12px;color:var(--text-lt);line-height:1.5;padding:7px 11px;border-left:2px solid var(--border);margin-bottom:6px}',
+      '.ucg-pick{display:flex;gap:8px;align-items:flex-start;background:rgba(230,124,15,.14);color:#8A4B04;' +
+        'border-radius:11px;padding:9px 11px;margin-bottom:11px;font-size:12px;line-height:1.45;font-weight:600}',
+      '.ucg-pick .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
+      'html[data-theme="dark"] .ucg-pick{color:#F5C089;background:rgba(230,124,15,.18)}',
+      'html[data-theme="dark"] .ucg-mgh{color:#5FD3A8}',
+      // The tick is what says "this one is being given" — untapped rows are
+      // shown but nothing is prescribed or taken off the shelf for them.
+      '.ucg-tick{grid-column:1;grid-row:1;align-self:start;width:26px;height:26px;border-radius:9px;border:1.5px solid var(--border);' +
+        'background:var(--surface);color:var(--text-lt);display:grid;place-items:center;cursor:pointer;font-family:inherit;flex:none;margin-right:2px}',
+      '.ucg-tick .material-icons-outlined{font-size:16px}',
+      '.ucg-tick.on{background:#0E7C5A;border-color:#0E7C5A;color:#fff}',
+      '.ucg-drug{display:grid;grid-template-columns:auto 1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px;opacity:.72}',
+      '.ucg-drug.on{opacity:1;background:var(--brand-tint,#EAF7F1)}',
+      'html[data-theme="dark"] .ucg-drug.on{background:rgba(14,124,90,.20)}',
+      '.ucg-drug .nm{grid-column:2;grid-row:1;min-width:0}',
       '.ucg-drug .nm b{font-size:13.5px;font-weight:800;color:var(--text);display:block;line-height:1.3;overflow-wrap:anywhere}',
       '.ucg-drug .nm span{font-size:11px;color:var(--text-lt);display:block;margin-top:1px}',
       '.ucg-stk{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;line-height:1.6}',
@@ -253,7 +410,7 @@
       'html[data-theme="dark"] .ucg-stk.no{color:#F5B160}',
       '.ucg-drug .fields{grid-column:1 / -1;grid-row:2;display:flex;gap:9px;align-items:end}',
       '.ucg-drug .fields > div{flex:0 0 auto}',
-      '.ucg-drug .ucg-x{grid-column:2;grid-row:1;align-self:start}',
+      '.ucg-drug .ucg-x{grid-column:3;grid-row:1;align-self:start}',
       '.ucg-num{width:44px;text-align:center;border:1.5px solid var(--border);border-radius:9px;padding:6px 2px;font:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text)}',
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
       '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
@@ -409,10 +566,67 @@
 
   function close() { var o = document.getElementById('ucgOverlay'); if (o) o.style.display = 'none'; }
 
+  // The guideline's medicines, laid out the way the book means them: the
+  // treatment (usually a CHOICE, not a course), the supportive treatment for
+  // complications, the drips, and — kept, not thrown away — the lines that are
+  // not a medicine at all but that the guideline still says.
+  var MED_GROUPS = [
+    { key: 'treatment',  title: 'Treatment',
+      hint: 'The guideline usually offers a choice here — tap the one you are giving.' },
+    { key: 'supportive', title: 'Supportive treatment',
+      hint: 'For complications, if the patient has them.' },
+    { key: 'fluid',      title: 'Drips, fluids &amp; blood',
+      hint: 'IV fluids and rehydration.' },
+    { key: 'other',      title: 'Also in the guideline',
+      hint: 'The guideline says this, but it is not a medicine the app can add for you — use the search below.' },
+  ];
+
+  function drugRowHtml(d, i) {
+    if (d.group === 'other') {
+      return '<div class="ucg-note">' + esc(d.text || d.drug) + '</div>';
+    }
+    var on = !!d.selected;
+    return '<div class="ucg-drug' + (on ? ' on' : '') + '">' +
+      '<button class="ucg-tick' + (on ? ' on' : '') + '" data-tick="' + i + '" ' +
+        'aria-pressed="' + on + '" title="' + (on ? 'Giving this' : 'Tap to give this') + '">' +
+        '<span class="material-icons-outlined">' + (on ? 'check' : 'add') + '</span></button>' +
+      '<div class="nm"><b>' + esc(d.drug) + '</b><span>' + esc(d.dosage || '') +
+        (d.reason ? ' · for ' + esc(d.reason.toLowerCase()) : '') +
+        (d.from === 'learned' ? ' · your standard' : '') + '</span>' +
+        (on ? stockNote(d) : '') + '</div>' +
+      '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
+      (on ? '<div class="fields">' +
+        '<div><span class="ucg-lbl">×/day</span>' +
+          '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
+        '<div><span class="ucg-lbl">Days</span>' +
+          '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
+        '<div><span class="ucg-lbl">Qty</span>' +
+          '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
+      '</div>' : '') +
+    '</div>';
+  }
+
+  function drugGroupsHtml() {
+    return MED_GROUPS.map(function (g) {
+      var rows = pkg.drugs.map(function (d, i) { return { d: d, i: i }; })
+        .filter(function (r) { return (r.d.group || 'treatment') === g.key; });
+      if (!rows.length) return '';
+      return '<div class="ucg-mg"><div class="ucg-mgh">' + g.title +
+             '<span>' + rows.length + '</span></div>' +
+             '<div class="ucg-mgi">' + g.hint + '</div>' +
+             rows.map(function (r) { return drugRowHtml(r.d, r.i); }).join('') + '</div>';
+    }).join('');
+  }
+
   // ── Render ───────────────────────────────────────────────────────────────
   function render() {
     var b = document.getElementById('ucgBody');
-    var totalQty = pkg.drugs.reduce(function (s, d) { return s + (Number(d.qty) || 0); }, 0);
+    var giveable = pkg.drugs.filter(function (d) { return (d.group || 'treatment') !== 'other'; });
+    var nGiveable = giveable.length;
+    var nSel = giveable.filter(function (d) { return d.selected; }).length;
+    var totalQty = pkg.drugs.reduce(function (s, d) {
+      return s + (d.selected ? (Number(d.qty) || 0) : 0);
+    }, 0);
     b.innerHTML =
       '<div class="ucg-src">From the Uganda Clinical Guidelines 2023' +
         (ctx.page ? ' · p.' + esc(ctx.page) : '') +
@@ -420,7 +634,7 @@
 
       // ① Investigations
       '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">1</span>' +
-        '<h4>Investigations / lab tests</h4><span class="ucg-count">' + pkg.tests.length + '</span></div>' +
+        '<h4>Lab tests to order</h4><span class="ucg-count">' + pkg.tests.length + '</span></div>' +
         '<div class="ucg-rows" id="ucgTests">' +
           (pkg.tests.length ? pkg.tests.map(function (t, i) {
             return '<span class="ucg-chip">' + esc(t) +
@@ -431,23 +645,17 @@
 
       // ② Medicines
       '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">2</span>' +
-        '<h4>Medicines &amp; dosage</h4><span class="ucg-count">' + pkg.drugs.length +
-        ' · ' + totalQty + ' units</span></div>' +
+        '<h4>Medicines &amp; dosage</h4><span class="ucg-count">' + nSel +
+        ' of ' + nGiveable + ' · ' + totalQty + ' units</span></div>' +
         '<div class="ucg-rows" id="ucgDrugs">' +
-          (pkg.drugs.length ? pkg.drugs.map(function (d, i) {
-            return '<div class="ucg-drug">' +
-              '<div class="nm"><b>' + esc(d.drug) + '</b><span>' + esc(d.dosage || '') +
-                (d.from === 'learned' ? ' · your standard' : '') + '</span>' + stockNote(d) + '</div>' +
-              '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
-              '<div class="fields">' +
-                '<div><span class="ucg-lbl">×/day</span>' +
-                  '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
-                '<div><span class="ucg-lbl">Days</span>' +
-                  '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
-                '<div><span class="ucg-lbl">Qty</span>' +
-                  '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
-              '</div></div>';
-          }).join('') : '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
+          // Easy to miss otherwise, and the consequence is a consultation saved
+          // with no medicine on it.
+          (nGiveable && !nSel ? '<div class="ucg-pick" id="ucgPick">' +
+            '<span class="material-icons-outlined">touch_app</span>' +
+            '<span>Nothing ticked yet. Tap <b>+</b> on each medicine you are giving — ' +
+            'nothing is prescribed, and nothing leaves the shelf, until you do.</span></div>' : '') +
+          (pkg.drugs.length ? drugGroupsHtml() :
+            '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
         '</div>' +
         '<div id="ucgSearchWrap">' +
           '<input id="ucgDrugSearch" placeholder="Search a drug to add — type e.g. amo…" autocomplete="off">' +
@@ -654,12 +862,14 @@
       d('Management (guideline)', i.management, 'medical_information') +
       d('What to look for — clinical features', i.clinical_features, 'visibility') +
       d('If you are not certain — other possibilities', i.differential, 'help_outline') +
-      d('Investigations in full', i.investigations, 'biotech') +
+      d('Investigations — what the guideline says', i.investigations, 'biotech') +
       d('Complications to watch for', i.complications, 'warning_amber') +
       d('Causes / risk factors', i.causes, 'coronavirus') +
       d('Prevention & advice for the patient', i.prevention, 'health_and_safety') +
-      d('Notes & cautions', i.notes, 'sticky_note_2') +
-      d('Full guideline text (source)', i.full_text, 'menu_book');
+      // "Full guideline text (source)" used to sit here. It was the same page
+      // over again — every one of the panels above is cut from it — so it only
+      // made the section long enough to hide the parts that matter.
+      d('Notes & cautions', i.notes, 'sticky_note_2');
     return html || '<div style="font-size:12.5px;color:var(--text-lt)">No extra guideline detail for this section.</div>';
   }
 
@@ -676,6 +886,16 @@
     });
     body.querySelectorAll('[data-rmdrug]').forEach(function (b) {
       b.onclick = function () { pkg.drugs.splice(Number(b.dataset.rmdrug), 1); render(); };
+    });
+    // Tapping the tick is what decides a medicine is actually being given —
+    // and so what gets prescribed and taken off the shelf.
+    body.querySelectorAll('[data-tick]').forEach(function (b) {
+      b.onclick = function () {
+        var d = pkg.drugs[Number(b.dataset.tick)];
+        if (!d) return;
+        d.selected = !d.selected;
+        render();
+      };
     });
     body.querySelectorAll('[data-fd]').forEach(function (inp) {
       inp.onchange = function () {
@@ -925,6 +1145,9 @@
         durationDays: Number(d.value) || 5,
         qty: Number(q.value) || 0,
         from: 'added',
+        // A drug the clinician went and searched for is one they mean to give.
+        group: 'treatment',
+        selected: true,
       });
       ask.style.display = 'none';
       render();
@@ -987,7 +1210,11 @@
       ctx.learned = true;
       pkg = {
         tests: learned.tests.slice(),
-        drugs: learned.drugs.map(function (d) { return Object.assign({}, d, { from: 'learned' }); }),
+        // A saved clinic standard IS what this clinic gives, so it arrives
+        // ticked — that is the point of having learned it.
+        drugs: learned.drugs.map(function (d) {
+          return Object.assign({ group: 'treatment' }, d, { from: 'learned', selected: true });
+        }),
         fees: Object.assign({ consult: 0, lab: 0, meds: 0 }, learned.fees),
         followUpDays: learned.followUpDays || 7,
         page: page, title: title,
@@ -1146,7 +1373,11 @@
       return m && String(m.drug || '').trim();
     });
     pkg.tests.forEach(function (t) { if (state.labTests.indexOf(t) < 0) state.labTests.push(t); });
-    pkg.drugs.forEach(function (d) {
+    // Only what the clinician ticked is prescribed — and so only that comes off
+    // the shelf. Everything else stays on the panel as reference.
+    pkg.drugs.filter(function (d) {
+      return d.selected && (d.group || 'treatment') !== 'other';
+    }).forEach(function (d) {
       var tpd = Math.max(1, Math.min(4, Number(d.timesPerDay) || 2));
       // Give every row real intake times. Leaving these empty meant the
       // consultation could never be sent — the package looked applied, the
@@ -1197,7 +1428,8 @@
     // "Package applied" on its own read as "consultation recorded" — it is not,
     // nothing is saved until the consultation is sent. Say what is still needed.
     var _need = 'Not saved yet — press Send at the bottom to record it.';
-    toast('Package applied (' + pkg.drugs.length + ' medicine' + (pkg.drugs.length !== 1 ? 's' : '') +
+    var _n = pkg.drugs.filter(function (d) { return d.selected && (d.group || 'treatment') !== 'other'; }).length;
+    toast('Package applied (' + _n + ' medicine' + (_n !== 1 ? 's' : '') +
       ', ' + pkg.tests.length + ' test' + (pkg.tests.length !== 1 ? 's' : '') + '). ' + _need, 'success');
 
     if (!changes.length) return;                 // nothing to learn
