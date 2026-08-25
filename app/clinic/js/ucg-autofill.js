@@ -429,6 +429,32 @@
   // prints preventive treatment: "Sulfadoxine/Pyrimethamine (SP) for IPT.
   // Start at 13 weeks and give monthly till delivery".
   var GIVE_ON_LINE = /\b(give|start|administer|prescribe|treat with)\b/i;
+  // …but never off a line that is telling you NOT to. The guideline says "Do
+  // not give SP in HIV patients on cotrimoxazole"; reading that as a
+  // prescription would be the worst kind of mistake this code could make.
+  var NOT_A_PRESCRIPTION = /\b(do not|don'?t|never|avoid|avoided|contraindicat\w*|not recommended|not required|not indicated|instead of|rather than|except)\b/i;
+
+  // The programme abbreviations the book uses instead of a name. "Adults:
+  // TDF+3TC+ATV/r" is the whole PEP regimen and the only place those medicines
+  // are named on the page, so without this the HIV pages list no medicine at all.
+  var MED_ABBREV = [
+    ['TDF',   'Tenofovir'],
+    ['3TC',   'Lamivudine'],
+    ['FTC',   'Emtricitabine'],
+    ['ABC',   'Abacavir'],
+    ['AZT',   'Zidovudine'],
+    ['ZDV',   'Zidovudine'],
+    ['DTG',   'Dolutegravir'],
+    ['EFV',   'Efavirenz'],
+    ['NVP',   'Nevirapine'],
+    ['ATV/r', 'Atazanavir/ritonavir'],
+    ['LPV/r', 'Lopinavir/ritonavir'],
+    ['DRV/r', 'Darunavir/ritonavir'],
+    ['RAL',   'Raltegravir'],
+    ['CTX',   'Cotrimoxazole'],
+    ['ORS',   'Oral rehydration salts (ORS)'],
+    ['SP',    'Sulfadoxine/Pyrimethamine (SP)'],
+  ];
 
   function lineAround(text, at) {
     var a = text.lastIndexOf('\n', at); a = a < 0 ? 0 : a + 1;
@@ -438,6 +464,7 @@
 
   function prescribedHere(text, at, marks) {
     var ln = lineAround(text, at);
+    if (NOT_A_PRESCRIPTION.test(ln.text)) return false;
     if (DOSE_ON_LINE.test(ln.text) || GIVE_ON_LINE.test(ln.text)) return true;
     for (var i = 0; i < marks.length; i++) {
       if (marks[i].end > at) break;
@@ -492,6 +519,33 @@
       usedKey[k] = 1; usedName[pick.name] = 1; usedNameKeys.push(nk);
       out.push({ name: pick.name, found: m[0] });
     }
+
+    // Now the abbreviations, which the word scan above cannot see.
+    MED_ABBREV.forEach(function (pair) {
+      var abbr = pair[0], name = pair[1], nk2 = drugKey(name);
+      if (usedName[name] || haveKeys.indexOf(drugKey(abbr)) >= 0) return;
+      if (usedNameKeys.some(function (u) { return u.indexOf(nk2) >= 0 || nk2.indexOf(u) >= 0; })) return;
+      if (haveKeys.indexOf(nk2) >= 0) return;
+      // Plain indexOf with the boundaries checked by hand: a lookbehind would
+      // throw outright on the older Android WebViews this app still runs on.
+      var from = 0, at2;
+      while ((at2 = t.indexOf(abbr, from)) >= 0) {
+        from = at2 + abbr.length;
+        var before = at2 > 0 ? t.charAt(at2 - 1) : ' ';
+        var after = t.charAt(at2 + abbr.length) || ' ';
+        if (/[A-Za-z0-9]/.test(before) || /[A-Za-z0-9]/.test(after)) continue;
+        var mm = { index: at2 };
+        var ln2 = lineAround(t, mm.index).text;
+        if (NOT_A_PRESCRIPTION.test(ln2)) continue;
+        // Either it is written as part of a regimen (TDF+3TC+ATV/r), or the
+        // line is plainly telling you to give it.
+        var isRegimen = /[A-Za-z0-9\/]\s*\+\s*[A-Za-z0-9]/.test(ln2);
+        if (!isRegimen && !prescribedHere(t, mm.index, marks || [])) continue;
+        usedName[name] = 1; usedNameKeys.push(nk2);
+        out.push({ name: name, found: abbr });
+        break;
+      }
+    });
     return out;
   }
 
@@ -1730,6 +1784,16 @@
     if (!hits.length) {
       hits = rows('SELECT id,title,page FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 8', ['%' + term + '%']);
     }
+    if (!hits.length && term.length >= 4) {
+      // Mistyped, most likely. Search again allowing a slip or two before
+      // telling the clinician their condition is not in the book at all.
+      var q = term.toLowerCase();
+      try {
+        hits = rows('SELECT id,title,page FROM conditions ORDER BY length(title) LIMIT 600', [])
+          .filter(function (r) { return looksLike(q, r.title); }).slice(0, 8);
+      } catch (e) { hits = []; }
+      if (hits.length) toast('Showing “' + hits[0].title + '” — did you mean that?', 'info');
+    }
     if (!hits.length) {
       // Nothing in the guidelines — still give the clinician a worksheet.
       toast('Not in the guidelines — start a package for “' + term + '”', 'info');
@@ -1779,6 +1843,54 @@
     return out.sort(function (a, b) { return b.uses - a.uses; }).map(function (x) { return x.t; });
   }
 
+  // ── Typing it slightly wrong ──────────────────────────────────────────────
+  // "typiod" found nothing at all, because everything here matched on the exact
+  // letters. A clinician typing between patients will drop a letter or swap
+  // two, and the app should still know what they mean. This is the standard
+  // edit distance, with adjacent swaps counted as one mistake rather than two,
+  // because that is the commonest typing slip (typhoid → typiod).
+  function editDist(a, b, cap) {
+    var la = a.length, lb = b.length;
+    if (Math.abs(la - lb) > cap) return cap + 1;
+    var prev2 = [], prev = [], cur = [], i, j;
+    for (j = 0; j <= lb; j++) prev[j] = j;
+    for (i = 1; i <= la; i++) {
+      cur = [i];
+      var best = i;
+      for (j = 1; j <= lb; j++) {
+        var cost = a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1;
+        var v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        if (i > 1 && j > 1 &&
+            a.charAt(i - 1) === b.charAt(j - 2) && a.charAt(i - 2) === b.charAt(j - 1)) {
+          v = Math.min(v, prev2[j - 2] + 1);       // the two letters were swapped
+        }
+        cur[j] = v;
+        if (v < best) best = v;
+      }
+      if (best > cap) return cap + 1;              // no way back under the budget
+      prev2 = prev; prev = cur;
+    }
+    return prev[lb];
+  }
+
+  // How wrong a word is allowed to be: one slip in a short word, more in a long
+  // one. Tight enough that "cough" cannot match "cholera".
+  function slipBudget(n) { return n <= 3 ? 1 : (n <= 9 ? 2 : 3); }
+
+  // Does any word of this title look like what was typed?
+  function looksLike(q, title) {
+    var cap = slipBudget(q.length);
+    var words = String(title || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    for (var i = 0; i < words.length; i++) {
+      var w = words[i];
+      if (w.length < 3) continue;
+      if (editDist(q, w, cap) <= cap) return true;
+      // …or it is the start of a longer word, typed with a slip in it.
+      if (w.length > q.length && editDist(q, w.slice(0, q.length + cap), cap) <= cap) return true;
+    }
+    return false;
+  }
+
   function suggestDx(q) {
     q = String(q || '').trim().toLowerCase();
     if (q.length < 2) return [];
@@ -1808,6 +1920,19 @@
         rows('SELECT title FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 10',
              ['%' + q + '%']).forEach(function (r) { add(r.title, 'UCG 2023'); });
       } catch (e) {}
+    }
+    // 4. Nothing matched the letters exactly — so it was probably mistyped.
+    // Only now, and only for a word long enough to be sure of, so the ordinary
+    // case costs nothing.
+    if (!out.length && q.length >= 4) {
+      COMMON_DX.forEach(function (t) { if (looksLike(q, t)) add(t, 'did you mean?'); });
+      learnedTitles().forEach(function (t) { if (looksLike(q, t)) add(t, 'your standard'); });
+      if (db) {
+        try {
+          rows('SELECT title FROM conditions ORDER BY length(title) LIMIT 600', [])
+            .forEach(function (r) { if (looksLike(q, r.title)) add(r.title, 'UCG 2023 · did you mean?'); });
+        } catch (e) {}
+      }
     }
     return out.slice(0, 8);
   }
