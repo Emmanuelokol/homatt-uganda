@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v128';
+const CACHE = 'homatt-clinic-v129';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -35,7 +35,7 @@ const SHELL = [
   'guidelines.html',
   'js/guidelines.js?v=20260820',
   'js/vendor/sql-wasm.js',
-  'js/ucg-autofill.js?v=20260824d',
+  'js/ucg-autofill.js?v=20260828c',
   'manifest.json',
   'js/vendor/supabase.min.js?v=2110',
   'fonts/material-icons.css?v=1',
@@ -43,12 +43,12 @@ const SHELL = [
   'fonts/inter.css?v=1',
   'fonts/inter-latin.woff2?v=1',
   'css/clinic.css?v=20260825b',
-  'js/clinic.js?v=20260826',
+  'js/clinic.js?v=20260829',
   'js/messages.js?v=20260811',
   'js/clinic-offline.js?v=20260823b',
   'js/stock-intake.js?v=20260826',
-  'js/new-order-wizard.js?v=20260824c',
-  'js/msg-alerts.js?v=20260809',
+  'js/new-order-wizard.js?v=20260827a',
+  'js/msg-alerts.js?v=20260829',
   'js/pwa-install.js?v=20260803',
   '../js/config.js',
   '../js/native-bridge.js',
@@ -198,6 +198,32 @@ async function matchAnyCache(req) {
 // buggy versions could wipe the cache) — this makes ANY good online page load
 // re-populate everything, so the app reliably opens offline afterwards.
 let _shellEnsuredAt = 0;
+// ── Data budget ────────────────────────────────────────────────────────────
+// Mobile data here is bought by the megabyte. Measured before this: opening
+// the app re-downloaded 1.27 MB of files it already had, every single time,
+// because every asset was revalidated on every load. These two helpers stop
+// that without ever risking a stale app: versioned files are treated as
+// immutable (their ?v= changes when they do), and pages are refreshed on a
+// timer instead of on every navigation.
+const REVALIDATE_EVERY = 6 * 60 * 60 * 1000;     // a page, at most 4× a day
+
+async function metaGet(key) {
+  try { const r = await idbGet('__meta__' + key); return r && Number(r.body) || 0; }
+  catch (e) { return 0; }
+}
+async function metaSet(key, val) {
+  try { await idbPut('__meta__' + key, { body: String(val), ct: 'text/plain' }); } catch (e) {}
+}
+
+// A file whose URL carries its version, or that never changes without one,
+// can be served from the cache for good — fetching it again buys nothing and
+// costs the clinic money.
+function isImmutable(url) {
+  if (url.origin !== self.location.origin) return false;
+  if (/[?&]v=/.test(url.search)) return true;
+  return /\/(fonts|icons)\/|\/js\/vendor\/|\.(woff2?|ttf|otf|png|jpg|jpeg|svg|wasm)($|\?)/i.test(url.pathname);
+}
+
 async function ensureShellCached(cache, force) {
   const now = Date.now();
   if (!force && now - _shellEnsuredAt < 45 * 1000) return;   // throttle unless forced
@@ -286,7 +312,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v128"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v129"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -325,6 +351,25 @@ function offlineFallbackResponse() {
   );
 }
 
+// An update should only cost the clinic the files that actually changed.
+// Every asset URL carries its own version, so an entry with the identical URL
+// in the previous cache is the identical file — copying it across costs
+// nothing, where re-downloading the whole shell cost about 580 KB on every
+// single app update, on every phone.
+async function carryOver(newCache, url) {
+  try {
+    if (await newCache.match(url)) return true;
+    const keys = await caches.keys();
+    const olds = keys.filter((k) => k !== CACHE && k.indexOf('homatt-clinic-') === 0);
+    for (let i = olds.length - 1; i >= 0; i--) {
+      const old = await caches.open(olds[i]);
+      const hit = await old.match(url);
+      if (hit) { await newCache.put(url, hit.clone()); return true; }
+    }
+  } catch (e) {}
+  return false;
+}
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE).then(async (c) => {
@@ -335,16 +380,25 @@ self.addEventListener('install', (event) => {
       // activate-repair step, opportunistic per-load caching and the IndexedDB
       // mirror fill any gaps. An always-active worker is what keeps the app's
       // own offline handling in control instead of the browser's.
+      // The pages themselves are not versioned, so they are always fetched —
+      // that is how new code reaches the phone.
       await Promise.allSettled(CORE_PAGES.map(async (u) => {
         try {
           const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
           if (r && r.ok && !r.redirected) await c.put(u, r);
         } catch (e) {}
       }));
-      // Vendor + non-core assets: best-effort in the background.
-      Promise.allSettled(VENDOR.map((u) => c.add(u).catch(() => {})));
+      // Everything else: take it from the previous cache when the URL is
+      // unchanged, and only download what is genuinely new.
+      Promise.allSettled(VENDOR.map(async (u) => {
+        if (await carryOver(c, u)) return;
+        return c.add(u).catch(() => {});
+      }));
       Promise.allSettled(
-        SHELL.filter((u) => CORE_PAGES.indexOf(u) < 0).map((u) => c.add(u).catch(() => {}))
+        SHELL.filter((u) => CORE_PAGES.indexOf(u) < 0).map(async (u) => {
+          if (await carryOver(c, u)) return;
+          return c.add(u).catch(() => {});
+        })
       );
     }).then(() => self.skipWaiting())
   );
@@ -494,7 +548,7 @@ self.addEventListener('fetch', (event) => {
     // so the worker checks for a newer version of itself on navigations
     // (throttled). This is how stuck devices eventually receive fixes.
     const now = Date.now();
-    if (now - _lastSelfUpdateCheck > 30 * 60 * 1000) {
+    if (now - _lastSelfUpdateCheck > 6 * 60 * 60 * 1000) {
       _lastSelfUpdateCheck = now;
       try { self.registration.update().catch(() => {}); } catch (e) {}
     }
@@ -504,10 +558,20 @@ self.addEventListener('fetch', (event) => {
       // Chrome show ITS OWN dark "You're offline" screen — the exact dead end
       // this worker exists to prevent. Hence the outer try/catch and navSafe().
       try {
-        // Background revalidate — never blocks the response; refreshes the cache
-        // (and the whole shell) for next time. Never rejects.
-        const netUpdate = fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        // Background revalidate — never blocks the response; refreshes the
+        // cache (and the whole shell) for next time. Never rejects.
+        //
+        // It does NOT run on every navigation any more. These pages are large
+        // (the dashboard is ~190 KB compressed) and re-fetching one on every
+        // open was the single biggest recurring cost the app had. Once every
+        // six hours keeps a clinic on current code within a day, for a
+        // twentieth of the data.
+        const lastRev = await metaGet(url.pathname);
+        const dueForRefresh = (now - lastRev) > REVALIDATE_EVERY;
+        const netUpdate = !dueForRefresh ? Promise.resolve(null) :
+          fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
           .then((res) => {
+            metaSet(url.pathname, Date.now());
             if (res && res.ok && !res.redirected) {
               const copy = res.clone();
               caches.open(CACHE).then((c) => {
@@ -543,7 +607,30 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Same-origin assets → stale-while-revalidate. Deep fallbacks when offline:
+  // A file that carries its own version in the URL cannot change without the
+  // URL changing, so once it is on the phone it is served from there for good.
+  // This is what stops the app re-downloading its own scripts, styles, fonts
+  // and icons every time it is opened — over a megabyte a day, for files the
+  // phone already had.
+  if (isImmutable(url)) {
+    event.respondWith(
+      caches.match(req).then((hit) => hit ||
+        caches.match(req, { ignoreSearch: false }).then((h2) => h2 ||
+          fetch(req).then((res) => {
+            if (res && res.status === 200) {
+              const copy = res.clone();
+              caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          }).catch(async () =>
+            (await caches.match(req, { ignoreSearch: true })) ||
+            (await idbServe(url.pathname)) ||
+            Response.error())))
+    );
+    return;
+  }
+
+  // Everything else same-origin → stale-while-revalidate. Deep fallbacks when offline:
   // an ignoreSearch cache match (so a different ?v= query still resolves the
   // cached file) then the IndexedDB shell copy — so scripts/CSS/fonts always
   // load even if a page requests a slightly different asset version than the

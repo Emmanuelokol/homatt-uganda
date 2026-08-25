@@ -1133,8 +1133,8 @@
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/stock-intake.js?v=20260826"></script>
-<script src="js/clinic.js?v=20260827"></script>
-<script src="js/msg-alerts.js?v=20260809"></script>
+<script src="js/clinic.js?v=20260829"></script>
+<script src="js/msg-alerts.js?v=20260829"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -4483,7 +4483,13 @@
   function refreshFigures() {
     loadRevenue(); loadFinancial(_finPeriod);
   }
-  setInterval(refreshAll, 45000);
+  // Paced, not on a fixed clock: silent while the phone is away or the live
+  // socket is connected, and slower the longer the clinic stays quiet.
+  HomattPace.every({
+    label: 'dashboard-full', base: 45000, max: 300000,
+    live: function () { return _rtLive || window._homattRtLive === true; },
+    run: refreshAll,
+  });
 
   // TODAY sweep: the panels that change while the clinic is working. Realtime
   // is the fast path, but it needs 20260815_realtime_dashboard.sql applied AND
@@ -4492,12 +4498,15 @@
   // flicker); ClinicOffline re-checks the server behind it and fires
   // 'clinic-fresh' only when something actually changed, so this is one small
   // query — not a redraw — every cycle.
-  setInterval(function() {
-    if (document.visibilityState !== 'visible') return;   // no traffic in the pocket
-    loadConsultations();
-    loadActiveTreatments();
-    loadMedsDispensed();
-  }, 20000);
+  HomattPace.every({
+    label: 'dashboard-today', base: 20000, max: 180000,
+    live: function () { return _rtLive || window._homattRtLive === true; },
+    run: function () {
+      loadConsultations();
+      loadActiveTreatments();
+      loadMedsDispensed();
+    },
+  });
 
   // Returning to the app: repaint just the figures (no blink). A FULL refresh
   // only if it's been a while (>60s) since one — so a quick app-switch is
@@ -4525,6 +4534,9 @@
   // app returns to the foreground. clinic_referrals is included so a referral
   // reaches the receiving clinic in real time (like the messenger).
   var _rtChannel = null, _rtGen = 0, _rtRetry = 0;
+  // Is the live socket actually connected? When it is, the timed checks
+  // below have nothing to add and stay silent.
+  var _rtLive = false;
   async function setupRealtime() {
     if (!supabase) return;
     var clinicId = await resolveClinicId();
@@ -4571,6 +4583,12 @@
         })
       .subscribe(function(status) {
         if (mine !== _rtGen) return;
+        // Whether the socket is up decides whether anything needs to poll at
+        // all — see the pacer above.
+        _rtLive = (status === 'SUBSCRIBED');
+        // Mirrored so the state is visible from outside — used when measuring
+        // what the app costs in data with the socket up versus down.
+        try { window._homattRtLive = _rtLive; } catch (e) {}
         if (status === 'SUBSCRIBED') { _rtRetry = 0; }
         else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
           var wait = Math.min(30000, 3000 * Math.pow(2, Math.min(_rtRetry++, 4)));

@@ -159,6 +159,10 @@
 
   // ── Realtime (instant when it works; the poll is the safety net) ───
   var _rtGen = 0, _rtRetry = 0, _rtChannel = null;
+  // When this socket is connected, new messages arrive on it the moment they
+  // are sent — so the timed check below has nothing to add and stays quiet.
+  var _rtLive = false;
+
   function subscribe() {
     try {
       if (!supabase.channel) return;
@@ -175,7 +179,8 @@
           if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
             var wait = Math.min(30000, 3000 * Math.pow(2, Math.min(_rtRetry++, 4)));
             setTimeout(function () { if (mine === _rtGen) subscribe(); }, wait);
-          } else if (status === 'SUBSCRIBED') _rtRetry = 0;
+            _rtLive = false;
+          } else if (status === 'SUBSCRIBED') { _rtRetry = 0; _rtLive = true; }
         });
     } catch (e) {}
   }
@@ -197,6 +202,17 @@
     document.addEventListener('visibilitychange', function () {
       if (!document.hidden) refresh(true);
     });
-    setInterval(function () { if (!document.hidden) refresh(true); }, 12000);
+    // Paced rather than every 12 seconds: silent while the phone is away or
+    // the message socket is up, and slower the longer nothing arrives. On a
+    // quiet afternoon this alone was ~300 requests an hour.
+    if (window.HomattPace) {
+      HomattPace.every({
+        label: 'msg-alerts', base: 15000, max: 180000,
+        live: function () { return _rtLive; },
+        run: function () { refresh(true); },
+      });
+    } else {
+      setInterval(function () { if (!document.hidden) refresh(true); }, 12000);
+    }
   })();
 })();

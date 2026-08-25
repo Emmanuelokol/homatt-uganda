@@ -452,11 +452,91 @@ window.homattNextCaseSeq = homattNextCaseSeq;
 
 // ── Which version is this phone actually running? ─────────────────────────
 // The build marker used to live only on the sign-in page, so once a clinician
+// ── Data pacer ──────────────────────────────────────────────────────────────
+// Mobile data here is bought by the megabyte, so a screen left open must not
+// quietly spend money. Measured before this existed: an idle dashboard asked
+// the server something every 1.7 seconds — about 2.4 MB an hour, 19 MB across
+// a clinic day, for a clinic where nothing had happened.
+//
+// Every repeating check now goes through here, and it does three things:
+//   • nothing at all while the phone is in a pocket (screen off / app behind);
+//   • nothing at all while the live socket is connected, because that already
+//     reports every change the moment it happens — just a slow heartbeat in
+//     case the socket has died without saying so;
+//   • and when it does have to poll, it slows down the longer nothing changes,
+//     springing straight back to full speed the moment anything does.
+// A busy clinic therefore stays as responsive as before; a quiet one costs
+// almost nothing.
+window.HomattPace = (function () {
+  var wakers = [];
+
+  function every(opts) {
+    var base = opts.base || 20000;
+    var max  = opts.max  || 240000;
+    var beat = opts.heartbeat || 600000;      // proof-of-life while the socket is up
+    // The page has just loaded everything it needs, so treat now as the last
+    // check. Starting at zero made the very first tick fire even when the live
+    // socket was already connected and had nothing to add.
+    var wait = base, timer = null, lastRun = Date.now();
+
+    function schedule(ms) { clearTimeout(timer); timer = setTimeout(tick, ms); }
+
+    function tick() {
+      timer = null;
+      if (document.visibilityState !== 'visible') {   // in a pocket: spend nothing
+        wait = base;
+        schedule(beat);
+        return;
+      }
+      var live = false;
+      try { live = typeof opts.live === 'function' && !!opts.live(); } catch (e) {}
+      if (live && (Date.now() - lastRun) < beat) {    // the socket has it covered
+        schedule(Math.min(beat, max));
+        return;
+      }
+      lastRun = Date.now();
+      try { opts.run(); } catch (e) {}
+      wait = Math.min(max, Math.round(wait * 1.8));
+      schedule(wait);
+    }
+
+    // Waking shortens the interval again — it does NOT fire a round of checks
+    // on the spot. Firing immediately turned this into a loop: a check caused
+    // a repaint, the repaint looked like activity, activity woke the checks.
+    // Keeping lastRun also means the live-socket heartbeat is still respected.
+    function wake() { wait = base; schedule(Math.min(wait, 5000)); }
+    wakers.push(wake);
+    schedule(base);
+    return { wake: wake };
+  }
+
+  var _lastWake = 0;
+  function wakeAll() {
+    var now = Date.now();
+    if (now - _lastWake < 5000) return;        // one wake per burst, not per event
+    _lastWake = now;
+    wakers.forEach(function (w) { try { w(); } catch (e) {} });
+  }
+
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (document.visibilityState === 'visible') wakeAll();
+    });
+    // Deliberately NOT listening for 'clinic-fresh': that fires because a check
+    // found something, so treating it as a reason to check again is circular —
+    // it kept the app talking to the server about once every four seconds even
+    // with the live socket connected. A save from this device is a real signal.
+    window.addEventListener('clinic-synced', wakeAll);
+  } catch (e) {}
+
+  return { every: every, wakeAll: wakeAll };
+})();
+
 // was signed in there was no way to tell whether a fix had reached them. On the
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v128';
+var HOMATT_BUILD = 'v129';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {
