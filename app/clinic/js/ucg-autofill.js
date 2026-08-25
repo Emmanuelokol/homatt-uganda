@@ -236,9 +236,9 @@
   // the first six were ever reaching the screen.
 
   // A line that opens with an instruction is a sentence, not a drug.
-  var MED_VERB = /^(give|apply|treat|increase|decrease|reduce|start|continue|stop|repeat|re-?assure|prevent|relieve|followed?|transfuse|de-?worm|assess|monitor|refer|admit|add|use|take|check|avoid|consider|maintain|slowly|manage|correct|control|administer|ensure|advise|encourage|observe|review|do|if|for|in|with|and|or|the|a|an|about|when|where|after|before|then|also|may|can|should)\b/i;
+  var MED_VERB = /^(give|apply|treat|increase|decrease|reduce|start|continue|stop|repeat|re-?assure|prevent|relieve|followed?|transfuse|de-?worm|assess|monitor|refer|admit|add|use|take|check|avoid|consider|maintain|slowly|manage|correct|control|administer|ensure|advise|encourage|observe|review|do|if|for|in|with|and|or|the|a|an|about|when|where|after|before|then|also|may|can|should|switch|change|one|two|three)\b/i;
   // Bare labels off the page that are never the name of a medicine.
-  var MED_NOISE = /^(alternatives?|maintenance dose|toxic dose|doses?|about|elderly|initially|combination|adults?|children|infants?|neonates?|daily fluid requirements?|basic total fluid|oliguria|anuria|fibrosis|varices present|notes?|cautions?|others?|regimens?|(first|second|third) line( medicine| alternative)?|dosage|treatment|management|prevention|prophylaxis|indications?|contraindications?)$/i;
+  var MED_NOISE = /^(alternatives?|maintenance dose|toxic dose|doses?|about|elderly|initially|combination|adults?|children|infants?|neonates?|daily fluid requirements?|basic total fluid|oliguria|anuria|fibrosis|varices present|notes?|cautions?|others?|regimens?|(first|second|third) line( medicine| alternative)?|dosage|treatment|management|prevention|prophylaxis|indications?|contraindications?|(one |a )?single dose( of)?|one single dose of)$/i;
 
   // Fluids and rehydration — the drips. They were being dropped along with
   // everything else past the sixth medicine.
@@ -270,10 +270,229 @@
     return r.charAt(0).toUpperCase() + r.slice(1);
   }
 
+  // ── First line, alternative, second line ──────────────────────────────────
+  // The guideline never just lists medicines — it ranks them. "First line
+  // medicine … First line alternative … Second line medicine … Pre-referral
+  // treatment". Flattened into a list that ranking disappears, and a clinician
+  // is left choosing between six drugs with nothing to say which the book
+  // actually wants first. These read the ranking back out of the text.
+  var RANK_MARKS = [
+    [/first[- ]?line\s+alternatives?/gi, 'alt'],
+    [/second[- ]?line/gi,                'second'],
+    [/third[- ]?line/gi,                 'third'],
+    [/pre-?referral/gi,                  'prereferral'],
+    [/if not available|if unavailable|where not available/gi, 'alt'],
+    [/\balternatives?\b/gi,              'alt'],
+    [/first[- ]?line/gi,                 'first'],
+  ];
+  var RANK_INFO = {
+    first:       { label: 'FIRST LINE',   order: 1 },
+    alt:         { label: 'ALTERNATIVE',  order: 2 },
+    second:      { label: 'SECOND LINE',  order: 3 },
+    third:       { label: 'THIRD LINE',   order: 4 },
+    prereferral: { label: 'PRE-REFERRAL', order: 5 },
+  };
+
+  // Every ranking word in the text, with where it sits. Overlapping matches
+  // keep the longer one, so "first line alternative" is not read as "first
+  // line" followed by nothing.
+  // "Alternative in pregnancy" says more than "alternative", so the badge keeps
+  // the book's own words where they add something.
+  function markLabel(raw, tail) {
+    var base = String(raw).replace(/\s+/g, ' ').trim()
+      .replace(/\b(medicines?|treatments?|regimens?|drugs?|therapy)\b/gi, '')
+      .replace(/\s+/g, ' ').trim();
+    var q = /^[\s:—-]*((?:in|for)\s+[A-Za-z][A-Za-z\s>\d-]{2,20}?)(?:\s*$|[,.:;\n])/.exec(tail || '');
+    return (base + (q ? ' ' + q[1].trim() : '')).toUpperCase().slice(0, 28);
+  }
+
+  function rankMarkers(text) {
+    var t = String(text || ''), marks = [];
+    RANK_MARKS.forEach(function (pair) {
+      var re = new RegExp(pair[0].source, 'gi'), m;
+      while ((m = re.exec(t))) {
+        var end = m.index + m[0].length;
+        marks.push({ at: m.index, end: end, key: pair[1], len: m[0].length,
+                     label: markLabel(m[0], t.slice(end, end + 34)) });
+        if (m.index === re.lastIndex) re.lastIndex++;
+      }
+    });
+    marks.sort(function (a, b) { return a.at - b.at || b.len - a.len; });
+    var out = [];
+    marks.forEach(function (m) {
+      var prev = out[out.length - 1];
+      if (prev && m.at < prev.end) return;      // swallowed by a longer marker
+      out.push(m);
+    });
+    return out;
+  }
+
+  // The rank of a drug is the ranking word most recently printed before it.
+  // A drug named more than once — artesunate is the alternative for
+  // uncomplicated malaria and first line for severe — keeps its best rank.
+  // How far after a ranking word a drug can still belong to it. The book prints
+  // the heading and the medicine within a line or two of each other; anything
+  // further away is a different part of the page and gets no rank at all,
+  // rather than inheriting one that was never meant for it.
+  var RANK_REACH = 120;
+  // …and it must be within a line or two on the page. Distance in characters
+  // alone was not enough: for typhoid the heading "Alternative in pregnancy"
+  // sits above amoxicillin, and four lines further down comes doxycycline —
+  // which must NEVER be labelled an alternative in pregnancy, because it is
+  // contraindicated in pregnancy. Counting the line breaks stops that.
+  var RANK_LINES = 2;
+
+  function rankOf(drugName, text, marks) {
+    var key = stockKey(drugName).split(' ')[0];
+    if (!key || key.length < 4) return '';
+    var re = new RegExp(key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    var t = String(text || ''), m, best = null;
+    while ((m = re.exec(t))) {
+      var here = null;
+      for (var i = 0; i < marks.length; i++) {
+        if (marks[i].at < m.index) here = marks[i]; else break;
+      }
+      if (!here || (m.index - here.end) > RANK_REACH) continue;
+      var gap = t.slice(here.end, m.index);
+      if ((gap.match(/\n/g) || []).length > RANK_LINES) continue;
+      if (!best || RANK_INFO[here.key].order < RANK_INFO[best.key].order) best = here;
+    }
+    return best || null;
+  }
+
   function medGroup(name, sourceLine, reason) {
     if (MED_FLUID.test(name)) return 'fluid';
     if (reason) return 'supportive';
     return 'treatment';
+  }
+
+  // ── Medicines the extractor missed altogether ─────────────────────────────
+  // Severe malaria names Dihydroartemisinin/Piperaquine as the second line
+  // medicine and Sulfadoxine/Pyrimethamine for prevention in pregnancy, and
+  // NEITHER was pulled into the medicines table — they are only in the prose.
+  // So the prose is read again, against the national medicines list that ships
+  // with the app (EMHSLU 2023), and any real drug named there but missing from
+  // the list is put back.
+  //
+  // Spelling differs between the two books (Sulfadoxine / Sulphadoxine) and the
+  // PDF drops letters (Dihydroartemisin), so names are compared with ph→f and
+  // by prefix.
+  function drugKey(s) {
+    return String(s || '').toLowerCase()
+      .replace(/ph/g, 'f').replace(/ae|oe/g, 'e').replace(/[^a-z]/g, '');
+  }
+
+  var emLexicon = null;
+  function emDrugWords() {
+    if (emLexicon) return emLexicon;
+    var byKey = {};
+    try {
+      emRows("SELECT name FROM emhslu_items WHERE item_type='medicine'", []).forEach(function (r) {
+        var full = String(r.name || '').replace(/\s+/g, ' ').trim();
+        if (!full) return;
+        // A combination keeps its whole name — "Dihydroartemisinin + piperaquine"
+        // is one medicine, not two — but either half may be what the guideline
+        // wrote, so both are searchable keys pointing at the same medicine.
+        full.split(/[+/,()]/).forEach(function (part) {
+          var w = part.trim();
+          if (w.length < 7 || w.split(/\s+/).length > 2) return;
+          var k = drugKey(w);
+          // When the guideline writes "adrenaline", the medicine meant is
+          // Adrenaline — not "Lignocaine + adrenaline". Shortest name wins.
+          if (!byKey[k] || full.length < byKey[k].length) byKey[k] = full;
+        });
+      });
+    } catch (e) { byKey = {}; }
+    emLexicon = Object.keys(byKey).map(function (k) {
+      var name = byKey[k];
+      // "Lignocaine + epinephrine" is a combination; "Glucose (Dextrose)" is one
+      // medicine under two names. Only the first needs both halves named.
+      var parts = /[+/]/.test(name)
+        ? name.split(/[+/]/).map(function (x) { return drugKey(x.replace(/\(.*?\)/g, '')); })
+              .filter(function (x) { return x.length >= 7; })
+        : [];
+      return { key: k, name: name, parts: parts };
+    });
+    emLexicon.sort(function (a, b) { return b.key.length - a.key.length; });
+    return emLexicon;
+  }
+
+  // A drug name appearing SOMEWHERE in the prose is not enough — the page also
+  // mentions drugs to avoid, drugs for other conditions, and cross-references.
+  // A scan that loose put back a thousand medicines across the book, which is
+  // guessing, not accuracy. So a recovered medicine must be printed the way the
+  // book prints something it is telling you to give: either right under one of
+  // its ranking headings ("Second line medicine / Dihydroartemisin/
+  // Piperaquine"), or on a line that carries a dose.
+  var DOSE_ON_LINE = /\d+(\.\d+)?\s*(mg|mcg|g|ml|iu|units?|%)\b/i;
+  // …or the line is plainly an instruction to give it, which is how the book
+  // prints preventive treatment: "Sulfadoxine/Pyrimethamine (SP) for IPT.
+  // Start at 13 weeks and give monthly till delivery".
+  var GIVE_ON_LINE = /\b(give|start|administer|prescribe|treat with)\b/i;
+
+  function lineAround(text, at) {
+    var a = text.lastIndexOf('\n', at); a = a < 0 ? 0 : a + 1;
+    var b = text.indexOf('\n', at); if (b < 0) b = text.length;
+    return { start: a, text: text.slice(a, b) };
+  }
+
+  function prescribedHere(text, at, marks) {
+    var ln = lineAround(text, at);
+    if (DOSE_ON_LINE.test(ln.text) || GIVE_ON_LINE.test(ln.text)) return true;
+    for (var i = 0; i < marks.length; i++) {
+      if (marks[i].end > at) break;
+      var gap = text.slice(marks[i].end, at);
+      if ((gap.match(/\n/g) || []).length <= RANK_LINES && (at - marks[i].end) <= RANK_REACH) return true;
+    }
+    return false;
+  }
+
+  function findMissingDrugs(text, already, marks) {
+    var lex = emDrugWords();
+    if (!lex.length) return [];
+    var t = String(text || '');
+    var haveKeys = already.map(function (n) { return drugKey(n); }).join(' ');
+    var usedKey = {}, usedName = {}, usedNameKeys = [], out = [];
+    var re = /[A-Za-z][A-Za-z-]{6,}/g, m;
+    while ((m = re.exec(t))) {
+      var k = drugKey(m[0]);
+      if (k.length < 7 || usedKey[k]) continue;
+      if (haveKeys.indexOf(k) >= 0) continue;          // already on the list
+      // The medicine whose own name is this word, if there is one; otherwise
+      // the closest longer name it is the start of.
+      var pick = null;
+      for (var i = 0; i < lex.length; i++) {
+        if (lex[i].key === k) { pick = lex[i]; break; }
+      }
+      if (!pick) {
+        for (var j = 0; j < lex.length; j++) {
+          var e = lex[j];
+          if ((k.length >= 8 && e.key.indexOf(k) === 0) ||
+              (e.key.length >= 8 && k.indexOf(e.key) === 0)) {
+            if (!pick || e.name.length < pick.name.length) pick = e;
+          }
+        }
+      }
+      if (!pick) continue;
+      if (usedName[pick.name] || haveKeys.indexOf(pick.key) >= 0) { usedKey[k] = 1; continue; }
+      // A combination is only proposed when the guideline names both halves —
+      // the text saying "epinephrine" does not mean "lignocaine + epinephrine".
+      if (pick.parts.length > 1) {
+        var whole = drugKey(t);
+        var allThere = pick.parts.every(function (pk) { return whole.indexOf(pk) >= 0; });
+        if (!allThere) { usedKey[k] = 1; continue; }
+      }
+      if (!prescribedHere(t, m.index, marks || [])) continue;
+      // "Glucose (Dextrose)" and "Dextrose" are the same thing under two
+      // names; whichever the guideline printed first is the one kept.
+      var nk = drugKey(pick.name);
+      if (usedNameKeys.some(function (u) { return u.indexOf(nk) >= 0 || nk.indexOf(u) >= 0; })) {
+        usedKey[k] = 1; continue;
+      }
+      usedKey[k] = 1; usedName[pick.name] = 1; usedNameKeys.push(nk);
+      out.push({ name: pick.name, found: m[0] });
+    }
+    return out;
   }
 
   // frequency text → times/day (so quantity can be computed)
@@ -333,6 +552,44 @@
     }).filter(function (d) {
       return d.group !== 'other' || (d.text && d.text.length >= 6);
     });
+
+    // Anything the guideline names that never made it into the medicines table
+    // at all. No dose is invented for these — the guideline's own words are
+    // shown instead, and the clinician sets the dose if they give it.
+    var prose = [c.management, c.prevention, c.notes].filter(Boolean).join('\n');
+    var known = drugs.map(function (d) { return d.drug || d.text || ''; });
+    var marks = rankMarkers(prose);
+    findMissingDrugs(prose, known, marks).forEach(function (mm) {
+      drugs.push({
+        drug: mm.name,
+        // The word the guideline actually printed, which is what to look for
+        // when working out the ranking — the book writes "Dihydroartemisin"
+        // where the medicines list says "Dihydroartemisinin".
+        asWritten: mm.found,
+        dosage: '',
+        timesPerDay: 2, durationDays: 5, qty: 10,
+        from: 'guideline-text',
+        group: 'treatment',
+        selected: false,
+      });
+    });
+
+    // Put the book's ranking back on: which is first line, which is the
+    // alternative, which is second line, which is only for pre-referral.
+    drugs.forEach(function (d) {
+      // Only the treatment options are ranked. A drip or something given for
+      // convulsions is not "second line" anything.
+      if (d.group !== 'treatment') return;
+      var r = rankOf(d.asWritten || d.drug, prose, marks);
+      if (!r) return;
+      d.rank = r.key;
+      d.rankLabel = r.label || RANK_INFO[r.key].label;
+    });
+    // The order is the book's own. An earlier version sorted the ranked ones to
+    // the top, which was worse: the guideline prints the treatment of choice
+    // FIRST and the alternatives after it, so for typhoid that hoisted
+    // "Alternative in pregnancy" above the ciprofloxacin everyone gets. The
+    // badges say which is which; the order stays as printed.
 
     // What gets prescribed is a clinical decision, and the guideline is usually
     // offering a CHOICE ("first line … first line alternative … second line"),
@@ -402,6 +659,17 @@
       '.ucg-drug .nm{grid-column:2;grid-row:1;min-width:0}',
       '.ucg-drug .nm b{font-size:13.5px;font-weight:800;color:var(--text);display:block;line-height:1.3;overflow-wrap:anywhere}',
       '.ucg-drug .nm span{font-size:11px;color:var(--text-lt);display:block;margin-top:1px}',
+      '.ucg-drug .nm .ucg-rank,.ucg-drug .nm .ucg-stk{display:inline-block;width:auto}',
+      '.ucg-rank{display:inline-block;margin:2px 0 0;font-size:9.5px;font-weight:800;letter-spacing:.5px;' +
+        'padding:1px 7px;border-radius:9px;background:var(--bg);color:var(--text-lt);line-height:1.7}',
+      '.ucg-rank.r-first{background:rgba(14,124,90,.16);color:#0B6B4F}',
+      '.ucg-rank.r-alt{background:rgba(11,92,138,.14);color:#0B5C8A}',
+      '.ucg-rank.r-second,.ucg-rank.r-third{background:rgba(138,90,6,.14);color:#8A5A06}',
+      '.ucg-rank.r-prereferral{background:rgba(179,38,30,.13);color:#B3261E}',
+      'html[data-theme="dark"] .ucg-rank.r-first{color:#5FD3A8}',
+      'html[data-theme="dark"] .ucg-rank.r-alt{color:#79C4EE}',
+      'html[data-theme="dark"] .ucg-rank.r-second,html[data-theme="dark"] .ucg-rank.r-third{color:#E5B463}',
+      'html[data-theme="dark"] .ucg-rank.r-prereferral{color:#FF9E93}',
       '.ucg-stk{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;line-height:1.6}',
       '.ucg-stk.ok{background:rgba(46,125,50,.14);color:#2E7D32}',
       '.ucg-stk.no{background:rgba(230,124,15,.16);color:#B35309}',
@@ -572,7 +840,7 @@
   // not a medicine at all but that the guideline still says.
   var MED_GROUPS = [
     { key: 'treatment',  title: 'Treatment',
-      hint: 'The guideline usually offers a choice here — tap the one you are giving.' },
+      hint: 'The guideline ranks these — first line, then the alternative, then second line. Tap the one you are giving.' },
     { key: 'supportive', title: 'Supportive treatment',
       hint: 'For complications, if the patient has them.' },
     { key: 'fluid',      title: 'Drips, fluids &amp; blood',
@@ -590,10 +858,13 @@
       '<button class="ucg-tick' + (on ? ' on' : '') + '" data-tick="' + i + '" ' +
         'aria-pressed="' + on + '" title="' + (on ? 'Giving this' : 'Tap to give this') + '">' +
         '<span class="material-icons-outlined">' + (on ? 'check' : 'add') + '</span></button>' +
-      '<div class="nm"><b>' + esc(d.drug) + '</b><span>' + esc(d.dosage || '') +
+      '<div class="nm"><b>' + esc(d.drug) + '</b>' +
+        (d.rank ? '<span class="ucg-rank r-' + d.rank + '">' + esc(d.rankLabel || RANK_INFO[d.rank].label) + '</span>' : '') +
+        '<span>' + esc(d.dosage || '') +
         (d.reason ? ' · for ' + esc(d.reason.toLowerCase()) : '') +
-        (d.from === 'learned' ? ' · your standard' : '') + '</span>' +
-        (on ? stockNote(d) : '') + '</div>' +
+        (d.from === 'learned' ? ' · your standard' : '') +
+        (d.from === 'guideline-text' ? ' · named in the guideline — set the dose yourself' : '') +
+        '</span>' + (on ? stockNote(d) : '') + '</div>' +
       '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
       (on ? '<div class="fields">' +
         '<div><span class="ucg-lbl">×/day</span>' +
@@ -1443,6 +1714,9 @@
     if (!term) { toast('Enter the diagnosis first', 'error'); return; }
     ensurePanel();
     try { await openDb(); } catch (e) { toast('Guideline database unavailable offline yet', 'error'); return; }
+    // The national medicines list is what lets the package recover drugs the
+    // guideline names but that were never extracted. Not fatal if it is slow.
+    try { await openEm(); } catch (e) {}
 
     var toks = term.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(Boolean);
     var hits = [];
