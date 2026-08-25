@@ -238,7 +238,7 @@
   // A line that opens with an instruction is a sentence, not a drug.
   var MED_VERB = /^(give|apply|treat|increase|decrease|reduce|start|continue|stop|repeat|re-?assure|prevent|relieve|followed?|transfuse|de-?worm|assess|monitor|refer|admit|add|use|take|check|avoid|consider|maintain|slowly|manage|correct|control|administer|ensure|advise|encourage|observe|review|do|if|for|in|with|and|or|the|a|an|about|when|where|after|before|then|also|may|can|should|switch|change|one|two|three)\b/i;
   // Bare labels off the page that are never the name of a medicine.
-  var MED_NOISE = /^(alternatives?|maintenance dose|toxic dose|doses?|about|elderly|initially|combination|adults?|children|infants?|neonates?|daily fluid requirements?|basic total fluid|oliguria|anuria|fibrosis|varices present|notes?|cautions?|others?|regimens?|(first|second|third) line( medicine| alternative)?|dosage|treatment|management|prevention|prophylaxis|indications?|contraindications?|(one |a )?single dose( of)?|one single dose of)$/i;
+  var MED_NOISE = /^(alternatives?|maintenance dose|toxic dose|doses?|about|elderly|initially|combination|adults?|children|infants?|neonates?|daily fluid requirements?|basic total fluid|oliguria|anuria|fibrosis|varices present|notes?|cautions?|others?|regimens?|(first|second|third) line( medicine| alternative)?|dosage|treatment|management|prevention|prophylaxis|indications?|contraindications?|(one |a )?single dose( of)?|one single dose of|oral|iv|im|sc|po|topical|inhaled|inhalation|rectal|nasal|infusion|drip|route)$/i;
 
   // Fluids and rehydration — the drips. They were being dropped along with
   // everything else past the sixth medicine.
@@ -645,16 +645,22 @@
     // "Alternative in pregnancy" above the ciprofloxacin everyone gets. The
     // badges say which is which; the order stays as printed.
 
-    // What gets prescribed is a clinical decision, and the guideline is usually
-    // offering a CHOICE ("first line … first line alternative … second line"),
-    // not a combined course. So the app ticks a medicine for you only when the
-    // guideline names exactly one treatment; otherwise everything is listed and
-    // the clinician taps what is actually being given. Supportive treatment and
-    // drips are never ticked for you — they are for if the patient needs them.
-    var mainOnes = drugs.filter(function (d) { return d.group === 'treatment'; });
-    drugs.forEach(function (d) {
-      d.selected = (mainOnes.length === 1 && d.group === 'treatment');
+    // ── What the app ticks for you ───────────────────────────────────────
+    // The guideline's FIRST CHOICE, and only that one. The book ranks its
+    // medicines and prints the treatment of choice first, so that is what is
+    // ready to give when the package opens: artemether/lumefantrine for
+    // malaria, ciprofloxacin for typhoid. The alternatives are listed under it,
+    // untapped, one tap away.
+    //
+    // Never more than one, and never anything from supportive treatment or the
+    // drips — those are for if the patient needs them, which the app cannot
+    // know. And never a medicine recovered from the prose, because those carry
+    // no dose of their own.
+    var mainOnes = drugs.filter(function (d) {
+      return d.group === 'treatment' && d.from === 'guideline' && isMedicineName(d.drug.replace(/\s*\d.*$/, ''));
     });
+    var firstChoice = mainOnes.filter(function (d) { return d.rank === 'first'; })[0] || mainOnes[0] || null;
+    drugs.forEach(function (d) { d.selected = (d === firstChoice); });
 
     return {
       tests: extractTests(c.investigations, c.full_text),
@@ -699,6 +705,8 @@
       '.ucg-pick{display:flex;gap:8px;align-items:flex-start;background:rgba(230,124,15,.14);color:#8A4B04;' +
         'border-radius:11px;padding:9px 11px;margin-bottom:11px;font-size:12px;line-height:1.45;font-weight:600}',
       '.ucg-pick .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
+      '.ucg-pick.ok{background:rgba(14,124,90,.13);color:#0B6B4F}',
+      'html[data-theme="dark"] .ucg-pick.ok{color:#7FD9B4;background:rgba(14,124,90,.20)}',
       'html[data-theme="dark"] .ucg-pick{color:#F5C089;background:rgba(230,124,15,.18)}',
       'html[data-theme="dark"] .ucg-mgh{color:#5FD3A8}',
       // The tick is what says "this one is being given" — untapped rows are
@@ -949,6 +957,7 @@
     var giveable = pkg.drugs.filter(function (d) { return (d.group || 'treatment') !== 'other'; });
     var nGiveable = giveable.length;
     var nSel = giveable.filter(function (d) { return d.selected; }).length;
+    var firstSel = (giveable.filter(function (d) { return d.selected; })[0] || {}).drug || '';
     var totalQty = pkg.drugs.reduce(function (s, d) {
       return s + (d.selected ? (Number(d.qty) || 0) : 0);
     }, 0);
@@ -973,12 +982,18 @@
         '<h4>Medicines &amp; dosage</h4><span class="ucg-count">' + nSel +
         ' of ' + nGiveable + ' · ' + totalQty + ' units</span></div>' +
         '<div class="ucg-rows" id="ucgDrugs">' +
-          // Easy to miss otherwise, and the consequence is a consultation saved
-          // with no medicine on it.
-          (nGiveable && !nSel ? '<div class="ucg-pick" id="ucgPick">' +
-            '<span class="material-icons-outlined">touch_app</span>' +
-            '<span>Nothing ticked yet. Tap <b>+</b> on each medicine you are giving — ' +
-            'nothing is prescribed, and nothing leaves the shelf, until you do.</span></div>' : '') +
+          // Say plainly what is ticked and what is not — a consultation saved
+          // with the wrong medicine, or with none, is easy to do silently.
+          (nGiveable && !nSel
+            ? '<div class="ucg-pick" id="ucgPick">' +
+              '<span class="material-icons-outlined">touch_app</span>' +
+              '<span>Nothing ticked yet. Tap <b>+</b> on each medicine you are giving — ' +
+              'nothing is prescribed, and nothing leaves the shelf, until you do.</span></div>'
+            : (nSel ? '<div class="ucg-pick ok" id="ucgPick">' +
+              '<span class="material-icons-outlined">check_circle</span>' +
+              '<span>Ready to give: <b>' + esc(firstSel) + '</b>' +
+              (nGiveable > nSel ? ' — the guideline\'s first choice. Tap <b>+</b> on another if you are giving that instead.' : '.') +
+              '</span></div>' : '')) +
           (pkg.drugs.length ? drugGroupsHtml() :
             '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
         '</div>' +
