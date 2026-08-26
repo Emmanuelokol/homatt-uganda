@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v129';
+const CACHE = 'homatt-clinic-v130';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -35,19 +35,19 @@ const SHELL = [
   'guidelines.html',
   'js/guidelines.js?v=20260820',
   'js/vendor/sql-wasm.js',
-  'js/ucg-autofill.js?v=20260828c',
+  'js/ucg-autofill.js?v=20260829a',
   'manifest.json',
   'js/vendor/supabase.min.js?v=2110',
   'fonts/material-icons.css?v=1',
   'fonts/material-icons-outlined.woff2?v=1',
   'fonts/inter.css?v=1',
   'fonts/inter-latin.woff2?v=1',
-  'css/clinic.css?v=20260825b',
+  'css/clinic.css?v=20260829a',
   'js/clinic.js?v=20260829',
   'js/messages.js?v=20260811',
   'js/clinic-offline.js?v=20260823b',
   'js/stock-intake.js?v=20260826',
-  'js/new-order-wizard.js?v=20260827a',
+  'js/new-order-wizard.js?v=20260829a',
   'js/msg-alerts.js?v=20260829',
   'js/pwa-install.js?v=20260803',
   '../js/config.js',
@@ -312,7 +312,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v129"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v130"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +

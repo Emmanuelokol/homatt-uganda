@@ -364,7 +364,7 @@ html[data-theme="dark"] .wiz-dot{background:var(--surface); border-color:var(--b
 html[data-theme="dark"] .wiz-dot-line{background:var(--border)}
 html[data-theme="dark"] .autocomplete-item{background:var(--surface); color:var(--text)}
 html[data-theme="dark"] .autocomplete-item:hover{background:rgba(67,160,71,.14)}
-html[data-theme="dark"] .med-row{background:var(--surface); border-color:var(--border)}
+html[data-theme="dark"] .dmed-row{background:var(--surface); border-color:var(--border)}
 html[data-theme="dark"] .settings-card{background:var(--surface); box-shadow:0 2px 8px rgba(0,0,0,.4); color:var(--text)}
 html[data-theme="dark"] .settings-card-title{color:var(--text)}
 html[data-theme="dark"] :where(.facility-btn){background:var(--surface); border-color:var(--border); color:var(--text-lt)}
@@ -432,26 +432,26 @@ html[data-theme="dark"] #qsSelectedPanel{background:#101812 !important; border-c
    left the card background light, so drug names were white on white and could
    not be read at all. Nothing here depends on that rule. */
 
-.med-row{
+.dmed-row{
   display:flex; align-items:center; gap:11px;
   padding:10px 12px; margin-bottom:7px;
   background:var(--bg,#F5F7F5); border:1px solid var(--border,#E8EAED);
   border-radius:11px;
 }
-.med-row-ic{ font-size:19px; color:var(--primary,#1B5E20); flex-shrink:0 }
-.med-row-b { flex:1; min-width:0 }
-.med-row-n { font-size:13.5px; font-weight:700; color:var(--text,#111); line-height:1.3 }
-.med-row-s { font-size:11.5px; color:var(--text-lt,#5F6368); margin-top:2px }
-.med-row-q {
+.dmed-row-ic{ font-size:19px; color:var(--primary,#1B5E20); flex-shrink:0 }
+.dmed-row-b { flex:1; min-width:0 }
+.dmed-row-n { font-size:13.5px; font-weight:700; color:var(--text,#111); line-height:1.3 }
+.dmed-row-s { font-size:11.5px; color:var(--text-lt,#5F6368); margin-top:2px }
+.dmed-row-q {
   font-size:11px; font-weight:800; color:var(--primary,#1B5E20);
   background:var(--brand-tint,#DBF4EA); padding:3px 9px; border-radius:9px;
   white-space:nowrap; flex-shrink:0;
 }
-html[data-theme="dark"] .med-row{ background:#151E18; border-color:#293630 }
-html[data-theme="dark"] .med-row-n{ color:#E8F0EA }
-html[data-theme="dark"] .med-row-s{ color:#A9BCAE }
-html[data-theme="dark"] .med-row-ic{ color:#7BC98A }
-html[data-theme="dark"] .med-row-q{ background:rgba(67,160,71,.20); color:#A5D6A7 }
+html[data-theme="dark"] .dmed-row{ background:#151E18; border-color:#293630 }
+html[data-theme="dark"] .dmed-row-n{ color:#E8F0EA }
+html[data-theme="dark"] .dmed-row-s{ color:#A9BCAE }
+html[data-theme="dark"] .dmed-row-ic{ color:#7BC98A }
+html[data-theme="dark"] .dmed-row-q{ background:rgba(67,160,71,.20); color:#A5D6A7 }
 
 .act-card{
   margin:10px 16px; padding:14px 16px; cursor:pointer;

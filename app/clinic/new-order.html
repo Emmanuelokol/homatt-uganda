@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260825b">
+  <link rel="stylesheet" href="css/clinic.css?v=20260829a">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -111,6 +111,58 @@
     textarea.field-input { resize: vertical; min-height: 70px; }
     .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+    /* ── The record of the visit, shown after saving ─────────────────── */
+    .sum-card{background:var(--surface,#fff);border-radius:22px 22px 0 0;width:100%;max-width:520px;
+      max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+    .sum-top{display:flex;gap:12px;align-items:flex-start;padding:20px 20px 14px;flex:none;
+      background:linear-gradient(140deg,#0B3D2E,#10855F 65%,#17A46F);color:#fff}
+    .sum-top .material-icons-outlined{font-size:30px;flex:none;margin-top:1px}
+    .sum-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
+    .sum-sub{font-size:12.5px;opacity:.9;margin-top:2px;line-height:1.45}
+    .sum-body{overflow-y:auto;padding:16px 18px;flex:1;-webkit-overflow-scrolling:touch}
+    .sum-head{margin-bottom:16px}
+    .sum-case{display:inline-block;font-size:13px;font-weight:800;letter-spacing:.5px;
+      background:var(--brand-tint,#DBF4EA);color:#0A5C43;padding:4px 12px;border-radius:999px;margin-bottom:7px}
+    .sum-who{font-size:17px;font-weight:800;color:var(--text,#111);line-height:1.25;overflow-wrap:anywhere}
+    .sum-dx{font-size:13px;color:var(--text-lt,#5F6368);margin-top:2px;text-transform:capitalize}
+    .sum-todo{font-size:13px;font-weight:600;color:#B35309}
+    .sum-sec{margin-bottom:16px}
+    .sum-h{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.5px;
+      text-transform:uppercase;color:#0B6B4F;margin-bottom:8px}
+    .sum-h .material-icons-outlined{font-size:16px}
+    .sum-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+      font-size:13px;color:var(--text-lt,#5F6368);padding:4px 0;line-height:1.4}
+    .sum-line b{color:var(--text,#111);font-weight:700;text-align:right;overflow-wrap:anywhere}
+    .sum-line.sum-total{border-top:1px solid var(--border,#E8EAED);margin-top:5px;padding-top:8px;font-size:14px}
+    .sum-line.sum-total b{font-size:17px;color:#0E7C5A;letter-spacing:-.02em}
+    .sum-line.sum-owing b{color:#C62828}
+    .sum-line.sum-paid b{color:#2E7D32}
+    .sum-line.sum-sub{font-size:12px;opacity:.85}
+    .sum-meds{display:flex;flex-direction:column;gap:7px}
+    .sum-med{background:var(--bg,#F5F7F5);border-radius:11px;padding:9px 11px}
+    .sum-med-n{font-size:13.5px;font-weight:700;color:var(--text,#111);line-height:1.3;overflow-wrap:anywhere}
+    .sum-med-s{font-size:11.5px;color:var(--text-lt,#5F6368);margin-top:1px}
+    .sum-med-q{display:inline-block;font-size:10.5px;font-weight:800;margin-top:4px;
+      background:rgba(14,124,90,.13);color:#0B6B4F;padding:1px 8px;border-radius:999px}
+    .sum-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .sum-chip{font-size:12px;font-weight:700;background:var(--brand-tint,#DBF4EA);color:#0A5C43;
+      padding:5px 11px;border-radius:999px}
+    .sum-none{font-size:12.5px;color:var(--text-lt,#9AA0A6);font-style:italic}
+    .sum-actions{flex:none;padding:12px 18px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+      border-top:1px solid var(--border,#E8EAED);display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff)}
+    .sum-btn{width:100%;padding:13px;border-radius:13px;font:inherit;font-size:14.5px;font-weight:800;
+      cursor:pointer;font-family:inherit;touch-action:manipulation;
+      background:transparent;color:#0E7C5A;border:1.5px solid #0E7C5A}
+    .sum-btn.primary{background:#0E7C5A;color:#fff;border-color:#0E7C5A}
+    html[data-theme="dark"] .sum-med-q{background:rgba(67,160,71,.22);color:#A5D6A7}
+    html[data-theme="dark"] .sum-h{color:#5FD3A8}
+    html[data-theme="dark"] .sum-case{background:rgba(14,124,90,.22);color:#7FD9B4}
+    html[data-theme="dark"] .sum-line.sum-total b{color:#5FD3A8}
+    html[data-theme="dark"] .sum-line.sum-owing b{color:#FF9E93}
+    html[data-theme="dark"] .sum-todo{color:#F5B160}
+    html[data-theme="dark"] .sum-btn{color:#5FD3A8;border-color:#2E7D32}
+    html[data-theme="dark"] .sum-btn.primary{background:#0E7C5A;color:#fff}
     .helper { font-size: 12px; color: #9AA0A6; margin-top: 5px; line-height: 1.4; }
 
     /* ── Patient pill ───────────────────────────────────────────── */
@@ -998,21 +1050,20 @@
 
 <!-- Success bottom sheet -->
 <div id="successSheet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:700;align-items:flex-end;justify-content:center">
-  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:28px 24px 36px;text-align:center">
-    <div style="width:64px;height:64px;background:#E8F5E9;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px">
-      <span class="material-icons-outlined" style="font-size:36px;color:#1B5E20">check_circle</span>
+  <div class="sum-card">
+    <div class="sum-top">
+      <span class="material-icons-outlined">check_circle</span>
+      <div>
+        <div class="sum-title">Consultation saved</div>
+        <div class="sum-sub" id="successMsg">Everything below has been recorded.</div>
+      </div>
     </div>
-    <div style="font-size:20px;font-weight:800;color:#111;margin-bottom:6px">Consultation Saved</div>
-    <div style="font-size:13px;color:#5F6368;margin-bottom:20px;line-height:1.6" id="successMsg">
-      Prescription sent. Patient will receive medication reminders automatically.
+    <div class="sum-body" id="successBody"></div>
+    <div id="successReminders" style="display:none"></div>
+    <div class="sum-actions">
+      <button onclick="window.location.href='dashboard.html'" class="sum-btn primary">Back to Dashboard</button>
+      <button onclick="window.location.reload()" class="sum-btn">New Consultation</button>
     </div>
-    <div style="background:#F1F8F1;border-radius:12px;padding:14px;margin-bottom:20px;text-align:left" id="successReminders"></div>
-    <button onclick="window.location.href='dashboard.html'" style="width:100%;padding:14px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;margin-bottom:10px">
-      Back to Dashboard
-    </button>
-    <button onclick="window.location.reload()" style="width:100%;padding:12px;background:transparent;color:#1B5E20;border:1.5px solid #1B5E20;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation">
-      New Consultation
-    </button>
   </div>
 </div>
 
@@ -1022,8 +1073,8 @@
 <script src="js/clinic.js?v=20260829"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/new-order-wizard.js?v=20260827a"></script>
-<script src="js/ucg-autofill.js?v=20260828c"></script>
+<script src="js/new-order-wizard.js?v=20260829a"></script>
+<script src="js/ucg-autofill.js?v=20260829a"></script>
 <script src="js/pwa-install.js?v=20260803"></script>
 
 <!-- ── Refer to partner clinic (works offline; queued + auto-synced) ── -->

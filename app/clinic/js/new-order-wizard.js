@@ -2344,6 +2344,103 @@
     if (box) box.style.display = 'none';
   }
 
+
+  // ── The record of the visit ────────────────────────────────────────────────
+  // Built from what was actually saved, in the order a clinician reads it.
+  function _sumMoney(n) { return 'UGX ' + (Number(n) || 0).toLocaleString('en-UG'); }
+
+  function renderConsultationSummary(ctx) {
+    const meds  = ctx.meds || [];
+    const times = ctx.times || [];
+    const consult = Number(state.feeConsult) || 0;
+    const lab     = Number(state.feeLab) || 0;
+    const medsFee = Number(state.feeMeds) || 0;
+    const total   = consult + lab + medsFee;
+    const status  = state.paymentStatus || 'pending';
+    const paid    = status === 'paid' ? total : (Number(state.amountPaid) > 0 ? Number(state.amountPaid) : 0);
+    const owing   = Math.max(0, total - paid);
+
+    function section(title, icon, body) {
+      if (!body) return '';
+      return '<div class="sum-sec"><div class="sum-h">' +
+        '<span class="material-icons-outlined">' + icon + '</span>' + esc(title) + '</div>' + body + '</div>';
+    }
+    function line(k, v, cls) {
+      return '<div class="sum-line' + (cls ? ' ' + cls : '') + '"><span>' + k + '</span><b>' + v + '</b></div>';
+    }
+
+    // Who and what
+    const who = state.patient && state.patient.name
+      ? esc(state.patient.name)
+      : '<span class="sum-todo">Name not taken yet — add it from the dashboard</span>';
+
+    let head = '';
+    if (state.caseCode) head += '<div class="sum-case">' + esc(state.caseCode) + '</div>';
+    head += '<div class="sum-who">' + who + '</div>';
+    if (state.confirmedDx) head += '<div class="sum-dx">' + esc(state.confirmedDx) +
+      (state.severity ? ' · ' + esc(state.severity) : '') + '</div>';
+
+    // Medicines — the substance of the visit
+    let medsHtml = '';
+    if (meds.length) {
+      medsHtml = '<div class="sum-meds">' + meds.map(function (m) {
+        const qty = Number(m.qtyToDeduct) || 0;
+        return '<div class="sum-med">' +
+          '<div class="sum-med-n">' + esc(m.drug || '—') + '</div>' +
+          '<div class="sum-med-s">' + esc(m.dosage || '') +
+            ' · ' + (m.timesPerDay || 1) + '×/day · ' + (m.durationDays || 1) + ' day' +
+            ((m.durationDays || 1) !== 1 ? 's' : '') + '</div>' +
+          (qty ? '<div class="sum-med-q">' + qty + ' off the shelf</div>' : '') +
+        '</div>';
+      }).join('') + '</div>';
+      const totalUnits = meds.reduce(function (n, m) { return n + (Number(m.qtyToDeduct) || 0); }, 0);
+      if (totalUnits) medsHtml += line('Taken from stock', totalUnits + ' units', 'sum-sub');
+    } else {
+      medsHtml = '<div class="sum-none">No medicine given</div>';
+    }
+
+    // Lab tests
+    const testsHtml = (state.labTests && state.labTests.length)
+      ? '<div class="sum-chips">' + state.labTests.map(function (t) {
+          return '<span class="sum-chip">' + esc(t) + '</span>'; }).join('') + '</div>'
+      : '<div class="sum-none">No lab test ordered</div>';
+
+    // Money
+    let money = '';
+    if (consult) money += line('Consultation', _sumMoney(consult));
+    if (lab)     money += line('Lab tests', _sumMoney(lab));
+    if (medsFee) money += line('Medicines', _sumMoney(medsFee));
+    money += line('Total charged', _sumMoney(total), 'sum-total');
+    const statusLabel = { paid: 'Paid in full', pending: 'Payment pending',
+                          credit: 'On credit', waived: 'Waived' }[status] || status;
+    money += line('Status', esc(statusLabel), 'sum-' + status);
+    if (paid && owing)  money += line('Paid now', _sumMoney(paid));
+    if (owing)          money += line('Still owed', _sumMoney(owing), 'sum-owing');
+
+    // What happens next
+    let next = '';
+    if (times.length) next += line('Medicine reminders', times.join(', '));
+    if (state.expectedRecovery) next += line('Course ends', esc(state.expectedRecovery));
+    if (Number(state.followUpDays) > 0) {
+      const rd = new Date(); rd.setDate(rd.getDate() + Number(state.followUpDays));
+      next += line('Return visit', rd.toLocaleDateString('en-UG', { weekday: 'short', day: 'numeric', month: 'short' }));
+    }
+    next += line('Prescription', state.stockSource === 'pharmacy'
+      ? 'Sent to partner pharmacy' : 'Ready at the clinic pharmacy');
+
+    const body = document.getElementById('successBody');
+    if (body) {
+      body.innerHTML =
+        '<div class="sum-head">' + head + '</div>' +
+        section('Medicines given', 'medication', medsHtml) +
+        section('Lab tests ordered', 'biotech', testsHtml) +
+        section('Charges', 'payments', money) +
+        section('What happens next', 'event_available', next);
+    }
+    const sheet = document.getElementById('successSheet');
+    if (sheet) sheet.style.display = 'flex';
+  }
+
   document.getElementById('submitBtn').onclick = async () => {
     const btn = document.getElementById('submitBtn');
     const resetBtn = () => {
@@ -2517,11 +2614,11 @@
         }
       } catch(e) {}
       const successMsgEl = document.getElementById('successMsg');
-      if (successMsgEl) successMsgEl.innerHTML = '<strong>' + esc(state.patient?.name || 'Patient') + '</strong>’s consultation <strong>saved offline</strong>. It syncs automatically when you’re back online.';
-      const successRemindersEl = document.getElementById('successReminders');
-      if (successRemindersEl) successRemindersEl.innerHTML = '<div style="font-size:12px;color:#2E7D32;padding:3px 0"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">cloud_off</span> Prescription &amp; reminders will be scheduled once it syncs.</div>';
-      const successSheet = document.getElementById('successSheet');
-      if (successSheet) successSheet.style.display = 'flex';
+      if (successMsgEl) successMsgEl.textContent =
+        'Saved on this phone \u2014 it syncs by itself the moment you are back online.';
+      // The same record of the visit, whether it went to the server or not.
+      const offTimes = [...new Set(meds.flatMap(m => m.intakeTimes).sort())];
+      renderConsultationSummary({ meds: meds, times: offTimes });
       _closeReferralIfAny();   // referral handled → leaves the inbox
       _invalidateDashboardCaches();
     }
@@ -2694,35 +2791,16 @@
       } catch(e) {}
     }
 
-    // 6. Show success sheet
+    // 6. Show what was actually done
+    // The old sheet said only "consultation saved" — which is true and useless.
+    // A clinician needs the record of the visit in front of them: the case
+    // number they will say out loud, what was diagnosed, what was ordered,
+    // what was given and in what quantity, what it came to, what was paid and
+    // what is still owed, and what happens next.
     const allTimes  = meds.flatMap(m => m.intakeTimes).sort();
     const uniqTimes = [...new Set(allTimes)];
+    renderConsultationSummary({ meds: meds, times: uniqTimes });
 
-    const successMsgEl = document.getElementById('successMsg');
-    if (successMsgEl) {
-      successMsgEl.innerHTML = `<strong>${esc(state.patient?.name || 'Patient')}</strong>'s consultation saved. `
-        + (state.stockSource === 'pharmacy'
-          ? 'Prescription sent to partner pharmacy.'
-          : 'Prescription ready at clinic pharmacy.');
-    }
-    const successRemindersEl = document.getElementById('successReminders');
-    if (successRemindersEl) {
-      const lines = [
-        `📲 <strong>Medication reminders</strong> daily at ${uniqTimes.length ? uniqTimes.join(', ') : '—'}`,
-        `💬 <strong>Check-in message</strong> tomorrow at ${uniqTimes[0] || '08:00'}`,
-      ];
-      if (state.expectedRecovery) {
-        lines.push(`🎯 <strong>Course-completion check</strong> on ${state.expectedRecovery}`);
-      }
-      if (Number(state.followUpDays) > 0) {
-        const rd = new Date();
-        rd.setDate(rd.getDate() + Number(state.followUpDays));
-        lines.push(`📅 <strong>Return visit</strong> — ${rd.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short' })}`);
-      }
-      successRemindersEl.innerHTML = lines.map(l =>
-        `<div style="font-size:12px;color:#2E7D32;padding:3px 0">${l}</div>`
-      ).join('');
-    }
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
     _closeReferralIfAny();     // referral handled → leaves the inbox

@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260825b">
+  <link rel="stylesheet" href="css/clinic.css?v=20260829a">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -2410,13 +2410,13 @@
       var dur  = m.duration ? (m.duration + ' day' + (m.duration!==1?'s':'')) : '';
       var sub  = [dose, freq, dur].filter(Boolean).join(' · ');
       var qty = m.quantity || m.qty;
-      return '<div class="med-row">'
-        +'<span class="material-icons-outlined med-row-ic">medication</span>'
-        +'<div class="med-row-b">'
-          +'<div class="med-row-n">'+esc(name)+'</div>'
-          +(sub ? '<div class="med-row-s">'+esc(sub)+'</div>' : '')
+      return '<div class="dmed-row">'
+        +'<span class="material-icons-outlined dmed-row-ic">medication</span>'
+        +'<div class="dmed-row-b">'
+          +'<div class="dmed-row-n">'+esc(name)+'</div>'
+          +(sub ? '<div class="dmed-row-s">'+esc(sub)+'</div>' : '')
         +'</div>'
-        +(qty ? '<span class="med-row-q">'+esc(qty)+'</span>' : '')
+        +(qty ? '<span class="dmed-row-q">'+esc(qty)+'</span>' : '')
       +'</div>';
     }).join('');
   }
@@ -2529,7 +2529,7 @@
   // adds to the bill, optionally records a payment. Does NOT create a new case.
   function followupMedRowHTML(i) {
     return ''
-    + '<div class="fu-med-row" data-idx="'+i+'" style="border:1px solid #E8EAED;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+    + '<div class="fu-dmed-row" data-idx="'+i+'" style="border:1px solid #E8EAED;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
         + '<div style="font-size:11px;font-weight:700;color:#1565C0;letter-spacing:.5px;text-transform:uppercase">Medication '+(i+1)+'</div>'
         + (i > 0 ? '<button type="button" class="fu-med-remove" style="background:transparent;border:none;color:#C62828;font-size:12px;cursor:pointer;font-family:inherit;padding:2px 6px">Remove</button>' : '')
@@ -2605,7 +2605,7 @@
     // Wire add-row / remove-row buttons
     document.getElementById('fuAddMedBtn').onclick = function() {
       var ctr = document.getElementById('fuMedsContainer');
-      var idx = ctr.querySelectorAll('.fu-med-row').length;
+      var idx = ctr.querySelectorAll('.fu-dmed-row').length;
       ctr.insertAdjacentHTML('beforeend', followupMedRowHTML(idx));
       wireFollowupRemoveButtons();
     };
@@ -2635,7 +2635,7 @@
   function wireFollowupRemoveButtons() {
     document.querySelectorAll('.fu-med-remove').forEach(function(btn) {
       btn.onclick = function() {
-        var row = btn.closest('.fu-med-row');
+        var row = btn.closest('.fu-dmed-row');
         if (row) row.remove();
       };
     });
@@ -2661,7 +2661,7 @@
 
     // Collect new medications
     var newMeds = [];
-    document.querySelectorAll('#fuMedsContainer .fu-med-row').forEach(function(row) {
+    document.querySelectorAll('#fuMedsContainer .fu-dmed-row').forEach(function(row) {
       var name = (row.querySelector('.fu-med-name').value || '').trim();
       if (!name) return;
       var freq = Number(row.querySelector('.fu-med-freq').value) || 1;

@@ -387,9 +387,10 @@
     if (emLexicon) return emLexicon;
     var byKey = {};
     try {
-      emRows("SELECT name FROM emhslu_items WHERE item_type='medicine'", []).forEach(function (r) {
+      emRows("SELECT name, strength FROM emhslu_items WHERE item_type='medicine'", []).forEach(function (r) {
         var full = String(r.name || '').replace(/\s+/g, ' ').trim();
         if (!full) return;
+        var strength = String(r.strength || '').replace(/\s+/g, ' ').trim();
         // A combination keeps its whole name — "Dihydroartemisinin + piperaquine"
         // is one medicine, not two — but either half may be what the guideline
         // wrote, so both are searchable keys pointing at the same medicine.
@@ -399,19 +400,19 @@
           var k = drugKey(w);
           // When the guideline writes "adrenaline", the medicine meant is
           // Adrenaline — not "Lignocaine + adrenaline". Shortest name wins.
-          if (!byKey[k] || full.length < byKey[k].length) byKey[k] = full;
+          if (!byKey[k] || full.length < byKey[k].name.length) byKey[k] = { name: full, strength: strength };
         });
       });
     } catch (e) { byKey = {}; }
     emLexicon = Object.keys(byKey).map(function (k) {
-      var name = byKey[k];
+      var name = byKey[k].name, strength = byKey[k].strength;
       // "Lignocaine + epinephrine" is a combination; "Glucose (Dextrose)" is one
       // medicine under two names. Only the first needs both halves named.
       var parts = /[+/]/.test(name)
         ? name.split(/[+/]/).map(function (x) { return drugKey(x.replace(/\(.*?\)/g, '')); })
               .filter(function (x) { return x.length >= 7; })
         : [];
-      return { key: k, name: name, parts: parts };
+      return { key: k, name: name, strength: strength, parts: parts };
     });
     emLexicon.sort(function (a, b) { return b.key.length - a.key.length; });
     // Never remember an EMPTY list. This is built the first time a medicine
@@ -522,7 +523,7 @@
         usedKey[k] = 1; continue;
       }
       usedKey[k] = 1; usedName[pick.name] = 1; usedNameKeys.push(nk);
-      out.push({ name: pick.name, found: m[0] });
+      out.push({ name: pick.name, strength: pick.strength, found: m[0] });
     }
 
     // Now the abbreviations, which the word scan above cannot see.
@@ -547,7 +548,9 @@
         var isRegimen = /[A-Za-z0-9\/]\s*\+\s*[A-Za-z0-9]/.test(ln2);
         if (!isRegimen && !prescribedHere(t, mm.index, marks || [])) continue;
         usedName[name] = 1; usedNameKeys.push(nk2);
-        out.push({ name: name, found: abbr });
+        var full = null;
+        for (var q = 0; q < lex.length; q++) { if (lex[q].name === name) { full = lex[q]; break; } }
+        out.push({ name: name, strength: full ? full.strength : '', found: abbr });
         break;
       }
     });
@@ -625,7 +628,12 @@
         // when working out the ranking — the book writes "Dihydroartemisin"
         // where the medicines list says "Dihydroartemisinin".
         asWritten: mm.found,
-        dosage: '',
+        // The strength as published in the national medicines list. Leaving it
+        // blank is what produced the red "Medicine 8 is incomplete" alarm: the
+        // app added a medicine and then refused to save the consultation
+        // because that medicine had no dose. This is a real published figure,
+        // not one the app made up — and it is editable like any other.
+        dosage: mm.strength || '',
         timesPerDay: 2, durationDays: 5, qty: 10,
         from: 'guideline-text',
         group: 'treatment',
@@ -650,22 +658,16 @@
     // "Alternative in pregnancy" above the ciprofloxacin everyone gets. The
     // badges say which is which; the order stays as printed.
 
-    // ── What the app ticks for you ───────────────────────────────────────
-    // The guideline's FIRST CHOICE, and only that one. The book ranks its
-    // medicines and prints the treatment of choice first, so that is what is
-    // ready to give when the package opens: artemether/lumefantrine for
-    // malaria, ciprofloxacin for typhoid. The alternatives are listed under it,
-    // untapped, one tap away.
+    // ── What comes through ready to give ─────────────────────────────────
+    // Everything the guideline lists arrives included, with its dose, days and
+    // quantity filled in. The clinician takes out what this patient is not
+    // getting — one tap on the × — rather than tapping thirteen medicines in
+    // to build the same list by hand.
     //
-    // Never more than one, and never anything from supportive treatment or the
-    // drips — those are for if the patient needs them, which the app cannot
-    // know. And never a medicine recovered from the prose, because those carry
-    // no dose of their own.
-    var mainOnes = drugs.filter(function (d) {
-      return d.group === 'treatment' && d.from === 'guideline' && isMedicineName(d.drug.replace(/\s*\d.*$/, ''));
-    });
-    var firstChoice = mainOnes.filter(function (d) { return d.rank === 'first'; })[0] || mainOnes[0] || null;
-    drugs.forEach(function (d) { d.selected = (d === firstChoice); });
+    // The only rows that stay out are the ones under "Also in the guideline":
+    // those are lines of the book's text, not medicines, and there is nothing
+    // to prescribe or deduct for them.
+    drugs.forEach(function (d) { d.selected = (d.group || 'treatment') !== 'other'; });
 
     return {
       tests: extractTests(c.investigations, c.full_text),
@@ -907,11 +909,11 @@
   // not a medicine at all but that the guideline still says.
   var MED_GROUPS = [
     { key: 'treatment',  title: 'Treatment',
-      hint: 'The guideline ranks these — first line, then the alternative, then second line. Tap the one you are giving.' },
+      hint: 'The guideline ranks these — first line, then the alternative, then second line. Remove the ones you are not giving.' },
     { key: 'supportive', title: 'Supportive treatment',
-      hint: 'For complications, if the patient has them.' },
+      hint: 'For complications — remove any the patient does not have.' },
     { key: 'fluid',      title: 'Drips, fluids &amp; blood',
-      hint: 'IV fluids and rehydration.' },
+      hint: 'IV fluids and rehydration — remove any not being run.' },
     { key: 'other',      title: 'Also in the guideline',
       hint: 'The guideline says this, but it is not a medicine the app can add for you — use the search below.' },
   ];
@@ -930,7 +932,7 @@
         '<span>' + esc(d.dosage || '') +
         (d.reason ? ' · for ' + esc(d.reason.toLowerCase()) : '') +
         (d.from === 'learned' ? ' · your standard' : '') +
-        (d.from === 'guideline-text' ? ' · named in the guideline — set the dose yourself' : '') +
+        (d.from === 'guideline-text' ? ' · named in the guideline · strength from the national list' : '') +
         '</span>' + (on ? stockNote(d) : '') + '</div>' +
       '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
       (on ? '<div class="fields">' +
@@ -992,12 +994,13 @@
           (nGiveable && !nSel
             ? '<div class="ucg-pick" id="ucgPick">' +
               '<span class="material-icons-outlined">touch_app</span>' +
-              '<span>Nothing ticked yet. Tap <b>+</b> on each medicine you are giving — ' +
+              '<span>Nothing included. Tap <b>+</b> on each medicine you are giving — ' +
               'nothing is prescribed, and nothing leaves the shelf, until you do.</span></div>'
             : (nSel ? '<div class="ucg-pick ok" id="ucgPick">' +
               '<span class="material-icons-outlined">check_circle</span>' +
-              '<span>Ready to give: <b>' + esc(firstSel) + '</b>' +
-              (nGiveable > nSel ? ' — the guideline\'s first choice. Tap <b>+</b> on another if you are giving that instead.' : '.') +
+              '<span><b>All ' + nSel + '</b> ' + (nSel === 1 ? 'medicine is' : 'medicines are') +
+              ' ready to give, with doses filled in. Take out what this patient is not ' +
+              'getting with <b>×</b> — only what is left is prescribed and comes off the shelf.' +
               '</span></div>' : '')) +
           (pkg.drugs.length ? drugGroupsHtml() :
             '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
