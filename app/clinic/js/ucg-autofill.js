@@ -708,6 +708,10 @@
       '.ucg-mgh{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:#0B6B4F;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 3px}',
       '.ucg-mgh span{background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:0 7px;font-size:10px;letter-spacing:0}',
       '.ucg-mgi{font-size:11px;color:var(--text-lt);line-height:1.4;margin-bottom:7px}',
+      '.ucg-from{display:flex;gap:8px;align-items:flex-start;background:rgba(11,92,138,.12);color:#0B5C8A;' +
+        'border-radius:11px;padding:9px 11px;margin:0 0 11px;font-size:12px;line-height:1.45}',
+      '.ucg-from .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
+      'html[data-theme="dark"] .ucg-from{color:#8FCBEC;background:rgba(11,92,138,.20)}',
       '.ucg-note{font-size:12px;color:var(--text-lt);line-height:1.5;padding:7px 11px;border-left:2px solid var(--border);margin-bottom:6px}',
       '.ucg-pick{display:flex;gap:8px;align-items:flex-start;background:rgba(230,124,15,.14);color:#8A4B04;' +
         'border-radius:11px;padding:9px 11px;margin-bottom:11px;font-size:12px;line-height:1.45;font-weight:600}',
@@ -972,6 +976,14 @@
       '<div class="ucg-src">From the Uganda Clinical Guidelines 2023' +
         (ctx.page ? ' · p.' + esc(ctx.page) : '') +
         '. Everything below is editable — remove with ×, add with +.</div>' +
+      // The book prints some conditions' treatment on another page. Say which,
+      // so nobody has to wonder where this package came from.
+      (ctx.borrowedFrom ? '<div class="ucg-from">' +
+        '<span class="material-icons-outlined">menu_book</span>' +
+        '<span>The guidelines print the treatment for <b>' + esc(ctx.title) + '</b> on the ' +
+        '<b>' + esc(ctx.borrowedFrom.title) + '</b> page' +
+        (ctx.borrowedFrom.page ? ' (p.' + esc(ctx.borrowedFrom.page) + ')' : '') +
+        ' — the two are covered together. This is that page\'s package.</span></div>' : '') +
 
       // ① Investigations
       '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">1</span>' +
@@ -1552,6 +1564,15 @@
       if (kids.length) { pickFrom(kids, title, severity); return; }
     }
 
+    // The treatment for this condition may be printed on a relative's page.
+    // Use it, under the name the clinician chose, and say so plainly.
+    ctx.borrowedFrom = null;
+    var borrowed = borrowSource({ id: condId });
+    if (borrowed && !getLearned(condId, severity)) {
+      ctx.borrowedFrom = borrowed;
+      ctx.sourceId = borrowed.id;
+    }
+
     var learned = getLearned(condId, severity);
     if (learned && condId) {
       // load the guideline detail for the notes block even when using a learned package
@@ -1575,7 +1596,7 @@
         page: page, title: title,
       };
     } else {
-      pkg = buildFromGuideline(condId, severity) ||
+      pkg = buildFromGuideline(ctx.sourceId || condId, severity) ||
         { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: page, title: title };
     }
     srcPkg = JSON.parse(JSON.stringify(pkg));
@@ -1604,6 +1625,7 @@
       var what = [];
       if (h.n)     what.push(h.n + ' medicine' + (h.n !== 1 ? 's' : ''));
       if (h.tests) what.push(h.tests + ' lab test' + (h.tests !== 1 ? 's' : ''));
+      if (h.from)  what.push('from the ' + esc(h.from) + ' page');
       return '<div data-h="' + i + '" style="cursor:pointer;padding:11px 4px;border-bottom:1px solid var(--border)">' +
         '<div style="font-weight:700;line-height:1.35">' + esc(h.title) + '</div>' +
         (what.length ? '<div style="font-size:11.5px;font-weight:600;color:var(--text-lt);margin-top:2px">' +
@@ -1841,9 +1863,12 @@
     // used to list seven, four of them empty or holding another disease's text
     // entirely; the clinician had to open each one to find that out.
     hits = hits.map(function (h) {
-      var p = packInfo(h.id);
-      return Object.assign({}, h, { n: p.n, tests: extractTests(
-        (rows('SELECT investigations FROM conditions WHERE id=? LIMIT 1', [h.id])[0] || {}).investigations, '').length });
+      // A section whose treatment is printed on a relative's page is offered
+      // with THAT page's contents, so the clinician can see what they get.
+      var src = borrowSource(h) || h;
+      var p = packInfo(src.id);
+      return Object.assign({}, h, { n: p.n, from: src.id !== h.id ? src.title : '', tests: extractTests(
+        (rows('SELECT investigations FROM conditions WHERE id=? LIMIT 1', [src.id])[0] || {}).investigations, '').length });
     });
     var real = hits.filter(carriesTreatment);
     // Never leave the clinician with nothing: if none of them carries a
@@ -1935,7 +1960,11 @@
   // has barely 370 characters and must still be findable.
   function carriesGuidance(condId) {
     var p = packInfo(condId);
-    return p.n > 0 || (p.mg + p.inv) >= 400 || hasDosedProse(condId);
+    if (p.n > 0 || (p.mg + p.inv) >= 400 || hasDosedProse(condId)) return true;
+    // …or its treatment is printed on a relative's page — an ordinary malaria
+    // case must be findable even though the book filed its treatment under the
+    // severe heading.
+    return !!borrowSource({ id: condId });
   }
 
   // Worth offering as a TREATMENT package, which is what the chooser is for:
@@ -1944,6 +1973,7 @@
   function carriesTreatment(cond) {
     var p = packInfo(cond.id);
     if (p.n > 0) return true;
+    if (borrowSource(cond)) return true;
     if (p.inv > 0 && (p.mg + p.inv) >= 400) return true;
     try {
       var c = rows('SELECT management,prevention,notes FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
@@ -1952,6 +1982,79 @@
       if (!prose.trim()) return false;
       return findMissingDrugs(prose, [], rankMarkers(prose)).length > 0;
     } catch (e) { return false; }
+  }
+
+  // ── When the treatment for a condition is printed on another page ─────────
+  // The book covers uncomplicated and severe malaria on the same page, and the
+  // extractor filed the whole of it — including "All patients: First line
+  // medicine Artemether/Lumefantrine" — under "Complicated/Severe Malaria".
+  // So the section called "Uncomplicated Malaria" is an empty shell, and a
+  // clinician with an ordinary malaria case had nothing to choose.
+  //
+  // A section may take its package from a relative, but only on evidence, and
+  // only between two sections about the same condition:
+  //   • the relative prints this section's title as a heading of its own;
+  //   • the two titles share the name of the condition;
+  //   • neither is a prevention or counselling page — those are not treatment.
+  // Across the whole book that is true three times. Everything else is left
+  // alone, because borrowing between different conditions would be dangerous:
+  // Cushing's must never inherit the treatment for Addison's.
+  var BORROW_STOP = ('disease diseases syndrome other general management treatment acute chronic ' +
+    'severe infection infections conditions prevention control care pregnancy children child ' +
+    'infant infants adults women check counselling problems').split(' ');
+  var BORROW_NEVER = /prophylax|prevention|preventive|counsel|immunis|immuniz|vaccin|screening/i;
+
+  function topicWords(t) {
+    return String(t || '').toLowerCase().split(/[^a-z]+/).filter(function (w) {
+      return w.length >= 5 && BORROW_STOP.indexOf(w) < 0;
+    });
+  }
+  function flatten(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  function printsAsHeading(relId, title) {
+    var key = flatten(title);
+    if (key.length < 8) return false;
+    try {
+      var c = rows('SELECT management,notes,prevention FROM conditions WHERE id=? LIMIT 1', [relId])[0];
+      if (!c) return false;
+      var text = [c.management, c.notes, c.prevention].filter(Boolean).join('\n');
+      var lines = text.split('\n');
+      for (var i = 0; i < lines.length; i++) if (flatten(lines[i]) === key) return true;
+    } catch (e) {}
+    return false;
+  }
+
+  var borrowCache = {};
+  function borrowSource(cond) {
+    if (!cond || !cond.id) return null;
+    if (borrowCache[cond.id] !== undefined) return borrowCache[cond.id];
+    borrowCache[cond.id] = null;
+    try {
+      if (packInfo(cond.id).n > 0) return null;
+      var self = rows('SELECT number,title FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
+      if (!self || !self.number || BORROW_NEVER.test(self.title)) return null;
+      var mine = topicWords(self.title);
+      if (!mine.length) return null;
+      var parent = self.number.indexOf('.') > 0 ? self.number.replace(/\.[^.]+$/, '') : '';
+      // the parent, then the siblings, then the children
+      var kin = rows(
+        'SELECT c.id,c.title,c.page,c.number,(SELECT COUNT(*) FROM medicines m WHERE m.condition_id=c.id) n ' +
+        'FROM conditions c WHERE c.id<>? AND (c.number=? OR c.number LIKE ? OR c.number LIKE ?) ' +
+        'ORDER BY n DESC LIMIT 40',
+        [cond.id, parent, parent ? parent + '.%' : '\u0000', self.number + '.%']);
+      for (var i = 0; i < kin.length; i++) {
+        var k = kin[i];
+        if (!k.n || BORROW_NEVER.test(k.title)) continue;
+        if (!printsAsHeading(k.id, self.title)) continue;
+        var theirs = topicWords(k.title);
+        var shared = mine.some(function (w) { return theirs.indexOf(w) >= 0; });
+        if (!shared) continue;
+        borrowCache[cond.id] = k;
+        return k;
+      }
+    } catch (e) {}
+    return borrowCache[cond.id];
   }
 
   function learnedTitles() {
