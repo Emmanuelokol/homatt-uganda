@@ -885,7 +885,9 @@
   // in the wizard afterwards; the package panel itself is fully editable too.
   const _otBtn = document.getElementById('ucgOneTap');
   if (_otBtn) _otBtn.addEventListener('click', () => {
-    const dx = (document.getElementById('confirmedDx').value || state.confirmedDx || '').trim();
+    // Only the condition currently being added is looked up — with two already
+    // in the box, searching the whole "Malaria + Typhoid" string finds nothing.
+    const dx = window._wizCurrentDx();
     if (!dx) { showToast('Type the diagnosis first, then tap the package', 'error'); return; }
     if (!window.UCGPackage) { showToast('Guideline package is still loading…', 'info'); return; }
     window.UCGPackage.start(dx, state.severity, state);
@@ -914,8 +916,68 @@
   };
 
   // ── Diagnosis input ──────────────────────────────────────────────
+  // ONE VISIT CAN CARRY MORE THAN ONE CONDITION. Malaria and typhoid together
+  // is the commonest pair there is, and a patient seen once for both must be
+  // recorded as having had both.
+  //
+  // The diagnosis box holds them joined with " + " and is the single source of
+  // truth: what it says is what is saved. Nothing is remembered behind it, so
+  // deleting a condition from the box really deletes it. The guideline package
+  // APPENDS the condition it treated rather than replacing what is there —
+  // otherwise the record could claim the patient had only the last condition
+  // while carrying the first one's medicines, which is what used to happen.
+  function _dxParts(v) {
+    return String(v == null ? '' : v).split('+')
+      .map(s => s.trim()).filter(Boolean);
+  }
+  // The condition to look up: the last one typed, not the whole list.
+  window._wizCurrentDx = function () {
+    const el = document.getElementById('confirmedDx');
+    const parts = _dxParts((el && el.value) || state.confirmedDx);
+    return parts.length ? parts[parts.length - 1] : '';
+  };
+  // Put an exact list of conditions in the box. Used by the guideline package,
+  // which knows which conditions are actually being treated on this visit.
+  window._wizSetConditions = function (list) {
+    const parts = [], seen = {};
+    (list || []).forEach(t => {
+      t = String(t || '').trim();
+      if (!t) return;
+      const k = t.toLowerCase();
+      if (seen[k]) return;
+      seen[k] = 1;
+      parts.push(t);
+    });
+    state.confirmedDx = parts.join(' + ');
+    const el = document.getElementById('confirmedDx');
+    if (el) el.value = state.confirmedDx;
+    const nx = document.getElementById('step1Next');
+    if (nx) nx.disabled = !state.confirmedDx.trim();
+  };
+  // What the box says right now, as a list.
+  window._wizConditions = function () {
+    const el = document.getElementById('confirmedDx');
+    return _dxParts((el && el.value) || state.confirmedDx);
+  };
+  // Add a condition to this visit, keeping the ones already there.
+  window._wizAddCondition = function (title) {
+    window._wizSetConditions(window._wizConditions().concat([title]));
+  };
+  // "+ Add another condition": keep what is there and open a slot for the next.
+  // This used to select the whole box, so typing the second condition wiped the
+  // first — the reported bug.
+  window._wizStartAnotherCondition = function () {
+    const el = document.getElementById('confirmedDx');
+    if (!el) return;
+    const parts = _dxParts(el.value);
+    el.value = parts.length ? parts.join(' + ') + ' + ' : '';
+    el.focus();
+    try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) {}
+  };
+
   document.getElementById('confirmedDx').addEventListener('input', e => {
-    state.confirmedDx = e.target.value;
+    // Normalised, so a half-typed "Malaria + " is saved as "Malaria".
+    state.confirmedDx = _dxParts(e.target.value).join(' + ');
     // The diagnosis alone is enough to continue — the phone can come later.
     const nx = document.getElementById('step1Next');
     if (nx) nx.disabled = !state.confirmedDx.trim();

@@ -25,6 +25,11 @@
   var pkg = null;                // the package being edited
   var srcPkg = null;             // what was auto-filled (to detect edits)
   var ctx = { conditionId: null, title: '', severity: '', page: null, learned: false };
+  // What the clinician actually typed for THIS condition. Kept apart from ctx,
+  // which is rebuilt every time a package opens, so the words that go into the
+  // record are the clinician's own ("Malaria"), not the book's chapter heading
+  // ("Uncomplicated Malaria").
+  var dxTerm = '';
 
   var LEVELS = ['HC1', 'HC2', 'HC3', 'HC4', 'H', 'RR', 'NR'];
 
@@ -1305,10 +1310,17 @@
     };
     var addC = document.getElementById('ucgAddCond');
     if (addC) addC.onclick = function () {
+      // Apply what is on screen first, otherwise stepping on to the next
+      // condition silently threw this one's medicines away.
+      applyToWizard();
       close();
-      toast('Pick the next condition, then tap the package button again', 'info');
-      var dx = document.getElementById('confirmedDx');
-      if (dx) { dx.focus(); dx.select && dx.select(); }
+      toast('Type the next condition, then tap the package button again', 'info');
+      if (typeof window._wizStartAnotherCondition === 'function') {
+        window._wizStartAnotherCondition();
+      } else {
+        var dx = document.getElementById('confirmedDx');
+        if (dx) { dx.focus(); dx.select && dx.select(); }
+      }
     };
     wireDrugSearch();
   }
@@ -1751,6 +1763,7 @@
 
   function applyToWizard() {
     if (!state) return;
+    var _cond = String(dxTerm || pkg.title || ctx.title || '').trim();
     // The wizard starts with one blank medicine row — drop it so the package
     // doesn't leave an empty prescription line behind.
     state.medications = (state.medications || []).filter(function (m) {
@@ -1759,8 +1772,24 @@
     pkg.tests.forEach(function (t) { if (state.labTests.indexOf(t) < 0) state.labTests.push(t); });
     // Only what the clinician ticked is prescribed — and so only that comes off
     // the shelf. Everything else stays on the panel as reference.
-    pkg.drugs.filter(function (d) {
+    // Applying the same package twice — easy to do now that a visit can carry
+    // several conditions — must not prescribe the same drug twice.
+    function _alreadyPrescribed(name) {
+      var k = String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      if (!k) return false;
+      return (state.medications || []).some(function (m) {
+        return String(m.drug || '').toLowerCase().replace(/\s+/g, ' ').trim() === k;
+      });
+    }
+    // What this condition is being treated with — recorded whether or not the
+    // drug was added just now, so re-applying the same package (which adds
+    // nothing, because it is already prescribed) still counts as treatment.
+    var _wanted = pkg.drugs.filter(function (d) {
       return d.selected && (d.group || 'treatment') !== 'other';
+    });
+    var _added = _wanted.map(function (d) { return d.drug; });
+    _wanted.filter(function (d) {
+      return !_alreadyPrescribed(d.drug);
     }).forEach(function (d) {
       var tpd = Math.max(1, Math.min(4, Number(d.timesPerDay) || 2));
       // Give every row real intake times. Leaving these empty meant the
@@ -1789,9 +1818,27 @@
         qtyToDeduct: Number(d.qty) || 0,
       });
     });
-    state.feeConsult = Number(pkg.fees.consult) || 0;
-    state.feeLab = Number(pkg.fees.lab) || 0;
-    state.feeMeds = Number(pkg.fees.meds) || 0;
+    // Charges add up across the conditions treated in this visit — two
+    // conditions means two sets of tests and two sets of medicines, and the
+    // bill has to say so. Kept per condition so re-opening and re-applying the
+    // same package replaces its own contribution instead of doubling it.
+    // The consultation itself is charged once, however many conditions.
+    state.dxFees = (state.dxFees && typeof state.dxFees === 'object') ? state.dxFees : {};
+    state.dxFees[(_cond || pkg.title || 'condition').toLowerCase()] = {
+      consult: Number(pkg.fees.consult) || 0,
+      lab:     Number(pkg.fees.lab) || 0,
+      meds:    Number(pkg.fees.meds) || 0,
+    };
+    var _tot = { consult: 0, lab: 0, meds: 0 };
+    Object.keys(state.dxFees).forEach(function (k) {
+      var f = state.dxFees[k] || {};
+      _tot.consult = Math.max(_tot.consult, Number(f.consult) || 0);
+      _tot.lab  += Number(f.lab)  || 0;
+      _tot.meds += Number(f.meds) || 0;
+    });
+    state.feeConsult = _tot.consult;
+    state.feeLab = _tot.lab;
+    state.feeMeds = _tot.meds;
     // Carry the payment choice through, so saving from the panel settles the
     // money too. "Paid" is what writes the amount into the payments ledger.
     if (pkg.paymentStatus) {
@@ -1802,6 +1849,52 @@
       });
     }
     if (pkg.followUpDays) state.followUpDays = pkg.followUpDays;
+
+    // ── Every condition treated on this visit stays in the diagnosis ────────
+    //
+    // Malaria and typhoid together is the commonest pair in Uganda. Applying
+    // the second package adds its medicines to the first one's, so the record
+    // MUST name both conditions — otherwise it says the patient had typhoid
+    // while dispensing malaria treatment, which is what used to happen: typing
+    // the second condition over the first simply erased it.
+    //
+    // The box is not trusted to remember, because looking up the next condition
+    // means typing over it. What is trusted is the treatment: a condition whose
+    // medicines or tests are still on this consultation was treated, and belongs
+    // in the diagnosis. Remove its treatment and it drops out by itself.
+    if (_cond) {
+      state.dxApplied = (state.dxApplied && typeof state.dxApplied === 'object') ? state.dxApplied : {};
+      state.dxApplied[_cond.toLowerCase()] = {
+        name:  _cond,
+        drugs: _added.slice(),
+        tests: pkg.tests.slice(),
+      };
+    }
+    try {
+      if (typeof window._wizSetConditions === 'function') {
+        var _meds = (state.medications || []).map(function (m) {
+          return String(m.drug || '').toLowerCase().replace(/\s+/g, ' ').trim();
+        });
+        var _labs = (state.labTests || []).map(function (t) { return String(t).toLowerCase(); });
+        var _keep = [];
+        Object.keys(state.dxApplied || {}).forEach(function (k) {
+          var rec = state.dxApplied[k] || {};
+          var alive =
+            (rec.drugs || []).some(function (d) {
+              return _meds.indexOf(String(d).toLowerCase().replace(/\s+/g, ' ').trim()) >= 0;
+            }) ||
+            (rec.tests || []).some(function (t) { return _labs.indexOf(String(t).toLowerCase()) >= 0; });
+          if (alive) _keep.push(rec.name);
+          else delete state.dxApplied[k];      // its treatment was taken off
+        });
+        // Anything else the clinician wrote by hand stays exactly as written.
+        (window._wizConditions() || []).forEach(function (p) {
+          if (!_keep.some(function (k) { return k.toLowerCase() === p.toLowerCase(); })) _keep.push(p);
+        });
+        window._wizSetConditions(_keep);
+      }
+    } catch (e) {}
+
     try { if (typeof window._wizRefreshAfterAutofill === 'function') window._wizRefreshAfterAutofill(); } catch (e) {}
   }
 
@@ -1823,8 +1916,12 @@
   // ── Public entry: find the condition for the typed diagnosis, then open ──
   async function start(dxText, severity, wizState) {
     state = wizState || window._wizState || null;
-    var term = (dxText || '').trim();
+    // With two conditions in the box the whole string is "Malaria + Typhoid",
+    // which matches nothing in the book. Look up the last one — the one being
+    // added now — whoever called us.
+    var term = (dxText || '').split('+').pop().trim();
     if (!term) { toast('Enter the diagnosis first', 'error'); return; }
+    dxTerm = term;
     ensurePanel();
     try { await openDb(); } catch (e) { toast('Guideline database unavailable offline yet', 'error'); return; }
     // The national medicines list is what lets the package recover drugs the
