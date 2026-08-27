@@ -111,6 +111,18 @@
   // Drop cached query results so the next read goes to the server. Used after a
   // write (a consultation, a sale) — otherwise the cache-first reads keep
   // serving the pre-write snapshot and the dashboard looks frozen.
+  // Mark saved data as out of date — WITHOUT throwing it away.
+  //
+  // This used to delete the entry outright. That meant recording a single
+  // consultation wiped the clinic's only offline copy of the money taken, the
+  // patients seen, the bookings, the patient history and the Quick Sale stock.
+  // A phone that lost signal afterwards — which is most of the day in a
+  // village — then showed blank figures and "No saved stock yet", even though
+  // all of it had been downloaded minutes earlier.
+  //
+  // Marking it stale keeps the data on the phone for offline use AND makes
+  // cachedQuery refresh it at the first opportunity, which is what every
+  // caller actually wants.
   function invalidate(prefixes) {
     var list = Array.isArray(prefixes) ? prefixes : [prefixes];
     try {
@@ -119,7 +131,17 @@
         if (!key || key.indexOf(PREFIX) !== 0) continue;
         var bare = key.slice(PREFIX.length);
         for (var j = 0; j < list.length; j++) {
-          if (bare.indexOf(list[j]) === 0) { localStorage.removeItem(key); break; }
+          if (bare.indexOf(list[j]) !== 0) continue;
+          try {
+            var rec = JSON.parse(localStorage.getItem(key) || 'null');
+            if (rec && typeof rec === 'object' && 'v' in rec) {
+              rec.ts = 0;                                   // stale, but still here
+              localStorage.setItem(key, JSON.stringify(rec));
+            } else {
+              localStorage.removeItem(key);                 // unreadable — no loss
+            }
+          } catch (e) { try { localStorage.removeItem(key); } catch (e2) {} }
+          break;
         }
       }
     } catch (e) {}

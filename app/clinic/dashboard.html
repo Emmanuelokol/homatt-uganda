@@ -1127,7 +1127,7 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=20260823b"></script>
+<script src="js/clinic-offline.js?v=20260830a"></script>
 <!-- Stock intake: three questions, the app does the arithmetic. The SQLite
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
@@ -5973,6 +5973,19 @@
     var hadInstant = false;
     if (window.ClinicOffline && quickCid) {
       var saved = ClinicOffline.get('qs_inventory_' + quickCid);
+      // A clinic that has opened the Stock Tracker but never Quick Sale still
+      // has its shelf saved on the phone, under the tracker's own key. Sell
+      // from that rather than telling them there is nothing saved. Prices may
+      // be missing from that copy — the card says "Set sell price" and the
+      // seller can type it, which beats an empty screen.
+      if ((!saved || !saved.length)) {
+        var shelf = ClinicOffline.get('stock_' + quickCid);
+        if (shelf && shelf.length) {
+          saved = shelf.filter(function (i) {
+            return i && i.is_active !== false && Number(i.quantity) > 0;
+          });
+        }
+      }
       if (saved && saved.length) {
         _qsDrugs = saved; renderQsGrid(_qsDrugs); renderQsCategoryChips();
         hadInstant = true;
