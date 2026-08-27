@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════════════
- * Homatt Health — New Consultation Wizard  (2-screen)
+ * Homatt Health — New Treatment Wizard  (2-screen)
  * Screen 1: Patient & Assessment
  * Screen 2: Treatment & Bill
  * Saves to: clinic_diagnoses, e_prescriptions, clinic_followups
@@ -1599,7 +1599,7 @@
   loadFormulary();
   loadClinicInventory();
 
-  // Opening the app should land on Home — not a blank New Consultation that the
+  // Opening the app should land on Home — not a blank New Treatment that the
   // OS resumed. If the app is brought back and this wizard is completely
   // untouched, go to the dashboard. ANY entered work (patient, diagnosis, meds,
   // labs, or a booking) keeps the user here so nothing is ever lost.

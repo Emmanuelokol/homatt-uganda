@@ -563,7 +563,7 @@ window.HomattPace = (function () {
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v134';
+var HOMATT_BUILD = 'v135';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {
@@ -643,7 +643,7 @@ const MOCK_APPOINTMENTS = [
 ];
 
 /* ── Offline consultation replay ───────────────────────────────────────────
- * A New Consultation recorded offline is queued (type 'consultation') with a
+ * A New Treatment recorded offline is queued (type 'consultation') with a
  * client-generated diagnosis id and everything that depends on it. This handler
  * replays the same sequence the wizard runs online, from any page that loaded
  * clinic.js, once the connection returns. The diagnosis id is the primary key,

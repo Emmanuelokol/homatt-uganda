@@ -294,7 +294,7 @@
         <span class="material-icons-outlined">home</span> Home
       </a>
       <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations">
-        <span class="material-icons-outlined">medical_services</span> New Consultation
+        <span class="material-icons-outlined">medical_services</span> New Treatment
       </a>
       <a href="messages.html" class="sidebar-link"><span class="material-icons-outlined">forum</span> Messages</a>
       <a href="guidelines.html" class="sidebar-link"><span class="material-icons-outlined">menu_book</span> Clinical Guidelines</a>
@@ -375,7 +375,7 @@
         </div>
       </div>
 
-      <!-- Hero with New Consultation CTA -->
+      <!-- Hero with New Treatment CTA -->
       <div class="home-hero" data-slide="home">
         <div>
           <h1 id="heroGreeting">Good morning</h1>
@@ -384,7 +384,7 @@
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a href="new-order.html" class="home-cta" data-cap="consultations">
             <span class="material-icons-outlined">medical_services</span>
-            New Consultation
+            New Treatment
           </a>
           <button class="home-cta" onclick="openQuickSale()" data-cap="quicksale" style="background:rgba(255,255,255,0.12);color:#fff;border:2px solid rgba(255,255,255,0.5)">
             <span class="material-icons-outlined">point_of_sale</span>
@@ -827,6 +827,20 @@
         style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
     </div>
 
+    <!-- Add straight from the search.
+         Selling something that is not on the shelf yet is the commonest reason
+         a sale stalls, and the only way in used to be the "+ New Item" button
+         up in the header — away from the fingers, and it threw away whatever
+         had been typed. This sits directly under the box, and carries the
+         typed word into the sheet so the name is never typed twice. -->
+    <div style="padding:0 16px 8px;flex-shrink:0">
+      <button id="qsAddFromSearch" type="button"
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
+        <span class="material-icons-outlined" style="font-size:17px">add_circle_outline</span>
+        <span id="qsAddFromSearchLabel">Add an item or medicine</span>
+      </button>
+    </div>
+
     <!-- Category / illness filter chips (populated by JS after drugs load) -->
     <div id="qsCategoryRow" style="display:flex;gap:6px;padding:0 16px 8px;overflow-x:auto;flex-shrink:0;-webkit-overflow-scrolling:touch;scrollbar-width:none;-ms-overflow-style:none"></div>
 
@@ -1133,7 +1147,7 @@
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/stock-blueprints.js?v=20260827"></script>
-<script src="js/stock-intake.js?v=20260827"></script>
+<script src="js/stock-intake.js?v=20260902"></script>
 <script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script>
@@ -5977,11 +5991,8 @@
     // "+ New Item" goes to the same sheet the Stock Tracker uses: pick the name
     // off the national list, and the app already knows it is a medicine counted
     // in tabs. Nothing is typed twice and no dropdowns have to be answered.
-    bindTap(document.getElementById('qsAddDrugBtn'), function() {
-      closeQuickSale();
-      if (window.StockIntake) window.StockIntake.start(null);
-      else if (typeof openAddStockModal === 'function') openAddStockModal();
-    });
+    bindTap(document.getElementById('qsAddDrugBtn'), function() { qsAddFromSearch(); });
+    bindTap(document.getElementById('qsAddFromSearch'), function() { qsAddFromSearch(); });
 
     bindTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
     bindTap(document.getElementById('qsQtyPlus'),  function() { changeQsQty(1);  });
@@ -6265,10 +6276,52 @@
       if (nameMatch && catMatch) visible++;
     });
     var nm = document.getElementById('qsNoMatch');
-    if (nm) nm.style.display = visible === 0 ? 'block' : 'none';
+    if (nm) {
+      nm.style.display = visible === 0 ? 'block' : 'none';
+      if (visible === 0) {
+        // Nothing matched — say what was searched for and offer the way out,
+        // instead of a dead "No match found."
+        nm.innerHTML = q
+          ? 'Nothing on the shelf matches <strong style="color:#1B5E20">' + esc(searchEl.value.trim()) + '</strong>.'
+            + '<div style="margin-top:4px;font-size:12.5px">Add it below and it is sellable straight away.</div>'
+          : 'No match found.';
+      }
+    }
+    // The add button always offers to add exactly what was typed.
+    var lbl = document.getElementById('qsAddFromSearchLabel');
+    if (lbl) {
+      var typed = searchEl ? searchEl.value.trim() : '';
+      lbl.textContent = typed ? 'Add “' + typed + '”' : 'Add an item or medicine';
+    }
   }
 
   function filterQsDrugs() { applyQsFilters(); }
+
+  // "Add an item or medicine", straight from the Quick Sale search. Carries the
+  // typed word across so it is never typed twice, and comes BACK to Quick Sale
+  // once the item exists — the clinic was mid-sale, and should be able to
+  // finish it.
+  function qsAddFromSearch() {
+    var el = document.getElementById('qsSearch');
+    var typed = el ? el.value.trim() : '';
+    if (!window.StockIntake) {
+      closeQuickSale();
+      if (typeof openAddStockModal === 'function') openAddStockModal();
+      return;
+    }
+    closeQuickSale();
+    window.StockIntake.start(null, {
+      query: typed,
+      onDone: function (name) {
+        // Back to the sale, with the new item already searched for.
+        if (typeof openQuickSale === 'function') openQuickSale();
+        setTimeout(function () {
+          var s = document.getElementById('qsSearch');
+          if (s) { s.value = name || typed || ''; applyQsFilters(); }
+        }, 400);
+      },
+    });
+  }
 
   function selectQsDrug(id) {
     var drug = _qsDrugs.find(function(d) { return d.id === id; });

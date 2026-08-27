@@ -36,6 +36,7 @@
   var EM_URL = 'data/emhslu_2023.db';   // the national medicines list
   var emdb = null, emLoading = null;
   var st = null;                        // the intake being built
+  var done = null;                      // where to go back to once it is saved
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -226,6 +227,7 @@
   }
 
   function close() {
+    done = null;
     var o = document.getElementById('stkOverlay');
     if (o) o.style.display = 'none';
   }
@@ -621,8 +623,14 @@
         threshold: num(st.threshold) || 10,
       });
       if (ok === false) { btn.disabled = false; btn.textContent = wasLabel; return; }
+      // Taken before close(), which clears it so a cancelled sheet never fires
+      // a stale callback later.
+      var savedName = st.name, savedUnit = st.unit, back = done;
       close();
-      toast(fmt(c.total) + ' ' + st.unit + ' of ' + st.name + ' added to stock', 'success');
+      toast(fmt(c.total) + ' ' + savedUnit + ' of ' + savedName + ' added to stock', 'success');
+      // Hand control back to whoever opened this — a sale waiting to be
+      // finished, most likely.
+      if (back) { try { back(savedName); } catch (e) {} }
     } catch (e) {
       btn.disabled = false; btn.textContent = wasLabel;
       toast('Could not add the stock: ' + (e && e.message ? e.message : 'please try again'), 'error');
@@ -630,14 +638,36 @@
   }
 
   // ── Public ───────────────────────────────────────────────────────────────
-  // start()          — the owner taps "Add stock" or "+ New Item"
-  // start(item)      — the owner taps "Restock" on a row that is already there
-  function start(item) {
+  // start()               — the owner taps "Add stock" or "+ New Item"
+  // start(item)           — the owner taps "Restock" on a row already there
+  // start(null, {query})  — opened from a search box, carrying what was typed
+  // start(null, {onDone}) — called back once the item is on the shelf, so the
+  //                         caller can return to whatever it was doing
+  function start(item, opts) {
+    opts = opts || {};
+    done = typeof opts.onDone === 'function' ? opts.onDone : null;
     ensure();
     document.getElementById('stkOverlay').style.display = 'flex';
     openEm().catch(function () {});
     if (item) { pick({ name: item.item_name, existing: item, itemType: item.item_type }); }
-    else { st = null; renderPick(); }
+    else {
+      st = null;
+      renderPick();
+      // Whatever was typed in the search that sent us here is already the name
+      // being looked for — type it once, not twice.
+      var q = String(opts.query || '').trim();
+      if (q) {
+        var inp = document.getElementById('stkSearch');
+        if (inp) {
+          inp.value = q;
+          openEm().then(function () {
+            var el = document.getElementById('stkSearch');
+            if (el && el.value === q) el.dispatchEvent(new Event('input', { bubbles: true }));
+          }).catch(function () {});
+          inp.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      }
+    }
   }
 
   window.StockIntake = { start: start, close: close, suggest: suggest };
