@@ -5198,26 +5198,35 @@
         _addStockItemToCache(row);
         _syncQsCacheForItem(row);      // sellable in Quick Sale right away
       } else {
-        var ir = await supabase.from('clinic_inventory').insert(row).select().single();
-        var guard = 0;
         // If the live database is missing a newer column, PostgREST rejects the
         // WHOLE insert. Strip just that column and retry, so the item is never
-        // lost over a migration the clinic has not run yet.
-        while (ir && ir.error && guard++ < 10) {
-          var m = (ir.error.message || '').match(/Could not find the '([^']+)' column/);
-          if (!m) {
-            if (!/strips_per_box|units_per_strip|last_boxes|expiry_date|selling_price|tabs_per_pack|packs_per_box/
-                 .test(ir.error.message || '')) break;
-            var bare = Object.assign({}, row);
-            ['strips_per_box','units_per_strip','last_boxes','expiry_date',
-             'selling_price_ugx','pack_selling_price_ugx','tabs_per_pack','packs_per_box']
-              .forEach(function (k) { delete bare[k]; });
-            ir = await supabase.from('clinic_inventory').insert(bare).select().single();
-            break;
+        // lost over a migration the clinic has not run yet. Every column below
+        // is an extra — the name and the count are what matter, and those are
+        // never stripped.
+        var OPTIONAL = ['strips_per_box', 'units_per_strip', 'last_boxes', 'expiry_date',
+                        'selling_price_ugx', 'pack_selling_price_ugx',
+                        'tabs_per_pack', 'packs_per_box', 'category'];
+        var ir = await supabase.from('clinic_inventory').insert(row).select().single();
+        var guard = 0, strippedAll = false;
+        while (ir && ir.error && guard++ < 12) {
+          var msg = ir.error.message || '';
+          var m = msg.match(/Could not find the '([^']+)' column|column \S*?\.?"?([a-z_]+)"? does not exist/i);
+          var bad = m && (m[1] || m[2]);
+          if (bad && (bad in row)) {
+            delete row[bad];
+            ir = await supabase.from('clinic_inventory').insert(row).select().single();
+            continue;
           }
-          if (!(m[1] in row)) break;
-          delete row[m[1]];
-          ir = await supabase.from('clinic_inventory').insert(row).select().single();
+          // Still refused over a column, but naming one already dropped (or
+          // none at all). Rather than give up and lose the item, drop every
+          // optional column at once and try that.
+          if (!strippedAll && /Could not find the|does not exist|schema cache/i.test(msg)) {
+            strippedAll = true;
+            OPTIONAL.forEach(function (k) { delete row[k]; });
+            ir = await supabase.from('clinic_inventory').insert(row).select().single();
+            continue;
+          }
+          break;
         }
         if (ir && ir.error) {
           if (CO && CO.isNetworkErr(ir.error)) {

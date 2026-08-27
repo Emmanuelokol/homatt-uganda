@@ -98,12 +98,19 @@
     });
 
     try {
+      // The national list keeps the strength in its own column, but the name
+      // shown — and therefore the name typed — is the two joined: "Amoxicillin
+      // 250 mg". Matching the name column alone found nothing the moment
+      // anybody typed the strength, so the search matches what it displays.
+      var FULL = "(name || CASE WHEN strength IS NULL OR strength='' " +
+                 "THEN '' ELSE ' ' || strength END)";
+      var COLS = "SELECT name, dosage_form, strength, specification FROM emhslu_items ";
       // Starts-with first (that is what a half-typed name means), then anywhere.
       ['medicine', 'health_supply'].forEach(function (kind) {
-        emRows("SELECT name, dosage_form, strength, specification FROM emhslu_items " +
-               "WHERE item_type=? AND name LIKE ? ORDER BY length(name), name LIMIT 10", [kind, q + '%'])
-          .concat(emRows("SELECT name, dosage_form, strength, specification FROM emhslu_items " +
-               "WHERE item_type=? AND name LIKE ? ORDER BY length(name), name LIMIT 10", [kind, '%' + q + '%']))
+        emRows(COLS + "WHERE item_type=? AND " + FULL + " LIKE ? " +
+               "ORDER BY length(name), name LIMIT 10", [kind, q + '%'])
+          .concat(emRows(COLS + "WHERE item_type=? AND " + FULL + " LIKE ? " +
+               "ORDER BY length(name), name LIMIT 10", [kind, '%' + q + '%']))
           .forEach(function (r) {
             var full = r.name + (r.strength ? ' ' + r.strength : '');
             if (!take(full.toLowerCase())) return;
