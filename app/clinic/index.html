@@ -207,7 +207,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v132';
+    var BUILD = 'v133';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -287,8 +287,8 @@
      so a queued write that can never succeed no longer shows "Syncing…" forever
      while you're signed out. It only defines functions + registers handlers —
      no side effects that touch the login flow. -->
-<script src="js/clinic.js?v=20260829"></script>
-<script src="js/pwa-install.js?v=20260803"></script>
+<script src="js/clinic.js?v=20260831"></script>
+<script src="js/pwa-install.js?v=20260831"></script>
 <script>
   (function() {
     try {

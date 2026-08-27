@@ -237,8 +237,13 @@
     if (document.getElementById('_homattInstallBar') || isStandalone() || bannerSnoozed()) return;
     var bar = document.createElement('div');
     bar.id = '_homattInstallBar';
+    // z-index 400, the same as the pill: above the page, BELOW every sheet and
+    // modal (z >= 500). It is a bottom bar, and every sheet in the portal puts
+    // its action button along the bottom — at 12000 it sat squarely on top of
+    // "Add to stock", "Sell" and "Save", so the install nudge blocked the very
+    // thing the clinic had opened the sheet to do.
     bar.style.cssText =
-      'position:fixed;left:12px;right:12px;bottom:12px;z-index:12000;' +
+      'position:fixed;left:12px;right:12px;bottom:12px;z-index:400;' +
       'background:#fff;border:1px solid #E0E0E0;border-radius:14px;' +
       'box-shadow:0 8px 24px rgba(0,0,0,0.18);padding:12px 14px;' +
       'display:flex;align-items:center;gap:12px;font-family:inherit;max-width:520px;margin:0 auto';

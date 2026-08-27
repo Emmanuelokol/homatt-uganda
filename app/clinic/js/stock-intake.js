@@ -1,20 +1,29 @@
 /* Homatt Health — Stock intake
  *
- * Restocking has to take seconds, not minutes, and it has to be arithmetic the
- * owner can check in their head.
+ * Adding stock has to take seconds, not minutes, and it has to be arithmetic
+ * the owner can check in their head.
  *
- * Medicines arrive in boxes of strips of tablets. So the app asks three plain
- * questions the first time an item is stocked:
+ * The name comes from the national list (EMHSLU 2023), so nothing has to be
+ * typed twice and nothing has to be spelt right. Picking a name settles what
+ * kind of thing it is and what it is counted in — a clinic should never have to
+ * tell the app that Amoxicillin is a medicine counted in capsules.
  *
- *     How many boxes did you buy?        5
- *     How many strips in one box?        4
- *     How many tablets in one strip?     6
+ * Then it asks how much arrived, in the words on the carton:
+ *
+ *     How many boxes did you receive?     5
+ *     How many strips in one box?        10   ← remembered after the first time
+ *     How many caps in one strip?        10   ← remembered after the first time
  *                                        ─────────────────
- *                                        5 × 4 × 6 = 120 tablets
+ *                                        5 x 10 x 10 = 500 caps
  *
- * The strips-per-box and tablets-per-strip do not change between deliveries, so
- * they are kept against the item as a template. The next delivery asks ONE
- * question — how many boxes? — and the total is already worked out.
+ * The pack shape does not change between deliveries, so it is kept against the
+ * item. The next delivery asks ONE question — how many boxes? — and the total
+ * is already worked out. A first-time item starts from the standard pack for
+ * that kind of medicine (see stock-blueprints.js), shown in full so a wrong
+ * guess is obvious before it is saved.
+ *
+ * Nothing is ever refused. A name the national list has never heard of — a
+ * brand, pampers, a trade pack — is added exactly as typed.
  *
  * Nobody counts pills. Dispensing during a consultation deducts automatically,
  * and stock is allowed to go NEGATIVE: a clinician who has run out still treats
@@ -36,6 +45,17 @@
   function toast(m, k) { try { showToast(m, k || 'info'); } catch (e) {} }
   function num(v) { var n = Number(v); return isFinite(n) && n > 0 ? n : 0; }
   function fmt(n) { return (Math.round(n * 100) / 100).toLocaleString('en-UG'); }
+  function money(n) { return 'UGX ' + Math.round(Number(n) || 0).toLocaleString('en-UG'); }
+
+  // "boxes" → "box", "packets" → "packet". Only ever used on our own words.
+  function one(w) {
+    w = String(w || '');
+    if (/xes$/.test(w)) return w.slice(0, -2);
+    if (/ies$/.test(w)) return w.slice(0, -3) + 'y';
+    if (/s$/.test(w))   return w.slice(0, -1);
+    return w;
+  }
+  function bp() { return window.StockBlueprint; }
 
   // ── The national list, for the name suggestions ──────────────────────────
   function openEm() {
@@ -60,38 +80,57 @@
   }
 
   // Suggestions come from what the clinic ALREADY stocks first (those carry a
-  // pack template and can be topped up in one question), then the national list.
+  // pack shape and can be topped up in one question), then the national list —
+  // medicines and supplies both — then the counter items the national list does
+  // not carry at all (pampers, retail condoms, pads).
   function suggest(q) {
     q = String(q || '').trim();
     if (q.length < 2) return [];
     var out = [], seen = {};
     var ql = q.toLowerCase();
+    function take(k) { if (seen[k]) return false; seen[k] = 1; return true; }
 
     (window._stockItems || []).forEach(function (it) {
       var n = String(it.item_name || '');
       if (n.toLowerCase().indexOf(ql) < 0) return;
-      var k = n.toLowerCase();
-      if (seen[k]) return;
-      seen[k] = 1;
-      out.push({ name: n, existing: it, tag: 'in your stock' });
+      if (!take(n.toLowerCase())) return;
+      out.push({ name: n, existing: it, itemType: it.item_type || 'medicine', tag: 'in your stock' });
     });
 
     try {
-      emRows("SELECT name, dosage_form, strength FROM emhslu_items " +
-             "WHERE item_type='medicine' AND name LIKE ? " +
-             "ORDER BY length(name), name LIMIT 12", [q + '%'])
-        .concat(emRows("SELECT name, dosage_form, strength FROM emhslu_items " +
-             "WHERE item_type='medicine' AND name LIKE ? " +
-             "ORDER BY length(name), name LIMIT 12", ['%' + q + '%']))
-        .forEach(function (r) {
-          var full = r.name + (r.strength ? ' ' + r.strength : '');
-          var k = full.toLowerCase();
-          if (seen[k]) return;
-          seen[k] = 1;
-          out.push({ name: full, form: r.dosage_form || '', tag: 'EMHSLU' });
-        });
+      // Starts-with first (that is what a half-typed name means), then anywhere.
+      ['medicine', 'health_supply'].forEach(function (kind) {
+        emRows("SELECT name, dosage_form, strength, specification FROM emhslu_items " +
+               "WHERE item_type=? AND name LIKE ? ORDER BY length(name), name LIMIT 10", [kind, q + '%'])
+          .concat(emRows("SELECT name, dosage_form, strength, specification FROM emhslu_items " +
+               "WHERE item_type=? AND name LIKE ? ORDER BY length(name), name LIMIT 10", [kind, '%' + q + '%']))
+          .forEach(function (r) {
+            var full = r.name + (r.strength ? ' ' + r.strength : '');
+            if (!take(full.toLowerCase())) return;
+            out.push({
+              name: full, form: r.dosage_form || '', spec: r.specification || '',
+              itemType: (bp() ? bp().typeFor(kind) : (kind === 'medicine' ? 'medicine' : 'consumable')),
+              tag: kind === 'medicine' ? 'EMHSLU medicine' : 'EMHSLU supply',
+            });
+          });
+      });
     } catch (e) {}
-    return out.slice(0, 8);
+
+    try {
+      (bp() ? bp().commodities(q) : []).forEach(function (c) {
+        if (!take(c.name.toLowerCase())) return;
+        out.push({ name: c.name, itemType: 'consumable', tag: 'counter item' });
+      });
+    } catch (e) {}
+
+    // Medicines lead — a clinic searching "amox" wants the drug, not a folder.
+    out.sort(function (a, b) {
+      var ra = a.existing ? 0 : (a.itemType === 'medicine' ? 1 : 2);
+      var rb = b.existing ? 0 : (b.itemType === 'medicine' ? 1 : 2);
+      if (ra !== rb) return ra - rb;
+      return 0;
+    });
+    return out.slice(0, 10);
   }
 
   // ── The sheet ────────────────────────────────────────────────────────────
@@ -146,6 +185,19 @@
       '.stk-batch.soon .e{color:#B26A00;font-weight:700}',
       '.stk-batch.exp{background:#FDECEC}.stk-batch.exp .e{color:#B3261E;font-weight:800}',
       'html[data-theme="dark"] .stk-batch.exp{background:rgba(229,72,77,.14)}',
+      // What kind of thing is it — asked ONLY for a name nothing has heard of.
+      '.stk-kind{display:flex;gap:10px;margin-top:14px}',
+      '.stk-kind button{flex:1;padding:16px 12px;border-radius:16px;border:1.5px solid var(--border,#E0E0E0);background:var(--surface,#fff);font:inherit;cursor:pointer;text-align:left;color:var(--text,#111)}',
+      '.stk-kind button b{display:block;font-size:14.5px;font-weight:800;margin-bottom:2px}',
+      '.stk-kind button span{font-size:11.5px;color:var(--text-lt,#5F6368);line-height:1.35;display:block}',
+      '.stk-kind button:active{border-color:#0E7C5A}',
+      // Price block
+      '.stk-price{margin-top:18px;padding:14px;border-radius:16px;border:1.5px solid var(--brand-tint,#DBF4EA);background:var(--surface,#fff)}',
+      'html[data-theme="dark"] .stk-price{border-color:#22503F;background:#101A15}',
+      '.stk-price .cap{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:#0E7C5A;margin-bottom:10px}',
+      'html[data-theme="dark"] .stk-price .cap{color:#7BC98A}',
+      '.stk-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
+      '.stk-mini{font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--text-lt,#5F6368);display:block;margin-bottom:5px}',
     ].join('\n');
     document.head.appendChild(css);
 
@@ -171,14 +223,14 @@
     if (o) o.style.display = 'none';
   }
 
-  // ── Step 1: which medicine ───────────────────────────────────────────────
+  // ── Step 1: which item ───────────────────────────────────────────────────
   function renderPick() {
     document.getElementById('stkTitle').textContent = 'Add stock';
     document.getElementById('stkSub').textContent =
-      'Type the first few letters — for example “coar” for Coartem.';
+      'Type the first few letters — for example “amox” for Amoxicillin, or “pamp” for pampers.';
     document.getElementById('stkBody').innerHTML =
       '<label class="stk-lbl" for="stkSearch">Medicine or item</label>' +
-      '<input id="stkSearch" class="stk-in" autocomplete="off" placeholder="coar…">' +
+      '<input id="stkSearch" class="stk-in" autocomplete="off" placeholder="amox…">' +
       '<div id="stkRes"></div>';
     document.getElementById('stkSave').style.display = 'none';
 
@@ -189,15 +241,16 @@
       var hits = suggest(inp.value);
       var typed = inp.value.trim();
       if (!hits.length && typed.length < 2) { box.style.display = 'none'; return; }
+      var exact = hits.some(function (h) { return h.name.toLowerCase() === typed.toLowerCase(); });
       var html = hits.map(function (h, i) {
         return '<div data-i="' + i + '"><b>' + esc(h.name) + '</b>' +
           '<span class="t">' + esc(h.tag) + '</span></div>';
       }).join('');
-      // Anything not on the list can still be stocked — gloves, syringes, a
-      // brand the national list does not carry.
-      if (typed.length >= 2) {
-        html += '<div data-new="1"><b>Use “' + esc(typed) + '”</b>' +
-                '<span class="t">as typed</span></div>';
+      // NOTHING is ever refused. A brand, a trade pack, a name the national
+      // list has never carried — it goes in exactly as typed.
+      if (typed.length >= 2 && !exact) {
+        html += '<div data-new="1"><b>Add “' + esc(typed) + '”</b>' +
+                '<span class="t">not on the list — add it anyway</span></div>';
       }
       box.innerHTML = html;
       box.style.display = 'block';
@@ -205,7 +258,7 @@
         el.onclick = function () { pick(hits[Number(el.dataset.i)]); };
       });
       var nw = box.querySelector('[data-new]');
-      if (nw) nw.onclick = function () { pick({ name: typed }); };
+      if (nw) nw.onclick = function () { renderKind(typed); };
     }
     inp.oninput = function () {
       clearTimeout(t);
@@ -215,13 +268,30 @@
     setTimeout(function () { try { inp.focus(); } catch (e) {} }, 120);
   }
 
-  // ── Remembered pack templates ────────────────────────────────────────────
-  // The template MUST survive without the database migration. Storing it only
-  // in the strips_per_box / units_per_strip columns meant that on a clinic that
+  // ── Step 1b: only for a name nothing has heard of ────────────────────────
+  // The one thing that genuinely cannot be worked out. Two taps, plain words.
+  function renderKind(name) {
+    document.getElementById('stkTitle').textContent = name;
+    document.getElementById('stkSub').textContent =
+      'This one is not on the national list — that is fine, it is being added now. Which is it?';
+    document.getElementById('stkSave').style.display = 'none';
+    document.getElementById('stkBody').innerHTML =
+      '<div class="stk-kind">' +
+        '<button data-k="medicine"><b>A medicine</b><span>Tablets, capsules, syrup, an injection — anything you dispense.</span></button>' +
+        '<button data-k="consumable"><b>Something else you sell</b><span>Pampers, condoms, pads, gloves, a test kit.</span></button>' +
+      '</div>';
+    document.getElementById('stkBody').querySelectorAll('[data-k]').forEach(function (b) {
+      b.onclick = function () { pick({ name: name, itemType: b.getAttribute('data-k') }); };
+    });
+  }
+
+  // ── Remembered pack shapes ───────────────────────────────────────────────
+  // The shape MUST survive without the database migration. Storing it only in
+  // the strips_per_box / units_per_strip columns meant that on a clinic that
   // has not run 20260825_stock_packs.sql, the first save silently dropped those
-  // columns and the second delivery asked all three questions again. So the
-  // template is kept locally too, keyed by clinic + item name, and read back
-  // whenever the database row does not carry one.
+  // columns and the second delivery asked all the questions again. So it is
+  // kept locally too, keyed by clinic + item name, and read back whenever the
+  // database row does not carry one.
   function clinicId() {
     try { return (JSON.parse(localStorage.getItem('clinic_session') || '{}').clinicId) || 'local'; }
     catch (e) { return 'local'; }
@@ -232,37 +302,69 @@
   }
   function nameKey(name) { return String(name || '').toLowerCase().trim(); }
   function getTemplate(name) { return allTemplates()[nameKey(name)] || null; }
-  function rememberTemplate(name, strips, units, boxes) {
+  function rememberTemplate(name, strips, units, boxes, extra) {
     if (!(num(strips) > 0 && num(units) > 0)) return;
     try {
       var all = allTemplates();
-      all[nameKey(name)] = {
+      all[nameKey(name)] = Object.assign({
         strips_per_box: num(strips), units_per_strip: num(units),
         last_boxes: num(boxes) || undefined, updated: new Date().toISOString(),
-      };
+      }, extra || {});
       localStorage.setItem(tmplKey(), JSON.stringify(all));
     } catch (e) {}
   }
 
+  // What the clinic already knows beats any blueprint; the blueprint only fills
+  // the gaps on something stocked for the very first time.
   function pick(hit) {
     var ex = hit.existing || matchExisting(hit.name);
-    // The database row first, then whatever the clinic saved on this device.
     var tmpl = getTemplate(hit.name) || {};
-    var strips = ex && Number(ex.strips_per_box) > 0 ? Number(ex.strips_per_box)
-               : (Number(tmpl.strips_per_box) > 0 ? Number(tmpl.strips_per_box) : '');
-    var units  = ex && Number(ex.units_per_strip) > 0 ? Number(ex.units_per_strip)
-               : (Number(tmpl.units_per_strip) > 0 ? Number(tmpl.units_per_strip) : '');
-    var boxes  = (ex && Number(ex.last_boxes)) || Number(tmpl.last_boxes) || '';
+    var kind = hit.itemType || (ex && ex.item_type) || 'medicine';
+    var plan = (bp() ? bp().blueprintFor({
+      name: hit.name, form: hit.form, spec: hit.spec, itemType: kind,
+    }) : { kind: 'medicine', unit: 'tabs', outer: 'boxes', inner: 'strips', strips: 10, units: 10, sure: false, note: '' });
+
+    // An item already on the shelf knows what it is counted in, and that is
+    // better evidence than a dosage form we no longer have: a restock of
+    // something measured in vials must never be asked about strips.
+    if (ex && ex.unit && bp()) {
+      var byUnit = bp().shapeForUnit(ex.unit);
+      if (byUnit && byUnit.unit !== plan.unit) {
+        plan = { kind: plan.kind, unit: byUnit.unit, outer: byUnit.outer, inner: byUnit.inner,
+                 strips: byUnit.strips, units: byUnit.units, note: '', sure: false };
+      }
+    }
+
+    function firstNum() {
+      for (var i = 0; i < arguments.length; i++) if (num(arguments[i]) > 0) return num(arguments[i]);
+      return '';
+    }
     st = {
       name: hit.name,
-      unit: (ex && ex.unit) || 'tabs',
+      // The national list files condoms under contraceptives — a medicine. To
+      // the clinic selling them over the counter they are a counter item, and
+      // that is how they should be counted and sold. Where the two disagree the
+      // clinic's view wins; everything else keeps the list's classification.
+      itemType: kind === 'material' ? 'material'
+              : (plan.kind === 'commodity' ? 'consumable'
+              : (kind === 'consumable' ? 'consumable' : 'medicine')),
+      unit:   (ex && ex.unit) || tmpl.unit || plan.unit || 'tabs',
+      outer:  tmpl.outer || plan.outer || 'boxes',
+      inner:  (tmpl.inner != null ? tmpl.inner : plan.inner) || '',
       existing: ex || null,
-      boxes: boxes,
-      strips: strips,
-      units: units,
+      boxes:  firstNum(ex && ex.last_boxes, tmpl.last_boxes),
+      strips: firstNum(ex && ex.strips_per_box, ex && ex.packs_per_box, tmpl.strips_per_box),
+      units:  firstNum(ex && ex.units_per_strip, ex && ex.tabs_per_pack, tmpl.units_per_strip),
+      // The suggestion, kept apart so the sheet can say where a number came from.
+      suggest: { strips: plan.strips, units: plan.units, sure: plan.sure, note: plan.note || '' },
+      unitPrice: (ex && num(ex.selling_price_ugx)) || '',
+      packPrice: (ex && num(ex.pack_selling_price_ugx)) || '',
+      threshold: (ex && num(ex.min_threshold)) || 10,
       expiry: '',
       forceAsk: false,
     };
+    // No middle layer for this kind of thing → one multiplier only.
+    if (!st.inner) st.strips = 1;
     renderCount();
   }
 
@@ -273,15 +375,24 @@
     }) || null;
   }
 
-  // ── Step 2: the three questions (or just one, if we already know) ────────
+  // ── Step 2: how much arrived ─────────────────────────────────────────────
+  function known() { return !st.forceAsk && num(st.strips) > 0 && num(st.units) > 0; }
+  // A brand new item always asks for its price; an existing one only if it has
+  // never had one set (otherwise Quick Sale can't sell it).
+  function needsPrice() { return st.itemType !== 'material' && !num(st.unitPrice); }
+
   function renderCount() {
-    var known = !st.forceAsk && num(st.strips) > 0 && num(st.units) > 0;
+    var isKnown = known();
     var cur = st.existing ? Number(st.existing.quantity) : null;
+    var outerOne = one(st.outer), innerOne = one(st.inner);
+    var single = !st.inner && num(st.units) === 1;   // bought one bottle at a time
 
     document.getElementById('stkTitle').textContent = st.name;
-    document.getElementById('stkSub').textContent = known
-      ? 'You have stocked this before — just tell us how many boxes.'
-      : 'Three quick questions. The app works out the rest.';
+    document.getElementById('stkSub').textContent = st.existing
+      ? (isKnown ? 'Stocked before — just say how many ' + st.outer + ' arrived.'
+                 : 'Tell us the pack size once and it is remembered.')
+      : 'New item. ' + (st.itemType === 'medicine' ? 'Medicine' : 'Counter item') +
+        ', counted in ' + st.unit + '.';
     document.getElementById('stkSave').style.display = '';
 
     var h = '';
@@ -293,24 +404,62 @@
       // can see exactly which stock leaves next. Filled in once loaded.
       h += '<div id="stkBatches"></div>';
     }
-    h += '<div class="stk-q"><label class="stk-lbl" for="stkBoxes">How many boxes did you buy?</label>' +
+
+    // Q1 — always asked. When there is no pack at all, this IS the count.
+    h += '<div class="stk-q"><label class="stk-lbl" for="stkBoxes">How many ' +
+         esc(single ? st.unit : st.outer) + ' did you receive?</label>' +
          '<input id="stkBoxes" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
          'value="' + (st.boxes || '') + '" placeholder="e.g. 5"></div>';
 
-    if (known) {
-      h += '<div class="stk-known">One box = <b>' + fmt(st.strips) + ' strips</b>, ' +
-           'one strip = <b>' + fmt(st.units) + ' ' + esc(st.unit) + '</b>' +
-           '<br><button class="stk-edit" id="stkChange">Change the pack size</button></div>';
+    if (isKnown) {
+      if (!single) {
+        h += '<div class="stk-known">One ' + esc(outerOne) + ' = ' +
+             (st.inner ? '<b>' + fmt(st.strips) + ' ' + esc(num(st.strips) === 1 ? innerOne : st.inner) + '</b>, one ' +
+                         esc(innerOne) + ' = ' : '') +
+             '<b>' + fmt(st.units) + ' ' + esc(st.unit) + '</b>' +
+             '<br><button class="stk-edit" id="stkChange">Change the pack size</button></div>';
+      } else {
+        h += '<div class="stk-known">Counted one ' + esc(one(st.unit)) + ' at a time.' +
+             '<br><button class="stk-edit" id="stkChange">They come in a pack</button></div>';
+      }
     } else {
-      h += '<div class="stk-q"><label class="stk-lbl" for="stkStrips">How many strips are in one box?</label>' +
-           '<input id="stkStrips" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
-           'value="' + (st.strips || '') + '" placeholder="e.g. 4">' +
-           '<div class="hint">If it comes as a tin or a bottle rather than strips, put 1.</div></div>' +
-           '<div class="stk-q"><label class="stk-lbl" for="stkUnits">How many ' + esc(st.unit) +
-           ' are in one strip?</label>' +
+      if (st.inner) {
+        h += '<div class="stk-q"><label class="stk-lbl" for="stkStrips">How many ' + esc(st.inner) +
+             ' are in one ' + esc(outerOne) + '?</label>' +
+             '<input id="stkStrips" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
+             'value="' + (st.strips || st.suggest.strips || '') + '" placeholder="e.g. 10">' +
+             '<div class="hint">If it comes as a tin or a bottle rather than ' + esc(st.inner) + ', put 1.</div></div>';
+      }
+      h += '<div class="stk-q"><label class="stk-lbl" for="stkUnits">How many ' + esc(st.unit) +
+           ' are in one ' + esc(st.inner ? innerOne : outerOne) + '?</label>' +
            '<input id="stkUnits" class="stk-in" type="number" inputmode="numeric" min="1" step="1" ' +
-           'value="' + (st.units || '') + '" placeholder="e.g. 6"></div>';
+           'value="' + (st.units || st.suggest.units || '') + '" placeholder="e.g. 10">' +
+           (st.suggest.note
+             ? '<div class="hint">' + esc(st.suggest.note) + '</div>'
+             : (st.suggest.units
+                 ? '<div class="hint">' + (st.suggest.sure ? 'This is the pack size we have on record.'
+                     : 'That is the usual pack — check your carton and change it if yours is different.') +
+                   ' It is remembered after this.</div>'
+                 : '')) +
+           '</div>';
     }
+
+    // Price — what Quick Sale needs. Asked once, on the way in, rather than
+    // leaving an item on the shelf that cannot be sold.
+    if (needsPrice()) {
+      h += '<div class="stk-price"><div class="cap">Selling price</div>' +
+           '<div class="stk-two">' +
+             '<div><label class="stk-mini" for="stkUnitPrice">One ' + esc(one(st.unit)) + '</label>' +
+               '<input id="stkUnitPrice" class="stk-in" type="number" inputmode="numeric" min="0" step="50" ' +
+               'value="' + (st.unitPrice || '') + '" placeholder="e.g. 500"></div>' +
+             '<div><label class="stk-mini" for="stkPackPrice">One ' +
+               esc(st.inner ? innerOne : outerOne) + ' <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span></label>' +
+               '<input id="stkPackPrice" class="stk-in" type="number" inputmode="numeric" min="0" step="100" ' +
+               'value="' + (st.packPrice || '') + '" placeholder="worked out"></div>' +
+           '</div>' +
+           '<div class="hint" id="stkPriceHint" style="font-size:12px;color:#5F6368;margin-top:7px;line-height:1.4"></div></div>';
+    }
+
     // Each delivery is its own batch with its own expiry — different boxes,
     // different dates. Asked here, on the batch being added.
     h += '<div class="stk-q"><label class="stk-lbl" for="stkExpiry">Expiry date of this batch ' +
@@ -318,13 +467,24 @@
          '<input id="stkExpiry" class="stk-in" type="date" value="' + esc(st.expiry || '') + '">' +
          '<div class="hint">If this delivery expires sooner than what is already on the shelf, the app tracks the earlier date.</div></div>';
 
+    // Low-stock warning level. Starts at 10 and is only touched if the owner
+    // wants it different — never a question they have to answer.
+    if (!st.existing) {
+      h += '<div class="stk-q"><label class="stk-lbl" for="stkThreshold">Warn me when fewer than…</label>' +
+           '<input id="stkThreshold" class="stk-in" type="number" inputmode="numeric" min="0" step="1" ' +
+           'value="' + (st.threshold || 10) + '">' +
+           '<div class="hint">' + esc(st.unit) + ' left on the shelf. Leave it at 10 if you are not sure.</div></div>';
+    }
+
     h += '<div class="stk-sum" id="stkSum"></div>';
     document.getElementById('stkBody').innerHTML = h;
 
-    ['stkBoxes', 'stkStrips', 'stkUnits'].forEach(function (id) {
+    ['stkBoxes', 'stkStrips', 'stkUnits', 'stkUnitPrice', 'stkPackPrice'].forEach(function (id) {
       var el = document.getElementById(id);
       if (el) el.oninput = recalc;
     });
+    var th = document.getElementById('stkThreshold');
+    if (th) th.oninput = function () { st.threshold = num(th.value); };
     var xp = document.getElementById('stkExpiry');
     if (xp) xp.onchange = function () { st.expiry = xp.value || ''; };
     var ch = document.getElementById('stkChange');
@@ -365,28 +525,54 @@
   }
 
   function current() {
-    var known = !st.forceAsk && num(st.strips) > 0 && num(st.units) > 0;
+    var isKnown = known();
     var boxes  = num((document.getElementById('stkBoxes') || {}).value);
-    var strips = known ? num(st.strips) : num((document.getElementById('stkStrips') || {}).value);
-    var units  = known ? num(st.units)  : num((document.getElementById('stkUnits')  || {}).value);
+    var strips = isKnown ? num(st.strips)
+               : (st.inner ? num((document.getElementById('stkStrips') || {}).value) : 1);
+    var units  = isKnown ? num(st.units)  : num((document.getElementById('stkUnits')  || {}).value);
     return { boxes: boxes, strips: strips, units: units, total: boxes * strips * units };
+  }
+
+  function prices(c) {
+    var up = num((document.getElementById('stkUnitPrice') || {}).value) || num(st.unitPrice);
+    var pp = num((document.getElementById('stkPackPrice') || {}).value) || num(st.packPrice);
+    // The pack price is optional exactly as asked — if it is left blank it is
+    // worked out from the price of one, so a strip or a packet can still be
+    // sold whole in Quick Sale.
+    if (!pp && up && c.units > 1) pp = up * c.units;
+    return { unit: up, pack: pp };
   }
 
   function recalc() {
     var c = current();
     var sum = document.getElementById('stkSum');
     var btn = document.getElementById('stkSave');
+    var hint = document.getElementById('stkPriceHint');
+    if (hint) {
+      var p = prices(c);
+      hint.textContent = !p.unit
+        ? 'Quick Sale needs the price of one ' + one(st.unit) + '. You can still save without it and set it later.'
+        : (c.units > 1
+            ? 'One ' + one(st.inner || st.outer) + ' of ' + fmt(c.units) + ' ' + st.unit + ' sells for ' + money(p.pack) + '.'
+            : 'Sells at ' + money(p.unit) + ' each.');
+    }
     if (!c.boxes || !c.strips || !c.units) {
-      sum.innerHTML = '<div class="note">Fill the boxes in above and the total appears here.</div>';
+      sum.innerHTML = '<div class="note">Fill in the numbers above and the total appears here.</div>';
       btn.disabled = true;
       return;
     }
     var cur = st.existing ? Number(st.existing.quantity) : 0;
     var after = cur + c.total;
+    var innerOne = one(st.inner), outerOne = one(st.outer);
     // The multiplication is shown in full so the owner can check it at a glance.
+    var line = c.strips > 1
+      ? fmt(c.boxes) + ' ' + st.outer + ' × ' + fmt(c.strips) + ' ' + (st.inner || 'packs') +
+        ' × ' + fmt(c.units) + ' ' + st.unit
+      : (c.units > 1
+          ? fmt(c.boxes) + ' ' + st.outer + ' × ' + fmt(c.units) + ' ' + st.unit
+          : fmt(c.boxes) + ' ' + st.unit);
     sum.innerHTML =
-      '<div class="calc">' + fmt(c.boxes) + ' boxes × ' + fmt(c.strips) + ' strips × ' +
-        fmt(c.units) + ' ' + esc(st.unit) + '</div>' +
+      '<div class="calc">' + esc(line) + '</div>' +
       '<div class="tot">' + fmt(c.total) + ' ' + esc(st.unit) + '</div>' +
       (st.existing
         ? '<div class="note">' +
@@ -394,27 +580,38 @@
               ? 'Clears a shortfall of ' + fmt(-cur) + ' and leaves <b>' + fmt(after) + ' ' + esc(st.unit) + '</b> on the shelf.'
               : 'Shelf goes from ' + fmt(cur) + ' to <b>' + fmt(after) + ' ' + esc(st.unit) + '</b>.') +
           '</div>'
-        : '<div class="note">A new stock item will be created with this amount.</div>');
+        : '<div class="note">A new ' + (st.itemType === 'medicine' ? 'medicine' : 'item') +
+          ' will be created with this amount' +
+          (num(st.threshold) ? ', warning you below ' + fmt(st.threshold) + ' ' + esc(st.unit) : '') + '.</div>');
     btn.disabled = false;
+    // Deliberately does NOT write c.strips / c.units back onto st: doing so
+    // would make known() true mid-typing, and current() would then read the
+    // remembered number instead of the box the owner had just cleared. The
+    // save takes its numbers from current(), which always reads the fields.
   }
 
   // ── Save ─────────────────────────────────────────────────────────────────
   async function save() {
     var c = current();
     if (!c.total) return;
+    var p = prices(c);
     var btn = document.getElementById('stkSave');
     btn.disabled = true;
     var wasLabel = btn.textContent;
     btn.textContent = 'Adding…';
-    // Remember the pack size on THIS device, whatever the database can store.
-    // Next delivery of the same medicine then asks only for boxes.
-    rememberTemplate(st.name, c.strips, c.units, c.boxes);
+    // Remember the pack shape on THIS device, whatever the database can store.
+    // Next delivery of the same item then asks only for the outer count.
+    rememberTemplate(st.name, c.strips, c.units, c.boxes, {
+      unit: st.unit, outer: st.outer, inner: st.inner, item_type: st.itemType,
+    });
     try {
       var xp = document.getElementById('stkExpiry');
       var ok = await window.stockIntakeCommit({
-        name: st.name, unit: st.unit, existing: st.existing,
+        name: st.name, unit: st.unit, itemType: st.itemType, existing: st.existing,
         boxes: c.boxes, strips: c.strips, units: c.units, total: c.total,
         expiry: (xp && xp.value) || st.expiry || '',
+        unitPrice: p.unit || null, packPrice: p.pack || null,
+        threshold: num(st.threshold) || 10,
       });
       if (ok === false) { btn.disabled = false; btn.textContent = wasLabel; return; }
       close();
@@ -426,13 +623,13 @@
   }
 
   // ── Public ───────────────────────────────────────────────────────────────
-  // start()          — the owner taps "Add stock"
+  // start()          — the owner taps "Add stock" or "+ New Item"
   // start(item)      — the owner taps "Restock" on a row that is already there
   function start(item) {
     ensure();
     document.getElementById('stkOverlay').style.display = 'flex';
     openEm().catch(function () {});
-    if (item) { pick({ name: item.item_name, existing: item }); }
+    if (item) { pick({ name: item.item_name, existing: item, itemType: item.item_type }); }
     else { st = null; renderPick(); }
   }
 

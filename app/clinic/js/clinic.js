@@ -1,11 +1,43 @@
 /* Homatt Health — Clinic Portal shared JS */
 
+/* The Supabase client, and how it survives the pages.
+ *
+ * A page that writes `var supabase = _getClinicSupabase()` at the top level of
+ * a classic script does not create a local variable — it REPLACES
+ * window.supabase, which is where the Supabase library itself lives. From that
+ * moment `window.supabase.createClient` is gone, and every later call here
+ * throws. That is not cosmetic: the offline outbox replays through this
+ * function, so a clinic that recorded work without signal had it queued
+ * correctly, shown correctly, and then never sent — the queue simply retried
+ * and failed for ever.
+ *
+ * So the library is captured the moment this file loads (before any page's
+ * inline script can run) and the client is made once and reused.
+ */
+var _supaLib = (window.supabase && typeof window.supabase.createClient === 'function')
+  ? window.supabase : null;
+var _supaClient = null;
+
 function _getClinicSupabase() {
   const cfg = window.HOMATT_CONFIG || {};
-  if (!cfg.SUPABASE_URL || !window.supabase) return null;
-  return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-    auth: { storageKey: 'sb-homatt-clinic-auth' }
-  });
+  if (!cfg.SUPABASE_URL) return null;
+  // Still catch the library if this file happened to load before it.
+  if (!_supaLib && window.supabase && typeof window.supabase.createClient === 'function') {
+    _supaLib = window.supabase;
+  }
+  if (_supaClient) return _supaClient;
+  if (!_supaLib) {
+    // Library already gone. If what is on window is a usable client, use it —
+    // better than returning nothing and losing the write.
+    if (window.supabase && typeof window.supabase.from === 'function') return window.supabase;
+    return null;
+  }
+  try {
+    _supaClient = _supaLib.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+      auth: { storageKey: 'sb-homatt-clinic-auth' }
+    });
+  } catch (e) { return null; }
+  return _supaClient;
 }
 
 function requireClinic() {
@@ -91,15 +123,10 @@ function setupClinicMobileNav() {
 
 async function clinicSignOut() {
   // Sign out of Supabase auth so the session token is invalidated
-  const cfg = window.HOMATT_CONFIG || {};
-  if (window.supabase && cfg.SUPABASE_URL) {
-    try {
-      const tmpSupa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
-        auth: { storageKey: 'sb-homatt-clinic-auth' }
-      });
-      await tmpSupa.auth.signOut();
-    } catch(e) {}
-  }
+  try {
+    const supa = _getClinicSupabase();
+    if (supa) await supa.auth.signOut();
+  } catch(e) {}
   localStorage.removeItem('clinic_session');
   window.location.href = 'index.html';
 }
@@ -536,7 +563,7 @@ window.HomattPace = (function () {
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v132';
+var HOMATT_BUILD = 'v133';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {

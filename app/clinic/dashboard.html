@@ -580,7 +580,7 @@
             Stock Tracker
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <button onclick="openAddStockModal()" style="font-size:12px;padding:6px 14px;background:#00897B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+            <button onclick="(window.StockIntake?window.StockIntake.start(null):openAddStockModal())" style="font-size:12px;padding:6px 14px;background:#00897B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
               <span class="material-icons-outlined" style="font-size:15px">add</span> Add Item
             </button>
           </div>
@@ -1132,8 +1132,9 @@
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-intake.js?v=20260826"></script>
-<script src="js/clinic.js?v=20260829"></script>
+<script src="js/stock-blueprints.js?v=20260827"></script>
+<script src="js/stock-intake.js?v=20260827"></script>
+<script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
@@ -5074,6 +5075,12 @@
       units_per_strip: intake.units,
       last_boxes:      intake.boxes,
     };
+    // The same two numbers, in the columns Quick Sale already sells by, so a
+    // strip or a box can be sold whole the moment the item exists.
+    if (intake.units > 1) tmpl.tabs_per_pack = intake.units;
+    if (intake.strips > 1) tmpl.packs_per_box = intake.strips;
+    if (intake.unitPrice) tmpl.selling_price_ugx = intake.unitPrice;
+    if (intake.packPrice && intake.units > 1) tmpl.pack_selling_price_ugx = intake.packPrice;
 
     // The expiry belongs to THIS batch. If this delivery expires sooner than
     // what is already on the shelf, that earlier date is the one that matters.
@@ -5084,6 +5091,16 @@
       // Show it on the shelf straight away — the sync can take its time.
       _applyStockDeltaToCache(id, intake.total);
       _patchStockCache(id, tmpl);
+      // A price set during intake has to reach Quick Sale now, not after the
+      // next sync — and has to survive a database missing the price columns.
+      var _exExtras = {};
+      ['selling_price_ugx','pack_selling_price_ugx','tabs_per_pack','packs_per_box']
+        .forEach(function (k) { if (tmpl[k] != null) _exExtras[k] = tmpl[k]; });
+      if (Object.keys(_exExtras).length) {
+        _saveInvExtras(clinicId, intake.name, _exExtras);
+        var _merged = (window._stockItems || []).find(function (i) { return i.id === id; });
+        if (_merged) _syncQsCacheForItem(_merged);
+      }
 
       var _notes = intake.boxes + ' box' + (intake.boxes !== 1 ? 'es' : '') +
                    ' x ' + intake.strips + ' x ' + intake.units;
@@ -5132,56 +5149,94 @@
           if (CO && CO.isNetworkErr(r.error)) CO.enqueueRpc('add_stock_batch', batchArgs);
           else { showToast('Could not add stock: ' + r.error.message, 'error'); return false; }
         }
-        // Store the pack template (best-effort; column may not be migrated).
+        // Store the pack shape and price (best-effort; a column may not be
+        // migrated yet — strip just that one and keep going, so a missing
+        // migration never costs the clinic the rest of the entry).
         try {
-          var tr = await supabase.from('clinic_inventory').update(tmpl)
+          var patch = Object.assign({}, tmpl);
+          var tr = await supabase.from('clinic_inventory').update(patch)
             .eq('id', id).eq('clinic_id', clinicId);
+          var g2 = 0;
+          while (tr && tr.error && g2++ < 10) {
+            var mm = (tr.error.message || '').match(/Could not find the '([^']+)' column|column \S*?\.?"?([a-z_]+)"? does not exist/i);
+            var bad = mm && (mm[1] || mm[2]);
+            if (!bad || !(bad in patch)) break;
+            delete patch[bad];
+            if (!Object.keys(patch).length) { tr = { error: null }; break; }
+            tr = await supabase.from('clinic_inventory').update(patch)
+              .eq('id', id).eq('clinic_id', clinicId);
+          }
           if (tr && tr.error && CO && CO.isNetworkErr(tr.error)) CO.enqueue('table_update', tmplPayload);
         } catch (e) { if (CO) CO.enqueue('table_update', tmplPayload); }
       }
     } else {
-      // Brand new item.
+      // Brand new item. The sheet has already worked out what kind of thing it
+      // is and what it is counted in, so nothing here has to be guessed.
+      var thres = Number(intake.threshold) > 0 ? Number(intake.threshold) : 10;
       var row = Object.assign({
         clinic_id: clinicId,
         item_name: intake.name,
-        item_type: 'medicine',
+        item_type: intake.itemType || 'medicine',
         unit: intake.unit || 'tabs',
         quantity: intake.total,
-        min_threshold: Math.max(1, Math.round(intake.total * 0.2)),
-        reorder_level: Math.max(2, Math.round(intake.total * 0.5)),
+        min_threshold: thres,
+        reorder_level: thres * 2,
         is_active: true,
       }, tmpl);
       if (newExpiry) row.expiry_date = newExpiry;
 
+      // Prices belong to newer migrations. Keep them on-device as well so Quick
+      // Sale can sell the item even on a database that has not been migrated.
+      var _priceExtras = {};
+      ['selling_price_ugx','pack_selling_price_ugx','tabs_per_pack','packs_per_box','expiry_date']
+        .forEach(function (k) { if (row[k] != null) _priceExtras[k] = row[k]; });
+      if (Object.keys(_priceExtras).length) _saveInvExtras(clinicId, intake.name, _priceExtras);
+
       if (CO && CO.isOffline()) {
         row.id = CO.uuid();
-        CO.enqueue('table_insert', { table: 'clinic_inventory', rows: [row] });
+        CO.enqueue('table_insert', { table: 'clinic_inventory', row: row, stripUnknownColumns: true });
         _addStockItemToCache(row);
+        _syncQsCacheForItem(row);      // sellable in Quick Sale right away
       } else {
         var ir = await supabase.from('clinic_inventory').insert(row).select().single();
-        if (ir && ir.error) {
-          var msg = ir.error.message || '';
-          // Retry without any column this database has not migrated yet — the
-          // stock count matters more than the template or the expiry.
-          if (/strips_per_box|units_per_strip|last_boxes|expiry_date/.test(msg)) {
+        var guard = 0;
+        // If the live database is missing a newer column, PostgREST rejects the
+        // WHOLE insert. Strip just that column and retry, so the item is never
+        // lost over a migration the clinic has not run yet.
+        while (ir && ir.error && guard++ < 10) {
+          var m = (ir.error.message || '').match(/Could not find the '([^']+)' column/);
+          if (!m) {
+            if (!/strips_per_box|units_per_strip|last_boxes|expiry_date|selling_price|tabs_per_pack|packs_per_box/
+                 .test(ir.error.message || '')) break;
             var bare = Object.assign({}, row);
-            delete bare.strips_per_box; delete bare.units_per_strip; delete bare.last_boxes;
-            delete bare.expiry_date;
+            ['strips_per_box','units_per_strip','last_boxes','expiry_date',
+             'selling_price_ugx','pack_selling_price_ugx','tabs_per_pack','packs_per_box']
+              .forEach(function (k) { delete bare[k]; });
             ir = await supabase.from('clinic_inventory').insert(bare).select().single();
+            break;
           }
-          if (ir && ir.error) {
-            if (CO && CO.isNetworkErr(ir.error)) {
-              row.id = CO.uuid();
-              CO.enqueue('table_insert', { table: 'clinic_inventory', rows: [row] });
-              _addStockItemToCache(row);
-            } else { showToast('Could not add stock: ' + ir.error.message, 'error'); return false; }
-          } else if (ir.data) { _addStockItemToCache(ir.data); }
-        } else if (ir.data) { _addStockItemToCache(ir.data); }
+          if (!(m[1] in row)) break;
+          delete row[m[1]];
+          ir = await supabase.from('clinic_inventory').insert(row).select().single();
+        }
+        if (ir && ir.error) {
+          if (CO && CO.isNetworkErr(ir.error)) {
+            row.id = CO.uuid();
+            CO.enqueue('table_insert', { table: 'clinic_inventory', row: row, stripUnknownColumns: true });
+            _addStockItemToCache(row);
+            _syncQsCacheForItem(row);
+          } else { showToast('Could not add stock: ' + ir.error.message, 'error'); return false; }
+        } else if (ir.data) {
+          // Anything the database could not store still has to reach Quick Sale.
+          _addStockItemToCache(Object.assign({}, ir.data, _priceExtras));
+          _syncQsCacheForItem(Object.assign({}, ir.data, _priceExtras));
+        }
       }
     }
 
     try { if (CO && CO.invalidate) CO.invalidate(['qs_inventory_', 'stock_']); } catch (e) {}
     loadInventory();
+    if (typeof loadQsDrugs === 'function') loadQsDrugs();
     return true;
   };
 
@@ -5910,9 +5965,13 @@
 
     bindTap(document.getElementById('qsCloseBtn'), function() { closeQuickSale(); });
 
+    // "+ New Item" goes to the same sheet the Stock Tracker uses: pick the name
+    // off the national list, and the app already knows it is a medicine counted
+    // in tabs. Nothing is typed twice and no dropdowns have to be answered.
     bindTap(document.getElementById('qsAddDrugBtn'), function() {
       closeQuickSale();
-      if (typeof openAddStockModal === 'function') openAddStockModal();
+      if (window.StockIntake) window.StockIntake.start(null);
+      else if (typeof openAddStockModal === 'function') openAddStockModal();
     });
 
     bindTap(document.getElementById('qsQtyMinus'), function() { changeQsQty(-1); });
@@ -6984,6 +7043,6 @@
   loadTopConditions();
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/pwa-install.js?v=20260803"></script>
+<script src="js/pwa-install.js?v=20260831"></script>
 </body>
 </html>
