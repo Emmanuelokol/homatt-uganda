@@ -338,48 +338,12 @@
       <!-- Verify-codes panel removed for now (2026-07) at the clinic's request.
            Its JS (qvCode/qvPin/qvSubmitBtn) is null-guarded, so restoring is
            just re-adding the panel markup from git history. -->
-      <!-- Refer a patient to a partner clinic (no consultation needed) -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px">
-          <div style="font-size:15px;font-weight:700"><span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#6A1B9A">alt_route</span> Refer a Patient</div>
-          <div style="font-size:12.5px;color:#5F6368;margin-top:3px">Send a patient to a partner clinic — they get notified instantly, the patient gets the details on WhatsApp.</div>
-        </div>
-        <button type="button" onclick="openDashReferral()" style="padding:11px 18px;background:#6A1B9A;color:#fff;border:none;border-radius:11px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Refer now</button>
-      </div>
-
-      <!-- Referrals received from partner clinics -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="3" style="padding:0;margin-bottom:24px;">
-        <div class="table-header" style="justify-content:space-between">
-          <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00838F">call_received</span>
-            Referrals Received
-          </div>
-          <span id="refInCount" style="font-size:11px;color:#fff;background:#00838F;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
-        </div>
-        <div id="refInList" style="padding:8px 0">
-          <div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">Loading…</div>
-        </div>
-      </div>
-
-      <!-- Referrals I sent — did the patient arrive and get seen? -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="4" style="padding:0;margin-bottom:24px;">
-        <div class="table-header" style="justify-content:space-between">
-          <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#6A1B9A">call_made</span>
-            Referrals I Sent
-          </div>
-          <span id="refOutCount" style="font-size:11px;color:#fff;background:#6A1B9A;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
-        </div>
-        <div id="refOutList" style="padding:8px 0">
-          <div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">Loading…</div>
-        </div>
-      </div>
 
       <!-- Hero with New Treatment CTA -->
       <div class="home-hero" data-slide="home">
         <div>
           <h1 id="heroGreeting">Good morning</h1>
-          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual consultation.</p>
+          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual treatment.</p>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a href="new-order.html" class="home-cta" data-cap="consultations">
@@ -502,10 +466,10 @@
         </div>
       </div>
 
-      <!-- Today's consultations list -->
+      <!-- Today's treatments list -->
       <div class="admin-table-wrap" data-cap="history" data-slide="patients" style="padding:0;margin-bottom:24px">
         <div class="table-header">
-          <div class="table-title">Today's Consultations</div>
+          <div class="table-title">Today's Treatments</div>
           <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
         </div>
         <div id="ordersList" style="padding:16px">
@@ -944,7 +908,7 @@
     <button id="vmSubmitBtn"
       style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
       <span class="material-icons-outlined">verified</span>
-      Verify &amp; Start Consultation
+      Verify &amp; Start Treatment
     </button>
     <div style="height:8px"></div>
     <button id="vmCancelBtn"
@@ -974,7 +938,7 @@
           <option value="consumable">Other item you sell (pampers, condoms…) — Quick Sale</option>
           <option value="material">Material — used in the clinic, not sold</option>
         </select>
-        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Medicines &amp; sellable items appear in Quick Sale. “Material” is for internal supplies (drip sets, gloves) used during consultations.</div>
+        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Medicines &amp; sellable items appear in Quick Sale. “Material” is for internal supplies (drip sets, gloves) used during treatments.</div>
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
@@ -1106,36 +1070,6 @@
   </div>
 </div>
 
-<!-- ── Refer a patient (standalone; offline-queued) ── -->
-<div id="dashRefModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:640;align-items:center;justify-content:center;padding:18px">
-  <div style="background:#fff;border-radius:18px;max-width:430px;width:100%;padding:22px;max-height:92vh;overflow-y:auto">
-    <div style="font-size:17px;font-weight:800;margin-bottom:12px">Refer a patient</div>
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Patient name *</label>
-    <input id="drName" type="text" autocomplete="off" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Patient phone</label>
-    <input id="drPhone" type="tel" autocomplete="off" placeholder="07…" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Send to clinic *</label>
-    <select id="drClinic" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
-      <option value="">Loading partner clinics…</option>
-    </select>
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Why refer? *</label>
-    <div id="drReasons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
-    <input id="drItem" type="text" autocomplete="off" placeholder="Which medicine / test does the patient need?" style="display:none;width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px">
-    <label style="font-size:12px;font-weight:600;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Doctor's referral notes <span style="font-weight:400;color:#9AA0A6;text-transform:none">(what was done / found)</span></label>
-    <textarea id="drNotes" rows="3" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:10px;resize:vertical" placeholder="e.g. Malaria RDT positive, started on quinine injection today, needs full Coartem course. BP 120/80."></textarea>
-    <div id="drError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
-    <div id="drDone" style="display:none;background:#E8F5E9;border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-weight:800;color:#1B5E20;margin-bottom:4px">Referral sent ✔ &nbsp;<span id="drCode" style="font-weight:800"></span></div>
-      <a id="drWhats" target="_blank" rel="noopener" style="display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:700;text-decoration:none;margin-top:8px">
-        <span class="material-icons-outlined" style="font-size:18px">send</span> Send details to patient on WhatsApp
-      </a>
-    </div>
-    <div style="display:flex;gap:10px">
-      <button type="button" onclick="document.getElementById('dashRefModal').style.display='none'" style="flex:1;padding:12px;background:transparent;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;color:inherit">Close</button>
-      <button type="button" id="drSendBtn" style="flex:2;padding:12px;background:#6A1B9A;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Send referral</button>
-    </div>
-  </div>
-</div>
 
 <div id="clinicToast" class="admin-toast"></div>
 
@@ -1163,114 +1097,6 @@
   applyTierGating();   // lock premium sections on the basic plan
   var supabase = _getClinicSupabase();
   try { refreshClinicTier(supabase, session); } catch(e) {}
-
-  // ═══ REFER A PATIENT (standalone, Patients slide) ═══════════════════════
-  var _drReason = '';
-  var DR_REASONS = ['Medicine out of stock', 'Lab test not available', 'Needs specialist', 'Needs admission', 'Other'];
-
-  function _drLoadClinics() {
-    var sel = document.getElementById('drClinic');
-    if (!sel) return;
-    var CO = window.ClinicOffline;
-    var paint = function (rows) {
-      if (!rows || !rows.length) { sel.innerHTML = '<option value="">No partner clinics found yet</option>'; return; }
-      sel.innerHTML = '<option value="">Choose a clinic…</option>' + rows.map(function (c) {
-        var place = [c.district, c.address].filter(Boolean).join(', ');
-        return '<option value="' + esc(c.id) + '" data-phone="' + esc(c.phone || '') + '" data-place="' + esc(place) + '">'
-          + esc(c.name) + (c.district ? ' — ' + esc(c.district) : '') + '</option>';
-      }).join('');
-    };
-    var cached = CO && CO.get('partner_clinics', null);
-    if (cached) paint(cached);
-    if (!supabase || (CO && CO.isOffline())) { if (!cached) paint([]); return; }
-    resolveClinicId().then(function (cid) {
-      supabase.from('clinics').select('id,name,phone,district,address')
-        .neq('id', cid || '00000000-0000-0000-0000-000000000000')
-        .eq('active', true).order('name').limit(150)
-        .then(function (res) {
-          if (res.error || !res.data) return;
-          if (CO) CO.set('partner_clinics', res.data);
-          paint(res.data);
-        }).catch(function () {});
-    }).catch(function () {});
-  }
-
-  function openDashReferral() {
-    var m = document.getElementById('dashRefModal');
-    if (!m) return;
-    ['drName', 'drPhone', 'drItem', 'drNotes'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = ''; });
-    document.getElementById('drItem').style.display = 'none';
-    document.getElementById('drError').style.display = 'none';
-    document.getElementById('drDone').style.display = 'none';
-    document.getElementById('drSendBtn').style.display = '';
-    _drReason = '';
-    var rz = document.getElementById('drReasons');
-    rz.innerHTML = DR_REASONS.map(function (r) {
-      return '<button type="button" class="ref-reason" data-r="' + esc(r) + '" style="padding:8px 12px;border-radius:18px;border:1.5px solid #D7CCE4;background:transparent;color:#4A3762;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">' + esc(r) + '</button>';
-    }).join('');
-    rz.querySelectorAll('.ref-reason').forEach(function (b) {
-      b.addEventListener('click', function () {
-        rz.querySelectorAll('.ref-reason').forEach(function (x) { x.style.background = 'transparent'; x.style.color = '#4A3762'; });
-        b.style.background = '#6A1B9A'; b.style.color = '#fff';
-        _drReason = b.dataset.r;
-        var ni = document.getElementById('drItem');
-        var wants = /medicine|lab/i.test(_drReason);
-        ni.style.display = wants ? '' : 'none';
-        if (wants) ni.focus();
-      });
-    });
-    _drLoadClinics();
-    m.style.display = 'flex';
-  }
-  window.openDashReferral = openDashReferral;
-
-  (function wireDashReferral() {
-    var m = document.getElementById('dashRefModal');
-    if (!m) return;
-    m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
-    document.getElementById('drSendBtn').addEventListener('click', function () {
-      var errEl = document.getElementById('drError');
-      var fail = function (msg) { errEl.textContent = msg; errEl.style.display = 'block'; };
-      errEl.style.display = 'none';
-      var name = (document.getElementById('drName').value || '').trim();
-      var phone = (document.getElementById('drPhone').value || '').trim();
-      var sel = document.getElementById('drClinic');
-      if (!name) return fail('Enter the patient\u2019s name.');
-      if (!sel.value) return fail('Choose the clinic to refer to.');
-      if (!_drReason) return fail('Pick a reason.');
-      resolveClinicId().then(function (cid) {
-        if (!cid) return fail('Your account is not linked to a clinic yet — reconnect once and retry.');
-        var CO = window.ClinicOffline;
-        var code = 'RF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-        var row = {
-          from_clinic_id: cid, to_clinic_id: sel.value,
-          patient_name: name, patient_phone: phone || null,
-          reason: _drReason,
-          needed_item: (document.getElementById('drItem').value || '').trim() || null,
-          notes: (document.getElementById('drNotes').value || '').trim() || null,
-          referral_code: code,
-        };
-        if (CO) {
-          row.id = CO.uuid();
-          CO.enqueue('table_insert', { table: 'clinic_referrals', row: row, stripUnknownColumns: true });
-          CO.flush();
-        } else if (supabase) {
-          supabase.from('clinic_referrals').insert(row).then(function(){}).catch(function(){});
-        }
-        var opt = sel.options[sel.selectedIndex];
-        var msg = 'Hello ' + name + ', you have been referred to ' + opt.textContent
-          + (opt.dataset.place ? ' (' + opt.dataset.place + ')' : '')
-          + (opt.dataset.phone ? ', tel ' + opt.dataset.phone : '')
-          + '. Your referral code is ' + code + '. Please show this message when you arrive. — Homatt Health';
-        var wa = (phone || '').replace(/[^0-9]/g, '').replace(/^0/, '256');
-        document.getElementById('drWhats').href = 'https://wa.me/' + wa + '?text=' + encodeURIComponent(msg);
-        document.getElementById('drCode').textContent = code;
-        document.getElementById('drDone').style.display = 'block';
-        document.getElementById('drSendBtn').style.display = 'none';
-        showToast('Referral sent' + ((CO && CO.isOffline()) ? ' — will sync when online' : ''), 'success');
-      }).catch(function () { fail('Could not resolve your clinic — try again.'); });
-    });
-  })();
 
   // ═══ WHATSAPP-STYLE SLIDES ═════════════════════════════════════════════
   // Groups the dashboard into swipeable panels — Home | Patients | Money |
@@ -1412,7 +1238,7 @@
   // sidebar, View-all buttons and console — the check must live HERE, not just
   // on the (hideable) links, so a sub-account can never open a section its
   // role doesn't include.
-  var SV_CAPS = { stock: 'stock', payments: 'payments', conditions: 'consultations', referrals_in: 'consultations', referrals_out: 'consultations' };
+  var SV_CAPS = { stock: 'stock', payments: 'payments', conditions: 'consultations' };
   function openSectionView(key) {
     if (SV_CAPS[key] && typeof clinicCan === 'function' && !clinicCan(SV_CAPS[key])) {
       if (typeof showToast === 'function') showToast('Your role does not have access to this section', 'error');
@@ -1581,7 +1407,7 @@
         }
       }
       try { await supabase.from('bookings').update({status:'in_progress',attended_at:new Date().toISOString()}).eq('id', booking.id); } catch(e2) {}
-      qvOk.innerHTML = '<strong>Verified!</strong> Patient: ' + esc(booking.patient_name||'Unknown') + '. Opening consultation…';
+      qvOk.innerHTML = '<strong>Verified!</strong> Patient: ' + esc(booking.patient_name||'Unknown') + '. Opening treatment…';
       qvOk.style.display = 'block';
       var phone = '';
       if (booking.patient_user_id) {
@@ -1899,7 +1725,7 @@
             }
           } else if (!r.data || !r.data.length) {
             msg.style.color = '#C62828';
-            msg.textContent = 'Nothing was updated — this consultation may belong to another clinic.';
+            msg.textContent = 'Nothing was updated — this treatment may belong to another clinic.';
           } else { done = true; }
         }
       } catch (e) {
@@ -1920,7 +1746,7 @@
     var el = document.getElementById('ordersList');
     if (!el) return;
     if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
-    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see consultations.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see treatments.</div>'; return; }
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
@@ -1968,7 +1794,7 @@
       var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
       var sd = document.getElementById('statDispatched'); if (sd) sd.textContent = inpatient;
       if (!rows2.length) {
-        el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No consultations today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
+        el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No treatments today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
         return;
       }
       el.innerHTML = rows2.map(function(c) {
@@ -2146,59 +1972,6 @@
     bodyEl.innerHTML = g.records.map(function(c, i) {
       return renderHistVisitCard(c, g.records.length - i, i === 0);
     }).join('');
-    // Referral history for this patient (what was referred, when, by whom) —
-    // fetched in the background with a hard timeout so it can never hang the
-    // modal, and prepended above the visits when it arrives.
-    _loadPatientReferralHistory(g.phone);
-  }
-
-  async function _loadPatientReferralHistory(phone) {
-    if (!phone || !supabase) return;
-    try {
-      var cid = await resolveClinicId();
-      if (!cid) return;
-      var CO = window.ClinicOffline;
-      var q = supabase.from('clinic_referrals')
-        .select('id,from_clinic_id,to_clinic_id,reason,needed_item,notes,referral_code,status,created_at')
-        .eq('patient_phone', phone)
-        .or('from_clinic_id.eq.' + cid + ',to_clinic_id.eq.' + cid)
-        .order('created_at', { ascending: false }).limit(20);
-      var rr = CO ? await CO.withTimeout(q, 7000) : await q;
-      if (!rr || rr._timeout || rr.error || !rr.data || !rr.data.length) return;
-      var modal = document.getElementById('histModal');
-      var body = document.getElementById('histModalBody');
-      if (!body || !modal || modal.style.display !== 'flex') return;   // modal closed meanwhile
-      var names = (CO && CO.get('clinic_names', {})) || {};
-      // Resolve any unknown partner-clinic names (best effort, timed out).
-      var need = rr.data.map(function(r){ return r.from_clinic_id === cid ? r.to_clinic_id : r.from_clinic_id; })
-        .filter(function(id, i, a){ return id && !names[id] && a.indexOf(id) === i; });
-      if (need.length && !(CO && CO.isOffline())) {
-        try {
-          var nq = supabase.from('clinics').select('id,name').in('id', need);
-          var nr = CO ? await CO.withTimeout(nq, 5000) : await nq;
-          if (nr && !nr._timeout && nr.data) { nr.data.forEach(function(c){ names[c.id]=c.name; }); if (CO) CO.set('clinic_names', names); }
-        } catch (e) {}
-      }
-      var rowsHtml = rr.data.map(function(r){
-        var out = r.from_clinic_id === cid;
-        var other = out ? r.to_clinic_id : r.from_clinic_id;
-        var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '';
-        return '<div style="font-size:12.5px;color:#4A148C;padding:7px 0;border-top:1px solid #E1BEE7">'
-          + '<strong>' + (out ? 'Referred OUT' : 'Referred IN') + '</strong> · ' + when
-          + ' · ' + (out ? 'to ' : 'from ') + esc(names[other] || 'partner clinic')
-          + (r.reason ? ' · ' + esc(r.reason) : '')
-          + (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
-          + ' · <span style="text-transform:uppercase;font-weight:800;font-size:10.5px">' + esc(r.status) + '</span>'
-          + (r.notes ? '<div style="font-style:italic;margin-top:2px">“' + esc(r.notes) + '”</div>' : '')
-        + '</div>';
-      }).join('');
-      var html = '<div style="background:#F3E5F5;border-radius:12px;padding:12px 14px;margin-bottom:12px">'
-        + '<div style="font-size:11px;font-weight:800;color:#6A1B9A;text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px">'
-        +   '<span class="material-icons-outlined" style="font-size:14px;vertical-align:-2px">alt_route</span> Referrals</div>'
-        + rowsHtml
-        + '</div>';
-      body.insertAdjacentHTML('afterbegin', html);
-    } catch (e) {}
   }
 
   // Full clinical + financial detail for one past visit in the Patient History modal.
@@ -2271,7 +2044,7 @@
 
     // Financial breakdown
     function feeRow(label, amt){ return amt > 0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:#5F6368;margin-bottom:2px"><span>'+label+'</span><span>UGX '+fmtUGX(amt)+'</span></div>' : ''; }
-    var feeRows = feeRow('Consultation', Number(c.consultation_fee_ugx)||0)
+    var feeRows = feeRow('Treatment', Number(c.consultation_fee_ugx)||0)
       + feeRow('Lab / tests', Number(c.lab_fee_ugx)||0)
       + feeRow('Medicines', Number(c.meds_fee_ugx)||0);
     var financialBlock = total > 0
@@ -2340,7 +2113,7 @@
       var bits = [];
       bits.push(whoTxt
         ? '<strong>' + esc(whoTxt) + '</strong>'
-        : '<em style="opacity:.75">Not named yet — tap a consultation to add the name</em>');
+        : '<em style="opacity:.75">Not named yet — tap a treatment to add the name</em>');
       if (current.patient_phone) bits.push(esc(current.patient_phone));
       metaEl.innerHTML = bits.join(' · ');
     }
@@ -3330,7 +3103,7 @@
     var topKeys = keys.slice(0, 12);
 
     var headParts = [];
-    if (totalConsults) headParts.push(totalConsults + ' consultation' + (totalConsults !== 1 ? 's' : ''));
+    if (totalConsults) headParts.push(totalConsults + ' treatment' + (totalConsults !== 1 ? 's' : ''));
     if (totalQs)       headParts.push(totalQs + ' quick sale' + (totalQs !== 1 ? 's' : ''));
     headParts.push('top ' + topKeys.length + ' drugs');
 
@@ -4051,12 +3824,6 @@
 
   // ── Initial load ──
   async function loadAll() {
-    // Referrals FIRST and un-awaited: they used to be missing from loadAll
-    // entirely, so the card sat on "Loading…" until the 45s refresh cycle ran.
-    // (Both paint instantly from cache before any network — see _refPaintCached.)
-    try { _refPaintCached(); } catch (e) {}     // 0-await paint from cache
-    try { loadReferralsIn(); } catch (e) {}
-    try { loadReferralsOut(); } catch (e) {}
     var _cid = await resolveClinicId();
     loadBookings();
     loadActiveTreatments();
@@ -4072,372 +3839,6 @@
   loadAll();
 
   // ── Safety auto-refresh (in case realtime drops or isn't enabled) ──
-  // ── Referrals received from partner clinics (offline-cached) ────────────
-  async function loadReferralsIn() {
-    var list = document.getElementById('refInList');
-    if (!list) return;
-    var clinicId = await resolveClinicId();
-    if (!clinicId || !supabase) {
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
-        + (session && session.demo ? 'Demo mode — referrals appear here for real clinics.' : 'Not linked to a clinic.') + '</div>';
-      return;
-    }
-    var CO = window.ClinicOffline;
-    var run = function () {
-      return supabase.from('clinic_referrals')
-        .select('id,from_clinic_id,patient_name,patient_phone,reason,needed_item,notes,referral_code,status,created_at')
-        .eq('to_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
-    };
-    var res = CO ? await CO.cachedQuery('referrals_in_' + clinicId, run) : await run();
-    if (res.error && !(res.data || []).length) {
-      var m = (res.error.message || '');
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
-        + (/clinic_referrals|does not exist|schema cache/i.test(m)
-          ? 'Referrals need a database update — run 20260718_clinic_referrals.sql.'
-          : 'Could not load referrals.') + '</div>';
-      return;
-    }
-    var all = res.data || [];
-    // ONLY active referrals stay in the inbox. Once the patient is marked
-    // 'seen' (approved/attended), the referral leaves this list and lives on in
-    // the patient's history (Patient History → the referral shows there). So the
-    // inbox only ever shows what still needs action.
-    var rows = all.filter(function (r) { return r.status === 'pending' || r.status === 'received'; });
-    var cEl = document.getElementById('refInCount');
-    if (cEl) { cEl.textContent = rows.length + ' open'; cEl.style.display = rows.length ? '' : 'none'; }
-    if (!rows.length) {
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">No referrals yet. When a partner clinic refers a patient to you, they appear here instantly.</div>';
-      return;
-    }
-    // RENDER NOW with whatever sender names we already have — NEVER block the
-    // list on the names lookup. That lookup had no timeout and hung the whole
-    // "Referrals Received" section on "Loading…" on slow internet.
-    var names = (CO && CO.get('clinic_names', {})) || {};
-    _refInRows = rows; _refNames = names;
-    _renderRefRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
-    // Fill missing sender names in the background with a HARD timeout, then
-    // re-render — a slow link can never wedge the list again.
-    var missing = rows.map(function (r) { return r.from_clinic_id; })
-      .filter(function (id, i, a) { return id && !names[id] && a.indexOf(id) === i; });
-    if (missing.length && !(CO && CO.isOffline())) {
-      try {
-        var q = supabase.from('clinics').select('id,name').in('id', missing);
-        var nr = CO ? await CO.withTimeout(q, 7000) : await q;
-        if (nr && !nr._timeout && nr.data) {
-          nr.data.forEach(function (c) { names[c.id] = c.name; });
-          if (CO) CO.set('clinic_names', names);
-          _refNames = names;
-          _renderRefRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
-          refreshSectionView();
-        }
-      } catch (e) {}
-    }
-  }
-
-  function _renderRefRows(list, rows, names, total) {
-    list.innerHTML = rows.map(function (r) {
-      var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
-      var stColor = r.status === 'pending' ? '#E65100' : r.status === 'received' ? '#00838F' : '#2E7D32';
-      // ONE clear way to remove a referral: "Patient attended" files it to the
-      // patient's history and takes it out of this inbox. Every referral shows
-      // it (no need to first "mark received"). Pending ones also get a light
-      // "On the way" if you just want to note the patient is coming.
-      // A referral IS a patient — tapping the row starts their consultation.
-      // startReferralConsult resolves them against the system: already known →
-      // straight to the assessment; new → Register (prefilled) then the same steps.
-      var startBtn = '<button onclick="startReferralConsult(\'' + esc(r.id) + '\',\'' + esc(r.patient_name || '') + '\',\'' + esc(r.patient_phone || '') + '\')" '
-        + 'style="font-size:12px;padding:8px 14px;background:linear-gradient(135deg,#17936B,#0C6A4C);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-family:inherit;display:inline-flex;align-items:center;gap:5px">'
-        + '<span class="material-icons-outlined" style="font-size:16px">medical_services</span>Start consultation</button>';
-      var doneBtn = '<button onclick="setReferralStatus(\'' + esc(r.id) + '\',\'seen\')" '
-        + 'style="font-size:12px;padding:8px 14px;background:#1B5E20;color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-family:inherit;display:inline-flex;align-items:center;gap:5px">'
-        + '<span class="material-icons-outlined" style="font-size:16px">check_circle</span>Patient attended — remove</button>';
-      var onWayBtn = r.status === 'pending'
-        ? '<button onclick="setReferralStatus(\'' + esc(r.id) + '\',\'received\')" '
-          + 'style="font-size:11.5px;padding:8px 12px;background:#E0F7FA;color:#006064;border:1px solid #4DD0E1;border-radius:10px;cursor:pointer;font-weight:700;font-family:inherit">On the way</button>'
-        : '';
-      var actions = startBtn + onWayBtn + doneBtn;
-      // Whole row is tappable (buttons stopPropagation via their own onclick).
-      var rowTap = 'onclick="if(!event.target.closest(\'button\'))startReferralConsult(\'' + esc(r.id) + '\',\'' + esc(r.patient_name || '') + '\',\'' + esc(r.patient_phone || '') + '\')"';
-      return '<div ' + rowTap + ' style="padding:12px 20px;border-bottom:1px solid #F5F5F5;cursor:pointer">'
-        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        +   '<strong style="font-size:14px">' + esc(r.patient_name || 'Patient') + '</strong>'
-        +   (r.referral_code ? '<span style="font-size:10.5px;background:#E0F2F1;color:#00695C;padding:2px 8px;border-radius:10px;font-weight:700">' + esc(r.referral_code) + '</span>' : '')
-        +   '<span style="font-size:10.5px;color:#fff;background:' + stColor + ';padding:2px 8px;border-radius:10px;font-weight:700;text-transform:uppercase">' + esc(r.status) + '</span>'
-        +   '<span style="font-size:11px;color:#9AA0A6;margin-left:auto">' + when + '</span>'
-        + '</div>'
-        + '<div style="font-size:12.5px;color:#5F6368;margin-top:4px">'
-        +   'From <strong>' + esc(names[r.from_clinic_id] || 'partner clinic') + '</strong>'
-        +   (r.reason ? ' · ' + esc(r.reason) : '')
-        +   (r.needed_item ? ' · Needs: <strong>' + esc(r.needed_item) + '</strong>' : '')
-        +   (r.patient_phone ? ' · 📞 ' + esc(r.patient_phone) : '')
-        + '</div>'
-        + (r.notes ? '<div style="font-size:12px;color:#5F6368;margin-top:3px;font-style:italic">\u201C' + esc(r.notes) + '\u201D</div>' : '')
-        + (actions ? '<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">' + actions + '</div>' : '')
-      + '</div>';
-    }).join('')
-    + ((total && total > rows.length) ? _svViewAllBtn('referrals_in', 'View all ' + total + ' referrals') : '');
-  }
-
-  // Referrals loaded this session, kept for the searchable "View all" screens.
-  var _refInRows = [], _refOutRows = [], _refNames = {};
-  var REF_SUMMARY_N = 6;    // show the newest few; the rest live behind View all
-
-  // INSTANT paint: render referrals straight from the offline cache with NO
-  // awaits at all (not even resolveClinicId), so the cards are filled the
-  // moment the dashboard opens. The network refresh then updates them in place.
-  function _refPaintCached() {
-    try {
-      var cid = (session && session.clinicId) || null;
-      var CO = window.ClinicOffline;
-      if (!cid || !CO) return;
-      // REF_SUMMARY_N is a `var` assigned later in this script; this function
-      // runs synchronously BEFORE that line executes, so fall back to 6.
-      var N = REF_SUMMARY_N || 6;
-      _refNames = CO.get('clinic_names', {}) || {};
-      var inCached = CO.get('referrals_in_' + cid, null);
-      if (Array.isArray(inCached)) {
-        var act = inCached.filter(function (r) { return r.status === 'pending' || r.status === 'received'; });
-        _refInRows = act;
-        var li = document.getElementById('refInList');
-        var ci = document.getElementById('refInCount');
-        if (ci) { ci.textContent = act.length + ' open'; ci.style.display = act.length ? '' : 'none'; }
-        if (li && act.length) _renderRefRows(li, act.slice(0, N), _refNames, act.length);
-      }
-      var outCached = CO.get('referrals_out_' + cid, null);
-      if (Array.isArray(outCached) && outCached.length) {
-        _refOutRows = outCached;
-        var lo = document.getElementById('refOutList');
-        var co = document.getElementById('refOutCount');
-        var waiting = outCached.filter(function (r) { return !r.attended && (r.status === 'pending' || r.status === 'received'); }).length;
-        if (co) { co.textContent = waiting + ' awaiting'; co.style.display = waiting ? '' : 'none'; }
-        if (lo) _renderRefOutRows(lo, outCached.slice(0, N), _refNames, outCached.length);
-      }
-    } catch (e) {}
-  }
-
-  // ── Referrals I SENT: did the patient arrive and get seen? ──────────────
-  // Closes the loop for the referring clinician: every referral they sent with
-  // its live status (Waiting → On the way → Attended), which partner clinic it
-  // went to, and when. Same non-blocking pattern as the inbox: render from the
-  // cache first, fill partner names in the background with a hard timeout.
-  async function loadReferralsOut() {
-    var list = document.getElementById('refOutList');
-    if (!list) return;
-    var clinicId = await resolveClinicId();
-    if (!clinicId || !supabase) {
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
-        + (session && session.demo ? 'Demo mode — your referrals appear here for real clinics.' : 'Not linked to a clinic.') + '</div>';
-      return;
-    }
-    var CO = window.ClinicOffline;
-    // Prefer referrals_sent(): it reports the REAL outcome (was the patient
-    // actually treated at the destination, when, for what, by whom) instead of
-    // only the referral's own status — which stays 'pending' unless someone at
-    // the other clinic taps a button. Falls back to the plain table query when
-    // the RPC isn't installed on this database yet.
-    var run = function () {
-      var plain = function () {
-        return supabase.from('clinic_referrals')
-          .select('id,to_clinic_id,patient_name,patient_phone,reason,needed_item,status,referral_code,created_at')
-          .eq('from_clinic_id', clinicId).order('created_at', { ascending: false }).limit(200);
-      };
-      // ANY failure of the RPC (not installed, RLS, network, timeout) falls back
-      // to the plain table query — the safe baseline that always works. Only a
-      // successful RPC result is preferred, for its outcome columns.
-      return supabase.rpc('referrals_sent', { p_limit: 200 })
-        .then(function (r) { return (r && !r.error && r.data) ? r : plain(); })
-        .catch(function () { return plain(); });
-    };
-    var res = CO ? await CO.cachedQuery('referrals_out_' + clinicId, run) : await run();
-    if (res.error && !(res.data || []).length) {
-      var m = (res.error.message || '');
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">'
-        + (/clinic_referrals|does not exist|schema cache/i.test(m)
-          ? 'Referrals need a database update — run 20260718_clinic_referrals.sql.'
-          : 'Could not load your referrals.') + '</div>';
-      return;
-    }
-    var rows = res.data || [];
-    var cEl = document.getElementById('refOutCount');
-    var waiting = rows.filter(function (r) { return !r.attended && (r.status === 'pending' || r.status === 'received'); }).length;
-    if (cEl) { cEl.textContent = waiting + ' awaiting'; cEl.style.display = waiting ? '' : 'none'; }
-    if (!rows.length) {
-      list.innerHTML = '<div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">You haven’t referred anyone yet. Use <strong>Refer now</strong> above to send a patient to a partner clinic.</div>';
-      return;
-    }
-    var names = (CO && CO.get('clinic_names', {})) || {};
-    _refOutRows = rows; _refNames = names;
-    _renderRefOutRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
-    var missing = rows.map(function (r) { return r.to_clinic_id; })
-      .filter(function (id, i, a) { return id && !names[id] && a.indexOf(id) === i; });
-    if (missing.length && !(CO && CO.isOffline())) {
-      try {
-        var q = supabase.from('clinics').select('id,name').in('id', missing);
-        var nr = CO ? await CO.withTimeout(q, 7000) : await q;
-        if (nr && !nr._timeout && nr.data) {
-          nr.data.forEach(function (c) { names[c.id] = c.name; });
-          if (CO) CO.set('clinic_names', names);
-          _refNames = names;
-          _renderRefOutRows(list, rows.slice(0, REF_SUMMARY_N), names, rows.length);
-          refreshSectionView();
-        }
-      } catch (e) {}
-    }
-  }
-
-  function _renderRefOutRows(list, rows, names, total) {
-    list.innerHTML = rows.map(function (r) {
-      var when = r.created_at ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
-      // Plain-language status the sender actually cares about.
-      // The outcome from the destination clinic wins over the raw status: if they
-      // treated the patient, it says so even if nobody tapped a button there.
-      var st = (r.attended || r.status === 'seen')
-                                       ? { t: 'Attended \u2713',    c: '#0E7C5A', bg: '#DBF4EA' }
-             : r.status === 'received' ? { t: 'Patient on the way', c: '#00838F', bg: '#DBEFFB' }
-             : r.status === 'pending'  ? { t: 'Waiting for them',  c: '#E65100', bg: '#FCEFCF' }
-             :                           { t: r.status || '\u2014', c: '#5F6368', bg: '#EEEEEE' };
-      // What actually happened over there — what they were treated for and by whom.
-      var outcome = '';
-      if (r.attended) {
-        var aWhen = r.attended_at ? new Date(r.attended_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
-        outcome = '<div style="font-size:12px;color:#0E7C5A;margin-top:4px;background:#DBF4EA;border-radius:8px;padding:6px 9px">'
-          + '<span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> Seen'
-          + (aWhen ? ' ' + aWhen : '')
-          + (r.outcome_diagnosis ? ' \u00B7 ' + esc(r.outcome_diagnosis) : '')
-          + (r.outcome_clinician ? ' \u00B7 by ' + esc(r.outcome_clinician) : '')
-          + '</div>';
-      }
-      return '<div style="padding:12px 20px;border-bottom:1px solid #F5F5F5">'
-        + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'
-        +   '<strong style="font-size:14px">' + esc(r.patient_name || 'Patient') + '</strong>'
-        +   '<span style="font-size:10.5px;background:' + st.bg + ';color:' + st.c + ';padding:2px 9px;border-radius:10px;font-weight:800">' + st.t + '</span>'
-        +   '<span style="font-size:11px;color:#9AA0A6;margin-left:auto">' + when + '</span>'
-        + '</div>'
-        + '<div style="font-size:12.5px;color:#5F6368;margin-top:4px">'
-        +   'To <strong>' + esc(r.to_clinic_name || names[r.to_clinic_id] || 'partner clinic') + '</strong>'
-        +   (r.reason ? ' · ' + esc(r.reason) : '')
-        +   (r.needed_item ? ' · Needed: <strong>' + esc(r.needed_item) + '</strong>' : '')
-        + '</div>'
-        + outcome
-      + '</div>';
-    }).join('')
-    + ((total && total > rows.length) ? _svViewAllBtn('referrals_out', 'View all ' + total + ' sent') : '');
-  }
-
-  // Full-screen searchable views for when there are MANY referrals.
-  (window._svRenderers = window._svRenderers || {}).referrals_in = {
-    title: 'Referrals Received',
-    render: function (body, q) {
-      var rows = (_refInRows || []).filter(function (r) {
-        if (!q) return true;
-        return String(r.patient_name || '').toLowerCase().indexOf(q) >= 0
-          || String(r.patient_phone || '').indexOf(q) >= 0
-          || String(r.reason || '').toLowerCase().indexOf(q) >= 0
-          || String(_refNames[r.from_clinic_id] || '').toLowerCase().indexOf(q) >= 0;
-      });
-      _svSetCount(rows.length + ' of ' + (_refInRows || []).length);
-      if (!rows.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No referrals match.</div>'; return; }
-      _renderRefRows(body, rows, _refNames);
-    }
-  };
-  (window._svRenderers = window._svRenderers || {}).referrals_out = {
-    title: 'Referrals I Sent',
-    render: function (body, q) {
-      var rows = (_refOutRows || []).filter(function (r) {
-        if (!q) return true;
-        return String(r.patient_name || '').toLowerCase().indexOf(q) >= 0
-          || String(r.patient_phone || '').indexOf(q) >= 0
-          || String(r.reason || '').toLowerCase().indexOf(q) >= 0
-          || String(_refNames[r.to_clinic_id] || '').toLowerCase().indexOf(q) >= 0;
-      });
-      _svSetCount(rows.length + ' of ' + (_refOutRows || []).length);
-      if (!rows.length) { body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No referrals match.</div>'; return; }
-      _renderRefOutRows(body, rows, _refNames);
-    }
-  };
-
-  // Tap a referral → start that patient's consultation. The wizard resolves the
-  // phone against the clinic's patients: already in the system → straight to the
-  // assessment steps; not in the system → Register (name + phone prefilled) then
-  // the same steps. referral_id travels along so the referral is filed to the
-  // patient's history (and leaves this inbox) once the consultation is saved.
-  window.startReferralConsult = function (id, name, phone) {
-    if (!clinicCan || clinicCan('consultations')) {
-      var q = 'new-order.html?referral_id=' + encodeURIComponent(id)
-        + '&patient_phone=' + encodeURIComponent(phone || '')
-        + '&patient_name=' + encodeURIComponent(name || '')
-        + '&lookup=1';
-      window.location.href = q;
-    } else {
-      showToast('Your role does not include consultations', 'error');
-    }
-  };
-
-  // Change a referral's status so BOTH clinics see it.
-  // A plain table UPDATE is not enough: the original RLS policy's WITH CHECK
-  // only allowed rows whose from_clinic_id is mine, so a RECEIVING clinic's
-  // update was rejected (or silently matched 0 rows) — the row vanished from
-  // this screen via the optimistic cache while the sender still saw "Waiting
-  // for them". We now call the set_referral_status RPC (security definer,
-  // verifies the caller is a party to the referral) and only fall back to the
-  // table update if that RPC isn't installed. The write is queued through the
-  // outbox so it also works offline and retries by itself.
-  window.setReferralStatus = function (id, status) {
-    resolveClinicId().then(async function (cid) {
-      if (!cid) return;
-      var CO = window.ClinicOffline;
-
-      // Optimistic local update so the list reflects it instantly (offline too)
-      if (CO) {
-        var key = 'referrals_in_' + cid;
-        var cached = CO.get(key, null);
-        if (cached) CO.set(key, cached.map(function (r) { return r.id === id ? Object.assign({}, r, { status: status }) : r; }));
-      }
-      loadReferralsIn();
-
-      // OFFLINE → queue the RPC; it replays (and reaches the other clinic) on sync.
-      if (CO && CO.isOffline()) {
-        CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: id, p_status: status } });
-        showToast('Referral marked ' + status + ' — syncs when you’re online', 'success');
-        return;
-      }
-
-      var ok = false, why = '';
-      try {
-        var rr = supabase.rpc('set_referral_status', { p_referral_id: id, p_status: status });
-        var res = CO ? await CO.withTimeout(rr, 9000) : await rr;
-        if (res && res._timeout) {
-          if (CO) { CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: id, p_status: status } }); CO.flush(); }
-          showToast('Slow connection — the update will finish in the background', 'info');
-          return;
-        }
-        if (res && !res.error && res.data && res.data.ok) ok = true;
-        else if (res && res.error && /could not find the function|does not exist|schema cache/i.test(res.error.message || '')) {
-          // RPC not installed yet → fall back to a direct update, and VERIFY it
-          // actually changed a row (RLS can match 0 rows without erroring).
-          var up = await supabase.from('clinic_referrals')
-            .update({ status: status }).eq('id', id).select('id');
-          if (!up.error && up.data && up.data.length) ok = true;
-          else why = (up.error && up.error.message) || 'blocked by database permissions';
-        } else why = (res && res.error && res.error.message) || (res && res.data && res.data.error) || 'update rejected';
-      } catch (e) { why = (e && e.message) || 'network error'; }
-
-      if (ok) {
-        showToast('Referral marked ' + status, 'success');
-        try { loadReferralsIn(); } catch (e) {}
-      } else {
-        // Put the row back — it did NOT change on the server, and the other
-        // clinic must not be left thinking nothing happened while we show done.
-        if (CO) {
-          var k2 = 'referrals_in_' + cid;
-          var c2 = CO.get(k2, null);
-          if (c2) CO.set(k2, c2.map(function (r) { return r.id === id ? Object.assign({}, r, { status: r._prevStatus || 'pending' }) : r; }));
-        }
-        try { loadReferralsIn(); } catch (e) {}
-        showToast('Could not update the referral: ' + why + ' — run 20260819_fix_referral_update_rls.sql', 'error');
-      }
-    }).catch(function(){});
-  };
 
   // ── Repaint when the background refresh brings back something new ────────
   // Every panel reads its cached copy first so the screen paints instantly on a
@@ -4454,8 +3855,6 @@
     ['revenue_',             function(){ loadRevenue(); }],
     ['financial_',           function(){ loadFinancial(_finPeriod); }],
     ['top_conditions_',      function(){ try { loadTopConditions(); } catch(e){} }],
-    ['referrals_in_',        function(){ try { loadReferralsIn(); } catch(e){} }],
-    ['referrals_out_',       function(){ try { loadReferralsOut(); } catch(e){} }],
     ['qs_inventory_',        function(){ loadInventory(); }]
   ];
   var _freshBusy = {};
@@ -4488,8 +3887,6 @@
     loadConsultations(); loadRevenue();
     loadInventory(); loadFinancial(_finPeriod);
     loadMedsDispensed();
-    try { loadReferralsIn(); } catch (e) {}
-    try { loadReferralsOut(); } catch (e) {}
   }
   // LIGHT refresh: only the money/stock FIGURES (painted via textContent, so no
   // list is torn down and rebuilt). Used when the app simply becomes visible
@@ -4546,8 +3943,7 @@
   // every subscription below is silently dead and online changes never stream
   // live (the user had to refresh). The channel also RESUBSCRIBES itself with
   // backoff when it errors/closes (flaky 4G drops it), and re-auths whenever the
-  // app returns to the foreground. clinic_referrals is included so a referral
-  // reaches the receiving clinic in real time (like the messenger).
+  // app returns to the foreground.
   var _rtChannel = null, _rtGen = 0, _rtRetry = 0;
   // Is the live socket actually connected? When it is, the timed checks
   // below have nothing to add and stay silent.
@@ -4580,22 +3976,6 @@
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_quick_sales', filter: 'clinic_id=eq.' + clinicId },
         function() { _rtReload(['revenue_','financial_','meds_qs_','qs_inventory_'],
           function(){ loadRevenue(); loadFinancial(_finPeriod); loadInventory(); loadMedsDispensed(); }); })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'to_clinic_id=eq.' + clinicId },
-        function() { try { loadReferralsIn(); } catch (e) {} try { refreshFigures(); } catch (e) {} })
-      // Referrals I SENT: stream status changes back so the sender sees the
-      // patient arrive and get attended, live — and gets told when it happens.
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'clinic_referrals', filter: 'from_clinic_id=eq.' + clinicId },
-        function(payload) {
-          try { loadReferralsOut(); } catch (e) {}
-          try {
-            var n = payload && payload.new, o = payload && payload.old;
-            if (n && n.status === 'seen' && (!o || o.status !== 'seen')) {
-              showToast('✓ ' + (n.patient_name || 'Your referred patient') + ' was attended at the partner clinic', 'success');
-            } else if (n && n.status === 'received' && (!o || o.status !== 'received')) {
-              showToast((n.patient_name || 'Your referred patient') + ' is on the way to the partner clinic', 'info');
-            }
-          } catch (e) {}
-        })
       .subscribe(function(status) {
         if (mine !== _rtGen) return;
         // Whether the socket is up decides whether anything needs to poll at
@@ -6787,7 +6167,7 @@
     var html = '<div style="display:flex;flex-direction:column;gap:14px">'
       + all.slice(0, COND_N).map(function(entry, idx) { return _condCardHtml(entry, idx); }).join('')
       + '</div>'
-      + '<div style="font-size:11px;color:#9AA0A6;padding:10px 0 0;text-align:right">'+totalCases+' total consultations in last '+_condPeriodDays+' days</div>'
+      + '<div style="font-size:11px;color:#9AA0A6;padding:10px 0 0;text-align:right">'+totalCases+' total treatments in last '+_condPeriodDays+' days</div>'
       + (all.length > COND_N ? _svViewAllBtn('conditions', 'View all ' + all.length + ' conditions') : '');
     body.innerHTML = html;
     refreshSectionView();
@@ -7031,7 +6411,7 @@
       { label:'Outstanding (UGX)',   val: fmtUGX(r.total_outstanding_ugx),bg:'#FFEBEE',col:'#C62828' },
       { label:'Stock Cost (UGX)',    val: fmtUGX(r.stock_cost_ugx),      bg:'#FFF3E0', col:'#E65100' },
       { label:'Net Margin (UGX)',    val: fmtUGX(r.net_margin_ugx),      bg: r.net_margin_ugx >= 0 ? '#E8F5E9':'#FFEBEE', col: r.net_margin_ugx >= 0 ? '#1B5E20':'#C62828' },
-      { label:'Consultations',       val: r.total_consultations,          bg:'#E3F2FD', col:'#0277BD' },
+      { label:'Treatments',         val: r.total_consultations,          bg:'#E3F2FD', col:'#0277BD' },
       { label:'Patients',            val: r.total_patients,               bg:'#E8EAF6', col:'#283593' },
     ];
     var cardsHtml = cards.map(function(c) {

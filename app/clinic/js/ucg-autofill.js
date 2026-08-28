@@ -834,7 +834,7 @@
         '<div class="ucg-foot" style="flex-wrap:wrap">' +
           '<button class="ucg-btn ghost" id="ucgCancel" style="flex:0 0 auto;padding-left:16px;padding-right:16px">Cancel</button>' +
           '<button class="ucg-btn ghost" id="ucgApply" style="flex:1 1 40%">Apply &amp; review</button>' +
-          '<button class="ucg-btn go" id="ucgSave" style="flex:1 1 100%">Save consultation</button>' +
+          '<button class="ucg-btn go" id="ucgSave" style="flex:1 1 100%">Save treatment</button>' +
         '</div>' +
       '</div>';
     document.body.appendChild(ov);
@@ -1031,7 +1031,7 @@
       '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">3</span>' +
         '<h4>Charges (UGX)</h4><span class="ucg-count">you enter</span></div>' +
         '<div class="ucg-money">' +
-          '<div><label>Consultation</label><input type="number" min="0" id="ucgFeeC" value="' + (pkg.fees.consult || 0) + '"></div>' +
+          '<div><label>Treatment</label><input type="number" min="0" id="ucgFeeC" value="' + (pkg.fees.consult || 0) + '"></div>' +
           '<div><label>Lab</label><input type="number" min="0" id="ucgFeeL" value="' + (pkg.fees.lab || 0) + '"></div>' +
           '<div><label>Medicines</label><input type="number" min="0" id="ucgFeeM" value="' + (pkg.fees.meds || 0) + '"></div>' +
         '</div>' +

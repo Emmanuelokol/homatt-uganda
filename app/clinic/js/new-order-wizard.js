@@ -797,7 +797,7 @@
   const regModal = document.getElementById('registerModal');
   function openRegisterModal(prefillPhone, prefillName) {
     document.getElementById('regPhone').value = prefillPhone || phoneInput.value;
-    // A referred patient arrives with their name already known — prefill it so
+    // A patient opened by phone arrives with their name already known — prefill it so
     // registering is a single tap.
     document.getElementById('regName').value = prefillName || '';
     regModal.style.display = 'flex';
@@ -1156,123 +1156,6 @@
     state.labResults = e.target.value;
   });
 
-  // ── Refer to a partner clinic (offline-safe, auto-notifies them) ──
-  let _refReason = '';
-  const _refKey = () => 'partner_clinics';
-
-  function loadPartnerClinics() {
-    const sel = document.getElementById('refClinicSel');
-    if (!sel) return;
-    const CO = window.ClinicOffline;
-    const paint = (rows) => {
-      if (!rows || !rows.length) {
-        sel.innerHTML = '<option value="">No partner clinics found yet</option>';
-        return;
-      }
-      sel.innerHTML = '<option value="">Choose a clinic…</option>' + rows.map(c =>
-        `<option value="${esc(c.id)}" data-phone="${esc(c.phone || '')}" data-place="${esc([c.district, c.address].filter(Boolean).join(', '))}">${esc(c.name)}${c.district ? ' — ' + esc(c.district) : ''}</option>`
-      ).join('');
-    };
-    const cached = CO && CO.get(_refKey(), null);
-    if (cached) paint(cached);
-    if (!supabase || (CO && CO.isOffline())) { if (!cached) paint([]); return; }
-    supabase.from('clinics').select('id,name,phone,district,address')
-      .neq('id', _clinicId || '00000000-0000-0000-0000-000000000000')
-      .eq('active', true).order('name').limit(150)
-      .then(res => {
-        if (res.error || !res.data) return;
-        if (CO) CO.set(_refKey(), res.data);
-        paint(res.data);
-      }).catch(() => {});
-  }
-
-  function openReferralModal() {
-    if (!state.patient) { showToast('Select or register the patient first', 'error'); return; }
-    const m = document.getElementById('refModal');
-    if (!m) return;
-    document.getElementById('refPatientLine').textContent =
-      state.patient.name + (state.patient.phone ? ' · ' + state.patient.phone : '');
-    document.getElementById('refDone').style.display = 'none';
-    document.getElementById('refError').style.display = 'none';
-    document.getElementById('refCreateBtn').style.display = '';
-    document.getElementById('refNotes').value = '';
-    document.getElementById('refNeededItem').value = '';
-    document.getElementById('refNeededItem').style.display = 'none';
-    _refReason = '';
-    document.querySelectorAll('.ref-reason').forEach(b => b.classList.remove('active'));
-    loadPartnerClinics();
-    m.style.display = 'flex';
-  }
-
-  document.getElementById('referOutBtn')?.addEventListener('click', openReferralModal);
-  document.getElementById('refCancelBtn')?.addEventListener('click', () => {
-    document.getElementById('refModal').style.display = 'none';
-  });
-  document.getElementById('refModal')?.addEventListener('click', (e) => {
-    if (e.target === e.currentTarget) e.currentTarget.style.display = 'none';
-  });
-  document.querySelectorAll('.ref-reason').forEach(b => {
-    b.addEventListener('click', () => {
-      document.querySelectorAll('.ref-reason').forEach(x => x.classList.remove('active'));
-      b.classList.add('active');
-      _refReason = b.dataset.r;
-      // Ask WHICH item when the reason is a missing drug or test
-      const ni = document.getElementById('refNeededItem');
-      const wants = /medicine|lab/i.test(_refReason);
-      ni.style.display = wants ? '' : 'none';
-      if (wants) ni.focus();
-    });
-  });
-
-  document.getElementById('refCreateBtn')?.addEventListener('click', () => {
-    const errEl = document.getElementById('refError');
-    const fail = (msg) => { errEl.textContent = msg; errEl.style.display = 'block'; };
-    errEl.style.display = 'none';
-    const sel = document.getElementById('refClinicSel');
-    const toId = sel.value;
-    if (!toId) return fail('Choose the clinic to refer to.');
-    if (!_refReason) return fail('Pick a reason.');
-    const opt = sel.options[sel.selectedIndex];
-    const CO = window.ClinicOffline;
-    const code = 'RF-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-    const row = {
-      from_clinic_id: _clinicId,
-      to_clinic_id: toId,
-      patient_name: state.patient.name,
-      patient_phone: state.patient.phone || null,
-      reason: _refReason,
-      needed_item: (document.getElementById('refNeededItem').value || '').trim() || null,
-      notes: (document.getElementById('refNotes').value || '').trim() || null,
-      referral_code: code,
-    };
-    if (!_clinicId) return fail('Your account is not linked to a clinic yet — reconnect once and retry.');
-    if (CO) {
-      row.id = CO.uuid();
-      CO.enqueue('table_insert', { table: 'clinic_referrals', row: row, stripUnknownColumns: true });
-      CO.flush();
-    } else if (supabase) {
-      supabase.from('clinic_referrals').insert(row).then(() => {}).catch(() => {});
-    }
-    // Success view + WhatsApp handoff for the patient
-    const clinicName  = opt.textContent;
-    const clinicPhone = opt.dataset.phone || '';
-    const clinicPlace = opt.dataset.place || '';
-    document.getElementById('refCodeOut').textContent = code;
-    document.getElementById('refClinicDetails').innerHTML =
-      '<strong>' + esc(clinicName) + '</strong><br>' +
-      (clinicPlace ? esc(clinicPlace) + '<br>' : '') +
-      (clinicPhone ? '📞 ' + esc(clinicPhone) : '');
-    const msg = 'Hello ' + state.patient.name + ', you have been referred to ' + clinicName
-      + (clinicPlace ? ' (' + clinicPlace + ')' : '')
-      + (clinicPhone ? ', tel ' + clinicPhone : '')
-      + '. Your referral code is ' + code + '. Please show this message when you arrive. — Homatt Health';
-    const waTarget = (state.patient.phone || '').replace(/[^0-9]/g, '').replace(/^0/, '256');
-    document.getElementById('refWhatsBtn').href =
-      'https://wa.me/' + (waTarget || '') + '?text=' + encodeURIComponent(msg);
-    document.getElementById('refDone').style.display = 'block';
-    document.getElementById('refCreateBtn').style.display = 'none';
-    showToast('Referral sent' + ((CO && CO.isOffline()) ? ' — will sync when online' : ''), 'success');
-  });
 
   // ── Care level toggle ────────────────────────────────────────────
   document.querySelectorAll('.care-opt').forEach(b => {
@@ -1303,8 +1186,8 @@
 
   // Resolve a phone number against the clinic's patients. Returns the matching
   // patient row (with their real ids so history links up) or null. Used when a
-  // REFERRED patient is opened from the dashboard: if they're already in the
-  // system we skip straight to the assessment; if not, we register them first.
+  // patient is opened by phone from elsewhere: already in the system → straight
+  // to the assessment; not in the system → register them first.
   async function _resolvePatientByPhone(phone) {
     const q = normPhone(phone);
     if (!q || q.length < 4) return null;
@@ -1347,8 +1230,6 @@
     return pick(searchLocalPatients(q));
   }
 
-  // A referral opened from the dashboard: mark it attended once the
-  // consultation is saved, so it leaves "Referrals Received" by itself.
   // After a consultation is saved the dashboard's cache-first reads would keep
   // serving the pre-save snapshot (today's patients, medicines dispensed, top
   // conditions, money). Drop those caches so the dashboard reloads fresh.
@@ -1367,32 +1248,6 @@
     } catch (e) {}
   }
 
-  function _closeReferralIfAny() {
-    const rid = state.referralId;
-    if (!rid) return;
-    state.referralId = null;                      // once only
-    try {
-      const CO = window.ClinicOffline;
-      if (CO) {
-        // Must go through the RPC: a plain UPDATE from the RECEIVING clinic is
-        // rejected by the referral RLS policy (its WITH CHECK only allows the
-        // sender's clinic), so the sending clinic would never see it attended.
-        // enqueue('rpc') not enqueueRpc(): the latter injects a p_op_id arg this
-        // function doesn't take (wasted failed call). Setting a fixed status is
-        // idempotent anyway.
-        CO.enqueue('rpc', { fn: 'set_referral_status', args: { p_referral_id: rid, p_status: 'seen' } });
-        CO.flush();
-        // Keep the cached inbox in step so it disappears immediately.
-        try {
-          const key = 'referrals_in_' + _clinicId;
-          const cached = CO.get(key, null);
-          if (cached) CO.set(key, cached.map(r => r.id === rid ? Object.assign({}, r, { status: 'seen' }) : r));
-        } catch (e) {}
-      } else if (supabase) {
-        supabase.rpc('set_referral_status', { p_referral_id: rid, p_status: 'seen' }).then(() => {}).catch(() => {});
-      }
-    } catch (e) {}
-  }
 
   // ── Pre-fill from URL params ─────────────────────────────────────
   (function preFillFromURL() {
@@ -1403,16 +1258,14 @@
     const cpId        = p.get('clinic_patient_id');
     const bookingId   = p.get('booking_id');
     const bookingCode = p.get('booking_code');
-    const referralId  = p.get('referral_id');
-    const lookup      = p.get('lookup') === '1' || !!referralId;
+    const lookup      = p.get('lookup') === '1';
 
     if (bookingId) {
       state.bookingId   = bookingId;
       state.bookingCode = bookingCode || null;
     }
-    if (referralId) state.referralId = referralId;
 
-    // REFERRED PATIENT: resolve them against the system first.
+    // Opened by phone: resolve them against the system first.
     //  • already in the system → select them and go straight to the assessment
     //  • not in the system     → open Register (prefilled) so one tap adds them,
     //                            then the same assessment steps continue
@@ -1435,7 +1288,7 @@
             phone: found.phone || phone,
             registered: !!found.registered,
           });
-          try { showToast('Referred patient found — continue the consultation', 'success'); } catch (e) {}
+          try { showToast('Patient found — continue the treatment', 'success'); } catch (e) {}
         } else {
           openRegisterModal(phone, name || '');
           try { showToast('New patient — register them to continue', 'info'); } catch (e) {}
@@ -2469,7 +2322,7 @@
 
     // Money
     let money = '';
-    if (consult) money += line('Consultation', _sumMoney(consult));
+    if (consult) money += line('Treatment', _sumMoney(consult));
     if (lab)     money += line('Lab tests', _sumMoney(lab));
     if (medsFee) money += line('Medicines', _sumMoney(medsFee));
     money += line('Total charged', _sumMoney(total), 'sum-total');
@@ -2519,7 +2372,7 @@
     }
 
     if (!supabase || !_clinicId) {
-      blockSubmit('This account is not linked to a clinic, so the consultation cannot be saved. Ask your admin to link you, then try again.');
+      blockSubmit('This account is not linked to a clinic, so the treatment cannot be saved. Ask your admin to link you, then try again.');
       resetBtn();
       return;
     }
@@ -2539,9 +2392,9 @@
     // mistake — it is just that blank line — so drop it before checking.
     //
     // A consultation may legitimately dispense NOTHING: prophylaxis advice, a
-    // counselling visit, a lab-only visit, a dressing change, a review, or a
-    // referral straight on. Refusing to save those was silently throwing away
-    // real consultations, which is why the dashboard stayed empty.
+    // counselling visit, a lab-only visit, a dressing change or a review.
+    // Refusing to save those was silently throwing away real treatments,
+    // which is why the dashboard stayed empty.
     // Only what the clinician actually TYPED counts as intent. A fresh row
     // already carries default intake times and a default duration, so those
     // prove nothing — judging by them is what kept the blank row "filled in".
@@ -2681,7 +2534,6 @@
       // The same record of the visit, whether it went to the server or not.
       const offTimes = [...new Set(meds.flatMap(m => m.intakeTimes).sort())];
       renderConsultationSummary({ meds: meds, times: offTimes });
-      _closeReferralIfAny();   // referral handled → leaves the inbox
       _invalidateDashboardCaches();
     }
 
@@ -2725,7 +2577,7 @@
         queueConsultationOffline();
         return;
       }
-      blockSubmit('The consultation was NOT saved. ' + dxError.message);
+      blockSubmit('The treatment was NOT saved. ' + dxError.message);
       resetBtn();
       return;
     }
@@ -2743,7 +2595,7 @@
           p_amount: _paidNow,
           p_method: state.paymentMethod || 'cash',
           p_reference: null,
-          p_notes: 'Paid at consultation',
+          p_notes: 'Paid at treatment',
         };
         const CO = window.ClinicOffline;
         if (CO && CO.isOffline()) {
@@ -2838,8 +2690,8 @@
           title   = 'Prescription Ready';
           message = 'Your prescription has been sent to a partner pharmacy. Tap to choose delivery or pickup.';
         } else {
-          title   = 'Consultation Complete';
-          message = 'Your consultation is done. Please collect your prescription at the clinic pharmacy.';
+          title   = 'Treatment Complete';
+          message = 'Your treatment is done. Please collect your prescription at the clinic pharmacy.';
         }
         await supabase.functions.invoke('send-notification', {
           body: {
@@ -2865,7 +2717,6 @@
 
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
-    _closeReferralIfAny();     // referral handled → leaves the inbox
     _invalidateDashboardCaches();
 
     } catch (fatalErr) {

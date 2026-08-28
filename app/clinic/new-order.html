@@ -511,7 +511,7 @@
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
         <div class="wiz-screen-title">Diagnosis</div>
-        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The patient's name and phone are added later — tap the consultation on the dashboard.</div>
+        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The patient's name and phone are added later — tap the treatment on the dashboard.</div>
 
 
         <!-- ── Diagnosis ── -->
@@ -574,10 +574,10 @@
         <!-- ══ Patient details and the standalone lab-test picker ══
              Screen 1 is now just: diagnosis → one-tap package → Continue.
              The phone and name are optional and added later by tapping the
-             consultation on the dashboard; lab tests are chosen inside the
+             treatment on the dashboard; lab tests are chosen inside the
              package itself, where they auto-suggest. Kept in the page but
-             hidden, because the referral flow and the booking-code lookup
-             still read these fields. -->
+             hidden, because the booking-code lookup still reads these
+             fields. -->
         <div id="legacyPatientLab" hidden style="display:none">
         <!-- ── Patient details (optional — can be added later) ── -->
         <div class="sec-label">
@@ -586,7 +586,7 @@
         </div>
         <div class="wiz-card" style="padding-top:14px">
           <div style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">
-            Not needed to record the consultation. The case number identifies this
+            Not needed to record the treatment. The case number identifies this
             patient; the name and phone can be filled in afterwards from the dashboard.
           </div>
         </div>
@@ -773,10 +773,6 @@
             Treatment &amp; Bill
             <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
           </button>
-          <button type="button" class="wiz-btn wiz-btn-back" id="referOutBtn" style="justify-content:center">
-            <span class="material-icons-outlined" style="font-size:18px">alt_route</span>
-            Refer to partner clinic
-          </button>
         </div>
       </section>
 
@@ -908,7 +904,7 @@
 
         <div class="wiz-card" id="feesCard">
           <div class="fee-grid">
-            <div class="fee-lbl">Consultation fee</div>
+            <div class="fee-lbl">Treatment fee</div>
             <div class="fee-input-wrap">
               <span class="fee-pfx">UGX</span>
               <input id="feeConsult" class="field-input" type="number" min="0" step="500"
@@ -1054,7 +1050,7 @@
     <div class="sum-top">
       <span class="material-icons-outlined">check_circle</span>
       <div>
-        <div class="sum-title">Consultation saved</div>
+        <div class="sum-title">Treatment saved</div>
         <div class="sum-sub" id="successMsg">Everything below has been recorded.</div>
       </div>
     </div>
@@ -1073,65 +1069,9 @@
 <script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/new-order-wizard.js?v=20260901"></script>
-<script src="js/ucg-autofill.js?v=20260901"></script>
+<script src="js/new-order-wizard.js?v=20260903"></script>
+<script src="js/ucg-autofill.js?v=20260903"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
-<!-- ── Refer to partner clinic (works offline; queued + auto-synced) ── -->
-<div id="refModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:640;align-items:center;justify-content:center;padding:18px">
-  <div style="background:var(--surface,#fff);border-radius:18px;max-width:430px;width:100%;padding:22px;max-height:92vh;overflow-y:auto">
-    <div style="font-size:17px;font-weight:800;margin-bottom:2px">Refer patient</div>
-    <div id="refPatientLine" style="font-size:13px;color:#5F6368;margin-bottom:14px"></div>
-
-    <label class="field-label">Send to clinic</label>
-    <select id="refClinicSel" class="field-input" style="width:100%;margin-bottom:12px">
-      <option value="">Loading partner clinics…</option>
-    </select>
-
-    <label class="field-label">Why refer?</label>
-    <div id="refReasons" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
-      <button type="button" class="ref-reason" data-r="Medicine out of stock">Medicine out of stock</button>
-      <button type="button" class="ref-reason" data-r="Lab test not available">Lab test not available</button>
-      <button type="button" class="ref-reason" data-r="Needs specialist">Needs specialist</button>
-      <button type="button" class="ref-reason" data-r="Needs admission">Needs admission</button>
-      <button type="button" class="ref-reason" data-r="Other">Other</button>
-    </div>
-    <input id="refNeededItem" class="field-input" type="text" style="width:100%;margin-bottom:12px;display:none"
-           placeholder="Which medicine / test does the patient need?">
-    <label class="field-label">Notes for the receiving clinic (optional)</label>
-    <textarea id="refNotes" class="field-input" rows="2" style="width:100%;margin-bottom:12px"
-              placeholder="e.g. Started on quinine, needs full course of Coartem…"></textarea>
-
-    <div id="refError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:10px"></div>
-
-    <div id="refDone" style="display:none;background:#E8F5E9;border-radius:12px;padding:14px;margin-bottom:12px">
-      <div style="font-weight:800;color:#1B5E20;margin-bottom:4px">Referral sent ✔</div>
-      <div style="font-size:13px;color:#33473A;margin-bottom:10px">
-        Code <strong id="refCodeOut"></strong>. The receiving clinic has been notified.
-        Give the patient these details:
-      </div>
-      <div id="refClinicDetails" style="font-size:13px;background:#fff;border-radius:8px;padding:10px;margin-bottom:10px;color:#202124"></div>
-      <a id="refWhatsBtn" target="_blank" rel="noopener"
-         style="display:flex;align-items:center;justify-content:center;gap:6px;background:#25D366;color:#fff;border-radius:10px;padding:11px;font-size:14px;font-weight:700;text-decoration:none">
-        <span class="material-icons-outlined" style="font-size:18px">send</span>
-        Send details to patient on WhatsApp
-      </a>
-    </div>
-
-    <div style="display:flex;gap:10px">
-      <button type="button" id="refCancelBtn" class="wiz-btn wiz-btn-back" style="flex:1;justify-content:center">Close</button>
-      <button type="button" id="refCreateBtn" class="wiz-btn wiz-btn-next" style="flex:2;justify-content:center">
-        <span class="material-icons-outlined" style="font-size:18px">alt_route</span> Send referral
-      </button>
-    </div>
-  </div>
-</div>
-<style>
-  .ref-reason{padding:8px 12px;border-radius:18px;border:1.5px solid #D7E4D9;background:transparent;color:#33473A;
-    font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation}
-  .ref-reason.active{background:#1B5E20;border-color:#1B5E20;color:#fff}
-  html[data-theme="dark"] .ref-reason{border-color:#3A4A40;color:#C2D3C6}
-  html[data-theme="dark"] .ref-reason.active{background:#2E7D32;border-color:#2E7D32;color:#fff}
-</style>
 </body>
 </html>

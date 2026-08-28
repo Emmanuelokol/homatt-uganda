@@ -225,7 +225,7 @@
         <p style="font-size:13px;color:#5F6368;margin:-6px 0 16px;line-height:1.5">
           Create logins for your team and choose what each person can see.
           <strong>Owners</strong> access everything — finances, stock, settings.
-          <strong>Clinicians</strong> and <strong>nurses</strong> get consultations,
+          <strong>Clinicians</strong> and <strong>nurses</strong> get treatments,
           patient history, bookings, quick sale and stock — but not financial
           reports. <strong>Receptionists</strong> handle the front desk — bookings,
           history, payments and quick sales. <strong>Sales / Drug shop</strong>
@@ -463,7 +463,7 @@
       <!-- Consultation Fees -->
       <div class="settings-card">
         <div class="settings-card-title">
-          <span class="material-icons-outlined">payments</span> Consultation Fees &amp; Services (UGX)
+          <span class="material-icons-outlined">payments</span> Treatment Fees &amp; Services (UGX)
         </div>
         <table class="fee-table">
           <thead><tr><th>Service Type</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th></tr></thead>
@@ -577,8 +577,8 @@ var testsData = [];        // { test, condition, price }
 var _testSuggCache = [];   // flat list used by _addSuggByIdx
 
 var DEFAULT_FEES = [
-  { type:'General Consultation', fee:'', notes:'Standard OPD visit' },
-  { type:'Specialist Consultation', fee:'', notes:'With a specialist doctor' },
+  { type:'General Treatment', fee:'', notes:'Standard OPD visit' },
+  { type:'Specialist Treatment', fee:'', notes:'With a specialist doctor' },
   { type:'Ante-natal / Maternity', fee:'', notes:'Antenatal care visit' },
   { type:'Child / Paediatric', fee:'', notes:'Under 12 years' },
   { type:'Emergency', fee:'', notes:'After-hours or urgent care' },
@@ -657,8 +657,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 /* ── Staff & Access ────────────────────────────────────────── */
 var STAFF_ROLE_OPTIONS = [
   { value: 'owner',        label: 'Owner / Manager — everything incl. finances' },
-  { value: 'clinician',    label: 'Clinician — consultations, quick sale, stock' },
-  { value: 'nurse',        label: 'Nurse — consultations, quick sale, stock' },
+  { value: 'clinician',    label: 'Clinician — treatments, quick sale, stock' },
+  { value: 'nurse',        label: 'Nurse — treatments, quick sale, stock' },
   { value: 'receptionist', label: 'Receptionist — front desk, payments, quick sale' },
   { value: 'salesperson',  label: 'Sales / Drug shop — quick sale + stock only' },
 ];
@@ -1265,7 +1265,7 @@ async function loadClinicProfile() {
   // Fees — merge with defaults
   var existingFees = [];
   if (c.consultation_fee) {
-    existingFees.push({ type:'General Consultation', fee: c.consultation_fee, notes:'Standard OPD visit' });
+    existingFees.push({ type:'General Treatment', fee: c.consultation_fee, notes:'Standard OPD visit' });
   }
   if (Array.isArray(c.services) && c.services.length) {
     c.services.forEach(function(s) {
@@ -1540,7 +1540,10 @@ async function saveSettings() {
     return { type: f.type, fee: Number(f.fee), notes: f.notes || '' };
   });
 
-  var generalFee = feesData.find(function(f){ return f.type === 'General Consultation' && f.fee; });
+  // Both names: clinics configured before this was renamed still have
+  // 'General Consultation' saved, and must keep their fee.
+  var generalFee = feesData.find(function(f){
+    return (f.type === 'General Treatment' || f.type === 'General Consultation') && f.fee; });
 
   var payload = {
     name: document.getElementById('sClinicName').value.trim() || undefined,
