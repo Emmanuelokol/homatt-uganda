@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260829a">
+  <link rel="stylesheet" href="css/clinic.css?v=20260904">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -416,6 +416,25 @@
       </div>
 
       <!-- Active treatments — open cases that have not been discharged yet -->
+      <!-- ── Names still to add ──
+           A walk-in is treated first and named later, so a case number is
+           often all there is. This is the catch-up list for a quiet moment:
+           every treatment with no name or no phone, the ones being asked to
+           come back at the top, each one a single tap from being filled in.
+           Built from rows already loaded, so it costs no extra data. -->
+      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:0;margin-bottom:24px;">
+        <div class="table-header" style="justify-content:space-between">
+          <div class="table-title">
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">contact_page</span>
+            Names to add
+          </div>
+          <span id="needNameCount" style="font-size:11px;color:#fff;background:#00897B;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
+        </div>
+        <div id="needNameList" style="padding:8px 0">
+          <div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
+      </div>
+
       <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
@@ -1734,6 +1753,25 @@
       btn.disabled = false; btn.textContent = 'Save details';
       if (!done) return;
       try { if (CO && CO.invalidate) CO.invalidate(['consultations_today_','hist_pool_','pending_payments_']); } catch(e){}
+      // Fold the new details into what is already loaded and cached, so the
+      // row leaves "Names to add" the instant it is saved — including with no
+      // signal, where reloading would only re-read the pre-save copy.
+      try {
+        _namedLocally[id] = { patient_name: patch.patient_name, patient_phone: patch.patient_phone };
+        _activeRows = (_activeRows || []).map(function (r) {
+          return r.id === id ? Object.assign({}, r, patch) : r;
+        });
+        if (CO && _activeCacheKey) {
+          var _cachedAct = CO.get(_activeCacheKey, null);
+          if (Array.isArray(_cachedAct)) {
+            CO.set(_activeCacheKey, _cachedAct.map(function (r) {
+              return r.id === id ? Object.assign({}, r, patch) : r;
+            }));
+          }
+        }
+        renderNeedName();
+        renderActiveTreatments();
+      } catch (e) {}
       ov.style.display = 'none';
       showToast(name ? (name + ' saved') : 'Contact saved', 'success');
       loadConsultations(); loadActiveTreatments(); loadPendingPayments();
@@ -2587,6 +2625,8 @@
 
   // Cache the loaded active treatments so the search box can filter without re-querying.
   var _activeRows = [];
+  // Names and numbers typed on this phone, held until the server agrees.
+  var _namedLocally = {};
   var _activeMigrationNeeded = false;
   var _activeCacheKey = null;   // set on each load; used for offline optimistic removal
 
@@ -2709,9 +2749,96 @@
       _offAct.forEach(function(o){ if (!_seenAct[o.dx.id]) rows.unshift(o.dx); });
     }
 
-    _activeRows = rows;
+    _activeRows = _applyLocalNames(rows);
     renderActiveTreatments();
     renderOverdueFollowups();
+    renderNeedName();
+  }
+
+  // Names and numbers typed on this phone, held until the server agrees.
+  // Without this a freshly-added name reappeared as missing seconds later: the
+  // save is followed by a reload, and the reload answers from a cache — or from
+  // a read that raced the write — that has not caught up yet.
+  function _applyLocalNames(rows) {
+    if (!rows || !rows.length) return rows || [];
+    var keys = Object.keys(_namedLocally);
+    if (!keys.length) return rows;
+    return rows.map(function (r) {
+      var fix = _namedLocally[r.id];
+      if (!fix) return r;
+      // Once the server reports the same thing, stop overriding it.
+      if ((r.patient_name || null) === (fix.patient_name || null) &&
+          (r.patient_phone || null) === (fix.patient_phone || null)) {
+        delete _namedLocally[r.id];
+        return r;
+      }
+      return Object.assign({}, r, fix);
+    });
+  }
+
+  // ── Names still to add ───────────────────────────────────────────────────
+  // Treating first and naming later is the right order in a busy clinic — but
+  // a case number cannot be phoned. This lists what is missing so a nurse can
+  // clear it in a quiet moment, and puts the patients who were told to come
+  // back at the top, because those are the ones somebody will need to reach.
+  // Reads rows already loaded for Active Treatments: no extra request.
+  function renderNeedName() {
+    var el = document.getElementById('needNameList');
+    var ct = document.getElementById('needNameCount');
+    if (!el) return;
+    var rows = (_activeRows || []).filter(function (r) {
+      return !String(r.patient_name || '').trim() || !String(r.patient_phone || '').trim();
+    });
+    // Coming back → first. Then the newest, because it is freshest in memory.
+    rows.sort(function (a, b) {
+      var fa = Number(a.follow_up_days) > 0 ? 0 : 1;
+      var fb = Number(b.follow_up_days) > 0 ? 0 : 1;
+      if (fa !== fb) return fa - fb;
+      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    });
+
+    if (ct) {
+      ct.textContent = rows.length + ' to add';
+      ct.style.display = rows.length ? '' : 'none';
+    }
+    if (!rows.length) {
+      el.innerHTML = '<div style="padding:18px;text-align:center;color:#9AA0A6;font-size:13px">'
+        + '<span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:6px;color:#7BC98A">task_alt</span>'
+        + 'Every patient has a name and a number.</div>';
+      return;
+    }
+
+    var SHOW = 8;
+    el.innerHTML = rows.slice(0, SHOW).map(function (r) {
+      var caseNo = String(r.case_code || '').trim() || patientCodeFor(r);
+      var name  = String(r.patient_name  || '').trim();
+      var phone = String(r.patient_phone || '').trim();
+      var missing = !name && !phone ? 'No name or number'
+                  : !name ? 'No name' : 'No phone number';
+      var back = Number(r.follow_up_days) > 0
+        ? '<span style="font-size:9.5px;font-weight:800;letter-spacing:.4px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:20px;white-space:nowrap">COMING BACK</span>'
+        : '';
+      var when = r.created_at
+        ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
+      return '<div class="nn-row" data-dxid="' + esc(r.id) + '"'
+        + ' data-name="' + esc(name) + '" data-phone="' + esc(phone) + '"'
+        + ' data-case="' + esc(caseNo) + '">'
+        + '<div class="nn-main">'
+        +   '<div class="nn-top"><strong>' + esc(caseNo || 'Patient') + '</strong>' + back + '</div>'
+        +   '<div class="nn-sub">' + esc(r.confirmed_diagnosis || 'Diagnosis pending')
+        +     (when ? ' · ' + esc(when) : '') + ' · ' + esc(missing) + '</div>'
+        + '</div>'
+        + '<span class="nn-add">Add</span>'
+      + '</div>';
+    }).join('')
+    + (rows.length > SHOW
+        ? '<div style="padding:10px 16px 2px;font-size:12px;color:#9AA0A6;text-align:center">'
+          + 'and ' + (rows.length - SHOW) + ' more</div>'
+        : '');
+
+    el.querySelectorAll('.nn-row').forEach(function (row) {
+      row.onclick = function () { openPatientEdit(row.dataset); };
+    });
   }
 
   function renderActiveTreatments() {

@@ -24,7 +24,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260829a">
+  <link rel="stylesheet" href="css/clinic.css?v=20260904">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -90,6 +90,11 @@
       margin-bottom: 12px;
     }
     .wiz-card + .wiz-card { margin-top: 0; }
+
+    /* Name and phone side by side — two short taps, not a form. Stacks on the
+       narrowest phones so neither box becomes too small to type a name in. */
+    .pt-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 359px) { .pt-two { grid-template-columns: 1fr; } }
 
     /* ── Inputs ─────────────────────────────────────────────────── */
     .field-label {
@@ -511,7 +516,7 @@
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
         <div class="wiz-screen-title">Diagnosis</div>
-        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The patient's name and phone are added later — tap the treatment on the dashboard.</div>
+        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The name and phone are optional — add them here, or later from the dashboard.</div>
 
 
         <!-- ── Diagnosis ── -->
@@ -547,6 +552,32 @@
             </span>
             <span class="material-icons-outlined ot-go">chevron_right</span>
           </button>
+        </div>
+
+        <!-- ── Who is it? — optional, never in the way ──
+             There used to be nowhere at all to type a name or a number: the
+             fields were hidden and the only way in was tapping a row on the
+             dashboard, which nobody could find. A name matters most for the
+             patients being asked to come back, so it is asked here, plainly
+             marked optional, and it never blocks Continue. -->
+        <div class="wiz-card">
+          <div class="sec-label" style="margin:0 0 10px">
+            <span class="material-icons-outlined" style="font-size:14px">person</span>
+            Who is it? <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span>
+          </div>
+          <div class="pt-two">
+            <div>
+              <label class="field-label" for="quickPatientName">Name</label>
+              <input id="quickPatientName" class="field-input" type="text"
+                placeholder="e.g. Okello John" autocomplete="off">
+            </div>
+            <div>
+              <label class="field-label" for="quickPatientPhone">Phone</label>
+              <input id="quickPatientPhone" class="field-input" type="tel"
+                placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+            </div>
+          </div>
+          <div class="helper" id="quickPatientHelper">Leave it blank if you are busy — you can add it later from the dashboard. Needed only if you want to call or remind them.</div>
         </div>
 
         <!-- ── Care level ── -->
@@ -1069,7 +1100,7 @@
 <script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/new-order-wizard.js?v=20260903"></script>
+<script src="js/new-order-wizard.js?v=20260904"></script>
 <script src="js/ucg-autofill.js?v=20260903"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 

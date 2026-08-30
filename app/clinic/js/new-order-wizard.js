@@ -348,6 +348,7 @@
     patientMenu.style.display = 'none';
     document.getElementById('step1Next').disabled = false;
     document.getElementById('bookingCodeBlock').style.display = 'none';
+    try { window._wizShowPatientInBoxes(p); } catch (e) {}
     loadPatientProfile(p);
   }
 
@@ -913,6 +914,42 @@
     if (fu) fu.value = state.followUpDays;
     try { recalcFees(); } catch (e) {}
     try { updateBill(); } catch (e) {}
+  };
+
+  // ── Who is it? — the plain name and phone boxes on screen 1 ──────
+  // Optional by design: a busy clinician types nothing and Continue still
+  // works. Whatever IS typed goes onto the treatment, so the patient can be
+  // called or reminded — which is the whole point for anyone told to come back.
+  // If a patient was picked from the lookup, these mirror them rather than
+  // fighting over state.patient.
+  const _qpName  = document.getElementById('quickPatientName');
+  const _qpPhone = document.getElementById('quickPatientPhone');
+  function _syncQuickPatient() {
+    const name  = ((_qpName  && _qpName.value)  || '').trim();
+    const phone = ((_qpPhone && _qpPhone.value) || '').trim();
+    if (!name && !phone) {
+      // Cleared both, and nobody was chosen from the lookup → no patient.
+      if (state.patient && state.patient._fromQuick) state.patient = null;
+      return;
+    }
+    if (state.patient && !state.patient._fromQuick) {
+      // A real patient record is selected — update it in place, keep its ids.
+      if (name)  state.patient.name  = name;
+      if (phone) state.patient.phone = phone;
+      return;
+    }
+    state.patient = Object.assign({}, state.patient || {}, {
+      name: name, phone: phone, _fromQuick: true,
+    });
+  }
+  if (_qpName)  _qpName.addEventListener('input', _syncQuickPatient);
+  if (_qpPhone) _qpPhone.addEventListener('input', _syncQuickPatient);
+  // Picking someone from the booking-code or phone lookup fills these in, so
+  // the screen always shows who the treatment is actually for.
+  window._wizShowPatientInBoxes = function (p) {
+    if (!p) return;
+    if (_qpName  && !_qpName.value)  _qpName.value  = p.name  || '';
+    if (_qpPhone && !_qpPhone.value) _qpPhone.value = p.phone || '';
   };
 
   // ── Diagnosis input ──────────────────────────────────────────────
