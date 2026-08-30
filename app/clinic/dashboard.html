@@ -780,17 +780,21 @@
          It shares the search row rather than taking one of its own: with the
          keyboard up this sheet has no spare height, and a row of its own was
          enough to push the Sell button off the bottom. -->
-    <div style="padding:12px 16px 6px;flex-shrink:0;display:flex;gap:8px;align-items:center">
-      <div style="position:relative;flex:1;min-width:0">
-        <span class="material-icons-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
-        <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-          oninput="filterQsDrugs(this.value)"
-          style="width:100%;padding:10px 14px 10px 34px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
-      </div>
-      <button id="qsAddFromSearch" type="button" title="Add an item or medicine"
-        style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;white-space:nowrap">
+    <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
+      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+      <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        oninput="filterQsDrugs(this.value)"
+        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
+    </div>
+
+    <!-- Add straight from the search — directly under the box, where it was
+         asked for. It costs a row, so the panels below it are allowed to
+         shrink and scroll rather than push the Sell button off the bottom. -->
+    <div style="padding:0 16px 8px;flex-shrink:0">
+      <button id="qsAddFromSearch" type="button"
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
         <span class="material-icons-outlined" style="font-size:17px">add_circle_outline</span>
-        <span id="qsAddFromSearchLabel">Add</span>
+        <span id="qsAddFromSearchLabel">Add an item or medicine</span>
       </button>
     </div>
 
@@ -5769,12 +5773,7 @@
     var lbl = document.getElementById('qsAddFromSearchLabel');
     if (lbl) {
       var typed = searchEl ? searchEl.value.trim() : '';
-      // The label stays short — it shares the row with the search box now.
-      // What is being added is spelled out in the tooltip and in the empty
-      // state below, where there is room for it.
-      lbl.textContent = 'Add';
-      var btn = document.getElementById('qsAddFromSearch');
-      if (btn) btn.title = typed ? 'Add “' + typed + '”' : 'Add an item or medicine';
+      lbl.textContent = typed ? 'Add “' + typed + '”' : 'Add an item or medicine';
     }
   }
 
