@@ -608,7 +608,10 @@ html[data-theme="dark"] .pt-tag.credit{ background:rgba(11,92,138,.25);  color:#
 /* line 3 — the one-tap fix when a row has no name or no number to call.
    Folded into the row itself rather than a list of its own, so the nurse sees
    the gap where the patient already is. */
-.pt-fix{ grid-row:3; grid-column:1 / -1; margin-top:5px }
+.pt-who.addable{
+  text-decoration:underline; text-decoration-style:dotted;
+  text-underline-offset:3px; cursor:pointer;
+}
 
 /* a small marker on line 2 when the patient is due back */
 .pt-due{

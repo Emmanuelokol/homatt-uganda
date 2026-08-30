@@ -2805,7 +2805,7 @@
       : _activeRows.slice();
 
     var needName = _activeRows.filter(function (r) {
-      return !String(r.patient_name || '').trim() || !String(r.patient_phone || '').trim();
+      return !String(r.patient_name || '').trim();
     }).length;
     if (ct) ct.textContent = _activeRows.length
       ? ((q ? rows.length + ' / ' + _activeRows.length + ' open' : _activeRows.length + ' open')
@@ -2854,19 +2854,19 @@
       return '<div class="pt-row '+edge+' active-tap" data-diagnosis-id="'+esc(c.id)+'"'
         +' data-name="'+esc(who)+'">'
         +'<span class="pt-time">'+esc(whenTxt)+'</span>'
-        +'<span class="pt-who'+(nm?'':' code')+'">'+esc(who)+'</span>'
+        // With no name the case number IS the identity, and tapping it is how
+        // a name gets added. Done on the existing line rather than a new one:
+        // a chip underneath made every unnamed row a third taller, which is
+        // the opposite of what a crowded list needs.
+        +'<span class="pt-who'+(nm?'':' code addable')+'"'
+          +(nm ? '' : ' data-dxid="'+esc(c.id)+'" data-name="" data-phone="'
+                    +esc(c.patient_phone||'')+'" data-case="'+esc(caseNo)+'"'
+                    +' title="Tap to add this patient\'s name"')
+          +'>'+esc(who)+(nm?'':' +')+'</span>'
         +'<span class="pt-amt">'+(total ? 'UGX '+fmtUGX(total) : '—')+'</span>'
         +(dueBack ? '<span class="pt-due">'+dueBack+'</span>' : '')
         +'<span class="pt-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+'</span>'
         +'<span class="pt-tag '+tag[0]+'">'+esc(tag[1])+'</span>'
-        // No name, or no number to call them on — offered right here rather
-        // than in a list of its own. A patient due back needs both.
-        +((!nm || !String(c.patient_phone||'').trim())
-          ? '<span class="pt-fix"><button type="button" class="px-add"'
-            +' data-dxid="'+esc(c.id)+'" data-name="'+esc(nm)+'"'
-            +' data-phone="'+esc(c.patient_phone||'')+'" data-case="'+esc(caseNo)+'">'
-            +(nm ? '+ Add phone' : '+ Add name')+'</button></span>'
-          : '')
       +'</div>';
     }).join('');
 
@@ -4753,7 +4753,7 @@
   // "+ Add name" anywhere a row has none — one delegated handler, so it works
   // on lists that repaint themselves without re-wiring anything.
   document.addEventListener('click', function (e) {
-    var b = e.target && e.target.closest && e.target.closest('.px-add');
+    var b = e.target && e.target.closest && e.target.closest('.px-add, .pt-who.addable');
     if (!b) return;
     e.preventDefault(); e.stopPropagation();
     openPatientEdit(b.dataset);
