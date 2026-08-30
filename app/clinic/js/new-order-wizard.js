@@ -1416,13 +1416,24 @@
         String(x.item_name || '').trim().toLowerCase() === name.toLowerCase());
       if (known) { m.inventoryItemId = known.id; continue; }
 
-      // Guess the unit from the name so the shelf entry reads sensibly —
-      // the owner can change it in the Stock Tracker.
+      // What is this counted in? Getting it wrong is not cosmetic: a bag of
+      // Dextrose 5% booked in as "tabs" then reads as a tablet on the shelf,
+      // on the prescription and in the deduction. The blueprint knows the
+      // drips, the ampoules and the syrups by name — the crude name-guess
+      // below is only a fallback for when that file has not loaded.
       const n = name.toLowerCase();
-      const unit = /syrup|suspension|solution|drops?|\bml\b/.test(n) ? 'ml'
-                 : /inject|vial|\bamp\b|ampoule|infusion/.test(n) ? 'vials'
-                 : /cream|ointment|gel/.test(n) ? 'tubes'
-                 : 'tabs';
+      let unit = null;
+      try {
+        if (window.StockBlueprint) {
+          unit = window.StockBlueprint.blueprintFor({ name: name, itemType: 'medicine' }).unit;
+        }
+      } catch (e) {}
+      if (!unit) {
+        unit = /syrup|suspension|solution|drops?|\bml\b/.test(n) ? 'ml'
+             : /inject|vial|\bamp\b|ampoule|infusion/.test(n) ? 'vials'
+             : /cream|ointment|gel/.test(n) ? 'tubes'
+             : 'tabs';
+      }
       const row = {
         clinic_id: _clinicId, item_name: name, item_type: 'medicine',
         unit, quantity: 0, min_threshold: 5, reorder_level: 10,

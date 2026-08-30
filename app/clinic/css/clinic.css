@@ -236,7 +236,15 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
   .admin-content{padding:70px 14px 14px}  /* top offsets 60px fixed topbar; sides/bottom 14px */
   .admin-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
   .admin-table{min-width:520px}
-  .table-header{flex-direction:column;align-items:flex-start;gap:10px;padding:14px 16px}
+  /* Was flex-direction:column, which gave every card's header its own extra
+     line even when it held nothing but a title and a count. Wrapping keeps the
+     title and its badge together and still drops a filter row underneath when
+     there is one — several hundred pixels of empty card back, per screen. */
+  .table-header{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px}
+  .table-title{font-size:15px}
+  /* The gap between cards was 24px on a 915px-tall phone — a third of a screen
+     spent on nothing across four cards. */
+  .admin-table-wrap{margin-bottom:12px}
   .table-filter{width:100%;flex-wrap:wrap}
   .table-filter select,.table-filter input{flex:1;min-width:0;min-height:44px;font-size:16px}
   .admin-login-card{width:calc(100vw - 32px);padding:28px 20px}
@@ -597,6 +605,11 @@ html[data-theme="dark"] .pt-tag.flag  { background:rgba(229,72,77,.20);  color:#
 html[data-theme="dark"] .pt-tag.waived{ background:rgba(240,180,41,.18); color:#F5D08A }
 html[data-theme="dark"] .pt-tag.credit{ background:rgba(11,92,138,.25);  color:#9BD1F5 }
 
+/* line 3 — the one-tap fix when a row has no name or no number to call.
+   Folded into the row itself rather than a list of its own, so the nurse sees
+   the gap where the patient already is. */
+.pt-fix{ grid-row:3; grid-column:1 / -1; margin-top:5px }
+
 /* a small marker on line 2 when the patient is due back */
 .pt-due{
   grid-row:2; grid-column:1; font-size:11px; font-weight:800; color:#E5484D;
@@ -631,3 +644,14 @@ html[data-theme="dark"] .nn-sub{ color:#A9BCAE }
   flex-shrink:0; font-size:12px; font-weight:800; letter-spacing:.3px;
   color:#fff; background:#00897B; padding:6px 14px; border-radius:20px;
 }
+
+/* "+ Add name" — offered wherever a row shows a case number instead of a
+   patient. A debt or a missed return visit you cannot put a name to is hard
+   to chase, and the name is usually one tap away. */
+.px-add{
+  margin-top:4px; padding:3px 10px; border-radius:20px;
+  border:1.5px solid #00897B; background:transparent; color:#00897B;
+  font:inherit; font-size:11px; font-weight:800; letter-spacing:.2px;
+  cursor:pointer; touch-action:manipulation;
+}
+.px-add:active{ background:rgba(0,137,123,.12) }

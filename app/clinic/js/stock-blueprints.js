@@ -82,8 +82,18 @@
       note: 'The standard carton holds 100 one-litre sachets.' },
     { re: /zinc sulphate|zinc sulfate/,
       unit: 'tabs', outer: 'boxes', inner: 'strips', strips: 10, units: 10 },
+    // ── Things that run into a vein ──────────────────────────────────────
+    // Counted as they are hung, never as tablets. Order matters: the small
+    // concentrated ampoules are matched BEFORE the big drip bags, because
+    // "dextrose 50%" is a 50 ml push for hypoglycaemia, not a 500 ml infusion.
+    { re: /dextrose\s*50|glucose\s*50|dextrose\s*40/,
+      unit: 'vials', outer: 'boxes', inner: '', strips: 1, units: 10,
+      note: 'Small concentrated ampoules — given as a slow IV push, not hung as a drip.' },
+    { re: /sodium bicarbonate|potassium chloride concentrate|magnesium sulphate|magnesium sulfate|water for injection/,
+      unit: 'vials', outer: 'boxes', inner: '', strips: 1, units: 10,
+      note: 'Given as an ampoule into a vein or into a running drip.' },
     // The big drip bags are bought by the carton.
-    { re: /sodium chloride 0\.9|normal saline|ringer'?s? ?lactate|dextrose \d|water for injection/,
+    { re: /sodium chloride 0\.9|normal saline|ringer'?s? ?lactate|hartmann|dextrose\s*(5|10)|glucose\s*(5|10)|darrow/,
       unit: 'bottles', outer: 'cartons', inner: '', strips: 1, units: 20,
       note: 'A carton of drip bottles — usually 20 x 500 ml.' },
     // Family planning

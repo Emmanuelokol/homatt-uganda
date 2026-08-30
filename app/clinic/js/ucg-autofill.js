@@ -639,6 +639,10 @@
         // because that medicine had no dose. This is a real published figure,
         // not one the app made up — and it is editable like any other.
         dosage: mm.strength || '',
+        // A blanket "2 x 5 = 10" was applied to everything here, which is how
+        // a 500 ml bag of Dextrose ended up as ten of something. Whatever runs
+        // into a vein starts at ONE — one bag, one ampoule — and the clinician
+        // sets the real number.
         timesPerDay: 2, durationDays: 5, qty: 10,
         from: 'guideline-text',
         group: 'treatment',
@@ -759,6 +763,11 @@
       '.ucg-drug .ucg-x{grid-column:3;grid-row:1;align-self:start}',
       '.ucg-num{width:44px;text-align:center;border:1.5px solid var(--border);border-radius:9px;padding:6px 2px;font:inherit;font-size:13px;font-weight:700;background:var(--surface);color:var(--text)}',
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
+      // A drip is hung here, not carried home — said plainly on the row.
+      '.fields-here{grid-template-columns:1fr auto !important;align-items:center}',
+      '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#0E7C5A;line-height:1.3}',
+      '.ucg-here .material-icons-outlined{font-size:15px}',
+      'html[data-theme="dark"] .ucg-here{color:#7BC98A}',
       '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
       '.ucg-add:active{transform:scale(.98)}',
       '.ucg-money{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;padding:12px}',
@@ -927,6 +936,50 @@
       hint: 'The guideline says this, but it is not a medicine the app can add for you — use the search below.' },
   ];
 
+  // ── Things run into a vein, not handed over a counter ────────────────────
+  // A drip, an infusion or an IV ampoule is administered AT THE CLINIC. The
+  // "×/day for N days" model belongs to tablets and does not describe it: one
+  // bag of Dextrose 5% is hung once. Treating it as a tablet is what produced
+  // "QTY 10" and a shelf reading "-30 tabs" of a 500 ml bottle.
+  function isGivenHere(d) {
+    if ((d.group || '') === 'fluid') return true;
+    var t = (String(d.drug || '') + ' ' + String(d.dosage || '')).toLowerCase();
+    return /\biv\b|\bim\b|infusion|injection|inject|ampoule|\bamp\b|drip/.test(t);
+  }
+  // The word for one of them, taken from what the clinic actually stocks where
+  // that is known, and from the blueprint otherwise. Never "tabs" for a drip.
+  function givenUnit(d) {
+    try {
+      var row = matchStockRow(d.drug, d.dosage);
+      if (row && row.unit && !/^tabs?$/i.test(row.unit)) return String(row.unit);
+    } catch (e) {}
+    try {
+      if (window.StockBlueprint) {
+        var u = window.StockBlueprint.blueprintFor({ name: d.drug, itemType: 'medicine' }).unit;
+        if (u && !/^tabs?$/i.test(u)) return u;
+      }
+    } catch (e) {}
+    return 'units';
+  }
+
+  // Anything given here starts at ONE — one bag, one ampoule. The tablet
+  // arithmetic (times a day × days) does not describe a drip, and applying it
+  // put ten of a 500 ml bottle on the prescription and took ten off the shelf.
+  // The clinician still sets the real number; this only fixes the start point.
+  function normaliseGivenHere(p) {
+    if (!p || !p.drugs) return;
+    p.drugs.forEach(function (d) {
+      if (!isGivenHere(d)) return;
+      d.givenHere = true;
+      d.timesPerDay = 1;
+      d.durationDays = 1;
+      // Keep a small figure the book actually stated; replace a tablet-shaped
+      // multiple with one.
+      var q = Number(d.qty) || 0;
+      d.qty = (q > 0 && q <= 6) ? q : 1;
+    });
+  }
+
   function drugRowHtml(d, i) {
     if (d.group === 'other') {
       return '<div class="ucg-note">' + esc(d.text || d.drug) + '</div>';
@@ -944,14 +997,29 @@
         (d.from === 'guideline-text' ? ' · named in the guideline · strength from the national list' : '') +
         '</span>' + (on ? stockNote(d) : '') + '</div>' +
       '<button class="ucg-x" data-rmdrug="' + i + '" title="Remove">×</button>' +
-      (on ? '<div class="fields">' +
-        '<div><span class="ucg-lbl">×/day</span>' +
-          '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
-        '<div><span class="ucg-lbl">Days</span>' +
-          '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
-        '<div><span class="ucg-lbl">Qty</span>' +
-          '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
-      '</div>' : '') +
+      (on ? (isGivenHere(d)
+        // A drip is hung here and now. It is not taken twice a day for five
+        // days, and it is not carried home — so it is counted the way it is
+        // actually used: how many bags or ampoules were run, given at the
+        // clinic. Asking for ×/day and Days here produced 10 "tabs" of
+        // Dextrose 5% off the shelf, which is not a real thing.
+        ? '<div class="fields fields-here">' +
+            '<div class="ucg-here">' +
+              '<span class="material-icons-outlined">vaccines</span>' +
+              'Given here at the clinic — not taken home' +
+            '</div>' +
+            '<div><span class="ucg-lbl">' + esc(givenUnit(d)) + '</span>' +
+              '<input class="ucg-num" type="number" min="0" max="99" value="' +
+              (Number(d.qty) > 0 ? Number(d.qty) : 1) + '" data-qt="' + i + '"></div>' +
+          '</div>'
+        : '<div class="fields">' +
+            '<div><span class="ucg-lbl">×/day</span>' +
+              '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
+            '<div><span class="ucg-lbl">Days</span>' +
+              '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
+            '<div><span class="ucg-lbl">Qty</span>' +
+              '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
+          '</div>') : '') +
     '</div>';
   }
 
@@ -1611,6 +1679,7 @@
       pkg = buildFromGuideline(ctx.sourceId || condId, severity) ||
         { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: page, title: title };
     }
+    normaliseGivenHere(pkg);
     srcPkg = JSON.parse(JSON.stringify(pkg));
     ctx.page = pkg.page || page;
 

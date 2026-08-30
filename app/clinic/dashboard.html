@@ -28,7 +28,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260904">
+  <link rel="stylesheet" href="css/clinic.css?v=20260905">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -358,7 +358,7 @@
       </div>
 
       <!-- Outcomes mini-stats -->
-      <div class="stats-grid" data-slide="home" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:24px">
+      <div class="stats-grid" data-slide="home" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:12px">
         <div class="stat-card">
           <div class="stat-icon blue"><span class="material-icons-outlined">medical_services</span></div>
           <div><div class="stat-number" id="statToday">0</div><div class="stat-label">Today's Patients</div></div>
@@ -402,7 +402,7 @@
       </div>
 
       <!-- Pending bookings (patients who booked but haven't been seen) -->
-      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:24px;" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="bookings" style="padding:0;margin-bottom:12px;" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">schedule</span>
@@ -416,26 +416,7 @@
       </div>
 
       <!-- Active treatments — open cases that have not been discharged yet -->
-      <!-- ── Names still to add ──
-           A walk-in is treated first and named later, so a case number is
-           often all there is. This is the catch-up list for a quiet moment:
-           every treatment with no name or no phone, the ones being asked to
-           come back at the top, each one a single tap from being filled in.
-           Built from rows already loaded, so it costs no extra data. -->
-      <div class="admin-table-wrap" data-cap="consultations" data-slide="patients" data-slide-order="2" style="padding:0;margin-bottom:24px;">
-        <div class="table-header" style="justify-content:space-between">
-          <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">contact_page</span>
-            Names to add
-          </div>
-          <span id="needNameCount" style="font-size:11px;color:#fff;background:#00897B;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
-        </div>
-        <div id="needNameList" style="padding:8px 0">
-          <div style="text-align:center;padding:18px;color:#9AA0A6;font-size:13px">Loading…</div>
-        </div>
-      </div>
-
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:12px;" data-slide="patients">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
@@ -455,7 +436,7 @@
       </div>
 
       <!-- ── Overdue Follow-up Tracker ── -->
-      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:24px;" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" data-tier-feature="followup_care" style="padding:0;margin-bottom:12px;" data-slide="patients">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">event_busy</span>
@@ -469,7 +450,7 @@
       </div>
 
       <!-- Pending Payments / Outstanding Balances -->
-      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:24px;" data-slide="money">
+      <div class="admin-table-wrap" data-cap="payments" style="padding:0;margin-bottom:12px;" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#E65100">request_quote</span>
@@ -485,19 +466,8 @@
         </div>
       </div>
 
-      <!-- Today's treatments list -->
-      <div class="admin-table-wrap" data-cap="history" data-slide="patients" style="padding:0;margin-bottom:24px">
-        <div class="table-header">
-          <div class="table-title">Today's Treatments</div>
-          <span id="todayDate" style="font-size:13px;color:#9AA0A6"></span>
-        </div>
-        <div id="ordersList" style="padding:16px">
-          <div style="text-align:center;padding:40px;color:#9AA0A6">Loading…</div>
-        </div>
-      </div>
-
       <!-- ── Medicines Dispensed Tracker ── -->
-      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:24px;" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="meds" style="padding:0;margin-bottom:12px;" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00ACC1">medication</span>
@@ -516,15 +486,15 @@
       </div>
 
       <!-- Patient History Search -->
-      <div class="admin-table-wrap" data-cap="history" data-slide="patients" data-slide-order="1" style="padding:0;margin-bottom:24px">
+      <div class="admin-table-wrap" data-cap="history" data-slide="patients" data-slide-order="1" style="padding:0;margin-bottom:12px">
         <div class="table-header" style="justify-content:space-between">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">manage_search</span>
             Patient History
           </div>
         </div>
-        <div style="padding:16px 20px">
-          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+        <div style="padding:12px 14px">
+          <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <input id="histSearchInput" type="text" placeholder="Search by name, phone or patient ID (HP-…)" autocomplete="off"
               style="flex:1;min-width:200px;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none">
             <button id="histSearchBtn" onclick="searchPatientHistory()"
@@ -539,7 +509,7 @@
       </div>
 
       <!-- Top Conditions & Treatments -->
-      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:24px;" id="topConditionsSection" data-slide="patients">
+      <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:12px;" id="topConditionsSection" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00796B">biotech</span>
@@ -556,7 +526,7 @@
       </div>
 
       <!-- Stock Tracker -->
-      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:24px;background:none;box-shadow:none" data-slide="stock">
+      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:12px;background:none;box-shadow:none" data-slide="stock">
         <div class="table-header" style="justify-content:space-between;border-bottom:none;padding-left:2px;padding-right:2px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
@@ -574,7 +544,7 @@
       </div>
 
       <!-- Financial Overview -->
-      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:24px" data-slide="money">
+      <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:12px" data-slide="money">
         <div class="table-header">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0E7C5A">analytics</span>
@@ -619,7 +589,7 @@
       </div>
 
       <!-- Monthly Reports -->
-      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:24px;" id="monthlyReportsSection" data-slide="money">
+      <div class="admin-table-wrap" data-cap="financials" data-tier-feature="monthly_report" style="padding:0;margin-bottom:12px;" id="monthlyReportsSection" data-slide="money">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0277BD">summarize</span>
@@ -1099,7 +1069,7 @@
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-blueprints.js?v=20260827"></script>
+<script src="js/stock-blueprints.js?v=20260905"></script>
 <script src="js/stock-intake.js?v=20260902"></script>
 <script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
@@ -1458,7 +1428,7 @@
         var remaining = list ? list.querySelectorAll('.order-card').length : 0;
         if (ct) ct.textContent = remaining ? remaining + ' waiting' : '';
         if (sp) sp.textContent = remaining;
-        if (list && !remaining) list.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings right now.<br><span style="font-size:12px;color:#BDBDBD">All caught up!</span></div>';
+        if (list && !remaining) list.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings right now.<br><span style="font-size:12px;color:#BDBDBD">All caught up!</span></div>';
       }, 320);
     } catch(e) { alert('Could not mark as done: ' + e.message); }
   }
@@ -1470,12 +1440,12 @@
     var sp = document.getElementById('statPending');
     if (!el) return;
     function msg(html) { el.innerHTML = html; if (ct) ct.textContent = ''; if (sp) sp.textContent = '0'; }
-    if (!supabase) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
-    if (session && session.demo) { msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
+    if (!supabase) { msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
+    if (session && session.demo) { msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>');
+      msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>');
       return;
     }
 
@@ -1495,7 +1465,7 @@
       }
       var rows = res.data || [];
       if (!rows.length) {
-        msg('<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>');
+        msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>');
         return;
       }
       if (ct) ct.textContent = rows.length + ' waiting';
@@ -1754,7 +1724,7 @@
       if (!done) return;
       try { if (CO && CO.invalidate) CO.invalidate(['consultations_today_','hist_pool_','pending_payments_']); } catch(e){}
       // Fold the new details into what is already loaded and cached, so the
-      // row leaves "Names to add" the instant it is saved — including with no
+      // row shows the name the instant it is saved — including with no
       // signal, where reloading would only re-read the pre-save copy.
       try {
         _namedLocally[id] = { patient_name: patch.patient_name, patient_phone: patch.patient_phone };
@@ -1769,7 +1739,6 @@
             }));
           }
         }
-        renderNeedName();
         renderActiveTreatments();
       } catch (e) {}
       ov.style.display = 'none';
@@ -1781,14 +1750,19 @@
   // ── Today's consultations ──
   var _dxNoCaseCode = false;   // set once the database tells us the column is absent
   async function loadConsultations() {
-    var el = document.getElementById('ordersList');
-    if (!el) return;
-    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
-    if (session && session.demo) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see treatments.</div>'; return; }
+    // The "Today's Treatments" list was removed — Active Treatments covers the
+    // same patients without a second copy of them. This still runs, because it
+    // is what counts Today's Patients and Inpatient on the home screen, and
+    // what fills the id→case-number lookup other lists identify rows with.
+    // A stub stands in for the missing list so every write below is harmless.
+    var el = document.getElementById('ordersList')
+          || { innerHTML: '', querySelectorAll: function () { return []; } };
+    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see treatments.</div>'; return; }
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
+      el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
       return;
     }
     try {
@@ -1828,11 +1802,12 @@
         _offToday.forEach(function(o){ if (!_seen2[o.dx.id]) rows2.unshift(o.dx); });
         rows2.sort(function(a,b){ return new Date(b.created_at||0) - new Date(a.created_at||0); });
       }
+      window._todayRows = rows2;
       var st = document.getElementById('statToday'); if (st) st.textContent = rows2.length;
       var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
       var sd = document.getElementById('statDispatched'); if (sd) sd.textContent = inpatient;
       if (!rows2.length) {
-        el.innerHTML = '<div style="padding:40px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:32px;display:block;margin-bottom:8px">inbox</span>No treatments today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
+        el.innerHTML = '<div style="padding:22px 16px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:5px">inbox</span>No treatments today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
         return;
       }
       el.innerHTML = rows2.map(function(c) {
@@ -2623,6 +2598,42 @@
     return '';
   }
 
+  // ── Who is this row? ─────────────────────────────────────────────────────
+  // A walk-in is treated first and named later, so many rows have no name. The
+  // case number IS their identity until one is added — showing "Walk-in" or
+  // "Unknown" instead left the clinic unable to tell one debtor from another.
+  // The pending-payments RPC does not return case_code, so it is recovered
+  // from the rows already loaded elsewhere, and derived from the id otherwise.
+  function _caseCodeFor(r) {
+    if (!r) return '';
+    var direct = String(r.case_code || '').trim();
+    if (direct) return direct;
+    try {
+      var pools = [_activeRows, window._todayRows];
+      for (var p = 0; p < pools.length; p++) {
+        var pool = pools[p];
+        if (!Array.isArray(pool)) continue;
+        for (var i = 0; i < pool.length; i++) {
+          if (pool[i] && pool[i].id === r.id) {
+            var c = String(pool[i].case_code || '').trim();
+            if (c) return c;
+          }
+        }
+      }
+    } catch (e) {}
+    return patientCodeFor(r);
+  }
+  // What to print as the patient's identity — their name if it is known, the
+  // case number if it is not. Never a word that identifies nobody.
+  function _whoLabel(r) {
+    var n = String((r && r.patient_name) || '').trim();
+    if (n) return n;
+    var code = _caseCodeFor(r);
+    if (code) return code;
+    var ph = String((r && r.patient_phone) || '').trim();
+    return ph || 'Not named yet';
+  }
+
   // Cache the loaded active treatments so the search box can filter without re-querying.
   var _activeRows = [];
   // Names and numbers typed on this phone, held until the server agrees.
@@ -2648,10 +2659,10 @@
     var el = document.getElementById('activeTreatmentsList');
     var ct = document.getElementById('activeCount');
     if (!el) return;
-    if (!supabase) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
 
     var clinicId = await resolveClinicId();
-    if (!clinicId) { el.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
+    if (!clinicId) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
 
     _activeMigrationNeeded = false;
 
@@ -2752,7 +2763,6 @@
     _activeRows = _applyLocalNames(rows);
     renderActiveTreatments();
     renderOverdueFollowups();
-    renderNeedName();
   }
 
   // Names and numbers typed on this phone, held until the server agrees.
@@ -2776,70 +2786,6 @@
     });
   }
 
-  // ── Names still to add ───────────────────────────────────────────────────
-  // Treating first and naming later is the right order in a busy clinic — but
-  // a case number cannot be phoned. This lists what is missing so a nurse can
-  // clear it in a quiet moment, and puts the patients who were told to come
-  // back at the top, because those are the ones somebody will need to reach.
-  // Reads rows already loaded for Active Treatments: no extra request.
-  function renderNeedName() {
-    var el = document.getElementById('needNameList');
-    var ct = document.getElementById('needNameCount');
-    if (!el) return;
-    var rows = (_activeRows || []).filter(function (r) {
-      return !String(r.patient_name || '').trim() || !String(r.patient_phone || '').trim();
-    });
-    // Coming back → first. Then the newest, because it is freshest in memory.
-    rows.sort(function (a, b) {
-      var fa = Number(a.follow_up_days) > 0 ? 0 : 1;
-      var fb = Number(b.follow_up_days) > 0 ? 0 : 1;
-      if (fa !== fb) return fa - fb;
-      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
-    });
-
-    if (ct) {
-      ct.textContent = rows.length + ' to add';
-      ct.style.display = rows.length ? '' : 'none';
-    }
-    if (!rows.length) {
-      el.innerHTML = '<div style="padding:18px;text-align:center;color:#9AA0A6;font-size:13px">'
-        + '<span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:6px;color:#7BC98A">task_alt</span>'
-        + 'Every patient has a name and a number.</div>';
-      return;
-    }
-
-    var SHOW = 8;
-    el.innerHTML = rows.slice(0, SHOW).map(function (r) {
-      var caseNo = String(r.case_code || '').trim() || patientCodeFor(r);
-      var name  = String(r.patient_name  || '').trim();
-      var phone = String(r.patient_phone || '').trim();
-      var missing = !name && !phone ? 'No name or number'
-                  : !name ? 'No name' : 'No phone number';
-      var back = Number(r.follow_up_days) > 0
-        ? '<span style="font-size:9.5px;font-weight:800;letter-spacing:.4px;background:#FFF3E0;color:#E65100;padding:2px 8px;border-radius:20px;white-space:nowrap">COMING BACK</span>'
-        : '';
-      var when = r.created_at
-        ? new Date(r.created_at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }) : '';
-      return '<div class="nn-row" data-dxid="' + esc(r.id) + '"'
-        + ' data-name="' + esc(name) + '" data-phone="' + esc(phone) + '"'
-        + ' data-case="' + esc(caseNo) + '">'
-        + '<div class="nn-main">'
-        +   '<div class="nn-top"><strong>' + esc(caseNo || 'Patient') + '</strong>' + back + '</div>'
-        +   '<div class="nn-sub">' + esc(r.confirmed_diagnosis || 'Diagnosis pending')
-        +     (when ? ' · ' + esc(when) : '') + ' · ' + esc(missing) + '</div>'
-        + '</div>'
-        + '<span class="nn-add">Add</span>'
-      + '</div>';
-    }).join('')
-    + (rows.length > SHOW
-        ? '<div style="padding:10px 16px 2px;font-size:12px;color:#9AA0A6;text-align:center">'
-          + 'and ' + (rows.length - SHOW) + ' more</div>'
-        : '');
-
-    el.querySelectorAll('.nn-row').forEach(function (row) {
-      row.onclick = function () { openPatientEdit(row.dataset); };
-    });
-  }
 
   function renderActiveTreatments() {
     var el = document.getElementById('activeTreatmentsList');
@@ -2858,8 +2804,12 @@
         })
       : _activeRows.slice();
 
+    var needName = _activeRows.filter(function (r) {
+      return !String(r.patient_name || '').trim() || !String(r.patient_phone || '').trim();
+    }).length;
     if (ct) ct.textContent = _activeRows.length
-      ? (q ? rows.length + ' / ' + _activeRows.length + ' open' : _activeRows.length + ' open')
+      ? ((q ? rows.length + ' / ' + _activeRows.length + ' open' : _activeRows.length + ' open')
+         + (needName ? ' · ' + needName + ' unnamed' : ''))
       : '';
 
     var notice = _activeMigrationNeeded
@@ -2873,7 +2823,7 @@
       var emptyMsg = q
         ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#BDBDBD">search_off</span>No patient matches "'+esc(q)+'".'
         : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!';
-      el.innerHTML = notice + '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
+      el.innerHTML = notice + '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
       return;
     }
 
@@ -2909,6 +2859,14 @@
         +(dueBack ? '<span class="pt-due">'+dueBack+'</span>' : '')
         +'<span class="pt-dx">'+esc(c.confirmed_diagnosis||'Diagnosis pending')+'</span>'
         +'<span class="pt-tag '+tag[0]+'">'+esc(tag[1])+'</span>'
+        // No name, or no number to call them on — offered right here rather
+        // than in a list of its own. A patient due back needs both.
+        +((!nm || !String(c.patient_phone||'').trim())
+          ? '<span class="pt-fix"><button type="button" class="px-add"'
+            +' data-dxid="'+esc(c.id)+'" data-name="'+esc(nm)+'"'
+            +' data-phone="'+esc(c.patient_phone||'')+'" data-case="'+esc(caseNo)+'">'
+            +(nm ? '+ Add phone' : '+ Add name')+'</button></span>'
+          : '')
       +'</div>';
     }).join('');
 
@@ -2961,7 +2919,9 @@
       var isToday  = daysLate <= 0;
       var urgColor = daysLate > 7 ? '#B71C1C' : daysLate > 3 ? '#C62828' : daysLate > 0 ? '#E65100' : '#F9A825';
       var dueLabel = isToday ? 'Due today' : 'Overdue by ' + daysLate + ' day' + (daysLate !== 1 ? 's' : '');
-      var ini = (c.patient_name || c.patient_phone || 'P').split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase();
+      var ini = String(c.patient_name || '').trim()
+        ? c.patient_name.split(' ').map(function(x){ return x[0]; }).slice(0,2).join('').toUpperCase()
+        : (String(_caseCodeFor(c)).replace(/[^0-9A-Za-z]/g,'').slice(-2).toUpperCase() || 'P');
       var phone = c.patient_phone || '';
       // Two-row card: identity (avatar + full-width name + due) on top, then
       // details, then full-width buttons. A single flex row crushed the name to
@@ -2970,7 +2930,7 @@
         + '<div style="display:flex;align-items:center;gap:10px">'
         +   '<div style="width:38px;height:38px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
         +   '<div style="flex:1;min-width:0">'
-        +     '<div style="font-size:14px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(c.patient_name || c.patient_phone || 'Unknown') + '</div>'
+        +     '<div style="font-size:14px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(_whoLabel(c)) + '</div>'
         +     '<div style="font-size:12px;color:' + urgColor + ';font-weight:700;white-space:nowrap">' + dueLabel + '</div>'
         +   '</div>'
         + '</div>'
@@ -3475,7 +3435,7 @@
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
       return;
     }
 
@@ -3486,7 +3446,7 @@
     function offlinePlaceholder() {
       listEl.innerHTML = CO
         ? CO.offlineHtml('Outstanding balances will show here once loaded online.')
-        : '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Offline.</div>';
+        : '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Offline.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '';
     }
@@ -3564,7 +3524,7 @@
     }
 
     if (!rows.length) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '0';
       return;
@@ -3613,7 +3573,9 @@
         +'<div style="padding:12px 16px;border-bottom:1px solid #F1F3F4">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'
             +'<div style="flex:1;min-width:0">'
-              +'<div style="font-size:14px;font-weight:700;color:#202124">'+esc(r.patient_name || 'Walk-in')+' '+statusBadge+'</div>'
+              +'<div style="font-size:14px;font-weight:700;color:#202124">'+esc(_whoLabel(r))+' '+statusBadge+'</div>'
+              +(String(r.patient_name||'').trim() ? '' :
+                '<button type="button" class="px-add" data-dxid="'+esc(r.id)+'" data-name="" data-phone="'+esc(r.patient_phone||'')+'" data-case="'+esc(_caseCodeFor(r))+'">+ Add name</button>')
               +'<div style="font-size:12px;color:#5F6368;margin-top:2px">'+esc(r.confirmed_diagnosis || 'No diagnosis recorded')+'</div>'
               +(r.patient_phone ? '<div style="font-size:11px;color:#9AA0A6;margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
             +'</div>'
@@ -4144,7 +4106,7 @@
     var clinicId = await resolveClinicId();
     var demoMode = !!(session && session.demo);
     if (!clinicId && !demoMode) {
-      listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
       return;
     }
 
@@ -4298,7 +4260,7 @@
       }
 
       if (!items.length) {
-        listEl.innerHTML = '<div style="padding:24px;text-align:center;color:#9AA0A6;font-size:13px">'
+        listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">'
           +'<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:8px">inventory_2</span>'
           +'No stock items yet. Add your medicines and materials to start tracking.'
           +'</div>';
@@ -4787,6 +4749,15 @@
       }
     } catch (e) {}
   }
+
+  // "+ Add name" anywhere a row has none — one delegated handler, so it works
+  // on lists that repaint themselves without re-wiring anything.
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('.px-add');
+    if (!b) return;
+    e.preventDefault(); e.stopPropagation();
+    openPatientEdit(b.dataset);
+  }, true);
 
   // Restock taps go to the three-question sheet, which already knows this
   // item's pack size and so only asks how many boxes arrived.
