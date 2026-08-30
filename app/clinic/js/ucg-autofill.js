@@ -247,7 +247,7 @@
 
   // Fluids and rehydration — the drips. They were being dropped along with
   // everything else past the sixth medicine.
-  var MED_FLUID = /(dextrose|glucose\s*\d|sodium chloride|normal saline|\bsaline\b|ringer|hartmann|water for injection|oral rehydration|\bORS\b|sodium bicarbonate|packed cells|whole blood|plasma)/i;
+  var MED_FLUID = /(dextrose|glucose\s*\d|sodium chloride|normal saline|\bsaline\b|ringer|hartmann|darrow|water for injection|oral rehydration|\bORS\b|resomal|sodium bicarbonate|packed cells|packed red|whole blood|blood transfusion|fresh frozen|plasma|platelet|cryoprecipitat|albumin|haemaccel|gelofus|dextran)/i;
 
   function isMedicineName(name) {
     var n = String(name || '').trim();
@@ -766,6 +766,12 @@
       // A drip is hung here, not carried home — said plainly on the row.
       '.fields-here{grid-template-columns:1fr auto !important;align-items:center}',
       '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#0E7C5A;line-height:1.3}',
+      // The common drips, one tap each — on every condition, not just the few
+      // the book happens to name a fluid for.
+      '.ucg-qf{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}',
+      '.ucg-qfb{padding:6px 11px;border-radius:20px;border:1.5px dashed var(--border,#D7E4D9);background:transparent;color:#0E7C5A;font:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}',
+      '.ucg-qfb:active{background:rgba(14,124,90,.10)}',
+      'html[data-theme="dark"] .ucg-qfb{border-color:#3A4A40;color:#7BC98A}',
       '.ucg-here .material-icons-outlined{font-size:15px}',
       'html[data-theme="dark"] .ucg-here{color:#7BC98A}',
       '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
@@ -930,8 +936,14 @@
       hint: 'The guideline ranks these — first line, then the alternative, then second line. Remove the ones you are not giving.' },
     { key: 'supportive', title: 'Supportive treatment',
       hint: 'For complications — remove any the patient does not have.' },
-    { key: 'fluid',      title: 'Drips, fluids &amp; blood',
-      hint: 'IV fluids and rehydration — remove any not being run.' },
+    // ALWAYS shown, on every condition. The book only names a drip on 23 of
+    // its 340 treatable conditions, so on the other 93% there was nowhere to
+    // put one — yet whether a patient needs fluids is a bedside decision, not
+    // something the chapter can know in advance. The section stands empty and
+    // waiting rather than absent.
+    { key: 'fluid',      title: 'Drips, fluids &amp; blood', always: true,
+      hint: 'IV fluids, rehydration and blood — remove any not being run.',
+      empty: 'The guideline does not name a drip for this condition. If you are running one, add it here.' },
     { key: 'other',      title: 'Also in the guideline',
       hint: 'The guideline says this, but it is not a medicine the app can add for you — use the search below.' },
   ];
@@ -1023,15 +1035,38 @@
     '</div>';
   }
 
+  // The fluids a Ugandan clinic actually hangs, offered as one tap each so a
+  // drip can be started on any condition without hunting through a search box.
+  // The clinician still sets the amount.
+  var QUICK_FLUIDS = [
+    { name: 'Sodium chloride 0.9%',  label: 'Normal saline 0.9%' },
+    { name: "Ringer's Lactate",      label: "Ringer's Lactate" },
+    { name: 'Dextrose 5%',           label: 'Dextrose 5%' },
+    { name: 'Dextrose 10%',          label: 'Dextrose 10%' },
+    { name: 'Dextrose 50%',          label: 'Dextrose 50%' },
+    { name: 'Half strength Darrow',  label: "Half-strength Darrow's" },
+    { name: 'Whole blood',           label: 'Whole blood' },
+    { name: 'Water for injection',   label: 'Water for injection' },
+  ];
+
+  function quickFluidsHtml() {
+    return '<div class="ucg-qf">' +
+      QUICK_FLUIDS.map(function (f, i) {
+        return '<button type="button" class="ucg-qfb" data-qf="' + i + '">+ ' +
+               esc(f.label) + '</button>';
+      }).join('') + '</div>';
+  }
+
   function drugGroupsHtml() {
     return MED_GROUPS.map(function (g) {
       var rows = pkg.drugs.map(function (d, i) { return { d: d, i: i }; })
         .filter(function (r) { return (r.d.group || 'treatment') === g.key; });
-      if (!rows.length) return '';
+      if (!rows.length && !g.always) return '';
       return '<div class="ucg-mg"><div class="ucg-mgh">' + g.title +
              '<span>' + rows.length + '</span></div>' +
-             '<div class="ucg-mgi">' + g.hint + '</div>' +
-             rows.map(function (r) { return drugRowHtml(r.d, r.i); }).join('') + '</div>';
+             '<div class="ucg-mgi">' + (rows.length ? g.hint : (g.empty || g.hint)) + '</div>' +
+             rows.map(function (r) { return drugRowHtml(r.d, r.i); }).join('') +
+             (g.key === 'fluid' ? quickFluidsHtml() : '') + '</div>';
     }).join('');
   }
 
@@ -1390,6 +1425,24 @@
         if (dx) { dx.focus(); dx.select && dx.select(); }
       }
     };
+    // One tap adds a common fluid, straight into Drips, fluids & blood.
+    document.querySelectorAll('[data-qf]').forEach(function (b) {
+      b.onclick = function () {
+        var f = QUICK_FLUIDS[Number(b.dataset.qf)];
+        if (!f) return;
+        var already = pkg.drugs.some(function (d) {
+          return String(d.drug || '').toLowerCase() === f.name.toLowerCase();
+        });
+        if (already) { toast(f.label + ' is already on this treatment', 'info'); return; }
+        pkg.drugs.push({
+          drug: f.name, dosage: '', from: 'added',
+          group: 'fluid', selected: true,
+          timesPerDay: 1, durationDays: 1, qty: 1,
+        });
+        normaliseGivenHere(pkg);
+        render();
+      };
+    });
     wireDrugSearch();
   }
 
@@ -1585,10 +1638,15 @@
         durationDays: Number(d.value) || 5,
         qty: Number(q.value) || 0,
         from: 'added',
-        // A drug the clinician went and searched for is one they mean to give.
-        group: 'treatment',
+        // A drug the clinician went and searched for is one they mean to give —
+        // but WHAT it is decides where it belongs. This was hard-coded to
+        // "treatment", so searching Dextrose filed a drip under Treatment and
+        // then dosed it like a tablet.
+        group: medGroup(m.name, '', ''),
         selected: true,
       });
+      // A drip added by hand is still hung, not taken home.
+      normaliseGivenHere(pkg);
       ask.style.display = 'none';
       render();
     };
