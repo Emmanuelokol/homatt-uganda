@@ -45,7 +45,11 @@
                                                           unit: 'vials',   outer: 'boxes',   inner: '',       strips: 1,  units: 10 },
     { re: /iv ?infusion|infusion|iv ?fluid|intravenous|concentrate for iv/,
                                                           unit: 'bottles', outer: 'cartons', inner: '',       strips: 1,  units: 20 },
-    { re: /eye ?\/? ?ear|eye drop|ear drop|nasal drop|nasal spray|ophthalmic|eye ointment|drops/,
+    // An eye or ear OINTMENT is a tube, not a bottle — tested before the drops
+    // rule, which would otherwise claim it.
+    { re: /eye ointment|ear ointment|ophthalmic (ointment|gel)|eye gel/,
+                                                          unit: 'tubes',   outer: 'boxes',   inner: '',       strips: 1,  units: 1  },
+    { re: /eye ?\/? ?ear|eye drop|ear drop|nasal drop|nasal spray|ophthalmic|drops/,
                                                           unit: 'bottles', outer: 'boxes',   inner: '',       strips: 1,  units: 1  },
     { re: /aerosol|inhal|nebulis|nebuliz|spray/,          unit: 'inhalers',outer: 'boxes',   inner: '',       strips: 1,  units: 1  },
     { re: /cream|ointment|gel|paste|lotion|oil\b|tincture|application|topical|antiseptic/,

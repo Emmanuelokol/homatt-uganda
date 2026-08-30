@@ -961,13 +961,21 @@
   // The word for one of them, taken from what the clinic actually stocks where
   // that is known, and from the blueprint otherwise. Never "tabs" for a drip.
   function givenUnit(d) {
+    // What the clinic already stocks it as is the truth.
     try {
       var row = matchStockRow(d.drug, d.dosage);
       if (row && row.unit && !/^tabs?$/i.test(row.unit)) return String(row.unit);
     } catch (e) {}
+    // Not stocked yet — work it out from the form. The dosage text carries it
+    // ("125 mg/5 ml Oral suspension"), and so sometimes does the name itself
+    // ("Amoxicillin syrup"). Passing the name alone found no form at all, so
+    // every unstocked syrup came back as a plain count.
     try {
       if (window.StockBlueprint) {
-        var u = window.StockBlueprint.blueprintFor({ name: d.drug, itemType: 'medicine' }).unit;
+        var hint = String(d.dosage || '') + ' ' + String(d.drug || '');
+        var u = window.StockBlueprint.blueprintFor({
+          name: d.drug, form: hint, itemType: 'medicine',
+        }).unit;
         if (u && !/^tabs?$/i.test(u)) return u;
       }
     } catch (e) {}
@@ -981,15 +989,44 @@
   function normaliseGivenHere(p) {
     if (!p || !p.drugs) return;
     p.drugs.forEach(function (d) {
-      if (!isGivenHere(d)) return;
-      d.givenHere = true;
-      d.timesPerDay = 1;
-      d.durationDays = 1;
-      // Keep a small figure the book actually stated; replace a tablet-shaped
-      // multiple with one.
-      var q = Number(d.qty) || 0;
-      d.qty = (q > 0 && q <= 6) ? q : 1;
+      if (isGivenHere(d)) {
+        d.givenHere = true;
+        d.timesPerDay = 1;
+        d.durationDays = 1;
+        // Keep a small figure the book actually stated; replace a tablet-shaped
+        // multiple with one.
+        var q = Number(d.qty) || 0;
+        d.qty = (q > 0 && q <= 6) ? q : 1;
+        return;
+      }
+      // A syrup, cream, inhaler or drops: the times-a-day and the days are the
+      // patient's real instructions and are kept, but what comes OFF THE SHELF
+      // is containers. One bottle covers the course unless the clinician says
+      // otherwise — it was taking one bottle per dose.
+      if (isWholeContainer(d)) {
+        var qc = Number(d.qty) || 0;
+        var doses = (Number(d.timesPerDay) || 1) * (Number(d.durationDays) || 1);
+        if (qc === doses || qc > 6 || qc === 0) d.qty = 1;
+      }
     });
+  }
+
+  // Tablets are dispensed one dose at a time, so "3 a day for 5 days" really
+  // is 15 tablets off the shelf. A syrup, a cream, an inhaler or eye drops are
+  // not: the patient takes 5 ml three times a day out of ONE bottle. Counting
+  // those in doses took 15 bottles off the shelf for a single child's course —
+  // 88 medicines in the national list are containers like this, 37 of them
+  // named in the guideline, so the stock was wrong every time one was given.
+  function isWholeContainer(d) {
+    if (isGivenHere(d)) return false;          // drips are handled on their own
+    var u = String(givenUnit(d) || '').toLowerCase();
+    return /bottle|tube|inhaler|tub\b|jar|sachet|pessar|supposit|piece|roll/.test(u);
+  }
+  // The label over the quantity box: the unit the shelf actually counts in, so
+  // it is never a bare "QTY" that could mean doses or bottles.
+  function qtyLabel(d) {
+    if (!isWholeContainer(d)) return 'Qty';
+    return String(givenUnit(d) || 'units');
   }
 
   function drugRowHtml(d, i) {
@@ -1029,7 +1066,7 @@
               '<input class="ucg-num" type="number" min="1" max="6" value="' + (d.timesPerDay || 2) + '" data-fd="' + i + '"></div>' +
             '<div><span class="ucg-lbl">Days</span>' +
               '<input class="ucg-num" type="number" min="1" max="90" value="' + (d.durationDays || 5) + '" data-dd="' + i + '"></div>' +
-            '<div><span class="ucg-lbl">Qty</span>' +
+            '<div><span class="ucg-lbl">' + esc(qtyLabel(d)) + '</span>' +
               '<input class="ucg-num" type="number" min="0" value="' + (d.qty || 0) + '" data-qt="' + i + '"></div>' +
           '</div>') : '') +
     '</div>';
@@ -1369,7 +1406,9 @@
       inp.onchange = function () {
         var d = pkg.drugs[Number(inp.dataset.fd)];
         d.timesPerDay = Math.max(1, Number(inp.value) || 1);
-        d.qty = d.timesPerDay * (d.durationDays || 1);
+        // How often it is taken does not change how many BOTTLES leave the
+        // shelf — only how many tablets do.
+        if (!isWholeContainer(d)) d.qty = d.timesPerDay * (d.durationDays || 1);
         render();
       };
     });
@@ -1377,7 +1416,7 @@
       inp.onchange = function () {
         var d = pkg.drugs[Number(inp.dataset.dd)];
         d.durationDays = Math.max(1, Number(inp.value) || 1);
-        d.qty = (d.timesPerDay || 1) * d.durationDays;
+        if (!isWholeContainer(d)) d.qty = (d.timesPerDay || 1) * d.durationDays;
         render();
       };
     });

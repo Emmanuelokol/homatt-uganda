@@ -772,25 +772,25 @@
       </div>
     </div>
 
-    <!-- Search -->
-    <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
-      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
-      <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-        oninput="filterQsDrugs(this.value)"
-        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
-    </div>
-
-    <!-- Add straight from the search.
-         Selling something that is not on the shelf yet is the commonest reason
-         a sale stalls, and the only way in used to be the "+ New Item" button
-         up in the header — away from the fingers, and it threw away whatever
-         had been typed. This sits directly under the box, and carries the
-         typed word into the sheet so the name is never typed twice. -->
-    <div style="padding:0 16px 8px;flex-shrink:0">
-      <button id="qsAddFromSearch" type="button"
-        style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
+    <!-- Search, with "add it" alongside.
+         Selling something not yet on the shelf is the commonest reason a sale
+         stalls, and the only way in used to be the "+ New Item" button up in
+         the header — away from the fingers, and it discarded whatever had been
+         typed. This sits beside the box and carries the typed word across.
+         It shares the search row rather than taking one of its own: with the
+         keyboard up this sheet has no spare height, and a row of its own was
+         enough to push the Sell button off the bottom. -->
+    <div style="padding:12px 16px 6px;flex-shrink:0;display:flex;gap:8px;align-items:center">
+      <div style="position:relative;flex:1;min-width:0">
+        <span class="material-icons-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+        <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          oninput="filterQsDrugs(this.value)"
+          style="width:100%;padding:10px 14px 10px 34px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
+      </div>
+      <button id="qsAddFromSearch" type="button" title="Add an item or medicine"
+        style="flex-shrink:0;display:flex;align-items:center;gap:4px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;touch-action:manipulation;white-space:nowrap">
         <span class="material-icons-outlined" style="font-size:17px">add_circle_outline</span>
-        <span id="qsAddFromSearchLabel">Add an item or medicine</span>
+        <span id="qsAddFromSearchLabel">Add</span>
       </button>
     </div>
 
@@ -803,7 +803,7 @@
     </div>
 
     <!-- Selected drug + controls -->
-    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:1;min-height:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
         <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
@@ -843,7 +843,7 @@
     </div>
 
     <!-- Cart: the items in the current sale (shown once you Add another) -->
-    <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid #E8F5E9;background:#FBFEFC">
+    <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:1;min-height:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid #E8F5E9;background:#FBFEFC">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:11px;font-weight:800;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">This sale</span>
         <button id="qsClearCart" type="button" style="background:none;border:none;color:#C62828;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Clear</button>
@@ -1069,7 +1069,7 @@
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-blueprints.js?v=20260905"></script>
+<script src="js/stock-blueprints.js?v=20260906"></script>
 <script src="js/stock-intake.js?v=20260902"></script>
 <script src="js/clinic.js?v=20260831"></script>
 <script src="js/msg-alerts.js?v=20260829"></script>
@@ -5769,7 +5769,12 @@
     var lbl = document.getElementById('qsAddFromSearchLabel');
     if (lbl) {
       var typed = searchEl ? searchEl.value.trim() : '';
-      lbl.textContent = typed ? 'Add “' + typed + '”' : 'Add an item or medicine';
+      // The label stays short — it shares the row with the search box now.
+      // What is being added is spelled out in the tooltip and in the empty
+      // state below, where there is room for it.
+      lbl.textContent = 'Add';
+      var btn = document.getElementById('qsAddFromSearch');
+      if (btn) btn.title = typed ? 'Add “' + typed + '”' : 'Add an item or medicine';
     }
   }
 
