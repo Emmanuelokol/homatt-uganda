@@ -235,16 +235,24 @@ async function quickStatus(riderId, status) {
   showAdminToast(status === 'approved' ? 'Rider approved!' : 'Rider suspended', status === 'approved' ? 'success' : 'default');
 }
 
+// PERMANENT delete — see the note on the pharmacy version: window.confirm()
+// is blocked in Android WebViews, so the old button silently did nothing.
 async function removeRider(riderId) {
-  if (!confirm('Remove this rider from the platform? They will no longer be able to receive deliveries.')) return;
-  const supa = supabase || adminSupa();
-  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
-  const { error } = await supa.from('riders').update({ status: 'removed', active: false, available: false, updated_at: new Date().toISOString() }).eq('id', riderId || activeRiderId);
-  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
-  if (activeRiderId) closeModal();
-  await loadRiders();
-  showAdminToast('Rider removed from platform', 'default');
+  const id = riderId || activeRiderId;
+  const row = (allRiders || []).find(function (x) { return x.id === id; }) || {};
+  const name = row.full_name || row.name || 'this rider';
+  if (!window.AdminDelete) { showAdminToast('Delete tool did not load — reload the page', 'error'); return; }
+  window.AdminDelete.start({
+    kind: 'rider', id: id, name: name, table: 'riders',
+    rpc: 'admin_delete_rider', rpcArg: { p_rider_id: id },
+    alsoText: '(delivery history and login)',
+    cascade: [{ table: 'deliveries', column: 'rider_id' }],
+    softExtra: { active: false, available: false, updated_at: new Date().toISOString() },
+    sqlFile: 'APPLY_IN_SQL_EDITOR_admin_delete_facilities.sql',
+    onDone: async function () { if (activeRiderId) closeModal(); await loadRiders(); },
+  });
 }
 </script>
+<script src="js/admin-delete.js?v=20260907"></script>
 </body>
 </html>

@@ -753,15 +753,29 @@ async function togglePharmacyStatus(id, newStatus) {
   showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
 }
 
+// PERMANENT delete. This used to ask with window.confirm(), which Android
+// WebViews block outright — the button did nothing and the option looked
+// missing. It also only set a status flag, so nothing was ever really removed.
 async function removePharmacy(id) {
-  if (!confirm('Remove this pharmacy from the platform? Users will no longer be able to order medicine from them.')) return;
-  var supa = adminSupa();
-  if (!supa) { showAdminToast('Demo mode — cannot remove', 'default'); return; }
-  var { error } = await supa.from('pharmacies').update({ status: 'removed', active: false, updated_at: new Date().toISOString() }).eq('id', id);
-  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
-  await loadPharmacies();
-  showAdminToast('Pharmacy removed from platform', 'default');
+  var row = (allPharmacies || []).find(function (x) { return x.id === id; }) || {};
+  var name = row.name || 'this pharmacy';
+  if (!window.AdminDelete) { showAdminToast('Delete tool did not load — reload the page', 'error'); return; }
+  window.AdminDelete.start({
+    kind: 'pharmacy', id: id, name: name, table: 'pharmacies',
+    rpc: 'admin_delete_pharmacy', rpcArg: { p_pharmacy_id: id },
+    alsoText: '(orders, stock and staff logins)',
+    cascade: [
+      { table: 'pharmacy_order_items', column: 'pharmacy_id' },
+      { table: 'pharmacy_orders',      column: 'pharmacy_id' },
+      { table: 'pharmacy_inventory',   column: 'pharmacy_id' },
+      { table: 'portal_users',         column: 'pharmacy_id' },
+    ],
+    softExtra: { active: false, updated_at: new Date().toISOString() },
+    sqlFile: 'APPLY_IN_SQL_EDITOR_admin_delete_facilities.sql',
+    onDone: loadPharmacies,
+  });
 }
 </script>
+<script src="js/admin-delete.js?v=20260907"></script>
 </body>
 </html>

@@ -375,10 +375,14 @@ function fmtK(n) {
   return Number(n).toLocaleString('en-UG');
 }
 
-function renderClinicMetrics(rows) {
+// `note` explains an EMPTY list. "No clinic data yet" read the same whether no
+// clinic had been registered, the clinics were all inactive, or the query had
+// been refused — which is exactly the situation an admin cannot diagnose.
+function renderClinicMetrics(rows, note) {
   var el = document.getElementById('clinicMetricsWrap');
   if (!rows || !rows.length) {
-    el.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No clinic data yet.</div>';
+    el.innerHTML = '<div style="text-align:center;padding:22px 16px;color:#9AA0A6;font-size:13px;line-height:1.55">'
+      + (note || 'No clinic data yet.') + '</div>';
     return;
   }
   el.innerHTML = rows.map(function(c) {
@@ -592,10 +596,16 @@ async function loadLive() {
   try {
     var [cdAll, cdToday, qsAll, qsToday, inpat, pendPay, clinicList, cdClinic, qsClinic] = await qt(Promise.all([
       supa.from('clinic_diagnoses').select('total_charged_ugx',{count:'exact'}),
-      supa.from('clinic_diagnoses').select('total_charged_ugx',{count:'exact'}).gte('created_at',todayIso),
+      // clinic_id is needed further down to split today's revenue per clinic —
+      // it was not selected, so every clinic's Revenue Today read 0.
+      supa.from('clinic_diagnoses').select('clinic_id,total_charged_ugx',{count:'exact'}).gte('created_at',todayIso),
       supa.from('clinic_quick_sales').select('total_ugx'),
-      supa.from('clinic_quick_sales').select('total_ugx').gte('created_at',todayIso),
-      supa.from('clinic_diagnoses').select('id',{count:'exact'}).in('status',['active','admitted','inpatient']),
+      supa.from('clinic_quick_sales').select('clinic_id,total_ugx').gte('created_at',todayIso),
+      // clinic_diagnoses has no "status" column — this asked PostgREST for one
+      // that does not exist, so it errored and Active Inpatients sat at 0
+      // forever. An inpatient is one admitted and not yet discharged.
+      supa.from('clinic_diagnoses').select('id',{count:'exact'})
+        .eq('patient_type','inpatient').is('discharged_at',null),
       supa.from('clinic_diagnoses').select('total_charged_ugx,amount_paid').in('payment_status',['pending','partial','credit']),
       supa.from('clinics').select('id,name').eq('active',true).order('name'),
       supa.from('clinic_diagnoses').select('clinic_id,total_charged_ugx,created_at').gte('created_at',todayIso),
@@ -624,7 +634,8 @@ async function loadLive() {
     (qsClinic.data||[]).forEach(function(r){ qsByClinic[r.clinic_id] = (qsByClinic[r.clinic_id]||0) + (+r.total_ugx||0); });
 
     // Count active patients per clinic
-    var { data: activeRows } = await qt(supa.from('clinic_diagnoses').select('clinic_id').in('status',['active','admitted','inpatient']));
+    var { data: activeRows } = await qt(supa.from('clinic_diagnoses')
+      .select('clinic_id').is('discharged_at',null));
     var activeByClinic = {};
     (activeRows||[]).forEach(function(r){ activeByClinic[r.clinic_id] = (activeByClinic[r.clinic_id]||0)+1; });
 
@@ -646,12 +657,41 @@ async function loadLive() {
         pending_balance: pendByClinic[c.id] || 0,
       };
     }).sort(function(a,b){ return b.consults_today - a.consults_today; });
-    renderClinicMetrics(metricsRows);
+
+    // Say WHY the list is empty. A clinic recording treatments but missing from
+    // this table is almost always a clinic whose row is not marked active — the
+    // list is built from active clinics only.
+    var note = null;
+    if (!metricsRows.length) {
+      if (clinicList.error) {
+        note = 'The clinic list could not be read: ' + (clinicList.error.message || 'permission denied')
+             + '.<br>This admin login may not have is_admin = true on its profile.';
+      } else {
+        var anyDx = (cdAll.count || 0) > 0;
+        note = anyDx
+          ? 'There are ' + cdAll.count + ' recorded treatments, but no clinic is marked <strong>active</strong>, '
+            + 'so none can be listed here.<br>Open Clinics and set the facility to approved/active.'
+          : 'No clinic has recorded a treatment yet.';
+      }
+    }
+    renderClinicMetrics(metricsRows, note);
   } catch(e) {
-    // Clinic metrics tables may not exist yet — leave cards showing '—'
+    // This used to blame a missing migration for EVERY failure — including a
+    // timeout, a permissions block, or a column that does not exist. An admin
+    // seeing "no clinic activity" then had nothing to go on. Say what actually
+    // happened.
+    var why = (e && e.message) || String(e || 'unknown error');
+    var hint = /timeout/i.test(why)
+        ? 'The database did not answer in 12 seconds. Usually a slow connection — reload to try again.'
+      : /permission|denied|rls|not authorized|jwt/i.test(why)
+        ? 'This admin login is not allowed to read the clinic tables. Its profile needs is_admin = true.'
+      : /does not exist|schema cache|could not find/i.test(why)
+        ? 'A table or column this page reads has not been created yet. Apply the pending migrations in Supabase.'
+      : 'Could not load clinic activity.';
     document.getElementById('clinicMetricsWrap').innerHTML =
-      '<div style="padding:14px;background:#FFF8E1;border-radius:8px;font-size:12px;color:#5D4037">'
-      + 'Apply the inventory + quick-sale migration to enable live clinic metrics.</div>';
+      '<div style="padding:14px;background:#FFF8E1;border-radius:8px;font-size:12.5px;color:#5D4037;line-height:1.55">'
+      + '<strong>Clinic activity could not be loaded.</strong><br>' + hint
+      + '<br><span style="font-size:11.5px;opacity:.8">' + String(why).slice(0,160) + '</span></div>';
   }
 
   } catch(e) {
