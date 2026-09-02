@@ -26,6 +26,26 @@
     html[data-theme="dark"] .g-disclaimer{background:#372C11}
     html[data-theme="dark"] .g-disclaimer div{color:#F2D79A}
 
+    /* Which book */
+    .g-books{display:flex;gap:8px;margin-bottom:12px}
+    .g-book-btn{flex:1;border:none;font:inherit;text-align:left;padding:11px 14px;
+      border-radius:14px;background:var(--surface);box-shadow:var(--shadow);
+      cursor:pointer;touch-action:manipulation;color:var(--text-lt)}
+    .g-book-btn b{display:block;font-size:13.5px;font-weight:800;color:var(--text)}
+    .g-book-btn span{font-size:11px}
+    .g-book-btn.on{background:#0E7C5A;color:#CFEFE2}
+    .g-book-btn.on b{color:#fff}
+    .g-whonote{display:none;font-size:12px;color:var(--text-lt);line-height:1.5;
+      background:var(--surface);border-radius:12px;padding:11px 14px;margin-bottom:12px;
+      box-shadow:var(--shadow)}
+
+    /* Conditions vs doses */
+    .g-moderow{display:none;align-items:center;gap:8px;margin-bottom:12px}
+    .g-mode-btn{border:none;font:inherit;font-size:13px;font-weight:700;padding:9px 16px;
+      border-radius:999px;background:var(--surface);color:var(--text-lt);
+      box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation}
+    .g-mode-btn.on{background:#0E7C5A;color:#fff}
+
     /* Search */
     .g-searchwrap{position:relative;margin-bottom:12px}
     .g-searchbox{display:flex;align-items:center;gap:10px;background:var(--surface);
@@ -115,6 +135,51 @@
     html[data-theme="dark"] .g-md-dose{color:#28D29B}
     .g-verify{font-size:11.5px;color:#C77E06;margin-top:9px;font-weight:600}
 
+    /* Children's book */
+    .g-head-who{background:linear-gradient(140deg,#123C6B 0%,#1565A8 60%,#1E86D0 100%);
+      box-shadow:0 14px 30px rgba(21,101,168,.28)}
+    .g-donot{background:#FDECEA;border-left:5px solid #C62828}
+    .g-donot h3{color:#C62828}
+    .g-donot .g-text{color:#7A1C1C;font-weight:600}
+    html[data-theme="dark"] .g-donot{background:#3A1A18}
+    html[data-theme="dark"] .g-donot .g-text{color:#FFC9C4}
+    .g-redflag{background:#FFF4E0;border-left:5px solid #E2960A}
+    html[data-theme="dark"] .g-redflag{background:#3A2E12}
+    .g-druglist{display:flex;flex-wrap:wrap;gap:8px}
+    .g-drugchip{border:1.5px solid var(--border);background:var(--bg);font:inherit;
+      font-size:13px;font-weight:700;color:#1565A8;padding:8px 13px;border-radius:999px;
+      cursor:pointer;touch-action:manipulation}
+    html[data-theme="dark"] .g-drugchip{color:#7FC4F5}
+    .g-tblcap{font-size:12px;font-weight:800;color:var(--text-lt);margin:10px 0 6px}
+    .g-tblcap:first-child{margin-top:0}
+    .g-md td,.g-md th{font-size:12.5px;vertical-align:top}
+    .g-md tr:first-child td{font-weight:700}
+
+    /* Weight → dose */
+    .g-wrow{display:flex;align-items:center;gap:9px}
+    .g-wrow input{width:110px;padding:12px 14px;border:1.5px solid var(--border);
+      border-radius:12px;font:inherit;font-size:17px;font-weight:700;background:var(--bg);
+      color:var(--text);outline:none}
+    .g-wrow input:focus{border-color:#1565A8}
+    .g-wrow span{font-size:15px;font-weight:700;color:var(--text-lt)}
+    .g-wclear{margin-left:auto;border:none;background:none;font:inherit;font-size:13px;
+      font-weight:700;color:var(--text-lt);cursor:pointer;padding:8px}
+    .g-wnote{font-size:12px;color:var(--text-lt);margin-top:9px}
+    .g-dfield{margin-bottom:10px}
+    .g-dfield span{display:block;font-size:11px;font-weight:800;text-transform:uppercase;
+      letter-spacing:.4px;color:var(--text-lt);margin-bottom:3px}
+    .g-dfield div{font-size:13.5px;color:var(--text);line-height:1.5}
+    .g-doses{min-width:0}
+    .g-doses td{font-size:13.5px}
+    .g-doses tr.g-hit td{background:#DBF4EA;font-weight:800}
+    html[data-theme="dark"] .g-doses tr.g-hit td{background:#123529}
+    .g-tick{display:inline-block;font-size:10px;font-weight:800;background:#0E7C5A;color:#fff;
+      padding:2px 7px;border-radius:999px;margin-left:6px;vertical-align:middle}
+    .g-chip.kg{background:#FFE0B2;color:#7A4F01}
+    .g-rowsrc{margin-top:10px}
+    .g-rowsrc summary{font-size:12px;font-weight:700;color:var(--text-lt);cursor:pointer}
+    .g-rowsrc .g-src{margin-top:8px;max-height:40vh}
+
     /* Source panel */
     .g-source{border:1.5px solid var(--brand-tint,#DBF4EA)}
     .g-srcnote{font-size:11.5px;color:var(--text-lt);margin-bottom:9px}
@@ -155,10 +220,30 @@
         <div class="g-disclaimer">
           <span class="material-icons-outlined">warning_amber</span>
           <div><strong>Reference only — not a prescribing authority.</strong> These entries are a
-          parsed mirror of the <strong>Uganda Clinical Guidelines 2023</strong> (Ministry of Health).
+          parsed mirror of the <strong>Uganda Clinical Guidelines 2023</strong> (Ministry of Health)
+          and the <strong>WHO pocket book of primary health care for children and adolescents</strong>.
           Parsed fields are produced by automatic text extraction and may be incomplete.
           <strong>Always verify dosages and treatment against the source guideline text</strong>
           (shown at the bottom of every card) before prescribing.</div>
+        </div>
+
+        <div class="g-books">
+          <button type="button" class="g-book-btn on" data-book="ucg">
+            <b>All ages</b><span>Uganda Clinical Guidelines 2023</span></button>
+          <button type="button" class="g-book-btn" data-book="who">
+            <b>Children</b><span>WHO pocket book · doses by weight</span></button>
+        </div>
+
+        <div class="g-whonote" id="gWhoNote">
+          <strong>WHO pocket book of primary health care for children and adolescents.</strong>
+          Every dose in it is worked out per kilogram of the child’s body weight. Open
+          <strong>Child doses</strong>, type the weight, and the app highlights the column the
+          book prints for that child — it never calculates a dose of its own.
+        </div>
+
+        <div class="g-moderow" id="gModeRow">
+          <button type="button" class="g-mode-btn on" data-mode="conditions">Conditions</button>
+          <button type="button" class="g-mode-btn" data-mode="doses">Child doses</button>
         </div>
 
         <div class="g-searchwrap">
@@ -170,12 +255,14 @@
           <div id="gResults"></div>
         </div>
 
-        <div class="g-sevrow">
+        <div class="g-sevrow" id="gSevRow">
           <span class="lbl">Severity</span>
           <button class="g-sev-btn" data-sev="mild">Mild</button>
           <button class="g-sev-btn" data-sev="moderate">Moderate</button>
           <button class="g-sev-btn" data-sev="severe">Severe</button>
-          <span id="gDbInfo" style="margin-left:auto;font-size:11px;color:var(--text-lt)"></span>
+        </div>
+        <div style="text-align:right;margin:-6px 2px 14px">
+          <span id="gDbInfo" style="font-size:11px;color:var(--text-lt)"></span>
         </div>
 
         <div id="gStatus"></div>
@@ -194,6 +281,6 @@
   <script src="js/vendor/sql-wasm.js"></script>
   <script src="../js/config.js"></script>
   <script src="js/clinic.js?v=20260831"></script>
-  <script src="js/guidelines.js?v=20260820"></script>
+  <script src="js/guidelines.js?v=20260908"></script>
 </body>
 </html>

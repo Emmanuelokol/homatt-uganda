@@ -563,7 +563,7 @@ window.HomattPace = (function () {
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v139';
+var HOMATT_BUILD = 'v140';
 window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattBuildLine() {

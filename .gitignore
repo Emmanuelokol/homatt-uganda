@@ -20,3 +20,4 @@ android/app/build/
 desktop/app
 desktop/dist
 desktop/node_modules
+__pycache__/
