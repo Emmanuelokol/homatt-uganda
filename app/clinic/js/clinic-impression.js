@@ -189,7 +189,7 @@
   function buildIndex(db) {
     var docs = [], df = {}, total = 0;
     var st = db.prepare('SELECT id,kind,title,title_normalized,page,src,cond_id,' +
-                        'has_features,f1,f2,f3 FROM docs');
+                        'has_features,sex,age,f1,f2,f3 FROM docs');
     while (st.step()) {
       var r = st.getAsObject();
       var key = r.kind === 'diff' ? 'diff' : (r.has_features ? 'ucg_feat' : 'ucg_raw');
@@ -205,6 +205,7 @@
       total += dl;
       docs.push({ kind: r.kind, title: r.title, norm: r.title_normalized,
                   page: r.page, src: r.src, cid: r.cond_id, has: r.has_features,
+                  sex: r.sex || null, age: r.age || null,
                   tf: tf, dl: dl,
                   text: ((r.f1 || '') + ' ' + (r.f2 || '') + ' ' + (r.f3 || '')).toLowerCase() });
     }
@@ -254,6 +255,17 @@
     return out;
   }
 
+  // Paediatric (<5), Child (5-12), Adult (>12). Months are accepted because a
+  // Ugandan mother gives a baby's age in months, not in fractions of a year.
+  function ageBand(age, unit) {
+    var a = parseFloat(age);
+    if (!isFinite(a) || a < 0) return '';
+    var years = /month/i.test(String(unit || '')) ? a / 12 : a;
+    if (years < 5) return 'paediatric';
+    if (years <= 12) return 'child';
+    return 'adult';
+  }
+
   function idfOf(t) {
     var df = IX.df[t] || 0;
     return Math.log(1 + (IX.N - df + 0.5) / (df + 0.5));
@@ -280,10 +292,24 @@
     terms.forEach(function (t) { idf[t] = idfOf(t); totIdf += idf[t]; });
     totIdf = totIdf || 1;
 
+    // ── Who the patient is, before anything is scored ────────────────────
+    //
+    // Offering Ectopic Pregnancy for a man, or Benign Prostatic Hyperplasia
+    // for a woman, destroys a clinician's trust in the whole list. 83 of the
+    // conditions can only happen to one sex.
+    //
+    // When the sex has NOT been recorded, every one of those is held back and
+    // the screen says how many and why — a blank field must not quietly widen
+    // the differential.
+    var sex = String(input.sex || '').toLowerCase().charAt(0);   // 'm' | 'f' | ''
+    var band = ageBand(input.age, input.ageUnit);
+    var blocked = 0;
+
     // BM25 over every document. 713 of them — a few milliseconds.
     var bykind = { diff: [], ucg: [] };
     for (var i = 0; i < IX.docs.length; i++) {
       var d = IX.docs[i], s = 0;
+      if (d.sex && (!sex || d.sex !== sex)) { blocked++; continue; }
       for (var j = 0; j < terms.length; j++) {
         var f = d.tf[terms[j]];
         if (!f) continue;
@@ -342,7 +368,8 @@
       o.pct = Math.max(5, Math.min(95, Math.round(100 * o.rank)));
       o.tests = testsFor(o);
     });
-    return { ready: true, items: out, flags: vitalFlags(input.vitals), terms: terms };
+    return { ready: true, items: out, flags: vitalFlags(input.vitals), terms: terms,
+             sexBlocked: sex ? 0 : blocked, band: band };
   }
 
   // ── What would confirm it ───────────────────────────────────────────────
@@ -369,6 +396,7 @@
     ready: ready,
     suggest: suggest,
     vitalFlags: vitalFlags,
+    ageBand: ageBand,
     _toks: toks,          // exposed so the tests can check parity with the tuning
     _size: function () { return IX ? IX.N : 0; },
   };

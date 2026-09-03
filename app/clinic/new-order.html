@@ -422,6 +422,22 @@
     html[data-theme="dark"] .it-debt{background:#3A1A18}
     html[data-theme="dark"] .it-debt i{color:#F3B7B2}
 
+    .it-sex{display:flex;gap:7px}
+    .it-sex-btn{flex:1;border:1.5px solid var(--border);background:var(--bg);font:inherit;
+      font-size:13.5px;font-weight:700;color:var(--text-lt);padding:11px 8px;border-radius:11px;
+      cursor:pointer;touch-action:manipulation}
+    .it-sex-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-age{display:flex;gap:6px;align-items:center}
+    .it-age input{flex:1;min-width:0;text-align:center;font-weight:700}
+    .it-unit{border:1.5px solid var(--border);background:var(--bg);font:inherit;font-size:11.5px;
+      font-weight:700;color:var(--text-lt);padding:9px 8px;border-radius:9px;cursor:pointer;
+      touch-action:manipulation}
+    .it-unit.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-whonote{display:none;font-size:11.5px;line-height:1.5;border-radius:10px;
+      padding:9px 11px;margin-top:11px;background:#FFF4E0;color:#7A4F01}
+    .it-whonote.child{background:var(--brand-tint);color:var(--brand-ink)}
+    html[data-theme="dark"] .it-whonote{background:#3A2E12;color:#FFD98A}
+
     .it-tabs{display:flex;gap:7px;margin:6px 0 12px}
     .it-tab{flex:1;position:relative;border:none;font:inherit;text-align:left;
       padding:10px 12px;border-radius:13px;background:var(--surface);
@@ -500,6 +516,13 @@
     .it-pulse{animation:itPulse 1.1s ease-in-out 2}
     @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
     @media (max-width:380px){ .it-tab i{display:none} .it-vitals{grid-template-columns:1fr} }
+
+    .ucg-childwarn{font-size:12px;color:#7A1C1C;background:#FDECEA;border-radius:9px;
+      padding:9px 11px;margin-top:8px;line-height:1.5}
+    html[data-theme="dark"] .ucg-childwarn{background:#3A1A18;color:#FFC9C4}
+    .ucg-unpriced{font-size:11.5px;color:#7A5206;background:#FCEFCF;border-radius:9px;
+      padding:8px 10px;margin-top:8px;line-height:1.5}
+    html[data-theme="dark"] .ucg-unpriced{background:#372C11;color:#F2D79A}
 
     /* ── One-tap package button ─────────────────────────────────── */
     .ucg-onetap{display:flex;align-items:center;gap:12px;width:100%;margin-top:16px;
@@ -635,6 +658,25 @@
                 placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
             </div>
           </div>
+          <div class="pt-two" style="margin-top:12px">
+            <div>
+              <label class="field-label">Sex</label>
+              <div class="it-sex">
+                <button type="button" class="it-sex-btn" data-sex="female">Female</button>
+                <button type="button" class="it-sex-btn" data-sex="male">Male</button>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" for="itAge">Age</label>
+              <div class="it-age">
+                <input id="itAge" class="field-input" inputmode="numeric" placeholder="e.g. 28">
+                <button type="button" class="it-unit on" data-unit="years">yrs</button>
+                <button type="button" class="it-unit" data-unit="months">mths</button>
+              </div>
+            </div>
+          </div>
+          <div id="itWhoNote" class="it-whonote"></div>
+
           <!-- Shows the moment a name or number matches an unpaid visit. -->
           <div id="itDebt" class="it-debt"></div>
           <div class="helper" id="quickPatientHelper"><b>Optional</b> — leave it blank if you are busy and add it later; the case number identifies the patient either way. It is asked first because the bill, the follow-up and the phone call all hang on it.</div>
@@ -1270,10 +1312,10 @@
 <script src="js/msg-alerts.js?v=20260829"></script>
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/stock-blueprints.js?v=20260906"></script>
-<script src="js/new-order-wizard.js?v=20260905"></script>
-<script src="js/ucg-autofill.js?v=20260908"></script>
-<script src="js/clinic-impression.js?v=20260908"></script>
-<script src="js/clinic-intake.js?v=20260908"></script>
+<script src="js/new-order-wizard.js?v=20260910"></script>
+<script src="js/ucg-autofill.js?v=20260910"></script>
+<script src="js/clinic-impression.js?v=20260910"></script>
+<script src="js/clinic-intake.js?v=20260910"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
 </body>

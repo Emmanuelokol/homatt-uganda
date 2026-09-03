@@ -43,10 +43,14 @@ CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 --
 --   kind 'diff' : f1 = diagnosis, f2 = presenting symptom, f3 = what is in its favour
 --   kind 'ucg'  : f1 = title,     f2 = clinical features,  f3 = investigations
+-- sex: 'f' / 'm' when the condition can only occur in one sex, NULL otherwise.
+-- age: 'child' when the chapter is paediatric, NULL otherwise.
+-- A suggestion engine that offers Ectopic Pregnancy for a man, or Benign
+-- Prostatic Hyperplasia for a woman, is not one a clinician can trust.
 CREATE TABLE docs (
   id INTEGER PRIMARY KEY, kind TEXT, title TEXT, title_normalized TEXT,
   page INTEGER, src TEXT, cond_id INTEGER, has_features INTEGER,
-  f1 TEXT, f2 TEXT, f3 TEXT);
+  sex TEXT, age TEXT, f1 TEXT, f2 TEXT, f3 TEXT);
 CREATE INDEX idx_docs_kind ON docs(kind);
 CREATE INDEX idx_docs_name ON docs(title_normalized);
 
@@ -90,6 +94,29 @@ NOT_A_TEST = re.compile(
     r'^(as (above|below|indicated)|if (available|indicated|possible)|none|'
     r'not (routinely )?(required|indicated|necessary)|depending|other|others|'
     r'refer|consider|see |according|where available)\b', re.I)
+
+
+# Conditions that can only happen to one sex. Chapter first — the UCG files
+# gynaecology, family planning and obstetrics in chapters of their own — then
+# the title, which catches the ones filed elsewhere: ectopic pregnancy under
+# emergencies, mastitis under skin.
+FEMALE_CHAPTERS = {14, 15, 16}
+FEMALE_RX = re.compile(
+    r'\b(pregnan|obstetric|gyn(?:a)?ecolog|labour|postnatal|antenatal|puerper|'
+    r'menstrua|menopaus|uterine|uterus|vagina|vulv|cervic|ovarian|ovary|'
+    r'lactation|eclampsia|abortion|ectopic|pelvic inflammatory|fibroid|'
+    r'endometri|mastitis|contracept|breast feed)', re.I)
+MALE_RX = re.compile(
+    r'\b(prostat|testic|scrotal|scrotum|penile|penis|epididym|phimosis|erectile)', re.I)
+CHILD_CHAPTERS = {17, 18}
+
+
+def sex_of(title, chapter):
+    if chapter in FEMALE_CHAPTERS or FEMALE_RX.search(title or ''):
+        return 'f'
+    if MALE_RX.search(title or ''):
+        return 'm'
+    return None
 
 
 def norm(s):
@@ -171,18 +198,19 @@ def main(who_path, ucg_path, out_path):
     for r in who.execute('SELECT symptom, caption, diagnosis, diagnosis_normalized, '
                          'page, in_favour FROM differentials'):
         db.execute('INSERT INTO docs(kind,title,title_normalized,page,src,cond_id,'
-                   'has_features,f1,f2,f3) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                   'has_features,sex,age,f1,f2,f3) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                    ('diff', r['diagnosis'], r['diagnosis_normalized'], r['page'],
                     'WHO ' + re.sub(r'\.\s*Differential.*', '', r['caption'] or ''),
-                    None, 1, r['diagnosis'], r['symptom'], r['in_favour']))
+                    None, 1, sex_of(r['diagnosis'], None), 'child',
+                    r['diagnosis'], r['symptom'], r['in_favour']))
         n_dif += 1
 
     # The Uganda guidelines, as short documents: the title, the clinical
     # features, the investigations. Not the full chapter text — that is where
     # the noise lives, and it is 6 MB.
     n_ucg = 0
-    for r in ucg.execute('SELECT id, title, page, clinical_features, investigations, '
-                         'full_text FROM conditions'):
+    for r in ucg.execute('SELECT id, title, page, chapter_number, clinical_features, '
+                         'investigations, full_text FROM conditions'):
         if NOT_DX.search(r['title'] or ''):
             continue
         feats = trim_field(r['clinical_features'])
@@ -190,9 +218,11 @@ def main(who_path, ucg_path, out_path):
         if not feats:
             feats = re.sub(r'\s+', ' ', (r['full_text'] or ''))[:1200]
         db.execute('INSERT INTO docs(kind,title,title_normalized,page,src,cond_id,'
-                   'has_features,f1,f2,f3) VALUES (?,?,?,?,?,?,?,?,?,?)',
+                   'has_features,sex,age,f1,f2,f3) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
                    ('ucg', r['title'], norm(r['title']), r['page'], 'UCG 2023',
-                    r['id'], has, r['title'], feats, r['investigations'] or ''))
+                    r['id'], has, sex_of(r['title'], r['chapter_number']),
+                    'child' if r['chapter_number'] in CHILD_CHAPTERS else None,
+                    r['title'], feats, r['investigations'] or ''))
         n_ucg += 1
 
     # Confirming tests — ONLY from the guideline's own "Investigations"
@@ -244,6 +274,11 @@ def main(who_path, ucg_path, out_path):
     db.commit()
     print(f'  differentials : {n_dif}')
     print(f'  ucg documents : {n_ucg}')
+    n_sex = db.execute("SELECT COUNT(*) FROM docs WHERE sex IS NOT NULL").fetchone()[0]
+    n_f = db.execute("SELECT COUNT(*) FROM docs WHERE sex = 'f'").fetchone()[0]
+    n_child = db.execute("SELECT COUNT(*) FROM docs WHERE age = 'child'").fetchone()[0]
+    print(f'  sex-specific  : {n_sex} ({n_f} female-only, {n_sex - n_f} male-only)')
+    print(f'  paediatric    : {n_child}')
     print(f'  dx_tests      : {n_t}  ({n_named} with named, orderable tests)')
     print(f'  lab map       : {len(LAB_MAP)} test names read from ucg-autofill.js')
     print(f'  file size     : {os.path.getsize(out_path)/1024:.0f} KB')

@@ -605,6 +605,9 @@
       return {
         drug: m.name + (m.dose ? ' ' + m.dose + (m.unit || '') : ''),
         dosage: (m.dose ? m.dose + (m.unit || '') : '') + (m.route ? ' ' + m.route : ''),
+        // Kept as its own field, not only glued into the dosage text, so the
+        // "is this given here?" test can read it directly.
+        route: m.route || '',
         timesPerDay: tpd, durationDays: dd,
         qty: tpd * dd,
         from: 'guideline',
@@ -643,7 +646,14 @@
         // a 500 ml bag of Dextrose ended up as ten of something. Whatever runs
         // into a vein starts at ONE — one bag, one ampoule — and the clinician
         // sets the real number.
-        timesPerDay: 2, durationDays: 5, qty: 10,
+        //
+        // The comment said that; the code did not do it. Saline and
+        // hydrocortisone were still arriving as 2/day for 5 days = qty 10 in
+        // the anaphylaxis and emergency packages, which is ten bags of fluid
+        // on the bill. Now the shape of the thing decides.
+        timesPerDay: _once(mm.name) ? 1 : 2,
+        durationDays: _once(mm.name) ? 1 : 5,
+        qty:          _once(mm.name) ? 1 : 10,
         from: 'guideline-text',
         group: 'treatment',
         selected: false,
@@ -667,6 +677,65 @@
     // "Alternative in pregnancy" above the ciprofloxacin everyone gets. The
     // badges say which is which; the order stays as printed.
 
+    // ── What comes through TICKED ────────────────────────────────────────
+    //
+    // Everything the guideline lists still ARRIVES — nothing is hidden, and
+    // one tap adds any of it. What changed is what is ticked, and therefore
+    // what gets prescribed and billed if the clinician just taps through.
+    //
+    // Ticking everything was dangerous, not merely untidy. Typing
+    // "Uncomplicated Malaria" produced a package with artesunate, quinine,
+    // phenobarbital IM, furosemide, IV diazepam, Dextrose 5%, sodium
+    // bicarbonate 8.4% and saline ALL TICKED: the severe, inpatient protocol,
+    // pre-selected and pre-billed for an outpatient who needs three days of
+    // oral ACT. (The two sections share a page in the book, so the parser gave
+    // the uncomplicated heading the severe page's medicines.)
+    //
+    // So the default now follows the guideline's own ranking and the severity
+    // the clinician chose:
+    //   • first-line oral treatment          -> ticked
+    //   • alternatives and second line        -> shown, not ticked
+    //   • anything run into a vein            -> only for severe / critical
+    //   • supportive drugs and drips          -> only for severe / critical
+    // For uncomplicated malaria that leaves exactly one thing ticked:
+    // artemether/lumefantrine. For severe malaria the whole protocol comes
+    // back, because that is when it is right.
+    function defaultSelected(d, isChosen) {
+      var g = d.group || 'treatment';
+      if (g === 'other') return false;
+      var sev = String(ctx.severity || '').toLowerCase();
+      var heavy = (sev === 'severe' || sev === 'critical');
+      // Into a vein, or hung on a stand: a clinic decision for a sick patient,
+      // never a default for someone walking out with tablets.
+      if (g === 'fluid') return heavy;
+      if (isGivenHere(d)) return heavy;
+      if (/\b(IV|IM|intravenous|intramuscular|infusion|rectal)\b/i.test(
+            String(d.dosage || '') + ' ' + String(d.text || ''))) return heavy;
+      // "For complications" — which this patient may not have.
+      if (g === 'supportive') return heavy;
+      // A CHILD DOES NOT GET AN ADULT DOSE.
+      //
+      // Every figure in the Uganda guidelines' medicines table is an adult
+      // dose. Ticking one for a five-year-old and letting the clinician tap
+      // through would hand a child an adult's tablets. So when the age says
+      // paediatric or child, nothing arrives ticked at all, and the package
+      // says to take the dose from the children's weight-band table instead.
+      if (_isChild()) return false;
+
+      // Treatment: the book's first choice, and only that one.
+      //
+      // A patient gets ONE antimalarial, not four. Ticking every option the
+      // chapter lists is how artesunate, quinine and sulphadoxine all arrived
+      // ticked beside the artemether/lumefantrine that was actually indicated
+      // — three extra drugs, prescribed and billed, for a patient who needed
+      // three days of tablets.
+      //
+      // The trade-off is deliberate: a genuine combination (TB, H. pylori)
+      // needs a tap per drug. Under-ticking costs a tap; over-ticking gives a
+      // patient medicine they do not need and charges them for it.
+      return !!isChosen;
+    }
+
     // ── What comes through ready to give ─────────────────────────────────
     // Everything the guideline lists arrives included, with its dose, days and
     // quantity filled in. The clinician takes out what this patient is not
@@ -676,7 +745,15 @@
     // The only rows that stay out are the ones under "Also in the guideline":
     // those are lines of the book's text, not medicines, and there is nothing
     // to prescribe or deduct for them.
-    drugs.forEach(function (d) { d.selected = (d.group || 'treatment') !== 'other'; });
+    // The guideline's first choice — the one drug that comes ticked.
+    var chosen = -1;
+    drugs.forEach(function (d, i) {
+      if (chosen < 0 && (d.group || 'treatment') === 'treatment' && d.rank === 'first') chosen = i;
+    });
+    if (chosen < 0) drugs.forEach(function (d, i) {
+      if (chosen < 0 && (d.group || 'treatment') === 'treatment') chosen = i;
+    });
+    drugs.forEach(function (d, i) { d.selected = defaultSelected(d, i === chosen); });
 
     return {
       tests: extractTests(c.investigations, c.full_text),
@@ -948,6 +1025,20 @@
       hint: 'The guideline says this, but it is not a medicine the app can add for you — use the search below.' },
   ];
 
+  // Is this thing hung, pushed or infused rather than handed over? Used before
+  // a drug object exists, so it works from the name alone.
+  var ONCE_RX = /(sodium chloride|normal saline|ringer|hartmann|dextrose|glucose\s*(5|10|50)|water for injection|sodium bicarbonate|blood|plasma|platelet|hydrocortisone|adrenaline|epinephrine|oxygen)/i;
+  function _once(name) { return ONCE_RX.test(String(name || '')); }
+
+  // Under 13, by the age recorded on the intake screen. Module level on
+  // purpose: both the package builder and the sheet that renders it need it.
+  function _isChild() {
+    try {
+      var b = (state && state.ageBand) || '';
+      return b === 'paediatric' || b === 'child';
+    } catch (e) { return false; }
+  }
+
   // ── Things run into a vein, not handed over a counter ────────────────────
   // A drip, an infusion or an IV ampoule is administered AT THE CLINIC. The
   // "×/day for N days" model belongs to tablets and does not describe it: one
@@ -955,8 +1046,15 @@
   // "QTY 10" and a shelf reading "-30 tabs" of a 500 ml bottle.
   function isGivenHere(d) {
     if ((d.group || '') === 'fluid') return true;
-    var t = (String(d.drug || '') + ' ' + String(d.dosage || '')).toLowerCase();
-    return /\biv\b|\bim\b|infusion|injection|inject|ampoule|\bamp\b|drip/.test(t);
+    // The guideline's own parsed route counts too, not only what the dosage
+    // text happens to spell out. "diazepam 2.5 mg RECTAL for sedation" was
+    // being read as tablets and dispensed as 2/day for 5 days — ten rectal
+    // tubes, for one dose given here.
+    if (/^(IV|IM|SC|IO|RECTAL|RECTALLY|INTRANASAL|SUBLINGUAL|NEBULIZED|NEBULISED|INHAL\w*)$/i
+        .test(String(d.route || '').trim())) return true;
+    var t = (String(d.drug || '') + ' ' + String(d.dosage || '') + ' ' +
+             String(d.text || '')).toLowerCase();
+    return /\biv\b|\bim\b|\bsc\b|infusion|injection|inject|ampoule|\bamp\b|drip|rectal|suppositor|nebuli[sz]|per rectum/.test(t);
   }
   // The word for one of them, taken from what the clinic actually stocks where
   // that is known, and from the blueprint otherwise. Never "tabs" for a drip.
@@ -1108,7 +1206,44 @@
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
+  // ── What this visit costs, worked out from what is actually ticked ───────
+  //
+  // The bill used to be two empty boxes. Removing a lab test or crossing out a
+  // medicine changed nothing, because the total was never derived from them —
+  // it was whatever someone typed, and it started at zero. A clinician could
+  // take four drugs off a package and still charge for them.
+  //
+  // Now every re-render reprices from the list: lab from the clinic's own price
+  // list, medicines from its own shelf price times the quantity being given.
+  // Both boxes stay editable, but the moment the list changes the figure
+  // follows the list — which is the point.
+  //
+  // A medicine the clinic has never priced counts as zero and SAYS so, rather
+  // than quietly making itself free.
+  function reprice() {
+    if (!pkg) return;
+    var lab = 0;
+    (pkg.tests || []).forEach(function (t) {
+      try { lab += (window.HomattPrices ? window.HomattPrices.lab(t) : 0) || 0; } catch (e) {}
+    });
+    var meds = 0, unpriced = 0;
+    pkg.drugs.forEach(function (d) {
+      if (!d.selected || (d.group || 'treatment') === 'other') return;
+      var unit = 0;
+      try {
+        var row = matchStockRow(d.drug, d.dosage);
+        unit = Number(row && (row.selling_price || row.unit_price_ugx)) || 0;
+      } catch (e) {}
+      if (unit > 0) meds += unit * (Number(d.qty) || 0);
+      else unpriced++;
+    });
+    pkg.fees.lab = Math.round(lab);
+    pkg.fees.meds = Math.round(meds);
+    pkg.unpricedDrugs = unpriced;
+  }
+
   function render() {
+    reprice();
     var b = document.getElementById('ucgBody');
     var giveable = pkg.drugs.filter(function (d) { return (d.group || 'treatment') !== 'other'; });
     var nGiveable = giveable.length;
@@ -1155,10 +1290,12 @@
               'nothing is prescribed, and nothing leaves the shelf, until you do.</span></div>'
             : (nSel ? '<div class="ucg-pick ok" id="ucgPick">' +
               '<span class="material-icons-outlined">check_circle</span>' +
-              '<span><b>All ' + nSel + '</b> ' + (nSel === 1 ? 'medicine is' : 'medicines are') +
-              ' ready to give, with doses filled in. Take out what this patient is not ' +
-              'getting with <b>×</b> — only what is left is prescribed and comes off the shelf.' +
-              '</span></div>' : '')) +
+              '<span><b>' + nSel + ' of ' + nGiveable + '</b> ready to give' +
+              (nSel === 1 ? ' — the guideline\'s first choice, with the dose filled in' : '') +
+              '. The rest are listed below with what the book calls them ' +
+              '(first line, alternative, second line): tap <b>+</b> to add any of them, ' +
+              '<b>×</b> to take one out. Only what is ticked is prescribed and comes ' +
+              'off the shelf.</span></div>' : '')) +
           (pkg.drugs.length ? drugGroupsHtml() :
             '<div style="font-size:12.5px;color:var(--text-lt);padding:2px 0 6px">No medicines suggested — add one.</div>') +
         '</div>' +
@@ -1177,6 +1314,30 @@
         '</div>' +
         '<div class="ucg-total"><span>Total charged</span><b id="ucgTotal">UGX ' +
           ((pkg.fees.consult || 0) + (pkg.fees.lab || 0) + (pkg.fees.meds || 0)).toLocaleString('en-UG') + '</b></div>' +
+          (_isChild()
+            ? '<div class="ucg-childwarn"><b>This is a child.</b> Nothing is ticked, ' +
+              'because every dose in this book is an adult dose. Take the dose from ' +
+              'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
+              '</div>'
+            : '') +
+          (pkg.unpricedDrugs
+            ? '<div class="ucg-unpriced">' + pkg.unpricedDrugs + ' ticked medicine' +
+              (_isChild()
+            ? '<div class="ucg-childwarn"><b>This is a child.</b> Nothing is ticked, ' +
+              'because every dose in this book is an adult dose. Take the dose from ' +
+              'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
+              '</div>'
+            : '') +
+          (pkg.unpricedDrugs !== 1 ? 's are' : ' is') + ' not priced in your stock, so ' +
+              (_isChild()
+            ? '<div class="ucg-childwarn"><b>This is a child.</b> Nothing is ticked, ' +
+              'because every dose in this book is an adult dose. Take the dose from ' +
+              'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
+              '</div>'
+            : '') +
+          (pkg.unpricedDrugs !== 1 ? 'they add' : 'it adds') + ' nothing to this total. ' +
+              'Set a selling price in Stock, or type the figure above.</div>'
+            : '') +
         // Saving straight from here means the money has to be settled here too.
         // "Paid" writes to the payments ledger, so it shows in Money In at once.
         '<div class="ucg-paylbl">Payment</div>' +
@@ -1378,6 +1539,15 @@
     return html || '<div style="font-size:12.5px;color:var(--text-lt)">No extra guideline detail for this section.</div>';
   }
 
+  // Update the money without touching the rest of the sheet.
+  function repaintMoney() {
+    reprice();
+    var l = document.getElementById('ucgFeeL'), m = document.getElementById('ucgFeeM');
+    if (l && document.activeElement !== l) l.value = pkg.fees.lab || 0;
+    if (m && document.activeElement !== m) m.value = pkg.fees.meds || 0;
+    recalc();
+  }
+
   function recalc() {
     var t = (Number(pkg.fees.consult) || 0) + (Number(pkg.fees.lab) || 0) + (Number(pkg.fees.meds) || 0);
     var el = document.getElementById('ucgTotal');
@@ -1421,7 +1591,13 @@
       };
     });
     body.querySelectorAll('[data-qt]').forEach(function (inp) {
-      inp.onchange = function () { pkg.drugs[Number(inp.dataset.qt)].qty = Math.max(0, Number(inp.value) || 0); };
+      inp.onchange = function () {
+        pkg.drugs[Number(inp.dataset.qt)].qty = Math.max(0, Number(inp.value) || 0);
+        // Reprice, but do NOT rebuild the sheet — the clinician's finger is in
+        // this box. Changing 10 tablets to 20 used to leave the bill on the old
+        // figure, so the patient was charged for ten.
+        repaintMoney();
+      };
     });
     ['C:consult', 'L:lab', 'M:meds'].forEach(function (pair) {
       var p = pair.split(':'), el = document.getElementById('ucgFee' + p[0]);
@@ -2534,5 +2710,30 @@
   // disagree.
   window.UCGPackage = { start: start, open: open, close: close, suggestDx: suggestDx,
                         formatNotes: glHtml, openDb: openDb, extractTests: extractTests,
-                        db: function () { return db; } };
+                        db: function () { return db; },
+                        // Audit hook: build a package without opening the sheet,
+                        // so every condition in the book can be checked at once.
+                        _build: function (condId, sev) {
+                          // Same path the screen takes: a section with no
+                          // medicines of its own is built from the relative's
+                          // page it borrows from, or the audit would test a
+                          // package no clinician ever sees.
+                          var row = rows('SELECT id,title,page FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+                          var src = (row && borrowSource(row)) || row || { id: condId };
+                          ctx = { conditionId: src.id, title: (row && row.title) || '',
+                                  severity: sev || '', page: src.page || null, learned: false };
+                          var p = buildFromGuideline(src.id, sev);
+                          // The screen normalises before it renders: a drip is
+                          // one bag, not "twice a day for five days". The audit
+                          // has to see the same numbers the clinician does.
+                          normaliseGivenHere(p);
+                          // Tag each line with the shape the app dispenses it
+                          // in, so an audit can apply the right arithmetic
+                          // rather than assuming everything is a tablet.
+                          p.drugs.forEach(function (d) {
+                            d.shape = isGivenHere(d) ? 'given-here'
+                                    : isWholeContainer(d) ? 'container' : 'unit';
+                          });
+                          return p;
+                        } };
 })();

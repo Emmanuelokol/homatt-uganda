@@ -105,6 +105,27 @@
     if (el) el.textContent = total.toLocaleString('en-UG');
   }
 
+  // The clinic's own price list, shared with the one-tap package so a test
+  // costs the same figure wherever it is added. Custom tests a clinic added
+  // itself are read from its own saved list.
+  window.HomattPrices = {
+    lab: function (name) {
+      var n = String(name || '').trim();
+      if (LAB_PRICES[n] != null) return Number(LAB_PRICES[n]) || 0;
+      try {
+        var list = JSON.parse(localStorage.getItem(_customLabKey()) || '[]');
+        for (var i = 0; i < list.length; i++) {
+          var it = list[i];
+          if (typeof it === 'object' && it && String(it.name || '').trim() === n) {
+            return Number(it.price || it.fee || 0) || 0;
+          }
+        }
+      } catch (e) {}
+      return 0;
+    },
+    all: function () { return LAB_PRICES; },
+  };
+
   function autoFillLabFee() {
     const total = state.labTests.reduce((s, t) => s + (LAB_PRICES[t] || 0), 0);
     const el = document.getElementById('feeLab');

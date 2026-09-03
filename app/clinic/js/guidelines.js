@@ -329,7 +329,20 @@
       '<h2>' + esc(c.title) + '</h2>' +
       '<div class="g-chips">' +
         (c.chapter_title ? '<span class="g-chip">Ch ' + esc(c.chapter_number || '') + ' · ' + esc(c.chapter_title) + '</span>' : '') +
-        (c.icd10 ? '<span class="g-chip icd">ICD-10 ' + esc(c.icd10) + '</span>' : '') +
+        // ICD-10 IS DELIBERATELY NOT SHOWN.
+        //
+        // The code in this database is unreliable: the parser took the first
+        // ICD-like token on the page, which usually belongs to a neighbouring
+        // condition. Spot-checking twelve well-known conditions, nine were
+        // wrong — peptic ulcer disease carried K86.0 (chronic pancreatitis),
+        // typhoid A75.9 (typhus), appendicitis K85 (acute pancreatitis),
+        // meningitis B45.1 (cryptococcosis), measles A80.3 (polio). 351 of the
+        // 535 conditions carry one of these.
+        //
+        // A wrong ICD-10 on a clinician's screen is worse than none: it goes
+        // onto forms, claims and returns. It stays hidden until the codes are
+        // rebuilt and verified against the real classification.
+        '' +
         (c.page ? '<span class="g-chip">UCG 2023 p.' + esc(c.page) + '</span>' : '') +
         (_sevSel ? '<span class="g-chip sev">' + esc(_sevSel) + '</span>' : '') +
       '</div></div>';

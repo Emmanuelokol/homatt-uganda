@@ -48,6 +48,10 @@ book and the 6 MB UCG file are not needed for this to work.
   +0.06), from its own one-tap history. That is the clinic's own data — not an
   invented claim about Ugandan epidemiology, which these two books cannot
   support.
+- **Sex and age gate the list before scoring.** 83 conditions can only happen
+  to one sex; until the sex is recorded every one is held back, and the count
+  is shown. Age is banded paediatric (<5) / child (5-12) / adult (>12), and a
+  child's package never arrives with an adult dose ticked.
 
 ### Why not SQLite FTS5
 
@@ -68,6 +72,11 @@ flatter it:
 | Given the findings the WHO book itself lists in favour of a diagnosis, is that diagnosis in the top 3? | **237 / 241 (98%)** |
 | Given half of a UCG condition's clinical features, is that condition in the top 3, competing against all 535? | **290 / 306 (94%)** |
 | Twelve presentations written by hand | 9 / 12 |
+
+Both benchmarks supply the patient's sex, because the engine holds sex-specific
+conditions back until it is recorded — measuring without it would measure the
+gate, not the retrieval. With the sex blank, 83 conditions are withheld and the
+screen says so.
 
 The three hand-written misses are answered with a clinically adjacent
 condition — *severe dehydration* for a dehydrated child with diarrhoea,
@@ -99,7 +108,11 @@ lab order, because a patient must not be billed for it.
   the two commonest reasons a Ugandan clinic runs a test. This is a defect in
   the existing `uganda_clinical_guidelines_2023.db` parse, not in this engine,
   and fixing it means rebuilding that database.
-- Two UCG conditions (Leprosy, Diphtheria) carry the *next* condition's
-  clinical features appended to their own. That is worked around here by
-  cutting the field at the runaway heading; the underlying database still has
-  it.
+- **About one UCG condition in six carries another condition's clinical
+  features.** Judged by hand on a random sample of 20: Hairy Leukoplakia shows
+  Kaposi's sarcoma, Nodding Disease shows migraine, Painful Scrotal Swelling
+  shows conjunctivitis, Prostatitis shows renal colic. Two of them (Leprosy,
+  Diphtheria) are worked around here by cutting the field at a runaway heading;
+  the rest are not, and cannot be without rebuilding that database. This
+  degrades the UCG half of the engine. The WHO differential half is unaffected
+  and is the one verified at 98%. See `AUDIT_2026-09.md`.

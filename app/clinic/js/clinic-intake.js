@@ -36,6 +36,7 @@
   function state() { return window._wizState || {}; }
 
   var data = {
+    sex: '', age: '', ageUnit: 'years',
     chief: '', subjective: '', background: '',
     vitals: { sbp: '', dbp: '', temp: '', weight: '', pulse: '' },
   };
@@ -47,6 +48,10 @@
   // so nothing can break for a clinic that has not run a migration.
   function summary() {
     var v = data.vitals, bits = [];
+    var who = [];
+    if (data.sex) who.push(data.sex.charAt(0).toUpperCase() + data.sex.slice(1));
+    if (data.age) who.push(data.age + ' ' + (data.ageUnit === 'months' ? 'months' : 'years'));
+    if (who.length) bits.push('Patient: ' + who.join(', '));
     if (data.chief.trim()) bits.push('Chief complaint: ' + data.chief.trim());
     if (data.subjective.trim()) bits.push('History: ' + data.subjective.trim());
     var vs = [];
@@ -60,9 +65,14 @@
   }
   function publish() {
     var s = state();
-    s.intake = { chief: data.chief, subjective: data.subjective,
+    s.intake = { sex: data.sex, age: data.age, ageUnit: data.ageUnit,
+                 chief: data.chief, subjective: data.subjective,
                  background: data.background, vitals: data.vitals,
                  summary: summary() };
+    s.patientSex = data.sex || '';
+    s.patientAgeYears = ageYears();
+    s.ageBand = (window.Impression && window.Impression.ageBand)
+      ? window.Impression.ageBand(data.age, data.ageUnit) : '';
     // The child's weight also answers the paediatric dosing question later.
     if (data.vitals.weight) s.patientWeightKg = data.vitals.weight;
   }
@@ -126,6 +136,7 @@
     var res;
     try {
       res = window.Impression.suggest({
+        sex: data.sex, age: data.age, ageUnit: data.ageUnit,
         chief: data.chief, subjective: data.subjective,
         background: data.background, vitals: data.vitals,
       }, 3);
@@ -151,6 +162,15 @@
       return;
     }
 
+    // Say plainly what is being held back and why — a blank sex field must
+    // never quietly narrow the differential without the clinician knowing.
+    if (res.sexBlocked) {
+      html += '<div class="it-flags"><div class="it-flag warn">' +
+        '<b>' + res.sexBlocked + ' conditions are being held back</b>' +
+        '<i>Set the patient\'s sex above. Until then, conditions that only affect ' +
+        'one sex — pregnancy, ectopic pregnancy, pelvic inflammatory disease, ' +
+        'prostate problems — are left out of this list.</i></div></div>';
+    }
     html += '<div class="it-imp-note">These are <b>suggestions from the books</b>, ' +
       'not a diagnosis. The figure is how strongly what you wrote matches how the ' +
       'guideline describes that condition — it is not a chance of having it. ' +
@@ -208,6 +228,35 @@
     }
     try { showToast('Diagnosis set to “' + it.title + '”. Tap the standard package.', 'success'); }
     catch (e) {}
+  }
+
+  function ageYears() {
+    var a = parseFloat(data.age);
+    if (!isFinite(a) || a < 0) return null;
+    return data.ageUnit === 'months' ? a / 12 : a;
+  }
+
+  // Who the patient is, in words, right under the name — including the warning
+  // that matters most: an adult dose is not a child's dose.
+  function paintWho() {
+    var el = $('itWhoNote');
+    if (!el) return;
+    var band = (window.Impression && window.Impression.ageBand)
+      ? window.Impression.ageBand(data.age, data.ageUnit) : '';
+    var msgs = [];
+    if (band === 'paediatric' || band === 'child') {
+      msgs.push('<b>This is a child (' + (band === 'paediatric' ? 'under 5' : '5–12') +
+        ').</b> Doses go by body weight, not by the adult figure. Put the weight in ' +
+        'Vitals, then use <b>Guidelines → Children → Child doses</b> for the ' +
+        'weight band. Nothing here fills in an adult dose for a child.');
+    }
+    if (!data.sex) {
+      msgs.push('Sex is not set, so conditions that only affect one sex are left out ' +
+        'of the suggestions.');
+    }
+    el.className = 'it-whonote' + (band === 'paediatric' || band === 'child' ? ' child' : '');
+    el.innerHTML = msgs.join('<br><br>');
+    el.style.display = msgs.length ? 'block' : 'none';
   }
 
   // ── Does this patient still owe the clinic? ─────────────────────────────
@@ -277,6 +326,29 @@
       if (b) b.addEventListener('click', function () { showTab(k); });
     });
 
+    Array.prototype.forEach.call(document.querySelectorAll('.it-sex-btn'), function (b) {
+      b.addEventListener('click', function () {
+        data.sex = (data.sex === b.dataset.sex) ? '' : b.dataset.sex;
+        Array.prototype.forEach.call(document.querySelectorAll('.it-sex-btn'), function (x) {
+          x.classList.toggle('on', x.dataset.sex === data.sex);
+        });
+        paintWho(); schedule();
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.it-unit'), function (b) {
+      b.addEventListener('click', function () {
+        data.ageUnit = b.dataset.unit;
+        Array.prototype.forEach.call(document.querySelectorAll('.it-unit'), function (x) {
+          x.classList.toggle('on', x.dataset.unit === data.ageUnit);
+        });
+        paintWho(); schedule();
+      });
+    });
+    var ageEl = $('itAge');
+    if (ageEl) ageEl.addEventListener('input', function () {
+      data.age = this.value; paintWho(); schedule();
+    });
+
     var chief = $('itChief'), subj = $('itSubjective'), back = $('itBackground');
     if (chief) chief.addEventListener('input', function () { data.chief = this.value; schedule(); });
     if (subj) subj.addEventListener('input', function () { data.subjective = this.value; schedule(); });
@@ -331,6 +403,7 @@
     try { t = localStorage.getItem('intake_tab') || '1'; } catch (e) {}
     showTab(t === '2' || t === '3' ? t : '1');
     marks();
+    paintWho();
     run();
 
     // Open the books in the background. Nothing waits on it: the nurse can
