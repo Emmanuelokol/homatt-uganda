@@ -2511,7 +2511,13 @@
       ward: state.ward || null,
       lab_tests_ordered: state.labTests,
       lab_results: state.labResults || null,
-      clinical_findings: state.labResults || null,
+      // The consultation itself — complaint, history, vitals, background —
+      // goes into clinical_findings, a column that already exists, so a clinic
+      // that has run no migration still keeps every word of it.
+      clinical_findings: [
+        (typeof window._intakeSummary === 'function' ? window._intakeSummary() : ''),
+        state.labResults || '',
+      ].filter(Boolean).join('\n') || null,
       patient_instructions: state.patientNotes || null,
       delivery_preference: state.stockSource === 'pharmacy' ? 'delivery' : 'pickup',
       treatment_plan: items.map(i => `${i.drug_name} ${i.strength} × ${i.duration}d`).join('; '),

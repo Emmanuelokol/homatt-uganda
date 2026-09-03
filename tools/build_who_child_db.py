@@ -682,6 +682,50 @@ def parse_drug_tables(tables, tokens):
     return [tuple(d) for d in keep], doses
 
 
+# ── 8. Differential diagnosis tables ───────────────────────────────────────
+DIFF_CAPTION = re.compile(r'differential diagnos[ei]s\s+(?:of|for)\s+(.+?)\s*$', re.I)
+# Rows that are a heading or a column label, not a diagnosis.
+NOT_A_DIAGNOSIS = re.compile(
+    r'^(a diagnosis|diagnosis|cause|causes|characteristics?|accompanying signs?|'
+    r'in favour|signs?|symptoms?|features?|finding|history|examination|other)$', re.I)
+
+
+def parse_differentials(tables):
+    """Turn the book's "Differential diagnosis of X" tables into rows.
+
+    Each row says: with this presenting symptom, this is a diagnosis to think
+    of, and these are the findings that count in its favour. That is precisely
+    what a clinician needs when the patient is in front of them, and it is the
+    one thing a guideline's prose cannot give quickly."""
+    out = []
+    for t in tables:
+        cap = (t['caption'] or '')
+        m = DIFF_CAPTION.search(cap)
+        if not m:
+            continue
+        symptom = re.sub(r'\s+', ' ', m.group(1)).strip(' .')
+        for line in t['body_md'].split('\n'):
+            row = line.strip()
+            if not row.startswith('|') or SEP_ROW.match(row):
+                continue
+            c = cells(row)
+            if len(c) < 2:
+                continue
+            name = re.sub(r'\*+', '', c[0]).strip()
+            favour = re.sub(r'\s+', ' ', re.sub(r'\*+', '', ' '.join(c[1:]))).strip()
+            if not name or not favour or len(name) > 70:
+                continue
+            if NOT_A_DIAGNOSIS.match(norm(name)) or len(norm(name)) < 3:
+                continue
+            pg = re.search(r'\(\s*p\.\s*(\d+)', name)
+            # The PDF hyphenated inside the cell: "Congenital hypo- thyroidism".
+            clean_name = re.sub(r'\s*\(\s*p\.\s*\d+\s*\)', '', name)
+            clean_name = re.sub(r'(\w)-\s+(\w)', r'\1\2', clean_name).strip(' .,;')
+            out.append((symptom, cap, clean_name, norm(clean_name),
+                        int(pg.group(1)) if pg else None, favour))
+    return out
+
+
 # ── Schema ─────────────────────────────────────────────────────────────────
 SCHEMA = """
 PRAGMA journal_mode=DELETE;
@@ -726,6 +770,18 @@ CREATE TABLE condition_drugs (
   drug_name TEXT, name_normalized TEXT);
 CREATE INDEX idx_cd_cond ON condition_drugs(condition_id);
 CREATE INDEX idx_cd_name ON condition_drugs(name_normalized);
+-- The book's 44 "Differential diagnosis of X" tables, one row per diagnosis.
+-- This is the most valuable thing in the book for a clinic: a mapping from
+-- what the patient presents with to what it might be, written by clinicians
+-- and stating, for each candidate, exactly what counts in its favour.
+CREATE TABLE differentials (
+  id INTEGER PRIMARY KEY, symptom TEXT, caption TEXT, diagnosis TEXT,
+  diagnosis_normalized TEXT, page INTEGER, in_favour TEXT, condition_id INTEGER);
+CREATE INDEX idx_dif_sym  ON differentials(symptom);
+CREATE INDEX idx_dif_name ON differentials(diagnosis_normalized);
+CREATE VIRTUAL TABLE differentials_fts USING fts5(
+  diagnosis, symptom, in_favour, content='differentials', content_rowid='id',
+  tokenize="unicode61");
 CREATE INDEX idx_cond_title ON conditions(title);
 CREATE INDEX idx_cond_chap  ON conditions(chapter_number);
 CREATE INDEX idx_tbl_cond   ON tables(condition_id);
@@ -945,6 +1001,21 @@ def main(src, dst, emhslu=None):
     db.executemany('INSERT INTO drug_doses(drug_id,band_order,band,dose) '
                    'VALUES (?,?,?,?)', doses)
 
+    diffs = parse_differentials(tables)
+    for sym, cap, name, nname, pg, favour in diffs:
+        # Point each differential at the section that describes it, so a
+        # clinician can go from "it might be this" to the full guideline.
+        cid = db.execute('SELECT id FROM conditions WHERE lower(title)=? OR '
+                         '(page IS NOT NULL AND page=?) ORDER BY '
+                         'CASE WHEN lower(title)=? THEN 0 ELSE 1 END LIMIT 1',
+                         (name.lower(), pg, name.lower())).fetchone()
+        db.execute('INSERT INTO differentials(symptom,caption,diagnosis,'
+                   'diagnosis_normalized,page,in_favour,condition_id) '
+                   'VALUES (?,?,?,?,?,?,?)',
+                   (sym, cap, name, nname, pg, favour, cid[0] if cid else None))
+    db.execute("INSERT INTO differentials_fts(rowid,diagnosis,symptom,in_favour) "
+               "SELECT id,diagnosis,symptom,in_favour FROM differentials")
+
     db.execute("INSERT INTO conditions_fts(rowid,title,number,chapter_title,"
                "clinical_features,treatment,management,full_text,tables_text) "
                "SELECT id,title,number,chapter_title,clinical_features,treatment,"
@@ -983,6 +1054,9 @@ def main(src, dst, emhslu=None):
     print(f'  medicines     : {n_med}')
     print(f'  drugs / doses : {len(drugs)} / {len(doses)}')
     print(f'  drug links    : {n_link}')
+    print(f'  differentials : {len(diffs)} rows, '
+          f"{db.execute('SELECT COUNT(DISTINCT diagnosis_normalized) FROM differentials').fetchone()[0]} diagnoses, "
+          f"{db.execute('SELECT COUNT(*) FROM differentials WHERE condition_id IS NOT NULL').fetchone()[0]} linked to a section")
     print(f'  fields        : treatment={filled[0]} management={filled[1]} '
           f'features={filled[2]} history={filled[3]} referral={filled[4]} '
           f'do-not={filled[5]} text>200ch={filled[6]}')

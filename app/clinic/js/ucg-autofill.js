@@ -2528,6 +2528,11 @@
     wireDxSuggest();
   }
 
+  // openDb/db/extractTests are shared with the impression engine on the same
+  // screen: one 6 MB database open once, and ONE definition of what a lab test
+  // is called — so a suggested test and the test the package orders can never
+  // disagree.
   window.UCGPackage = { start: start, open: open, close: close, suggestDx: suggestDx,
-                        formatNotes: glHtml };
+                        formatNotes: glHtml, openDb: openDb, extractTests: extractTests,
+                        db: function () { return db; } };
 })();

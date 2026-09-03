@@ -403,6 +403,95 @@
     }
     .wiz-btn:disabled { opacity: .45; cursor: not-allowed; }
 
+    /* ── Intake: who, then the three steps ──────────────────────── */
+    .it-who{border-left:4px solid #0E7C5A}
+    .it-debt{display:none;align-items:flex-start;gap:9px;margin-top:12px;
+      background:#FFEBEE;border-radius:12px;padding:11px 13px}
+    .it-debt .material-icons-outlined{color:#C62828;font-size:19px;flex:none}
+    .it-debt b{display:block;font-size:13px;font-weight:800;color:#C62828}
+    .it-debt i{display:block;font-size:11.5px;font-style:normal;color:#8E3B3B;margin-top:2px;line-height:1.45}
+    html[data-theme="dark"] .it-debt{background:#3A1A18}
+    html[data-theme="dark"] .it-debt i{color:#F3B7B2}
+
+    .it-tabs{display:flex;gap:7px;margin:6px 0 12px}
+    .it-tab{flex:1;position:relative;border:none;font:inherit;text-align:left;
+      padding:10px 12px;border-radius:13px;background:var(--surface);
+      box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation;color:var(--text-lt)}
+    .it-tab b{display:block;font-size:12.5px;font-weight:800;color:var(--text)}
+    .it-tab i{display:block;font-size:10.5px;font-style:normal;margin-top:1px}
+    .it-tab.on{background:#0E7C5A}
+    .it-tab.on b,.it-tab.on i{color:#fff}
+    .it-tab.on i{opacity:.85}
+    .it-tab.done::after{content:'';position:absolute;top:8px;right:9px;width:7px;height:7px;
+      border-radius:50%;background:#17A46F}
+    .it-tab.on.done::after{background:#fff}
+    .it-tab.warn::after{background:#E2960A}
+    .it-tab.alert::after{background:#E0454B;box-shadow:0 0 0 3px rgba(224,69,75,.22)}
+
+    .it-ccs{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .it-cc{font-size:12.5px;font-weight:700;color:var(--text-lt);background:var(--bg);
+      border:1.5px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer;
+      touch-action:manipulation}
+    .it-cc.on{background:#0E7C5A;border-color:#0E7C5A;color:#fff}
+
+    .it-vitals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .it-v .field-label{margin-bottom:5px}
+    .it-bp,.it-one{display:flex;align-items:center;gap:6px}
+    .it-bp input{width:100%;min-width:0;text-align:center;font-weight:800;font-size:17px}
+    .it-bp span{font-weight:800;color:var(--text-lt)}
+    .it-one input{width:100%;min-width:0;text-align:center;font-weight:800;font-size:17px}
+    .it-bp em,.it-one em{font-style:normal;font-size:11px;font-weight:700;color:var(--text-lt);white-space:nowrap}
+    /* An abnormal reading has to be unmistakable on a phone held at arm's
+       length in a busy room — a faint tint is not enough. */
+    .field-input.out{border-color:#E0454B !important;border-width:2px;
+      background:#FFEBEE !important;color:#C62828 !important;
+      box-shadow:0 0 0 3px rgba(224,69,75,.16)}
+    html[data-theme="dark"] .field-input.out{background:#4A1F1C !important;color:#FFC9C4 !important}
+
+    /* ── What this might be ── */
+    .it-imp{padding:14px 16px}
+    .it-imp-empty{font-size:12.5px;color:var(--text-lt);line-height:1.55}
+    .it-imp-note{font-size:11.5px;color:#7A5206;background:#FCEFCF;border-radius:10px;
+      padding:9px 11px;line-height:1.5;margin-bottom:12px}
+    html[data-theme="dark"] .it-imp-note{background:#372C11;color:#F2D79A}
+    .it-flags{display:flex;flex-direction:column;gap:7px;margin-bottom:11px}
+    .it-flag{border-radius:10px;padding:8px 11px;font-size:12.5px}
+    .it-flag b{font-weight:800;display:block}
+    .it-flag i{font-style:normal;font-size:11.5px;display:block;margin-top:2px;opacity:.9}
+    .it-flag.warn{background:#FFF4E0;color:#7A4F01}
+    .it-flag.danger{background:#FFEBEE;color:#C62828;font-weight:700}
+    html[data-theme="dark"] .it-flag.warn{background:#3A2E12;color:#FFD98A}
+    html[data-theme="dark"] .it-flag.danger{background:#3A1A18;color:#FFC9C4}
+
+    .it-dx{border:1.5px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:10px}
+    .it-dx.top{border-color:#0E7C5A;background:var(--brand-tint,#F1FBF7)}
+    html[data-theme="dark"] .it-dx.top{background:#10352A}
+    .it-dx-h{display:flex;align-items:baseline;gap:10px}
+    .it-dx-name{flex:1;font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+    .it-dx-pct{font-size:16px;font-weight:800;color:#0E7C5A;text-align:right;line-height:1}
+    .it-dx-pct i{display:block;font-style:normal;font-size:9.5px;font-weight:700;
+      color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+    .it-bar{height:5px;border-radius:999px;background:var(--border);margin:8px 0 10px;overflow:hidden}
+    .it-bar span{display:block;height:100%;background:#0E7C5A;border-radius:999px}
+    .it-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:7px}
+    .it-lbl{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
+      letter-spacing:.5px;width:100%}
+    .it-ev{font-size:11.5px;font-weight:700;color:#0A5C43;background:var(--brand-tint,#DBF4EA);
+      border-radius:999px;padding:4px 10px}
+    .it-ev.src{color:#5F6368;background:var(--bg);border:1px solid var(--border);font-weight:600}
+    .it-ev.test{color:#1565A8;background:#E7F1FB}
+    .it-note{font-size:11.5px;color:var(--text-lt);line-height:1.45;font-style:italic}
+    .it-ev.seen{color:#7A4F01;background:#FFF4E0}
+    html[data-theme="dark"] .it-ev.seen{background:#3A2E12;color:#FFD98A}
+    html[data-theme="dark"] .it-ev{background:#123529;color:#8CEFCD}
+    html[data-theme="dark"] .it-ev.test{background:#12283A;color:#8FC9F5}
+    .it-pick{width:100%;margin-top:5px;padding:11px;border:none;border-radius:11px;
+      background:#0E7C5A;color:#fff;font:inherit;font-size:13.5px;font-weight:800;
+      cursor:pointer;touch-action:manipulation}
+    .it-pulse{animation:itPulse 1.1s ease-in-out 2}
+    @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+    @media (max-width:380px){ .it-tab i{display:none} .it-vitals{grid-template-columns:1fr} }
+
     /* ── One-tap package button ─────────────────────────────────── */
     .ucg-onetap{display:flex;align-items:center;gap:12px;width:100%;margin-top:16px;
       padding:14px 16px;border:none;border-radius:16px;cursor:pointer;font-family:inherit;
@@ -515,8 +604,105 @@
            SCREEN 1 — Patient & Assessment
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
-        <div class="wiz-screen-title">Diagnosis</div>
-        <div class="wiz-screen-sub">Enter the condition, then tap the standard package. The name and phone are optional — add them here, or later from the dashboard.</div>
+        <div class="wiz-screen-title">New Treatment</div>
+        <div class="wiz-screen-sub">Who it is, then what they complain of, what you measure, and what you already know. Suggestions appear as you write. You confirm the diagnosis — the app never does.</div>
+
+        <!-- ── Who is it? — FIRST, because the name is what the money, the
+             follow-up and the phone call all hang on. Still never required. -->
+        <div class="wiz-card it-who">
+          <div class="sec-label" style="margin:0 0 10px">
+            <span class="material-icons-outlined" style="font-size:14px">person</span>
+            Who is it?
+          </div>
+          <div class="pt-two">
+            <div>
+              <label class="field-label" for="quickPatientName">Name</label>
+              <input id="quickPatientName" class="field-input" type="text"
+                placeholder="e.g. Okello John" autocomplete="off">
+            </div>
+            <div>
+              <label class="field-label" for="quickPatientPhone">Phone</label>
+              <input id="quickPatientPhone" class="field-input" type="tel"
+                placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+            </div>
+          </div>
+          <!-- Shows the moment a name or number matches an unpaid visit. -->
+          <div id="itDebt" class="it-debt"></div>
+          <div class="helper" id="quickPatientHelper"><b>Optional</b> — leave it blank if you are busy and add it later; the case number identifies the patient either way. It is asked first because the bill, the follow-up and the phone call all hang on it.</div>
+        </div>
+
+        <!-- ── The consultation, in three steps ── -->
+        <div class="it-tabs" role="tablist">
+          <button type="button" class="it-tab on" id="itTab1">
+            <b>1 · Complaint</b><i>What they tell you</i></button>
+          <button type="button" class="it-tab" id="itTab2">
+            <b>2 · Vitals</b><i>What you measure</i></button>
+          <button type="button" class="it-tab" id="itTab3">
+            <b>3 · Background</b><i>What you know</i></button>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane1">
+          <label class="field-label" for="itChief">Main complaint</label>
+          <input id="itChief" class="field-input" autocomplete="off"
+            placeholder="e.g. fever and headache">
+          <div class="it-ccs">
+            <span class="it-cc" data-cc="fever">fever</span>
+            <span class="it-cc" data-cc="cough">cough</span>
+            <span class="it-cc" data-cc="headache">headache</span>
+            <span class="it-cc" data-cc="diarrhoea">diarrhoea</span>
+            <span class="it-cc" data-cc="vomiting">vomiting</span>
+            <span class="it-cc" data-cc="abdominal pain">abdominal pain</span>
+            <span class="it-cc" data-cc="difficulty in breathing">hard breathing</span>
+            <span class="it-cc" data-cc="rash">rash</span>
+            <span class="it-cc" data-cc="ear pain">ear pain</span>
+            <span class="it-cc" data-cc="weakness">weakness</span>
+          </div>
+          <label class="field-label" for="itSubjective" style="margin-top:16px">The story — in the patient's own words</label>
+          <textarea id="itSubjective" class="field-input" rows="4"
+            placeholder="How long, how it started, what makes it better or worse, what they have already taken…"></textarea>
+          <div class="helper">This is the <b>subjective</b> part of the record: what the patient reports, before you examine them.</div>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane2" style="display:none">
+          <div class="it-vitals">
+            <div class="it-v">
+              <label class="field-label" for="itSbp">Blood pressure</label>
+              <div class="it-bp">
+                <input id="itSbp" class="field-input" inputmode="numeric" placeholder="120">
+                <span>/</span>
+                <input id="itDbp" class="field-input" inputmode="numeric" placeholder="80">
+                <em>mmHg</em>
+              </div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itTemp">Temperature</label>
+              <div class="it-one"><input id="itTemp" class="field-input" inputmode="decimal" placeholder="37.0"><em>°C</em></div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itWeight">Weight</label>
+              <div class="it-one"><input id="itWeight" class="field-input" inputmode="decimal" placeholder="62"><em>kg</em></div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itPulse">Pulse</label>
+              <div class="it-one"><input id="itPulse" class="field-input" inputmode="numeric" placeholder="78"><em>/min</em></div>
+            </div>
+          </div>
+          <div class="helper">This is the <b>objective</b> part: what you measured, not what you were told. A reading outside the normal range turns red and is used in the suggestions below.</div>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane3" style="display:none">
+          <label class="field-label" for="itBackground">Background — social and family history</label>
+          <textarea id="itBackground" class="field-input" rows="5"
+            placeholder="Chronic illness (diabetes, HIV, sickle cell, asthma), medicines already on, allergies, pregnancy, smoking or alcohol, who they live with, illness in the family…"></textarea>
+          <div class="helper">One box, on purpose. Write whatever matters — it is read along with everything else when the suggestions are worked out.</div>
+        </div>
+
+        <!-- ── What this might be — updated as you type ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">lightbulb</span>
+          What this might be
+        </div>
+        <div class="wiz-card it-imp" id="itImpression"></div>
 
 
         <!-- ── Diagnosis ── -->
@@ -529,7 +715,7 @@
           <label class="field-label">Confirmed condition</label>
           <input id="confirmedDx" class="field-input"
             placeholder="e.g. Malaria P. Falciparum, Typhoid, UTI…" autocomplete="off">
-          <div class="helper">Enter the diagnosis after your clinical exam and lab results.</div>
+          <div class="helper">Confirm one of the suggestions above, or type the diagnosis yourself. Nothing above is binding — this box is the record.</div>
 
           <div style="margin-top:16px">
             <label class="field-label">Severity</label>
@@ -552,32 +738,6 @@
             </span>
             <span class="material-icons-outlined ot-go">chevron_right</span>
           </button>
-        </div>
-
-        <!-- ── Who is it? — optional, never in the way ──
-             There used to be nowhere at all to type a name or a number: the
-             fields were hidden and the only way in was tapping a row on the
-             dashboard, which nobody could find. A name matters most for the
-             patients being asked to come back, so it is asked here, plainly
-             marked optional, and it never blocks Continue. -->
-        <div class="wiz-card">
-          <div class="sec-label" style="margin:0 0 10px">
-            <span class="material-icons-outlined" style="font-size:14px">person</span>
-            Who is it? <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span>
-          </div>
-          <div class="pt-two">
-            <div>
-              <label class="field-label" for="quickPatientName">Name</label>
-              <input id="quickPatientName" class="field-input" type="text"
-                placeholder="e.g. Okello John" autocomplete="off">
-            </div>
-            <div>
-              <label class="field-label" for="quickPatientPhone">Phone</label>
-              <input id="quickPatientPhone" class="field-input" type="tel"
-                placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
-            </div>
-          </div>
-          <div class="helper" id="quickPatientHelper">Leave it blank if you are busy — you can add it later from the dashboard. Needed only if you want to call or remind them.</div>
         </div>
 
         <!-- ── Care level ── -->
@@ -1102,7 +1262,9 @@
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/stock-blueprints.js?v=20260906"></script>
 <script src="js/new-order-wizard.js?v=20260905"></script>
-<script src="js/ucg-autofill.js?v=20260906"></script>
+<script src="js/ucg-autofill.js?v=20260908"></script>
+<script src="js/clinic-impression.js?v=20260908"></script>
+<script src="js/clinic-intake.js?v=20260908"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
 </body>
