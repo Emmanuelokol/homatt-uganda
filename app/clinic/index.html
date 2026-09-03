@@ -18,7 +18,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260905">
+  <link rel="stylesheet" href="css/clinic.css?v=20260909">
   <meta name="color-scheme" content="light dark">
   <script>
     // Apply the saved (or system) theme BEFORE first paint — no flash.
@@ -28,7 +28,17 @@
         if (t !== 'dark' && t !== 'light') {
           t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
         }
+        // The colour family, set before the first paint for the same reason.
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
         document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+        // The Android status bar reads this tag, so it has to follow the look.
+        var C = { forest:'#0B3D2E', midnight:'#0C2340', dark:'#000000', clay:'#3B2F27' };
+        document.addEventListener('DOMContentLoaded', function () {
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', C[s] || C.forest);
+        });
       } catch (e) {}
     })();
   </script>
@@ -41,9 +51,9 @@
       --lg-shadow:0 24px 70px rgba(21,64,28,.18);
       --lg-text:#17251A; --lg-text-sub:#5B6B5E; --lg-label:#33473A;
       --lg-input-bg:#FFFFFF; --lg-input-border:#D7E4D9; --lg-input-text:#17251A;
-      --lg-focus:#2E7D32; --lg-focus-ring:rgba(46,125,50,.18);
-      --lg-btn1:#1B5E20; --lg-btn2:#2E7D32;
-      --lg-ghost-bg:rgba(27,94,32,.06); --lg-ghost-border:rgba(27,94,32,.16); --lg-ghost-text:#1B5E20;
+      --lg-focus:var(--deep-2); --lg-focus-ring:rgba(46,125,50,.18);
+      --lg-btn1:var(--deep); --lg-btn2:var(--deep-2);
+      --lg-ghost-bg:rgba(27,94,32,.06); --lg-ghost-border:rgba(27,94,32,.16); --lg-ghost-text:var(--deep);
       --lg-divider:#C9DACB; --lg-marker:#93A697;
     }
     html[data-theme="dark"]{
@@ -54,8 +64,8 @@
       --lg-text:#EAF3EC; --lg-text-sub:#9FB4A4; --lg-label:#C2D3C6;
       --lg-input-bg:rgba(255,255,255,.06); --lg-input-border:rgba(255,255,255,.14); --lg-input-text:#EAF3EC;
       --lg-focus:#66BB6A; --lg-focus-ring:rgba(102,187,106,.22);
-      --lg-btn1:#2E7D32; --lg-btn2:#43A047;
-      --lg-ghost-bg:rgba(255,255,255,.05); --lg-ghost-border:rgba(255,255,255,.16); --lg-ghost-text:#A5D6A7;
+      --lg-btn1:var(--deep-2); --lg-btn2:#43A047;
+      --lg-ghost-bg:rgba(255,255,255,.05); --lg-ghost-border:rgba(255,255,255,.16); --lg-ghost-text:var(--tint-3);
       --lg-divider:rgba(255,255,255,.14); --lg-marker:#5F7263;
     }
     .admin-login-page{
@@ -179,7 +189,7 @@
     </button>
 
     <a id="apkDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk"
-       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:#1B5E20;color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
       <span class="material-icons-outlined" style="font-size:18px">android</span>
       Get the Android app (best offline — installs from a file)
     </a>
@@ -188,7 +198,7 @@
     </div>
 
     <a id="pcDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/desktop-latest/HomattClinic-Setup.exe"
-       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:#1B5E20;color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
       <span class="material-icons-outlined" style="font-size:18px">computer</span>
       Get the Windows app (works fully offline)
     </a>
@@ -207,7 +217,7 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v141';
+    var BUILD = 'v142';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());

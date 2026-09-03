@@ -40,7 +40,7 @@
     '.msg-badge{display:inline-flex;align-items:center;justify-content:center;' +
     'min-width:20px;height:20px;border-radius:10px;background:#25D366;' +
     'color:#0b3d1f;font-size:11px;font-weight:800;padding:0 6px;margin-left:auto}' +
-    '#msgAlertCard{display:flex;align-items:center;gap:12px;background:#1B5E20;color:#fff;' +
+    '#msgAlertCard{display:flex;align-items:center;gap:12px;background:var(--deep);color:#fff;' +
     'border-radius:14px;padding:13px 16px;margin:0 0 14px;cursor:pointer;' +
     'box-shadow:0 4px 14px rgba(27,94,32,0.35)}' +
     '#msgAlertCard .mac-icon{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,0.18);' +

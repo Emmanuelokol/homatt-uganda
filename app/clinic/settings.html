@@ -11,7 +11,16 @@
     // Apply saved (or system) theme before first paint — no flash.
     (function(){try{var t=localStorage.getItem('homatt_theme');
     if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
-    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+    /* The colour family. Set here, before the first paint, so switching
+       look never shows a flash of the old one. */
+    var s=localStorage.getItem('homatt_skin');
+    if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
+    var d=document.documentElement;
+    d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
+    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+    document.addEventListener('DOMContentLoaded',function(){
+      var m=document.querySelector('meta[name="theme-color"]');
+      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
   </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -24,24 +33,55 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260905">
+  <link rel="stylesheet" href="css/clinic.css?v=20260909">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
     .settings-card { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
-    .settings-card-title { font-size:14px; font-weight:700; color:#1B5E20; display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #F0F0F0; }
+    /* ── Make it yours: the look picker and the clinician's photo ── */
+    .look-lbl{font-size:11px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
+      letter-spacing:.5px;margin-bottom:10px}
+    .look-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .look-opt{position:relative;text-align:left;border:2px solid var(--border);background:var(--surface);
+      border-radius:14px;padding:12px 13px;font:inherit;cursor:pointer;touch-action:manipulation}
+    .look-opt.on{border-color:var(--primary);box-shadow:0 0 0 3px var(--brand-tint)}
+    .look-opt b{display:block;font-size:13.5px;font-weight:800;color:var(--text);margin-top:9px}
+    .look-opt > i{display:block;font-size:11px;font-style:normal;color:var(--text-lt);margin-top:1px}
+    .look-sw{display:flex;gap:4px}
+    .look-sw i{width:26px;height:16px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.08)}
+    .look-tick{position:absolute;top:9px;right:9px;font-size:19px;color:var(--primary)}
+    .look-note{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:11px}
+
+    .portrait-row{display:flex;gap:16px;align-items:flex-start}
+    .portrait-slot{flex:none;width:86px;height:86px;border-radius:50%;cursor:pointer;
+      border:2px dashed var(--border);background:var(--bg);background-size:cover;
+      background-position:center;display:flex;align-items:center;justify-content:center;
+      padding:0;touch-action:manipulation}
+    .portrait-slot.has-photo{border-style:solid;border-color:var(--primary)}
+    .portrait-slot.has-photo .portrait-icon{display:none}
+    .portrait-icon{color:var(--text-lt);font-size:26px}
+    .portrait-txt{flex:1;min-width:0}
+    .portrait-txt p{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:9px}
+    .portrait-btn{border:none;background:var(--primary);color:#fff;font:inherit;font-size:13px;
+      font-weight:700;padding:9px 15px;border-radius:10px;cursor:pointer;margin-right:7px;
+      touch-action:manipulation}
+    .portrait-btn.ghost{background:transparent;color:var(--text-lt);border:1.5px solid var(--border)}
+    .portrait-status{font-size:12px;color:var(--text-lt);margin-top:8px;min-height:1em;line-height:1.5}
+    @media (max-width:520px){ .look-grid{grid-template-columns:1fr} }
+
+    .settings-card-title { font-size:14px; font-weight:700; color:var(--deep-ink); display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #F0F0F0; }
     .form-row { margin-bottom:14px; }
     .form-row label { display:block; font-size:12px; font-weight:600; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
     .form-input { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; transition:border-color .2s; }
-    .form-input:focus { border-color:#1B5E20; }
+    .form-input:focus { border-color:var(--deep-ink); }
     .form-textarea { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; resize:vertical; transition:border-color .2s; }
-    .form-textarea:focus { border-color:#1B5E20; }
+    .form-textarea:focus { border-color:var(--deep-ink); }
 
     /* Chip tags */
     .chip-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid #E0E0E0; border-radius:8px; padding:8px; min-height:44px; cursor:text; transition:border-color .2s; }
-    .chip-wrap:focus-within { border-color:#1B5E20; }
-    .chip { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:4px 11px; font-size:12px; font-weight:600; }
-    .chip-del { background:none; border:none; cursor:pointer; padding:0; color:#2E7D32; font-size:16px; line-height:1; }
+    .chip-wrap:focus-within { border-color:var(--deep-ink); }
+    .chip { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:4px 11px; font-size:12px; font-weight:600; }
+    .chip-del { background:none; border:none; cursor:pointer; padding:0; color:var(--deep-ink); font-size:16px; line-height:1; }
     .chip-input { border:none; outline:none; font-family:inherit; font-size:13px; min-width:150px; flex:1; background:transparent; }
 
     /* Hours */
@@ -54,7 +94,7 @@
     /* Facilities */
     .facilities-grid { display:flex; flex-wrap:wrap; gap:8px; }
     .facility-btn { border:1.5px solid #E0E0E0; border-radius:10px; padding:6px 14px; font-size:12px; font-weight:500; cursor:pointer; background:#fff; font-family:inherit; color:#555; transition:all .15s; }
-    .facility-btn.active { border-color:#1B5E20; background:#E8F5E9; color:#1B5E20; font-weight:600; }
+    .facility-btn.active { border-color:var(--deep-ink); background:var(--tint-2); color:var(--deep-ink); font-weight:600; }
 
     /* Fee table */
     .fee-table { width:100%; border-collapse:collapse; }
@@ -67,10 +107,10 @@
     .cond-fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
     .cond-fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
     .cond-fee-empty { text-align:center; padding:24px; color:#9AA0A6; font-size:13px; }
-    .cond-badge { display:inline-flex; align-items:center; gap:4px; background:#E8F5E9; color:#1B5E20; border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
+    .cond-badge { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
     .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
 
-    .save-btn { background:#1B5E20; color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .save-btn { background:var(--deep); color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
     .save-btn:active { background:#154d18; }
     .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
 
@@ -140,7 +180,7 @@
         background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
         padding:12px; margin-bottom:10px;
       }
-      .hours-row > div:nth-child(1) { grid-column:1 / -1; font-weight:700; color:#1B5E20; font-size:14px; }
+      .hours-row > div:nth-child(1) { grid-column:1 / -1; font-weight:700; color:var(--deep-ink); font-size:14px; }
       .hours-row > div:nth-child(4) { grid-column:1 / -1; }
     }
   </style>
@@ -183,6 +223,38 @@
     </div>
 
     <div class="admin-content">
+
+      <!-- Make it yours — the look and the clinician's photo -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">palette</span> Make it yours
+        </div>
+
+        <div class="look-lbl">Your photo</div>
+        <div class="portrait-row">
+          <button type="button" class="portrait-slot" data-portrait data-portrait-pick
+                  aria-label="Add or change your photo">
+            <span class="material-icons-outlined portrait-icon">add_a_photo</span>
+          </button>
+          <div class="portrait-txt">
+            <button type="button" class="portrait-btn" data-portrait-pick>Choose a photo</button>
+            <button type="button" class="portrait-btn ghost" id="portraitRemove" style="display:none">Remove</button>
+            <div id="portraitStatus" class="portrait-status"></div>
+            <p>Shown on your home screen. The photo is shrunk to 512&nbsp;px on this
+              phone before it is sent — that takes a 4&nbsp;MB photo down to about
+              40&nbsp;KB <strong>and removes the hidden location data</strong> that
+              phone cameras attach to every picture. It is kept in your clinic's own
+              folder and stays on this device, so it still shows with no internet.</p>
+          </div>
+        </div>
+        <input type="file" id="portraitInput" accept="image/*" style="display:none">
+
+        <div class="look-lbl" style="margin-top:22px">Colour</div>
+        <div id="lookPicker" class="look-grid"></div>
+        <p class="look-note">Changes as soon as you tap, on this device. The
+          sun / moon button in the top bar still switches between light and dark
+          inside whichever colour you pick.</p>
+      </div>
 
       <!-- Basic Info -->
       <div class="settings-card">
@@ -232,7 +304,7 @@
           attendants get only quick sale and stock — ideal for a drug shop.
         </p>
         <button type="button" onclick="openAddStaffModal()"
-                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
           <span class="material-icons-outlined" style="font-size:17px">person_add</span>
           Add staff account
         </button>
@@ -261,7 +333,7 @@
           <div id="asError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
           <div style="display:flex;gap:8px">
             <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
-            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
+            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
           </div>
         </div>
       </div>
@@ -271,7 +343,7 @@
         <div class="settings-card-title">
           <span class="material-icons-outlined">location_on</span> Location
         </div>
-        <div style="background:#E8F5E9;border-radius:8px;padding:10px 14px;font-size:12px;color:#1B5E20;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+        <div style="background:var(--tint-2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--deep-ink);margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
           <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
           <span>Enter your clinic's location using Uganda's place names — district, subcounty, parish. We will automatically find your GPS position from these names so patients near you can find you first.</span>
         </div>
@@ -301,7 +373,7 @@
         <!-- Auto-geocode + GPS buttons -->
         <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
-            style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            style="display:flex;align-items:center;gap:6px;background:var(--deep);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
             <span class="material-icons-outlined" style="font-size:16px">my_location</span>
             Find GPS from address
           </button>
@@ -353,7 +425,7 @@
           <input type="hidden" id="sFrontPhotoUrl">
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
             <button type="button" onclick="document.getElementById('frontPhotoInput').click()"
-              style="display:flex;align-items:center;gap:6px;background:#1B5E20;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              style="display:flex;align-items:center;gap:6px;background:var(--deep);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
               <span class="material-icons-outlined" style="font-size:16px">upload</span>
               <span id="photoUploadLabel">Upload photo</span>
             </button>
@@ -404,7 +476,7 @@
           </tbody>
         </table>
         <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
-          <button onclick="addCondFeeRow()" style="background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
+          <button onclick="addCondFeeRow()" style="background:none;border:1px dashed var(--deep);color:var(--deep-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
           <button onclick="populateFromSpecialties()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
             <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
           </button>
@@ -445,15 +517,15 @@
           </div>
         </div>
         <div class="form-row" style="margin-top:4px">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
-            <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:#1B5E20" checked>
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--deep-ink);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)" checked>
             Accept online appointment bookings from patients
           </label>
           <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
         </div>
         <div class="form-row" style="margin-top:4px">
-          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:#1B5E20;text-transform:none;letter-spacing:0">
-            <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:#1B5E20">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--deep-ink);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)">
             Auto-confirm bookings (no manual review needed)
           </label>
           <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
@@ -469,7 +541,7 @@
           <thead><tr><th>Service Type</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th></tr></thead>
           <tbody id="feesTableBody"></tbody>
         </table>
-        <button onclick="addFeeRow()" style="margin-top:12px;background:none;border:1px dashed #1B5E20;color:#1B5E20;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Custom Service</button>
+        <button onclick="addFeeRow()" style="margin-top:12px;background:none;border:1px dashed var(--deep);color:var(--deep-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Custom Service</button>
       </div>
 
       <!-- Facility level (drives the national essential medicines list) -->
@@ -711,13 +783,13 @@ async function loadStaffList() {
       : ' <span style="font-size:10px;color:#C62828;background:#FFEBEE;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:1px">DEACTIVATED</span>';
     var toggleBtn = s.is_self ? '' :
       '<button type="button" onclick="changeStaffActive(\'' + s.id + '\', ' + (active ? 'false' : 'true') + ', this)" '
-      + 'style="flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid ' + (active ? '#EF9A9A' : '#A5D6A7') + ';'
-      + 'background:' + (active ? '#FFF5F5' : '#F1F8E9') + ';color:' + (active ? '#C62828' : '#1B5E20') + ';font-weight:700;cursor:pointer;font-family:inherit">'
+      + 'style="flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid ' + (active ? '#EF9A9A' : 'var(--tint-3)') + ';'
+      + 'background:' + (active ? '#FFF5F5' : '#F1F8E9') + ';color:' + (active ? '#C62828' : 'var(--deep)') + ';font-weight:700;cursor:pointer;font-family:inherit">'
       + (active ? 'Deactivate' : 'Activate') + '</button>';
     return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #F5F5F5;' + (active ? '' : 'opacity:.65') + '">'
       + '<div style="flex:1;min-width:150px">'
       +   '<div style="font-weight:600;color:#202124;font-size:14px">' + escHtml(name)
-      +     (s.is_self ? ' <span style="font-size:11px;color:#1B5E20;font-weight:700">(you)</span>' : '') + activeBadge + '</div>'
+      +     (s.is_self ? ' <span style="font-size:11px;color:var(--deep-ink);font-weight:700">(you)</span>' : '') + activeBadge + '</div>'
       +   (s.email ? '<div style="font-size:12px;color:#9AA0A6">' + escHtml(s.email) + '</div>' : '')
       + '</div>'
       + '<select onchange="changeStaffRole(\'' + s.id + '\', this.value, this)" '
@@ -740,7 +812,7 @@ async function changeStaffActive(targetId, active, btn) {
     if (status) { status.style.color = '#C62828'; status.textContent = msg; }
     return;
   }
-  if (status) { status.style.color = '#1B5E20'; status.textContent = active ? 'Account reactivated ✓' : 'Account deactivated ✓'; }
+  if (status) { status.style.color = 'var(--deep)'; status.textContent = active ? 'Account reactivated ✓' : 'Account deactivated ✓'; }
   setTimeout(function() { if (status) status.textContent = ''; }, 2500);
   loadStaffList();
 }
@@ -851,7 +923,7 @@ async function changeStaffRole(targetId, role, selectEl) {
     loadStaffList();   // revert the dropdown to the true value
     return;
   }
-  if (status) { status.style.color = '#1B5E20'; status.textContent = 'Role updated ✓'; }
+  if (status) { status.style.color = 'var(--deep)'; status.textContent = 'Role updated ✓'; }
   setTimeout(function() { if (status) status.textContent = ''; }, 2500);
 }
 
@@ -1703,8 +1775,8 @@ async function changePassword() {
 
   function showMsg(text, ok) {
     msg.textContent = text;
-    msg.style.color = ok ? '#1B5E20' : '#D32F2F';
-    msg.style.background = ok ? '#E8F5E9' : '#FFEBEE';
+    msg.style.color = ok ? 'var(--deep)' : '#D32F2F';
+    msg.style.background = ok ? 'var(--tint-2)' : '#FFEBEE';
     msg.style.padding = '10px 14px';
     msg.style.borderRadius = '8px';
     msg.style.display = 'block';
@@ -1744,6 +1816,7 @@ async function changePassword() {
 }
 </script>
 <script src="../js/native-bridge.js"></script>
+<script src="js/clinic-look.js?v=20260909"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 </body>
 </html>

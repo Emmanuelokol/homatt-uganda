@@ -338,12 +338,12 @@
     const badge = document.getElementById('ppBadge');
     if (p.fromBooking) {
       badge.textContent = '✓ Verified';
-      badge.style.background = '#E8F5E9';
-      badge.style.color = '#1B5E20';
+      badge.style.background = 'var(--tint-2)';
+      badge.style.color = 'var(--deep)';
     } else {
       badge.textContent = p.registered ? 'On Homatt' : 'Walk-in';
       badge.style.background = p.registered ? '#fff' : '#FFE0B2';
-      badge.style.color = p.registered ? '#2E7D32' : '#E65100';
+      badge.style.color = p.registered ? 'var(--deep-2)' : '#E65100';
     }
     patientMenu.style.display = 'none';
     document.getElementById('step1Next').disabled = false;
@@ -637,7 +637,7 @@
           <button id="requestConsentBtn" style="padding:6px 12px;background:#1565C0;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap">Request consent</button>
         </div>`;
       } else {
-        html += `<div style="background:#E8F5E9;border-radius:10px;padding:8px 12px;font-size:12px;color:#1B5E20;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+        html += `<div style="background:var(--tint-2);border-radius:10px;padding:8px 12px;font-size:12px;color:var(--deep-ink);margin-bottom:10px;display:flex;align-items:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:16px">verified</span>
           Patient consented — showing records from all clinics.
         </div>`;
@@ -669,7 +669,7 @@
           <span class="pp-row-value" style="font-size:12px">
             ${i === 0 ? '<strong>' + esc(dateStr) + '</strong> · ' : ''}${whereTxt}
             <br><span style="color:#5F6368">${esc(h.confirmed_diagnosis || 'Pending')}${noShow ? ' <span style="color:#C62828;font-weight:700"> · No-show</span>' : ''}</span>
-            ${h.clinician_name ? `<br><span style="color:#00796B">Seen by ${esc(h.clinician_name)}</span>` : ''}
+            ${h.clinician_name ? `<br><span style="color:var(--accent)">Seen by ${esc(h.clinician_name)}</span>` : ''}
             ${meds ? `<br><span style="color:#1565C0">${meds} med${meds !== 1 ? 's' : ''} prescribed</span>` : ''}
           </span>
         </div>`;
@@ -1887,13 +1887,13 @@
         </div>
         ${m.inventoryItemId ? (() => {
           const inv = state.clinicInventory.find(x => x.id === m.inventoryItemId);
-          const stockBg = inv?.is_critical ? '#FFEBEE' : inv?.is_low_stock ? '#FFF3E0' : '#E8F5E9';
-          const stockClr = inv?.is_critical ? '#C62828' : inv?.is_low_stock ? '#E65100' : '#1B5E20';
+          const stockBg = inv?.is_critical ? '#FFEBEE' : inv?.is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
+          const stockClr = inv?.is_critical ? '#C62828' : inv?.is_low_stock ? '#E65100' : 'var(--deep)';
           const stockTxt = inv ? `${inv.quantity} ${inv.unit} in stock` : 'In clinic stock';
           return `<div style="font-size:11px;color:${stockClr};background:${stockBg};padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px">
             <span class="material-icons-outlined" style="font-size:12px">inventory_2</span>${esc(stockTxt)}</div>`;
         })() : ''}
-        ${m._autoNote ? `<div style="font-size:11px;color:#1B5E20;background:#E8F5E9;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
+        ${m._autoNote ? `<div style="font-size:11px;color:var(--deep-ink);background:var(--tint-2);padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
           <span class="material-icons-outlined" style="font-size:12px">bolt</span>Auto-filled (${esc(m._autoNote)}) — edit anything below if needed</div>` : ''}
         ${m._pregWarn ? `<div style="font-size:11px;color:#C62828;background:#FFEBEE;padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px;margin-left:4px">
           <span class="material-icons-outlined" style="font-size:12px">pregnant_woman</span>Caution in pregnancy — confirm before prescribing</div>` : ''}
@@ -1914,7 +1914,7 @@
             <label class="field-label">Units used (${esc(state.clinicInventory.find(x=>x.id===m.inventoryItemId)?.unit||'units')})</label>
             <input class="field-input qty-deduct-input" data-idx="${i}"
               type="number" min="0" step="1" value="${m.qtyToDeduct||''}" placeholder="0"
-              style="border-color:#00897B">
+              style="border-color:var(--accent)">
           </div>` : ''}
         </div>
 
@@ -2008,15 +2008,15 @@
     if (!invMatches.length && !formMatches.length) { menu.style.display = 'none'; return; }
 
     const invHtml = invMatches.map(inv => {
-      const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : '#E8F5E9';
-      const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : '#1B5E20';
+      const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
+      const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : 'var(--deep)';
       return `<div class="autocomplete-item" data-inv-id="${esc(inv.id)}" data-inv-name="${esc(inv.item_name)}"
-                   style="border-left:3px solid #00897B">
+                   style="border-left:3px solid var(--accent)">
         <div class="ac-name" style="display:flex;align-items:center;gap:6px">
           ${esc(inv.item_name)}
           <span style="font-size:10px;background:${stockBg};color:${stockClr};padding:1px 6px;border-radius:10px;font-weight:700">${inv.quantity} ${esc(inv.unit)}</span>
         </div>
-        <div class="ac-cat" style="color:#00897B">From clinic stock</div>
+        <div class="ac-cat" style="color:var(--accent)">From clinic stock</div>
       </div>`;
     }).join('');
 
@@ -2027,7 +2027,7 @@
       </div>
     `).join('');
 
-    menu.innerHTML = (invMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#00897B;text-transform:uppercase;letter-spacing:.4px;background:#F1F8E9">Clinic Stock</div>${invHtml}` : '')
+    menu.innerHTML = (invMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;background:#F1F8E9">Clinic Stock</div>${invHtml}` : '')
       + (formMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;background:#FAFAFA">Formulary</div>${formHtml}` : '');
     menu.style.display = 'block';
 
@@ -2108,7 +2108,7 @@
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F5F5">
         <span style="flex:1;font-size:13px;font-weight:600;color:#202124">${esc(m.item_name)}${esc(stockTxt)}</span>
         <input type="number" min="1" step="1" value="${m.qty||1}"
-          style="width:60px;padding:5px 8px;border:1.5px solid #00897B;border-radius:8px;font-size:13px;text-align:center;font-family:inherit;outline:none"
+          style="width:60px;padding:5px 8px;border:1.5px solid var(--accent);border-radius:8px;font-size:13px;text-align:center;font-family:inherit;outline:none"
           data-mat-idx="${i}" class="mat-qty-input">
         <span style="font-size:12px;color:#9AA0A6">${esc(m.unit||'units')}</span>
         <button class="mat-del-btn" data-idx="${i}" style="background:none;border:none;cursor:pointer;padding:2px">
@@ -2144,11 +2144,11 @@
     sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:800;display:flex;align-items:flex-end;justify-content:center';
     sheet.innerHTML = `<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:500px;max-height:70vh;overflow-y:auto;padding:20px">
       <div style="font-weight:700;font-size:16px;margin-bottom:14px;display:flex;align-items:center;gap:8px">
-        <span class="material-icons-outlined" style="color:#00897B">inventory_2</span> Select Material / Consumable
+        <span class="material-icons-outlined" style="color:var(--accent)">inventory_2</span> Select Material / Consumable
       </div>
       ${options.map(inv => {
-        const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : '#E8F5E9';
-        const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : '#1B5E20';
+        const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
+        const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : 'var(--deep)';
         return `<div class="mat-picker-item" data-id="${esc(inv.id)}" data-name="${esc(inv.item_name)}" data-unit="${esc(inv.unit||'units')}"
                      style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid #E8EAED;border-radius:10px;margin-bottom:8px;cursor:pointer">
           <div>

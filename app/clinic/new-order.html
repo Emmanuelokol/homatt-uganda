@@ -11,7 +11,16 @@
     // Apply saved (or system) theme before first paint — no flash.
     (function(){try{var t=localStorage.getItem('homatt_theme');
     if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
-    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+    /* The colour family. Set here, before the first paint, so switching
+       look never shows a flash of the old one. */
+    var s=localStorage.getItem('homatt_skin');
+    if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
+    var d=document.documentElement;
+    d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
+    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+    document.addEventListener('DOMContentLoaded',function(){
+      var m=document.querySelector('meta[name="theme-color"]');
+      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
   </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -24,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260905">
+  <link rel="stylesheet" href="css/clinic.css?v=20260909">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -49,7 +58,7 @@
       background: var(--primary); border-color: var(--primary); color: #fff;
     }
     .wiz-dot.current .wiz-dot-circle {
-      background: #E8F5E9; border-color: var(--primary); color: var(--primary);
+      background: var(--tint-2); border-color: var(--primary); color: var(--primary);
     }
     .wiz-dot-label {
       font-size: 10px; font-weight: 700; color: #BDBDBD;
@@ -121,58 +130,58 @@
     .sum-card{background:var(--surface,#fff);border-radius:22px 22px 0 0;width:100%;max-width:520px;
       max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
     .sum-top{display:flex;gap:12px;align-items:flex-start;padding:20px 20px 14px;flex:none;
-      background:linear-gradient(140deg,#0B3D2E,#10855F 65%,#17A46F);color:#fff}
+      background:linear-gradient(140deg,var(--grad-1),var(--grad-2) 65%,var(--grad-3));color:#fff}
     .sum-top .material-icons-outlined{font-size:30px;flex:none;margin-top:1px}
     .sum-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
     .sum-sub{font-size:12.5px;opacity:.9;margin-top:2px;line-height:1.45}
     .sum-body{overflow-y:auto;padding:16px 18px;flex:1;-webkit-overflow-scrolling:touch}
     .sum-head{margin-bottom:16px}
     .sum-case{display:inline-block;font-size:13px;font-weight:800;letter-spacing:.5px;
-      background:var(--brand-tint,#DBF4EA);color:#0A5C43;padding:4px 12px;border-radius:999px;margin-bottom:7px}
+      background:var(--brand-tint);color:var(--primary-d);padding:4px 12px;border-radius:999px;margin-bottom:7px}
     .sum-who{font-size:17px;font-weight:800;color:var(--text,#111);line-height:1.25;overflow-wrap:anywhere}
     .sum-dx{font-size:13px;color:var(--text-lt,#5F6368);margin-top:2px;text-transform:capitalize}
     .sum-todo{font-size:13px;font-weight:600;color:#B35309}
     .sum-sec{margin-bottom:16px}
     .sum-h{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.5px;
-      text-transform:uppercase;color:#0B6B4F;margin-bottom:8px}
+      text-transform:uppercase;color:var(--grad-2);margin-bottom:8px}
     .sum-h .material-icons-outlined{font-size:16px}
     .sum-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
       font-size:13px;color:var(--text-lt,#5F6368);padding:4px 0;line-height:1.4}
     .sum-line b{color:var(--text,#111);font-weight:700;text-align:right;overflow-wrap:anywhere}
     .sum-line.sum-total{border-top:1px solid var(--border,#E8EAED);margin-top:5px;padding-top:8px;font-size:14px}
-    .sum-line.sum-total b{font-size:17px;color:#0E7C5A;letter-spacing:-.02em}
+    .sum-line.sum-total b{font-size:17px;color:var(--primary);letter-spacing:-.02em}
     .sum-line.sum-owing b{color:#C62828}
-    .sum-line.sum-paid b{color:#2E7D32}
+    .sum-line.sum-paid b{color:var(--deep-ink)}
     .sum-line.sum-sub{font-size:12px;opacity:.85}
     .sum-meds{display:flex;flex-direction:column;gap:7px}
     .sum-med{background:var(--bg,#F5F7F5);border-radius:11px;padding:9px 11px}
     .sum-med-n{font-size:13.5px;font-weight:700;color:var(--text,#111);line-height:1.3;overflow-wrap:anywhere}
     .sum-med-s{font-size:11.5px;color:var(--text-lt,#5F6368);margin-top:1px}
     .sum-med-q{display:inline-block;font-size:10.5px;font-weight:800;margin-top:4px;
-      background:rgba(14,124,90,.13);color:#0B6B4F;padding:1px 8px;border-radius:999px}
+      background:rgba(14,124,90,.13);color:var(--grad-2);padding:1px 8px;border-radius:999px}
     .sum-chips{display:flex;flex-wrap:wrap;gap:6px}
-    .sum-chip{font-size:12px;font-weight:700;background:var(--brand-tint,#DBF4EA);color:#0A5C43;
+    .sum-chip{font-size:12px;font-weight:700;background:var(--brand-tint);color:var(--primary-d);
       padding:5px 11px;border-radius:999px}
     .sum-none{font-size:12.5px;color:var(--text-lt,#9AA0A6);font-style:italic}
     .sum-actions{flex:none;padding:12px 18px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
       border-top:1px solid var(--border,#E8EAED);display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff)}
     .sum-btn{width:100%;padding:13px;border-radius:13px;font:inherit;font-size:14.5px;font-weight:800;
       cursor:pointer;font-family:inherit;touch-action:manipulation;
-      background:transparent;color:#0E7C5A;border:1.5px solid #0E7C5A}
-    .sum-btn.primary{background:#0E7C5A;color:#fff;border-color:#0E7C5A}
-    html[data-theme="dark"] .sum-med-q{background:rgba(67,160,71,.22);color:#A5D6A7}
-    html[data-theme="dark"] .sum-h{color:#5FD3A8}
+      background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+    .sum-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    html[data-theme="dark"] .sum-med-q{background:rgba(67,160,71,.22);color:var(--tint-3)}
+    html[data-theme="dark"] .sum-h{color:var(--brand-ink)}
     html[data-theme="dark"] .sum-case{background:rgba(14,124,90,.22);color:#7FD9B4}
-    html[data-theme="dark"] .sum-line.sum-total b{color:#5FD3A8}
+    html[data-theme="dark"] .sum-line.sum-total b{color:var(--brand-ink)}
     html[data-theme="dark"] .sum-line.sum-owing b{color:#FF9E93}
     html[data-theme="dark"] .sum-todo{color:#F5B160}
-    html[data-theme="dark"] .sum-btn{color:#5FD3A8;border-color:#2E7D32}
-    html[data-theme="dark"] .sum-btn.primary{background:#0E7C5A;color:#fff}
+    html[data-theme="dark"] .sum-btn{color:var(--brand-ink);border-color:var(--deep-ink)}
+    html[data-theme="dark"] .sum-btn.primary{background:var(--primary);color:#fff}
     .helper { font-size: 12px; color: #9AA0A6; margin-top: 5px; line-height: 1.4; }
 
     /* ── Patient pill ───────────────────────────────────────────── */
     .patient-pill {
-      background: var(--brand-tint,#DBF4EA); border: none;
+      background: var(--brand-tint); border: none;
       border-radius: 16px; padding: 14px 16px;
       display: flex; align-items: center; gap: 12px;
     }
@@ -183,15 +192,15 @@
       font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
     .patient-pill .info { flex: 1; min-width: 0; }
-    .patient-pill .name { font-size: 15px; font-weight: 700; color: #1B5E20; }
-    .patient-pill .phone { font-size: 12px; color: #2E7D32; margin-top: 1px; }
+    .patient-pill .name { font-size: 15px; font-weight: 700; color: var(--deep-ink); }
+    .patient-pill .phone { font-size: 12px; color: var(--deep-ink); margin-top: 1px; }
     .patient-pill .badge {
       font-size: 10px; font-weight: 700;
-      background: #fff; color: #2E7D32;
+      background: #fff; color: var(--deep-ink);
       padding: 3px 9px; border-radius: 10px; white-space: nowrap;
     }
     .patient-pill .change-btn {
-      background: none; border: none; color: #2E7D32;
+      background: none; border: none; color: var(--deep-ink);
       cursor: pointer; padding: 4px;
     }
 
@@ -314,7 +323,7 @@
       transition: all .12s; font-family: inherit; text-align: left;
     }
     .stock-opt:hover { border-color: var(--primary); }
-    .stock-opt.active { background: #E8F5E9; border-color: var(--primary); }
+    .stock-opt.active { background: var(--tint-2); border-color: var(--primary); }
     .stock-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
     .stock-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
 
@@ -336,7 +345,7 @@
       cursor: pointer; font-family: inherit;
       transition: all .15s; white-space: nowrap;
     }
-    .pay-chip.active { background: #E8F5E9; color: #1B5E20; border-color: #66BB6A; }
+    .pay-chip.active { background: var(--tint-2); color: var(--deep-ink); border-color: #66BB6A; }
 
     /* ── Fee grid ───────────────────────────────────────────────── */
     .fee-grid {
@@ -371,8 +380,8 @@
       font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
     .csb-info { flex: 1; min-width: 0; }
-    .csb-name { font-size: 13px; font-weight: 700; color: #1B5E20; }
-    .csb-dx { font-size: 12px; color: #2E7D32; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .csb-name { font-size: 13px; font-weight: 700; color: var(--deep-ink); }
+    .csb-dx { font-size: 12px; color: var(--deep-ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
     /* ── Navigation buttons ─────────────────────────────────────── */
     .wiz-nav {
@@ -391,12 +400,12 @@
       box-shadow: var(--shadow, 0 2px 6px rgba(20,24,43,.08));
     }
     .wiz-btn-next {
-      background: linear-gradient(135deg,#17936B,#0C6A4C); color: #fff;
+      background: linear-gradient(135deg,var(--grad-3),var(--grad-2)); color: #fff;
       flex: 1; justify-content: center; border-radius: 15px;
       box-shadow: 0 10px 22px rgba(14,124,90,.32);
     }
     .wiz-btn-send {
-      background: linear-gradient(135deg,#17936B,#0C6A4C); color: #fff;
+      background: linear-gradient(135deg,var(--grad-3),var(--grad-2)); color: #fff;
       width: 100%; justify-content: center;
       padding: 16px; font-size: 16px; border-radius: 15px; margin-top: 8px;
       box-shadow: 0 10px 22px rgba(14,124,90,.32);
@@ -404,7 +413,7 @@
     .wiz-btn:disabled { opacity: .45; cursor: not-allowed; }
 
     /* ── Intake: who, then the three steps ──────────────────────── */
-    .it-who{border-left:4px solid #0E7C5A}
+    .it-who{border-left:4px solid var(--primary)}
     .it-debt{display:none;align-items:flex-start;gap:9px;margin-top:12px;
       background:#FFEBEE;border-radius:12px;padding:11px 13px}
     .it-debt .material-icons-outlined{color:#C62828;font-size:19px;flex:none}
@@ -419,11 +428,11 @@
       box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation;color:var(--text-lt)}
     .it-tab b{display:block;font-size:12.5px;font-weight:800;color:var(--text)}
     .it-tab i{display:block;font-size:10.5px;font-style:normal;margin-top:1px}
-    .it-tab.on{background:#0E7C5A}
+    .it-tab.on{background:var(--primary)}
     .it-tab.on b,.it-tab.on i{color:#fff}
     .it-tab.on i{opacity:.85}
     .it-tab.done::after{content:'';position:absolute;top:8px;right:9px;width:7px;height:7px;
-      border-radius:50%;background:#17A46F}
+      border-radius:50%;background:var(--grad-3)}
     .it-tab.on.done::after{background:#fff}
     .it-tab.warn::after{background:#E2960A}
     .it-tab.alert::after{background:#E0454B;box-shadow:0 0 0 3px rgba(224,69,75,.22)}
@@ -432,7 +441,7 @@
     .it-cc{font-size:12.5px;font-weight:700;color:var(--text-lt);background:var(--bg);
       border:1.5px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer;
       touch-action:manipulation}
-    .it-cc.on{background:#0E7C5A;border-color:#0E7C5A;color:#fff}
+    .it-cc.on{background:var(--primary);border-color:var(--primary);color:#fff}
 
     .it-vitals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .it-v .field-label{margin-bottom:5px}
@@ -464,29 +473,29 @@
     html[data-theme="dark"] .it-flag.danger{background:#3A1A18;color:#FFC9C4}
 
     .it-dx{border:1.5px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:10px}
-    .it-dx.top{border-color:#0E7C5A;background:var(--brand-tint,#F1FBF7)}
+    .it-dx.top{border-color:var(--primary);background:var(--brand-tint,var(--brand-tint))}
     html[data-theme="dark"] .it-dx.top{background:#10352A}
     .it-dx-h{display:flex;align-items:baseline;gap:10px}
     .it-dx-name{flex:1;font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
-    .it-dx-pct{font-size:16px;font-weight:800;color:#0E7C5A;text-align:right;line-height:1}
+    .it-dx-pct{font-size:16px;font-weight:800;color:var(--primary);text-align:right;line-height:1}
     .it-dx-pct i{display:block;font-style:normal;font-size:9.5px;font-weight:700;
       color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
     .it-bar{height:5px;border-radius:999px;background:var(--border);margin:8px 0 10px;overflow:hidden}
-    .it-bar span{display:block;height:100%;background:#0E7C5A;border-radius:999px}
+    .it-bar span{display:block;height:100%;background:var(--primary);border-radius:999px}
     .it-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:7px}
     .it-lbl{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
       letter-spacing:.5px;width:100%}
-    .it-ev{font-size:11.5px;font-weight:700;color:#0A5C43;background:var(--brand-tint,#DBF4EA);
+    .it-ev{font-size:11.5px;font-weight:700;color:var(--primary-d);background:var(--brand-tint);
       border-radius:999px;padding:4px 10px}
     .it-ev.src{color:#5F6368;background:var(--bg);border:1px solid var(--border);font-weight:600}
     .it-ev.test{color:#1565A8;background:#E7F1FB}
     .it-note{font-size:11.5px;color:var(--text-lt);line-height:1.45;font-style:italic}
     .it-ev.seen{color:#7A4F01;background:#FFF4E0}
     html[data-theme="dark"] .it-ev.seen{background:#3A2E12;color:#FFD98A}
-    html[data-theme="dark"] .it-ev{background:#123529;color:#8CEFCD}
+    html[data-theme="dark"] .it-ev{background:var(--brand-tint);color:var(--brand-ink)}
     html[data-theme="dark"] .it-ev.test{background:#12283A;color:#8FC9F5}
     .it-pick{width:100%;margin-top:5px;padding:11px;border:none;border-radius:11px;
-      background:#0E7C5A;color:#fff;font:inherit;font-size:13.5px;font-weight:800;
+      background:var(--primary);color:#fff;font:inherit;font-size:13.5px;font-weight:800;
       cursor:pointer;touch-action:manipulation}
     .it-pulse{animation:itPulse 1.1s ease-in-out 2}
     @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
@@ -851,11 +860,11 @@
               <span class="material-icons-outlined" style="font-size:18px">close</span>
             </button>
           </div>
-          <div id="labSelectedTray" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:10px 12px;background:#F1F8F1;border:1px dashed #A5D6A7;border-radius:10px"></div>
+          <div id="labSelectedTray" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:10px 12px;background:#F1F8F1;border:1px dashed var(--tint-3);border-radius:10px"></div>
           <div id="labNoMatch" style="display:none;padding:14px 12px;margin-bottom:12px;background:#FFF8E1;border-radius:10px;text-align:center;color:#5D4037;font-size:12px">
             <div style="margin-bottom:8px">No test matches "<strong id="labNoMatchQ"></strong>".</div>
             <button id="labAddNewBtn" type="button"
-              style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">
               <span class="material-icons-outlined" style="font-size:16px">add</span>
               Add it as a new test
             </button>
@@ -903,7 +912,7 @@
           <!-- INFECTIONS & SEROLOGY -->
           <div class="lab-group">
             <div class="lab-group-title">
-              <span class="lgt-icon" style="background:#E8F5E9">🔬</span> Infections &amp; Serology
+              <span class="lgt-icon" style="background:var(--tint-2)">🔬</span> Infections &amp; Serology
             </div>
             <div class="lab-chips">
               <button class="lab-chip" data-lab="HIV Rapid Test">HIV Rapid Test</button>
@@ -998,7 +1007,7 @@
                fills its dose/frequency/duration for that age automatically.
                Pre-filled from the patient record when known. Always editable. -->
           <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
-            <span class="material-icons-outlined" style="font-size:17px;color:#1B5E20">bolt</span>
+            <span class="material-icons-outlined" style="font-size:17px;color:var(--deep-ink)">bolt</span>
             <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">Auto-dose for age</span>
             <div style="display:flex;align-items:center;gap:4px">
               <input id="patientAgeInput" type="number" min="0" max="120" inputmode="numeric"
@@ -1011,11 +1020,11 @@
             <button type="button" id="doseModeAdult" class="sev-chip active" style="padding:7px 14px">Adult</button>
             <button type="button" id="doseModeChild" class="sev-chip" style="padding:7px 14px">Child</button>
           </div>
-          <div id="dosingBandLabel" style="font-size:12px;color:#1B5E20;font-weight:600;margin:0 0 12px;padding-left:4px;display:flex;align-items:center;gap:5px"></div>
+          <div id="dosingBandLabel" style="font-size:12px;color:var(--deep-ink);font-weight:600;margin:0 0 12px;padding-left:4px;display:flex;align-items:center;gap:5px"></div>
 
           <div id="medsContainer"></div>
 
-          <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:#1B5E20;border:1.5px dashed #A5D6A7;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
+          <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:var(--deep-ink);border:1.5px dashed var(--tint-3);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
             <span class="material-icons-outlined" style="font-size:20px">add_circle_outline</span>
             Add medication
           </button>
@@ -1032,7 +1041,7 @@
             <div id="materialsContainer">
               <div id="materialsEmptyHint" style="font-size:12px;color:#9AA0A6;padding:2px 0">Stock auto-deducted on save.</div>
             </div>
-            <button id="addMaterialBtn" style="margin-top:10px;font-size:12px;padding:7px 14px;background:#E0F2F1;color:#00695C;border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+            <button id="addMaterialBtn" style="margin-top:10px;font-size:12px;padding:7px 14px;background:#E0F2F1;color:var(--accent);border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
               <span class="material-icons-outlined" style="font-size:14px">add</span> Add material
             </button>
           </div>

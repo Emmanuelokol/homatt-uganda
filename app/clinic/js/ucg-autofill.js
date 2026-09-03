@@ -695,7 +695,7 @@
     css.textContent = [
       '#ucgOverlay{display:none;position:fixed;inset:0;background:rgba(10,20,16,.55);z-index:900;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}',
       '#ucgPanel{background:var(--bg);width:100%;max-width:640px;max-height:94vh;border-radius:22px 22px 0 0;display:flex;flex-direction:column;overflow:hidden}',
-      '.ucg-top{background:linear-gradient(140deg,#0B3D2E,#10855F 60%,#17A46F);color:#fff;padding:16px 18px;flex:none}',
+      '.ucg-top{background:linear-gradient(140deg,var(--grad-1),var(--grad-2) 60%,var(--grad-3));color:#fff;padding:16px 18px;flex:none}',
       '.ucg-top .k{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;opacity:.85}',
       '.ucg-top h3{font-size:19px;font-weight:800;margin:2px 0 8px;letter-spacing:-.02em}',
       '.ucg-tags{display:flex;flex-wrap:wrap;gap:6px}',
@@ -704,18 +704,18 @@
       '.ucg-body{overflow-y:auto;padding:14px;flex:1;-webkit-overflow-scrolling:touch}',
       '.ucg-block{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);margin-bottom:12px;overflow:hidden}',
       '.ucg-bh{display:flex;align-items:center;gap:9px;padding:12px 14px;border-bottom:1px solid var(--border)}',
-      '.ucg-step{width:24px;height:24px;border-radius:8px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}',
+      '.ucg-step{width:24px;height:24px;border-radius:8px;background:var(--brand-tint);color:var(--primary-d);font-size:12px;font-weight:800;display:grid;place-items:center;flex:none}',
       '.ucg-bh h4{font-size:13.5px;font-weight:800;flex:1;color:var(--text)}',
       '.ucg-count{font-size:11px;font-weight:700;color:var(--text-lt)}',
       '.ucg-rows{padding:10px 12px}',
-      '.ucg-chip{display:inline-flex;align-items:center;gap:7px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:7px 8px 7px 13px;font-size:12.5px;font-weight:700;margin:0 6px 6px 0}',
+      '.ucg-chip{display:inline-flex;align-items:center;gap:7px;background:var(--brand-tint);color:var(--primary-d);border-radius:999px;padding:7px 8px 7px 13px;font-size:12.5px;font-weight:700;margin:0 6px 6px 0}',
       '.ucg-x{border:none;background:rgba(0,0,0,.10);color:inherit;width:19px;height:19px;border-radius:50%;font-size:13px;line-height:1;cursor:pointer;display:grid;place-items:center;flex:none;font-family:inherit}',
       '.ucg-x:hover{background:#E0454B;color:#fff}',
       // Each kind of medicine under its own heading, so it is clear what is a
       // choice of treatment and what is there for a complication.
       '.ucg-mg{margin-bottom:12px}',
-      '.ucg-mgh{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:#0B6B4F;text-transform:uppercase;letter-spacing:.5px;margin:2px 0 3px}',
-      '.ucg-mgh span{background:var(--brand-tint,#DBF4EA);color:#0A5C43;border-radius:999px;padding:0 7px;font-size:10px;letter-spacing:0}',
+      '.ucg-mgh{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;color:var(--grad-2);text-transform:uppercase;letter-spacing:.5px;margin:2px 0 3px}',
+      '.ucg-mgh span{background:var(--brand-tint);color:var(--primary-d);border-radius:999px;padding:0 7px;font-size:10px;letter-spacing:0}',
       '.ucg-mgi{font-size:11px;color:var(--text-lt);line-height:1.4;margin-bottom:7px}',
       '.ucg-from{display:flex;gap:8px;align-items:flex-start;background:rgba(11,92,138,.12);color:#0B5C8A;' +
         'border-radius:11px;padding:9px 11px;margin:0 0 11px;font-size:12px;line-height:1.45}',
@@ -725,16 +725,16 @@
       '.ucg-pick{display:flex;gap:8px;align-items:flex-start;background:rgba(230,124,15,.14);color:#8A4B04;' +
         'border-radius:11px;padding:9px 11px;margin-bottom:11px;font-size:12px;line-height:1.45;font-weight:600}',
       '.ucg-pick .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
-      '.ucg-pick.ok{background:rgba(14,124,90,.13);color:#0B6B4F}',
+      '.ucg-pick.ok{background:rgba(14,124,90,.13);color:var(--grad-2)}',
       'html[data-theme="dark"] .ucg-pick.ok{color:#7FD9B4;background:rgba(14,124,90,.20)}',
       'html[data-theme="dark"] .ucg-pick{color:#F5C089;background:rgba(230,124,15,.18)}',
-      'html[data-theme="dark"] .ucg-mgh{color:#5FD3A8}',
+      'html[data-theme="dark"] .ucg-mgh{color:var(--brand-ink)}',
       // The tick is what says "this one is being given" — untapped rows are
       // shown but nothing is prescribed or taken off the shelf for them.
       '.ucg-tick{grid-column:1;grid-row:1;align-self:start;width:26px;height:26px;border-radius:9px;border:1.5px solid var(--border);' +
         'background:var(--surface);color:var(--text-lt);display:grid;place-items:center;cursor:pointer;font-family:inherit;flex:none;margin-right:2px}',
       '.ucg-tick .material-icons-outlined{font-size:16px}',
-      '.ucg-tick.on{background:#0E7C5A;border-color:#0E7C5A;color:#fff}',
+      '.ucg-tick.on{background:var(--primary);border-color:var(--primary);color:#fff}',
       '.ucg-drug{display:grid;grid-template-columns:auto 1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px;opacity:.72}',
       '.ucg-drug.on{opacity:1;background:var(--brand-tint,#EAF7F1)}',
       'html[data-theme="dark"] .ucg-drug.on{background:rgba(14,124,90,.20)}',
@@ -744,16 +744,16 @@
       '.ucg-drug .nm .ucg-rank,.ucg-drug .nm .ucg-stk{display:inline-block;width:auto}',
       '.ucg-rank{display:inline-block;margin:2px 0 0;font-size:9.5px;font-weight:800;letter-spacing:.5px;' +
         'padding:1px 7px;border-radius:9px;background:var(--bg);color:var(--text-lt);line-height:1.7}',
-      '.ucg-rank.r-first{background:rgba(14,124,90,.16);color:#0B6B4F}',
+      '.ucg-rank.r-first{background:rgba(14,124,90,.16);color:var(--grad-2)}',
       '.ucg-rank.r-alt{background:rgba(11,92,138,.14);color:#0B5C8A}',
       '.ucg-rank.r-second,.ucg-rank.r-third{background:rgba(138,90,6,.14);color:#8A5A06}',
       '.ucg-rank.r-prereferral{background:rgba(179,38,30,.13);color:#B3261E}',
-      'html[data-theme="dark"] .ucg-rank.r-first{color:#5FD3A8}',
+      'html[data-theme="dark"] .ucg-rank.r-first{color:var(--brand-ink)}',
       'html[data-theme="dark"] .ucg-rank.r-alt{color:#79C4EE}',
       'html[data-theme="dark"] .ucg-rank.r-second,html[data-theme="dark"] .ucg-rank.r-third{color:#E5B463}',
       'html[data-theme="dark"] .ucg-rank.r-prereferral{color:#FF9E93}',
       '.ucg-stk{display:inline-block;margin-top:3px;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;line-height:1.6}',
-      '.ucg-stk.ok{background:rgba(46,125,50,.14);color:#2E7D32}',
+      '.ucg-stk.ok{background:rgba(46,125,50,.14);color:var(--deep-ink)}',
       '.ucg-stk.no{background:rgba(230,124,15,.16);color:#B35309}',
       // Dark mode needs the lighter end of both colours to stay readable.
       'html[data-theme="dark"] .ucg-stk.ok{color:#8FD79B}',
@@ -765,39 +765,39 @@
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
       // A drip is hung here, not carried home — said plainly on the row.
       '.fields-here{grid-template-columns:1fr auto !important;align-items:center}',
-      '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:#0E7C5A;line-height:1.3}',
+      '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--primary);line-height:1.3}',
       // The common drips, one tap each — on every condition, not just the few
       // the book happens to name a fluid for.
       '.ucg-qf{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}',
-      '.ucg-qfb{padding:6px 11px;border-radius:20px;border:1.5px dashed var(--border,#D7E4D9);background:transparent;color:#0E7C5A;font:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}',
+      '.ucg-qfb{padding:6px 11px;border-radius:20px;border:1.5px dashed var(--border,#D7E4D9);background:transparent;color:var(--primary);font:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}',
       '.ucg-qfb:active{background:rgba(14,124,90,.10)}',
-      'html[data-theme="dark"] .ucg-qfb{border-color:#3A4A40;color:#7BC98A}',
+      'html[data-theme="dark"] .ucg-qfb{border-color:#3A4A40;color:var(--brand-ink)}',
       '.ucg-here .material-icons-outlined{font-size:15px}',
-      'html[data-theme="dark"] .ucg-here{color:#7BC98A}',
+      'html[data-theme="dark"] .ucg-here{color:var(--brand-ink)}',
       '.ucg-add{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:none;background:linear-gradient(135deg,#7C6CF0,#5B49D6);color:#fff;border-radius:13px;padding:12px 18px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer;margin-top:8px;box-shadow:0 6px 14px rgba(108,92,231,.30);touch-action:manipulation}',
       '.ucg-add:active{transform:scale(.98)}',
       '.ucg-money{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;padding:12px}',
       '.ucg-money label{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px}',
       '.ucg-money input{width:100%;border:1.5px solid var(--border);border-radius:11px;padding:10px;font:inherit;font-size:15px;font-weight:700;background:var(--surface);color:var(--text);text-align:right}',
       '.ucg-total{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-top:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text)}',
-      '.ucg-total b{font-size:18px;color:#0E7C5A;letter-spacing:-.02em}',
+      '.ucg-total b{font-size:18px;color:var(--primary);letter-spacing:-.02em}',
       '.ucg-foot{flex:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:9px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}',
       '.ucg-btn{flex:1;border:none;border-radius:14px;padding:14px;font:inherit;font-size:14.5px;font-weight:800;cursor:pointer}',
       '.ucg-btn.ghost{background:var(--bg);color:var(--text-lt);flex:0 0 34%}',
-      '.ucg-btn.go{background:linear-gradient(135deg,#17936B,#0C6A4C);color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.3)}',
+      '.ucg-btn.go{background:linear-gradient(135deg,var(--grad-3),var(--grad-2));color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.3)}',
       '.ucg-src{font-size:11px;color:var(--text-lt);padding:2px 2px 10px}',
       '#ucgSearchWrap{padding:0 12px 12px}',
       '#ucgSearchWrap input{width:100%;border:1.5px solid var(--border);border-radius:12px;padding:11px 13px;font:inherit;font-size:15px;background:var(--surface);color:var(--text)}',
-      '#ucgSearchRes,#ucgTestRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint,#DBF4EA)}',
+      '#ucgSearchRes,#ucgTestRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint)}',
       '#ucgSearchRes div,#ucgTestRes div{padding:11px 13px;font-size:13.5px;cursor:pointer;border-bottom:1px solid var(--border)}',
-      '#ucgSearchRes div:hover,#ucgTestRes div:hover{background:var(--brand-tint,#DBF4EA)}',
+      '#ucgSearchRes div:hover,#ucgTestRes div:hover{background:var(--brand-tint)}',
       '.ucg-ask{position:fixed;inset:0;background:rgba(10,20,16,.6);z-index:950;display:none;align-items:center;justify-content:center;padding:20px}',
       '.ucg-ask-card{background:var(--surface);border-radius:20px;max-width:420px;width:100%;padding:20px;box-shadow:var(--shadow-lg)}',
       '.ucg-ask-card h4{font-size:16px;font-weight:800;margin-bottom:6px;color:var(--text)}',
       '.ucg-ask-card p{font-size:13px;color:var(--text-lt);line-height:1.5;margin-bottom:10px}',
       '.ucg-diff{background:var(--bg);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--text);margin-bottom:14px;max-height:180px;overflow-y:auto}',
       '.ucg-diff div{padding:2px 0}',
-      '.em-tag{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;vertical-align:1px}',
+      '.em-tag{display:inline-block;margin-left:6px;font-size:10px;font-weight:800;padding:2px 7px;border-radius:999px;background:var(--brand-tint);color:var(--primary-d);vertical-align:1px}',
       '.em-tag.warn{background:#FCEFCF;color:#8A5A06}',
       '.em-tag.ven-V{background:#FBE1DE;color:#B3261E}',
       '.em-tag.ven-E{background:#DBEFFB;color:#0B5C8A}',
@@ -806,13 +806,13 @@
       '.ucg-pay{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
       '.ucg-paychip{padding:12px 8px;border:1.5px solid var(--border);border-radius:14px;background:var(--surface,#fff);'
         + 'font:inherit;font-size:13.5px;font-weight:700;color:var(--text);cursor:pointer;text-align:center}',
-      '.ucg-paychip.on{border-color:#0E7C5A;background:var(--brand-tint,#DBF4EA);color:#0A5C43;box-shadow:0 0 0 3px rgba(14,124,90,.10)}',
+      '.ucg-paychip.on{border-color:var(--primary);background:var(--brand-tint);color:var(--primary-d);box-shadow:0 0 0 3px rgba(14,124,90,.10)}',
       '.ucg-payhint{margin-top:8px;font-size:12px;line-height:1.45;color:var(--text-lt)}',
       '.em-src{float:right;font-size:9.5px;font-weight:800;color:var(--text-lt);letter-spacing:.06em;margin-top:3px}',
       '.ucg-det{border-radius:12px;background:var(--bg);margin-bottom:7px;overflow:hidden}',
       '.ucg-det summary{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;color:var(--text)}',
       '.ucg-det summary::-webkit-details-marker{display:none}',
-      '.ucg-det summary .material-icons-outlined{font-size:18px;color:#0E7C5A;flex:none}',
+      '.ucg-det summary .material-icons-outlined{font-size:18px;color:var(--primary);flex:none}',
       '.ucg-det summary .chev{margin-left:auto;color:var(--text-lt);transition:transform .18s}',
       '.ucg-det[open] summary .chev{transform:rotate(180deg)}',
       // The notes are real markup now (headings, paragraphs, bullets), not a
@@ -820,19 +820,19 @@
       '.ucg-det-b{padding:0 13px 13px;font-size:13px;line-height:1.55;color:var(--text);max-height:52vh;overflow-y:auto}',
       // A heading is separated from what came before by a rule, so it is
       // obvious where one point stops and the next begins.
-      '.gl-h{font-size:12.5px;font-weight:800;color:#0B6B4F;margin:15px 0 7px;padding-top:12px;border-top:1px solid var(--border);line-height:1.35}',
+      '.gl-h{font-size:12.5px;font-weight:800;color:var(--grad-2);margin:15px 0 7px;padding-top:12px;border-top:1px solid var(--border);line-height:1.35}',
       '.gl-h:first-child{margin-top:0;padding-top:0;border-top:none}',
       '.gl-p{margin:0 0 9px;line-height:1.55}',
       '.gl-frag{margin:0 0 9px;color:var(--text-lt);font-style:italic}',
       '.gl-ul{margin:0 0 11px;padding:0;list-style:none}',
       '.gl-ul li{position:relative;padding-left:17px;margin-bottom:6px;line-height:1.5}',
-      '.gl-ul li:before{content:"";position:absolute;left:4px;top:8px;width:5px;height:5px;border-radius:50%;background:#0E7C5A}',
+      '.gl-ul li:before{content:"";position:absolute;left:4px;top:8px;width:5px;height:5px;border-radius:50%;background:var(--primary)}',
       '.gl-warn{display:flex;gap:8px;align-items:flex-start;background:rgba(198,40,40,.10);color:#B3261E;' +
         'border-radius:10px;padding:9px 11px;margin:0 0 10px;font-weight:700;line-height:1.45}',
       '.gl-warn .material-icons-outlined{font-size:17px;flex:none;margin-top:1px}',
-      'html[data-theme="dark"] .gl-h{color:#5FD3A8}',
+      'html[data-theme="dark"] .gl-h{color:var(--brand-ink)}',
       'html[data-theme="dark"] .gl-warn{color:#FFA79C;background:rgba(255,138,128,.13)}',
-      'html[data-theme="dark"] .gl-ul li:before{background:#5FD3A8}',
+      'html[data-theme="dark"] .gl-ul li:before{background:var(--brand-ink)}',
     ].join('\n');
     document.head.appendChild(css);
 
@@ -1631,7 +1631,7 @@
           var venTxt = { V: 'Vital', E: 'Essential', N: 'Necessary' }[m.ven] || '';
           var above = lvl && m.level && LEVELS.indexOf(m.level) > LEVELS.indexOf(lvl);
           return '<div data-i="' + i + '"><b>' + esc(m.name) + '</b>' +
-            (m.dose ? ' <span style="color:#0E7C5A;font-weight:700">' + esc(m.dose + (m.unit || '')) + '</span>' : '') +
+            (m.dose ? ' <span style="color:var(--primary);font-weight:700">' + esc(m.dose + (m.unit || '')) + '</span>' : '') +
             (m.form ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.form) + '</span>' : '') +
             (m.route ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.route) + '</span>' : '') +
             (m.level ? '<span class="em-tag' + (above ? ' warn' : '') + '">' + esc(m.level) + '</span>' : '') +
@@ -2463,7 +2463,7 @@
     var box = document.createElement('div');
     box.id = 'ucgDxRes';
     box.style.cssText = 'display:none;margin-top:8px;background:var(--surface,#fff);' +
-      'border:1.5px solid var(--brand-tint,#DBF4EA);border-radius:12px;overflow:hidden;' +
+      'border:1.5px solid var(--brand-tint);border-radius:12px;overflow:hidden;' +
       'max-height:270px;overflow-y:auto;box-shadow:var(--shadow,0 6px 18px rgba(20,24,43,.07))';
     inp.parentNode.insertBefore(box, inp.nextSibling);
 

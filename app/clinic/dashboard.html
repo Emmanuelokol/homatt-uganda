@@ -15,7 +15,16 @@
     // Apply saved (or system) theme before first paint — no flash.
     (function(){try{var t=localStorage.getItem('homatt_theme');
     if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
-    document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+    /* The colour family. Set here, before the first paint, so switching
+       look never shows a flash of the old one. */
+    var s=localStorage.getItem('homatt_skin');
+    if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
+    var d=document.documentElement;
+    d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
+    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+    document.addEventListener('DOMContentLoaded',function(){
+      var m=document.querySelector('meta[name="theme-color"]');
+      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
   </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -28,7 +37,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260905">
+  <link rel="stylesheet" href="css/clinic.css?v=20260909">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -62,7 +71,7 @@
     }
     .slide-tab > span:last-child{overflow:hidden;text-overflow:ellipsis;min-width:0}
     .slide-tab .material-icons-outlined{font-size:16px;flex-shrink:0}
-    .slide-tab.active{background:linear-gradient(135deg,#17936B 0%,#0C6A4C 100%);color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.34)}
+    .slide-tab.active{background:linear-gradient(135deg,var(--grad-3) 0%,var(--grad-2) 100%);color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.34)}
 
     /* MOBILE: pin the tab bar under the FIXED topbar so it's always visible
        while scrolling. (sticky top:0 hid behind the fixed 60px topbar.) */
@@ -88,10 +97,10 @@
     @media (prefers-reduced-motion: reduce){.slides-ready .hslide{animation:none !important}}
 
     .home-hero {
-      background: linear-gradient(140deg, #0B3D2E 0%, #10855F 55%, #17A46F 100%);
+      background: linear-gradient(140deg, var(--grad-1) 0%, var(--grad-2) 55%, var(--grad-3) 100%);
       color: #fff;
       padding: 26px 26px 24px;
-      border-radius: var(--radius-lg, 24px);
+      border-radius: var(--radius-lg,24px);
       margin-bottom: 22px;
       display: flex; align-items: center; justify-content: space-between;
       gap: 20px; flex-wrap: wrap;
@@ -99,11 +108,21 @@
       position: relative; overflow: hidden;
     }
     .home-hero::after{content:"";position:absolute;right:-50px;top:-50px;width:180px;height:180px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.16),transparent 70%);pointer-events:none}
+    /* The clinician's photo, beside the greeting */
+    .hero-who{display:flex;align-items:center;gap:15px;min-width:0;position:relative;z-index:1}
+    .hero-portrait{flex:none;width:62px;height:62px;border-radius:50%;
+      border:2.5px solid rgba(255,255,255,.55);background:rgba(255,255,255,.14);
+      background-size:cover;background-position:center;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;padding:0;
+      touch-action:manipulation;transition:border-color .15s}
+    .hero-portrait:hover{border-color:#fff}
+    .hero-portrait.has-photo .hero-portrait-icon{display:none}
+    .hero-portrait-icon{color:rgba(255,255,255,.85);font-size:24px}
     .home-hero > * { position: relative; z-index: 1 }
     .home-hero h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing:-.02em }
     .home-hero p  { font-size: 14px; opacity: .9 }
     .home-cta {
-      background: #fff; color: #0A5C43;
+      background: #fff; color: var(--primary-d);
       padding: 14px 24px; border-radius: 15px;
       font-size: 15px; font-weight: 800;
       border: none; cursor: pointer;
@@ -118,7 +137,7 @@
 
     /* ── Money slide: soft ring tiles ── */
     .fin-wrap{padding:16px}
-    .fin-hero{background:linear-gradient(140deg,#0B3D2E 0%,#10855F 60%,#17A46F 100%);border-radius:var(--radius-lg,24px);padding:18px 20px;color:#fff;box-shadow:0 14px 30px rgba(14,124,90,.28);margin-bottom:13px;position:relative;overflow:hidden}
+    .fin-hero{background:linear-gradient(140deg,var(--grad-1) 0%,var(--grad-2) 60%,var(--grad-3) 100%);border-radius:var(--radius-lg,24px);padding:18px 20px;color:#fff;box-shadow:0 14px 30px rgba(14,124,90,.28);margin-bottom:13px;position:relative;overflow:hidden}
     .fin-hero::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(255,255,255,.15),transparent 70%)}
     .fin-hero .l{font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.09em;opacity:.85}
     .fin-hero .b{font-size:29px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;margin:2px 0;line-height:1.05}
@@ -142,7 +161,7 @@
     .stock-ic .material-icons-outlined{font-size:22px}
     .stock-name{flex:1;min-width:0;font-size:14px;font-weight:800;color:var(--text);letter-spacing:-.01em;line-height:1.35;overflow-wrap:anywhere;word-break:break-word}
     .stock-name .pill-s{margin-left:6px}
-    .stock-restock{font-size:11.5px;padding:8px 13px;background:var(--brand-tint,#DBF4EA);color:#0A5C43;border:none;border-radius:11px;cursor:pointer;font-weight:800;font-family:inherit;white-space:nowrap;flex:none}
+    .stock-restock{font-size:11.5px;padding:8px 13px;background:var(--brand-tint);color:var(--primary-d);border:none;border-radius:11px;cursor:pointer;font-weight:800;font-family:inherit;white-space:nowrap;flex:none}
     .stock-meta{font-size:11.5px;color:var(--text-lt);margin-top:8px}
     .stock-bar{height:7px;border-radius:999px;background:var(--border,#E8EAED);margin-top:9px;overflow:hidden}
     .stock-bar i{display:block;height:100%;border-radius:999px;transition:width .5s ease}
@@ -179,7 +198,7 @@
     .order-status { margin-bottom: 6px }
     .completion-tick {
       width: 24px; height: 24px; border-radius: 50%;
-      background: #E8F5E9; color: #2E7D32;
+      background: var(--tint-2); color: var(--deep-ink);
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 14px;
     }
@@ -255,22 +274,22 @@
        :hover state sticks after a tap and makes an unselected card look
        selected. */
     @media (hover: hover) and (pointer: fine) {
-      .qs-drug-card:hover { background: #E8F5E9; border-color: #81C784; }
+      .qs-drug-card:hover { background: var(--tint-2); border-color: #81C784; }
     }
     /* Selected must be clearly distinct from hover so staff know what's chosen. */
     .qs-drug-card.selected {
-      background: #E8F5E9; border-color: #1B5E20;
+      background: var(--tint-2); border-color: var(--deep-ink);
       box-shadow: 0 0 0 3px rgba(27,94,32,.22);
     }
     .qs-drug-name  { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
-    .qs-drug-price { font-size: 12px; color: #1B5E20; font-weight: 600; }
+    .qs-drug-price { font-size: 12px; color: var(--deep-ink); font-weight: 600; }
     .qs-drug-stock { font-size: 11px; margin-top: 2px; }
     .qs-pm-chip {
       padding: 8px 16px; border-radius: 20px; border: 1.5px solid #E0E0E0;
       background: transparent; color: #424242; font-size: 13px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; font-family: inherit; transition: all .1s;
     }
-    .qs-pm-chip.selected { background: #1B5E20; color: #fff; border-color: #1B5E20; }
+    .qs-pm-chip.selected { background: var(--deep); color: #fff; border-color: var(--deep-ink); }
     #qsSellBtn:disabled  { background: #BDBDBD !important; box-shadow: none !important; cursor: not-allowed; }
     @media (max-width: 480px) {
       #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
@@ -341,9 +360,17 @@
 
       <!-- Hero with New Treatment CTA -->
       <div class="home-hero" data-slide="home">
-        <div>
-          <h1 id="heroGreeting">Good morning</h1>
-          <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual treatment.</p>
+        <div class="hero-who">
+          <!-- The clinician's own photo. Tapping it picks a new one; it is
+               shrunk on the phone before it goes anywhere. -->
+          <button type="button" class="hero-portrait" data-portrait data-portrait-pick
+                  title="Add or change your photo" aria-label="Add or change your photo">
+            <span class="material-icons-outlined hero-portrait-icon">add_a_photo</span>
+          </button>
+          <div>
+            <h1 id="heroGreeting">Good morning</h1>
+            <p id="heroSubtitle">Walk-in patient without a Homatt code? Start a manual treatment.</p>
+          </div>
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <a href="new-order.html" class="home-cta" data-cap="consultations">
@@ -512,11 +539,11 @@
       <div class="admin-table-wrap" data-cap="consultations" style="padding:0;margin-bottom:12px;" id="topConditionsSection" data-slide="patients">
         <div class="table-header" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
           <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00796B">biotech</span>
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--accent)">biotech</span>
             Top Conditions &amp; Treatments
           </div>
           <div style="display:flex;gap:6px;align-items:center">
-            <button onclick="setCondPeriod(30)" id="condBtn30" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00796B;background:#00796B;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">30 days</button>
+            <button onclick="setCondPeriod(30)" id="condBtn30" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-family:inherit">30 days</button>
             <button onclick="setCondPeriod(90)" id="condBtn90" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">90 days</button>
           </div>
         </div>
@@ -529,11 +556,11 @@
       <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:12px;background:none;box-shadow:none" data-slide="stock">
         <div class="table-header" style="justify-content:space-between;border-bottom:none;padding-left:2px;padding-right:2px">
           <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#00897B">inventory_2</span>
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--accent)">inventory_2</span>
             Stock Tracker
           </div>
           <div style="display:flex;gap:8px;align-items:center">
-            <button onclick="(window.StockIntake?window.StockIntake.start(null):openAddStockModal())" style="font-size:12px;padding:6px 14px;background:#00897B;color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+            <button onclick="(window.StockIntake?window.StockIntake.start(null):openAddStockModal())" style="font-size:12px;padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
               <span class="material-icons-outlined" style="font-size:15px">add</span> Add Item
             </button>
           </div>
@@ -547,11 +574,11 @@
       <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:12px" data-slide="money">
         <div class="table-header">
           <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#0E7C5A">analytics</span>
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--primary)">analytics</span>
             Financial Overview
           </div>
           <div style="display:flex;gap:8px">
-            <button class="fin-tab active" data-period="day"   onclick="setFinPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #0E7C5A;background:#0E7C5A;color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
+            <button class="fin-tab active" data-period="day"   onclick="setFinPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
             <button class="fin-tab"        data-period="week"  onclick="setFinPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
             <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
           </div>
@@ -580,7 +607,7 @@
               <div class="fin-info"><div class="fin-num" id="finStockCost">—</div><div class="fin-lbl">Stock used</div><div class="fin-sub">Cost of meds</div></div>
             </div>
             <div class="fin-tile" style="grid-column:1 / -1">
-              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringPatients" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="#0E7C5A"/></svg></div>
+              <div class="fin-ring"><svg width="48" height="48"><circle class="frt" cx="24" cy="24" r="19" fill="none" stroke-width="6"/><circle class="frv" id="ringPatients" cx="24" cy="24" r="19" fill="none" stroke-width="6" stroke-linecap="round" stroke="var(--primary)"/></svg></div>
               <div class="fin-info"><div class="fin-num" id="finPatients">—</div><div class="fin-lbl">Patients seen</div><div class="fin-sub">This period</div></div>
             </div>
           </div>
@@ -634,7 +661,7 @@
   <div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
     <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">task_alt</span>
+        <span class="material-icons-outlined" style="color:var(--deep-ink);font-size:26px">task_alt</span>
         <h3 style="font-size:17px;font-weight:700;margin:0">Discharge Patient</h3>
       </div>
       <p style="font-size:13px;color:#5F6368;margin:0 0 14px;line-height:1.5">
@@ -646,7 +673,7 @@
       <div id="dischargeError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
       <div style="display:flex;gap:10px">
         <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
-        <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:#1B5E20;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify
         </button>
       </div>
@@ -666,7 +693,7 @@
           <span>Total bill</span><span id="pmTotal" style="font-weight:700;color:#202124">—</span>
         </div>
         <div style="display:flex;justify-content:space-between">
-          <span>Paid so far</span><span id="pmPaid" style="font-weight:700;color:#1B5E20">—</span>
+          <span>Paid so far</span><span id="pmPaid" style="font-weight:700;color:var(--deep-ink)">—</span>
         </div>
         <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #E0E0E0;margin-top:6px">
           <span style="font-weight:600">Balance due</span><span id="pmBalance" style="font-weight:700;color:#C62828">—</span>
@@ -680,7 +707,7 @@
         <button type="button" onclick="setPmQuickAmount('half')"
           style="font-size:12px;padding:6px 12px;background:#F5F5F5;border:1px solid var(--border);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Half</button>
         <button type="button" onclick="setPmQuickAmount('full')"
-          style="font-size:12px;padding:6px 12px;background:#E8F5E9;border:1px solid #A5D6A7;color:#1B5E20;border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Full Balance</button>
+          style="font-size:12px;padding:6px 12px;background:var(--tint-2);border:1px solid var(--tint-3);color:var(--deep-ink);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Full Balance</button>
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -742,7 +769,7 @@
              two lines per patient, and discharging is a decision you make after
              looking at the record, not while scrolling past it. -->
         <button id="histModalDischargeBtn"
-          style="display:none;width:100%;margin-top:9px;padding:13px;background:transparent;color:#1B5E20;border:1.5px solid #1B5E20;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px">
+          style="display:none;width:100%;margin-top:9px;padding:13px;background:transparent;color:var(--deep-ink);border:1.5px solid var(--deep);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px">
           <span class="material-icons-outlined" style="font-size:18px">task_alt</span>
           Discharge patient
         </button>
@@ -758,12 +785,12 @@
     <!-- Header -->
     <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0;gap:8px">
       <div style="display:flex;align-items:center;gap:10px;min-width:0">
-        <span class="material-icons-outlined" style="color:#1B5E20;font-size:26px">point_of_sale</span>
-        <span style="font-size:19px;font-weight:800;color:#1B5E20">Quick Sale</span>
+        <span class="material-icons-outlined" style="color:var(--deep-ink);font-size:26px">point_of_sale</span>
+        <span style="font-size:19px;font-weight:800;color:var(--deep-ink)">Quick Sale</span>
       </div>
       <div style="display:flex;gap:6px;align-items:center">
         <button id="qsAddDrugBtn" type="button"
-          style="background:#E8F5E9;border:1.5px solid #A5D6A7;color:#1B5E20;border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
+          style="background:var(--tint-2);border:1.5px solid var(--tint-3);color:var(--deep-ink);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
           <span class="material-icons-outlined" style="font-size:16px">add</span> New Item
         </button>
         <button id="qsCloseBtn" type="button" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
@@ -792,7 +819,7 @@
          shrink and scroll rather than push the Sell button off the bottom. -->
     <div style="padding:0 16px 8px;flex-shrink:0">
       <button id="qsAddFromSearch" type="button"
-        style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1.5px dashed #A5D6A7;background:transparent;color:#1B5E20;border-radius:10px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
+        style="width:100%;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 12px;border:1.5px dashed var(--tint-3);background:transparent;color:var(--deep-ink);border-radius:10px;font-size:13.5px;font-weight:700;font-family:inherit;cursor:pointer;touch-action:manipulation">
         <span class="material-icons-outlined" style="font-size:17px">add_circle_outline</span>
         <span id="qsAddFromSearchLabel">Add an item or medicine</span>
       </button>
@@ -807,9 +834,9 @@
     </div>
 
     <!-- Selected drug + controls -->
-    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid #E8F5E9;background:#FAFFFE;flex-shrink:1;min-height:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
+    <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid var(--tint-2);background:#FAFFFE;flex-shrink:1;min-height:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
-        <div id="qsSelName" style="font-size:16px;font-weight:800;color:#1B5E20;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+        <div id="qsSelName" style="font-size:16px;font-weight:800;color:var(--deep-ink);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
         <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
       </div>
       <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:8px"></div>
@@ -831,7 +858,7 @@
       <div style="display:flex;align-items:center;gap:8px">
         <span style="font-size:13px;font-weight:600;color:#5F6368">UGX</span>
         <input id="qsTotalInput" type="number" min="0" step="100" inputmode="numeric"
-          style="flex:1;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:18px;font-weight:800;color:#202124;font-family:inherit;outline:none;background:#fff;text-align:right;box-sizing:border-box">
+          style="flex:1;padding:11px 14px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:18px;font-weight:800;color:#202124;font-family:inherit;outline:none;background:#fff;text-align:right;box-sizing:border-box">
         <button id="qsResetTotal" type="button" title="Reset to auto"
           style="background:transparent;border:none;color:#9AA0A6;cursor:pointer;padding:6px;display:flex;align-items:center;touch-action:manipulation">
           <span class="material-icons-outlined" style="font-size:18px">refresh</span>
@@ -840,14 +867,14 @@
       <!-- Add-another: builds a multi-item sale. Selling ONE item stays one tap
            on Sell; tap this to keep adding items to the same sale. -->
       <button id="qsAddMoreBtn" type="button"
-        style="margin-top:10px;width:100%;padding:11px;background:#E8F5E9;color:#1B5E20;border:1.5px solid #A5D6A7;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+        style="margin-top:10px;width:100%;padding:11px;background:var(--tint-2);color:var(--deep-ink);border:1.5px solid var(--tint-3);border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
         <span class="material-icons-outlined" style="font-size:18px">add_shopping_cart</span>
         Add &amp; pick another item
       </button>
     </div>
 
     <!-- Cart: the items in the current sale (shown once you Add another) -->
-    <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:1;min-height:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid #E8F5E9;background:#FBFEFC">
+    <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:1;min-height:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid var(--tint-2);background:#FBFEFC">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <span style="font-size:11px;font-weight:800;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">This sale</span>
         <button id="qsClearCart" type="button" style="background:none;border:none;color:#C62828;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Clear</button>
@@ -857,7 +884,7 @@
 
     <!-- Sell button -->
     <button id="qsSellBtn" type="button" disabled
-      style="margin:10px 16px;margin-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding:16px;background:linear-gradient(135deg,#17936B,#0C6A4C);color:#fff;border:none;border-radius:15px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;box-shadow:0 10px 22px rgba(14,124,90,.34);transition:opacity .15s">
+      style="margin:10px 16px;margin-bottom:calc(14px + env(safe-area-inset-bottom, 0px));padding:16px;background:linear-gradient(135deg,var(--grad-3),var(--grad-2));color:#fff;border:none;border-radius:15px;font-size:17px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;touch-action:none;font-family:inherit;flex-shrink:0;box-shadow:0 10px 22px rgba(14,124,90,.34);transition:opacity .15s">
       <span class="material-icons-outlined" style="font-size:20px">sell</span>
       Sell
     </button>
@@ -894,7 +921,7 @@
       style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center">
 
     <div id="vmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
-    <div id="vmSuccess" style="display:none;background:#E8F5E9;color:#1B5E20;border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
+    <div id="vmSuccess" style="display:none;background:var(--tint-2);color:var(--deep-ink);border-radius:8px;padding:10px 12px;font-size:13px;margin-top:14px"></div>
 
     <div style="height:18px"></div>
 
@@ -915,7 +942,7 @@
 <div id="stockItemModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">inventory_2</span>
+      <span class="material-icons-outlined" style="color:var(--accent);font-size:26px">inventory_2</span>
       <h3 id="stockModalTitle" style="font-size:17px;font-weight:700;margin:0">Add Stock Item</h3>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
@@ -954,9 +981,9 @@
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#1B5E20;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
+        <label style="font-size:12px;font-weight:600;color:var(--deep-ink);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
         <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
-          style="width:100%;padding:11px 14px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          style="width:100%;padding:11px 14px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
         <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Expiry Date <span style="font-weight:400;color:#9AA0A6;text-transform:none">(optional — enables expiry alerts)</span></label>
@@ -981,7 +1008,7 @@
       </div>
       <!-- Packaging — optional, enables Pack / Box selling in Quick Sale -->
       <div style="grid-column:1/-1;margin-top:4px">
-        <div style="font-size:11px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding:6px 10px;background:#E8F5E9;border-radius:8px;display:flex;align-items:center;gap:6px">
+        <div style="font-size:11px;font-weight:700;color:var(--deep-ink);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;padding:6px 10px;background:var(--tint-2);border-radius:8px;display:flex;align-items:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:14px">inventory_2</span>
           Packaging — enables Pack &amp; Box selling in Quick Sale (optional)
         </div>
@@ -992,9 +1019,9 @@
               style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:#1B5E20;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Pack price (UGX)</label>
+            <label style="font-size:11px;font-weight:600;color:var(--deep-ink);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Pack price (UGX)</label>
             <input id="siPackPrice" type="number" min="0" step="100" placeholder="e.g. 8,000"
-              style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
             <label style="font-size:11px;font-weight:600;color:#424242;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Packs per box</label>
@@ -1002,9 +1029,9 @@
               style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:#1B5E20;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Box price (UGX)</label>
+            <label style="font-size:11px;font-weight:600;color:var(--deep-ink);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Box price (UGX)</label>
             <input id="siBoxPrice" type="number" min="0" step="100" placeholder="e.g. 75,000"
-              style="width:100%;padding:10px 12px;border:1.5px solid #A5D6A7;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
         </div>
       </div>
@@ -1012,7 +1039,7 @@
     <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
       <button onclick="document.getElementById('stockItemModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
-      <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
+      <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
     </div>
   </div>
 </div>
@@ -1038,7 +1065,7 @@
 <div id="restockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
   <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <span class="material-icons-outlined" style="color:#00897B;font-size:26px">add_shopping_cart</span>
+      <span class="material-icons-outlined" style="color:var(--accent);font-size:26px">add_shopping_cart</span>
       <div>
         <h3 style="font-size:17px;font-weight:700;margin:0" id="restockItemName">Restock</h3>
         <div id="restockCurrentQty" style="font-size:12px;color:#9AA0A6;margin-top:2px"></div>
@@ -1056,7 +1083,7 @@
     <div id="restockError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
       <button onclick="document.getElementById('restockModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
-      <button id="restockSaveBtn" style="flex:2;padding:12px;background:#00897B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+      <button id="restockSaveBtn" style="flex:2;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
         <span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock
       </button>
     </div>
@@ -1265,7 +1292,7 @@
   function _svViewAllBtn(key, label) {
     return '<button onclick="openSectionView(\'' + key + '\')" '
       + 'style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 32px);margin:10px 16px 14px;padding:11px;background:#F5F7FA;'
-      + 'color:#1B5E20;border:1.5px solid #C8E6C9;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">'
+      + 'color:var(--deep-ink);border:1.5px solid #C8E6C9;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">'
       + label + ' <span class="material-icons-outlined" style="font-size:16px">arrow_forward</span></button>';
   }
   function _svSetCount(txt) {
@@ -1482,12 +1509,12 @@
           +'<div class="order-avatar" style="background:#FFF8E1;color:#E65100">'+ini+'</div>'
           +'<div class="order-info" style="cursor:pointer">'
             +'<div class="order-patient">'+esc(b.patient_name||'Unknown')+'</div>'
-            +'<div class="order-drug">'+esc(b.ai_diagnosis||'—')+' · Code <strong style="color:#1B5E20;letter-spacing:1px">'+esc(b.booking_code)+'</strong></div>'
+            +'<div class="order-drug">'+esc(b.ai_diagnosis||'—')+' · Code <strong style="color:var(--deep-ink);letter-spacing:1px">'+esc(b.booking_code)+'</strong></div>'
             +'<div class="order-meta"><span>'+t+'</span></div>'
           +'</div>'
           +'<div class="order-right" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">'
             +'<span class="status-badge '+urg+'">'+esc(b.urgency_level||'normal')+'</span>'
-            +'<button class="mark-done-btn" data-id="'+esc(b.id)+'" style="font-size:11px;padding:4px 10px;background:#E8F5E9;color:#1B5E20;border:1px solid #A5D6A7;border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">&#10003; Done</button>'
+            +'<button class="mark-done-btn" data-id="'+esc(b.id)+'" style="font-size:11px;padding:4px 10px;background:var(--tint-2);color:var(--deep-ink);border:1px solid var(--tint-3);border-radius:20px;cursor:pointer;font-weight:600;font-family:inherit;white-space:nowrap">&#10003; Done</button>'
           +'</div>'
           +'</div>';
       }).join('');
@@ -1675,7 +1702,7 @@
           + '<button id="pxCancel" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border,#E0E0E0);'
             + 'background:var(--surface,#fff);font:inherit;font-size:14px;font-weight:700;color:var(--text,#111);cursor:pointer">Cancel</button>'
           + '<button id="pxSave" style="flex:2;padding:13px;border-radius:13px;border:none;'
-            + 'background:linear-gradient(135deg,#0E7C5A,#12A374);color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer">Save details</button>'
+            + 'background:linear-gradient(135deg,var(--primary),var(--grad-3));color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer">Save details</button>'
         + '</div></div>';
       document.body.appendChild(ov);
       ov.addEventListener('click', function(e){ if (e.target === ov) ov.style.display = 'none'; });
@@ -1915,7 +1942,7 @@
             +'<div class="order-drug">'+esc(latest.confirmed_diagnosis||'Pending')+'</div>'
             +'<div class="order-meta">'
               +((typeof homattPatientId === 'function' && homattPatientId(g.phone || latest))
-                  ? '<span style="background:#DBF4EA;color:#0A5C43;font-weight:800;padding:1px 7px;border-radius:10px">'
+                  ? '<span style="background:var(--brand-tint);color:var(--primary-d);font-weight:800;padding:1px 7px;border-radius:10px">'
                     + esc(homattPatientId(g.phone || latest)) + '</span>' : '')
               +'<span>'+count+' visit'+(count!==1?'s':'')+'</span>'+(g.phone?'<span>'+esc(g.phone)+'</span>':'')+'</div>'
           +'</div>'
@@ -1978,7 +2005,7 @@
     if (nameEl) nameEl.textContent = g.name || 'Patient';
     if (metaEl) {
       var hpid = (typeof homattPatientId === 'function') ? homattPatientId(g.phone || g.records[0]) : '';
-      metaEl.innerHTML = (hpid ? '<strong style="color:#0A5C43">' + esc(hpid) + '</strong> · ' : '') +
+      metaEl.innerHTML = (hpid ? '<strong style="color:var(--primary-d)">' + esc(hpid) + '</strong> · ' : '') +
         esc((g.phone ? g.phone + ' · ' : '')) + g.records.length + ' visit' + (g.records.length !== 1 ? 's' : '');
     }
     // This is a read-only history view — hide the active-patient follow-up footer
@@ -2004,7 +2031,7 @@
     var paidAmt = Number(c.amount_paid) || 0;
     var balance = Math.max(0, total - paidAmt);
     var payBadge = c.payment_status==='paid'
-      ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+      ? '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
       : c.payment_status==='waived'
       ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
       : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">'+((balance>0&&paidAmt>0)?'PART-PAID':'PENDING')+'</span>';
@@ -2038,7 +2065,7 @@
       var endTs = d.getTime() + maxDur * 86400000;
       var daysLeft = Math.ceil((endTs - Date.now()) / 86400000);
       if (daysLeft <= 0) {
-        courseChip = '<span style="background:#E8F5E9;color:#1B5E20;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> '+maxDur+'-day course period over</span>';
+        courseChip = '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> '+maxDur+'-day course period over</span>';
       } else {
         courseChip = '<span style="background:#FFF8E1;color:#E65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">pending</span> On treatment · '+daysLeft+' day'+(daysLeft!==1?'s':'')+' left</span>';
       }
@@ -2068,7 +2095,7 @@
       ? '<div style="background:#FAFAFA;border:1px solid #ECECEC;border-radius:10px;padding:10px 12px;margin-top:10px">'
           + feeRows
           + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#212121;border-top:1px solid #E0E0E0;margin-top:4px;padding-top:4px"><span>Total billed</span><span>UGX '+fmtUGX(total)+'</span></div>'
-          + (paidAmt>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:#1B5E20"><span>Paid</span><span>UGX '+fmtUGX(paidAmt)+'</span></div>' : '')
+          + (paidAmt>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--deep-ink)"><span>Paid</span><span>UGX '+fmtUGX(paidAmt)+'</span></div>' : '')
           + (balance>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#E65100"><span>Balance due</span><span>UGX '+fmtUGX(balance)+'</span></div>' : '')
         +'</div>'
       : '';
@@ -2085,7 +2112,7 @@
         +'<div style="font-weight:700;font-size:14px">Visit '+visitNum+' — '+esc(dateStr)
           +'<div style="font-size:11px;color:#9AA0A6;font-weight:500">'+esc(timeStr)+'</div></div>'
         +'<div style="text-align:right;flex-shrink:0">'+payBadge
-          +(total?'<div style="font-size:12px;font-weight:600;color:#1B5E20;margin-top:3px">UGX '+fmtUGX(total)+'</div>':'')
+          +(total?'<div style="font-size:12px;font-weight:600;color:var(--deep-ink);margin-top:3px">UGX '+fmtUGX(total)+'</div>':'')
         +'</div>'
       +'</div>'
       +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
@@ -2236,16 +2263,16 @@
     var status  = current.payment_status || (balance > 0 ? 'pending' : 'paid');
 
     var balanceBlock = total > 0
-      ? '<div style="background:'+(balance>0?'#FFF3E0':'#E8F5E9')+';border:1px solid '+(balance>0?'#FFB74D':'#A5D6A7')+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
+      ? '<div style="background:'+(balance>0?'#FFF3E0':'var(--tint-2)')+';border:1px solid '+(balance>0?'#FFB74D':'var(--tint-3)')+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
             +'<div>'
-              +'<div style="font-size:11px;color:'+(balance>0?'#E65100':'#1B5E20')+';font-weight:700;letter-spacing:.5px;text-transform:uppercase">'+(balance>0?'Outstanding Balance':'Bill Settled')+'</div>'
-              +'<div style="font-size:20px;font-weight:800;color:'+(balance>0?'#E65100':'#1B5E20')+';margin-top:2px">UGX '+fmtUGX(balance>0?balance:total)+'</div>'
+              +'<div style="font-size:11px;color:'+(balance>0?'#E65100':'var(--deep)')+';font-weight:700;letter-spacing:.5px;text-transform:uppercase">'+(balance>0?'Outstanding Balance':'Bill Settled')+'</div>'
+              +'<div style="font-size:20px;font-weight:800;color:'+(balance>0?'#E65100':'var(--deep)')+';margin-top:2px">UGX '+fmtUGX(balance>0?balance:total)+'</div>'
               +'<div style="font-size:11px;color:#5F6368;margin-top:4px">Total billed UGX '+fmtUGX(total)+' · Paid UGX '+fmtUGX(paid)+'</div>'
             +'</div>'
             +(balance>0
               ? '<button data-action="record-payment" style="background:#E65100;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap"><span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
-              : '<span style="background:#1B5E20;color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700">PAID</span>')
+              : '<span style="background:var(--deep);color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700">PAID</span>')
           +'</div>'
         +'</div>'
       : '';
@@ -2308,7 +2335,7 @@
           var hd = new Date(h.created_at);
           var hDate = hd.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
           var hPaid = h.payment_status === 'paid'
-            ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+            ? '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
             : (h.payment_status === 'waived'
               ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
               : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>');
@@ -2826,7 +2853,7 @@
     if (!rows.length) {
       var emptyMsg = q
         ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#BDBDBD">search_off</span>No patient matches "'+esc(q)+'".'
-        : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">task_alt</span>No active cases. All caught up!';
+        : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:var(--tint-3)">task_alt</span>No active cases. All caught up!';
       el.innerHTML = notice + '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
       return;
     }
@@ -2912,7 +2939,7 @@
 
     if (!overdue.length) {
       el.innerHTML = '<div style="padding:16px 20px;text-align:center;color:#9AA0A6;font-size:13px">'
-        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#A5D6A7">event_available</span>'
+        + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:var(--tint-3)">event_available</span>'
         + 'No missed return visits. All follow-ups on track.</div>';
       return;
     }
@@ -3007,7 +3034,7 @@
           + '</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
           +   '<a href="tel:' + esc(phone) + '" style="text-decoration:none">'
-          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:#1B5E20;color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
+          +     '<button type="button" style="touch-action:manipulation;width:100%;padding:14px 8px;background:var(--deep);color:#fff;border:none;border-radius:12px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px">'
           +       '<span class="material-icons-outlined" style="font-size:22px">call</span> Call'
           +     '</button>'
           +   '</a>'
@@ -3267,7 +3294,7 @@
 
   // Toast for discharge notification result (also reused by payment recording)
   function showDischargeToast(msg, kind) {
-    var bg = '#1B5E20', icon = 'check_circle';
+    var bg = 'var(--deep)', icon = 'check_circle';
     if (kind === 'warning') { bg = '#E65100'; icon = 'warning'; }
     if (kind === 'error')   { bg = '#C62828'; icon = 'error';   }
     var t = document.createElement('div');
@@ -3566,7 +3593,7 @@
         : _state === 'credit'
           ? '<span style="background:#E3F2FD;color:#1565C0;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">ON CREDIT</span>'
           : _state === 'paid'
-            ? '<span style="background:#E8F5E9;color:#1B5E20;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PAID</span>'
+            ? '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">PAID</span>'
             : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;letter-spacing:.3px">NOT PAID</span>';
       var ageDays = (Date.now() - new Date(r.created_at).getTime()) / 86400000;
       var ageBg = ageDays > 7 ? '#FFEBEE' : ageDays > 2 ? '#FFF3E0' : '#F5F5F5';
@@ -3593,12 +3620,12 @@
           // whole bill when it was only the part still outstanding.
           +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:11.5px;color:#5F6368;margin-bottom:5px">'
             +'<span>Bill <b style="color:#202124">UGX '+fmtUGX(_bill)+'</b>'
-              +' · Paid <b style="color:#1B5E20">UGX '+fmtUGX(_paid)+'</b>'
+              +' · Paid <b style="color:var(--deep-ink)">UGX '+fmtUGX(_paid)+'</b>'
               +' · Owing <b style="color:#C62828">UGX '+fmtUGX(_owed)+'</b></span>'
             +'<span>'+esc(lastPay)+'</span>'
           +'</div>'
           +'<div style="height:5px;background:#F1F3F4;border-radius:3px;overflow:hidden;margin-bottom:8px">'
-            +'<div style="width:'+pct+'%;height:100%;background:#1B5E20;transition:width .3s"></div>'
+            +'<div style="width:'+pct+'%;height:100%;background:var(--deep);transition:width .3s"></div>'
           +'</div>'
           +'<div style="display:flex;gap:6px">'
             +'<button class="record-pay-btn" data-id="'+esc(r.id)+'" data-name="'+esc(r.patient_name||'Patient')+'" data-total="'+(r.total_charged_ugx||0)+'" data-paid="'+(r.amount_paid||0)+'" data-balance="'+(r.balance_ugx||0)+'" '
@@ -3878,7 +3905,7 @@
         var d = new Date(p.created_at);
         return '<div style="padding:12px 0;border-bottom:1px solid #F1F3F4">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
-          +'<div style="font-size:14px;font-weight:700;color:#1B5E20">UGX '+fmtUGX(p.amount_ugx)+'</div>'
+          +'<div style="font-size:14px;font-weight:700;color:var(--deep-ink)">UGX '+fmtUGX(p.amount_ugx)+'</div>'
           +'<div style="font-size:11px;color:#9AA0A6">'+d.toLocaleString('en-UG')+'</div>'
           +'</div>'
           +'<div style="font-size:12px;color:#5F6368;margin-top:2px">Method: '+esc(p.method||'')+(p.reference?' • Ref: '+esc(p.reference):'')+'</div>'
@@ -4323,7 +4350,7 @@
 
   function _stockRowHtml(item) {
     var pct   = item.reorder_level > 0 ? Math.min(100, Math.round(item.quantity / item.reorder_level * 100)) : 100;
-    var barClr= item.is_critical ? '#E0454B' : item.is_low_stock ? '#E2960A' : '#0E7C5A';
+    var barClr= item.is_critical ? '#E0454B' : item.is_low_stock ? '#E2960A' : 'var(--primary)';
     var pills = '';
     // "OWED" is not the same as "LOW" — it means the clinic has already given
     // out medicine it never had, so the shelf is in debt until it is restocked.
@@ -4966,9 +4993,9 @@
     _finPeriod = period;
     document.querySelectorAll('.fin-tab').forEach(function(btn) {
       var active = btn.dataset.period === period;
-      btn.style.background  = active ? '#0E7C5A' : 'transparent';
+      btn.style.background  = active ? 'var(--primary)' : 'transparent';
       btn.style.color       = active ? '#fff'    : '#424242';
-      btn.style.borderColor = active ? '#0E7C5A' : '#E0E0E0';
+      btn.style.borderColor = active ? 'var(--primary)' : '#E0E0E0';
     });
     loadFinancial(period);
   }
@@ -5255,7 +5282,7 @@
         +   '<div style="font-size:13.5px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(d.name) + '</div>'
         +   '<div style="font-size:11.5px;color:#5F6368">' + d.qty + ' × ' + esc(d.unitLabel) + unitTxt + '</div>'
         + '</div>'
-        + '<div style="font-size:14px;font-weight:800;color:#1B5E20;white-space:nowrap">UGX ' + fmtUGX(d.total) + '</div>'
+        + '<div style="font-size:14px;font-weight:800;color:var(--deep-ink);white-space:nowrap">UGX ' + fmtUGX(d.total) + '</div>'
         + '<button type="button" onclick="removeQsCartLine(' + i + ')" title="Remove" style="background:none;border:none;color:#C62828;cursor:pointer;font-size:20px;line-height:1;padding:2px 4px;touch-action:manipulation">×</button>'
         + '</div>';
     }).join('');
@@ -5608,7 +5635,7 @@
         if (hadInstant) return;               // keep the saved stock on screen
         if (r._timeout || (window.ClinicOffline && ClinicOffline.isNetworkErr(r.error))) {
           grid.innerHTML = window.ClinicOffline
-            ? ClinicOffline.offlineHtml('Slow connection — couldn’t load stock.<br><button onclick="loadQsDrugs()" style="margin-top:10px;background:#1B5E20;color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit">Retry</button>')
+            ? ClinicOffline.offlineHtml('Slow connection — couldn’t load stock.<br><button onclick="loadQsDrugs()" style="margin-top:10px;background:var(--deep);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit">Retry</button>')
             : '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Slow connection — reopen Quick Sale to retry.</div>';
           return;
         }
@@ -5680,7 +5707,7 @@
     if (!items.length) {
       grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:#9AA0A6;font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:36px;display:block;margin-bottom:10px;color:#CFD8DC">inventory_2</span>'
-        + 'No sellable items in stock yet. Tap <strong style="color:#1B5E20">+ New Item</strong> above to add medicines or other items you sell (pampers, condoms…).'
+        + 'No sellable items in stock yet. Tap <strong style="color:var(--deep-ink)">+ New Item</strong> above to add medicines or other items you sell (pampers, condoms…).'
         + '</div>';
       return;
     }
@@ -5688,12 +5715,12 @@
       var sell     = Number(item.selling_price_ugx) || 0;
       var buy      = Number(item.unit_cost_ugx)     || 0;
       var priceStr = sell
-        ? '<span style="color:#1B5E20;font-weight:700">UGX ' + fmtUGX(sell) + '</span>'
+        ? '<span style="color:var(--deep-ink);font-weight:700">UGX ' + fmtUGX(sell) + '</span>'
         : '<span style="color:#E65100;font-size:11px;font-weight:700">⚠ Set sell price</span>';
       var lowStock = Number(item.quantity) <= Number(item.min_threshold || 5);
       var stockClr = lowStock ? '#E65100' : '#9AA0A6';
       var catBadge = item.category
-        ? '<div style="font-size:10px;color:#1B5E20;background:#E8F5E9;border-radius:10px;padding:1px 6px;display:inline-block;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(item.category) + '</div>'
+        ? '<div style="font-size:10px;color:var(--deep-ink);background:var(--tint-2);border-radius:10px;padding:1px 6px;display:inline-block;margin-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">' + esc(item.category) + '</div>'
         : '';
       var packBadge = '';
       if (qsHasPack(item)) {
@@ -5730,8 +5757,8 @@
       return '<button type="button" onclick="setQsCategory(\'' + c.replace(/'/g, "\\'") + '\')"'
         + ' style="flex-shrink:0;padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;'
         + 'cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;'
-        + 'border:1.5px solid ' + (active ? '#1B5E20' : '#E0E0E0') + ';'
-        + 'background:' + (active ? '#1B5E20' : '#fff') + ';'
+        + 'border:1.5px solid ' + (active ? 'var(--deep)' : '#E0E0E0') + ';'
+        + 'background:' + (active ? 'var(--deep)' : '#fff') + ';'
         + 'color:' + (active ? '#fff' : '#5F6368') + '">'
         + esc(label) + '</button>';
     }).join('');
@@ -5764,7 +5791,7 @@
         // Nothing matched — say what was searched for and offer the way out,
         // instead of a dead "No match found."
         nm.innerHTML = q
-          ? 'Nothing on the shelf matches <strong style="color:#1B5E20">' + esc(searchEl.value.trim()) + '</strong>.'
+          ? 'Nothing on the shelf matches <strong style="color:var(--deep-ink)">' + esc(searchEl.value.trim()) + '</strong>.'
             + '<div style="margin-top:4px;font-size:12.5px">Add it below and it is sellable straight away.</div>'
           : 'No match found.';
       }
@@ -5873,8 +5900,8 @@
     function chip(type, label, active) {
       return '<button type="button" onclick="setQsUnitType(\'' + type + '\')" '
         + 'style="padding:6px 13px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation;white-space:nowrap;'
-        + 'border:1.5px solid ' + (active ? '#1B5E20' : '#E0E0E0') + ';'
-        + 'background:' + (active ? '#1B5E20' : '#fff') + ';'
+        + 'border:1.5px solid ' + (active ? 'var(--deep)' : '#E0E0E0') + ';'
+        + 'background:' + (active ? 'var(--deep)' : '#fff') + ';'
         + 'color:' + (active ? '#fff' : '#5F6368') + '">'
         + label + '</button>';
     }
@@ -5939,14 +5966,14 @@
           ? 'pack (' + (d.tabs_per_pack || '?') + ' ' + qsPlural(unit, Number(d.tabs_per_pack) || 2) + ')'
           : 'box (' + (d.packs_per_box || '?') + ' packs)';
         priceEl.innerHTML = uPrice
-          ? 'Sell per ' + unitLabel + ': <b style="color:#1B5E20">UGX ' + fmtUGX(uPrice) + '</b>'
+          ? 'Sell per ' + unitLabel + ': <b style="color:var(--deep-ink)">UGX ' + fmtUGX(uPrice) + '</b>'
             + (sell ? ' &nbsp;<span style="color:#9AA0A6;font-size:11px">(' + fmtUGX(sell) + '/' + unit + ')</span>' : '')
           : '<span style="color:#E65100">⚠ No ' + unitLabel + ' price set</span>';
       } else {
         if (sell && buy) {
-          priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &middot; Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> per ' + unit;
+          priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &middot; Sell: <b style="color:var(--deep-ink)">UGX ' + fmtUGX(sell) + '</b> per ' + unit;
         } else if (sell) {
-          priceEl.innerHTML = 'Sell: <b style="color:#1B5E20">UGX ' + fmtUGX(sell) + '</b> per ' + unit + ' &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
+          priceEl.innerHTML = 'Sell: <b style="color:var(--deep-ink)">UGX ' + fmtUGX(sell) + '</b> per ' + unit + ' &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
         } else if (buy) {
           priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
         } else {
@@ -6186,12 +6213,12 @@
 
   function setCondPeriod(days) {
     _condPeriodDays = days;
-    document.getElementById('condBtn30').style.background = days === 30 ? '#00796B' : 'transparent';
+    document.getElementById('condBtn30').style.background = days === 30 ? 'var(--accent)' : 'transparent';
     document.getElementById('condBtn30').style.color      = days === 30 ? '#fff' : '#424242';
-    document.getElementById('condBtn30').style.borderColor= days === 30 ? '#00796B' : '#E0E0E0';
-    document.getElementById('condBtn90').style.background = days === 90 ? '#00796B' : 'transparent';
+    document.getElementById('condBtn30').style.borderColor= days === 30 ? 'var(--accent)' : '#E0E0E0';
+    document.getElementById('condBtn90').style.background = days === 90 ? 'var(--accent)' : 'transparent';
     document.getElementById('condBtn90').style.color      = days === 90 ? '#fff' : '#424242';
-    document.getElementById('condBtn90').style.borderColor= days === 90 ? '#00796B' : '#E0E0E0';
+    document.getElementById('condBtn90').style.borderColor= days === 90 ? 'var(--accent)' : '#E0E0E0';
     loadTopConditions();
   }
 
@@ -6283,8 +6310,8 @@
     var label = key.charAt(0).toUpperCase() + key.slice(1);
     var pct = Math.round(count / (d.totalCases || 1) * 100);
     var barW = Math.round(count / (d.maxCount || 1) * 100);
-    var bgClr = ['#E8F5E9','#E0F2F1','#E3F2FD','#F3E5F5','#FFF3E0','#FCE4EC','#E8EAF6','#F1F8E9'][idx % 8] || '#F5F5F5';
-    var txtClr = ['#1B5E20','#00695C','#1565C0','#4A148C','#E65100','#880E4F','#1A237E','#33691E'][idx % 8] || '#424242';
+    var bgClr = ['var(--tint-2)','#E0F2F1','#E3F2FD','#F3E5F5','#FFF3E0','#FCE4EC','#E8EAF6','#F1F8E9'][idx % 8] || '#F5F5F5';
+    var txtClr = ['var(--deep)','var(--accent)','#1565C0','#4A148C','#E65100','#880E4F','#1A237E','#33691E'][idx % 8] || '#424242';
 
     // Top 3 drugs
     var drugs = Object.entries(d.drugsByDx[key] || {})
@@ -6506,13 +6533,13 @@
 
     // Financial cards
     var cards = [
-      { label:'Billed (UGX)',       val: fmtUGX(r.total_billed_ugx),    bg:'#E8F5E9', col:'#1B5E20' },
-      { label:'Collected (UGX)',     val: fmtUGX(r.total_collected_ugx), bg:'#E0F2F1', col:'#00695C' },
+      { label:'Billed (UGX)',       val: fmtUGX(r.total_billed_ugx),    bg:'var(--tint-2)', col:'var(--deep)' },
+      { label:'Collected (UGX)',     val: fmtUGX(r.total_collected_ugx), bg:'#E0F2F1', col:'var(--accent)' },
       { label:'Quick Sales (UGX)',   val: fmtUGX(r.quick_sales_ugx),     bg:'#E3F2FD', col:'#1565C0' },
       { label:'Total Revenue (UGX)', val: fmtUGX(r.total_revenue_ugx),   bg:'#F3E5F5', col:'#4A148C' },
       { label:'Outstanding (UGX)',   val: fmtUGX(r.total_outstanding_ugx),bg:'#FFEBEE',col:'#C62828' },
       { label:'Stock Cost (UGX)',    val: fmtUGX(r.stock_cost_ugx),      bg:'#FFF3E0', col:'#E65100' },
-      { label:'Net Margin (UGX)',    val: fmtUGX(r.net_margin_ugx),      bg: r.net_margin_ugx >= 0 ? '#E8F5E9':'#FFEBEE', col: r.net_margin_ugx >= 0 ? '#1B5E20':'#C62828' },
+      { label:'Net Margin (UGX)',    val: fmtUGX(r.net_margin_ugx),      bg: r.net_margin_ugx >= 0 ? 'var(--tint-2)':'#FFEBEE', col: r.net_margin_ugx >= 0 ? 'var(--deep)':'#C62828' },
       { label:'Treatments',         val: r.total_consultations,          bg:'#E3F2FD', col:'#0277BD' },
       { label:'Patients',            val: r.total_patients,               bg:'#E8EAF6', col:'#283593' },
     ];
@@ -6535,7 +6562,7 @@
              + pmKeys.map(function(k) {
                  return '<div style="background:#F5F5F5;border-radius:8px;padding:9px 14px;font-size:13px">'
                       + '<span style="font-weight:600;color:#424242">' + (pmLabels[k]||k) + '</span>'
-                      + '<span style="color:#1B5E20;font-weight:700;margin-left:8px">UGX ' + fmtUGX(pm[k]) + '</span>'
+                      + '<span style="color:var(--deep-ink);font-weight:700;margin-left:8px">UGX ' + fmtUGX(pm[k]) + '</span>'
                       + '</div>';
                }).join('')
              + '</div></div>';
@@ -6550,7 +6577,7 @@
           + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:#202124">' + esc(s.item_name) + '</td>'
           + '<td style="padding:9px 10px;font-size:12px;color:#5F6368;text-align:center">' + esc(s.unit||'') + '</td>'
           + '<td style="padding:9px 10px;font-size:13px;color:#C62828;text-align:right;font-weight:600">' + (s.qty_used||0) + '</td>'
-          + '<td style="padding:9px 10px;font-size:13px;color:#1B5E20;text-align:right;font-weight:600">' + (s.qty_added||0) + '</td>'
+          + '<td style="padding:9px 10px;font-size:13px;color:var(--deep-ink);text-align:right;font-weight:600">' + (s.qty_added||0) + '</td>'
           + '<td style="padding:9px 10px;font-size:13px;color:#0277BD;text-align:right;font-weight:600">' + (s.closing_qty||0) + '</td>'
           + '<td style="padding:9px 10px;font-size:12px;color:#E65100;text-align:right">'
           + (s.total_cost_ugx > 0 ? fmtUGX(s.total_cost_ugx) : '—') + '</td>'
@@ -6564,7 +6591,7 @@
         + '<th style="padding:8px 10px;font-size:11px;text-align:left;color:#424242;font-weight:700;text-transform:uppercase">Item</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:center;color:#424242;font-weight:700;text-transform:uppercase">Unit</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#C62828;font-weight:700;text-transform:uppercase">Used</th>'
-        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#1B5E20;font-weight:700;text-transform:uppercase">Restocked</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:var(--deep-ink);font-weight:700;text-transform:uppercase">Restocked</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#0277BD;font-weight:700;text-transform:uppercase">Closing Stock</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#E65100;font-weight:700;text-transform:uppercase">Cost (UGX)</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
@@ -6587,6 +6614,7 @@
   loadTopConditions();
 </script>
 <script src="../js/native-bridge.js"></script>
+<script src="js/clinic-look.js?v=20260909"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 </body>
 </html>
