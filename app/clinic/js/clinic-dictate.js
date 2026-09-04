@@ -1,25 +1,37 @@
-/* Homatt Health — dictating the vitals
+/* Homatt Health — dictating the history and the vitals
  *
  * A clinician holding a phone in one hand and a cuff in the other should be
  * able to say "temp 38.5, BP 120 over 80, pulse 96, weight 62" and have the
- * four boxes fill in.
+ * four boxes fill in — and to say "complains of fever and headache for two
+ * days, no vomiting" and have that land in the complaint and the story.
  *
- * Only the vitals. Speech never sets a diagnosis and never adds a medicine:
- * a misheard drug name becomes a prescription, and no recogniser is good
- * enough at "artemether/lumefantrine" to be trusted with that. Numbers are the
- * one thing every recogniser does well, and a wrong number is visible on the
- * screen before it reaches the record.
+ * Never a diagnosis and never a medicine. A misheard drug name becomes a
+ * prescription, and no recogniser is good enough at "artemether/lumefantrine"
+ * to be trusted with that. Those stay a deliberate tap.
  *
- * PARSING RULES, and why they are strict
- * --------------------------------------
- * A value is taken ONLY when the clinician said what it was — a label
- * ("temp", "pulse") or an unambiguous unit ("kg", "mmHg"). A bare number is
- * left alone. Guessing which box "38.5" belongs to is how a temperature ends
- * up in the weight field, and the clinician would have to notice to undo it.
+ * TWO KINDS OF TEXT, TWO DIFFERENT DANGERS
+ * ----------------------------------------
+ * The vitals are numbers, and the danger is a number in the wrong box. So a
+ * value is taken ONLY when the clinician said what it was — a label ("temp",
+ * "pulse") or an unambiguous unit ("kg", "mmHg"). A bare "38.5" fills nothing.
+ * Every reading is then range-checked against what a human body can do, and
+ * one outside it is REPORTED rather than stored: "I heard 385 for the
+ * temperature" is useful; silently writing it is not.
  *
- * Every reading is then range-checked against what a human body can do. A
- * value outside the range is REPORTED, not stored: "I heard 385 for the
- * temperature, which cannot be right" is useful; silently writing it is not.
+ * The complaint and the story are prose, and the danger is the opposite — not
+ * a wrong box but a LOST sentence, because a clinician who dictated "no chest
+ * pain" and cannot find it will assume it was recorded. So every word spoken
+ * ends up in one box or the other, the complaint is only taken when the
+ * clinician marked it, and everything ambiguous goes to the story where it
+ * will be read back.
+ *
+ * WHAT THIS CANNOT DO
+ * -------------------
+ * It cannot tell that a recogniser DROPPED a negation. "no chest pain" heard
+ * as "chest pain" reads perfectly well and means the opposite, and it would
+ * feed the suggestion engine below. Nothing in this file detects that. The
+ * only defence is that the transcript is shown back word for word, and the
+ * denials it did hear are listed separately to draw the eye.
  */
 (function (global) {
   'use strict';
@@ -188,6 +200,149 @@
     sbp: 'Systolic', dbp: 'Diastolic',
   };
 
+  // ── The complaint and the story ──────────────────────────────────────────
+  // Vitals are numbers, so the rule there is never to guess which box one
+  // belongs to. Free text has the opposite failure: the danger is not a wrong
+  // box but a LOST sentence, because a clinician who dictated "no chest pain"
+  // and cannot find it will assume it was recorded.
+  //
+  // So the invariant here is that every word spoken ends up in one box or the
+  // other. The complaint is only taken when the clinician marked it — by
+  // saying "complains of", or by opening with a short symptom phrase — and
+  // everything else, including anything ambiguous, goes to the story. The
+  // story is the safe place: it is a free textarea the clinician reads back.
+
+  // The clinician saying, in so many words, "this is what they came with".
+  var COMPLAINT_CUE = /\b(?:complain(?:s|ing|ed)?\s+of|complaint\s+(?:is|of)|presents?\s+with|presenting\s+with|came\s+(?:in\s+)?with|comes?\s+in\s+with|here\s+(?:for|with)|c\s*\/\s*o)\b\s*/i;
+
+  // Where the complaint stops and the story starts: a duration, an onset, an
+  // extra symptom, something already taken, or a denial.
+  var STORY_CUE = /\b(?:for\s+(?:the\s+)?(?:\d|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|several|about)|since\b|started\b|starting\b|began\b|onset\b|which\s+began|also\b|plus\b|associated\b|denies\b|denied\b|no\s+[a-z]|not\s+[a-z]|without\s+[a-z]|has\s+(?:taken|had|been)|have\s+taken|was\s+given|were\s+given|took\b|tried\b|getting\s+worse|worse\s+(?:at|after|on|with)|better\s+(?:at|after|on|with)|relieved\s+by|aggravated\s+by|radiat\w+|on\s+and\s+off|comes\s+and\s+goes|(?:this|last|yesterday|today|tonight)\s|for\s+(?:a|an|the)\s+(?:day|week|month|year|while|night))\b/i;
+
+  // Enough of a symptom vocabulary to recognise an opening line as a
+  // complaint. It does not need to be complete — anything it does not know
+  // simply goes to the story, which is the harmless direction.
+  var SYMPTOM = new RegExp('\\b(?:' + [
+    'fever', 'hot body', 'body hotness', 'chills', 'rigors', 'shivering',
+    'cough', 'coughing', 'catarrh', 'flu', 'cold',
+    'headache', 'head ?ache', 'migraine', 'dizziness', 'dizzy', 'fainting',
+    'diarrhoea', 'diarrhea', 'loose stools?', 'running stomach',
+    'vomiting', 'vomits?', 'throwing up', 'nausea', 'nauseous',
+    'abdominal pain', 'stomach ?ache', 'stomach pain', 'belly pain', 'colic',
+    'chest pain', 'palpitations', 'breathlessness', 'difficulty in breathing',
+    'hard(?: to)? breath\\w*', 'short(?:ness)? of breath', 'wheez\\w+',
+    'fast breathing', 'chest in-?drawing',
+    'rash', 'itching', 'itchy', 'swelling', 'swollen', 'boils?', 'ulcers?',
+    'wound', 'burn', 'bite', 'injury', 'fracture', 'bleeding',
+    'ear ?ache', 'ear pain', 'ear discharge', 'sore throat', 'throat pain',
+    'toothache', 'tooth pain', 'gum pain',
+    'weakness', 'fatigue', 'tiredness', 'malaise', 'body weakness',
+    'joint pain', 'back ?ache', 'back pain', 'muscle pain', 'body pain',
+    'burning urine', 'painful urination', 'dysuria', 'frequency',
+    'discharge', 'sores?', 'jaundice', 'yellow eyes',
+    'convulsions?', 'fits?', 'seizures?', 'unconscious\\w*', 'confusion',
+    'loss of appetite', 'not eating', 'weight loss', 'night sweats',
+    'stiff neck', 'neck stiffness', 'photophobia',
+    'blurred vision', 'poor vision', 'red eye', 'eye pain', 'eye discharge',
+    'pain',
+  ].join('|') + ')\\b', 'i');
+
+  // The clinician's own denials, surfaced so their eye goes to them. A
+  // recogniser that DROPS a "no" cannot be detected from the text it produced
+  // — which is exactly why the transcript is shown back verbatim rather than
+  // only the tidied result.
+  var NEGATION = /\b(?:no|not|denies|denied|without|never)\s+((?:[a-z]+\s*){1,3})/gi;
+
+  function tidy(s) {
+    return String(s || '')
+      .replace(/\s+/g, ' ')
+      .replace(/\s+([,.;:])/g, '$1')
+      .replace(/^[\s,.;:–—-]+/, '')
+      .replace(/[\s,;:]+$/, '')
+      .trim();
+  }
+
+  /**
+   * Split a dictated sentence into the complaint and the story.
+   *
+   * Returns { complaint, history, negations, lost }:
+   *   lost — words that reached neither box. It must always be empty; the
+   *          test asserts it, because losing a sentence is the fault that
+   *          matters here.
+   */
+  function parseStory(spoken) {
+    var text = tidy(spoken);
+    if (!text) return { complaint: '', history: '', negations: [], lost: '' };
+
+    // cutFrom is where the complaint span is removed from the story; start is
+    // where the complaint TEXT begins. They differ by the cue itself
+    // ("complains of"), which is scaffolding rather than clinical content and
+    // would otherwise be stranded in the story as "Patient complains of for
+    // two days".
+    var cutFrom = -1, start = -1, cueText = '';
+    var cue = COMPLAINT_CUE.exec(text);
+    if (cue) {
+      cutFrom = cue.index;
+      start = cue.index + cue[0].length;
+      cueText = cue[0];
+      // "Patient complains of", "She presents with" — the subject belongs to
+      // the cue, not to the story. Left behind it strands a lone "Patient" at
+      // the front of the history.
+      var subj = /(?:^|\s)((?:the\s+)?(?:patient|pt|client|mother|father|child|baby|infant|man|woman|lady|he|she|they)\s+)$/i
+        .exec(text.slice(0, cutFrom));
+      if (subj) { cutFrom -= subj[1].length; cueText = subj[1] + cueText; }
+    } else if (SYMPTOM.test(text.split(/\s+/).slice(0, 8).join(' '))) {
+      // No cue, but the clinician opened on a symptom — "fever for three days
+      // getting worse at night". That is a complaint followed by its story.
+      cutFrom = start = 0;
+    }
+
+    var complaint = '', history = text;
+    if (start >= 0) {
+      var after = text.slice(start);
+      var stop = STORY_CUE.exec(after);
+      var punct = /[,.;]/.exec(after);
+      var end = after.length;
+      if (stop) end = Math.min(end, stop.index);
+      if (punct) end = Math.min(end, punct.index);
+      // A complaint is a phrase, not a paragraph. Anything longer belongs to
+      // the story, where the clinician reads it back.
+      var w = after.slice(0, end).trim().split(/\s+/);
+      if (w.length > 8) end = after.indexOf(w[8]);
+      // Never end on a joining word. The cap above cut "a wound on the left
+      // leg from a | boda accident", leaving "from a" hanging on the
+      // complaint; those words belong with the rest in the story.
+      var tail = /(?:\s+(?:a|an|the|of|on|in|at|from|with|and|to|for|by|his|her|their))+\s*$/i
+        .exec(after.slice(0, end));
+      if (tail) end -= tail[0].length;
+      if (end > 0) {
+        complaint = tidy(after.slice(0, end));
+        history = tidy(text.slice(0, cutFrom) + ' ' + text.slice(start + end));
+      }
+    }
+
+    // Nothing clinical may vanish. Compared on words, since punctuation and
+    // spacing are tidied on the way through; the cue phrase is excluded
+    // because it is deliberately dropped.
+    function bag(s) {
+      return String(s || '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ')
+        .split(/\s+/).filter(Boolean).sort();
+    }
+    var before = bag(text), after2 = bag(complaint + ' ' + history), lost = [];
+    var seen = {};
+    after2.concat(bag(cueText)).forEach(function (x) { seen[x] = (seen[x] || 0) + 1; });
+    before.forEach(function (x) {
+      if (seen[x]) seen[x]--; else lost.push(x);
+    });
+
+    var negations = [], m;
+    NEGATION.lastIndex = 0;
+    while ((m = NEGATION.exec(text))) negations.push(tidy(m[0]));
+
+    return { complaint: complaint, history: history,
+             negations: negations, lost: lost.join(' ') };
+  }
+
   // ── The microphone ───────────────────────────────────────────────────────
   // Recording is only half of it. Transcription happens on the server, so it
   // needs a connection — and this app is built for clinics that often do not
@@ -212,6 +367,21 @@
   // Put the numbers in the boxes and tell the fields they changed, so the
   // existing abnormal-reading colouring and the suggestion engine both run
   // exactly as they do when the clinician types.
+  // Append rather than replace. A clinician who dictates a second sentence
+  // must not lose the first, and a box the clinician typed into by hand must
+  // survive a dictation. Nothing spoken overwrites anything already there.
+  function addTo(id, text) {
+    var el = document.getElementById(id);
+    if (!el || !text) return 0;
+    var had = String(el.value || '').trim();
+    el.value = had ? had.replace(/[\s,;]+$/, '') + '. ' + text : text;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return 1;
+  }
+
+  // Vitals REPLACE: a re-taken temperature is meant to overwrite the old
+  // one. Free text appends, because a second sentence adds to the story
+  // rather than correcting it. addTo() above is the free-text half.
   function fill(vitals) {
     var n = 0;
     Object.keys(vitals).forEach(function (k) {
@@ -224,9 +394,10 @@
     return n;
   }
 
-  async function transcribe(blob) {
+  async function transcribe(blob, mode) {
     var form = new FormData();
-    form.append('audio', blob, 'vitals.webm');
+    form.append('audio', blob, 'clip.webm');
+    form.append('mode', mode || 'vitals');
     // _getClinicSupabase() is the app's one shared client — the page-level
     // `supabase` global is not safe to read here, because a page that assigns
     // to it replaces the library with the client.
@@ -236,6 +407,48 @@
     var r = await sb.functions.invoke('transcribe', { body: form });
     if (r.error) throw r.error;
     return (r.data && r.data.text) || '';
+  }
+
+  // What to do with the transcript, and what to tell the clinician about it.
+  //
+  // The story mode always shows the transcript VERBATIM. That is not padding:
+  // a recogniser that drops a "no" from "no chest pain" produces text that
+  // reads perfectly well and means the opposite, and nothing in this file can
+  // detect it. The only defence is that the clinician sees the words that were
+  // actually heard, so the denials are listed separately to draw the eye.
+  function applied(mode, text) {
+    text = String(text || '').trim();
+    if (mode === 'story') {
+      var got = parseStory(text);
+      // The chief complaint is ONE thing — the reason they came. A clinician
+      // adding "also complains of joint pain" is giving another symptom, and
+      // that belongs in the history. So the complaint box is only ever set
+      // when it is empty; after that everything spoken joins the story.
+      var chief = document.getElementById('itChief');
+      var taken = chief && !String(chief.value || '').trim();
+      var n = (taken ? addTo('itChief', got.complaint) : 0) +
+              addTo('itSubjective', taken ? got.history : text);
+      if (!n) return { text: 'Heard nothing to write down.', ok: false };
+      var lines = ['Heard: “' + text + '”'];
+      if (got.complaint) lines.push('Complaint: ' + got.complaint);
+      if (got.negations.length) {
+        lines.push('You said: ' + got.negations.join(', ') + ' — check that is right');
+      }
+      return { text: lines.join('  ·  '), ok: true };
+    }
+
+    var v = parseVitals(text);
+    var filled = fill(v.vitals);
+    var out = [];
+    if (filled) out.push('Heard: ' + v.heard.join(' · '));
+    v.ignored.forEach(function (g) {
+      out.push('Ignored ' + g.key + ' ' + g.value + ' — ' + g.why);
+    });
+    if (!filled && !v.ignored.length) {
+      out.push('Heard “' + text.slice(0, 60) + '” — no reading in that. Say it ' +
+               'like: temp 38.5, BP 120 over 80, pulse 96.');
+    }
+    return { text: out.join('  ·  '), ok: !!filled };
   }
 
   function stop() {
@@ -249,10 +462,11 @@
    *   btnId  — the button
    *   sayId  — a line under it where what was heard is written back
    */
-  function attach(btnId, sayId) {
+  function attach(btnId, sayId, mode) {
     var btn = document.getElementById(btnId);
     var out = document.getElementById(sayId);
     if (!btn) return;
+    mode = mode === 'story' ? 'story' : 'vitals';
 
     btn.addEventListener('click', async function () {
       if (_rec) { stop(); btn.classList.remove('on'); say(out, 'Listening finished — reading it…'); return; }
@@ -285,34 +499,26 @@
         say(out, 'Reading it…');
         var text;
         try {
-          text = await transcribe(blob);
+          text = await transcribe(blob, mode);
         } catch (e) {
-          say(out, 'Could not reach the transcription service. Type the ' +
-                   'readings for now.', 'warn');
+          say(out, 'Could not reach the transcription service. Type it in ' +
+                   'for now.', 'warn');
           return;
         }
-        var got = parseVitals(text);
-        var n = fill(got.vitals);
-        var lines = [];
-        if (n) lines.push('Heard: ' + got.heard.join(' · '));
-        got.ignored.forEach(function (g) {
-          lines.push('Ignored ' + g.key + ' ' + g.value + ' — ' + g.why);
-        });
-        if (!n && !got.ignored.length) {
-          lines.push('Heard “' + (text || '').slice(0, 60) + '” — no reading in ' +
-                     'that. Say it like: temp 38.5, BP 120 over 80, pulse 96.');
-        }
-        say(out, lines.join('  ·  '), n ? 'ok' : 'warn');
+        var res = applied(mode, text);
+        say(out, res.text, res.ok ? 'ok' : 'warn');
       };
       _rec.start();
       btn.classList.add('on');
-      say(out, 'Listening — say the readings, then tap again.');
+      say(out, mode === 'story'
+        ? 'Listening — say what they came with, then tap again.'
+        : 'Listening — say the readings, then tap again.');
       _stopT = setTimeout(stop, MAX_MS);
     });
   }
 
-  var API = { parseVitals: parseVitals, digitsFromWords: digitsFromWords,
-              RANGE: RANGE, attach: attach };
+  var API = { parseVitals: parseVitals, parseStory: parseStory,
+              digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   global.HomattDictate = API;

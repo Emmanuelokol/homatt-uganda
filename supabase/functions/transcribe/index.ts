@@ -6,7 +6,9 @@
  * arrangement as ai-proxy and send-notification.
  *
  *   POST /functions/v1/transcribe
- *   Body: multipart/form-data with `audio` (a recorded clip)
+ *   Body: multipart/form-data with `audio` (a recorded clip) and an optional
+ *         `mode` of "vitals" (default) or "story", which chooses the vocabulary
+ *         Whisper is told to expect.
  *   Reply: { "text": "temp 38.5 BP 120 over 80 pulse 96" }
  *
  * Secret required:
@@ -14,10 +16,11 @@
  *
  * WHAT THIS IS AND IS NOT FOR
  * ---------------------------
- * It transcribes the VITALS a clinician reads off a thermometer and a cuff.
- * The reply is text; the app parses the numbers out of it and shows them in
- * the boxes for the clinician to check. Nothing here writes to a record, sets
- * a diagnosis, or names a medicine.
+ * It transcribes what a clinician says while taking a history: the vitals read
+ * off a thermometer and a cuff, and the complaint the patient came with. The
+ * reply is text; the app decides where it belongs and shows it for the
+ * clinician to check. Nothing here writes to a record, sets a diagnosis, or
+ * names a medicine.
  *
  * Two things are deliberately bounded, because this costs money per minute and
  * sends patient audio off the premises:
@@ -38,11 +41,24 @@ const MAX_BYTES = 2 * 1024 * 1024;
 // vocabulary of a vitals reading measurably improves the numbers and the
 // units, which is the whole point — the app throws away anything it cannot
 // recognise as a labelled reading, so a better transcript is a better fill.
-const VITALS_HINT =
-  'Clinical vitals dictated by a nurse in a Ugandan clinic. ' +
-  'Temperature in degrees Celsius, blood pressure in mmHg systolic over ' +
-  'diastolic, pulse in beats per minute, weight in kilograms. ' +
-  'For example: temperature 38.5, BP 120 over 80, pulse 96, weight 62.';
+const HINTS: Record<string, string> = {
+  vitals:
+    'Clinical vitals dictated by a nurse in a Ugandan clinic. ' +
+    'Temperature in degrees Celsius, blood pressure in mmHg systolic over ' +
+    'diastolic, pulse in beats per minute, weight in kilograms. ' +
+    'For example: temperature 38.5, BP 120 over 80, pulse 96, weight 62.',
+  // The complaint and the story. Biasing toward vitals here would push the
+  // model to hear numbers that were never said; biasing toward the way a
+  // Ugandan clinician actually describes a presentation gives a better
+  // transcript of the words that matter — including the negatives, which
+  // carry as much clinical weight as the positives.
+  story:
+    'A clinician in a Ugandan clinic describing what a patient came with. ' +
+    'Symptoms, how long they have lasted, what makes them better or worse, ' +
+    'what the patient has already taken, and what they deny. ' +
+    'For example: complains of fever and headache for two days, also ' +
+    'vomiting, no diarrhoea, has taken panadol with no relief.',
+};
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -74,10 +90,13 @@ Deno.serve(async (req) => {
   }
 
   let audio: File | null = null;
+  let mode = 'vitals';
   try {
     const form = await req.formData();
     const f = form.get('audio');
     if (f instanceof File) audio = f;
+    const m = String(form.get('mode') || '').toLowerCase();
+    if (m && HINTS[m]) mode = m;
   } catch {
     return json({ error: 'Send the clip as multipart/form-data in `audio`.' }, 400);
   }
@@ -92,7 +111,7 @@ Deno.serve(async (req) => {
   out.append('file', audio, audio.name || 'vitals.webm');
   out.append('model', 'whisper-1');
   out.append('language', 'en');
-  out.append('prompt', VITALS_HINT);
+  out.append('prompt', HINTS[mode]);
   // Plain text back: the app does its own parsing and has no use for word
   // timings or confidence scores.
   out.append('response_format', 'text');

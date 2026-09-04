@@ -444,7 +444,8 @@
   // exactly as they do to typing.
   function bindDictation() {
     if (window.HomattDictate && window.HomattDictate.attach) {
-      window.HomattDictate.attach('itDictate', 'itDictateSay');
+      window.HomattDictate.attach('itDictate', 'itDictateSay', 'vitals');
+      window.HomattDictate.attach('itDictateStory', 'itDictateStorySay', 'story');
     }
   }
 

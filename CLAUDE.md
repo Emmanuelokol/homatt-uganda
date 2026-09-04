@@ -75,10 +75,11 @@ Screen → URL mapping lives in `app/js/onesignal.js` (`SCREEN_URLS`).
 - Min SDK: 22 (set in `android/variables.gradle`)
 - `POST_NOTIFICATIONS` permission already declared in `AndroidManifest.xml`
 
-## Dictating the Vitals
+## Dictating the History and the Vitals
 
 **Provider:** OpenAI Whisper, called from a Supabase Edge Function
-**Scope:** the four vitals boxes only — never a diagnosis, never a medicine
+**Scope:** the complaint, the story and the four vitals boxes — never a
+diagnosis, never a medicine
 
 ### Setup required
 | What | Where |
@@ -98,7 +99,25 @@ parses the text and fills `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse`,
 firing the same `input` events as typing so the abnormal-reading colouring and
 the suggestion engine react identically.
 
+### Two buttons, two modes
+`transcribe` takes a `mode` of `vitals` or `story`, which chooses the
+vocabulary Whisper is told to expect. Biasing a history toward vitals makes it
+hear numbers nobody said.
+
+| button | mode | fills |
+|--------|------|-------|
+| "Say what they came with" (tab 1) | `story` | `itChief`, `itSubjective` |
+| "Say the readings" (tab 2) | `vitals` | `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse` |
+
 ### The rules it follows, and why
+- **Nothing spoken is ever lost.** In the story, every word ends up in the
+  complaint or the history; anything ambiguous goes to the history, where the
+  clinician reads it back. A lost sentence is the fault that matters in prose,
+  because it looks exactly like a sentence that was never said.
+- **The chief complaint is one thing.** It is only set when the box is empty;
+  "also complains of joint pain" on a second dictation joins the history.
+- **Vitals replace, prose appends.** A re-taken temperature overwrites the old
+  one; a second sentence adds to the story rather than wiping it.
 - **A value is taken only when the clinician said what it was** — a label
   ("temp", "pulse") or an unambiguous unit ("kg", "mmHg"). A bare "38.5" fills
   nothing. Guessing which box a number belongs to is how a temperature ends up
@@ -109,6 +128,11 @@ the suggestion engine react identically.
 - **Never a diagnosis, never a drug.** A misheard drug name becomes a
   prescription, and no recogniser is good enough at "artemether/lumefantrine"
   to be trusted with that.
+- **A dropped negation cannot be detected.** "no chest pain" heard as "chest
+  pain" reads perfectly well, means the opposite, and would feed the suggestion
+  engine. Nothing in the code can see it. The defence is that the transcript is
+  shown back word for word and the denials it *did* hear are listed to draw the
+  eye — read it before moving on.
 
 ### Known limits
 - **It needs a connection.** Whisper runs on OpenAI's servers, so dictation is
