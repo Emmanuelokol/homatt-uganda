@@ -17,7 +17,8 @@
 (function () {
   'use strict';
 
-  var DB_URL = 'data/uganda_clinical_guidelines_2023.db';
+  // ?v= must match DATA_VERSION in clinic-sw.js — see guidelines.js.
+  var DB_URL = 'data/uganda_clinical_guidelines_2023.db?v=144';
   var EM_URL = 'data/emhslu_2023.db';       // national essential medicines list
   var db = null, loading = null;
   var emdb = null, emLoading = null;
@@ -1904,7 +1905,7 @@
     var ownDrugs = rows('SELECT COUNT(*) n FROM medicines WHERE condition_id=?', [condId])[0];
     if (self && (!ownDrugs || !ownDrugs.n) && !getLearned(condId, severity)) {
       var kids = rows(
-        'SELECT c.id,c.title,c.page,(SELECT COUNT(*) FROM medicines m WHERE m.condition_id=c.id) n ' +
+        'SELECT c.id,c.title,c.page,c.number,(SELECT COUNT(*) FROM medicines m WHERE m.condition_id=c.id) n ' +
         'FROM conditions c WHERE c.number LIKE ? AND c.id<>? ORDER BY c.number LIMIT 8',
         [self.number + '.%', condId])
         .filter(function (k) { return k.n > 0 || carriesTreatment(k); })
@@ -2274,13 +2275,13 @@
     var hits = [];
     if (toks.length) {
       try {
-        hits = rows('SELECT c.id,c.title,c.page FROM conditions_fts f JOIN conditions c ON c.id=f.rowid ' +
+        hits = rows('SELECT c.id,c.title,c.page,c.number FROM conditions_fts f JOIN conditions c ON c.id=f.rowid ' +
           'WHERE conditions_fts MATCH ? ORDER BY rank LIMIT 8',
           [toks.map(function (t) { return '"' + t + '"*'; }).join(' AND ')]);
       } catch (e) { hits = []; }
     }
     if (!hits.length) {
-      hits = rows('SELECT id,title,page FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 8', ['%' + term + '%']);
+      hits = rows('SELECT id,title,page,number FROM conditions WHERE title LIKE ? ORDER BY length(title) LIMIT 8', ['%' + term + '%']);
     }
     if (!hits.length && term.length >= 4) {
       // Mistyped, most likely. Search again allowing a slip or two before
@@ -2313,7 +2314,17 @@
     // Never leave the clinician with nothing: if none of them carries a
     // treatment, offer what there is rather than pretending there is nothing.
     if (real.length) hits = real;
-    hits.sort(function (a, b) { return (b.n - a.n) || (b.tests - a.tests) || (a.title.length - b.title.length); });
+    // Offer them in the book's own order, not by how many medicines each
+    // holds. The UCG prints a condition before its severe form and its severe
+    // form before the management of its complications, which is the order a
+    // clinician wants: typing "malaria" should put the ordinary case first.
+    // Counting medicines inverted that — "Management of Complications of
+    // Severe Malaria" carries the most drugs precisely because it is the least
+    // ordinary thing in the list.
+    hits.sort(function (a, b) {
+      return bookOrder(a.number, b.number) || (b.n - a.n) ||
+             (b.tests - a.tests) || (a.title.length - b.title.length);
+    });
     if (hits.length === 1) { open(hits[0].id, hits[0].title, severity, hits[0].page); return; }
 
     pickFrom(hits, term, severity);
@@ -2374,8 +2385,12 @@
     if (dosedCache[condId] !== undefined) return dosedCache[condId];
     var out = false;
     try {
-      var c = rows('SELECT management,prevention,notes FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+      var c = rows('SELECT management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
       var prose = c ? [c.management, c.prevention, c.notes].filter(Boolean).join(' ') : '';
+      // A section printed wholly as a table has no parsed columns at all; its
+      // text is only in full_text. Without this, "Recommended First Line
+      // Regimens" — six thousand characters of ARV combinations — looks empty.
+      if (!prose.trim() && c) prose = c.full_text || '';
       out = DOSE_ON_LINE.test(prose) || MED_ABBREV.some(function (pair) {
         var at = prose.indexOf(pair[0]);
         if (at < 0) return false;
@@ -2415,9 +2430,15 @@
     if (borrowSource(cond)) return true;
     if (p.inv > 0 && (p.mg + p.inv) >= 400) return true;
     try {
-      var c = rows('SELECT management,prevention,notes FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
+      var c = rows('SELECT management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
       if (!c) return false;
       var prose = [c.management, c.prevention, c.notes].filter(Boolean).join('\n');
+      // Some sections are printed entirely as a table with no headings at all,
+      // so nothing lands in a parsed column — "Recommended First Line
+      // Regimens" is six thousand characters of ARV combinations and not one
+      // "Management" line. Falling back to the section's own text keeps those
+      // findable instead of treating them as empty.
+      if (!prose.trim()) prose = c.full_text || '';
       if (!prose.trim()) return false;
       return findMissingDrugs(prose, [], rankMarkers(prose)).length > 0;
     } catch (e) { return false; }
@@ -2451,13 +2472,32 @@
   function flatten(s) {
     return String(s || '').toLowerCase().replace(/[^a-z ]/g, ' ').replace(/\s+/g, ' ').trim();
   }
+  // "2.5.10" comes after "2.5.9", not after "2.5.1". A section with no number
+  // sorts last rather than jumping to the front.
+  function bookOrder(a, b) {
+    var x = String(a || '').split('.'), y = String(b || '').split('.');
+    if (!a) return b ? 1 : 0;
+    if (!b) return -1;
+    for (var i = 0; i < Math.max(x.length, y.length); i++) {
+      var d = (parseInt(x[i], 10) || 0) - (parseInt(y[i], 10) || 0);
+      if (d) return d;
+    }
+    return 0;
+  }
+
   function printsAsHeading(relId, title) {
     var key = flatten(title);
     if (key.length < 8) return false;
     try {
-      var c = rows('SELECT management,notes,prevention FROM conditions WHERE id=? LIMIT 1', [relId])[0];
+      // full_text is included because that is where a heading actually lives.
+      // "Complicated/Severe Malaria" prints "Uncomplicated Malaria" and
+      // "Treatment of uncomplicated malaria" as headings inside its own pages,
+      // but neither falls inside its short parsed Management block, so looking
+      // only at the parsed fields would lose the evidence that the ordinary
+      // case's treatment is printed there.
+      var c = rows('SELECT management,notes,prevention,full_text FROM conditions WHERE id=? LIMIT 1', [relId])[0];
       if (!c) return false;
-      var text = [c.management, c.notes, c.prevention].filter(Boolean).join('\n');
+      var text = [c.management, c.notes, c.prevention, c.full_text].filter(Boolean).join('\n');
       var lines = text.split('\n');
       for (var i = 0; i < lines.length; i++) if (flatten(lines[i]) === key) return true;
     } catch (e) {}

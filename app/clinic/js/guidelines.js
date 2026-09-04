@@ -30,7 +30,10 @@
 
   var BOOKS = {
     ucg: {
-      url: 'data/uganda_clinical_guidelines_2023.db',
+      // ?v= is what makes a rebuilt book reach a phone that already has one:
+      // the service worker caches these files for good and never re-fetches a
+      // URL it already holds. Must match DATA_VERSION in clinic-sw.js.
+      url: 'data/uganda_clinical_guidelines_2023.db?v=144',
       name: 'Uganda Clinical Guidelines 2023',
       cite: 'UCG 2023',
       mb: 6,

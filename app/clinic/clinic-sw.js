@@ -11,7 +11,13 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v143';
+const CACHE = 'homatt-clinic-v144';
+
+// Bumped only when a bundled .db is rebuilt. The databases are cached
+// cache-first and never re-downloaded, so this is what tells an existing
+// install that the book underneath it has changed. It must match the DATA_V
+// used to build the .db URLs in the pages that load them.
+const DATA_VERSION = '144';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -33,10 +39,10 @@ const SHELL = [
   'settings.html',
   'messages.html',
   'guidelines.html',
-  'js/guidelines.js?v=20260910',
+  'js/guidelines.js?v=20260911',
   'js/vendor/sql-wasm.js',
-  'js/ucg-autofill.js?v=20260910',
-  'js/clinic-impression.js?v=20260910',
+  'js/ucg-autofill.js?v=20260911',
+  'js/clinic-impression.js?v=20260911',
   'js/clinic-intake.js?v=20260910',
   'js/clinic-look.js?v=20260909',
   'manifest.json',
@@ -316,7 +322,7 @@ function offlineFallbackResponse() {
     // exact failure. QuotaExceededError = phone storage is full — the one cause
     // no code can work around, but the user can fix in a minute.
     'async function testWrite(){try{var c=await caches.open("homatt-clinic-probe");await c.put("__probe__",new Response("ok"));var hit=await c.match("__probe__");await caches.delete("homatt-clinic-probe");return hit?{ok:true}:{ok:false,err:"write did not persist"};}catch(e){return {ok:false,err:(e&&(e.name+": "+e.message))||"unknown"};}}' +
-    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v143"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
+    'async function healOnline(){var okAny=false;try{var ks=(await caches.keys()).filter(function(k){return k.indexOf("homatt-clinic-")===0;});if(!ks.length)ks=["homatt-clinic-v144"];for(var i=0;i<ks.length;i++){var c=await caches.open(ks[i]);var cs=core();for(var j=0;j<cs.length;j++){try{var r=await fetch(cs[j],{cache:"reload"});if(r&&r.ok&&!r.redirected){await c.put(cs[j],r.clone());okAny=true;}}catch(e){}}}}catch(e){}return okAny;}' +
     'async function run(){' +
     'var tries=0;try{tries=parseInt(sessionStorage.getItem("_healTries")||"0",10);}catch(e){}' +
     'var pages=await countPages();' +
@@ -426,6 +432,15 @@ self.addEventListener('activate', (event) => {
         const reqs = await old.keys();
         for (const rq of reqs) {
           try {
+            // The clinical databases are cached for good and never
+            // re-downloaded, so migrating them forward would pin a clinic to
+            // the copy it first installed. When the book itself is rebuilt —
+            // corrected ICD-10 codes, sections cut on the right boundaries —
+            // the stale copy must NOT travel into the new cache. It is keyed
+            // by DATA_VERSION in the URL, so anything carrying a different
+            // version is left behind and re-fetched on the next online visit.
+            if (/\/data\/.*\.db($|\?)/.test(new URL(rq.url).pathname) &&
+                rq.url.indexOf('v=' + DATA_VERSION) < 0) continue;
             if (await target.match(rq)) continue;   // keep the fresher copy
             const resp = await old.match(rq);
             if (!resp) continue;

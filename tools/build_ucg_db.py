@@ -2,8 +2,8 @@
 """
 Build uganda_clinical_guidelines_2023.db from the converted UCG 2023 HTML.
 
-Produces EXACTLY the schema documented in README.md so the app (and any other
-tooling) works unchanged if the official .db is dropped in later:
+Produces EXACTLY the schema the app reads, so a rebuild is a drop-in
+replacement:
 
   chapters(number, title)
   conditions(id, number, title, depth, chapter_number, chapter_title, icd10,
@@ -15,149 +15,35 @@ tooling) works unchanged if the official .db is dropped in later:
   v_medicines_normalized    -- medicines with case-normalized names
   v_condition_full          -- flattened condition view
 
+WHERE THE SECTIONS COME FROM
+----------------------------
+Earlier builds cut each condition out of the book by PAGE RANGE: a condition
+began on the page the contents named and ended where the next condition's page
+began.  A printed page carries the tail of one condition and the head of the
+next, so roughly one condition in six inherited a neighbour's text.  Hairy
+Leukoplakia described Kaposi's sarcoma, Painful Scrotal Swelling described
+conjunctivitis, and Prostatitis described renal colic.  The same slicing chose
+the icd10 code by taking the first ICD-shaped token on the page, which usually
+belonged to whichever condition happened to be printed above.
+
+This build cuts on the book's own headings instead (tools/ucg_spine.py), so a
+section's text physically cannot cross into its neighbour, and reads the ICD
+code from the heading line the code is actually printed on.
+
 Usage: python3 build_ucg_db.py <input.html> <output.db>
 """
-import html
 import os
 import re
 import sqlite3
 import sys
-from collections import Counter
 
-# ── Text helpers ───────────────────────────────────────────────────────────
-RUNNING_HEADER = {'uganda', 'clinical', 'guidelines', '2023', 'ministry of health'}
-COMMON_WORDS = {
-    'the', 'and', 'for', 'with', 'patient', 'treatment', 'give', 'dose', 'days',
-    'blood', 'infection', 'management', 'clinical', 'features', 'signs', 'test',
-    'child', 'children', 'adults', 'oral', 'daily', 'history', 'examination',
-    'laboratory', 'investigations', 'prevention', 'health', 'visit', 'action',
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import ucg_clean
+import ucg_fields
+import ucg_spine
 
 
-def looks_english(s: str) -> bool:
-    words = re.findall(r'[a-z]{3,}', s.lower())
-    return any(w in COMMON_WORDS for w in words)
-
-
-def maybe_unreverse(line: str) -> str:
-    """The PDF→HTML conversion emitted some (rotated table) text backwards.
-    Reverse a line only when doing so clearly turns gibberish into English."""
-    s = line.strip()
-    if len(s) < 4 or looks_english(s):
-        return line
-    rev = s[::-1]
-    return rev if looks_english(rev) else line
-
-
-CTRL_RE = re.compile('[\x00-\x08\x0b-\x1f\x7f-\x9f\u200b-\u200f\ufeff\ufffd\ue000-\uf8ff]')
-
-
-def clean_lines(raw_html: str):
-    txt = html.unescape(re.sub(r'<[^>]+>', '\n', raw_html))
-    txt = txt.replace('\xa0', ' ')
-    # PDF bullet/glyph leftovers (\x89, PUA glyphs, zero-widths) render as tofu
-    txt = CTRL_RE.sub(' ', txt)
-    # words split across a line break by PDF hyphenation: 'contrain-\ndicated'
-    txt = re.sub(r'(\w)-\n(\w)', r'\1\2', txt)
-    return [l.strip() for l in txt.split('\n')]
-
-
-# ── 1. Table of contents → chapters + conditions ───────────────────────────
-TOC_RE = re.compile(r'^((?:\d+\.)+\d*|\d+)\s+(.{3,140}?)\s*\.{3,}\s*(\d{1,4})$')
-
-
-def parse_toc(lines):
-    seen, toc = set(), []
-    for l in lines:
-        m = TOC_RE.match(l)
-        if not m:
-            continue
-        num = m.group(1).rstrip('.')
-        title = re.sub(r'\s+', ' ', m.group(2)).strip(' .')
-        page = int(m.group(3))
-        if not title or num in seen:
-            continue
-        seen.add(num)
-        toc.append({'number': num, 'title': title, 'page': page,
-                    'depth': num.count('.') + 1})
-    return toc
-
-
-# ── 2. Body split into pages ───────────────────────────────────────────────
-def parse_pages(lines):
-    """Return {page_number: [lines]} using the running-header page markers."""
-    marks = []
-    for i, l in enumerate(lines):
-        if re.fullmatch(r'\d{1,4}', l):
-            nxt = ' '.join(lines[i + 1:i + 4]).lower()
-            if 'uganda' in nxt and 'clinical' in nxt:
-                marks.append((int(l), i))
-    pages = {}
-    for k, (pno, idx) in enumerate(marks):
-        end = marks[k + 1][1] if k + 1 < len(marks) else len(lines)
-        body = []
-        for l in lines[idx + 1:end]:
-            low = l.lower().strip()
-            if not l or low in RUNNING_HEADER or re.fullmatch(r'chapter\s+\d+:?', low):
-                continue
-            body.append(maybe_unreverse(l))
-        # The page's running header arrives as one word per line
-        # ("CHAPTER / 1: / Emergencies / and / Trauma"). Drop that leading
-        # fragment run so full_text starts at the real content.
-        head_re = re.compile(r'^(?:chapter|\d+:?|[A-Za-z]{2,14}|and|of|the)$', re.I)
-        k = 0
-        while k < min(12, len(body)) and ' ' not in body[k] and len(body[k]) < 20:
-            if any(rx.match(body[k]) for _, rx in FIELD_RES):
-                break                      # never eat a real heading
-            if not head_re.match(body[k]):
-                break
-            k += 1
-        pages.setdefault(pno, []).extend(body[k:])
-    return pages
-
-
-# ── 3. Field splitting inside a condition's text ───────────────────────────
-FIELD_PATTERNS = [
-    ('causes',            r'^(?:causes?|aetiolog(?:y|ical\s+agents?)|cause\s*/\s*risk\s*factors?)\b'),
-    ('clinical_features', r'^(?:clinical\s+features?|signs?\s+and\s+symptoms?|symptoms?\s+and\s+signs?|presentation)\b'),
-    ('differential',      r'^(?:differential\s+diagnos[ei]s)\b'),
-    ('investigations',    r'^(?:investigations?|laboratory\s+investigations?|diagnosis)\b'),
-    ('management',        r'^(?:management|treatment(?:\s+loc)?|treatment\s+objectives?)\b'),
-    ('prevention',        r'^(?:prevention(?:\s+and\s+control)?|health\s+education)\b'),
-    ('complications',     r'^(?:complications?)\b'),
-    ('notes',             r'^(?:notes?|caution|remember|important)\b'),
-]
-FIELD_RES = [(k, re.compile(p, re.I)) for k, p in FIELD_PATTERNS]
-
-
-def split_fields(text_lines):
-    """Split a condition's text into the UCG fields. A heading counts when the
-    line IS the heading, or the line STARTS with it followed by ':' / '-' and
-    the rest of the sentence (both shapes occur in the converted text)."""
-    fields, current = {}, None
-    for l in text_lines:
-        stripped = l.strip(' :\u2022~-')
-        head, rest = None, ''
-        for key, rx in FIELD_RES:
-            m = rx.match(stripped)
-            if not m:
-                continue
-            tail = stripped[m.end():].lstrip()
-            # heading alone, or "Heading: text…"
-            if len(stripped) <= 60 or tail[:1] in {':', '-', '\u2013'}:
-                head, rest = key, tail.lstrip(':-\u2013 ').strip()
-                break
-        if head:
-            current = head
-            fields.setdefault(current, [])
-            if rest:
-                fields[current].append(rest)
-        elif current:
-            fields[current].append(l)
-    return {k: '\n'.join(v).strip() for k, v in fields.items() if ''.join(v).strip()}
-
-
-# ── 4. Treatments (level of care) ──────────────────────────────────────────
+# ── Treatment steps ────────────────────────────────────────────────────────
 LOC_RE = re.compile(r'\b(HC\s?[2-4]|RR|GH|NR|H\b)\b', re.I)
 
 
@@ -170,7 +56,7 @@ def parse_treatments(mgmt_text):
     """Each meaningful management line is a step; a level-of-care code on (or
     above) the line attributes it to that facility level. PDF line-wrapping is
     undone first so a step reads as one instruction, not three fragments."""
-    BULLET = re.compile(r'^\s*(?:[•~\-\u2013\u2022\u25cf\u00b7]|\(?[a-z]\)|\d+[.)])\s+')
+    BULLET = re.compile(r'^\s*(?:[•~\-–•●·]|\(?[a-z]\)|\d+[.)])\s+')
     STARTER = re.compile(r'^(give|start|treat|administer|continue|refer|admit|advise|'
                          r'monitor|check|apply|repeat|stop|avoid|use|do not|if |in |for |'
                          r'adults?|children?|first|second|alternative|note)\b', re.I)
@@ -193,21 +79,21 @@ def parse_treatments(mgmt_text):
 
     out, level, order = [], None, 0
     for line in merged:
-        line = line.strip(' \u2022~-\t')
+        line = line.strip(' •~-\t')
         if len(line) < 6:
             continue
         found = [norm_loc(m.group(1)) for m in LOC_RE.finditer(line)]
         found = [f for f in found if f]
         if found:
             level = found[0]
-            if len(re.sub(LOC_RE, '', line).strip(' :\u2013-')) < 6:
+            if len(re.sub(LOC_RE, '', line).strip(' :–-')) < 6:
                 continue          # a bare "HC3" header only sets the level
         order += 1
         out.append((level, line[:1000], order))
     return out
 
 
-# ── 5. Medicines ───────────────────────────────────────────────────────────
+# ── Medicines ──────────────────────────────────────────────────────────────
 UNIT = r'(mg|g|mcg|µg|ml|mL|IU|units?|%)'
 DRUG = r'([A-Z][A-Za-z][A-Za-z\-/]+(?:\s+[A-Z]?[a-z\-/]+){0,3})'
 MED_RE = re.compile(
@@ -267,7 +153,7 @@ def parse_medicines(text):
             # Drug strengths are small; saturations are not.
             if unit == '%':
                 try:
-                    if float(re.split(r'[-\u2013/]', dose)[0]) > 20:
+                    if float(re.split(r'[-–/]', dose)[0]) > 20:
                         continue
                 except ValueError:
                     pass
@@ -285,12 +171,18 @@ def parse_medicines(text):
     return out
 
 
-# ── 6. ICD-10 ──────────────────────────────────────────────────────────────
+# ── ICD-10 ─────────────────────────────────────────────────────────────────
+# A real ICD-10 code is a letter (U excluded) then two digits, optionally a
+# point and one or two more characters.  The code is taken only from the
+# payload printed on the section's own heading line; nothing is inferred.  Six
+# sections print their codes with the letter missing ("70.31, 70.11") and they
+# are left empty rather than guessed at, because a wrong code travels onto
+# forms, claims and returns and is worse than no code at all.
 ICD_RE = re.compile(r'\b([A-TV-Z]\d{2}(?:\.\d{1,2})?)\b')
 
 
-def find_icd10(text):
-    hits = ICD_RE.findall(text or '')
+def clean_icd(payload):
+    hits = ICD_RE.findall(payload or '')
     return hits[0] if hits else None
 
 
@@ -329,58 +221,90 @@ CREATE VIEW v_condition_full AS
 """
 
 
-def main(src, dst):
-    raw = open(src, encoding='utf-8', errors='replace').read()
-    lines = clean_lines(raw)
-    toc = parse_toc(lines)
-    pages = parse_pages(lines)
-    print(f'  TOC entries      : {len(toc)}')
-    print(f'  pages segmented  : {len(pages)}')
+def book_order(number):
+    """Sort key that puts 2.10 after 2.9 rather than after 2.1."""
+    return [int(p) if p.isdigit() else 0 for p in number.split('.')]
 
-    chapters = {}
-    for t in toc:
-        if t['depth'] == 1:
-            try:
-                chapters[int(t['number'])] = t['title']
-            except ValueError:
-                pass
-    conditions = [t for t in toc if t['depth'] >= 2]
-    conditions.sort(key=lambda t: (t['page'], t['number']))
+
+# The book's back matter - appendices, references, the index - carries no
+# heading the spine recognises, so without a stop the final section swallows all
+# of it. "Techniques for Regional Anaesthesia" is eighteen lines of clinical
+# text and was arriving with eight hundred, ending in a list of web addresses.
+BACK_MATTER = re.compile(r'^(Appendix|Annex|References|Bibliography|Index)\b'
+                         r'(\s+\d+)?\s*$', re.I)
+
+
+def back_matter_start(lines, after):
+    """The first line of the book's back matter, or len(lines)."""
+    for i in range(after, len(lines)):
+        if BACK_MATTER.match(lines[i].strip()):
+            return i
+    return len(lines)
+
+
+def build_sections(lines):
+    """Every section in the book, in printed order, with its line span."""
+    toc = ucg_spine.parse_toc(lines)
+    chapters = {int(n): e['title'] for n, e in toc.items()
+                if e['depth'] == 1 and n.isdigit()}
+    spine, unmatched = ucg_spine.resolve(lines, toc)
+    orphans = ucg_spine.find_orphans(lines, spine)
+    for o in orphans:
+        spine[o['number']] = o
+
+    seq = sorted(spine.values(), key=lambda v: v['line'])
+    for a, b in zip(seq, seq[1:]):
+        a['end'] = b['line']
+    if seq:
+        seq[-1]['end'] = back_matter_start(lines, seq[-1]['line'])
+    return chapters, seq, unmatched, orphans
+
+
+def main(src, dst):
+    lines = ucg_spine.load_lines(src)
+    chapters, seq, unmatched, orphans = build_sections(lines)
+    drop = ucg_clean.furniture_mask(lines, chapters)
+    pidx = ucg_clean.page_index(lines, chapters)
+
+    print(f'  chapters         : {len(chapters)}')
+    print(f'  sections         : {len(seq)}  ({len(orphans)} not listed in the contents)')
+    print(f'  unmatched        : {len(unmatched)}')
+    print(f'  furniture lines  : {len(drop)}')
 
     if os.path.exists(dst):
         os.remove(dst)
     db = sqlite3.connect(dst)
     db.executescript(SCHEMA)
-
     db.executemany('INSERT INTO chapters(number,title) VALUES (?,?)',
                    sorted(chapters.items()))
 
-    max_page = max(pages) if pages else 0
-    n_tr = n_med = 0
-    for i, c in enumerate(conditions):
-        # text = this condition's page through the page before the next condition
-        start = c['page']
-        # Sections share pages: include the page the NEXT condition starts on,
-        # otherwise a condition whose treatment table spills over is truncated
-        # mid-sentence (this is what hid Pneumonia's whole management table).
-        end = conditions[i + 1]['page'] if i + 1 < len(conditions) else min(start + 3, max_page)
-        if end < start:
-            end = start
-        end = min(end, start + 12)          # guard against TOC gaps
-        body = []
-        for p in range(start, end + 1):
-            body.extend(pages.get(p, []))
-        full_text = '\n'.join(body).strip()
+    n_tr = n_med = n_icd = 0
+    for v in seq:
+        body = [lines[i] for i in range(v['line'] + 1, v['end']) if i not in drop]
+        full_text = ucg_spine.dehyphenate('\n'.join(body)).strip()
+        body = full_text.split('\n')
 
-        f = split_fields(body)
-        ch_no = int(c['number'].split('.')[0]) if c['number'].split('.')[0].isdigit() else None
+        # The definition paragraph the book prints before any header has no
+        # column of its own.  It is not folded into notes: doing so would make
+        # notes a thing that exists in two places at once, and full_text - which
+        # the app already shows under "View source guideline text" - carries it
+        # verbatim and in the right order.
+        f, _lead = ucg_fields.split(body)
+
+        ch_no = int(v['number'].split('.')[0]) if v['number'].split('.')[0].isdigit() else None
+        icd = clean_icd(v.get('icd10')) or \
+            clean_icd(ucg_spine.icd_below(lines, v['line']))
+        if icd:
+            n_icd += 1
+        page = v.get('page') or ucg_clean.page_at(pidx, v['line'])
+
         cur = db.execute(
             'INSERT INTO conditions(number,title,depth,chapter_number,chapter_title,'
             'icd10,page,causes,clinical_features,differential,investigations,'
             'management,prevention,complications,notes,full_text) '
             'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            (c['number'], c['title'], c['depth'], ch_no, chapters.get(ch_no),
-             find_icd10(full_text), c['page'],
+            (v['number'], v['title'], v['depth'], ch_no, chapters.get(ch_no),
+             icd, page,
              f.get('causes'), f.get('clinical_features'), f.get('differential'),
              f.get('investigations'), f.get('management'), f.get('prevention'),
              f.get('complications'), f.get('notes'), full_text))
@@ -389,8 +313,8 @@ def main(src, dst):
         mgmt = f.get('management') or ''
         if not mgmt:
             # No parsed Management block: recover the treatment table from the
-            # raw text — start at the UCG "TREATMENT LOC" header when present,
-            # else keep only lines carrying an explicit level-of-care code.
+            # section's own text — start at the UCG "TREATMENT LOC" header when
+            # present, else keep only lines carrying a level-of-care code.
             m = re.search(r'treatment\s+loc', full_text, re.I)
             if m:
                 mgmt = full_text[m.end():]
@@ -419,22 +343,14 @@ def main(src, dst):
     db.execute('VACUUM')
     db.commit()
 
-    print(f'  chapters         : {len(chapters)}')
-    print(f'  conditions       : {len(conditions)}')
-    print(f'  treatments       : {n_tr}')
-    print(f'  medicines        : {n_med}')
-    loc = db.execute('SELECT level_of_care, COUNT(*) FROM treatments '
-                     'GROUP BY level_of_care ORDER BY 2 DESC').fetchall()
-    print(f'  levels of care   : {loc[:8]}')
-    filled = db.execute(
-        'SELECT SUM(clinical_features IS NOT NULL), SUM(investigations IS NOT NULL), '
-        'SUM(management IS NOT NULL), SUM(icd10 IS NOT NULL), '
-        'SUM(length(full_text)>200) FROM conditions').fetchone()
-    print(f'  parsed fields    : features={filled[0]} investigations={filled[1]} '
-          f'management={filled[2]} icd10={filled[3]} full_text>200ch={filled[4]}')
-    print(f'  file size        : {os.path.getsize(dst)/1024/1024:.2f} MB')
+    print(f'  treatment steps  : {n_tr}')
+    print(f'  medicine rows    : {n_med}')
+    print(f'  ICD-10 codes     : {n_icd}')
+    print(f'  wrote            : {dst} ({os.path.getsize(dst)/1e6:.1f} MB)')
     db.close()
 
 
 if __name__ == '__main__':
+    if len(sys.argv) != 3:
+        sys.exit(__doc__)
     main(sys.argv[1], sys.argv[2])
