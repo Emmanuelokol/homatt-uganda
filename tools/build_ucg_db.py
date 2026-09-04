@@ -94,10 +94,18 @@ def parse_treatments(mgmt_text):
 
 
 # ── Medicines ──────────────────────────────────────────────────────────────
-UNIT = r'(mg|g|mcg|µg|ml|mL|IU|units?|%)'
+# MU is mega-units, how the book doses benzylpenicillin ("3 MU every 6 hours");
+# without it that drug is invisible. mmol, microgram spelled out, and the
+# container words are here for the same reason.
+UNIT = (r'(mg/kg/day|mg/kg|mcg/kg|micrograms?/kg|units?/kg|ml/kg|'
+        r'mg|g|mcg|µg|micrograms?|ml|mL|litres?|IU|MU|mmol|units?|'
+        r'drops?|puffs?|sachets?|tablets?|capsules?|ampoules?|vials?|%)(?![A-Za-z])')
 DRUG = r'([A-Z][A-Za-z][A-Za-z\-/]+(?:\s+[A-Z]?[a-z\-/]+){0,3})'
+# Thousands-grouped first ("500,000"), then a plain number which may use
+# either separator for its decimal ("0.5", "0,5"). norm_dose settles which.
+NUM = r'\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:[.,]\d+)?'
 MED_RE = re.compile(
-    DRUG + r'[^\n]{0,40}?(\d+(?:[.,]\d+)?(?:\s*[-–/]\s*\d+(?:[.,]\d+)?)?)\s*' + UNIT,
+    DRUG + r'[^\n]{0,40}?((?:' + NUM + r')(?:\s*[-–/]\s*(?:' + NUM + r'))?)\s*' + UNIT,
     re.UNICODE)
 ROUTE_RE = re.compile(r'\b(IV|IM|PO|oral(?:ly)?|rectal(?:ly)?|topical(?:ly)?|SC|IO|inhal\w*|sublingual)\b', re.I)
 FREQ_RE = re.compile(r'\b(once|twice|thrice|\d+\s*(?:times?|x))\s*(?:a|per)?\s*day\b|\b(?:od|bd|tds|qid|q\d+h|\d+\s*hourly|every\s+\d+\s*(?:hours?|hrs?))\b', re.I)
@@ -108,6 +116,14 @@ STOP_WORDS = {'The', 'This', 'If', 'In', 'Give', 'Do', 'For', 'All', 'Not', 'And
               'Patient', 'Pregnant', 'Women', 'Weight', 'Age', 'Total', 'Maximum',
               'Repeat', 'Continue', 'Alternative', 'First', 'Second', 'Third', 'Then',
               'Treatment', 'Management', 'Duration', 'Follow', 'Refer', 'Severe', 'Mild'}
+# A name the heuristic lifted straight out of an instruction: "Infiltrate 2 ml",
+# "Start with 10 drops", "Toxic dose: >150 mg/kg". None of these is a medicine,
+# and none is in the national list, so they are refused by their opening word.
+NAME_NOT_DRUG = re.compile(
+    r'^(infiltrate|instil|instill|apply|inject|dilute|start|stop|reduce|raise|'
+    r'toxic|lethal|fatal|maximum|minimum|target|goal|therapeutic|initial|'
+    r'loading|maintenance|standard|usual|normal|average|daily|weekly|hourly|'
+    r'infuse|transfuse|titrate|administer|supply|deliver|measure|monitor)\b', re.I)
 LEADING_CONNECTOR = re.compile(r'^(?:plus|and|or|with|then|also|add|give|use|dosage\s+of|dose\s+of|dosing\s+of|preparation\s+of|dilution\s+of)\s+', re.I)
 # Clinical findings / vitals / lab readings get caught by the "name + number +
 # unit" pattern ("Renal failure Urine output 12 ml"). They are NOT drugs and
@@ -117,6 +133,153 @@ NON_DRUG = re.compile(
     r'saturation|h[ae]moglobin|score|index|status|deficit|intake|urine|stool|'
     r'glucose|sugar|haematocrit|hematocrit|circumference|diameter|size|'
     r'duration|interval|age|height|bmi|pulse|respiration|oxygen|dilution|preparation|administration)\b', re.I)
+
+# A named derangement is a finding to act on, not a thing to prescribe:
+# "Hypoglycaemia (Blood sugar <3 mmol/L or <54 mg/dL)" was becoming a medicine
+# called Hypoglycaemia, dosed 3 mmol. Not one of the 750 medicines in the
+# national list begins hypo- or hyper- or ends in -aemia, so this costs nothing.
+DERANGEMENT = re.compile(r'^(hypo|hyper)|a?emia$', re.I)
+
+
+# ── The national medicines list, used as a vocabulary ──────────────────────
+# The old name pattern required a capital letter, because capitalisation was
+# the cheap way to tell a drug from an ordinary word.  The book does not
+# co-operate: it writes "Or erythromycin 500 mg", "plus metronidazole 500 mg
+# IV", "Give an antipyretic: paracetamol 15 mg/kg".  Measured against the 750
+# medicines of the Uganda Essential Medicines and Health Supplies List, the
+# capitalisation rule found 49% of the drugs the guideline actually names.
+#
+# So the name is looked up in that list instead.  It is a better test in both
+# directions: it finds a lowercase drug, and it cannot mistake "Renal failure
+# Urine output 12 ml" for a prescription, because no such medicine exists.
+EMHSLU_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         '..', 'app', 'clinic', 'data', 'emhslu_2023.db')
+
+# Words that are medicines in the list but appear constantly in ordinary
+# clinical prose.  Matching them by name alone would put a drug on a
+# prescription every time the book mentioned a body fluid or a gas.
+VOCAB_SKIP = {
+    'water', 'oxygen', 'air', 'medical air', 'alcohol', 'blood', 'plasma',
+    'compound', 'solution', 'powder', 'starch', 'talc', 'gas', 'urea', 'sugar',
+    'glucose', 'sodium', 'potassium', 'calcium', 'iron', 'zinc oxide',
+    'nitrous oxide', 'paraffin', 'gauze', 'cotton', 'salt', 'sugar solution',
+}
+
+
+# The staples of a Ugandan clinic, written the way the guideline writes them.
+# The national list spells several of them so differently that a name lookup
+# never meets them: it files normal saline under "Sodium chloride (Normal
+# saline)", oral rehydration salts under "ORS/Zinc co-pack", and Ringer's
+# lactate under "(Hartmann's/Ringer' s lactate IV" — with a stray space inside
+# the word. These are too common to lose to a typesetting accident.
+VOCAB_ALIASES = [
+    'oral rehydration salts', 'ors', 'zinc sulphate', 'zinc',
+    "ringer's lactate", 'ringers lactate', 'ringer lactate', "hartmann's",
+    'hartmanns', 'normal saline', 'sodium chloride', 'dextrose',
+    'water for injection', 'darrow', 'resomal',
+]
+
+
+def load_vocab(path=EMHSLU_DB):
+    """Lower-cased medicine names from the national list, longest first."""
+    names = set(VOCAB_ALIASES)
+    try:
+        db = sqlite3.connect(path)
+        rows = db.execute("SELECT DISTINCT name FROM emhslu_items "
+                          "WHERE item_type='medicine'").fetchall()
+        db.close()
+    except Exception:
+        return sorted(names, key=len, reverse=True)
+    for (raw,) in rows:
+        n = re.sub(r'\s+', ' ', raw or '').strip()
+        n = n.strip('()[]* ').replace('’', "'").replace("' s ", "'s ")
+        # "Artemether/Lumefantrine, dispersible" -> the drug, not the form
+        head = re.split(r'\s*[,(]', n)[0].strip().lower()
+        if len(head) < 5 or head in VOCAB_SKIP:
+            continue
+        names.add(head)
+        # The list joins a combination with " + ", the book with "/", and
+        # neither spells it the other's way. Without both forms the full name
+        # never matches and each half is found separately instead — which is
+        # how one artemether/lumefantrine became two medicines.
+        if re.search(r'\s*[/+]\s*', head):
+            parts = [x.strip() for x in re.split(r'\s*[/+]\s*', head) if x.strip()]
+            for sep in (' + ', '/', ' / ', '+'):
+                names.add(sep.join(parts))
+            # …and either half on its own, for when the book names just one
+            for part in parts:
+                if len(part) >= 6 and part not in VOCAB_SKIP:
+                    names.add(part)
+    return sorted(names, key=len, reverse=True)
+
+
+_VOCAB = None
+_VOCAB_RE = None
+
+
+def vocab_re():
+    global _VOCAB, _VOCAB_RE
+    if _VOCAB_RE is None:
+        _VOCAB = load_vocab()
+        _VOCAB_RE = re.compile(
+            r'(?<![A-Za-z])(' + '|'.join(re.escape(n) for n in _VOCAB) +
+            r')(?![A-Za-z])', re.I) if _VOCAB else re.compile(r'(?!x)x')
+    return _VOCAB_RE
+
+
+# A dose sitting next to a name: "500 mg", "15 mg/kg", "3 MU", "0.9%".
+DOSE_NEAR = re.compile(r'((?:' + NUM + r')(?:\s*[-–/]\s*(?:' + NUM + r'))?)\s*' + UNIT)
+
+
+# Between a dose and the name it belongs to, the book writes nothing but a
+# joining word: "100 ml/kg OF Ringer's Lactate", "2 ml of lignocaine".
+DOSE_JOINER = re.compile(r'\s*(?:of|of the)?\s*', re.I)
+
+# Reconstituting a drug is not prescribing one. Severe malaria's page explains
+# how to make up IV artesunate — "pre-packed with sodium bicarbonate solution
+# 1 ml", "dilute by adding 5 ml of sodium chloride" — and those became a
+# bicarbonate and a saline on an ordinary malaria patient's prescription.
+PREP_LINE = re.compile(
+    r'\b(dilut\w*|reconstitut\w*|pre-?pack\w*|diluent|solvent|'
+    r'obtaining a concentration|make up to|dissolve\w*)\b', re.I)
+
+
+# "0,5 mg" is a decimal comma and becomes 0.5; "500,000 IU" is a thousands
+# separator and must stay as it is. The difference is how many digits follow.
+DECIMAL_COMMA = re.compile(r',(?=\d{1,2}(?!\d))')
+
+
+def norm_dose(d):
+    return DECIMAL_COMMA.sub('.', d or '')
+
+
+def dose_for(name_start, name_end, line, nxt):
+    """The dose belonging to a name: after it, then before it, then on the
+    following line.
+
+    After is the normal case ("paracetamol 15 mg/kg").  Before covers the
+    book's other habit, "Give 100 ml/kg of Ringer's Lactate" — but only when
+    nothing but a joining word separates the two.  Without that restriction
+    "Repeat 20 ml/kg IV fluids and consider adrenaline" hands adrenaline the
+    fluid's dose, which is the kind of mistake this parser exists to avoid.
+    The following line covers a name that ran out of room, which is how zinc
+    is printed: "give Zinc supplementation Child <6 months:" / "10 mg once a
+    day".
+    """
+    m = DOSE_NEAR.search(line[name_end:name_end + 60])
+    if m:
+        return m.group(1), m.group(2), line
+
+    head = line[:name_start]
+    hits = list(DOSE_NEAR.finditer(head))
+    if hits and DOSE_JOINER.fullmatch(head[hits[-1].end():]):
+        return hits[-1].group(1), hits[-1].group(2), line
+
+    if nxt:
+        m = DOSE_NEAR.match(nxt.strip())
+        if m:
+            return m.group(1), m.group(2), line + ' ' + nxt.strip()
+    return None, None, None
 
 
 def parse_medicines(text):
@@ -135,15 +298,38 @@ def parse_medicines(text):
                 name = m2.group(1).strip()
             if not name or len(name) < 4:
                 continue
+            # The heuristic below grabs up to four words, so it catches the
+            # sentence around the drug as well as the drug: "Prednisolone is
+            # given in", "Instil atropine eye drops", "Start with". When the
+            # national list recognises a medicine inside that phrase, keep the
+            # medicine and drop the sentence; when a multi-word phrase holds no
+            # medicine at all, it was never a drug name.
+            inner = vocab_re().search(name)
+            if inner:
+                name = inner.group(1)
+            elif len(name.split()) >= 3 or NAME_NOT_DRUG.match(name):
+                continue
             first = name.split()[0]
             if first in STOP_WORDS or first.lower() in {w.lower() for w in STOP_WORDS}:
+                continue
+            # "Give an antipyretic: paracetamol 15 mg/kg" was becoming a
+            # medicine called "an antipyretic". A drug is never introduced by
+            # an article, and a drug CLASS is not a drug — the vocabulary pass
+            # below finds the real name on the same line.
+            if re.match(r'^(an?|the|any|some|other|another)\b', name, re.I):
+                continue
+            if re.search(r'\b(antipyretics?|analgesics?|antibiotics?|antimalarials?|'
+                         r'antiseptics?|antihistamines?|antiemetics?|laxatives?|'
+                         r'anticonvulsants?|antifungals?|antivirals?|steroids?|'
+                         r'bronchodilators?|vaccines?|supplements?|medicines?|drugs?)$',
+                         name, re.I):
                 continue
             # a real drug name starts with a letter and isn't a bare number/unit
             if not re.match(r'^[A-Za-z]', name):
                 continue
-            if NON_DRUG.search(name):
+            if NON_DRUG.search(name) or DERANGEMENT.search(name):
                 continue
-            dose, unit = m.group(2).replace(',', '.'), m.group(3)
+            dose, unit = norm_dose(m.group(2)), m.group(3)
             route = (ROUTE_RE.search(line) or [None])
             route = route.group(1).upper() if hasattr(route, 'group') else None
             freq = FREQ_RE.search(line)
@@ -168,6 +354,43 @@ def parse_medicines(text):
                         freq.group(0) if freq else None,
                         dur.group(0) if dur else None,
                         line[:500]))
+
+    # Second pass: every medicine the national list knows, however the book
+    # capitalised it.  This runs after the pattern above and only ADDS, so a
+    # drug already found keeps exactly the name, dose and source line it had.
+    rx = vocab_re()
+    lines = [l.strip() for l in (text or '').split('\n')]
+    for i, line in enumerate(lines):
+        if len(line) < 6 or len(line) > 300:
+            continue
+        if PREP_LINE.search(line):
+            continue
+        nxt = lines[i + 1] if i + 1 < len(lines) else ''
+        for m in rx.finditer(line):
+            name = m.group(1)
+            dose, unit, src = dose_for(m.start(), m.end(), line, nxt)
+            if not dose:
+                continue          # named without a dose: not a prescription
+            dose = norm_dose(dose)
+            # The heuristic pass above refuses a percentage over 20 because it
+            # cannot tell a drug strength from an oxygen saturation. Here the
+            # name is already a medicine in the national list, so a percentage
+            # is a strength — benzyl benzoate lotion really is 25%, hydrogen
+            # peroxide 6%, halothane 100%. Only the wording is checked.
+            if unit == '%' and re.search(r'oxygen|satur|spo2|cyanos|apnoe', line, re.I):
+                continue
+            key = (name.lower(), dose, unit.lower())
+            if key in seen or any(k[0] == name.lower() for k in seen):
+                continue
+            seen.add(key)
+            route = ROUTE_RE.search(src)
+            freq = FREQ_RE.search(src)
+            dur = DUR_RE.search(src)
+            out.append((name, dose, unit,
+                        route.group(1).upper() if route else None,
+                        freq.group(0) if freq else None,
+                        dur.group(0) if dur else None,
+                        src[:500]))
     return out
 
 

@@ -279,8 +279,25 @@
     // A drug name is short. Anything running on is a sentence that lost its verb.
     var words = n.split(/\s+/);
     if (words.length > 4) return false;
-    // …and it has to contain a real word, not just numbers and symbols.
-    return /[A-Za-z]{4}/.test(n);
+    // …and it has to contain a real word, not just numbers and symbols —
+    // unless it is a name the book only ever writes as an abbreviation. ORS is
+    // three letters, and demanding four filed the guideline's own "Give ORS
+    // 20 ml/kg/hour" as prose instead of as the medicine it is.
+    return /[A-Za-z]{4}/.test(n) || isKnownAbbrev(n);
+  }
+
+  // "ORS" -> "Oral rehydration salts (ORS)". The book abbreviates; the
+  // clinician reading the prescription should not have to expand it.
+  function abbrevFull(name) {
+    var n = String(name || '').trim().toUpperCase();
+    for (var i = 0; i < MED_ABBREV.length; i++) {
+      if (MED_ABBREV[i][0].toUpperCase() === n) return MED_ABBREV[i][1];
+    }
+    return null;
+  }
+
+  function isKnownAbbrev(name) {
+    return !!abbrevFull(name);
   }
 
   // The guideline usually prints supportive treatment as "<what for> Give <drug>"
@@ -651,6 +668,9 @@
     var drugs = meds.map(function (m) {
       var tpd = freqPerDay(m.frequency), dd = durDays(m.duration);
       var reason = medReason(m.source_line);
+      // The database keeps the book's own wording; the screen shows the name
+      // in full, so a prescription never reads just "ORS".
+      m = Object.assign({}, m, { name: abbrevFull(m.name) || m.name });
       // Not a drug name but a piece of the sentence it was printed in. It is
       // still something the guideline says, so it is kept and shown as the line
       // it came from — never dropped, never offered as a medicine to dispense.

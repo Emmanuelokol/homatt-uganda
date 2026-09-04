@@ -232,22 +232,77 @@ must move together:
 The migration deliberately leaves behind any `/data/*.db` whose URL carries a
 different version, so the new file is fetched on the next online visit.
 
-## Known and not fixed
+## The dose parser
 
-**Drug names that wrap, or follow their dose, are not extracted.** In
-`Dehydration in Children under 5 years` the book prints
-`give Zinc supplementation Child <6 months:` on one line and `10 mg once a day
-for 10 days` on the next, and writes `Give 100 ml/kg of Ringer's Lactate` with
-the dose before the name. `parse_medicines` expects name-then-dose on one line
-and finds neither.
+Once the sections were right, the medicines could be measured — and they were
+worse than they looked. Recall was checked against a vocabulary we did not
+invent: the **750 medicines of the Uganda Essential Medicines and Health
+Supplies List**, already bundled with the app. Every EMHSLU name appearing in a
+guideline's own management text is a drug the book is naming, so whether the
+parser caught it is a fact rather than an opinion.
 
-This is a pre-existing limit of the dose parser, not something the rebuild
-introduced — and the old database "compensated" for it by hoovering up
-neighbouring text, which is how that condition came to list a drug **named
-`oral`** twice, from source lines belonging to a different section. Producing
-nothing is better than producing that.
+**It caught 49%.**
 
-Fixing it means making dose extraction more aggressive, which trades one kind
-of error for another, in the component that decides what a patient is handed.
-It belongs in its own change, with its own audit, not bolted onto a boundary
-fix.
+The cause was not line-wrapping, which is what had been assumed. The name
+pattern began `[A-Z]`, because capitalisation was the cheap way to tell a drug
+from an ordinary word — and the book does not co-operate:
+
+```
+Give an antipyretic: paracetamol 15 mg/kg every 6 hours
+Or erythromycin 500 mg every 6 hours
+plus metronidazole 500 mg IV every 8 hours
+benzylpenicillin 3 MU every 6 hours          <- MU was not even a unit
+```
+
+So the name is now looked up in the national list instead. That is a better
+test in **both** directions: it finds a lowercase drug, and it cannot mistake
+`Renal failure Urine output 12 ml` for a prescription, because no such medicine
+exists. The vocabulary pass runs *after* the original one and only ever adds,
+so a drug already found keeps exactly the name, dose and source line it had.
+
+| | before | after |
+|---|---|---|
+| recall against the national list | 49% | **75%** |
+| of mentions the book actually **doses** | — | **~99%** |
+| medicine rows | 845 | 1008 |
+
+The remaining 25% are drugs the book names without dosing them there
+(`Analgesic e.g. paracetamol (avoid NSAIDS…)`). They are deliberately not
+prescriptions; the app recovers them from the prose at render time, undosed,
+for the clinician to dose.
+
+### What the second pass had to be taught not to do
+
+Precision was hand-audited twice on random samples of the added rows — 23/30
+the first time, which was not good enough to ship. Each fault below is now a
+rule, and each rule exists because a real row was wrong:
+
+- **`1/2 glass` read as a dose of `1/2 g`.** The unit had no closing boundary,
+  so `g` matched inside *glass*.
+- **`500,000-1,000,000 IU` became `000.000`.** A comma was treated as a decimal
+  point. It now depends on how many digits follow: `0,5` is 0.5, `500,000` is
+  not.
+- **`Repeat 20 ml/kg IV fluids and consider adrenaline` gave adrenaline the
+  fluid's dose.** Looking *before* a name for its dose is now allowed only when
+  nothing but "of" separates the two — which is what makes
+  `100 ml/kg of Ringer's Lactate` work without inventing the other.
+- **`Start with`, `Toxic dose`, `Infiltrate` became medicines.** An instruction
+  is refused by its opening word; a multi-word phrase containing no known
+  medicine is not a drug name at all.
+- **`Prednisolone is given in`, `Instil atropine eye drops`.** When the list
+  recognises a medicine inside the phrase, the medicine is kept and the
+  sentence dropped.
+- **`Hypoglycaemia` dosed at `3 mmol`.** A named derangement is a finding, not
+  a thing to prescribe. Not one of the 750 medicines begins *hypo-*/*hyper-* or
+  ends *-aemia*, so this costs nothing.
+- **One `artemether/lumefantrine` became two medicines.** The list joins a
+  combination with `+`, the book with `/`; neither spells it the other's way,
+  so the full name never matched and each half was found separately.
+- **Reconstituting a drug is not prescribing one.** Severe malaria's page
+  explains how to make up IV artesunate — "pre-packed with sodium bicarbonate
+  solution 1 ml", "dilute by adding 5 ml of sodium chloride" — and those were
+  arriving as a bicarbonate and a saline on an ordinary malaria patient's
+  prescription.
+
+`tools/check_ucg_db.py` still reports **0 medicines attributed to another
+condition**, so none of this loosened the boundaries the rebuild established.
