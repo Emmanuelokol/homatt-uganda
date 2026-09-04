@@ -438,6 +438,17 @@
     });
   }
 
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);
-  else bind();
+  // Dictating the vitals, when the module is present and the clinic is online.
+  // It fills the same boxes the clinician types into and fires the same input
+  // events, so the abnormal-reading colouring and the suggestions below react
+  // exactly as they do to typing.
+  function bindDictation() {
+    if (window.HomattDictate && window.HomattDictate.attach) {
+      window.HomattDictate.attach('itDictate', 'itDictateSay');
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () { bind(); bindDictation(); });
+  } else { bind(); bindDictation(); }
 })();

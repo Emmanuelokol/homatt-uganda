@@ -12,6 +12,12 @@
 
     <!-- Camera & Media -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- The microphone, for dictating the vitals and for voice notes in
+         Messages. getUserMedia inside the WebView needs this declared, so
+         without it recording works in a browser and fails in the APK — which
+         is what the voice-note button has been doing. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />

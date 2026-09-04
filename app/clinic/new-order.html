@@ -513,6 +513,15 @@
     .it-pick{width:100%;margin-top:5px;padding:11px;border:none;border-radius:11px;
       background:var(--primary);color:#fff;font:inherit;font-size:13.5px;font-weight:800;
       cursor:pointer;touch-action:manipulation}
+    .it-dict{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+      margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;
+      background:var(--tint-2);color:var(--brand-ink);font-weight:600;font-size:15px}
+    .it-dict .material-icons-outlined{font-size:20px}
+    .it-dict.on{background:var(--primary);color:#fff;border-style:solid;
+      animation:itPulse 1.1s ease-in-out infinite}
+    .it-dict-say{margin-top:6px;font-size:13px;line-height:1.45;color:var(--muted)}
+    .it-dict-say.ok{color:var(--brand-ink)}
+    .it-dict-say.warn{color:var(--danger,#b3261e)}
     .it-pulse{animation:itPulse 1.1s ease-in-out 2}
     @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
     @media (max-width:380px){ .it-tab i{display:none} .it-vitals{grid-template-columns:1fr} }
@@ -738,6 +747,11 @@
               <div class="it-one"><input id="itPulse" class="field-input" inputmode="numeric" placeholder="78"><em>/min</em></div>
             </div>
           </div>
+          <button type="button" id="itDictate" class="it-dict">
+            <span class="material-icons-outlined">mic</span>
+            <span>Say the readings</span>
+          </button>
+          <div id="itDictateSay" class="it-dict-say"></div>
           <div class="helper">This is the <b>objective</b> part: what you measured, not what you were told. A reading outside the normal range turns red and is used in the suggestions below.</div>
         </div>
 
@@ -1315,6 +1329,7 @@
 <script src="js/new-order-wizard.js?v=20260910"></script>
 <script src="js/ucg-autofill.js?v=20260911"></script>
 <script src="js/clinic-impression.js?v=20260911"></script>
+<script src="js/clinic-dictate.js?v=20260911"></script>
 <script src="js/clinic-intake.js?v=20260910"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 

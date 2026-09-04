@@ -74,3 +74,55 @@ Screen → URL mapping lives in `app/js/onesignal.js` (`SCREEN_URLS`).
 - `google-services.json` from Firebase Console → place at `android/app/google-services.json`
 - Min SDK: 22 (set in `android/variables.gradle`)
 - `POST_NOTIFICATIONS` permission already declared in `AndroidManifest.xml`
+
+## Dictating the Vitals
+
+**Provider:** OpenAI Whisper, called from a Supabase Edge Function
+**Scope:** the four vitals boxes only — never a diagnosis, never a medicine
+
+### Setup required
+| What | Where |
+|------|-------|
+| `OPENAI_API_KEY` | Supabase secret (already expected by `ai-proxy`) |
+| `RECORD_AUDIO` | declared in `android/app/src/main/AndroidManifest.xml` |
+| Edge Function | deploy `supabase/functions/transcribe` |
+
+Without the secret the button reports "Dictation is not configured on this
+server" rather than failing silently.
+
+### How it works
+The phone records a short clip, posts it to the `transcribe` Edge Function,
+and gets back plain text. The key never reaches the phone — the same
+arrangement as `send-notification` and `ai-proxy`. `clinic-dictate.js` then
+parses the text and fills `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse`,
+firing the same `input` events as typing so the abnormal-reading colouring and
+the suggestion engine react identically.
+
+### The rules it follows, and why
+- **A value is taken only when the clinician said what it was** — a label
+  ("temp", "pulse") or an unambiguous unit ("kg", "mmHg"). A bare "38.5" fills
+  nothing. Guessing which box a number belongs to is how a temperature ends up
+  in the weight field.
+- **Every reading is range-checked** against what a human body can do, and one
+  outside it is reported rather than stored: "Ignored temp 385 — outside
+  30–45 °C".
+- **Never a diagnosis, never a drug.** A misheard drug name becomes a
+  prescription, and no recogniser is good enough at "artemether/lumefantrine"
+  to be trusted with that.
+
+### Known limits
+- **It needs a connection.** Whisper runs on OpenAI's servers, so dictation is
+  the one part of this app that does not work offline. The button says so.
+- **Patient audio leaves the clinic.** That is inherent to the cloud provider
+  and was a deliberate choice; the on-device alternative (whisper.cpp) needs a
+  31–57 MB model, which is 3–6x the whole bundled clinical library, and runs at
+  1–3x realtime on a mid-range phone.
+- Cost is roughly 1 US cent per consultation at Whisper's per-minute rate; the
+  Edge Function caps a clip at ~1 minute so a stuck microphone cannot run up a
+  bill.
+
+### Key files
+| File | Purpose |
+|------|---------|
+| `app/clinic/js/clinic-dictate.js` | recording, the vitals parser, filling the boxes |
+| `supabase/functions/transcribe/index.ts` | holds the key, calls Whisper, caps the clip |
