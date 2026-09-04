@@ -189,7 +189,34 @@ Three consequences worth knowing:
 3. **The shortlist is ordered by the book's own order**, not by how many
    medicines each section holds. Counting medicines put *Management of
    Complications of Severe Malaria* first, precisely because it is the least
-   ordinary thing in the list.
+   ordinary thing in the list. A parent heading is dropped from the list when
+   its own subsections are already on it, so choosing "Asthma" no longer leads
+   to a second question asking which asthma.
+
+4. **A family shares what the book writes once.** `5.2.9 Pneumonia` carries the
+   causes and the investigations; `5.2.9.2 Pneumonia in a Child of 2 months-5
+   years` carries the regimen and nothing else. An empty descriptive field is
+   filled from the section above and labelled with where it came from.
+   Medicines and treatment steps are never inherited — those stay with the
+   section that printed them. The suggestion index does the same, and will also
+   take a **single** sibling's investigations block: malaria's is printed under
+   the severe heading and opens "All suspected malaria patients MUST be tested
+   by blood slide or RDT", which is plainly about every malaria case. Malaria
+   and urinary tract infection now have confirming tests, which closes a gap
+   the September audit recorded as open.
+
+5. **A test the book qualifies is offered but not ordered.** Every test in a
+   package is billed, and malaria's investigations read:
+
+   ```
+   RDT or thick blood slide for diagnosis of malaria
+   Random blood sugar and Hb level IF CLINICALLY INDICATED
+   Lumbar puncture: IN CASE OF convulsion/coma and negative malaria test
+   ```
+
+   Taking all of them put a **lumbar puncture on the bill of an ordinary
+   malaria case** — seven tests where the book asks for two. Qualified lines
+   are now left off the default list; they can still be searched for and added.
 
 ## Getting a rebuilt book onto a phone
 

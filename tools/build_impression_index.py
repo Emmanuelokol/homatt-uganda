@@ -151,6 +151,63 @@ def load_lab_map(js_path='app/clinic/js/ucg-autofill.js'):
 LAB_MAP = load_lab_map()
 
 
+# The book qualifies many investigations - "Random blood sugar and Hb level IF
+# CLINICALLY INDICATED", "Lumbar puncture: IN CASE OF convulsion/coma". Offered
+# as the way to confirm a diagnosis they read as instructions, which is how a
+# febrile patient came to be pointed at a lumbar puncture. The qualified lines
+# are dropped; what the book asks for outright is kept.
+TEST_IF = re.compile(r'\b(if|when|where|unless|in case[s]? of|consider|suspect\w*|'
+                     r'as indicated|where possible|where available|optional)\b', re.I)
+
+
+def plain_investigations(text):
+    """The investigation lines the book asks for without a condition attached."""
+    keep = [l for l in (text or '').split('\n') if l.strip() and not TEST_IF.search(l)]
+    return '\n'.join(keep)
+
+
+# A family of conditions shares one Investigations block, printed on the
+# heading above them: "Pneumonia" carries it, "Pneumonia in a Child" does not,
+# and "Uncomplicated Malaria" is three lines of symptoms whose investigations
+# are printed under "Complicated/Severe Malaria". Reading a child's page alone
+# leaves it with no way to confirm anything, so an empty field is filled from
+# the section above - the book's own hierarchy, not page adjacency.
+def with_inherited_investigations(conn):
+    """cond_id -> investigations, borrowed from the family when the section
+    itself has none.
+
+    The parent is tried first.  Failing that, a single sibling's block is
+    taken - but only when exactly one sibling has one, so nothing is ever
+    chosen between two candidates.  Malaria needs this: the block is printed
+    under "Complicated/Severe Malaria" and opens "All suspected malaria
+    patients MUST be tested by blood slide or RDT", which is plainly about
+    every malaria case and not only the severe ones, while "Uncomplicated
+    Malaria" is three lines of symptoms with no investigations of its own.
+    """
+    rows = {r['number']: (r['id'], r['investigations'] or '')
+            for r in conn.execute('SELECT id, number, investigations FROM conditions')
+            if r['number']}
+    kids = {}
+    for num in rows:
+        if '.' in num:
+            kids.setdefault(num.rsplit('.', 1)[0], []).append(num)
+
+    def borrowed(num):
+        up = num
+        while '.' in up:
+            up = up.rsplit('.', 1)[0]
+            if rows.get(up, ('', ''))[1].strip():
+                return rows[up][1]
+            among = [rows[k][1] for k in kids.get(up, [])
+                     if k != num and rows[k][1].strip()]
+            if len(among) == 1:
+                return among[0]
+        return ''
+
+    return {cid: (inv if inv.strip() else borrowed(num))
+            for num, (cid, inv) in rows.items()}
+
+
 def named_tests(*sources):
     """The named tests a piece of guideline text is really asking for, in the
     order the text mentions them."""
@@ -209,6 +266,7 @@ def main(who_path, ucg_path, out_path):
     # features, the investigations. Not the full chapter text — that is where
     # the noise lives, and it is 6 MB.
     n_ucg = 0
+    inv_of = with_inherited_investigations(ucg)
     for r in ucg.execute('SELECT id, title, page, chapter_number, clinical_features, '
                          'investigations, full_text FROM conditions'):
         if NOT_DX.search(r['title'] or ''):
@@ -222,7 +280,7 @@ def main(who_path, ucg_path, out_path):
                    ('ucg', r['title'], norm(r['title']), r['page'], 'UCG 2023',
                     r['id'], has, sex_of(r['title'], r['chapter_number']),
                     'child' if r['chapter_number'] in CHILD_CHAPTERS else None,
-                    r['title'], feats, r['investigations'] or ''))
+                    r['title'], feats, inv_of.get(r['id'], '')))
         n_ucg += 1
 
     # Confirming tests — ONLY from the guideline's own "Investigations"
@@ -237,12 +295,16 @@ def main(who_path, ucg_path, out_path):
     n_t = n_named = 0
     seen = set()
     for book, conn, cite in (('who', who, 'WHO pocket book'), ('ucg', ucg, 'UCG 2023')):
-        for r in conn.execute('SELECT title, page, investigations FROM conditions '
-                              'WHERE investigations IS NOT NULL'):
+        inherited = with_inherited_investigations(conn) if book == 'ucg' else {}
+        for r in conn.execute('SELECT id, title, page, investigations FROM conditions'):
             if NOT_DX.search(r['title'] or ''):
                 continue
-            named = named_tests(r['investigations'])
-            prose = tests_from(r['investigations'])
+            inv = plain_investigations(
+                inherited.get(r['id']) if book == 'ucg' else r['investigations'])
+            if not inv.strip():
+                continue
+            named = named_tests(inv)
+            prose = tests_from(inv)
             if not named and not prose:
                 continue
             key = (book, norm(r['title']))

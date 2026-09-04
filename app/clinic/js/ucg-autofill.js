@@ -227,10 +227,31 @@
       var hit = pair[0].exec(src);
       if (!hit) return;
       if (found.some(function (f) { return f.name === pair[1]; })) return;
+      if (isConditionalTest(src, hit.index)) return;
       found.push({ name: pair[1], at: hit.index });
     });
     found.sort(function (a, b) { return a.at - b.at; });
     return found.map(function (f) { return f.name; }).slice(0, 10);
+  }
+
+  // Every test in the package is ordered and BILLED, so only the ones the book
+  // asks for outright belong there. Malaria's investigations read:
+  //
+  //   RDT or thick blood slide for diagnosis of malaria
+  //   Random blood sugar and Hb level IF CLINICALLY INDICATED
+  //   Lumbar puncture: IN CASE OF convulsion/coma and negative malaria test
+  //
+  // Taking all of them put a lumbar puncture on the bill of an ordinary
+  // malaria case. A qualified test is still findable by searching for it — it
+  // is simply not ordered on the patient's behalf before anyone has decided
+  // they need it.
+  var TEST_IF = /\b(if|when|where|unless|in case of|in cases of|consider|suspect\w*|only if|as indicated|if indicated|where possible|where available|if available|if clinically|if necessary|if in doubt|optional)\b/i;
+
+  function isConditionalTest(src, at) {
+    var from = src.lastIndexOf('\n', at) + 1;
+    var to = src.indexOf('\n', at);
+    var line = src.slice(from, to < 0 ? src.length : to);
+    return TEST_IF.test(line);
   }
 
   // ── Which of the guideline's lines are really medicines ───────────────────
@@ -579,8 +600,41 @@
     return m ? Math.min(90, Number(m[1])) : 5;
   }
 
+  // The book writes what a family of conditions has in common once, on the
+  // heading above them. "Pneumonia" carries the causes and the investigations;
+  // "Pneumonia in a Child of 2 months-5 years" carries the regimen and nothing
+  // else. Read on its own, the child's page has no investigations at all — so
+  // an empty field is filled from the section above it, which is how the book
+  // is meant to be read. Only the descriptive fields are inherited: medicines
+  // and treatment steps stay with the section that actually printed them.
+  var INHERIT = ['causes', 'clinical_features', 'differential', 'investigations',
+                 'complications', 'prevention'];
+
+  function inheritFromParent(c, info) {
+    try {
+      var num = c && c.number;
+      if (!num) {
+        var self = rows('SELECT number FROM conditions WHERE id=? LIMIT 1', [c.id])[0];
+        num = self && self.number;
+      }
+      while (num && num.indexOf('.') > 0) {
+        var gaps = INHERIT.filter(function (k) { return !String(info[k] || '').trim(); });
+        if (!gaps.length) return;
+        num = num.replace(/\.[^.]+$/, '');
+        var p = rows('SELECT title,' + INHERIT.join(',') +
+                     ' FROM conditions WHERE number=? LIMIT 1', [num])[0];
+        if (!p) continue;
+        gaps.forEach(function (k) {
+          if (String(p[k] || '').trim()) {
+            info[k] = p[k] + '\n(from “' + p.title + '”, the section above)';
+          }
+        });
+      }
+    } catch (e) {}
+  }
+
   function buildFromGuideline(condId, sev) {
-    var c = rows('SELECT id,title,page,causes,clinical_features,differential,investigations,' +
+    var c = rows('SELECT id,number,title,page,causes,clinical_features,differential,investigations,' +
       'management,complications,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
     if (!c) return null;
     ctx.info = {
@@ -588,6 +642,7 @@
       investigations: c.investigations, management: c.management, complications: c.complications,
       prevention: c.prevention, notes: c.notes, full_text: c.full_text,
     };
+    inheritFromParent(c, ctx.info);
     // EVERY medicine the guideline lists for this condition — no cap. The old
     // "LIMIT 12 … slice(0,6)" silently threw away the rest, which is why the
     // drips and the treatment of complications were never on screen.
@@ -2314,6 +2369,18 @@
     // Never leave the clinician with nothing: if none of them carries a
     // treatment, offer what there is rather than pretending there is nothing.
     if (real.length) hits = real;
+
+    // Drop a parent heading when its own subsections are already on the list.
+    // "Asthma" is a heading over "Acute Asthma" and "Chronic Asthma" and has no
+    // package of its own, so choosing it only produces a second question —
+    // which asthma? — and the clinician answers the same thing twice.
+    hits = hits.filter(function (h) {
+      if (!h.number || packInfo(h.id).n > 0) return true;
+      return !hits.some(function (o) {
+        return o !== h && o.number &&
+               o.number.lastIndexOf(h.number + '.', 0) === 0;
+      });
+    });
     // Offer them in the book's own order, not by how many medicines each
     // holds. The UCG prints a condition before its severe form and its severe
     // form before the management of its complications, which is the order a
@@ -2385,12 +2452,14 @@
     if (dosedCache[condId] !== undefined) return dosedCache[condId];
     var out = false;
     try {
-      var c = rows('SELECT management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
+      var c = rows('SELECT title,management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
       var prose = c ? [c.management, c.prevention, c.notes].filter(Boolean).join(' ') : '';
       // A section printed wholly as a table has no parsed columns at all; its
       // text is only in full_text. Without this, "Recommended First Line
       // Regimens" — six thousand characters of ARV combinations — looks empty.
-      if (!prose.trim() && c) prose = c.full_text || '';
+      // Prophylaxis and prevention pages are excluded for the same reason as
+      // in carriesTreatment: they name medicines without being a treatment.
+      if (!prose.trim() && c && !BORROW_NEVER.test(c.title || '')) prose = c.full_text || '';
       out = DOSE_ON_LINE.test(prose) || MED_ABBREV.some(function (pair) {
         var at = prose.indexOf(pair[0]);
         if (at < 0) return false;
@@ -2430,7 +2499,7 @@
     if (borrowSource(cond)) return true;
     if (p.inv > 0 && (p.mg + p.inv) >= 400) return true;
     try {
-      var c = rows('SELECT management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
+      var c = rows('SELECT title,management,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [cond.id])[0];
       if (!c) return false;
       var prose = [c.management, c.prevention, c.notes].filter(Boolean).join('\n');
       // Some sections are printed entirely as a table with no headings at all,
@@ -2438,7 +2507,13 @@
       // Regimens" is six thousand characters of ARV combinations and not one
       // "Management" line. Falling back to the section's own text keeps those
       // findable instead of treating them as empty.
-      if (!prose.trim()) prose = c.full_text || '';
+      //
+      // Not for a prophylaxis, prevention or counselling page though: those
+      // name medicines while describing who should be given them rather than
+      // how to treat someone who is ill, and offering them as a treatment
+      // package is how "Malaria Prophylaxis" ended up in a list of packages
+      // for a patient who already has malaria.
+      if (!prose.trim() && !BORROW_NEVER.test(c.title || '')) prose = c.full_text || '';
       if (!prose.trim()) return false;
       return findMissingDrugs(prose, [], rankMarkers(prose)).length > 0;
     } catch (e) { return false; }
