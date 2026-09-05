@@ -37,7 +37,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260909">
+  <link rel="stylesheet" href="css/clinic.css?v=20260913">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -747,21 +747,24 @@
 
   <!-- Patient History Detail Modal -->
   <div id="histModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:640px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
-      <div style="padding:20px 24px 16px;border-bottom:1px solid #E8EAED;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
-        <div>
-          <div style="font-size:18px;font-weight:700" id="histModalName">Patient Name</div>
-          <div style="font-size:12px;color:#9AA0A6;margin-top:2px" id="histModalMeta"></div>
+    <div style="background:var(--surface);color:var(--text);border-radius:16px;width:100%;max-width:640px;max-height:92vh;max-height:92dvh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+      <!-- Compact header: the case number and who it is, nothing else. It was
+           taking 90px of a 915px phone before the record even started. -->
+      <div style="padding:13px 16px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-shrink:0">
+        <div style="min-width:0">
+          <div style="font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="histModalName">Patient Name</div>
+          <div style="font-size:12px;color:var(--text-lt);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="histModalMeta"></div>
         </div>
         <button onclick="document.getElementById('histModal').style.display='none'"
-          style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer">
-          <span class="material-icons-outlined">close</span>
+          aria-label="Close"
+          style="background:var(--tint-2);color:var(--text);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
+          <span class="material-icons-outlined" style="font-size:19px">close</span>
         </button>
       </div>
-      <div id="histModalBody" style="overflow-y:auto;padding:20px 24px;flex:1">Loading…</div>
-      <div id="histModalFooter" style="display:none;padding:14px 24px 16px;border-top:1px solid #E8EAED;flex-shrink:0">
+      <div id="histModalBody" class="pr-body" style="overflow-y:auto;padding:14px 16px 18px;flex:1">Loading…</div>
+      <div id="histModalFooter" style="display:none;padding:10px 16px 14px;border-top:1px solid var(--border);flex-shrink:0;background:var(--surface)">
         <button id="histModalNewVisitBtn"
-          style="width:100%;padding:14px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
+          style="width:100%;padding:12px;background:var(--info);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px">
           <span class="material-icons-outlined" style="font-size:18px">post_add</span>
           Record Follow-up Visit
         </button>
@@ -769,7 +772,7 @@
              two lines per patient, and discharging is a decision you make after
              looking at the record, not while scrolling past it. -->
         <button id="histModalDischargeBtn"
-          style="display:none;width:100%;margin-top:9px;padding:13px;background:transparent;color:var(--deep-ink);border:1.5px solid var(--deep);border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px">
+          style="display:none;width:100%;margin-top:7px;padding:11px;background:transparent;color:var(--deep-ink);border:1.5px solid var(--deep);border-radius:10px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;align-items:center;justify-content:center;gap:8px">
           <span class="material-icons-outlined" style="font-size:18px">task_alt</span>
           Discharge patient
         </button>
@@ -2031,10 +2034,10 @@
     var paidAmt = Number(c.amount_paid) || 0;
     var balance = Math.max(0, total - paidAmt);
     var payBadge = c.payment_status==='paid'
-      ? '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
+      ? '<span class="pr-pill paid">PAID</span>'
       : c.payment_status==='waived'
-      ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
-      : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">'+((balance>0&&paidAmt>0)?'PART-PAID':'PENDING')+'</span>';
+      ? '<span class="pr-pill waived">WAIVED</span>'
+      : '<span class="pr-pill pending">'+((balance>0&&paidAmt>0)?'PART-PAID':'PENDING')+'</span>';
 
     // Free-text / list section helper — hides itself when there's no value.
     function sect(label, value) {
@@ -2047,9 +2050,9 @@
       }
       v = String(v).trim();
       if (!v) return '';
-      return '<div style="margin-bottom:8px">'
-        +'<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px">'+label+'</div>'
-        +'<div style="font-size:13px;color:#333;white-space:pre-line">'+esc(v)+'</div>'
+      return '<div class="pr-field">'
+        +'<div class="pr-field-k">'+label+'</div>'
+        +'<div class="pr-field-v">'+esc(v)+'</div>'
       +'</div>';
     }
 
@@ -2065,9 +2068,9 @@
       var endTs = d.getTime() + maxDur * 86400000;
       var daysLeft = Math.ceil((endTs - Date.now()) / 86400000);
       if (daysLeft <= 0) {
-        courseChip = '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">task_alt</span> '+maxDur+'-day course period over</span>';
+        courseChip = '<span class="pr-tag done"><span class="material-icons-outlined">task_alt</span> '+maxDur+'-day course over</span>';
       } else {
-        courseChip = '<span style="background:#FFF8E1;color:#E65100;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700"><span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">pending</span> On treatment · '+daysLeft+' day'+(daysLeft!==1?'s':'')+' left</span>';
+        courseChip = '<span class="pr-tag on"><span class="material-icons-outlined">pending</span> On treatment · '+daysLeft+' day'+(daysLeft!==1?'s':'')+' left</span>';
       }
     })();
 
@@ -2076,27 +2079,28 @@
     if (c.follow_up_days && c.follow_up_days > 0) {
       var due = new Date(d.getTime() + c.follow_up_days * 86400000);
       var dueStr = due.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
-      followBlock = '<div style="font-size:12px;color:#1565C0;margin-top:6px;margin-bottom:8px"><span class="material-icons-outlined" style="font-size:14px;vertical-align:-3px">event_repeat</span> Return by '+esc(dueStr)
-        + (c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '') + '</div>';
+      followBlock = '<div class="pr-field"><div class="pr-field-k">Next return visit</div>'
+        + '<div class="pr-field-v">' + esc(dueStr)
+        + (c.follow_up_reason ? ' — ' + esc(c.follow_up_reason) : '') + '</div></div>';
     }
 
     // Medicines given
-    var medsBlock = '<div style="margin-bottom:8px">'
-      +'<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.3px;text-transform:uppercase;margin-bottom:4px">Medicines given</div>'
+    var medsBlock = '<div class="pr-field">'
+      +'<div class="pr-field-k">Medicines given</div>'
       + renderMedsList(c.prescription_items)
       +'</div>';
 
     // Financial breakdown
-    function feeRow(label, amt){ return amt > 0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:#5F6368;margin-bottom:2px"><span>'+label+'</span><span>UGX '+fmtUGX(amt)+'</span></div>' : ''; }
+    function feeRow(label, amt){ return amt > 0 ? '<div class="pr-fee"><span>'+label+'</span><span>UGX '+fmtUGX(amt)+'</span></div>' : ''; }
     var feeRows = feeRow('Treatment', Number(c.consultation_fee_ugx)||0)
       + feeRow('Lab / tests', Number(c.lab_fee_ugx)||0)
       + feeRow('Medicines', Number(c.meds_fee_ugx)||0);
     var financialBlock = total > 0
-      ? '<div style="background:#FAFAFA;border:1px solid #ECECEC;border-radius:10px;padding:10px 12px;margin-top:10px">'
+      ? '<div class="pr-fees">'
           + feeRows
-          + '<div style="display:flex;justify-content:space-between;font-size:13px;font-weight:700;color:#212121;border-top:1px solid #E0E0E0;margin-top:4px;padding-top:4px"><span>Total billed</span><span>UGX '+fmtUGX(total)+'</span></div>'
-          + (paidAmt>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;color:var(--deep-ink)"><span>Paid</span><span>UGX '+fmtUGX(paidAmt)+'</span></div>' : '')
-          + (balance>0 ? '<div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;color:#E65100"><span>Balance due</span><span>UGX '+fmtUGX(balance)+'</span></div>' : '')
+          + '<div class="pr-fee total"><span>Total billed</span><span>UGX '+fmtUGX(total)+'</span></div>'
+          + (paidAmt>0 ? '<div class="pr-fee paid"><span>Paid</span><span>UGX '+fmtUGX(paidAmt)+'</span></div>' : '')
+          + (balance>0 ? '<div class="pr-fee due"><span>Balance due</span><span>UGX '+fmtUGX(balance)+'</span></div>' : '')
         +'</div>'
       : '';
 
@@ -2107,18 +2111,18 @@
     // already render the structured medicines block above.
     var planTxt = (Array.isArray(c.prescription_items) && c.prescription_items.length) ? '' : c.treatment_plan;
 
-    return '<div style="border:1px solid #E8EAED;border-radius:12px;padding:14px 16px;margin-bottom:12px'+(isLatest?';':'')+'">'
-      +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:8px">'
-        +'<div style="font-weight:700;font-size:14px">Visit '+visitNum+' — '+esc(dateStr)
-          +'<div style="font-size:11px;color:#9AA0A6;font-weight:500">'+esc(timeStr)+'</div></div>'
-        +'<div style="text-align:right;flex-shrink:0">'+payBadge
-          +(total?'<div style="font-size:12px;font-weight:600;color:var(--deep-ink);margin-top:3px">UGX '+fmtUGX(total)+'</div>':'')
+    return '<div class="pr-visit">'
+      +'<div class="pr-visit-h">'
+        +'<div><div class="pr-visit-n">Visit '+visitNum+' — '+esc(dateStr)+'</div>'
+          +'<div class="pr-visit-t">'+esc(timeStr)+'</div></div>'
+        +'<div class="pr-visit-r">'+payBadge
+          +(total?'<div class="pr-visit-f">UGX '+fmtUGX(total)+'</div>':'')
         +'</div>'
       +'</div>'
-      +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">'
-        +'<span style="background:#E3F2FD;color:#0D47A1;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700">'+esc(c.confirmed_diagnosis||'Pending')+'</span>'
-        +(c.severity?'<span style="background:#F3E5F5;color:#6A1B9A;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">'+esc(c.severity)+'</span>':'')
-        +(c.patient_type?'<span style="background:#ECEFF1;color:#37474F;font-size:11px;padding:3px 9px;border-radius:20px;font-weight:600">'+esc(c.patient_type)+(c.ward?' · '+esc(c.ward):'')+'</span>':'')
+      +'<div class="pr-tags">'
+        +'<span class="pr-tag dx">'+esc(c.confirmed_diagnosis||'Pending')+'</span>'
+        +(c.severity?'<span class="pr-tag">'+esc(c.severity)+'</span>':'')
+        +(c.patient_type?'<span class="pr-tag">'+esc(c.patient_type)+(c.ward?' · '+esc(c.ward):'')+'</span>':'')
         +courseChip
       +'</div>'
       + sect('Seen by', c.clinician_name)
@@ -2233,26 +2237,43 @@
 
   function renderMedsList(items) {
     if (!Array.isArray(items) || !items.length) {
-      return '<div style="font-size:12px;color:#9AA0A6;font-style:italic">No medications recorded for this visit.</div>';
+      return '<div class="pr-note">No medicines recorded for this visit.</div>';
     }
     return items.map(function(m) {
       var name = m.drug_name || m.name || 'Medication';
       var dose = m.strength || m.dosage || '';
       var freq = (m.frequency || '').replace('_daily','/day').replace(/_/g,' ');
       var dur  = m.duration ? (m.duration + ' day' + (m.duration!==1?'s':'')) : '';
-      var sub  = [dose, freq, dur].filter(Boolean).join(' · ');
+      // The dose is usually already in the name ("paracetamol 1g"), so repeating
+      // it under the name filled the row with the same words twice.
+      var bits = [];
+      if (dose && name.toLowerCase().indexOf(String(dose).toLowerCase()) < 0) bits.push(dose);
+      if (freq) bits.push(freq);
+      if (dur) bits.push(dur);
       var qty = m.quantity || m.qty;
-      return '<div class="dmed-row">'
-        +'<span class="material-icons-outlined dmed-row-ic">medication</span>'
-        +'<div class="dmed-row-b">'
-          +'<div class="dmed-row-n">'+esc(name)+'</div>'
-          +(sub ? '<div class="dmed-row-s">'+esc(sub)+'</div>' : '')
+      return '<div class="pr-med">'
+        +'<span class="material-icons-outlined pr-med-ic">medication</span>'
+        +'<div class="pr-med-b">'
+          +'<div class="pr-med-n">'+esc(name)+'</div>'
+          +(bits.length ? '<div class="pr-med-s">'+esc(bits.join(' · '))+'</div>' : '')
         +'</div>'
-        +(qty ? '<span class="dmed-row-q">'+esc(qty)+'</span>' : '')
+        +(qty ? '<span class="pr-med-q">'+esc(qty)+'</span>' : '')
       +'</div>';
     }).join('');
   }
 
+  // The patient record, arranged the way it is read.
+  //
+  //   1  what is wrong           the diagnosis, large, with when and how bad
+  //   2  what needs doing        money owed and the return date, side by side,
+  //                              each with its action on it
+  //   3  what they are on        the medicines
+  //   4  what came before        folded away until asked for
+  //
+  // Everything is a class from clinic.css, so it follows the theme. The old
+  // version wrote colours inline and dark mode patched them by matching those
+  // colours as substrings — which is how grey text ended up on a cream card at
+  // 1.43:1 and became unreadable.
   function renderPatientDetailBody(current, history) {
     var d = new Date(current.created_at);
     var dateStr = d.toLocaleDateString('en-UG',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
@@ -2260,100 +2281,109 @@
     var total   = Number(current.total_charged_ugx) || 0;
     var paid    = Number(current.amount_paid) || 0;
     var balance = Math.max(0, total - paid);
-    var status  = current.payment_status || (balance > 0 ? 'pending' : 'paid');
+    var sev     = String(current.severity || 'moderate').toLowerCase();
 
-    var balanceBlock = total > 0
-      ? '<div style="background:'+(balance>0?'#FFF3E0':'var(--tint-2)')+';border:1px solid '+(balance>0?'#FFB74D':'var(--tint-3)')+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start">'
-            +'<div>'
-              +'<div style="font-size:11px;color:'+(balance>0?'#E65100':'var(--deep)')+';font-weight:700;letter-spacing:.5px;text-transform:uppercase">'+(balance>0?'Outstanding Balance':'Bill Settled')+'</div>'
-              +'<div style="font-size:20px;font-weight:800;color:'+(balance>0?'#E65100':'var(--deep)')+';margin-top:2px">UGX '+fmtUGX(balance>0?balance:total)+'</div>'
-              +'<div style="font-size:11px;color:#5F6368;margin-top:4px">Total billed UGX '+fmtUGX(total)+' · Paid UGX '+fmtUGX(paid)+'</div>'
-            +'</div>'
-            +(balance>0
-              ? '<button data-action="record-payment" style="background:#E65100;color:#fff;border:none;border-radius:20px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap"><span class="material-icons-outlined" style="font-size:14px">payments</span> Record Payment</button>'
-              : '<span style="background:var(--deep);color:#fff;border-radius:20px;padding:6px 12px;font-size:11px;font-weight:700">PAID</span>')
-          +'</div>'
+    var hero =
+      '<div class="pr-hero">'
+        +'<div style="min-width:0">'
+          +'<div class="pr-hero-dx">'+esc(current.confirmed_diagnosis || 'Diagnosis pending')+'</div>'
+          +'<div class="pr-hero-when">'+esc(dateStr)+' at '+esc(timeStr)
+            +(current.patient_type ? ' · ' + esc(current.patient_type) : '')+'</div>'
         +'</div>'
-      : '';
-
-    // Next return visit panel — shows when this patient is expected back & for what
-    var returnBlock = '';
-    if (current.follow_up_days && current.follow_up_days > 0) {
-      var due = new Date(d.getTime() + current.follow_up_days * 86400000);
-      var daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
-      var dueLabel = due.toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-      var statusTxt, bg, fg, border;
-      if (daysLeft < 0)      { statusTxt = 'Overdue by ' + Math.abs(daysLeft) + ' day' + (Math.abs(daysLeft)!==1?'s':''); bg='#FFEBEE'; fg='#C62828'; border='#EF9A9A'; }
-      else if (daysLeft === 0) { statusTxt = 'Today'; bg='#FFF3E0'; fg='#E65100'; border='#FFB74D'; }
-      else if (daysLeft === 1) { statusTxt = 'Tomorrow'; bg='#FFF8E1'; fg='#E65100'; border='#FFD54F'; }
-      else if (daysLeft <= 3)  { statusTxt = 'In ' + daysLeft + ' days'; bg='#FFF8E1'; fg='#E65100'; border='#FFE082'; }
-      else                     { statusTxt = 'In ' + daysLeft + ' days'; bg='#E3F2FD'; fg='#1565C0'; border='#90CAF9'; }
-      returnBlock =
-        '<div style="background:'+bg+';border:1px solid '+border+';border-radius:10px;padding:12px 14px;margin-bottom:14px">'
-          +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px">'
-            +'<div style="flex:1;min-width:0">'
-              +'<div style="font-size:11px;color:'+fg+';font-weight:700;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:4px">'
-                +'<span class="material-icons-outlined" style="font-size:14px">event_repeat</span> Next return visit'
-              +'</div>'
-              +'<div style="font-size:14px;font-weight:700;color:'+fg+';margin-top:2px">'+esc(dueLabel)+'</div>'
-              +(current.follow_up_reason ? '<div style="font-size:12px;color:#424242;margin-top:4px"><strong>For:</strong> '+esc(current.follow_up_reason)+'</div>' : '<div style="font-size:11px;color:#9AA0A6;margin-top:4px;font-style:italic">No reason recorded</div>')
-            +'</div>'
-            +'<span style="background:'+fg+';color:#fff;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700;white-space:nowrap">'+esc(statusTxt.toUpperCase())+'</span>'
-          +'</div>'
-        +'</div>';
-    } else {
-      returnBlock =
-        '<div style="background:#F5F5F5;border:1px dashed #BDBDBD;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:12px;color:#5F6368;display:flex;align-items:center;gap:8px">'
-          +'<span class="material-icons-outlined" style="font-size:16px;color:#9AA0A6">event_busy</span>'
-          +'No return visit scheduled. Set one when recording a follow-up.'
-        +'</div>';
-    }
-
-    var currentBlock =
-      '<div style="border:2px solid #1565C0;border-radius:12px;padding:14px 16px;margin-bottom:18px;background:#fff">'
-        +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'
-          +'<div>'
-            +'<div style="font-size:11px;color:#1565C0;font-weight:700;letter-spacing:.5px;text-transform:uppercase">Active Visit</div>'
-            +'<div style="font-size:14px;font-weight:700;margin-top:2px">'+esc(dateStr)+' at '+esc(timeStr)+'</div>'
-          +'</div>'
-          +'<span style="background:#E3F2FD;color:#0D47A1;font-size:10px;padding:3px 10px;border-radius:20px;font-weight:700">'+esc((current.severity||'moderate').toUpperCase())+'</span>'
-        +'</div>'
-        +'<div style="font-size:13px;color:#424242;margin-bottom:10px"><strong>Diagnosis:</strong> '+esc(current.confirmed_diagnosis||'Pending')+'</div>'
-        +(current.patient_type ? '<div style="font-size:12px;color:#9AA0A6;margin-bottom:10px">Patient type: '+esc(current.patient_type)+'</div>' : '')
-        +balanceBlock
-        +returnBlock
-        +'<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:6px">Current Medications</div>'
-        +renderMedsList(current.prescription_items)
+        +'<span class="pr-sev '+esc(sev)+'">'+esc(sev)+'</span>'
       +'</div>';
 
-    var historyBlock = '';
-    if (history.length) {
-      historyBlock =
-        '<div style="font-size:11px;color:#5F6368;font-weight:700;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Previous Visits ('+history.length+')</div>'
-        + history.map(function(h, i) {
-          var hd = new Date(h.created_at);
-          var hDate = hd.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
-          var hPaid = h.payment_status === 'paid'
-            ? '<span style="background:var(--tint-2);color:var(--deep-ink);font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PAID</span>'
-            : (h.payment_status === 'waived'
-              ? '<span style="background:#FFF8E1;color:#E65100;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">WAIVED</span>'
-              : '<span style="background:#FFEBEE;color:#C62828;font-size:10px;padding:2px 7px;border-radius:20px;font-weight:700">PENDING</span>');
-          var hFee = h.total_charged_ugx ? 'UGX ' + fmtUGX(h.total_charged_ugx) : '';
-          var hMeds = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
-          return '<div style="border:1px solid #E8EAED;border-radius:10px;padding:12px 14px;margin-bottom:10px">'
-            +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">'
-              +'<div style="font-weight:700;font-size:13px">'+esc(hDate)+'</div>'
-              +(hFee?'<div style="font-size:12px;color:#5F6368">'+esc(hFee)+' '+hPaid+'</div>':'')
-            +'</div>'
-            +'<div style="font-size:12px;color:#424242">'+esc(h.confirmed_diagnosis||'Pending')+(hMeds?' · '+hMeds+' med'+(hMeds!==1?'s':''):'')+'</div>'
-          +'</div>';
-        }).join('');
-    } else {
-      historyBlock = '<div style="font-size:12px;color:#9AA0A6;text-align:center;padding:8px;font-style:italic">No previous visits at this clinic.</div>';
+    // ── Money ──
+    var money = '';
+    if (total > 0 && balance > 0) {
+      money =
+        '<div class="pr-tile owe">'
+          +'<div class="pr-tile-k"><span class="material-icons-outlined">account_balance_wallet</span>Owed</div>'
+          +'<div class="pr-tile-v">UGX '+fmtUGX(balance)+'</div>'
+          +'<div class="pr-tile-s">of UGX '+fmtUGX(total)+' billed'+(paid>0?' · UGX '+fmtUGX(paid)+' paid':'')+'</div>'
+          +'<button class="pr-tile-act" data-action="record-payment">'
+            +'<span class="material-icons-outlined">payments</span>Record payment</button>'
+        +'</div>';
+    } else if (total > 0) {
+      money =
+        '<div class="pr-tile ok">'
+          +'<div class="pr-tile-k"><span class="material-icons-outlined">task_alt</span>Bill settled</div>'
+          +'<div class="pr-tile-v">UGX '+fmtUGX(total)+'</div>'
+          +'<div class="pr-tile-s">paid in full</div>'
+        +'</div>';
     }
 
-    return currentBlock + historyBlock;
+    // ── Next return visit ──
+    var ret = '';
+    if (current.follow_up_days && current.follow_up_days > 0) {
+      var due = new Date(d.getTime() + current.follow_up_days * 86400000);
+      var left = Math.ceil((due.getTime() - Date.now()) / 86400000);
+      var dueLabel = due.toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
+      var when, kind;
+      if (left < 0)        { when = Math.abs(left) + ' day' + (Math.abs(left)!==1?'s':'') + ' overdue'; kind = 'late'; }
+      else if (left === 0) { when = 'due today';    kind = 'late'; }
+      else if (left === 1) { when = 'due tomorrow'; kind = 'due'; }
+      else                 { when = 'in ' + left + ' days'; kind = 'due'; }
+      ret =
+        '<div class="pr-tile '+kind+'">'
+          +'<div class="pr-tile-k"><span class="material-icons-outlined">event_repeat</span>Back '+esc(when)+'</div>'
+          +'<div class="pr-tile-v">'+esc(dueLabel)+'</div>'
+          +'<div class="pr-tile-s">'+(current.follow_up_reason
+              ? esc(current.follow_up_reason)
+              : 'no reason recorded')+'</div>'
+        +'</div>';
+    } else {
+      ret =
+        '<div class="pr-tile">'
+          +'<div class="pr-tile-k"><span class="material-icons-outlined">event_busy</span>No return visit</div>'
+          +'<div class="pr-tile-s" style="margin-top:3px">Set one when you record a follow-up.</div>'
+        +'</div>';
+    }
+
+    var strip = '<div class="pr-strip' + (money ? '' : ' one') + '">' + money + ret + '</div>';
+
+    var meds =
+      '<div>'
+        +'<div class="pr-sec">On now'
+          +(Array.isArray(current.prescription_items) && current.prescription_items.length
+            ? ' <b>· '+current.prescription_items.length+'</b>' : '')+'</div>'
+        +'<div style="margin-top:8px">'+renderMedsList(current.prescription_items)+'</div>'
+      +'</div>';
+
+    // ── Previous visits, folded ──
+    var past;
+    if (history.length) {
+      past =
+        '<details class="pr-past">'
+          +'<summary><span class="material-icons-outlined">history</span>'
+            +'Previous visits ('+history.length+')'
+            +'<span style="flex:1"></span>'
+            +'<span class="material-icons-outlined pr-caret">expand_more</span></summary>'
+          +'<div class="pr-past-in">'
+          + history.map(function(h) {
+              var hd = new Date(h.created_at);
+              var hDate = hd.toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'});
+              var st = h.payment_status === 'paid' ? 'paid'
+                     : (h.payment_status === 'waived' ? 'waived' : 'pending');
+              var hFee = h.total_charged_ugx ? 'UGX ' + fmtUGX(h.total_charged_ugx) : '';
+              var hMeds = Array.isArray(h.prescription_items) ? h.prescription_items.length : 0;
+              return '<div class="pr-row">'
+                +'<div class="pr-row-t">'
+                  +'<div class="pr-row-d">'+esc(hDate)+'</div>'
+                  +'<div class="pr-row-f">'+esc(hFee)
+                    +'<span class="pr-pill '+st+'">'+st.toUpperCase()+'</span></div>'
+                +'</div>'
+                +'<div class="pr-row-x">'+esc(h.confirmed_diagnosis||'Pending')
+                  +(hMeds?' · '+hMeds+' medicine'+(hMeds!==1?'s':''):'')+'</div>'
+              +'</div>';
+            }).join('')
+          +'</div>'
+        +'</details>';
+    } else {
+      past = '<div class="pr-note">No previous visits at this clinic.</div>';
+    }
+
+    return hero + strip + meds + past;
   }
 
   // ── Follow-up visit form ────────────────────────────────

@@ -758,3 +758,196 @@ html[data-theme="dark"] .nn-sub{ color:#A9BCAE }
   cursor:pointer; touch-action:manipulation;
 }
 .px-add:active{ background:rgba(0,137,123,.12) }
+
+/* ═══ PATIENT RECORD SHEET ═══════════════════════════════════════════════
+   The modal a clinician opens from the active-visits list.
+
+   It used to be built from inline styles with hard-coded light-mode colours,
+   which dark mode then patched by matching those colours as SUBSTRINGS of the
+   style attribute:
+
+       html[data-theme="dark"] [style*="color:#5F6368"]{color:#C2D3C6!important}
+
+   Only the colours somebody remembered to list were caught. The balance card's
+   cream #FFF3E0 was not on the list, so it stayed cream — while the grey text
+   ON it was rewritten to a pale green-grey for dark mode. Pale grey on cream
+   measured 1.43:1, and "Total billed UGX 60,000 · Paid UGX 0" was, in the
+   clinician's words, not seen.
+
+   So the sheet is built from classes and theme variables instead. Nothing here
+   names a colour that only works in one theme. Status tints are translucent
+   over whatever surface is behind them, which is what lets one rule serve all
+   four skins in both themes.
+   ────────────────────────────────────────────────────────────────────────── */
+:root{
+  --pr-owe-bg:rgba(230,81,0,.10);  --pr-owe-fg:#B23C00; --pr-owe-bd:rgba(230,81,0,.32);
+  --pr-due-bg:rgba(21,101,192,.09);--pr-due-fg:#0D47A1; --pr-due-bd:rgba(21,101,192,.28);
+  --pr-ok-bg:rgba(46,125,50,.10);  --pr-ok-fg:#1B5E20;  --pr-ok-bd:rgba(46,125,50,.30);
+  --pr-late-bg:rgba(198,40,40,.10);--pr-late-fg:#B3261E;--pr-late-bd:rgba(198,40,40,.32);
+  /* White on the usual #E65100 measures 3.79:1 — under AA for a 12px label.
+     The button gets its own pair so it passes in both themes. */
+  --pr-act-bg:#A83900; --pr-act-fg:#FFFFFF;
+}
+html[data-theme="dark"]{
+  --pr-owe-bg:rgba(255,167,38,.14); --pr-owe-fg:#FFB870; --pr-owe-bd:rgba(255,167,38,.34);
+  --pr-due-bg:rgba(100,181,246,.13);--pr-due-fg:#8FC4F8; --pr-due-bd:rgba(100,181,246,.30);
+  --pr-ok-bg:rgba(102,187,106,.14); --pr-ok-fg:#8FE0A0;  --pr-ok-bd:rgba(102,187,106,.32);
+  --pr-late-bg:rgba(239,83,80,.15); --pr-late-fg:#FF9E99; --pr-late-bd:rgba(239,83,80,.34);
+  --pr-act-bg:#FFB870; --pr-act-fg:#241300;
+}
+
+.pr-body{ display:flex; flex-direction:column; gap:14px }
+
+/* The one thing the clinician came to read. */
+.pr-hero{ display:flex; align-items:flex-start; gap:10px; justify-content:space-between }
+.pr-hero-dx{ font-size:19px; font-weight:800; line-height:1.25; color:var(--text); min-width:0 }
+.pr-hero-when{ font-size:12px; color:var(--text-lt); margin-top:3px }
+.pr-sev{
+  flex-shrink:0; font-size:10px; font-weight:800; letter-spacing:.6px;
+  padding:4px 10px; border-radius:20px; text-transform:uppercase;
+  background:var(--pr-due-bg); color:var(--pr-due-fg);
+  border:1px solid var(--pr-due-bd);
+}
+.pr-sev.moderate{ background:var(--pr-owe-bg); color:var(--pr-owe-fg); border-color:var(--pr-owe-bd) }
+.pr-sev.severe, .pr-sev.critical{ background:var(--pr-late-bg); color:var(--pr-late-fg); border-color:var(--pr-late-bd) }
+
+/* Money and the return date: the two things that are ACTIONS, side by side at
+   the top, where they used to be two full-width blocks the medication list had
+   to be scrolled past. */
+.pr-strip{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.pr-strip.one{ grid-template-columns:1fr }
+.pr-tile{
+  border-radius:12px; padding:11px 12px; border:1px solid var(--border);
+  background:var(--tint-2); min-width:0; display:flex; flex-direction:column; gap:2px;
+}
+.pr-tile.owe{ background:var(--pr-owe-bg); border-color:var(--pr-owe-bd) }
+.pr-tile.due{ background:var(--pr-due-bg); border-color:var(--pr-due-bd) }
+.pr-tile.ok{  background:var(--pr-ok-bg);  border-color:var(--pr-ok-bd) }
+.pr-tile.late{background:var(--pr-late-bg);border-color:var(--pr-late-bd) }
+.pr-tile-k{
+  font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  color:var(--text-lt); display:flex; align-items:center; gap:4px;
+}
+.pr-tile.owe .pr-tile-k{ color:var(--pr-owe-fg) }
+.pr-tile.due .pr-tile-k{ color:var(--pr-due-fg) }
+.pr-tile.ok  .pr-tile-k{ color:var(--pr-ok-fg) }
+.pr-tile.late .pr-tile-k{ color:var(--pr-late-fg) }
+.pr-tile-k .material-icons-outlined{ font-size:13px }
+/* The figure never wraps: "UGX 60,000" split across two lines because a button
+   was sitting beside it. The button is now underneath. */
+.pr-tile-v{
+  font-size:17px; font-weight:800; color:var(--text);
+  line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pr-tile.owe .pr-tile-v{ color:var(--pr-owe-fg) }
+.pr-tile.late .pr-tile-v{ color:var(--pr-late-fg) }
+.pr-tile-s{ font-size:11px; color:var(--text-lt); line-height:1.35 }
+.pr-tile-act{
+  margin-top:7px; width:100%; border:none; border-radius:9px; padding:8px;
+  font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  background:var(--pr-act-bg); color:var(--pr-act-fg);
+}
+.pr-tile-act .material-icons-outlined{ font-size:15px }
+.pr-tile-act:active{ filter:brightness(.92) }
+
+.pr-sec{
+  font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  color:var(--text-lt); display:flex; align-items:center; gap:6px;
+}
+.pr-sec::after{ content:''; flex:1; height:1px; background:var(--border) }
+.pr-sec b{ color:var(--text-lt); font-weight:800 }
+
+.pr-note{ font-size:12px; color:var(--text-lt); font-style:italic }
+
+/* Medications: one line each where it fits, so six drugs are a list and not a
+   scroll. The quantity is the thing the clinician counts out, so it keeps its
+   own column. */
+.pr-med{
+  display:flex; align-items:center; gap:10px; padding:9px 11px;
+  border:1px solid var(--border); border-radius:10px; background:var(--surface);
+}
+.pr-med + .pr-med{ margin-top:7px }
+/* --deep-ink, not --primary: the true-dark skin sets --primary to #2C3035, a
+   near-black grey by design, which on its near-black surface measured 1.46:1.
+   --deep-ink is the token that is readable ink in every skin. */
+.pr-med-ic{ font-size:17px; color:var(--deep-ink); flex-shrink:0 }
+.pr-med-b{ flex:1; min-width:0 }
+.pr-med-n{ font-size:13.5px; font-weight:700; color:var(--text); line-height:1.3 }
+.pr-med-s{ font-size:11.5px; color:var(--text-lt); margin-top:1px }
+.pr-med-q{
+  flex-shrink:0; font-size:12px; font-weight:800; color:var(--deep-ink);
+  background:var(--tint-2); border-radius:8px; padding:4px 9px; min-width:34px; text-align:center;
+}
+
+/* Previous visits fold away. The visit in front of you is the one that matters;
+   the history was pushing it off the screen. */
+.pr-past{ border:1px solid var(--border); border-radius:10px; background:var(--surface) }
+.pr-past > summary{
+  list-style:none; cursor:pointer; padding:11px 12px; display:flex;
+  align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--text);
+}
+.pr-past > summary::-webkit-details-marker{ display:none }
+.pr-past > summary .material-icons-outlined{ font-size:17px; color:var(--text-lt); transition:transform .18s }
+.pr-past[open] > summary .material-icons-outlined.pr-caret{ transform:rotate(180deg) }
+.pr-past-in{ padding:0 12px 12px }
+.pr-row{ padding:9px 0; border-top:1px solid var(--border) }
+.pr-row-t{ display:flex; justify-content:space-between; align-items:baseline; gap:8px }
+.pr-row-d{ font-size:12.5px; font-weight:700; color:var(--text) }
+.pr-row-f{ font-size:11.5px; color:var(--text-lt); white-space:nowrap }
+.pr-row-x{ font-size:12px; color:var(--text-lt); margin-top:2px }
+.pr-pill{
+  font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:20px;
+  letter-spacing:.4px; margin-left:5px;
+}
+.pr-pill.paid{ background:var(--pr-ok-bg); color:var(--pr-ok-fg) }
+.pr-pill.pending{ background:var(--pr-late-bg); color:var(--pr-late-fg) }
+.pr-pill.waived{ background:var(--pr-owe-bg); color:var(--pr-owe-fg) }
+
+@media (max-width:360px){
+  .pr-strip{ grid-template-columns:1fr }
+}
+
+/* The same sheet reached the other way — from the patient-history search — was
+   still drawing itself with seventeen hard-coded colours. Same modal, same
+   #histModalBody: a clinician opening a record from the active list saw one
+   design and from the search saw another, and only one of them was legible in
+   the dark. */
+.pr-visit{
+  border:1px solid var(--border); border-radius:12px; padding:12px 14px;
+  background:var(--surface); margin-bottom:11px;
+}
+.pr-visit-h{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:9px }
+.pr-visit-n{ font-size:13.5px; font-weight:800; color:var(--text) }
+.pr-visit-t{ font-size:11px; color:var(--text-lt); font-weight:500; margin-top:1px }
+.pr-visit-r{ text-align:right; flex-shrink:0 }
+.pr-visit-f{ font-size:12px; font-weight:700; color:var(--text); margin-top:3px }
+
+.pr-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px }
+.pr-tag{
+  font-size:11px; padding:3px 9px; border-radius:20px; font-weight:700;
+  background:var(--tint-2); color:var(--text); border:1px solid var(--border);
+}
+.pr-tag.dx{ background:var(--pr-due-bg); color:var(--pr-due-fg); border-color:var(--pr-due-bd) }
+.pr-tag.on{ background:var(--pr-owe-bg); color:var(--pr-owe-fg); border-color:var(--pr-owe-bd) }
+.pr-tag.done{ background:var(--pr-ok-bg); color:var(--pr-ok-fg); border-color:var(--pr-ok-bd) }
+.pr-tag .material-icons-outlined{ font-size:13px; vertical-align:-2px }
+
+.pr-field{ margin-bottom:9px }
+.pr-field-k{
+  font-size:11px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+  color:var(--text-lt); margin-bottom:2px;
+}
+.pr-field-v{ font-size:13px; color:var(--text); white-space:pre-line; line-height:1.45 }
+
+.pr-fees{
+  background:var(--tint-2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px; margin-top:10px;
+}
+.pr-fee{ display:flex; justify-content:space-between; font-size:12px; color:var(--text-lt); margin-bottom:2px }
+.pr-fee.total{
+  font-size:13px; font-weight:800; color:var(--text);
+  border-top:1px solid var(--border); margin-top:5px; padding-top:5px;
+}
+.pr-fee.paid{ color:var(--pr-ok-fg); font-weight:700 }
+.pr-fee.due{ color:var(--pr-owe-fg); font-weight:800 }
