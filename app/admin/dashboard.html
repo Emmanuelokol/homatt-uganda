@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Homatt Admin — Dashboard</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -38,9 +38,20 @@
     .incoming-badge { background:#D32F2F; color:#fff; font-size:11px; font-weight:700; border-radius:10px; padding:1px 7px; margin-left:6px; }
 
     .section-2col { display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-bottom:24px; }
-    @media(max-width:900px) { .section-2col { grid-template-columns:1fr; } }
+    @media(max-width:768px) { .section-2col { grid-template-columns:1fr; } }
+    @media(min-width:769px) and (max-width:900px) { .section-2col { grid-template-columns:1fr; } }
     .section-3col { display:grid; grid-template-columns:1fr 1fr 1fr; gap:20px; margin-bottom:24px; }
-    @media(max-width:1000px) { .section-3col { grid-template-columns:1fr; } }
+    @media(max-width:768px) { .section-3col { grid-template-columns:1fr; } }
+    @media(min-width:769px) and (max-width:1000px) { .section-3col { grid-template-columns:1fr; } }
+
+    /* Clinic metrics section */
+    .clinic-metric-bar { display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid #F0F0F0; }
+    .clinic-metric-bar:last-child { border-bottom:none; }
+    .clinic-metric-name { flex:1; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .clinic-metric-pill { font-size:11px; font-weight:700; padding:3px 9px; border-radius:20px; white-space:nowrap; }
+    .pill-green { background:#E8F5E9; color:#1B5E20; }
+    .pill-blue  { background:#E3F2FD; color:#1565C0; }
+    .pill-orange{ background:#FFF3E0; color:#E65100; }
   </style>
 </head>
 <body>
@@ -70,6 +81,27 @@
         <div class="stat-card"><div class="stat-icon red"><span class="material-icons-outlined">contact_support</span></div><div><div class="stat-number" id="statTickets">—</div><div class="stat-label">Open Tickets</div></div></div>
         <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">medication</span></div><div><div class="stat-number" id="statRx">—</div><div class="stat-label">Pending Rx</div></div></div>
         <div class="stat-card"><div class="stat-icon orange"><span class="material-icons-outlined">star</span></div><div><div class="stat-number" id="statRatings">—</div><div class="stat-label">Avg Platform ★</div></div></div>
+      </div>
+
+      <!-- Clinic Metrics KPIs -->
+      <div class="stats-grid" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr));margin-bottom:24px">
+        <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">medical_services</span></div><div><div class="stat-number" id="statConsultTotal">—</div><div class="stat-label">Total Consultations</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue"><span class="material-icons-outlined">today</span></div><div><div class="stat-number" id="statConsultToday">—</div><div class="stat-label">Consultations Today</div></div></div>
+        <div class="stat-card"><div class="stat-icon green"><span class="material-icons-outlined">payments</span></div><div><div class="stat-number" id="statRevenueTotal">—</div><div class="stat-label">Total Revenue (UGX)</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><span class="material-icons-outlined">trending_up</span></div><div><div class="stat-number" id="statRevenueToday">—</div><div class="stat-label">Revenue Today (UGX)</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue"><span class="material-icons-outlined">hotel</span></div><div><div class="stat-number" id="statInpatients">—</div><div class="stat-label">Active Inpatients</div></div></div>
+        <div class="stat-card"><div class="stat-icon red"><span class="material-icons-outlined">account_balance_wallet</span></div><div><div class="stat-number" id="statPendingBal">—</div><div class="stat-label">Unpaid Balance (UGX)</div></div></div>
+      </div>
+
+      <!-- Per-clinic breakdown -->
+      <div class="admin-table-wrap" style="margin-bottom:24px">
+        <div class="table-header">
+          <div class="table-title">Clinic Activity Breakdown</div>
+          <a href="clinics.html" class="btn-admin secondary sm" style="text-decoration:none">Manage Clinics</a>
+        </div>
+        <div id="clinicMetricsWrap" style="padding:8px 16px 16px">
+          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+        </div>
       </div>
 
       <!-- Signup Trends Chart -->
@@ -248,7 +280,7 @@ function renderIncomingOrders(orders, supa) {
       '<div style="font-size:12px;color:#5F6368;margin-bottom:2px">' +
         '<span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ' + (o.patient_name||'—') +
         ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">phone</span> ' + (o.patient_phone||'—') +
-        ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ' + (o.delivery_address||'—') +
+        ' &nbsp;|&nbsp; <span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ' + (o.delivery_address||'—') + ((o.delivery_lat && o.delivery_lon) ? ' <a href="https://www.google.com/maps?q=' + o.delivery_lat + ',' + o.delivery_lon + '" target="_blank" rel="noopener" style="color:#1976D2;text-decoration:none;vertical-align:middle" title="Open in Google Maps"><span class="material-icons-outlined" style="font-size:13px">open_in_new</span></a>' : '') +
       '</div>' +
       (o.patient_symptom_description ? '<div style="font-size:12px;color:#5F6368;font-style:italic;margin-bottom:4px">Patient: "' + o.patient_symptom_description.slice(0,80) + '"</div>' : '') +
       '<div style="font-size:13px;font-weight:600;color:#1B5E20;margin-bottom:8px">Total: ' + ugx(o.total_cost) + '</div>' +
@@ -336,6 +368,37 @@ document.addEventListener('DOMContentLoaded', async function() {
   await loadLive();
 });
 
+function fmtK(n) {
+  if (!n || isNaN(n)) return '0';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n/1000).toFixed(0) + 'K';
+  return Number(n).toLocaleString('en-UG');
+}
+
+// `note` explains an EMPTY list. "No clinic data yet" read the same whether no
+// clinic had been registered, the clinics were all inactive, or the query had
+// been refused — which is exactly the situation an admin cannot diagnose.
+function renderClinicMetrics(rows, note) {
+  var el = document.getElementById('clinicMetricsWrap');
+  if (!rows || !rows.length) {
+    el.innerHTML = '<div style="text-align:center;padding:22px 16px;color:#9AA0A6;font-size:13px;line-height:1.55">'
+      + (note || 'No clinic data yet.') + '</div>';
+    return;
+  }
+  el.innerHTML = rows.map(function(c) {
+    var pendBadge = c.pending_balance > 0
+      ? '<span class="clinic-metric-pill pill-orange">UGX ' + fmtK(c.pending_balance) + ' unpaid</span>'
+      : '<span class="clinic-metric-pill pill-green">Paid up</span>';
+    return '<div class="clinic-metric-bar">'
+      + '<div class="clinic-metric-name" title="' + (c.name||'') + '">' + (c.name||'—') + '</div>'
+      + '<span class="clinic-metric-pill pill-blue">' + (c.consults_today||0) + ' today</span>'
+      + '<span class="clinic-metric-pill pill-green">UGX ' + fmtK(c.revenue_today||0) + '</span>'
+      + '<span class="clinic-metric-pill" style="background:#F3E5F5;color:#6A1B9A">' + (c.active_patients||0) + ' active</span>'
+      + pendBadge
+      + '</div>';
+  }).join('');
+}
+
 function loadDemo() {
   document.getElementById('statUsers').textContent = '248';
   document.getElementById('statBookings').textContent = '1,043';
@@ -352,6 +415,22 @@ function loadDemo() {
     fakeRows.push({ created_at: new Date(Date.now() - Math.floor(Math.random()*14)*864e5 - Math.random()*864e5).toISOString() });
   }
   buildTrendChart(fakeRows);
+
+  // Clinic metric KPIs
+  document.getElementById('statConsultTotal').textContent = '2,341';
+  document.getElementById('statConsultToday').textContent = '47';
+  document.getElementById('statRevenueTotal').textContent = '58M';
+  document.getElementById('statRevenueToday').textContent = '1.2M';
+  document.getElementById('statInpatients').textContent = '12';
+  document.getElementById('statPendingBal').textContent = '340K';
+
+  renderClinicMetrics([
+    { name:'Nakasero Medical Centre', consults_today:18, revenue_today:480000, active_patients:4, pending_balance:0 },
+    { name:'Mulago National Referral', consults_today:12, revenue_today:210000, active_patients:5, pending_balance:75000 },
+    { name:'International Hospital Kampala', consults_today:9, revenue_today:320000, active_patients:2, pending_balance:0 },
+    { name:'Kampala Hospital', consults_today:5, revenue_today:95000, active_patients:1, pending_balance:45000 },
+    { name:'Nsambya Hospital', consults_today:3, revenue_today:85000, active_patients:0, pending_balance:0 },
+  ]);
 
   document.getElementById('pendingClinics').innerHTML = '<span style="color:#9AA0A6">Ntinda Health Clinic (pending)</span>';
   document.getElementById('pendingPharmacies').innerHTML = '<span style="color:#9AA0A6">None pending</span>';
@@ -410,8 +489,14 @@ async function loadLive() {
   var supa = adminSupa();
   if (!supa) { loadDemo(); return; }
 
+  function qt(p, ms) {
+    return Promise.race([p, new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, ms||12000); })]);
+  }
+
+  try {
+
   // KPIs in parallel
-  var results = await Promise.all([
+  var results = await qt(Promise.all([
     supa.from('profiles').select('id',{count:'exact',head:true}),
     supa.from('bookings').select('id',{count:'exact',head:true}),
     supa.from('pharmacy_orders').select('id',{count:'exact',head:true}),
@@ -420,7 +505,7 @@ async function loadLive() {
     supa.from('support_tickets').select('id',{count:'exact',head:true}).eq('status','open'),
     supa.from('prescriptions').select('id',{count:'exact',head:true}).eq('status','active'),
     supa.from('ratings').select('score').limit(1000),
-  ]);
+  ]));
 
   document.getElementById('statUsers').textContent = results[0].count ?? '—';
   document.getElementById('statBookings').textContent = results[1].count ?? '—';
@@ -436,19 +521,19 @@ async function loadLive() {
 
   // Signup trend chart — all profiles for last 14 days
   var since = new Date(); since.setDate(since.getDate()-13); since.setHours(0,0,0,0);
-  var { data: signupRows } = await supa.from('profiles').select('created_at').gte('created_at', since.toISOString()).order('created_at',{ascending:true});
-  buildTrendChart(signupRows || []);
+  var signupRes = await qt(supa.from('profiles').select('created_at').gte('created_at', since.toISOString()).order('created_at',{ascending:true}));
+  buildTrendChart((signupRes.data) || []);
 
   // Incoming orders for admin
-  var { data: incoming } = await supa.from('pharmacy_orders').select('*').eq('status','incoming').order('created_at',{ascending:false}).limit(20);
-  renderIncomingOrders(incoming || [], supa);
+  var incomingRes = await qt(supa.from('pharmacy_orders').select('*').eq('status','incoming').order('created_at',{ascending:false}).limit(20));
+  renderIncomingOrders((incomingRes.data) || [], supa);
 
   // Pending approvals
-  var [pC, pP, pRi] = await Promise.all([
+  var [pC, pP, pRi] = await qt(Promise.all([
     supa.from('clinics').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
     supa.from('pharmacies').select('name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
     supa.from('riders').select('full_name,created_at').eq('status','pending').order('created_at',{ascending:false}).limit(3),
-  ]);
+  ]));
   function renderPending(data, key, elId) {
     var d = document.getElementById(elId);
     if (!data || !data.length) { d.innerHTML='<span style="color:#9AA0A6">None pending</span>'; return; }
@@ -461,9 +546,9 @@ async function loadLive() {
   renderPending(pRi.data,'full_name','pendingRiders');
 
   // Clinic performance
-  var { data: clinicsPerf } = await supa.from('clinics').select('name,avg_patient_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8);
+  var { data: clinicsPerf } = await qt(supa.from('clinics').select('name,avg_patient_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8));
   // Also count bookings per clinic
-  var { data: bookingCounts } = await supa.from('bookings').select('clinic_id').limit(5000);
+  var { data: bookingCounts } = await qt(supa.from('bookings').select('clinic_id').limit(5000));
   var byClinc = {};
   (bookingCounts||[]).forEach(function(b){ byClinc[b.clinic_id] = (byClinc[b.clinic_id]||0)+1; });
   document.getElementById('clinicPerfBody').innerHTML = (clinicsPerf||[]).length ? (clinicsPerf||[]).map(function(c) {
@@ -471,8 +556,8 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No clinics found</td></tr>';
 
   // Pharmacy performance
-  var { data: pharmsPerf } = await supa.from('pharmacies').select('id,name,avg_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8);
-  var { data: orderCounts } = await supa.from('pharmacy_orders').select('pharmacy_id').limit(5000);
+  var { data: pharmsPerf } = await qt(supa.from('pharmacies').select('id,name,avg_rating,total_ratings,active').order('total_ratings',{ascending:false}).limit(8));
+  var { data: orderCounts } = await qt(supa.from('pharmacy_orders').select('pharmacy_id').limit(5000));
   var byPharm = {};
   (orderCounts||[]).forEach(function(o){ byPharm[o.pharmacy_id] = (byPharm[o.pharmacy_id]||0)+1; });
   document.getElementById('pharmacyPerfBody').innerHTML = (pharmsPerf||[]).length ? (pharmsPerf||[]).map(function(p) {
@@ -480,7 +565,7 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No pharmacies found</td></tr>';
 
   // Recent signups — showing real first_name + last_name
-  var { data: recentUsers } = await supa.from('profiles').select('first_name,last_name,city,district,created_at').order('created_at',{ascending:false}).limit(8);
+  var { data: recentUsers } = await qt(supa.from('profiles').select('first_name,last_name,city,district,created_at').order('created_at',{ascending:false}).limit(8));
   document.getElementById('recentSignupsBody').innerHTML = (recentUsers||[]).length ? (recentUsers||[]).map(function(u) {
     var name = [u.first_name,u.last_name].filter(Boolean).join(' ') || 'Unknown';
     var loc = [u.city,u.district].filter(Boolean).join(', ') || '—';
@@ -488,23 +573,147 @@ async function loadLive() {
   }).join('') : '<tr><td colspan="3" style="text-align:center;padding:20px;color:#9AA0A6">No users signed up yet</td></tr>';
 
   // Recent bookings
-  var { data: bk } = await supa.from('bookings').select('patient_name,urgency_level,status,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: bk } = await qt(supa.from('bookings').select('patient_name,urgency_level,status,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentBookingsBody').innerHTML = (bk||[]).length ? (bk||[]).map(function(b) {
     return '<tr><td><strong>' + (b.patient_name||'—') + '</strong></td><td><span class="status-badge ' + (b.urgency_level==='high'?'urgent':'normal') + '">' + (b.urgency_level||'—') + '</span></td><td><span class="status-badge ' + b.status + '">' + (b.status||'').replace('_',' ') + '</span></td><td style="font-size:12px;color:#9AA0A6">' + formatShortDate(b.created_at) + '</td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No bookings yet</td></tr>';
 
   // Recent orders
-  var { data: ord } = await supa.from('pharmacy_orders').select('patient_name,status,total_cost,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: ord } = await qt(supa.from('pharmacy_orders').select('patient_name,status,total_cost,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentOrdersBody').innerHTML = (ord||[]).length ? (ord||[]).map(function(o) {
     return '<tr><td><strong>' + (o.patient_name||'—') + '</strong></td><td><span class="status-badge ' + o.status + '">' + (o.status||'').replace('_',' ') + '</span></td><td style="font-weight:600">' + ugx(o.total_cost) + '</td><td style="font-size:12px;color:#9AA0A6">' + formatShortDate(o.created_at) + '</td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:20px;color:#9AA0A6">No orders yet</td></tr>';
 
   // Recent tickets
-  var { data: tk } = await supa.from('support_tickets').select('user_name,subject,priority,status,created_at').order('created_at',{ascending:false}).limit(6);
+  var { data: tk } = await qt(supa.from('support_tickets').select('user_name,subject,priority,status,created_at').order('created_at',{ascending:false}).limit(6));
   document.getElementById('recentTicketsBody').innerHTML = (tk||[]).length ? (tk||[]).map(function(t) {
     return '<tr><td><strong>' + (t.user_name||'Anonymous') + '</strong></td><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + t.subject + '</td><td><span class="status-badge ' + t.priority + '">' + t.priority + '</span></td><td><span class="status-badge ' + t.status + '">' + (t.status||'').replace('_',' ') + '</span></td></tr>';
   }).join('') : '<tr><td colspan="4" style="text-align:center;padding:24px;color:#9AA0A6">No tickets</td></tr>';
+
+  // ── Clinic Metrics ──
+  var todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  var todayIso = todayStart.toISOString();
+  try {
+    var [cdAll, cdToday, qsAll, qsToday, inpat, pendPay, clinicList, cdClinic, qsClinic] = await qt(Promise.all([
+      supa.from('clinic_diagnoses').select('total_charged_ugx',{count:'exact'}),
+      // clinic_id is needed further down to split today's revenue per clinic —
+      // it was not selected, so every clinic's Revenue Today read 0.
+      supa.from('clinic_diagnoses').select('clinic_id,total_charged_ugx',{count:'exact'}).gte('created_at',todayIso),
+      supa.from('clinic_quick_sales').select('total_ugx'),
+      supa.from('clinic_quick_sales').select('clinic_id,total_ugx').gte('created_at',todayIso),
+      // clinic_diagnoses has no "status" column — this asked PostgREST for one
+      // that does not exist, so it errored and Active Inpatients sat at 0
+      // forever. An inpatient is one admitted and not yet discharged.
+      supa.from('clinic_diagnoses').select('id',{count:'exact'})
+        .eq('patient_type','inpatient').is('discharged_at',null),
+      supa.from('clinic_diagnoses').select('total_charged_ugx,amount_paid').in('payment_status',['pending','partial','credit']),
+      supa.from('clinics').select('id,name').eq('active',true).order('name'),
+      supa.from('clinic_diagnoses').select('clinic_id,total_charged_ugx,created_at').gte('created_at',todayIso),
+      supa.from('clinic_quick_sales').select('clinic_id,total_ugx,created_at').gte('created_at',todayIso),
+    ]));
+
+    document.getElementById('statConsultTotal').textContent = fmtK(cdAll.count || 0);
+    document.getElementById('statConsultToday').textContent = cdToday.count || 0;
+
+    var totalRev = (cdAll.data||[]).reduce(function(s,r){return s+(+r.total_charged_ugx||0);},0)
+                 + (qsAll.data||[]).reduce(function(s,r){return s+(+r.total_ugx||0);},0);
+    var todayRev = (cdToday.data||[]).reduce(function(s,r){return s+(+r.total_charged_ugx||0);},0)
+                 + (qsToday.data||[]).reduce(function(s,r){return s+(+r.total_ugx||0);},0);
+    document.getElementById('statRevenueTotal').textContent = fmtK(totalRev);
+    document.getElementById('statRevenueToday').textContent = fmtK(todayRev);
+    document.getElementById('statInpatients').textContent = inpat.count || 0;
+
+    var pendBal = (pendPay.data||[]).reduce(function(s,r){
+      return s + Math.max(0,(+r.total_charged_ugx||0)-(+r.amount_paid||0));
+    },0);
+    document.getElementById('statPendingBal').textContent = fmtK(pendBal);
+
+    // Per-clinic breakdown
+    var diagsByClinic = {}, qsByClinic = {};
+    (cdClinic.data||[]).forEach(function(r){ diagsByClinic[r.clinic_id] = (diagsByClinic[r.clinic_id]||0) + 1; });
+    (qsClinic.data||[]).forEach(function(r){ qsByClinic[r.clinic_id] = (qsByClinic[r.clinic_id]||0) + (+r.total_ugx||0); });
+
+    // Count active patients per clinic
+    var { data: activeRows } = await qt(supa.from('clinic_diagnoses')
+      .select('clinic_id').is('discharged_at',null));
+    var activeByClinic = {};
+    (activeRows||[]).forEach(function(r){ activeByClinic[r.clinic_id] = (activeByClinic[r.clinic_id]||0)+1; });
+
+    // Pending balance per clinic
+    var { data: pendRows } = await qt(supa.from('clinic_diagnoses').select('clinic_id,total_charged_ugx,amount_paid').in('payment_status',['pending','partial','credit']));
+    var pendByClinic = {};
+    (pendRows||[]).forEach(function(r){
+      pendByClinic[r.clinic_id] = (pendByClinic[r.clinic_id]||0) + Math.max(0,(+r.total_charged_ugx||0)-(+r.amount_paid||0));
+    });
+
+    var metricsRows = (clinicList.data||[]).map(function(c) {
+      var revToday = (cdToday.data||[]).filter(function(r){return r.clinic_id===c.id;}).reduce(function(s,r){return s+(+r.total_charged_ugx||0);},0)
+                   + (qsToday.data||[]).filter(function(r){return r.clinic_id===c.id;}).reduce(function(s,r){return s+(+r.total_ugx||0);},0);
+      return {
+        name: c.name,
+        consults_today: diagsByClinic[c.id] || 0,
+        revenue_today:  revToday,
+        active_patients: activeByClinic[c.id] || 0,
+        pending_balance: pendByClinic[c.id] || 0,
+      };
+    }).sort(function(a,b){ return b.consults_today - a.consults_today; });
+
+    // Say WHY the list is empty. A clinic recording treatments but missing from
+    // this table is almost always a clinic whose row is not marked active — the
+    // list is built from active clinics only.
+    var note = null;
+    if (!metricsRows.length) {
+      if (clinicList.error) {
+        note = 'The clinic list could not be read: ' + (clinicList.error.message || 'permission denied')
+             + '.<br>This admin login may not have is_admin = true on its profile.';
+      } else {
+        var anyDx = (cdAll.count || 0) > 0;
+        note = anyDx
+          ? 'There are ' + cdAll.count + ' recorded treatments, but no clinic is marked <strong>active</strong>, '
+            + 'so none can be listed here.<br>Open Clinics and set the facility to approved/active.'
+          : 'No clinic has recorded a treatment yet.';
+      }
+    }
+    renderClinicMetrics(metricsRows, note);
+  } catch(e) {
+    // This used to blame a missing migration for EVERY failure — including a
+    // timeout, a permissions block, or a column that does not exist. An admin
+    // seeing "no clinic activity" then had nothing to go on. Say what actually
+    // happened.
+    var why = (e && e.message) || String(e || 'unknown error');
+    var hint = /timeout/i.test(why)
+        ? 'The database did not answer in 12 seconds. Usually a slow connection — reload to try again.'
+      : /permission|denied|rls|not authorized|jwt/i.test(why)
+        ? 'This admin login is not allowed to read the clinic tables. Its profile needs is_admin = true.'
+      : /does not exist|schema cache|could not find/i.test(why)
+        ? 'A table or column this page reads has not been created yet. Apply the pending migrations in Supabase.'
+      : 'Could not load clinic activity.';
+    document.getElementById('clinicMetricsWrap').innerHTML =
+      '<div style="padding:14px;background:#FFF8E1;border-radius:8px;font-size:12.5px;color:#5D4037;line-height:1.55">'
+      + '<strong>Clinic activity could not be loaded.</strong><br>' + hint
+      + '<br><span style="font-size:11.5px;opacity:.8">' + String(why).slice(0,160) + '</span></div>';
+  }
+
+  } catch(e) {
+    // DB unavailable or timed out — fall back to demo data so the page isn't blank
+    loadDemo();
+  }
 }
+</script>
+
+<!-- Realtime alerts -->
+<script src="../js/realtime-alerts.js"></script>
+<script>
+(function () {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return;
+  const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-admin-auth' }
+  });
+  if (typeof initRealtimeAlerts === 'function') {
+    initRealtimeAlerts({ client, portal: 'admin', entityId: null });
+  }
+})();
 </script>
 </body>
 </html>

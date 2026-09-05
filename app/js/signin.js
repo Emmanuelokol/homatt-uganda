@@ -135,18 +135,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (profile) {
       localStorage.setItem('homatt_user', JSON.stringify({
-        firstName: profile.first_name,
-        lastName: profile.last_name,
-        phone: profile.phone_number,
-        dob: profile.dob,
-        sex: profile.sex,
-        district: profile.district,
-        city: profile.city,
-        hasFamily: profile.has_family,
-        familySize: profile.family_size,
+        firstName:   profile.first_name,
+        lastName:    profile.last_name,
+        phone:       profile.phone_number,
+        dob:         profile.dob,
+        sex:         profile.sex,
+        district:    profile.district,
+        county:      profile.county,
+        city:        profile.city,
+        parish:      profile.parish,
+        hasFamily:   profile.has_family,
+        familySize:  profile.family_size,
         healthGoals: profile.health_goals,
       }));
+      localStorage.setItem('homatt_session', JSON.stringify({
+        userId:       data.user.id,
+        first_name:   profile.first_name,
+        last_name:    profile.last_name,
+        name:         ((profile.first_name || '') + ' ' + (profile.last_name || '')).trim(),
+        phone_number: profile.phone_number,
+        district:     profile.district,
+      }));
     }
+
+    // Expose authenticated client globally so onesignal.js can save the player_id
+    window._supabaseClient = supabase;
+    // Link this user's push token to their Supabase UUID for targeted notifications
+    if (typeof oneSignalLogin === 'function') oneSignalLogin(data.user.id);
 
     window.location.href = 'dashboard.html';
   });

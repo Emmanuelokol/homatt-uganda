@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Clinic — New Treatment</title>
+  <script>
+    // Apply saved (or system) theme before first paint — no flash.
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    /* The colour family. Set here, before the first paint, so switching
+       look never shows a flash of the old one. */
+    var s=localStorage.getItem('homatt_skin');
+    if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
+    var d=document.documentElement;
+    d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
+    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+    document.addEventListener('DOMContentLoaded',function(){
+      var m=document.querySelector('meta[name="theme-color"]');
+      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
+  </script>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20260915">
+  <style>
+    /* ── Wizard shell ───────────────────────────────────────────── */
+    .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
+
+    /* ── 2-dot progress ─────────────────────────────────────────── */
+    .wiz-dots {
+      display: flex; align-items: center; gap: 0;
+      margin-bottom: 28px; user-select: none;
+    }
+    .wiz-dot {
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: default;
+    }
+    .wiz-dot-circle {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 2px solid #E0E0E0; background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 800; color: #BDBDBD;
+      transition: all .2s;
+    }
+    .wiz-dot.done .wiz-dot-circle {
+      background: var(--primary); border-color: var(--primary); color: #fff;
+    }
+    .wiz-dot.current .wiz-dot-circle {
+      background: var(--tint-2); border-color: var(--primary); color: var(--primary);
+    }
+    .wiz-dot-label {
+      font-size: 10px; font-weight: 700; color: #BDBDBD;
+      text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
+    }
+    .wiz-dot.done .wiz-dot-label,
+    .wiz-dot.current .wiz-dot-label { color: var(--primary); }
+    .wiz-dot-line {
+      flex: 1; height: 2px; background: #E0E0E0;
+      margin: 0 8px; margin-bottom: 20px;
+      transition: background .2s;
+    }
+    .wiz-dot-line.done { background: var(--primary); }
+
+    /* ── Step header ────────────────────────────────────────────── */
+    .wiz-screen-title {
+      /* was a hardcoded #111 — invisible on the dark theme the clinic uses */
+      font-size: 24px; font-weight: 800; color: var(--text, #111); margin-bottom: 4px;
+    }
+    .wiz-screen-sub {
+      font-size: 13px; color: #5F6368; margin-bottom: 24px; line-height: 1.5;
+    }
+
+    /* ── Section dividers ───────────────────────────────────────── */
+    .sec-label {
+      font-size: 11px; font-weight: 700; color: #9AA0A6;
+      text-transform: uppercase; letter-spacing: .6px;
+      margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .sec-label::after {
+      content: ''; flex: 1; height: 1px; background: #F0F0F0;
+    }
+
+    /* ── Cards ──────────────────────────────────────────────────── */
+    .wiz-card {
+      background: var(--surface,#fff); border-radius: var(--radius,18px); padding: 18px 20px;
+      box-shadow: var(--shadow, 0 6px 18px rgba(20,24,43,.07));
+      margin-bottom: 12px;
+    }
+    .wiz-card + .wiz-card { margin-top: 0; }
+
+    /* Name and phone side by side — two short taps, not a form. Stacks on the
+       narrowest phones so neither box becomes too small to type a name in. */
+    .pt-two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 359px) { .pt-two { grid-template-columns: 1fr; } }
+
+    /* ── Inputs ─────────────────────────────────────────────────── */
+    .field-label {
+      font-size: 11px; font-weight: 700; color: #424242;
+      display: block; margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: .4px;
+    }
+    .field-input {
+      width: 100%; padding: 13px 15px;
+      border: 1.5px solid var(--border); border-radius: 14px;
+      font-size: 15px; font-family: inherit;
+      outline: none; transition: border-color .15s, box-shadow .15s;
+      background: var(--surface,#fff); box-sizing: border-box; color: var(--text,#111);
+    }
+    .field-input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(27,94,32,.08);
+    }
+    textarea.field-input { resize: vertical; min-height: 70px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 560px) { .field-row { grid-template-columns: 1fr; } }
+
+    /* ── The record of the visit, shown after saving ─────────────────── */
+    .sum-card{background:var(--surface,#fff);border-radius:22px 22px 0 0;width:100%;max-width:520px;
+      max-height:92vh;display:flex;flex-direction:column;overflow:hidden}
+    .sum-top{display:flex;gap:12px;align-items:flex-start;padding:20px 20px 14px;flex:none;
+      background:linear-gradient(140deg,var(--grad-1),var(--grad-2) 65%,var(--grad-3));color:#fff}
+    .sum-top .material-icons-outlined{font-size:30px;flex:none;margin-top:1px}
+    .sum-title{font-size:18px;font-weight:800;letter-spacing:-.01em}
+    .sum-sub{font-size:12.5px;opacity:.9;margin-top:2px;line-height:1.45}
+    .sum-body{overflow-y:auto;padding:16px 18px;flex:1;-webkit-overflow-scrolling:touch}
+    .sum-head{margin-bottom:16px}
+    .sum-case{display:inline-block;font-size:13px;font-weight:800;letter-spacing:.5px;
+      background:var(--brand-tint);color:var(--primary-d);padding:4px 12px;border-radius:999px;margin-bottom:7px}
+    .sum-who{font-size:17px;font-weight:800;color:var(--text,#111);line-height:1.25;overflow-wrap:anywhere}
+    .sum-dx{font-size:13px;color:var(--text-lt,#5F6368);margin-top:2px;text-transform:capitalize}
+    .sum-todo{font-size:13px;font-weight:600;color:#B35309}
+    .sum-sec{margin-bottom:16px}
+    .sum-h{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:800;letter-spacing:.5px;
+      text-transform:uppercase;color:var(--grad-2);margin-bottom:8px}
+    .sum-h .material-icons-outlined{font-size:16px}
+    .sum-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
+      font-size:13px;color:var(--text-lt,#5F6368);padding:4px 0;line-height:1.4}
+    .sum-line b{color:var(--text,#111);font-weight:700;text-align:right;overflow-wrap:anywhere}
+    .sum-line.sum-total{border-top:1px solid var(--border,#E8EAED);margin-top:5px;padding-top:8px;font-size:14px}
+    .sum-line.sum-total b{font-size:17px;color:var(--primary);letter-spacing:-.02em}
+    .sum-line.sum-owing b{color:#C62828}
+    .sum-line.sum-paid b{color:var(--deep-ink)}
+    .sum-line.sum-sub{font-size:12px;opacity:.85}
+    .sum-meds{display:flex;flex-direction:column;gap:7px}
+    .sum-med{background:var(--bg,#F5F7F5);border-radius:11px;padding:9px 11px}
+    .sum-med-n{font-size:13.5px;font-weight:700;color:var(--text,#111);line-height:1.3;overflow-wrap:anywhere}
+    .sum-med-s{font-size:11.5px;color:var(--text-lt,#5F6368);margin-top:1px}
+    .sum-med-q{display:inline-block;font-size:10.5px;font-weight:800;margin-top:4px;
+      background:rgba(14,124,90,.13);color:var(--grad-2);padding:1px 8px;border-radius:999px}
+    .sum-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .sum-chip{font-size:12px;font-weight:700;background:var(--brand-tint);color:var(--primary-d);
+      padding:5px 11px;border-radius:999px}
+    .sum-none{font-size:12.5px;color:var(--text-lt,#9AA0A6);font-style:italic}
+    .sum-actions{flex:none;padding:12px 18px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
+      border-top:1px solid var(--border,#E8EAED);display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff)}
+    .sum-btn{width:100%;padding:13px;border-radius:13px;font:inherit;font-size:14.5px;font-weight:800;
+      cursor:pointer;font-family:inherit;touch-action:manipulation;
+      background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
+    .sum-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+    html[data-theme="dark"] .sum-med-q{background:rgba(67,160,71,.22);color:var(--tint-3)}
+    html[data-theme="dark"] .sum-h{color:var(--brand-ink)}
+    html[data-theme="dark"] .sum-case{background:rgba(14,124,90,.22);color:#7FD9B4}
+    html[data-theme="dark"] .sum-line.sum-total b{color:var(--brand-ink)}
+    html[data-theme="dark"] .sum-line.sum-owing b{color:#FF9E93}
+    html[data-theme="dark"] .sum-todo{color:#F5B160}
+    html[data-theme="dark"] .sum-btn{color:var(--brand-ink);border-color:var(--deep-ink)}
+    html[data-theme="dark"] .sum-btn.primary{background:var(--primary);color:#fff}
+    .helper { font-size: 12px; color: #9AA0A6; margin-top: 5px; line-height: 1.4; }
+
+    /* ── Patient pill ───────────────────────────────────────────── */
+    .patient-pill {
+      background: var(--brand-tint); border: none;
+      border-radius: 16px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .patient-pill .avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    .patient-pill .info { flex: 1; min-width: 0; }
+    .patient-pill .name { font-size: 15px; font-weight: 700; color: var(--deep-ink); }
+    .patient-pill .phone { font-size: 12px; color: var(--deep-ink); margin-top: 1px; }
+    .patient-pill .badge {
+      font-size: 10px; font-weight: 700;
+      background: #fff; color: var(--deep-ink);
+      padding: 3px 9px; border-radius: 10px; white-space: nowrap;
+    }
+    .patient-pill .change-btn {
+      background: none; border: none; color: var(--deep-ink);
+      cursor: pointer; padding: 4px;
+    }
+
+    /* ── Autocomplete ───────────────────────────────────────────── */
+    .autocomplete-wrap { position: relative; }
+    .autocomplete-menu {
+      position: absolute; top: 100%; left: 0; right: 0;
+      background: #fff; border: 1px solid var(--border);
+      border-radius: 12px; margin-top: 4px;
+      max-height: 260px; overflow-y: auto;
+      box-shadow: 0 8px 28px rgba(0,0,0,.12);
+      z-index: 50; display: none;
+    }
+    .autocomplete-item {
+      padding: 11px 14px; cursor: pointer;
+      border-bottom: 1px solid #F5F5F5;
+    }
+    .autocomplete-item:hover, .autocomplete-item.active { background: #F0F7FF; }
+    .autocomplete-item:last-child { border-bottom: none; }
+    .ac-name { font-size: 14px; font-weight: 600; color: #212121; }
+    .ac-cat { font-size: 11px; color: #9AA0A6; text-transform: uppercase; letter-spacing: .3px; }
+
+    /* ── Lookup tabs ────────────────────────────────────────────── */
+    .lookup-tab {
+      flex: 1; padding: 10px; border: none; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
+      display: flex; align-items: center; justify-content: center; gap: 5px;
+    }
+    .lookup-tab.active { background: #E3F2FD; color: #1565C0; font-weight: 700; }
+    .lookup-tab:not(.active) { background: transparent; color: #5F6368; }
+
+    /* ── Severity chips ─────────────────────────────────────────── */
+    .sev-chips { display: flex; gap: 8px; }
+    .sev-chip {
+      flex: 1; padding: 11px 6px;
+      border: none; border-radius: 999px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      background: var(--surface,#fff); box-shadow: var(--shadow, 0 2px 6px rgba(20,24,43,.08));
+      color: var(--text-lt); font-family: inherit;
+      text-align: center; transition: all .12s; letter-spacing: .2px;
+    }
+    .sev-chip:hover { border-color: var(--primary); }
+    .sev-chip.active { background: var(--primary); color: #fff; box-shadow: 0 6px 14px rgba(14,124,90,.32); }
+    .sev-chip[data-sev="severe"].active  { background: #E2960A; color:#fff; }
+    .sev-chip[data-sev="critical"].active { background: #E0454B; color:#fff; }
+
+    /* ── Care toggle ────────────────────────────────────────────── */
+    .care-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .care-opt {
+      padding: 14px 12px; border: 2px solid var(--border); border-radius: 12px;
+      background: #fff; cursor: pointer; text-align: center;
+      transition: all .12s; font-family: inherit;
+    }
+    .care-opt:hover { border-color: var(--primary); }
+    .care-opt.active { background: #E3F2FD; border-color: var(--primary); }
+    .care-opt .material-icons-outlined { font-size: 26px; color: var(--primary); display: block; margin-bottom: 4px; }
+    .care-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .care-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
+
+    /* ── Lab test groups ────────────────────────────────────────── */
+    .lab-group { margin-bottom: 14px; }
+    .lab-group:last-child { margin-bottom: 0; }
+    .lab-group-title {
+      font-size: 10px; font-weight: 700; color: #9AA0A6;
+      text-transform: uppercase; letter-spacing: .7px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+    }
+    .lab-group-title .lgt-icon {
+      width: 18px; height: 18px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px;
+    }
+    .lab-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .lab-chip {
+      padding: 8px 14px; border: none;
+      border-radius: 999px; background: var(--surface,#fff);
+      box-shadow: var(--shadow, 0 2px 6px rgba(20,24,43,.08)); color: var(--text-lt);
+      font-size: 12px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: all .12s; line-height: 1.3;
+    }
+    .lab-chip:hover { border-color: var(--primary); background: #F1F8F1; }
+    .lab-chip.active {
+      background: var(--primary); color: #fff; font-weight: 700; box-shadow: 0 6px 14px rgba(14,124,90,.3);
+    }
+    /* Malaria chips get a red accent when active */
+    .lab-chip[data-group="malaria"].active {
+      background: #FFEBEE; border-color: #C62828; color: #B71C1C;
+    }
+
+    /* ── Medication rows ────────────────────────────────────────── */
+    .med-row {
+      border: none; border-radius: 16px;
+      padding: 14px 16px; margin-bottom: 10px;
+      background: var(--surface,#fff); box-shadow: var(--shadow, 0 2px 6px rgba(20,24,43,.07));
+    }
+    .med-row-h {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .med-num {
+      font-size: 11px; font-weight: 700; color: var(--primary);
+      text-transform: uppercase; letter-spacing: .5px;
+    }
+    .med-del-btn {
+      background: none; border: none; cursor: pointer;
+      color: #C62828; padding: 4px; display: inline-flex;
+    }
+    .time-grid { display: grid; gap: 8px; margin-top: 6px; }
+    .time-grid input {
+      padding: 8px 10px; border: 1.5px solid var(--border);
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      outline: none; box-sizing: border-box; text-align: center;
+    }
+
+    /* ── Stock toggle ───────────────────────────────────────────── */
+    .stock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .stock-opt {
+      padding: 13px 14px; border: 1.5px solid var(--border);
+      border-radius: 12px; background: #fff; cursor: pointer;
+      transition: all .12s; font-family: inherit; text-align: left;
+    }
+    .stock-opt:hover { border-color: var(--primary); }
+    .stock-opt.active { background: var(--tint-2); border-color: var(--primary); }
+    .stock-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .stock-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
+
+    /* ── Collapsible materials section ──────────────────────────── */
+    .collapse-toggle {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: #5F6368;
+      cursor: pointer; padding: 10px 0; border: none; background: none;
+      font-family: inherit; width: 100%; text-align: left;
+    }
+    .collapse-toggle .ct-icon { font-size: 18px; transition: transform .2s; }
+    .collapse-toggle.open .ct-icon { transform: rotate(180deg); }
+
+    /* ── Payment chips ──────────────────────────────────────────── */
+    .pay-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .pay-chip {
+      padding: 8px 16px; border-radius: 22px; border: 1.5px solid var(--border);
+      background: #fff; color: var(--text-lt); font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: all .15s; white-space: nowrap;
+    }
+    .pay-chip.active { background: var(--tint-2); color: var(--deep-ink); border-color: #66BB6A; }
+
+    /* ── Fee grid ───────────────────────────────────────────────── */
+    .fee-grid {
+      display: grid; grid-template-columns: 1fr auto;
+      gap: 10px 14px; align-items: center;
+    }
+    .fee-grid .fee-lbl { font-size: 13px; color: #424242; font-weight: 500; }
+    .fee-grid .fee-input-wrap { display: flex; align-items: center; gap: 5px; }
+    .fee-grid .fee-pfx { font-size: 11px; color: #9AA0A6; white-space: nowrap; }
+    .fee-grid input { width: 120px; text-align: right; }
+    .fee-total-row {
+      border-top: 1.5px solid #E8EAED; margin-top: 4px; padding-top: 12px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .fee-total-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .fee-total-val {
+      font-size: 20px; font-weight: 800; color: var(--primary);
+      display: flex; align-items: baseline; gap: 4px;
+    }
+    .fee-total-val .fee-currency { font-size: 12px; font-weight: 600; color: #9AA0A6; }
+
+    /* ── Live summary bar (top of screen 2) ─────────────────────── */
+    .consult-summary-bar {
+      background: #F1F8F1; border: 1.5px solid #C8E6C9;
+      border-radius: 14px; padding: 14px 18px;
+      display: flex; align-items: center; gap: 12px; margin-bottom: 20px;
+    }
+    .csb-avatar {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: var(--primary); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    .csb-info { flex: 1; min-width: 0; }
+    .csb-name { font-size: 13px; font-weight: 700; color: var(--deep-ink); }
+    .csb-dx { font-size: 12px; color: var(--deep-ink); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Navigation buttons ─────────────────────────────────────── */
+    .wiz-nav {
+      display: flex; gap: 10px; margin-top: 20px;
+      padding-bottom: 24px;
+    }
+    .wiz-btn {
+      padding: 14px 22px; border-radius: 12px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: inherit; border: none;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: opacity .12s, background .12s;
+    }
+    .wiz-btn-back {
+      background: var(--surface,#fff); color: var(--text-lt);
+      box-shadow: var(--shadow, 0 2px 6px rgba(20,24,43,.08));
+    }
+    .wiz-btn-next {
+      background: linear-gradient(135deg,var(--grad-3),var(--grad-2)); color: #fff;
+      flex: 1; justify-content: center; border-radius: 15px;
+      box-shadow: 0 10px 22px rgba(14,124,90,.32);
+    }
+    .wiz-btn-send {
+      background: linear-gradient(135deg,var(--grad-3),var(--grad-2)); color: #fff;
+      width: 100%; justify-content: center;
+      padding: 16px; font-size: 16px; border-radius: 15px; margin-top: 8px;
+      box-shadow: 0 10px 22px rgba(14,124,90,.32);
+    }
+    .wiz-btn:disabled { opacity: .45; cursor: not-allowed; }
+
+    /* ── Intake: who, then the three steps ──────────────────────── */
+    .it-who{border-left:4px solid var(--primary)}
+    .it-debt{display:none;align-items:flex-start;gap:9px;margin-top:12px;
+      background:#FFEBEE;border-radius:12px;padding:11px 13px}
+    .it-debt .material-icons-outlined{color:#C62828;font-size:19px;flex:none}
+    .it-debt b{display:block;font-size:13px;font-weight:800;color:#C62828}
+    .it-debt i{display:block;font-size:11.5px;font-style:normal;color:#8E3B3B;margin-top:2px;line-height:1.45}
+    html[data-theme="dark"] .it-debt{background:#3A1A18}
+    html[data-theme="dark"] .it-debt i{color:#F3B7B2}
+
+    .it-sex{display:flex;gap:7px}
+    .it-sex-btn{flex:1;border:1.5px solid var(--border);background:var(--bg);font:inherit;
+      font-size:13.5px;font-weight:700;color:var(--text-lt);padding:11px 8px;border-radius:11px;
+      cursor:pointer;touch-action:manipulation}
+    .it-sex-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-age{display:flex;gap:6px;align-items:center}
+    .it-age input{flex:1;min-width:0;text-align:center;font-weight:700}
+    .it-unit{border:1.5px solid var(--border);background:var(--bg);font:inherit;font-size:11.5px;
+      font-weight:700;color:var(--text-lt);padding:9px 8px;border-radius:9px;cursor:pointer;
+      touch-action:manipulation}
+    .it-unit.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-whonote{display:none;font-size:11.5px;line-height:1.5;border-radius:10px;
+      padding:9px 11px;margin-top:11px;background:#FFF4E0;color:#7A4F01}
+    .it-whonote.child{background:var(--brand-tint);color:var(--brand-ink)}
+    html[data-theme="dark"] .it-whonote{background:#3A2E12;color:#FFD98A}
+
+    .it-tabs{display:flex;gap:7px;margin:6px 0 12px}
+    .it-tab{flex:1;position:relative;border:none;font:inherit;text-align:left;
+      padding:10px 12px;border-radius:13px;background:var(--surface);
+      box-shadow:var(--shadow);cursor:pointer;touch-action:manipulation;color:var(--text-lt)}
+    .it-tab b{display:block;font-size:12.5px;font-weight:800;color:var(--text)}
+    .it-tab i{display:block;font-size:10.5px;font-style:normal;margin-top:1px}
+    .it-tab.on{background:var(--primary)}
+    .it-tab.on b,.it-tab.on i{color:#fff}
+    .it-tab.on i{opacity:.85}
+    .it-tab.done::after{content:'';position:absolute;top:8px;right:9px;width:7px;height:7px;
+      border-radius:50%;background:var(--grad-3)}
+    .it-tab.on.done::after{background:#fff}
+    .it-tab.warn::after{background:#E2960A}
+    .it-tab.alert::after{background:#E0454B;box-shadow:0 0 0 3px rgba(224,69,75,.22)}
+
+    .it-ccs{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+    .it-cc{font-size:12.5px;font-weight:700;color:var(--text-lt);background:var(--bg);
+      border:1.5px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer;
+      touch-action:manipulation}
+    .it-cc.on{background:var(--primary);border-color:var(--primary);color:#fff}
+
+    .it-vitals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .it-v .field-label{margin-bottom:5px}
+    .it-bp,.it-one{display:flex;align-items:center;gap:6px}
+    .it-bp input{width:100%;min-width:0;text-align:center;font-weight:800;font-size:17px}
+    .it-bp span{font-weight:800;color:var(--text-lt)}
+    .it-one input{width:100%;min-width:0;text-align:center;font-weight:800;font-size:17px}
+    .it-bp em,.it-one em{font-style:normal;font-size:11px;font-weight:700;color:var(--text-lt);white-space:nowrap}
+    /* An abnormal reading has to be unmistakable on a phone held at arm's
+       length in a busy room — a faint tint is not enough. */
+    .field-input.out{border-color:#E0454B !important;border-width:2px;
+      background:#FFEBEE !important;color:#C62828 !important;
+      box-shadow:0 0 0 3px rgba(224,69,75,.16)}
+    html[data-theme="dark"] .field-input.out{background:#4A1F1C !important;color:#FFC9C4 !important}
+
+    /* ── What this might be ── */
+    .it-imp{padding:14px 16px}
+    .it-imp-empty{font-size:12.5px;color:var(--text-lt);line-height:1.55}
+    .it-imp-note{font-size:11.5px;color:#7A5206;background:#FCEFCF;border-radius:10px;
+      padding:9px 11px;line-height:1.5;margin-bottom:12px}
+    html[data-theme="dark"] .it-imp-note{background:#372C11;color:#F2D79A}
+    .it-flags{display:flex;flex-direction:column;gap:7px;margin-bottom:11px}
+    .it-flag{border-radius:10px;padding:8px 11px;font-size:12.5px}
+    .it-flag b{font-weight:800;display:block}
+    .it-flag i{font-style:normal;font-size:11.5px;display:block;margin-top:2px;opacity:.9}
+    .it-flag.warn{background:#FFF4E0;color:#7A4F01}
+    .it-flag.danger{background:#FFEBEE;color:#C62828;font-weight:700}
+    html[data-theme="dark"] .it-flag.warn{background:#3A2E12;color:#FFD98A}
+    html[data-theme="dark"] .it-flag.danger{background:#3A1A18;color:#FFC9C4}
+
+    .it-dx{border:1.5px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:10px}
+    .it-dx.top{border-color:var(--primary);background:var(--brand-tint,var(--brand-tint))}
+    html[data-theme="dark"] .it-dx.top{background:#10352A}
+    .it-dx-h{display:flex;align-items:baseline;gap:10px}
+    .it-dx-name{flex:1;font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
+    .it-dx-pct{font-size:16px;font-weight:800;color:var(--primary);text-align:right;line-height:1}
+    .it-dx-pct i{display:block;font-style:normal;font-size:9.5px;font-weight:700;
+      color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+    .it-bar{height:5px;border-radius:999px;background:var(--border);margin:8px 0 10px;overflow:hidden}
+    .it-bar span{display:block;height:100%;background:var(--primary);border-radius:999px}
+    .it-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:7px}
+    .it-lbl{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
+      letter-spacing:.5px;width:100%}
+    .it-ev{font-size:11.5px;font-weight:700;color:var(--primary-d);background:var(--brand-tint);
+      border-radius:999px;padding:4px 10px}
+    .it-ev.src{color:#5F6368;background:var(--bg);border:1px solid var(--border);font-weight:600}
+    .it-ev.test{color:#1565A8;background:#E7F1FB}
+    .it-note{font-size:11.5px;color:var(--text-lt);line-height:1.45;font-style:italic}
+    .it-ev.seen{color:#7A4F01;background:#FFF4E0}
+    html[data-theme="dark"] .it-ev.seen{background:#3A2E12;color:#FFD98A}
+    html[data-theme="dark"] .it-ev{background:var(--brand-tint);color:var(--brand-ink)}
+    html[data-theme="dark"] .it-ev.test{background:#12283A;color:#8FC9F5}
+    .it-pick{width:100%;margin-top:5px;padding:11px;border:none;border-radius:11px;
+      background:var(--primary);color:#fff;font:inherit;font-size:13.5px;font-weight:800;
+      cursor:pointer;touch-action:manipulation}
+    .it-dict{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+      margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;
+      background:var(--tint-2);color:var(--brand-ink);font-weight:600;font-size:15px}
+    .it-dict .material-icons-outlined{font-size:20px}
+    .it-dict.on{background:var(--primary);color:#fff;border-style:solid;
+      animation:itPulse 1.1s ease-in-out infinite}
+    .it-dict-say{margin-top:6px;font-size:13px;line-height:1.45;color:var(--muted)}
+    .it-dict-say.ok{color:var(--brand-ink)}
+    .it-dict-say.warn{color:var(--danger,#b3261e)}
+    .it-pulse{animation:itPulse 1.1s ease-in-out 2}
+    @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+    @media (max-width:380px){ .it-tab i{display:none} .it-vitals{grid-template-columns:1fr} }
+
+    .ucg-childwarn{font-size:12px;color:#7A1C1C;background:#FDECEA;border-radius:9px;
+      padding:9px 11px;margin-top:8px;line-height:1.5}
+    html[data-theme="dark"] .ucg-childwarn{background:#3A1A18;color:#FFC9C4}
+    .ucg-unpriced{font-size:11.5px;color:#7A5206;background:#FCEFCF;border-radius:9px;
+      padding:8px 10px;margin-top:8px;line-height:1.5}
+    html[data-theme="dark"] .ucg-unpriced{background:#372C11;color:#F2D79A}
+
+    /* ── One-tap package button ─────────────────────────────────── */
+    .ucg-onetap{display:flex;align-items:center;gap:12px;width:100%;margin-top:16px;
+      padding:14px 16px;border:none;border-radius:16px;cursor:pointer;font-family:inherit;
+      background:linear-gradient(135deg,#7C6CF0 0%,#5B49D6 100%);color:#fff;
+      box-shadow:0 10px 22px rgba(108,92,231,.32);text-align:left}
+    .ucg-onetap:active{transform:scale(.99)}
+    .ucg-onetap .ot-txt{flex:1;min-width:0}
+    .ucg-onetap .ot-txt b{display:block;font-size:14.5px;font-weight:800;letter-spacing:-.01em}
+    .ucg-onetap .ot-txt i{display:block;font-size:11.5px;opacity:.9;font-style:normal;margin-top:1px}
+    .ucg-onetap .ot-go{opacity:.9}
+
+    /* ── Patient profile card ───────────────────────────────────── */
+    .pp-alert {
+      border-radius: 10px; padding: 10px 14px; margin-bottom: 8px;
+      font-size: 12px; font-weight: 600;
+      display: flex; align-items: flex-start; gap: 8px;
+    }
+    .pp-alert.allergy { background: #FFEBEE; color: #B71C1C; border-left: 4px solid #C62828; }
+    .pp-alert.chronic { background: #FFF8E1; color: #E65100; border-left: 4px solid #F57C00; }
+    .pp-alert.blood   { background: #F3E5F5; color: #6A1B9A; border-left: 4px solid #8E24AA; }
+    .pp-alert.notes   { background: #F3F4F6; color: #374151; border-left: 4px solid #9CA3AF; }
+    .pp-section-title {
+      font-size: 11px; font-weight: 700; color: #9AA0A6;
+      text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 6px;
+    }
+    .pp-row {
+      display: flex; justify-content: space-between; align-items: flex-start;
+      padding: 7px 0; border-bottom: 1px solid #F5F5F5; font-size: 13px;
+    }
+    .pp-row:last-child { border-bottom: none; }
+    .pp-row-label { color: #9AA0A6; font-weight: 600; min-width: 90px; flex-shrink: 0; }
+    .pp-row-value { color: #212121; flex: 1; text-align: right; }
+
+    /* ── Blood-group chips ──────────────────────────────────────── */
+    .bg-chip {
+      padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px;
+      background: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+      font-family: inherit; transition: all .12s;
+    }
+    .bg-chip.active { background: #E3F2FD; border-color: var(--primary); color: var(--primary); }
+
+    /* ── Return-visit row ───────────────────────────────────────── */
+    .return-row {
+      display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap;
+    }
+    .return-row .rr-days { flex: 0 0 100px; }
+    .return-row .rr-reason { flex: 1; min-width: 160px; }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo" style="display:flex;align-items:center;gap:11px">
+      <img src="icons/logo-mark.svg?v=1" alt="" style="width:34px;height:34px;flex-shrink:0" draggable="false">
+      <div style="min-width:0">
+        <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+        <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link active"><span class="material-icons-outlined">add_circle</span> New Treatment</a>
+      <a href="messages.html" class="sidebar-link"><span class="material-icons-outlined">forum</span> Messages</a>
+      <a href="guidelines.html" class="sidebar-link"><span class="material-icons-outlined">menu_book</span> Clinical Guidelines</a>
+      <a href="settings.html" class="sidebar-link" data-nav-cap="settings"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">
+        <a href="dashboard.html" style="color:#5F6368;text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px">
+          <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
+        </a>
+        New Treatment
+      </div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+    <div class="wiz">
+
+      <!-- ── 2-dot progress ── -->
+      <div class="wiz-dots">
+        <div class="wiz-dot current" data-dot="1">
+          <div class="wiz-dot-circle">1</div>
+          <span class="wiz-dot-label">Diagnosis</span>
+        </div>
+        <div class="wiz-dot-line" id="dotLine"></div>
+        <div class="wiz-dot" data-dot="2">
+          <div class="wiz-dot-circle">2</div>
+          <span class="wiz-dot-label">Treatment &amp; Bill</span>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════
+           SCREEN 1 — Patient & Assessment
+           ════════════════════════════════════════════════════════ -->
+      <section class="wiz-section" data-step="1">
+        <div class="wiz-screen-title">New Treatment</div>
+        <div class="wiz-screen-sub">Who it is, then what they complain of, what you measure, and what you already know. Suggestions appear as you write. You confirm the diagnosis — the app never does.</div>
+
+        <!-- ── Who is it? — FIRST, because the name is what the money, the
+             follow-up and the phone call all hang on. Still never required. -->
+        <div class="wiz-card it-who">
+          <div class="sec-label" style="margin:0 0 10px">
+            <span class="material-icons-outlined" style="font-size:14px">person</span>
+            Who is it?
+          </div>
+          <div class="pt-two">
+            <div>
+              <label class="field-label" for="quickPatientName">Name</label>
+              <input id="quickPatientName" class="field-input" type="text"
+                placeholder="e.g. Okello John" autocomplete="off">
+            </div>
+            <div>
+              <label class="field-label" for="quickPatientPhone">Phone</label>
+              <input id="quickPatientPhone" class="field-input" type="tel"
+                placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+            </div>
+          </div>
+          <div class="pt-two" style="margin-top:12px">
+            <div>
+              <label class="field-label">Sex</label>
+              <div class="it-sex">
+                <button type="button" class="it-sex-btn" data-sex="female">Female</button>
+                <button type="button" class="it-sex-btn" data-sex="male">Male</button>
+              </div>
+            </div>
+            <div>
+              <label class="field-label" for="itAge">Age</label>
+              <div class="it-age">
+                <input id="itAge" class="field-input" inputmode="numeric" placeholder="e.g. 28">
+                <button type="button" class="it-unit on" data-unit="years">yrs</button>
+                <button type="button" class="it-unit" data-unit="months">mths</button>
+              </div>
+            </div>
+          </div>
+          <div id="itWhoNote" class="it-whonote"></div>
+
+          <!-- Shows the moment a name or number matches an unpaid visit. -->
+          <div id="itDebt" class="it-debt"></div>
+          <div class="helper" id="quickPatientHelper"><b>Optional</b> — leave it blank if you are busy and add it later; the case number identifies the patient either way. It is asked first because the bill, the follow-up and the phone call all hang on it.</div>
+        </div>
+
+        <!-- ── The consultation, in three steps ── -->
+        <div class="it-tabs" role="tablist">
+          <button type="button" class="it-tab on" id="itTab1">
+            <b>1 · Complaint</b><i>What they tell you</i></button>
+          <button type="button" class="it-tab" id="itTab2">
+            <b>2 · Vitals</b><i>What you measure</i></button>
+          <button type="button" class="it-tab" id="itTab3">
+            <b>3 · Background</b><i>What you know</i></button>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane1">
+          <label class="field-label" for="itChief">Main complaint</label>
+          <input id="itChief" class="field-input" autocomplete="off"
+            placeholder="e.g. fever and headache">
+          <div class="it-ccs">
+            <span class="it-cc" data-cc="fever">fever</span>
+            <span class="it-cc" data-cc="cough">cough</span>
+            <span class="it-cc" data-cc="headache">headache</span>
+            <span class="it-cc" data-cc="diarrhoea">diarrhoea</span>
+            <span class="it-cc" data-cc="vomiting">vomiting</span>
+            <span class="it-cc" data-cc="abdominal pain">abdominal pain</span>
+            <span class="it-cc" data-cc="difficulty in breathing">hard breathing</span>
+            <span class="it-cc" data-cc="rash">rash</span>
+            <span class="it-cc" data-cc="ear pain">ear pain</span>
+            <span class="it-cc" data-cc="weakness">weakness</span>
+          </div>
+          <label class="field-label" for="itSubjective" style="margin-top:16px">The story — in the patient's own words</label>
+          <textarea id="itSubjective" class="field-input" rows="4"
+            placeholder="How long, how it started, what makes it better or worse, what they have already taken…"></textarea>
+          <button type="button" id="itDictateStory" class="it-dict">
+            <span class="material-icons-outlined">mic</span>
+            <span>Say who it is and what they came with</span>
+          </button>
+          <div id="itDictateStorySay" class="it-dict-say"></div>
+          <div class="helper">This is the <b>subjective</b> part of the record: what the patient reports, before you examine them.</div>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane2" style="display:none">
+          <div class="it-vitals">
+            <div class="it-v">
+              <label class="field-label" for="itSbp">Blood pressure</label>
+              <div class="it-bp">
+                <input id="itSbp" class="field-input" inputmode="numeric" placeholder="120">
+                <span>/</span>
+                <input id="itDbp" class="field-input" inputmode="numeric" placeholder="80">
+                <em>mmHg</em>
+              </div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itTemp">Temperature</label>
+              <div class="it-one"><input id="itTemp" class="field-input" inputmode="decimal" placeholder="37.0"><em>°C</em></div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itWeight">Weight</label>
+              <div class="it-one"><input id="itWeight" class="field-input" inputmode="decimal" placeholder="62"><em>kg</em></div>
+            </div>
+            <div class="it-v">
+              <label class="field-label" for="itPulse">Pulse</label>
+              <div class="it-one"><input id="itPulse" class="field-input" inputmode="numeric" placeholder="78"><em>/min</em></div>
+            </div>
+          </div>
+          <button type="button" id="itDictate" class="it-dict">
+            <span class="material-icons-outlined">mic</span>
+            <span>Say the readings</span>
+          </button>
+          <div id="itDictateSay" class="it-dict-say"></div>
+          <div class="helper">This is the <b>objective</b> part: what you measured, not what you were told. A reading outside the normal range turns red and is used in the suggestions below.</div>
+        </div>
+
+        <div class="wiz-card it-pane" id="itPane3" style="display:none">
+          <label class="field-label" for="itBackground">Background — social and family history</label>
+          <textarea id="itBackground" class="field-input" rows="5"
+            placeholder="Chronic illness (diabetes, HIV, sickle cell, asthma), medicines already on, allergies, pregnancy, smoking or alcohol, who they live with, illness in the family…"></textarea>
+          <div class="helper">One box, on purpose. Write whatever matters — it is read along with everything else when the suggestions are worked out.</div>
+        </div>
+
+        <!-- ── What this might be — updated as you type ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">lightbulb</span>
+          What this might be
+        </div>
+        <div class="wiz-card it-imp" id="itImpression"></div>
+
+
+        <!-- ── Diagnosis ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">medical_services</span>
+          Diagnosis
+        </div>
+
+        <div class="wiz-card">
+          <label class="field-label">Confirmed condition</label>
+          <input id="confirmedDx" class="field-input"
+            placeholder="e.g. Malaria P. Falciparum, Typhoid, UTI…" autocomplete="off">
+          <div class="helper">Confirm one of the suggestions above, or type the diagnosis yourself. Nothing above is binding — this box is the record.</div>
+
+          <div style="margin-top:16px">
+            <label class="field-label">Severity</label>
+            <div class="sev-chips" id="sevChips">
+              <button class="sev-chip" data-sev="mild">Mild</button>
+              <button class="sev-chip active" data-sev="moderate">Moderate</button>
+              <button class="sev-chip" data-sev="severe">Severe</button>
+              <button class="sev-chip" data-sev="critical">Critical</button>
+            </div>
+          </div>
+
+          <!-- ONE-TAP STANDARD PACKAGE: pulls the tests, medicines with dose &
+               quantity, follow-up and charges from the Uganda Clinical
+               Guidelines (or this clinic's learned standard). Works offline. -->
+          <button type="button" id="ucgOneTap" class="ucg-onetap">
+            <span class="material-icons-outlined">bolt</span>
+            <span class="ot-txt">
+              <b>One-tap standard package</b>
+              <i>Auto-fill tests, drugs, doses, quantity &amp; charges</i>
+            </span>
+            <span class="material-icons-outlined ot-go">chevron_right</span>
+          </button>
+        </div>
+
+        <!-- ── Care level ── -->
+        <div class="wiz-card">
+          <label class="field-label">Care level</label>
+          <div class="care-toggle">
+            <button class="care-opt active" data-care="outpatient">
+              <span class="material-icons-outlined">home</span>
+              <div class="care-opt-label">Outpatient</div>
+              <div class="care-opt-desc">Treat &amp; send home</div>
+            </button>
+            <button class="care-opt" data-care="inpatient">
+              <span class="material-icons-outlined">local_hospital</span>
+              <div class="care-opt-label">Inpatient</div>
+              <div class="care-opt-desc">Admit to ward</div>
+            </button>
+          </div>
+          <div id="wardField" style="display:none;margin-top:14px">
+            <label class="field-label">Ward / Bed</label>
+            <input id="wardInput" class="field-input" placeholder="e.g. General Ward — Bed 3">
+          </div>
+        </div>
+
+        <!-- ── Lab tests ── -->
+        <!-- ══ Patient details and the standalone lab-test picker ══
+             Screen 1 is now just: diagnosis → one-tap package → Continue.
+             The phone and name are optional and added later by tapping the
+             treatment on the dashboard; lab tests are chosen inside the
+             package itself, where they auto-suggest. Kept in the page but
+             hidden, because the booking-code lookup still reads these
+             fields. -->
+        <div id="legacyPatientLab" hidden style="display:none">
+        <!-- ── Patient details (optional — can be added later) ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">person</span>
+          Patient details <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional, can be added later</span>
+        </div>
+        <div class="wiz-card" style="padding-top:14px">
+          <div style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">
+            Not needed to record the treatment. The case number identifies this
+            patient; the name and phone can be filled in afterwards from the dashboard.
+          </div>
+        </div>
+        <!-- ── Patient ── -->
+        <div class="wiz-card">
+          <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1.5px solid var(--border)">
+            <button id="lookupTabPhone" class="lookup-tab active">
+              <span class="material-icons-outlined" style="font-size:16px">phone</span> Phone / Name
+            </button>
+            <button id="lookupTabCode" class="lookup-tab">
+              <span class="material-icons-outlined" style="font-size:16px">qr_code</span> Booking Code
+            </button>
+          </div>
+
+          <!-- Phone search -->
+          <div id="patientSearchBlock">
+            <label class="field-label">Patient phone number</label>
+            <div class="autocomplete-wrap">
+              <input id="patientPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" autocomplete="off" inputmode="tel">
+              <div id="patientResults" class="autocomplete-menu"></div>
+            </div>
+            <div class="helper" id="patientHelper">Works for the patient's own number or a parent's number for children.</div>
+          </div>
+
+          <!-- Booking code search -->
+          <div id="bookingCodeBlock" style="display:none">
+            <label class="field-label">Homatt Booking Code</label>
+            <input id="bookingCodeInput" class="field-input" type="text" placeholder="HO-928"
+              style="text-transform:uppercase;font-weight:800;letter-spacing:2px;font-size:20px;text-align:center" autocomplete="off">
+            <button id="lookupCodeBtn"
+              style="margin-top:10px;width:100%;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:18px">search</span> Find Patient
+            </button>
+            <div id="codeError" style="display:none;margin-top:8px;background:#FFEBEE;color:#C62828;border-radius:8px;padding:8px 12px;font-size:13px"></div>
+          </div>
+
+          <!-- Selected patient pill -->
+          <div id="patientPillBlock" style="display:none">
+            <div class="patient-pill">
+              <div class="avatar" id="ppAvatar">?</div>
+              <div class="info">
+                <div class="name" id="ppName"></div>
+                <div class="phone" id="ppPhone"></div>
+              </div>
+              <span class="badge" id="ppBadge">On Homatt</span>
+              <button class="change-btn" id="ppChangeBtn" title="Change patient">
+                <span class="material-icons-outlined">edit</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Patient profile alerts -->
+          <div id="patientProfileCard" style="display:none;margin-top:12px"></div>
+        </div>
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">science</span>
+          Lab Tests &amp; Findings
+        </div>
+
+        <div class="wiz-card">
+          <!-- Quick filter — type to narrow chips -->
+          <div style="position:relative;margin-bottom:14px">
+            <input id="labSearch" class="field-input" type="text"
+              placeholder="Type to find a test… e.g. malaria, HIV, urine, x-ray"
+              autocomplete="off"
+              style="padding-left:38px;padding-right:38px">
+            <span class="material-icons-outlined"
+              style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#9AA0A6;pointer-events:none">search</span>
+            <button id="labSearchClear" type="button"
+              style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:#9AA0A6">
+              <span class="material-icons-outlined" style="font-size:18px">close</span>
+            </button>
+          </div>
+          <div id="labSelectedTray" style="display:none;flex-wrap:wrap;gap:6px;margin-bottom:14px;padding:10px 12px;background:#F1F8F1;border:1px dashed var(--tint-3);border-radius:10px"></div>
+          <div id="labNoMatch" style="display:none;padding:14px 12px;margin-bottom:12px;background:#FFF8E1;border-radius:10px;text-align:center;color:#5D4037;font-size:12px">
+            <div style="margin-bottom:8px">No test matches "<strong id="labNoMatchQ"></strong>".</div>
+            <button id="labAddNewBtn" type="button"
+              style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">
+              <span class="material-icons-outlined" style="font-size:16px">add</span>
+              Add it as a new test
+            </button>
+          </div>
+
+          <!-- YOUR CLINIC'S OWN TESTS (added from consultations; offline-safe) -->
+          <div class="lab-group" id="customLabGroup" style="display:none">
+            <div class="lab-group-title"><span class="lgt-icon">⭐</span> Your Clinic's Tests</div>
+            <div class="lab-chips" id="customLabChips"></div>
+          </div>
+
+          <!-- MALARIA -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#FFEBEE">🦟</span> Malaria
+            </div>
+            <div class="lab-chips" id="labChips">
+              <button class="lab-chip" data-lab="Malaria RDT" data-group="malaria">Malaria RDT</button>
+              <button class="lab-chip" data-lab="Thick Blood Smear" data-group="malaria">Thick Blood Smear</button>
+              <button class="lab-chip" data-lab="Thin Blood Smear" data-group="malaria">Thin Smear (speciation)</button>
+              <button class="lab-chip" data-lab="Malaria PCR" data-group="malaria">Malaria PCR</button>
+            </div>
+          </div>
+
+          <!-- BLOOD COUNT & CHEMISTRY -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#FFF3E0">🩸</span> Blood Count &amp; Chemistry
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="Full Blood Count (FBC)">FBC / CBC</button>
+              <button class="lab-chip" data-lab="ESR">ESR</button>
+              <button class="lab-chip" data-lab="CRP">CRP</button>
+              <button class="lab-chip" data-lab="Blood Group & Rhesus">Blood Group &amp; Rh</button>
+              <button class="lab-chip" data-lab="Blood Sugar (Random)">Blood Sugar (Random)</button>
+              <button class="lab-chip" data-lab="Fasting Blood Sugar">Fasting Blood Sugar</button>
+              <button class="lab-chip" data-lab="HbA1c">HbA1c</button>
+              <button class="lab-chip" data-lab="Liver Function Tests (LFTs)">Liver Function (LFTs)</button>
+              <button class="lab-chip" data-lab="Kidney Function (Creatinine)">Kidney / Creatinine</button>
+              <button class="lab-chip" data-lab="Serum Electrolytes">Electrolytes (Na/K)</button>
+              <button class="lab-chip" data-lab="Blood Culture & Sensitivity">Blood Culture &amp; S</button>
+            </div>
+          </div>
+
+          <!-- INFECTIONS & SEROLOGY -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:var(--tint-2)">🔬</span> Infections &amp; Serology
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="HIV Rapid Test">HIV Rapid Test</button>
+              <button class="lab-chip" data-lab="CD4 Count">CD4 Count</button>
+              <button class="lab-chip" data-lab="Hepatitis B (HBsAg)">Hepatitis B (HBsAg)</button>
+              <button class="lab-chip" data-lab="Hepatitis C (HCV)">Hepatitis C (HCV)</button>
+              <button class="lab-chip" data-lab="Syphilis (VDRL/RPR)">Syphilis (VDRL)</button>
+              <button class="lab-chip" data-lab="Widal (Typhoid)">Widal / Typhoid</button>
+              <button class="lab-chip" data-lab="Brucella Agglutination">Brucella</button>
+              <button class="lab-chip" data-lab="TB Sputum AFB Smear">TB Sputum (AFB)</button>
+              <button class="lab-chip" data-lab="TB GeneXpert">TB GeneXpert</button>
+            </div>
+          </div>
+
+          <!-- URINE & STOOL -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#E3F2FD">💧</span> Urine &amp; Stool
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="Urinalysis (Dipstick)">Urinalysis (Dipstick)</button>
+              <button class="lab-chip" data-lab="Urine Microscopy">Urine Microscopy</button>
+              <button class="lab-chip" data-lab="Urine Culture & Sensitivity">Urine C&amp;S</button>
+              <button class="lab-chip" data-lab="Pregnancy Test (uHCG)">Pregnancy Test</button>
+              <button class="lab-chip" data-lab="Stool Microscopy (Ova & Parasites)">Stool Microscopy</button>
+              <button class="lab-chip" data-lab="Stool Culture & Sensitivity">Stool C&amp;S</button>
+              <button class="lab-chip" data-lab="H. Pylori (Stool Antigen)">H. Pylori (Stool)</button>
+            </div>
+          </div>
+
+          <!-- VITALS & IMAGING -->
+          <div class="lab-group">
+            <div class="lab-group-title">
+              <span class="lgt-icon" style="background:#F3E5F5">📋</span> Vitals &amp; Imaging
+            </div>
+            <div class="lab-chips">
+              <button class="lab-chip" data-lab="BP Measurement">BP Measurement</button>
+              <button class="lab-chip" data-lab="Pulse Oximetry (SpO2)">Pulse Oximetry</button>
+              <button class="lab-chip" data-lab="Blood Glucose (POC)">Blood Glucose (POC)</button>
+              <button class="lab-chip" data-lab="ECG">ECG</button>
+              <button class="lab-chip" data-lab="Chest X-Ray">Chest X-Ray</button>
+              <button class="lab-chip" data-lab="Ultrasound">Ultrasound</button>
+            </div>
+          </div>
+
+          <!-- Results textarea -->
+          <div style="margin-top:16px">
+            <label class="field-label">Findings &amp; Results</label>
+            <textarea id="labResults" class="field-input" rows="2"
+              placeholder="e.g. Malaria RDT positive, Thick smear 2+, BP 148/94, Blood sugar 12.4 mmol/L…"></textarea>
+          </div>
+        </div>
+
+        </div><!-- /legacyPatientLab -->
+        <!-- ── Continue ── -->
+        <div class="wiz-nav" style="gap:10px;flex-wrap:wrap">
+          <button class="wiz-btn wiz-btn-next" id="step1Next" disabled>
+            Treatment &amp; Bill
+            <span class="material-icons-outlined" style="font-size:18px">arrow_forward</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- ════════════════════════════════════════════════════════
+           SCREEN 2 — Treatment & Bill
+           ════════════════════════════════════════════════════════ -->
+      <section class="wiz-section" data-step="2" style="display:none">
+
+        <!-- Live summary of patient + dx from screen 1 -->
+        <div class="consult-summary-bar" id="consultSummaryBar">
+          <div class="csb-avatar" id="csbAvatar">?</div>
+          <div class="csb-info">
+            <div class="csb-name" id="csbName">—</div>
+            <div class="csb-dx" id="csbDx">—</div>
+          </div>
+          <button class="wiz-btn wiz-btn-back" data-back style="flex:0;white-space:nowrap;padding:10px 14px">
+            <span class="material-icons-outlined" style="font-size:16px">edit</span> Edit
+          </button>
+        </div>
+
+        <!-- ── Medications ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">medication</span>
+          Medications
+        </div>
+
+        <div style="margin-bottom:12px">
+          <!-- Expected recovery (hidden input, auto-set from drug duration) -->
+          <input id="expRecovery" type="date" style="display:none">
+
+          <!-- Auto-dosing: set the patient's age once and every drug typed below
+               fills its dose/frequency/duration for that age automatically.
+               Pre-filled from the patient record when known. Always editable. -->
+          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
+            <span class="material-icons-outlined" style="font-size:17px;color:var(--deep-ink)">bolt</span>
+            <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">Auto-dose for age</span>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input id="patientAgeInput" type="number" min="0" max="120" inputmode="numeric"
+                     placeholder="Age" autocomplete="off"
+                     style="width:62px;padding:7px 8px;border:1.5px solid #E8EAED;border-radius:9px;font-size:15px;font-family:inherit;text-align:center;outline:none">
+              <button type="button" id="ageUnitYrs" class="sev-chip active" style="padding:6px 10px">yrs</button>
+              <button type="button" id="ageUnitMos" class="sev-chip" style="padding:6px 10px">mos</button>
+            </div>
+            <span style="flex:1;min-width:8px"></span>
+            <button type="button" id="doseModeAdult" class="sev-chip active" style="padding:7px 14px">Adult</button>
+            <button type="button" id="doseModeChild" class="sev-chip" style="padding:7px 14px">Child</button>
+          </div>
+          <div id="dosingBandLabel" style="font-size:12px;color:var(--deep-ink);font-weight:600;margin:0 0 12px;padding-left:4px;display:flex;align-items:center;gap:5px"></div>
+
+          <div id="medsContainer"></div>
+
+          <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:var(--deep-ink);border:1.5px dashed var(--tint-3);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
+            <span class="material-icons-outlined" style="font-size:20px">add_circle_outline</span>
+            Add medication
+          </button>
+        </div>
+
+        <!-- ── Materials (collapsed by default) ── -->
+        <div class="wiz-card" id="materialsCard">
+          <button class="collapse-toggle" id="materialsToggle">
+            <span class="material-icons-outlined ct-icon">expand_more</span>
+            <span>Materials &amp; consumables used</span>
+            <span style="font-size:11px;color:#9AA0A6;margin-left:auto">e.g. Drip set, Gloves, Syringe</span>
+          </button>
+          <div id="materialsBody" style="display:none;margin-top:10px">
+            <div id="materialsContainer">
+              <div id="materialsEmptyHint" style="font-size:12px;color:#9AA0A6;padding:2px 0">Stock auto-deducted on save.</div>
+            </div>
+            <button id="addMaterialBtn" style="margin-top:10px;font-size:12px;padding:7px 14px;background:#E0F2F1;color:var(--accent);border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
+              <span class="material-icons-outlined" style="font-size:14px">add</span> Add material
+            </button>
+          </div>
+        </div>
+
+        <!-- ── Stock source ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">local_pharmacy</span>
+          Where does the patient get the meds?
+        </div>
+
+        <div class="wiz-card">
+          <div class="stock-row">
+            <button class="stock-opt active" data-stock="clinic">
+              <div class="stock-opt-label">🏥 Clinic stock</div>
+              <div class="stock-opt-desc">Patient gets meds here, now</div>
+            </button>
+            <button class="stock-opt" data-stock="pharmacy">
+              <div class="stock-opt-label">💊 E-prescription</div>
+              <div class="stock-opt-desc">Send to partner pharmacy</div>
+            </button>
+          </div>
+          <div style="margin-top:14px">
+            <label class="field-label">Patient instructions</label>
+            <textarea id="patientNotes" class="field-input" rows="2"
+              placeholder="e.g. Take with food, drink plenty of water, avoid alcohol…"></textarea>
+          </div>
+        </div>
+
+        <!-- ── Return visit ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">event_repeat</span>
+          Return visit
+        </div>
+
+        <div class="wiz-card">
+          <div class="return-row">
+            <div class="rr-days">
+              <label class="field-label">Return in</label>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input id="followUpDays" type="number" min="0" max="365" step="1" class="field-input"
+                  style="text-align:center;font-weight:700" placeholder="7" inputmode="numeric">
+                <span style="font-size:12px;color:#9AA0A6;white-space:nowrap">days</span>
+              </div>
+            </div>
+            <div class="rr-reason">
+              <label class="field-label">For</label>
+              <input id="followUpReason" type="text" class="field-input"
+                placeholder="e.g. BP recheck, refill Amlodipine" maxlength="200" autocomplete="off">
+            </div>
+          </div>
+          <div style="font-size:11px;color:#9AA0A6;margin-top:8px" id="followUpDateHint">—</div>
+        </div>
+
+        <!-- ── Fees & payment ── -->
+        <div class="sec-label">
+          <span class="material-icons-outlined" style="font-size:14px">payments</span>
+          Fees &amp; Payment
+        </div>
+
+        <div class="wiz-card" id="feesCard">
+          <div class="fee-grid">
+            <div class="fee-lbl">Treatment fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeConsult" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+
+            <div class="fee-lbl">Lab / Tests fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeLab" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+
+            <div class="fee-lbl">Medications fee</div>
+            <div class="fee-input-wrap">
+              <span class="fee-pfx">UGX</span>
+              <input id="feeMeds" class="field-input" type="number" min="0" step="500"
+                style="width:120px;text-align:right;padding:9px 10px" placeholder="0">
+            </div>
+          </div>
+
+          <div class="fee-total-row">
+            <div class="fee-total-label">Total charged</div>
+            <div class="fee-total-val">
+              <span class="fee-currency">UGX</span>
+              <span id="feeTotal">0</span>
+            </div>
+          </div>
+
+          <div style="margin-top:16px">
+            <label class="field-label">Payment status</label>
+            <div class="pay-chips">
+              <button class="pay-chip active" data-pay="paid">✓ Paid</button>
+              <button class="pay-chip" data-pay="pending">⏳ Pending</button>
+              <button class="pay-chip" data-pay="credit">📋 Credit</button>
+              <button class="pay-chip" data-pay="waived">🤝 Waived</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Send ── -->
+        <!-- Anything that stops the consultation being saved is shown HERE and
+             stays on screen. A toast that fades away was being missed, and the
+             clinician was left thinking the consultation had been recorded. -->
+        <div id="submitBlock" style="display:none;margin-top:12px;border:1.5px solid #E5484D;background:#FDEDED;color:#8A1C1C;border-radius:14px;padding:12px 14px;font-size:13.5px;font-weight:600;line-height:1.45">
+          <span class="material-icons-outlined" style="font-size:17px;vertical-align:-4px;margin-right:5px">error_outline</span>
+          <span id="submitBlockText"></span>
+        </div>
+
+        <button id="submitBtn" class="wiz-btn wiz-btn-send" style="margin-top:12px">
+          <span class="material-icons-outlined" style="font-size:20px">send</span>
+          Send Prescription &amp; Start Follow-up
+        </button>
+
+        <div style="text-align:center;font-size:11px;color:#9AA0A6;margin-top:10px;margin-bottom:32px">
+          Medication reminders, follow-up check-ins and inventory deduction happen automatically in the background.
+        </div>
+
+      </section>
+
+    </div>
+    </div>
+  </main>
+</div>
+
+<!-- Quick-register modal -->
+<div id="registerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:24px 22px 28px;max-height:90%;overflow-y:auto">
+    <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
+      <span class="material-icons-outlined" style="color:var(--primary)">person_add</span>
+      Register Patient
+    </h3>
+    <p style="font-size:13px;color:#5F6368;margin-bottom:16px">No Homatt account found. Save them now — they'll get an SMS to finish their profile later.</p>
+    <label class="field-label">Full name</label>
+    <input id="regName" class="field-input" placeholder="e.g. Nakato Brenda" autocomplete="off">
+    <div style="height:12px"></div>
+    <label class="field-label">Phone number</label>
+    <input id="regPhone" class="field-input" type="tel" placeholder="07XX XXX XXX" inputmode="tel">
+    <div style="height:18px"></div>
+    <button id="registerBtn" class="wiz-btn wiz-btn-next" style="width:100%;justify-content:center">
+      <span class="material-icons-outlined">check</span> Register &amp; Continue
+    </button>
+    <div style="height:8px"></div>
+    <button id="registerCancelBtn" class="wiz-btn wiz-btn-back" style="width:100%;justify-content:center">Cancel</button>
+  </div>
+</div>
+
+<!-- First-visit intake modal -->
+<div id="intakeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center">
+  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:20px 20px 32px;max-height:92vh;overflow-y:auto;box-sizing:border-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <h3 style="font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px">
+        <span class="material-icons-outlined" style="color:#F57C00">assignment_ind</span>
+        Patient Intake Form
+      </h3>
+      <button id="intakeCancelBtn" style="background:#F5F5F5;border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+        <span class="material-icons-outlined">close</span>
+      </button>
+    </div>
+    <p style="font-size:13px;color:#5F6368;margin:0 0 16px;line-height:1.5">
+      Captured once and stored securely. Helps all clinicians in the Homatt network provide safer care.
+    </p>
+
+    <label class="field-label">Known Allergies</label>
+    <input id="intakeAllergies" class="field-input" placeholder="e.g. Penicillin, Sulfa drugs — or type None"
+      style="margin-bottom:14px" autocomplete="off">
+
+    <label class="field-label">Chronic Conditions</label>
+    <input id="intakeChronic" class="field-input" placeholder="e.g. Hypertension, Diabetes Type 2 — or type None"
+      style="margin-bottom:14px" autocomplete="off">
+
+    <label class="field-label">Blood Group</label>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px" id="bloodGroupChips">
+      <button class="bg-chip" data-bg="A+">A+</button>
+      <button class="bg-chip" data-bg="A-">A-</button>
+      <button class="bg-chip" data-bg="B+">B+</button>
+      <button class="bg-chip" data-bg="B-">B-</button>
+      <button class="bg-chip" data-bg="O+">O+</button>
+      <button class="bg-chip" data-bg="O-">O-</button>
+      <button class="bg-chip" data-bg="AB+">AB+</button>
+      <button class="bg-chip" data-bg="AB-">AB-</button>
+      <button class="bg-chip" data-bg="Unknown">Unknown</button>
+    </div>
+
+    <label class="field-label">Other notes (optional)</label>
+    <textarea id="intakeNotes" class="field-input" rows="2"
+      placeholder="e.g. Pregnant, breastfeeding, special dietary needs…"
+      style="margin-bottom:18px"></textarea>
+
+    <button id="intakeSaveBtn" class="wiz-btn wiz-btn-next" style="width:100%;justify-content:center">
+      <span class="material-icons-outlined">save</span> Save &amp; Continue
+    </button>
+    <div style="height:8px"></div>
+    <button id="intakeSkipBtn" class="wiz-btn wiz-btn-back" style="width:100%;justify-content:center">
+      Skip for now
+    </button>
+  </div>
+</div>
+
+<!-- Success bottom sheet -->
+<div id="successSheet" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:700;align-items:flex-end;justify-content:center">
+  <div class="sum-card">
+    <div class="sum-top">
+      <span class="material-icons-outlined">check_circle</span>
+      <div>
+        <div class="sum-title">Treatment saved</div>
+        <div class="sum-sub" id="successMsg">Everything below has been recorded.</div>
+      </div>
+    </div>
+    <div class="sum-body" id="successBody"></div>
+    <div id="successReminders" style="display:none"></div>
+    <div class="sum-actions">
+      <button onclick="window.location.href='dashboard.html'" class="sum-btn primary">Back to Dashboard</button>
+      <button onclick="window.location.reload()" class="sum-btn">New Treatment</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/vendor/supabase.min.js?v=2110"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic-offline.js?v=20260830a"></script>
+<script src="js/clinic.js?v=20260831"></script>
+<script src="js/msg-alerts.js?v=20260829"></script>
+<script src="js/vendor/sql-wasm.js"></script>
+<script src="js/stock-blueprints.js?v=20260906"></script>
+<script src="js/new-order-wizard.js?v=20260910"></script>
+<script src="js/ucg-autofill.js?v=20260911"></script>
+<script src="js/clinic-impression.js?v=20260911"></script>
+<script src="js/clinic-dictate.js?v=20260916"></script>
+<script src="js/clinic-intake.js?v=20260916"></script>
+<script src="js/pwa-install.js?v=20260831"></script>
+
+</body>
+</html>

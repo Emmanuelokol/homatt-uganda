@@ -11,6 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
+    # Required so the "Publish APK to release" step can create/update the
+    # public android-latest release. Without this the release step fails with
+    # "Resource not accessible by integration" and no public download link is
+    # produced (the APK still builds as an artifact, but can't be published).
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,15 +34,29 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create app config.js with Supabase credentials
+      - name: Create app config.js with Supabase + OneSignal credentials
         run: |
           {
             echo "window.HOMATT_CONFIG = {"
             echo "  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',"
             echo "  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',"
             echo "  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',"
+            echo "  ONESIGNAL_APP_ID: '${{ secrets.ONESIGNAL_APP_ID }}',"
             echo "};"
           } > app/js/config.js
+
+      - name: Write google-services.json (required for FCM / push notifications)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+            echo "✓ google-services.json written"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON secret is not set — push notifications will NOT work in this build."
+            echo "::warning::Get google-services.json from Firebase Console → Project Settings → Your Android app"
+            echo "::warning::Then base64-encode it and add as GOOGLE_SERVICES_JSON secret in GitHub."
+          fi
 
       - name: Install npm dependencies
         run: npm install
@@ -59,19 +80,43 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Build Debug APK
+      # Signed RELEASE build (stable committed key + CI-bumped versionCode) so
+      # every published APK installs as an UPDATE over the previous one —
+      # clinics keep their offline data instead of uninstall/reinstall wiping it.
+      - name: Build Signed Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+          APK_VERSION_CODE: ${{ github.run_number }}
+          APK_VERSION_NAME: "1.1.${{ github.run_number }}"
 
       - name: Locate built APK
         run: find android/app/build/outputs -name "*.apk" -type f
 
-      - name: Upload APK — Homatt Health Android
+      - name: Upload APK — Homatt Clinic Android
         uses: actions/upload-artifact@v4
         with:
           name: Homatt-Health-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 90
+
+      - name: Rename APK for release
+        run: cp android/app/build/outputs/apk/release/app-release.apk HomattHealth.apk
+
+      # Publish the APK at a PERMANENT public link so the portal can offer a
+      # one-tap "Download Android app" — no GitHub account or Actions digging:
+      #   https://github.com/<owner>/<repo>/releases/download/android-latest/HomattHealth.apk
+      - name: Publish APK to the android-latest release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Homatt Clinic — Android app (latest)
+          body: |
+            Latest Homatt Clinic Android app (build ${{ github.run_number }}).
+            Download HomattHealth.apk below and open it on your phone to
+            install/update. Updates install over the previous version and keep
+            all offline data. Built automatically from the most recent code.
+          files: HomattHealth.apk
+          make_latest: true

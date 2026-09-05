@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health — How are you feeling?</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    .rf-screen { flex:1; overflow-y:auto; padding:0 0 100px; }
+    .rf-hero {
+      background: linear-gradient(135deg,#1B5E20,#4CAF50);
+      padding: 28px 22px 22px; color: #fff; text-align: center;
+    }
+    .rf-hero-icon {
+      width: 64px; height: 64px; border-radius: 20px; background: rgba(255,255,255,.22);
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;
+    }
+    .rf-hero h1 { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+    .rf-hero p { font-size: 13px; opacity: .88; margin: 0; line-height: 1.5; }
+
+    .rf-summary {
+      margin: -12px 16px 0; background: var(--surface); border-radius: 14px;
+      padding: 14px 16px; box-shadow: 0 4px 12px rgba(0,0,0,.08);
+      display: flex; align-items: center; gap: 12px; position: relative;
+    }
+    .rf-summary-icon {
+      width: 38px; height: 38px; border-radius: 12px; background: #E8F5E9;
+      color: #1B5E20; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .rf-summary-info { flex: 1; min-width: 0; }
+    .rf-summary-clinic { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+    .rf-summary-meta { font-size: 11px; color: var(--text-hint); margin-top: 2px; }
+    .rf-summary-amount { font-size: 14px; font-weight: 700; color: #1B5E20; white-space: nowrap; }
+
+    .rf-section {
+      margin: 16px 16px 0; background: var(--surface); border-radius: 14px;
+      padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+    .rf-section-title {
+      font-size: 12px; font-weight: 700; color: var(--text-secondary);
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 14px;
+    }
+
+    .rf-mood-row {
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px;
+    }
+    .rf-mood-btn {
+      background: var(--surface); border: 1.5px solid var(--border);
+      border-radius: 12px; padding: 14px 6px 10px; cursor: pointer;
+      text-align: center; font-family: inherit; transition: all .15s;
+    }
+    .rf-mood-btn:active { transform: scale(.94); }
+    .rf-mood-btn.active {
+      background: #E8F5E9; border-color: #4CAF50; box-shadow: 0 4px 14px rgba(76,175,80,.25);
+    }
+    .rf-mood-emoji { font-size: 30px; line-height: 1; margin-bottom: 4px; }
+    .rf-mood-label { font-size: 10px; font-weight: 600; color: var(--text-secondary); }
+    .rf-mood-btn.active .rf-mood-label { color: #1B5E20; }
+
+    .rf-textarea {
+      width: 100%; padding: 12px 14px;
+      border: 1.5px solid var(--border); border-radius: 12px;
+      font-size: 14px; font-family: inherit;
+      outline: none; box-sizing: border-box; resize: vertical; min-height: 80px;
+      background: var(--surface); color: var(--text-primary);
+    }
+    .rf-textarea:focus { border-color: #4CAF50; }
+
+    .rf-followup-row {
+      display: flex; gap: 10px; margin-top: 10px;
+    }
+    .rf-fu-opt {
+      flex: 1; padding: 11px 8px; border: 1.5px solid var(--border);
+      border-radius: 12px; background: var(--surface); cursor: pointer;
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      color: var(--text-secondary); text-align: center;
+    }
+    .rf-fu-opt.active {
+      background: #FFF8E1; border-color: #F9A825; color: #5D4037;
+    }
+
+    .rf-submit-btn {
+      width: calc(100% - 32px); margin: 22px 16px 12px;
+      background: #1B5E20; color: #fff; border: none; border-radius: 14px;
+      padding: 16px; font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .rf-submit-btn:active { background: #154d18; }
+    .rf-submit-btn:disabled { background: #9AA0A6; cursor: not-allowed; }
+
+    .rf-skip-link {
+      display: block; text-align: center; margin: 6px 16px 0;
+      color: var(--text-hint); font-size: 13px; padding: 10px; cursor: pointer;
+    }
+
+    /* Dark-mode polish */
+    [data-theme="dark"] .rf-mood-btn { background: #2A2A2A; }
+    [data-theme="dark"] .rf-mood-btn.active { background: #1A3010; border-color: #4CAF50; }
+    [data-theme="dark"] .rf-fu-opt.active { background: #3D2F00; color: #FFD54F; }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+
+    <!-- Status Bar -->
+    <div class="status-bar" style="background:#1B5E20">
+      <span class="status-time" id="statusTime">9:41</span>
+      <div class="status-icons">
+        <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+        <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+        <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+      </div>
+    </div>
+
+    <div class="app-screen rf-screen">
+
+      <!-- Hero -->
+      <div class="rf-hero">
+        <div class="rf-hero-icon">
+          <span class="material-icons-outlined" style="font-size:34px;color:#fff">favorite</span>
+        </div>
+        <h1>How are you feeling?</h1>
+        <p>Your treatment is complete. Let your clinic know how you're recovering.</p>
+      </div>
+
+      <!-- Visit summary -->
+      <div class="rf-summary">
+        <div class="rf-summary-icon">
+          <span class="material-icons-outlined">local_hospital</span>
+        </div>
+        <div class="rf-summary-info">
+          <div class="rf-summary-clinic" id="rfClinicName">Clinic</div>
+          <div class="rf-summary-meta" id="rfMeta">Treatment summary</div>
+        </div>
+        <div class="rf-summary-amount" id="rfAmount"></div>
+      </div>
+
+      <!-- Mood selector -->
+      <div class="rf-section">
+        <div class="rf-section-title">Compared to before treatment, how do you feel now?</div>
+        <div class="rf-mood-row" id="moodRow">
+          <button class="rf-mood-btn" data-mood="much_worse">
+            <div class="rf-mood-emoji">😣</div>
+            <div class="rf-mood-label">Much<br>worse</div>
+          </button>
+          <button class="rf-mood-btn" data-mood="worse">
+            <div class="rf-mood-emoji">😕</div>
+            <div class="rf-mood-label">Worse</div>
+          </button>
+          <button class="rf-mood-btn" data-mood="same">
+            <div class="rf-mood-emoji">😐</div>
+            <div class="rf-mood-label">Same</div>
+          </button>
+          <button class="rf-mood-btn" data-mood="better">
+            <div class="rf-mood-emoji">🙂</div>
+            <div class="rf-mood-label">Better</div>
+          </button>
+          <button class="rf-mood-btn" data-mood="much_better">
+            <div class="rf-mood-emoji">😄</div>
+            <div class="rf-mood-label">Much<br>better</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Comment -->
+      <div class="rf-section">
+        <div class="rf-section-title">Anything you'd like to share?</div>
+        <textarea id="rfComment" class="rf-textarea" rows="3"
+          placeholder="e.g. Fever is gone but I still feel weak. Or: I'm back to normal — thank you!"
+          autocomplete="off"></textarea>
+      </div>
+
+      <!-- Follow-up needed? -->
+      <div class="rf-section">
+        <div class="rf-section-title">Do you need another visit?</div>
+        <div class="rf-followup-row" id="followupRow">
+          <button class="rf-fu-opt" data-fu="no">No, I'm fine</button>
+          <button class="rf-fu-opt" data-fu="yes">Yes, please</button>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <button id="rfSubmitBtn" class="rf-submit-btn" disabled>
+        <span class="material-icons-outlined">send</span>
+        Send Update to My Clinic
+      </button>
+      <a class="rf-skip-link" onclick="navTo('dashboard.html')">Skip for now</a>
+
+      <!-- Toast -->
+      <div class="tracker-toast" id="rfToast"></div>
+    </div>
+
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/native-bridge.js"></script>
+  <script>
+  (function() {
+    // ── Time in status bar ──
+    function tick() {
+      const t = document.getElementById('statusTime');
+      if (t) t.textContent = new Date().toLocaleTimeString('en-UG', {hour:'2-digit',minute:'2-digit'});
+    }
+    tick(); setInterval(tick, 60000);
+
+    // ── Pull diagnosis context from URL ──
+    const qs = new URLSearchParams(location.search);
+    const diagnosisId = qs.get('diagnosis_id');
+    const clinicName  = qs.get('clinic_name')   || 'your clinic';
+    const amount      = qs.get('amount_ugx');
+
+    document.getElementById('rfClinicName').textContent = clinicName;
+    if (amount && Number(amount) > 0) {
+      document.getElementById('rfAmount').textContent = 'UGX ' + Number(amount).toLocaleString('en-UG');
+      document.getElementById('rfMeta').textContent   = 'Treatment summary';
+    } else {
+      document.getElementById('rfMeta').textContent = 'Treatment complete';
+    }
+
+    // ── Toast helper ──
+    function toast(msg, type) {
+      const el = document.getElementById('rfToast');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'tracker-toast' + (type === 'error' ? ' error' : '');
+      el.style.display = 'block';
+      setTimeout(() => { el.style.display = 'none'; }, 2400);
+    }
+
+    // ── Mood / Follow-up selection ──
+    let _mood = '';
+    let _followup = '';
+    const submitBtn = document.getElementById('rfSubmitBtn');
+
+    function refreshSubmit() {
+      submitBtn.disabled = !_mood;
+    }
+
+    document.querySelectorAll('.rf-mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rf-mood-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _mood = btn.dataset.mood;
+        refreshSubmit();
+      });
+    });
+    document.querySelectorAll('.rf-fu-opt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.rf-fu-opt').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        _followup = btn.dataset.fu;
+      });
+    });
+
+    // ── Supabase ──
+    const cfg = window.HOMATT_CONFIG || {};
+    const supa = (cfg.SUPABASE_URL && window.supabase)
+      ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY)
+      : null;
+
+    // ── Submit feedback ──
+    submitBtn.onclick = async () => {
+      if (!_mood) { toast('Pick how you\'re feeling first'); return; }
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="material-icons-outlined" style="animation:spin 1s linear infinite">hourglass_empty</span> Sending…';
+
+      try {
+        if (!supa) throw new Error('Database unavailable');
+        const { data: sess } = await supa.auth.getSession();
+        const userId = sess?.session?.user?.id || null;
+
+        // Look up booking_id + clinic_id from the diagnosis for richer records
+        let bookingId = null, clinicId = null;
+        if (diagnosisId) {
+          const { data: dx } = await supa.from('clinic_diagnoses')
+            .select('booking_id,clinic_id,patient_phone')
+            .eq('id', diagnosisId)
+            .maybeSingle();
+          bookingId = dx?.booking_id || null;
+          clinicId  = dx?.clinic_id  || null;
+        }
+
+        const { error } = await supa.from('treatment_outcomes').insert({
+          diagnosis_id:    diagnosisId,
+          booking_id:      bookingId,
+          patient_user_id: userId,
+          clinic_id:       clinicId,
+          recovery_status: _mood,
+          comment:         document.getElementById('rfComment').value.trim() || null,
+          followup_needed: _followup === 'yes',
+        });
+        if (error) throw error;
+
+        toast('Thanks! Your clinic has been notified.', 'success');
+        setTimeout(() => navTo('dashboard.html'), 1400);
+      } catch(e) {
+        toast('Could not send: ' + e.message, 'error');
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span class="material-icons-outlined">send</span> Send Update to My Clinic';
+      }
+    };
+  })();
+  </script>
+</body>
+</html>
