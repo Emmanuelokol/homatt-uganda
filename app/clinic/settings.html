@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260915">
+  <link rel="stylesheet" href="css/clinic.css?v=20260917">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
@@ -574,6 +574,26 @@
           <div>Day</div><div>Opens</div><div>Closes</div><div>Closed?</div>
         </div>
         <div id="hoursContainer"></div>
+      </div>
+
+      <!-- Dictation service -->
+      <div class="settings-card" id="dictationCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">mic</span> Dictation — speaking instead of typing
+        </div>
+        <p class="dict-note">
+          Clinicians can speak the complaint and the readings instead of typing
+          them. It is paid for by the minute, so it stops when the account runs
+          out. Check here before you are told by a dead button.
+        </p>
+        <div class="dict-state" id="dictState">
+          <span class="dict-dot" id="dictDot"></span>
+          <span class="dict-msg" id="dictMsg">Not checked yet.</span>
+        </div>
+        <div class="dict-detail" id="dictDetail"></div>
+        <button type="button" class="dict-btn" id="dictCheckBtn">
+          <span class="material-icons-outlined">refresh</span> Check now
+        </button>
       </div>
 
       <!-- Change Password -->
@@ -1814,6 +1834,105 @@ async function changePassword() {
     btn.innerHTML = '<span class="material-icons-outlined">lock_reset</span> Change Password';
   }
 }
+
+/* ── Dictation: is it working, and how much is left? ──────────────────────────
+ * Two different questions, answered together:
+ *   1. What the SERVER says right now — the key, and what is left on the
+ *      account. This is the one an owner needs, because it is the same answer
+ *      for every phone in the clinic and it is the one they can act on.
+ *   2. What THIS device last ran into. A phone that hit "out of credit" an hour
+ *      ago is worth showing even if the account has since been topped up,
+ *      because the clinician who saw it is still avoiding the button.
+ */
+var DICT_FAULT_KEY = 'homatt_dictation_fault';
+
+function dictShow(state, msg, detail) {
+  var dot = document.getElementById('dictDot');
+  var m = document.getElementById('dictMsg');
+  var d = document.getElementById('dictDetail');
+  if (!dot || !m || !d) return;
+  dot.className = 'dict-dot ' + state;      // ok | low | bad | unknown | busy
+  m.textContent = msg;
+  d.innerHTML = detail || '';
+  d.style.display = detail ? 'block' : 'none';
+}
+
+function dictLastFaultHtml() {
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(DICT_FAULT_KEY) || 'null'); }
+  catch (e) { raw = null; }
+  if (!raw || !raw.kind) return '';
+  var when = '';
+  try {
+    var t = new Date(raw.at);
+    if (!isNaN(t)) when = t.toLocaleString('en-UG',
+      { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  } catch (e) {}
+  return '<div class="dict-last"><span class="material-icons-outlined">history</span>' +
+         '<span>On this device' + (when ? ', ' + escHtml(when) : '') + ': ' +
+         escHtml(raw.message || raw.kind) + '</span></div>';
+}
+
+async function dictCheck() {
+  var btn = document.getElementById('dictCheckBtn');
+  if (btn) btn.disabled = true;
+  dictShow('unknown', 'Checking…', '');
+  try {
+    if (!navigator.onLine) {
+      dictShow('unknown', 'You are offline, so this cannot be checked. ' +
+        'Dictation needs a connection too.', dictLastFaultHtml());
+      return;
+    }
+    if (!_supa || !_supa.functions) {
+      dictShow('unknown', 'This device is not connected to the server, so the ' +
+        'dictation account cannot be checked.', dictLastFaultHtml());
+      return;
+    }
+    var r = await _supa.functions.invoke('transcribe', { body: { probe: true } });
+    var body = r.data;
+    if (r.error) {
+      // A non-2xx carries the function's own JSON in the context — without
+      // reading it, "no key set" looks exactly like "the server is down".
+      try {
+        if (r.error.context && typeof r.error.context.json === 'function') {
+          body = await r.error.context.json();
+        }
+      } catch (e) {}
+    }
+    if (!body) {
+      dictShow('bad', 'Could not reach the server to check dictation.',
+        dictLastFaultHtml());
+      return;
+    }
+    var kind = body.kind || (body.ok ? '' : 'bad');
+    var state = body.ok ? (kind === 'low' ? 'low' : 'ok')
+                        : (kind === 'busy' ? 'busy' : 'bad');
+    var lines = (body.providers || []).map(function (p) {
+      var bal = (p.balance === null || p.balance === undefined)
+        ? '' : ' — $' + Number(p.balance).toFixed(2) + ' left';
+      return '<div class="dict-row"><b>' + escHtml(p.name) + '</b>: ' +
+             escHtml(p.message || (p.ok ? 'working' : 'not working')) +
+             escHtml(bal) + '</div>';
+    }).join('');
+    dictShow(state, body.message || (body.ok ? 'Dictation is working.'
+                                             : 'Dictation is not working.'),
+      lines + dictLastFaultHtml());
+  } catch (e) {
+    dictShow('bad', 'Could not check dictation: ' + (e.message || e),
+      dictLastFaultHtml());
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  var btn = document.getElementById('dictCheckBtn');
+  if (btn) btn.addEventListener('click', dictCheck);
+  // Show what this device already knows without waiting to be asked; the live
+  // check costs a request, so it stays on the button.
+  var last = dictLastFaultHtml();
+  if (last) dictShow('bad', 'Dictation failed the last time it was used here.', last);
+});
 </script>
 <script src="../js/native-bridge.js"></script>
 <script src="js/clinic-look.js?v=20260909"></script>

@@ -11,8 +11,11 @@
  *         Whisper is told to expect.
  *   Reply: { "text": "temp 38.5 BP 120 over 80 pulse 96" }
  *
- * Secret required:
- *   OPENAI_API_KEY   — already used by ai-proxy
+ * Secrets, whichever the project has. Deepgram is tried first:
+ *   DEEPGRAM_API_KEY  — cheaper per minute, and its keyword boosting can be
+ *                       fed the vitals vocabulary, which is where the numbers
+ *                       a nurse acts on come from
+ *   OPENAI_API_KEY    — Whisper; already used by ai-proxy
  *
  * WHAT THIS IS AND IS NOT FOR
  * ---------------------------
@@ -31,6 +34,56 @@
  */
 
 const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions';
+const DEEPGRAM_URL = 'https://api.deepgram.com/v1/listen';
+const DEEPGRAM_API = 'https://api.deepgram.com/v1';
+const OPENAI_MODELS = 'https://api.openai.com/v1/models';
+
+// Below this many dollars the clinic is told to top up, rather than finding out
+// mid-morning with a patient in front of them. Deepgram's nova-2 runs at well
+// under a cent a minute, so a few dollars is still weeks of dictation — but a
+// clinic on a bad line cannot fix an empty account quickly, and the warning is
+// only useful if it arrives before the service stops.
+const LOW_BALANCE = 5;
+
+// Deepgram boosts words you tell it to expect. These are the ones whose
+// mishearing costs the most: a missed "temp" leaves a reading unlabelled and
+// the app then refuses it, so the clinician types it anyway.
+const BOOST = [
+  'temperature:3', 'temp:3', 'pulse:3', 'weight:3', 'BP:3',
+  'blood pressure:3', 'systolic:2', 'diastolic:2', 'mmHg:2',
+  'celsius:2', 'kilograms:2', 'complains:3', 'presents:2',
+  'fever:2', 'headache:2', 'cough:2', 'vomiting:2', 'diarrhoea:2',
+];
+
+/**
+ * What the clinic and the admin need to be told apart.
+ *
+ *   'credit'  — the account is out of money or over quota. The clinic can do
+ *               nothing about it; somebody has to top the account up. This is
+ *               the one that must never be reported as a network glitch,
+ *               because it will not fix itself and dictation stays dead.
+ *   'auth'    — the key is wrong, revoked, or was never set.
+ *   'busy'    — rate limited. Trying again in a moment usually works.
+ *   'refused' — the audio itself was rejected.
+ */
+function upstreamFault(status: number): { kind: string; message: string } {
+  if (status === 402) {
+    return { kind: 'credit',
+             message: 'The dictation account is out of credit. Dictation will ' +
+                      'not work until it is topped up — type the readings for now.' };
+  }
+  if (status === 401 || status === 403) {
+    return { kind: 'auth',
+             message: 'The dictation key was refused. It may have been revoked ' +
+                      'or replaced — type the readings for now.' };
+  }
+  if (status === 429) {
+    return { kind: 'busy',
+             message: 'The dictation service is busy. Wait a moment and try again.' };
+  }
+  return { kind: 'refused',
+           message: 'The dictation service refused the recording.' };
+}
 
 // About a minute of the compressed audio a phone records. Long enough to read
 // four vitals aloud twice over; short enough that a forgotten recording is a
@@ -73,6 +126,82 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/**
+ * Is dictation actually working, and how much is left?
+ *
+ * Asked from the settings screen, so an owner can see the account has run dry
+ * BEFORE a clinician meets a dead button in front of a patient. It sends no
+ * audio and costs nothing: Deepgram's projects endpoint answers whether the key
+ * is live, and the balances endpoint answers what is left on it.
+ */
+async function probeDeepgram(key: string) {
+  const head = { Authorization: `Token ${key}` };
+  let r: Response;
+  try {
+    r = await fetch(`${DEEPGRAM_API}/projects`, { headers: head });
+  } catch {
+    return { name: 'deepgram', ok: false, kind: 'unreachable', balance: null,
+             message: 'Could not reach Deepgram from this server.' };
+  }
+  if (!r.ok) {
+    const f = upstreamFault(r.status);
+    return { name: 'deepgram', ok: false, kind: f.kind, balance: null,
+             message: f.message };
+  }
+
+  // The key works. What is left on it is a separate question, and a project
+  // without billing access answers it with a 403 — which is not a fault, so a
+  // balance we cannot read is reported as unknown rather than as a failure.
+  let amount: number | null = null;
+  try {
+    const j = await r.json();
+    const id = j?.projects?.[0]?.project_id;
+    if (id) {
+      const b = await fetch(`${DEEPGRAM_API}/projects/${id}/balances`, { headers: head });
+      if (b.ok) {
+        const bj = await b.json();
+        const bal = Array.isArray(bj?.balances) ? bj.balances : [];
+        const total = bal.reduce(
+          (s: number, x: { amount?: unknown }) => s + (Number(x?.amount) || 0), 0);
+        if (bal.length) amount = Math.round(total * 100) / 100;
+      }
+    }
+  } catch { /* the key is good; the balance is simply unknown */ }
+
+  if (amount !== null && amount <= 0) {
+    return { name: 'deepgram', ok: false, kind: 'credit', balance: amount,
+             message: 'The Deepgram account is empty. Dictation will not work ' +
+                      'until it is topped up.' };
+  }
+  if (amount !== null && amount < LOW_BALANCE) {
+    return { name: 'deepgram', ok: true, kind: 'low', balance: amount,
+             message: `Dictation is working, but only $${amount.toFixed(2)} is ` +
+                      'left on the Deepgram account. Top it up before it runs out.' };
+  }
+  return { name: 'deepgram', ok: true, kind: '', balance: amount,
+           message: amount === null
+             ? 'Dictation is working. The balance on this key cannot be read.'
+             : `Dictation is working. $${amount.toFixed(2)} left on the account.` };
+}
+
+/** The fallback. OpenAI will not tell us a balance, only whether the key lives. */
+async function probeWhisper(key: string) {
+  let r: Response;
+  try {
+    r = await fetch(OPENAI_MODELS, { headers: { Authorization: `Bearer ${key}` } });
+  } catch {
+    return { name: 'whisper', ok: false, kind: 'unreachable', balance: null,
+             message: 'Could not reach OpenAI from this server.' };
+  }
+  if (r.ok) {
+    return { name: 'whisper', ok: true, kind: '', balance: null,
+             message: 'The OpenAI key works. OpenAI does not report a balance.' };
+  }
+  const f = upstreamFault(r.status);
+  return { name: 'whisper', ok: false, kind: f.kind, balance: null,
+           message: f.message };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
@@ -81,12 +210,48 @@ Deno.serve(async (req) => {
     return json({ error: 'Only POST requests are supported.' }, 405);
   }
 
-  const key = Deno.env.get('OPENAI_API_KEY');
-  if (!key) {
+  const dg = Deno.env.get('DEEPGRAM_API_KEY');
+  const oa = Deno.env.get('OPENAI_API_KEY');
+
+  // ── "Is dictation working?" ────────────────────────────────────────────────
+  // A JSON body rather than a clip means the caller is asking after the
+  // service, not using it. Checked before the secrets, so a server with no key
+  // at all still answers the question instead of erroring.
+  if ((req.headers.get('content-type') || '').includes('application/json')) {
+    let probe = false;
+    try { probe = !!(await req.json())?.probe; } catch { probe = false; }
+    if (probe) {
+      if (!dg && !oa) {
+        return json({ checked: true, ok: false, kind: 'unconfigured',
+          message: 'Dictation is not set up on this server. Set DEEPGRAM_API_KEY ' +
+                   'in Supabase secrets.', providers: [] });
+      }
+      const providers = [];
+      if (dg) providers.push(await probeDeepgram(dg));
+      if (oa) providers.push(await probeWhisper(oa));
+      // Dictation works if ANY provider works — the app falls back the same way.
+      const live = providers.find((p) => p.ok);
+      const worst = providers.find((p) => p.kind === 'credit')
+                 || providers.find((p) => p.kind === 'auth')
+                 || providers[0];
+      return json({
+        checked: true,
+        ok: !!live,
+        // A working service with a thin balance still reports 'low', because
+        // that is the thing worth acting on today.
+        kind: live ? (live.kind || '') : (worst?.kind || 'refused'),
+        message: live ? live.message : (worst?.message || 'Dictation is not working.'),
+        providers,
+      });
+    }
+  }
+
+  if (!dg && !oa) {
     // Said plainly, because the clinic-side symptom is a dictate button that
     // does nothing, and the cause is a secret nobody set.
-    return json({ error: 'Dictation is not configured on this server ' +
-                         '(OPENAI_API_KEY is not set).' }, 503);
+    return json({ error: 'Dictation is not configured on this server. Set ' +
+                         'DEEPGRAM_API_KEY or OPENAI_API_KEY in Supabase secrets.',
+                  kind: 'unconfigured' }, 503);
   }
 
   let audio: File | null = null;
@@ -107,33 +272,65 @@ Deno.serve(async (req) => {
                          'one short sentence and try again.' }, 413);
   }
 
-  const out = new FormData();
-  out.append('file', audio, audio.name || 'vitals.webm');
-  out.append('model', 'whisper-1');
-  out.append('language', 'en');
-  out.append('prompt', HINTS[mode]);
-  // Plain text back: the app does its own parsing and has no use for word
-  // timings or confidence scores.
-  out.append('response_format', 'text');
-
-  let res: Response;
-  try {
-    res = await fetch(OPENAI_URL, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${key}` },
-      body: out,
+  async function viaDeepgram(key: string) {
+    const q = new URLSearchParams({
+      model: 'nova-2-medical', language: 'en', smart_format: 'true',
+      punctuate: 'true', numerals: 'true',
     });
-  } catch (e) {
-    return json({ error: 'Could not reach the transcription service.',
-                  detail: String(e) }, 502);
+    BOOST.forEach((k) => q.append('keywords', k));
+    const r = await fetch(`${DEEPGRAM_URL}?${q}`, {
+      method: 'POST',
+      headers: { Authorization: `Token ${key}`,
+                 'Content-Type': audio!.type || 'audio/webm' },
+      body: await audio!.arrayBuffer(),
+    });
+    if (!r.ok) return { ok: false as const, status: r.status };
+    const j = await r.json();
+    const t = j?.results?.channels?.[0]?.alternatives?.[0]?.transcript ?? '';
+    return { ok: true as const, text: String(t) };
   }
 
-  const text = await res.text();
-  if (!res.ok) {
-    // Never echo the upstream body wholesale — it can carry request details.
-    return json({ error: 'The transcription service refused the recording.',
-                  status: res.status }, 502);
+  async function viaWhisper(key: string) {
+    const out = new FormData();
+    out.append('file', audio!, audio!.name || 'clip.webm');
+    out.append('model', 'whisper-1');
+    out.append('language', 'en');
+    out.append('prompt', HINTS[mode]);
+    // Plain text back: the app does its own parsing and has no use for word
+    // timings or confidence scores.
+    out.append('response_format', 'text');
+    const r = await fetch(OPENAI_URL, {
+      method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: out,
+    });
+    if (!r.ok) return { ok: false as const, status: r.status };
+    return { ok: true as const, text: (await r.text()).trim() };
   }
 
-  return json({ text: text.trim() });
+  const tries: Array<[string, () => Promise<{ ok: boolean; text?: string; status?: number }>]> = [];
+  if (dg) tries.push(['deepgram', () => viaDeepgram(dg)]);
+  if (oa) tries.push(['whisper', () => viaWhisper(oa)]);
+
+  let lastFault: { kind: string; message: string } | null = null;
+  let lastStatus = 0;
+  for (const [name, run] of tries) {
+    let r;
+    try {
+      r = await run();
+    } catch (e) {
+      lastFault = { kind: 'unreachable',
+                    message: 'Could not reach the dictation service.' };
+      continue;
+    }
+    if (r.ok) return json({ text: String(r.text || '').trim(), provider: name });
+    lastStatus = r.status || 0;
+    lastFault = upstreamFault(lastStatus);
+    // Out of credit or a bad key will not fix itself by asking again, but the
+    // OTHER provider might be fine — so keep going, and report the last fault
+    // only if nothing worked.
+  }
+
+  // Never echo the upstream body — it can carry request details.
+  return json({ error: lastFault?.message || 'Dictation failed.',
+                kind: lastFault?.kind || 'refused',
+                status: lastStatus }, 502);
 });

@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260915">
+  <link rel="stylesheet" href="css/clinic.css?v=20260917">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -647,6 +647,26 @@
       <section class="wiz-section" data-step="1">
         <div class="wiz-screen-title">New Treatment</div>
         <div class="wiz-screen-sub">Who it is, then what they complain of, what you measure, and what you already know. Suggestions appear as you write. You confirm the diagnosis — the app never does.</div>
+
+        <!-- ── Check this — everything that was captured, in one place ──
+             It sits ABOVE the form, not among the suggestions, because its job
+             is to be read BEFORE anything is confirmed. Warnings that used to
+             appear in the middle of the suggestion list live here now: a
+             clinician should not have to scroll past three possible diagnoses
+             to discover the patient's sex was never recorded. -->
+        <div class="wiz-card it-check" id="itCheck" style="display:none">
+          <div class="it-check-h">
+            <span class="material-icons-outlined">fact_check</span>
+            <b>Check this before you go on</b>
+            <button type="button" id="itCheckOk" class="it-check-ok">Looks right</button>
+          </div>
+          <div id="itCheckWarn"></div>
+          <div id="itCheckGrid" class="it-check-grid"></div>
+          <details id="itCheckHeard" class="it-check-heard">
+            <summary>What was heard, word for word</summary>
+            <div id="itCheckHeardText"></div>
+          </details>
+        </div>
 
         <!-- ── Who is it? — FIRST, because the name is what the money, the
              follow-up and the phone call all hang on. Still never required. -->
@@ -1334,8 +1354,8 @@
 <script src="js/new-order-wizard.js?v=20260910"></script>
 <script src="js/ucg-autofill.js?v=20260911"></script>
 <script src="js/clinic-impression.js?v=20260911"></script>
-<script src="js/clinic-dictate.js?v=20260916"></script>
-<script src="js/clinic-intake.js?v=20260916"></script>
+<script src="js/clinic-dictate.js?v=20260917"></script>
+<script src="js/clinic-intake.js?v=20260917"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
 </body>

@@ -77,43 +77,83 @@ Screen → URL mapping lives in `app/js/onesignal.js` (`SCREEN_URLS`).
 
 ## Dictating the History and the Vitals
 
-**Provider:** OpenAI Whisper, called from a Supabase Edge Function
-**Scope:** the complaint, the story and the four vitals boxes — never a
-diagnosis, never a medicine
+**Provider:** Deepgram (`nova-2-medical`) first, OpenAI Whisper as the fallback,
+both called from a Supabase Edge Function
+**Scope:** who the patient is, the complaint, the story, the background and the
+four vitals boxes — never a diagnosis, never a medicine
 
 ### Setup required
 | What | Where |
 |------|-------|
-| `OPENAI_API_KEY` | Supabase secret (already expected by `ai-proxy`) |
+| `DEEPGRAM_API_KEY` | Supabase secret — **never** in code or a message |
+| `OPENAI_API_KEY` | Supabase secret (already expected by `ai-proxy`); the fallback |
 | `RECORD_AUDIO` | declared in `android/app/src/main/AndroidManifest.xml` |
-| Edge Function | deploy `supabase/functions/transcribe` |
+| Edge Functions | deploy `supabase/functions/transcribe` and `supabase/functions/structure` |
 
-Without the secret the button reports "Dictation is not configured on this
-server" rather than failing silently.
+With neither key the button reports "Dictation is not set up on this server"
+rather than failing silently.
 
 ### How it works
-The phone records a short clip, posts it to the `transcribe` Edge Function,
-and gets back plain text. The key never reaches the phone — the same
-arrangement as `send-notification` and `ai-proxy`. `clinic-dictate.js` then
-parses the text and fills `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse`,
-firing the same `input` events as typing so the abnormal-reading colouring and
-the suggestion engine react identically.
+The phone records a short clip and posts it to the `transcribe` Edge Function,
+which returns plain text. The key never reaches the phone — the same
+arrangement as `send-notification` and `ai-proxy`.
 
-### Two buttons, two modes
-`transcribe` takes a `mode` of `vitals` or `story`, which chooses the
-vocabulary Whisper is told to expect. Biasing a history toward vitals makes it
-hear numbers nobody said.
+`clinic-dictate.js` then does two things with that text, in this order:
 
-| button | mode | fills |
-|--------|------|-------|
-| "Say what they came with" (tab 1) | `story` | `itChief`, `itSubjective` |
-| "Say the readings" (tab 2) | `vitals` | `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse` |
+1. **Rules, on the phone, instantly.** They read the vitals, the name, the sex,
+   the age, and split the prose into complaint / story / background. Measured
+   over 30 realistic dictations: 30/30 with every word in the right box, 0 lost
+   (`measure-story.js`). This runs with no second round trip, so it is what the
+   clinician sees first.
+2. **`structure`, if a model key exists.** It may improve the split and name the
+   patient. It may not set a number, a diagnosis, a medicine or a fee — the
+   reply is filtered against a whitelist on the server *and* on the phone, and
+   a split that loses words is thrown away in favour of the rules.
+
+Everything captured is then listed in one panel at the top of the intake screen
+(`#itCheck`) for the clinician to confirm before proceeding. A field nobody
+filled is marked; tapping a tile opens the box it belongs to.
+
+### Two buttons, two vocabularies
+`transcribe` takes a `mode` of `vitals` or `story`, which chooses the vocabulary
+the recogniser is told to expect. Biasing a history toward vitals makes it hear
+numbers nobody said.
+
+| button (id) | `attach` mode | `transcribe` mode | fills |
+|-------------|---------------|-------------------|-------|
+| "Say who it is and what they came with" (`itDictateStory`, tab 1) | `consult` | `story` | name, sex, age, `itChief`, `itSubjective`, `itBackground` |
+| "Say the readings" (`itDictate`, tab 2) | `vitals` | `vitals` | `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse` |
+
+`attach(btnId, sayId, mode)` also accepts `story` — prose only, no name or sex —
+which is what tab 1 used before the two were joined into one dictation.
+
+### Knowing when the service is cut off
+An empty Deepgram account is not a glitch — it will not fix itself, and a
+clinician who reads it as a bad signal will keep trying all morning. So the
+faults are told apart and named:
+
+| kind | what it means | who can fix it |
+|------|---------------|----------------|
+| `credit` | the account is out of money (HTTP 402) | whoever pays the bill |
+| `auth` | the key is wrong, revoked or never set (401/403) | whoever holds the key |
+| `busy` | rate limited (429) | wait a moment |
+| `unreachable` | no reply at all | the connection |
+
+Two places show it:
+- **On the phone**, the message appears under the button, and the last fault is
+  kept in `localStorage` under `homatt_dictation_fault`.
+- **In the admin**, Settings → *Dictation* has a **Check now** button. It posts
+  `{ "probe": true }` to `transcribe`, which asks Deepgram whether the key is
+  live and what is left on the account **without sending any audio**, so it
+  costs nothing. Under $5 it warns while dictation still works; at zero it says
+  the account is empty. It also shows what this device last ran into.
 
 ### The rules it follows, and why
 - **Nothing spoken is ever lost.** In the story, every word ends up in the
-  complaint or the history; anything ambiguous goes to the history, where the
-  clinician reads it back. A lost sentence is the fault that matters in prose,
-  because it looks exactly like a sentence that was never said.
+  complaint, the history or the background; anything ambiguous goes to the
+  history, where the clinician reads it back. A lost sentence is the fault that
+  matters in prose, because it looks exactly like a sentence that was never
+  said.
 - **The chief complaint is one thing.** It is only set when the box is empty;
   "also complains of joint pain" on a second dictation joins the history.
 - **Vitals replace, prose appends.** A re-taken temperature overwrites the old
@@ -125,6 +165,14 @@ hear numbers nobody said.
 - **Every reading is range-checked** against what a human body can do, and one
   outside it is reported rather than stored: "Ignored temp 385 — outside
   30–45 °C".
+- **A model may only report a name it actually heard.** Asked to fill a form, a
+  model will oblige; a plausible Ugandan name on a consultation nobody named is
+  worse than an empty box, because it reads like a record. `saidAloud()` checks
+  every word of a suggested name against the transcript, on the phone and on
+  the server.
+- **A model never touches a number.** The vitals come from rules that cannot
+  hallucinate a temperature. `age` is the only number `structure` may return,
+  and it is bounded.
 - **Never a diagnosis, never a drug.** A misheard drug name becomes a
   prescription, and no recogniser is good enough at "artemether/lumefantrine"
   to be trusted with that.
@@ -135,18 +183,24 @@ hear numbers nobody said.
   eye — read it before moving on.
 
 ### Known limits
-- **It needs a connection.** Whisper runs on OpenAI's servers, so dictation is
-  the one part of this app that does not work offline. The button says so.
+- **It needs a connection.** The recogniser runs on Deepgram's servers, so
+  dictation is the one part of this app that does not work offline. The button
+  says so.
 - **Patient audio leaves the clinic.** That is inherent to the cloud provider
   and was a deliberate choice; the on-device alternative (whisper.cpp) needs a
   31–57 MB model, which is 3–6x the whole bundled clinical library, and runs at
   1–3x realtime on a mid-range phone.
-- Cost is roughly 1 US cent per consultation at Whisper's per-minute rate; the
-  Edge Function caps a clip at ~1 minute so a stuck microphone cannot run up a
-  bill.
+- Cost is a fraction of a US cent per consultation on Deepgram's per-minute
+  rate; the Edge Function caps a clip at ~1 minute so a stuck microphone cannot
+  run up a bill.
+- **A key pasted into a chat is a burnt key.** Rotate it, and put the
+  replacement in Supabase secrets only.
 
 ### Key files
 | File | Purpose |
 |------|---------|
-| `app/clinic/js/clinic-dictate.js` | recording, the vitals parser, filling the boxes |
-| `supabase/functions/transcribe/index.ts` | holds the key, calls Whisper, caps the clip |
+| `app/clinic/js/clinic-dictate.js` | recording, the parsers, filling the boxes, remembering a fault |
+| `app/clinic/js/clinic-intake.js` | the "Check this" panel at the top of the intake screen |
+| `app/clinic/settings.html` | Settings → Dictation: the live "is it working?" check |
+| `supabase/functions/transcribe/index.ts` | holds the keys, calls Deepgram/Whisper, caps the clip, answers the probe |
+| `supabase/functions/structure/index.ts` | splits a transcript into fields; whitelisted server-side |

@@ -147,13 +147,13 @@
     }
     lastItems = res.items || [];
 
+    // Danger signs and the held-back-conditions warning are raised to the
+    // "Check this" panel at the top. Left here they sat BELOW three possible
+    // diagnoses, which is after the clinician has already started reading them.
+    _lastWarnings = warningsNow(res);
+    renderCheck(_lastWarnings);
+
     var html = '';
-    if (res.flags && res.flags.length) {
-      html += '<div class="it-flags">' + res.flags.map(function (f) {
-        return '<div class="it-flag ' + f.k + '"><b>' + esc(f.t) + '</b>' +
-          (f.w ? '<i>' + esc(f.w) + '</i>' : '') + '</div>';
-      }).join('') + '</div>';
-    }
 
     if (!lastItems.length) {
       html += '<div class="it-imp-empty">Nothing in the books matches this yet. ' +
@@ -162,15 +162,6 @@
       return;
     }
 
-    // Say plainly what is being held back and why — a blank sex field must
-    // never quietly narrow the differential without the clinician knowing.
-    if (res.sexBlocked) {
-      html += '<div class="it-flags"><div class="it-flag warn">' +
-        '<b>' + res.sexBlocked + ' conditions are being held back</b>' +
-        '<i>Set the patient\'s sex above. Until then, conditions that only affect ' +
-        'one sex — pregnancy, ectopic pregnancy, pelvic inflammatory disease, ' +
-        'prostate problems — are left out of this list.</i></div></div>';
-    }
     html += '<div class="it-imp-note">These are <b>suggestions from the books</b>, ' +
       'not a diagnosis. The figure is how strongly what you wrote matches how the ' +
       'guideline describes that condition — it is not a chance of having it. ' +
@@ -438,10 +429,118 @@
     });
   }
 
+  // ── Check this ──────────────────────────────────────────────────────────
+  // One panel, above everything, listing what the app believes it has. The
+  // clinician reads it and either fixes a box or goes on. Two things live here
+  // that used to be elsewhere:
+  //
+  //   • the warning that conditions are being held back for want of a sex. It
+  //     was rendered in the middle of the suggestion list, so the clinician met
+  //     three possible diagnoses BEFORE learning the list was incomplete.
+  //   • the danger signs the engine raises, for the same reason.
+  //
+  // It appears when a dictation has filled something in, or when there is a
+  // warning worth reading. It is not a modal and never blocks: "Looks right"
+  // puts it away, and any edit brings the current picture back.
+  var _checkOpen = false, _heardText = '';
+
+  function checkTile(key, label, value, tab, focusId) {
+    var missing = !String(value || '').trim();
+    return '<button type="button" class="it-chk' + (missing ? ' missing' : '') +
+      (key === 'complaint' || key === 'history' || key === 'background' ? ' wide' : '') +
+      '" data-tab="' + tab + '"' + (focusId ? ' data-focus="' + focusId + '"' : '') + '>' +
+      '<div class="it-chk-k">' + esc(label) + '</div>' +
+      '<div class="it-chk-v">' + esc(missing ? 'not set — tap to add' : value) + '</div>' +
+      '</button>';
+  }
+
+  function renderCheck(warnings) {
+    var host = $('itCheck');
+    if (!host) return;
+    var v = data.vitals;
+    var vitals = [];
+    if (v.sbp && v.dbp) vitals.push(v.sbp + '/' + v.dbp + ' mmHg');
+    if (v.temp) vitals.push(v.temp + ' °C');
+    if (v.pulse) vitals.push(v.pulse + '/min');
+    if (v.weight) vitals.push(v.weight + ' kg');
+
+    var name = ($('quickPatientName') || {}).value || '';
+    var age = data.age ? data.age + ' ' + (data.ageUnit === 'months' ? 'months' : 'years') : '';
+
+    var warn = (warnings || []).map(function (w) {
+      return '<div class="it-check-warn' + (w.danger ? ' danger' : '') + '">' +
+        '<b>' + esc(w.title) + '</b>' + esc(w.detail || '') + '</div>';
+    }).join('');
+
+    $('itCheckWarn').innerHTML = warn;
+    $('itCheckGrid').innerHTML =
+        checkTile('name', 'Name', name, 1, 'quickPatientName')
+      + checkTile('sex', 'Sex', data.sex, 1, '')
+      + checkTile('age', 'Age', age, 1, 'itAge')
+      + checkTile('vitals', 'Vitals', vitals.join(' · '), 2, 'itTemp')
+      + checkTile('complaint', 'Main complaint', data.chief, 1, 'itChief')
+      + checkTile('history', 'The story', data.subjective, 1, 'itSubjective')
+      + checkTile('background', 'Background', data.background, 3, 'itBackground');
+
+    var heard = $('itCheckHeard');
+    if (_heardText) {
+      heard.style.display = '';
+      $('itCheckHeardText').textContent = _heardText;
+    } else { heard.style.display = 'none'; }
+
+    host.style.display = (_checkOpen || warn) ? 'block' : 'none';
+  }
+
+  // The engine's warnings, raised to the top where they are read in time.
+  var _lastWarnings = [];
+  function warningsNow(res) {
+    var out = [];
+    if (res && res.sexBlocked) {
+      out.push({ title: res.sexBlocked + ' conditions are being held back',
+                 detail: 'The patient\'s sex is not set. Until it is, conditions ' +
+                         'that only affect one sex — pregnancy, ectopic pregnancy, ' +
+                         'prostate problems — are left out of the list below.' });
+    }
+    (res && res.flags || []).forEach(function (f) {
+      out.push({ title: f.t, detail: f.w || '', danger: f.k === 'danger' });
+    });
+    return out;
+  }
+  window._intakeCheck = function (heardText) {
+    if (heardText !== undefined) _heardText = heardText;
+    _checkOpen = true;
+    renderCheck(_lastWarnings);
+    var el = $('itCheck');
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  };
+
   // Dictating the vitals, when the module is present and the clinic is online.
   // It fills the same boxes the clinician types into and fires the same input
   // events, so the abnormal-reading colouring and the suggestions below react
   // exactly as they do to typing.
+  function bindCheck() {
+    var host = $('itCheck');
+    if (!host) return;
+    host.addEventListener('click', function (e) {
+      var ok = e.target.closest && e.target.closest('#itCheckOk');
+      if (ok) { _checkOpen = false; renderCheck(_lastWarnings); return; }
+      var tile = e.target.closest && e.target.closest('.it-chk');
+      if (!tile) return;
+      // Tapping a line takes you to the box it came from, on the right tab.
+      var tab = tile.dataset.tab;
+      if (tab) showTab(tab);
+      var f = tile.dataset.focus;
+      var el = f && $(f);
+      if (el) {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        setTimeout(function () { try { el.focus(); } catch (e2) {} }, 250);
+      } else if (tab === '1') {
+        var sx = document.querySelector('.it-sex-btn');
+        if (sx) sx.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    });
+  }
+
   function bindDictation() {
     if (window.HomattDictate && window.HomattDictate.attach) {
       window.HomattDictate.attach('itDictate', 'itDictateSay', 'vitals');
@@ -452,6 +551,8 @@
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { bind(); bindDictation(); });
-  } else { bind(); bindDictation(); }
+    document.addEventListener('DOMContentLoaded', function () {
+      bind(); bindDictation(); bindCheck();
+    });
+  } else { bind(); bindDictation(); bindCheck(); }
 })();

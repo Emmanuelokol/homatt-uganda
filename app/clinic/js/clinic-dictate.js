@@ -289,7 +289,30 @@
 
   // Where the complaint stops and the story starts: a duration, an onset, an
   // extra symptom, something already taken, or a denial.
-  var STORY_CUE = /\b(?:for\s+(?:the\s+)?(?:\d|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|several|about)|since\b|started\b|starting\b|began\b|onset\b|which\s+began|also\b|plus\b|associated\b|denies\b|denied\b|no\s+[a-z]|not\s+[a-z]|without\s+[a-z]|has\s+(?:taken|had|been)|have\s+taken|was\s+given|were\s+given|took\b|tried\b|getting\s+worse|worse\s+(?:at|after|on|with)|better\s+(?:at|after|on|with)|relieved\s+by|aggravated\s+by|radiat\w+|on\s+and\s+off|comes\s+and\s+goes|(?:this|last|yesterday|today|tonight)\s|for\s+(?:a|an|the)\s+(?:day|week|month|year|while|night))\b/i;
+  // A bare duration is a story cue on its own. Clinicians drop the "for":
+  // "diarrhoea three days, four episodes today" — and without this the
+  // duration rides into the complaint, where it reads as part of the symptom.
+  var SPAN = '(?:\\d+|one|two|three|four|five|six|seven|eight|nine|ten|' +
+             'a|an|few|several|couple\\s+of)\\s+' +
+             '(?:hour|day|night|week|month|year)s?';
+  var STORY_CUE = new RegExp('\\b(?:' + [
+    'for\\s+(?:the\\s+)?(?:\\d|one|two|three|four|five|six|seven|eight|nine|ten|a\\s+few|several|about)',
+    'since\\b', 'started\\b', 'starting\\b', 'began\\b', 'onset\\b', 'which\\s+began',
+    'also\\b', 'plus\\b', 'associated\\b',
+    'denies\\b', 'denied\\b', 'no\\s+[a-z]', 'not\\s+[a-z]', 'without\\s+[a-z]',
+    'has\\s+(?:taken|had|been)', 'have\\s+taken', 'was\\s+given', 'were\\s+given',
+    'took\\b', 'tried\\b',
+    'getting\\s+worse', 'worse\\s+(?:at|after|on|with)', 'better\\s+(?:at|after|on|with)',
+    'relieved\\s+by', 'aggravated\\s+by', 'radiat\\w+',
+    'on\\s+and\\s+off', 'comes\\s+and\\s+goes',
+    '(?:this|last|yesterday|today|tonight)\\s',
+    'for\\s+(?:a|an|the)\\s+(?:day|week|month|year|while|night)',
+    // How it happened, and what they can or cannot do because of it. Both are
+    // the story of the complaint, not the complaint itself: "back pain after
+    // lifting", "a wound from a nail", "fever and refuses to eat".
+    'after\\b', 'from\\s+(?:a|an)\\s', 'refus\\w+', '(?:un)?able\\s+to',
+    SPAN,
+  ].join('|') + ')\\b', 'i');
 
   // Enough of a symptom vocabulary to recognise an opening line as a
   // complaint. It does not need to be complete — anything it does not know
@@ -308,7 +331,7 @@
     'wound', 'burn', 'bite', 'injury', 'fracture', 'bleeding',
     'ear ?ache', 'ear pain', 'ear discharge', 'sore throat', 'throat pain',
     'toothache', 'tooth pain', 'gum pain',
-    'weakness', 'fatigue', 'tiredness', 'malaise', 'body weakness',
+    'weakness', 'fatigue', 'tiredness', 'tired', 'malaise', 'body weakness',
     'joint pain', 'back ?ache', 'back pain', 'muscle pain', 'body pain',
     'burning urine', 'painful urination', 'dysuria', 'frequency',
     'discharge', 'sores?', 'jaundice', 'yellow eyes',
@@ -324,6 +347,18 @@
   // — which is exactly why the transcript is shown back verbatim rather than
   // only the tidied result.
   var NEGATION = /\b(?:no|not|denies|denied|without|never)\s+((?:[a-z]+\s*){1,3})/gi;
+
+  // What belongs in the background rather than in today's story: what they
+  // already have, what they are already on, and who they are. A clinician says
+  // these in the same breath as the complaint, so they arrive mixed in.
+  var BACKGROUND_CUE = /\b(?:(?<!\bnot\s)known\b|is\s+a\s+known|history\s+of|past\s+history|family\s+history|previously\s+(?:treated|diagnosed)|already\s+on|currently\s+on|is\s+on\s+(?:treatment|medication|art|arvs?|insulin|metformin)|on\s+(?:art|arvs?|insulin|metformin|treatment for)|hiv\s*(?:positive|negative|\+ve)|diabetic|hypertensive|asthmatic|epileptic|pregnan\w+|breast\s*feeding|smok\w+|drinks?\s+alcohol|alcoholic|lives\s+(?:in|with|alone)|works?\s+as|farmer|market\s+vendor|boda)\b/i;
+
+  // A clause that is nothing but "on <something>" is a medicine they are
+  // already taking — "known heart problem, on furosemide". Tested on its own
+  // because it is anchored to the whole clause, which the cue list above is
+  // not.
+  var BACKGROUND_CLAUSE =
+    /^on\s+(?!and\b|the\b|an?\b|his\b|her\b|their\b|both\b|exam|palpation)[a-z][a-z-]*[,.;]?$/i;
 
   function tidy(s) {
     return String(s || '')
@@ -363,10 +398,20 @@
       var subj = /(?:^|\s)((?:the\s+)?(?:patient|pt|client|mother|father|child|baby|infant|man|woman|lady|he|she|they)\s+)$/i
         .exec(text.slice(0, cutFrom));
       if (subj) { cutFrom -= subj[1].length; cueText = subj[1] + cueText; }
-    } else if (SYMPTOM.test(text.split(/\s+/).slice(0, 8).join(' '))) {
+    } else {
       // No cue, but the clinician opened on a symptom — "fever for three days
       // getting worse at night". That is a complaint followed by its story.
-      cutFrom = start = 0;
+      // The complaint begins AT the symptom, not at the first word: "she has
+      // been feeling tired" would otherwise make "she" the complaint, because
+      // "has been" is where the story starts.
+      var head = text.split(/\s+/).slice(0, 8).join(' ');
+      var sym = SYMPTOM.exec(head);
+      if (sym) {
+        cutFrom = start = sym.index;
+        var lead = /(?:^|\s)((?:the\s+)?(?:patient|pt|client|mother|father|child|baby|infant|man|woman|lady|he|she|they)\s+(?:has\s+been\s+|have\s+been\s+|is\s+|are\s+|was\s+|were\s+|has\s+|have\s+|had\s+|feels?\s+|feeling\s+|reports?\s+|says?\s+)*)$/i
+          .exec(text.slice(0, cutFrom));
+        if (lead) { cutFrom -= lead[1].length; cueText = lead[1]; }
+      }
     }
 
     var complaint = '', history = text;
@@ -401,17 +446,41 @@
         .split(/\s+/).filter(Boolean).sort();
     }
     var before = bag(text), after2 = bag(complaint + ' ' + history), lost = [];
+    // (background is carved out of history below, so it is already counted)
     var seen = {};
     after2.concat(bag(cueText)).forEach(function (x) { seen[x] = (seen[x] || 0) + 1; });
     before.forEach(function (x) {
       if (seen[x]) seen[x]--; else lost.push(x);
     });
 
+    // Anything in the story that is really background is moved across, clause
+    // by clause, so "known diabetic on metformin" stops sitting inside today's
+    // complaint. Nothing is dropped in the move — the invariant above is
+    // recomputed over all three boxes.
+    var background = '';
+    if (history) {
+      var keep = [], bg = [];
+      history.split(/(?<=[,.;])\s*|\s+(?=and\s+(?:is\s+)?known\b)/).forEach(function (part) {
+        var t = part.trim();
+        if (!t) return;
+        (BACKGROUND_CUE.test(t) || BACKGROUND_CLAUSE.test(t) ? bg : keep).push(t);
+      });
+      // Everything left over CAN be background — "complains of chest pain,
+      // known hypertensive on amlodipine" leaves no story at all. Requiring
+      // something to stay behind was wrong: it parked the whole background in
+      // today's story, which is the box a clinician reads as what happened
+      // today.
+      if (bg.length) {
+        background = tidy(bg.join(' '));
+        history = tidy(keep.join(' '));
+      }
+    }
+
     var negations = [], m;
     NEGATION.lastIndex = 0;
     while ((m = NEGATION.exec(text))) negations.push(tidy(m[0]));
 
-    return { complaint: complaint, history: history,
+    return { complaint: complaint, history: history, background: background,
              negations: negations, lost: lost.join(' ') };
   }
 
@@ -466,6 +535,24 @@
     return n;
   }
 
+  // A failed dictation is remembered, so the clinic is told the same thing on
+  // the next attempt and the settings screen can show it. "Out of credit" is
+  // not a glitch: it will not fix itself, and a clinician who thinks it is a
+  // bad signal will keep trying all morning.
+  var FAULT_KEY = 'homatt_dictation_fault';
+  function noteFault(kind, message) {
+    try {
+      if (!kind) { localStorage.removeItem(FAULT_KEY); return; }
+      localStorage.setItem(FAULT_KEY, JSON.stringify({
+        kind: kind, message: message || '', at: new Date().toISOString(),
+      }));
+    } catch (e) {}
+  }
+  function lastFault() {
+    try { return JSON.parse(localStorage.getItem(FAULT_KEY) || 'null'); }
+    catch (e) { return null; }
+  }
+
   async function transcribe(blob, mode) {
     var form = new FormData();
     form.append('audio', blob, 'clip.webm');
@@ -475,9 +562,32 @@
     // to it replaces the library with the client.
     var sb = (typeof global._getClinicSupabase === 'function')
       ? global._getClinicSupabase() : null;
-    if (!sb || !sb.functions) throw new Error('not-configured');
+    if (!sb || !sb.functions) {
+      var e0 = new Error('Dictation is not set up on this server.');
+      e0.kind = 'unconfigured';
+      throw e0;
+    }
     var r = await sb.functions.invoke('transcribe', { body: form });
-    if (r.error) throw r.error;
+    // A non-2xx arrives as r.error, but the function's own JSON — which says
+    // WHICH fault it was — rides along in the context. Without reading it, an
+    // exhausted account is indistinguishable from a dropped connection.
+    if (r.error) {
+      var body = null;
+      try {
+        if (r.error.context && typeof r.error.context.json === 'function') {
+          body = await r.error.context.json();
+        }
+      } catch (e) {}
+      // With no reply to read, the connection is the likeliest fault, and the
+      // clinician needs the way round it in the same breath as the bad news —
+      // a message that only says something failed leaves them tapping the
+      // button again with a patient in front of them.
+      var err = new Error((body && body.error) ||
+        'Could not reach the dictation service. Type it in for now.');
+      err.kind = (body && body.kind) || 'unreachable';
+      throw err;
+    }
+    noteFault(null);
     return (r.data && r.data.text) || '';
   }
 
@@ -540,14 +650,66 @@
     return missing.length <= 3;
   }
 
+  // Write into a box, remembering what was there before and what we left, so a
+  // later, better split can REPLACE our text rather than be appended after it —
+  // and so a box the clinician has since typed in is recognised and left alone.
+  function writeTo(id, text, wrote) {
+    var el = document.getElementById(id);
+    if (!el || !text) return 0;
+    var had = String(el.value || '').trim().replace(/[\s,;]+$/, '');
+    var now = had ? had + '. ' + text : text;
+    el.value = now;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    if (wrote) wrote[id] = { had: had, left: now };
+    return 1;
+  }
+
+  // Put a better version of the same field in place of the one we wrote. If the
+  // box no longer holds exactly what we left there, the clinician has edited it
+  // since, and their words win — an "improvement" that deletes what a clinician
+  // typed is not an improvement.
+  function replaceIfUntouched(id, text, wrote) {
+    var el = document.getElementById(id);
+    var w = wrote && wrote[id];
+    if (!el || !text) return 0;
+    if (!w) return writeTo(id, text, wrote);       // nothing there before
+    if (String(el.value) !== w.left) return 0;     // typed in since
+    var now = w.had ? w.had + '. ' + text : text;
+    if (now === w.left) return 0;
+    el.value = now;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    w.left = now;
+    return 1;
+  }
+
+  // A model may only report a name it actually heard. Asked to fill a form, a
+  // model will oblige — and a plausible Ugandan name on a consultation nobody
+  // named is worse than an empty box, because it looks like a record. So every
+  // word of a suggested name has to be in the transcript.
+  function saidAloud(candidate, text) {
+    if (!candidate) return false;
+    var hay = ' ' + String(text).toLowerCase().replace(/[^a-z0-9\s]/g, ' ') + ' ';
+    return String(candidate).toLowerCase().split(/\s+/).filter(Boolean)
+      .every(function (w) { return hay.indexOf(' ' + w + ' ') >= 0; });
+  }
+
   /**
    * The whole consultation, from one dictation.
    *
-   * Rules run first and own anything measurable. The model runs second and may
-   * only improve the prose and name the patient — it is never shown a number
-   * and never asked for a diagnosis.
+   * The RULES fill the boxes the moment the words arrive — no second round
+   * trip, no waiting. On a clinic connection that is the difference between a
+   * filled form and a clinician watching an empty one, and the rules place
+   * every word correctly in 30 of 30 measured dictations.
+   *
+   * The MODEL is then asked, in the background, whether it can split the prose
+   * better and put a name to the patient. When it answers, anything it improves
+   * replaces what the rules wrote — unless the clinician has typed there since,
+   * in which case their words stand. It is never shown a number, never asked
+   * for a diagnosis, and its split is refused outright if it drops a word.
+   *
+   * `refine`, if given, is called with the updated result when that happens.
    */
-  async function applyConsult(text) {
+  async function applyConsult(text, refine) {
     var lines = [];
 
     // 1. Numbers, by rule. Never from a model.
@@ -558,65 +720,78 @@
       lines.push('Ignored ' + g.key + ' ' + g.value + ' — ' + g.why);
     });
 
-    // 2. Who they are, by rule.
+    // 2. Who they are and what they came with, by rule — straight into the
+    //    boxes, before anything is asked of the server.
     var who = parsePerson(text);
     var story = parseStory(text);
-
-    // 3. The model, for what rules cannot do — a Ugandan name above all.
-    var ai = await structure(text);
-
-    // A model may only report a name it actually heard. Asked to fill a form,
-    // a model will oblige — and a plausible Ugandan name on a consultation
-    // nobody named is worse than an empty box, because it looks like a record.
-    // So every word of a suggested name has to be in the transcript.
-    function saidAloud(candidate) {
-      if (!candidate) return false;
-      var hay = ' ' + String(text).toLowerCase().replace(/[^a-z0-9\s]/g, ' ') + ' ';
-      return String(candidate).toLowerCase().split(/\s+/).filter(Boolean)
-        .every(function (w) { return hay.indexOf(' ' + w + ' ') >= 0; });
-    }
-    var name = who.name || (saidAloud(ai.name) ? ai.name : '') || '';
-    var sex = who.sex || ai.sex || '';
-    var age = who.age || ai.age || '';
-    var unit = who.age ? who.ageUnit : (ai.ageUnit || 'years');
-
-    var complaint = story.complaint, history = story.history, background = '';
-    var usedModel = false;
-    if (ai.complaint || ai.history || ai.background) {
-      if (keepsEverything(text, ai.complaint || '', ai.history || '', ai.background || '')) {
-        complaint = ai.complaint || complaint;
-        history = ai.history || history;
-        background = ai.background || '';
-        usedModel = true;
-      }
-    }
+    var wrote = {};
+    var placedName = who.name, placedSex = who.sex, placedAge = who.age,
+        placedUnit = who.ageUnit || 'years', placedComplaint = story.complaint;
 
     var n = 0;
-    n += setName(name);
-    n += setSex(sex);
-    n += setAge(age, unit);
+    n += setName(who.name);
+    n += setSex(who.sex);
+    n += setAge(who.age, who.ageUnit);
     var chief = document.getElementById('itChief');
     var chiefEmpty = chief && !String(chief.value || '').trim();
-    n += (chiefEmpty ? addTo('itChief', complaint) : 0);
-    n += addTo('itSubjective', chiefEmpty ? history : text);
-    if (background) n += addTo('itBackground', background);
+    n += (chiefEmpty ? writeTo('itChief', story.complaint, wrote) : 0);
+    n += writeTo('itSubjective', chiefEmpty ? story.history : text, wrote);
+    if (story.background) n += writeTo('itBackground', story.background, wrote);
 
-    // Always the words that were actually heard, first, before any tidying —
-    // a dropped "no" is invisible in the tidied version and obvious here.
-    var out = ['Heard: “' + text + '”'];
-    var placed = [];
-    if (name) placed.push('name ' + name);
-    if (sex) placed.push(sex);
-    if (age) placed.push(age + ' ' + unit);
-    if (complaint) placed.push('complaint: ' + complaint);
-    if (placed.length) out.push('Filled in: ' + placed.join(' · '));
-    out = out.concat(lines);
-    if (story.negations.length) {
-      out.push('You said: ' + story.negations.join(', ') + ' — check that is right');
+    function report(name, sex, age, unit, complaint, count) {
+      // Always the words that were actually heard, first, before any tidying —
+      // a dropped "no" is invisible in the tidied version and obvious here.
+      var out = ['Heard: “' + text + '”'];
+      var placed = [];
+      if (name) placed.push('name ' + name);
+      if (sex) placed.push(sex);
+      if (age) placed.push(age + ' ' + unit);
+      if (complaint) placed.push('complaint: ' + complaint);
+      if (placed.length) out.push('Filled in: ' + placed.join(' · '));
+      out = out.concat(lines);
+      if (story.negations.length) {
+        out.push('You said: ' + story.negations.join(', ') + ' — check that is right');
+      }
+      if (!count) out.push('Nothing in that could be placed — the words are ' +
+                           'above, type what belongs where.');
+      return { text: out.join('  ·  '), ok: count > 0 };
     }
-    if (!n) out.push('Nothing in that could be placed — the words are above, ' +
-                     'type what belongs where.');
-    return { text: out.join('  ·  '), ok: n > 0, usedModel: usedModel };
+
+    // 3. The model, second and optional. Nothing above waits for it.
+    if (typeof refine === 'function') {
+      structure(text).then(function (ai) {
+        if (!ai) return;
+        var m = 0;
+        if (!placedName && saidAloud(ai.name, text)) {
+          m += setName(ai.name); if (m) placedName = ai.name;
+        }
+        if (!placedSex && ai.sex) { if (setSex(ai.sex)) { placedSex = ai.sex; m++; } }
+        if (!placedAge && ai.age) {
+          if (setAge(ai.age, ai.ageUnit || 'years')) {
+            placedAge = ai.age; placedUnit = ai.ageUnit || 'years'; m++;
+          }
+        }
+        if ((ai.complaint || ai.history || ai.background) &&
+            keepsEverything(text, ai.complaint || '', ai.history || '', ai.background || '')) {
+          if (chiefEmpty && ai.complaint) {
+            m += replaceIfUntouched('itChief', ai.complaint, wrote);
+            placedComplaint = ai.complaint;
+          }
+          if (chiefEmpty && ai.history) m += replaceIfUntouched('itSubjective', ai.history, wrote);
+          if (ai.background) m += replaceIfUntouched('itBackground', ai.background, wrote);
+        }
+        if (!m) return;
+        var r = report(placedName, placedSex, placedAge, placedUnit,
+                       placedComplaint, n + m);
+        r.usedModel = true;
+        refine(r);
+      }).catch(function () { /* the rules have already done the job */ });
+    }
+
+    var res = report(placedName, placedSex, placedAge, placedUnit,
+                     placedComplaint, n);
+    res.usedModel = false;
+    return res;
   }
 
   // What to do with the transcript, and what to tell the clinician about it.
@@ -626,9 +801,9 @@
   // reads perfectly well and means the opposite, and nothing in this file can
   // detect it. The only defence is that the clinician sees the words that were
   // actually heard, so the denials are listed separately to draw the eye.
-  function applied(mode, text) {
+  function applied(mode, text, refine) {
     text = String(text || '').trim();
-    if (mode === 'consult') return applyConsult(text);
+    if (mode === 'consult') return applyConsult(text, refine);
     if (mode === 'story') {
       var got = parseStory(text);
       // The chief complaint is ONE thing — the reason they came. A clinician
@@ -712,12 +887,27 @@
         try {
           text = await transcribe(blob, mode);
         } catch (e) {
-          say(out, 'Could not reach the transcription service. Type it in ' +
-                   'for now.', 'warn');
+          noteFault(e && e.kind, e && e.message);
+          say(out, (e && e.message) ||
+                   'Could not reach the dictation service. Type it in for now.',
+              'warn');
           return;
         }
-        var res = await applied(mode, text);
-        say(out, res.text, res.ok ? 'ok' : 'warn');
+        // The rules answer now; the model, if it answers at all, answers into
+        // the same two places a moment later. A fast model can beat the first
+        // answer to the screen, so the later one is never overwritten by it.
+        var refined = false;
+        function show(res, isRefine) {
+          if (refined && !isRefine) return;
+          if (isRefine) refined = true;
+          say(out, res.text, res.ok ? 'ok' : 'warn');
+          // Everything that was captured, gathered at the top of the screen for
+          // the clinician to check before anything is confirmed.
+          if (typeof global._intakeCheck === 'function') {
+            setTimeout(function () { global._intakeCheck(text); }, 320);
+          }
+        }
+        show(await applied(mode, text, function (r) { show(r, true); }));
       };
       _rec.start();
       btn.classList.add('on');
@@ -730,6 +920,7 @@
 
   var API = { parseVitals: parseVitals, parseStory: parseStory,
               parsePerson: parsePerson, applyConsult: applyConsult,
+              lastFault: lastFault, noteFault: noteFault,
               digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
