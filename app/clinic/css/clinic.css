@@ -1017,3 +1017,77 @@ html[data-theme="dark"]{
 .pr-field.inline{ display:flex; align-items:baseline; gap:8px; margin-bottom:6px }
 .pr-field.inline .pr-field-k{ margin-bottom:0; flex-shrink:0 }
 .pr-field.inline .pr-field-v{ min-width:0; overflow-wrap:anywhere }
+
+/* ═══ RECORD PAYMENT ═════════════════════════════════════════════════════
+   The same fault as the patient record, one modal along: the summary card was
+   background:#FFF8E1 — a cream not on the dark-mode substring list — carrying
+   text at color:#202124 and #5F6368, both of which ARE on it. Dark mode duly
+   rewrote the words to near-white and pale-grey and left the card cream, so
+   the patient's name and the amount they owed measured 1.09:1 and were simply
+   not there. Tokens below are the ones already proved on the record sheet. */
+.pay-sheet{
+  background:var(--surface); color:var(--text); border-radius:16px;
+  width:100%; max-width:460px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+  max-height:92vh; max-height:92dvh; overflow-y:auto;
+}
+.pay-head{ display:flex; align-items:center; gap:9px; margin-bottom:12px }
+.pay-head .material-icons-outlined{ color:var(--pr-owe-fg); font-size:24px }
+.pay-head h3{ font-size:17px; font-weight:800; margin:0; color:var(--text) }
+
+.pay-sum{
+  background:var(--pr-owe-bg); border:1px solid var(--pr-owe-bd);
+  border-radius:12px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.5;
+}
+.pay-who{ font-weight:800; font-size:14px; color:var(--text); margin-bottom:6px }
+.pay-line{ display:flex; justify-content:space-between; gap:10px; color:var(--text-lt) }
+.pay-line b{ font-weight:700; color:var(--text) }
+.pay-line.owed{
+  padding-top:7px; margin-top:7px; border-top:1px dashed var(--pr-owe-bd);
+  color:var(--pr-owe-fg); font-weight:700;
+}
+.pay-line.owed b{ color:var(--pr-owe-fg); font-weight:800; font-size:15px }
+.pay-line.paid b{ color:var(--pr-ok-fg) }
+
+.pay-lbl{
+  font-size:11.5px; font-weight:800; color:var(--text-lt); display:block;
+  margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px;
+}
+.pay-in{
+  width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:10px;
+  font-family:inherit; outline:none; box-sizing:border-box;
+  background:var(--surface); color:var(--text);
+}
+.pay-in::placeholder{ color:var(--text-lt) }
+.pay-in:focus{ border-color:var(--primary) }
+.pay-in.amount{ font-size:17px; font-weight:700 }
+
+.pay-quick{ display:flex; gap:7px; margin:8px 0 14px; flex-wrap:wrap }
+.pay-chip{
+  font-size:12.5px; font-weight:700; padding:7px 14px; border-radius:20px;
+  cursor:pointer; font-family:inherit;
+  background:var(--tint-2); border:1px solid var(--border); color:var(--text);
+}
+.pay-chip.full{ background:var(--pr-ok-bg); border-color:var(--pr-ok-bd); color:var(--pr-ok-fg) }
+.pay-chip:active{ transform:scale(.97) }
+
+.pay-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-bottom:14px }
+.pay-err{
+  display:none; background:var(--pr-late-bg); color:var(--pr-late-fg);
+  border:1px solid var(--pr-late-bd); border-radius:9px;
+  padding:10px 12px; font-size:13px; margin-bottom:14px; font-weight:600;
+}
+.pay-acts{ display:flex; gap:10px }
+.pay-btn{
+  padding:13px; border-radius:10px; font-size:14px; font-weight:700;
+  cursor:pointer; font-family:inherit; border:none;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.pay-btn.ghost{ flex:1; background:transparent; color:var(--text-lt); border:1.5px solid var(--border) }
+.pay-btn.go{ flex:2; background:var(--pr-act-bg); color:var(--pr-act-fg) }
+.pay-btn.go .material-icons-outlined{ font-size:18px }
+.pay-btn:active{ filter:brightness(.94) }
+/* The native spinner sits as a white block on a dark field and is no use on a
+   phone anyway — the amount is typed or taken from the two chips below. */
+.pay-in.amount::-webkit-outer-spin-button,
+.pay-in.amount::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.pay-in.amount{ -moz-appearance:textfield; appearance:textfield }

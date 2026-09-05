@@ -37,7 +37,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260914">
+  <link rel="stylesheet" href="css/clinic.css?v=20260915">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -681,39 +681,31 @@
   </div>
 
   <!-- Record Payment Modal -->
-  <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px;overflow-y:auto">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:460px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:92vh;overflow-y:auto">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
-        <span class="material-icons-outlined" style="color:#E65100;font-size:26px">payments</span>
-        <h3 style="font-size:17px;font-weight:700;margin:0">Record Payment</h3>
-      </div>
-      <div style="background:#FFF8E1;border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;line-height:1.55;color:#5F6368">
-        <div><strong id="pmPatientName" style="color:#202124">Patient</strong></div>
-        <div style="display:flex;justify-content:space-between;margin-top:6px">
-          <span>Total bill</span><span id="pmTotal" style="font-weight:700;color:#202124">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between">
-          <span>Paid so far</span><span id="pmPaid" style="font-weight:700;color:var(--deep-ink)">—</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;padding-top:6px;border-top:1px dashed #E0E0E0;margin-top:6px">
-          <span style="font-weight:600">Balance due</span><span id="pmBalance" style="font-weight:700;color:#C62828">—</span>
-        </div>
+  <div id="paymentModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:16px;overflow-y:auto">
+    <div class="pay-sheet">
+      <div class="pay-head">
+        <span class="material-icons-outlined">payments</span>
+        <h3>Record Payment</h3>
       </div>
 
-      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Amount Received (UGX) *</label>
-      <input id="pmAmount" type="number" min="0" step="500" placeholder="0"
-        style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:8px">
-      <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
-        <button type="button" onclick="setPmQuickAmount('half')"
-          style="font-size:12px;padding:6px 12px;background:#F5F5F5;border:1px solid var(--border);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Half</button>
-        <button type="button" onclick="setPmQuickAmount('full')"
-          style="font-size:12px;padding:6px 12px;background:var(--tint-2);border:1px solid var(--tint-3);color:var(--deep-ink);border-radius:18px;cursor:pointer;font-family:inherit;font-weight:600">Full Balance</button>
+      <div class="pay-sum">
+        <div class="pay-who" id="pmPatientName">Patient</div>
+        <div class="pay-line"><span>Total bill</span><b id="pmTotal">&mdash;</b></div>
+        <div class="pay-line paid"><span>Paid so far</span><b id="pmPaid">&mdash;</b></div>
+        <div class="pay-line owed"><span>Balance due</span><b id="pmBalance">&mdash;</b></div>
       </div>
 
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+      <label class="pay-lbl" for="pmAmount">Amount received (UGX) *</label>
+      <input id="pmAmount" class="pay-in amount" type="number" min="0" step="500" placeholder="0">
+      <div class="pay-quick">
+        <button type="button" class="pay-chip" onclick="setPmQuickAmount('half')">Half</button>
+        <button type="button" class="pay-chip full" onclick="setPmQuickAmount('full')">Full balance</button>
+      </div>
+
+      <div class="pay-grid">
         <div>
-          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Method *</label>
-          <select id="pmMethod" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+          <label class="pay-lbl" for="pmMethod">Method *</label>
+          <select id="pmMethod" class="pay-in">
             <option value="cash">Cash</option>
             <option value="mobile_money">Mobile Money</option>
             <option value="bank">Bank</option>
@@ -723,22 +715,21 @@
           </select>
         </div>
         <div>
-          <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Reference</label>
-          <input id="pmRef" type="text" placeholder="MoMo TXN ID, etc."
-            style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+          <label class="pay-lbl" for="pmRef">Reference</label>
+          <input id="pmRef" class="pay-in" type="text" placeholder="MoMo TXN ID">
         </div>
       </div>
 
-      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes</label>
-      <textarea id="pmNotes" rows="2" placeholder="e.g. First installment, will clear next week."
-        style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px;resize:vertical"></textarea>
+      <label class="pay-lbl" for="pmNotes">Notes</label>
+      <textarea id="pmNotes" class="pay-in" rows="2" style="margin-bottom:14px;resize:vertical"
+        placeholder="e.g. First installment, will clear next week."></textarea>
 
-      <div id="pmError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
+      <div id="pmError" class="pay-err"></div>
 
-      <div style="display:flex;gap:10px">
-        <button id="pmCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
-        <button id="pmSaveBtn" style="flex:2;padding:12px;background:#E65100;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
-          <span class="material-icons-outlined" style="font-size:18px">payments</span>
+      <div class="pay-acts">
+        <button id="pmCancelBtn" class="pay-btn ghost">Cancel</button>
+        <button id="pmSaveBtn" class="pay-btn go">
+          <span class="material-icons-outlined">payments</span>
           Record Payment
         </button>
       </div>
