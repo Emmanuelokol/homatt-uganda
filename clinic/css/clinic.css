@@ -1,0 +1,1093 @@
+/* ============================================
+   Homatt Health — Clinic Portal Styles
+   ============================================ */
+/* ============================================================
+   LOOKS
+   ------------------------------------------------------------
+   Four colour families, each with a light and a dark palette,
+   chosen in Clinic Profile -> Look. The light/dark switch in the
+   top bar is unchanged and works inside whichever family is
+   picked, so colour and brightness stay independent:
+
+     html[data-skin]  forest | midnight | dark | clay
+     html[data-theme] light  | dark
+
+   Everything the brand touches is a variable here. Before this,
+   116 brand colours were written into the pages by hand, so
+   changing the look would have recoloured only half the app.
+   ============================================================ */
+:root {
+  --deep:      #1B5E20;   /* deepest brand colour: button fills, focus rings */
+  --deep-ink:  #1B5E20;   /* the same, as TEXT — flips light in dark mode */
+  --deep-2:    #2E7D32;
+  --tint-2:    #E8F5E9;   /* palest brand wash */
+  --tint-3:    #A5D6A7;
+  --primary:   #0E7C5A;   /* Homatt emerald — unifies topbar, buttons, avatar with the brand */
+  --primary-d: #0A5C43;
+  --grad-1:    #0B3D2E;   /* the hero gradient, dark -> light */
+  --grad-2:    #10855F;
+  --grad-3:    #17A46F;
+  --brand-tint:#DBF4EA;   /* soft brand background behind chips and panels */
+  --brand-ink: #0A5C43;   /* text that sits on --brand-tint */
+  --side-accent:      #42A5F5;               /* sidebar highlight */
+  --side-accent-soft: rgba(66,165,245,.15);
+  --accent:    #00897B;
+  --surface:   #FFFFFF;
+  --bg:        #F0F4F9;
+  --sidebar:   #0B1626;
+  --sidebar-hv:#0D1F38;
+  --text:      #1A1A1A;
+  --text-lt:   #5F6368;
+  --border:    #E0E0E0;
+  --danger:    #D32F2F;
+  --success:   #2E7D32;
+  --warning:   #E65100;
+  --info:      #1565C0;
+  --radius:    18px;
+  --radius-lg: 24px;
+  --shadow:    0 6px 18px rgba(20,24,43,0.07), 0 1px 4px rgba(20,24,43,0.05);
+  --shadow-lg: 0 16px 38px rgba(20,24,43,0.13), 0 4px 10px rgba(20,24,43,0.06);
+  --accent-v:      #6C5CE7;   /* violet — interactive highlights */
+  --accent-v-tint: #ECE9FF;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{touch-action:manipulation}
+/* All interactive elements: kill double-tap-zoom delay */
+button,a,[onclick],input,select,label,.fin-tab,.meds-period-btn,.order-card,.qs-drug-card,.cbn-link,.sidebar-link{touch-action:manipulation;-webkit-tap-highlight-color:rgba(0,0,0,0.06)}
+/* Icons/spans inside buttons/anchors must NOT absorb the tap themselves —
+   that puts the hit-element back to the parent which already has
+   touch-action:manipulation, so there is zero 300ms delay. */
+button>*,a>*{pointer-events:none}
+/* No page-load opacity fade: the theme is set pre-paint (inline <head> script),
+   so a fade only adds a visible "blink" every time an Android WebView repaints
+   on return-to-app. The page just appears — instant and flicker-free. */
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ── Layout ── */
+.admin-layout{display:flex;min-height:100vh}
+
+/* ── Sidebar ── */
+.admin-sidebar{width:240px;background:var(--sidebar);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
+.sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.1)}
+.sidebar-logo-text{font-size:16px;font-weight:700;color:var(--side-accent)}
+.sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px}
+.sidebar-nav{padding:12px 0;flex:1}
+.sidebar-section-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:12px 20px 6px}
+.sidebar-link{display:flex;align-items:center;gap:12px;padding:14px 20px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;transition:background .15s,color .15s;border-left:3px solid transparent;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:48px}
+.sidebar-link:hover{background:rgba(255,255,255,0.07);color:#fff}
+.sidebar-link.active{background:var(--side-accent-soft);color:var(--side-accent);border-left-color:var(--side-accent)}
+.sidebar-link .material-icons-outlined{font-size:20px}
+.sidebar-footer{padding:16px 20px;border-top:1px solid rgba(255,255,255,0.1)}
+.admin-badge{display:inline-flex;align-items:center;gap:6px;background:var(--side-accent-soft);color:var(--side-accent);font-size:11px;font-weight:600;padding:4px 10px;border-radius:20px;margin-bottom:8px}
+.logout-sidebar-btn{width:100%;background:transparent;border:1px solid rgba(255,255,255,0.2);color:rgba(255,255,255,0.6);padding:8px 14px;border-radius:8px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:all .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:44px}
+.logout-sidebar-btn:hover{background:rgba(211,47,47,0.15);border-color:#D32F2F;color:#EF9A9A}
+
+/* ── Main ── */
+.admin-main{margin-left:240px;flex:1;display:flex;flex-direction:column;overflow-x:hidden}
+.admin-topbar{background:var(--surface);border-bottom:none;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:40;box-shadow:0 2px 12px rgba(20,24,43,0.05)}
+.admin-topbar-title{font-size:18px;font-weight:700}
+.admin-topbar-right{display:flex;align-items:center;gap:14px}
+.admin-user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-lt)}
+.clinic-exit-btn{display:inline-flex;align-items:center;gap:5px;background:var(--primary,var(--deep));color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.clinic-exit-btn.demo{background:#D32F2F}
+.clinic-exit-btn:active{opacity:.85}
+.clinic-demo-badge{background:#FFE082;color:#7A4F01;font-weight:800;font-size:11px;letter-spacing:.5px;padding:3px 8px;border-radius:6px;white-space:nowrap}
+.admin-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.admin-content{padding:28px;flex:1;overflow-x:hidden}
+
+/* Global touch fix for all clinic portal interactive elements */
+button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order-card{
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+}
+
+/* ── Login ── */
+.admin-login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0B1626 0%,#0D2137 100%)}
+.admin-login-card{background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
+.admin-login-logo{text-align:center;margin-bottom:28px}
+.admin-login-logo-mark{width:56px;height:56px;background:linear-gradient(135deg,var(--deep),#43A047);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#fff}
+.admin-login-title{font-size:20px;font-weight:700}
+.admin-login-sub{font-size:13px;color:var(--text-lt);margin-top:4px}
+.login-field{margin-bottom:16px}
+.login-field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;outline:none;transition:border-color .2s;min-height:48px;touch-action:manipulation}
+.login-field input:focus{border-color:var(--primary)}
+.login-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s;min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.login-btn:hover{background:var(--primary-d)}
+.login-btn:disabled{opacity:.7;cursor:not-allowed}
+.demo-btn{width:100%;background:#F3F4F6;color:var(--text);border:1px solid var(--border);padding:13px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;margin-top:10px;transition:background .2s;min-height:48px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.demo-btn:hover{background:#E5E7EB}
+.login-error{background:#FFEBEE;color:#D32F2F;border-radius:8px;padding:10px 14px;font-size:13px;margin-top:14px;display:none}
+.login-divider{text-align:center;color:var(--text-lt);font-size:12px;margin:14px 0;position:relative}
+.login-divider::before,.login-divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:var(--border)}
+.login-divider::before{left:0}.login-divider::after{right:0}
+
+/* ── Alert banner ── */
+.alert-banner{background:#FFEBEE;border:1px solid #FFCDD2;border-radius:10px;padding:12px 18px;margin-bottom:20px;display:flex;align-items:center;gap:10px;color:#C62828;font-size:13px;font-weight:500}
+.alert-banner .material-icons-outlined{color:#D32F2F}
+
+/* ── Stats ── */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:none;border-radius:var(--radius-lg);padding:18px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;transition:transform .12s ease}
+.stat-card:active{transform:scale(.985)}
+.stat-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.stat-icon .material-icons-outlined{font-size:23px}
+.stat-icon.green{background:var(--brand-tint);color:var(--primary)}
+.stat-icon.blue{background:#E3F2FD;color:#1565C0}
+.stat-icon.orange{background:#FCEFCF;color:#C77E06}
+.stat-icon.red{background:#FBE1DE;color:#C62828}
+.stat-icon.teal{background:#E0F2F1;color:var(--accent)}
+.stat-number{font-size:24px;font-weight:800;line-height:1;margin-bottom:4px;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+.stat-label{font-size:12px;color:var(--text-lt);font-weight:500}
+
+/* ── Table ── */
+.admin-table-wrap{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border)}
+.table-title{font-size:16px;font-weight:700}
+.table-filter{display:flex;gap:10px;align-items:center}
+.table-filter select,.table-filter input{padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
+.admin-table{width:100%;border-collapse:collapse}
+.admin-table th{background:#F8F9FA;padding:12px 18px;text-align:left;font-size:12px;font-weight:600;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.admin-table td{padding:14px 18px;font-size:13px;border-bottom:1px solid #F0F0F0;vertical-align:middle}
+.admin-table tr:hover td{background:#F8F9FA}
+.admin-table tr:last-child td{border-bottom:none}
+
+/* ── Status badges ── */
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.status-badge.waiting{background:#FFF8E1;color:#F57F17}
+.status-badge.in-progress,.status-badge.in_progress{background:#E3F2FD;color:#1565C0}
+.status-badge.completed,.status-badge.done{background:var(--tint-2);color:var(--deep-ink)}
+.status-badge.urgent,.status-badge.critical{background:#FFEBEE;color:#C62828}
+.status-badge.scheduled{background:#F3E5F5;color:#6A1B9A}
+.status-badge.normal,.status-badge.stable{background:var(--tint-2);color:var(--deep-ink)}
+.status-badge.high{background:#FFF3E0;color:#E65100}
+.status-badge.open{background:#FFF3E0;color:#E65100}
+.status-badge.active,.status-badge.available{background:#E3F2FD;color:#1565C0}
+
+/* ── Buttons ── */
+.btn-admin{display:inline-flex;align-items:center;gap:6px;padding:9px 17px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
+.btn-admin.primary{background:var(--primary);color:#fff}
+.btn-admin.primary:hover{background:var(--primary-d)}
+.btn-admin.secondary{background:#F3F4F6;color:var(--text);border:1px solid var(--border)}
+.btn-admin.secondary:hover{background:#E5E7EB}
+.btn-admin.danger{background:var(--danger);color:#fff}
+.btn-admin.success{background:var(--success);color:#fff}
+.btn-admin.sm{padding:5px 12px;font-size:12px}
+
+/* ── Queue number badge ── */
+.queue-number{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* ── Patient avatar ── */
+.patient-avatar{width:32px;height:32px;border-radius:50%;background:#E3F2FD;color:#1565C0;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+
+/* ── Grid row for queue + appointments ── */
+.content-row{display:grid;grid-template-columns:1fr 340px;gap:20px}
+@media(max-width:1100px){.content-row{grid-template-columns:1fr}}
+
+/* ── Appointment card ── */
+.appt-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow)}
+.appt-item{display:flex;gap:14px;align-items:flex-start;padding:14px 18px;border-bottom:1px solid #F0F0F0}
+.appt-item:last-child{border-bottom:none}
+.appt-time{font-size:12px;font-weight:600;color:var(--primary);min-width:48px}
+.appt-info{flex:1}
+.appt-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.appt-type{font-size:12px;color:var(--text-lt)}
+
+/* ── Toast ── */
+.admin-toast{pointer-events:none;position:fixed;bottom:24px;right:24px;background:#1E1E1E;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,0.3);transform:translateY(60px);opacity:0;transition:all .3s ease;z-index:999}
+.admin-toast.visible{transform:translateY(0);opacity:1}
+
+/* ── Check-In spinner ── */
+@keyframes checkin-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+
+/* ── Mobile hamburger ── */
+.sidebar-hamburger{display:none;align-items:center;justify-content:center;width:40px;height:40px;background:none;border:none;cursor:pointer;color:var(--text);border-radius:8px;flex-shrink:0}
+.sidebar-hamburger .material-icons-outlined{font-size:24px}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:99}
+.sidebar-overlay.active{display:block}
+
+/* ── Mobile bottom nav — DISABLED ──
+   Navigation is via the sidebar hamburger only.  Kept hidden with !important
+   so any leftover markup on legacy pages doesn't render the bar. */
+.clinic-bottom-nav{ display:none !important; }
+.clinic-bottom-nav-inner{
+  display:flex;
+  align-items:stretch;
+  min-height:56px;
+}
+.cbn-link{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:8px 4px;
+  padding-bottom:calc(8px + env(safe-area-inset-bottom,0px));
+  color:rgba(255,255,255,0.55);
+  text-decoration:none;font-size:10px;font-weight:600;letter-spacing:.3px;
+  gap:3px;transition:color .15s;
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+  cursor:pointer;
+  min-height:56px;
+  user-select:none;
+  -webkit-user-select:none;
+  position:relative;     /* stacking context so tap area is not clipped */
+  z-index:1;
+}
+.cbn-link .material-icons-outlined{font-size:22px;display:block}
+.cbn-link.active{color:var(--side-accent)}
+.cbn-link.cbn-main{
+  background:#1565C0;color:#fff;border-radius:0;
+  font-weight:700;
+}
+.cbn-link.cbn-main .material-icons-outlined{font-size:26px}
+
+/* ── Responsive ── */
+@media(max-width:768px){
+  .admin-sidebar{width:260px;transform:translateX(-100%);transition:transform .26s ease}
+  .admin-sidebar.open{transform:translateX(0)}
+  .admin-main{margin-left:0;padding-bottom:24px}
+  .sidebar-hamburger{display:flex}   /* hamburger is the ONLY nav on mobile */
+  /* Fix sticky: overflow-x:hidden on admin-main breaks position:sticky in Android WebView.
+     Use fixed positioning on mobile so the topbar always stays visible when scrolling. */
+  .admin-topbar{position:fixed;top:0;left:0;right:0;z-index:101;padding:10px 14px;gap:8px}
+  .admin-topbar-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+  .admin-topbar-right{gap:6px;flex-shrink:0}
+  .admin-topbar-right input[type="text"]{display:none}
+  /* Make room for the always-visible Exit button: drop the clock and the
+     username text (keep the avatar) on small screens. */
+  .admin-topbar-right #liveClock{display:none}
+  .admin-topbar-right .admin-user-chip span{display:none}
+  .clinic-exit-btn{padding:7px 11px}
+  .stats-grid{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px}
+  .stat-card{padding:14px;gap:10px}
+  .stat-icon{width:38px;height:38px}
+  .stat-number{font-size:20px}
+  .admin-content{padding:70px 14px 14px}  /* top offsets 60px fixed topbar; sides/bottom 14px */
+  .admin-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .admin-table{min-width:520px}
+  /* Was flex-direction:column, which gave every card's header its own extra
+     line even when it held nothing but a title and a count. Wrapping keeps the
+     title and its badge together and still drops a filter row underneath when
+     there is one — several hundred pixels of empty card back, per screen. */
+  .table-header{flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 14px}
+  .table-title{font-size:15px}
+  /* The gap between cards was 24px on a 915px-tall phone — a third of a screen
+     spent on nothing across four cards. */
+  .admin-table-wrap{margin-bottom:12px}
+  .table-filter{width:100%;flex-wrap:wrap}
+  .table-filter select,.table-filter input{flex:1;min-width:0;min-height:44px;font-size:16px}
+  .admin-login-card{width:calc(100vw - 32px);padding:28px 20px}
+  /* Prevent iOS zoom on focus + larger taps everywhere */
+  input,select,textarea{font-size:16px!important}
+  .admin-form-group input,.admin-form-group select,.admin-form-group textarea{font-size:16px!important;min-height:46px;padding:12px 14px}
+  .login-field input{min-height:48px;padding:12px 14px;font-size:16px}
+  .content-row{grid-template-columns:1fr!important}
+  .admin-toast{bottom:88px;left:14px;right:14px;text-align:center}
+
+  /* Touch-friendly buttons */
+  .btn-admin{min-height:44px;padding:11px 18px;font-size:14px}
+  .btn-admin.sm{min-height:36px;padding:8px 14px;font-size:13px}
+  .login-btn,.demo-btn{min-height:48px;font-size:16px;padding:14px}
+
+  /* Bigger order/booking cards on mobile */
+  .order-card{padding:14px;gap:12px;min-height:72px}
+  .order-patient{font-size:16px}
+  .order-drug{font-size:13px}
+  .order-meta{font-size:11px}
+  .order-avatar{width:42px;height:42px;font-size:15px}
+  .home-cta{min-height:52px;font-size:15px;width:100%;justify-content:center}
+  .home-hero{padding:20px 18px}
+
+  /* Modals — mobile-friendly */
+  #verifyModal>div{padding:22px 18px 24px;border-radius:14px;max-height:92vh;overflow-y:auto}
+  #verifyModal input{min-height:52px!important;font-size:18px!important}
+
+  /* Quick-verify panel: stack vertically so the button is always full-width */
+  #qvGrid{grid-template-columns:1fr 1fr !important}
+  #qvGrid > div:last-child{grid-column:1/-1}
+  #qvGrid > div:last-child button{width:100%;justify-content:center}
+}
+
+/* ── Keyboard-open handling for clinic portal modals ── */
+/* adjustResize shrinks the WebView viewport above the keyboard, so modals with
+   position:fixed + align-items:flex-end naturally sit just above the keyboard.
+   Only override max-height so older WebViews where dvh doesn't update still work.
+   Do NOT change align-items — that causes a black gap (modal jumps to top,
+   leaving the dark modal background visible below). */
+body.keyboard-open #verifyModal > div   { max-height:100% !important; overflow-y:auto }
+body.keyboard-open #registerModal > div { max-height:100% !important; overflow-y:auto }
+/* Also add a 16px font-size floor on all clinic inputs to prevent iOS/Android zoom on focus */
+.field-input,.admin-form-group input,.admin-form-group select,.admin-form-group textarea { font-size:16px !important }
+
+/* Touch active feedback (all screens, but most useful on touch) */
+.btn-admin:active,.home-cta:active,.cbn-link:active,.order-card:active{transform:scale(0.98)}
+.cbn-link{transition:color .15s,background .15s,transform .1s}
+.cbn-link:active{background:rgba(255,255,255,0.05)}
+
+/* Make all interactive elements at least 40px tall */
+button,a.cbn-link,.sidebar-link,.btn-admin,.login-btn,.demo-btn{min-height:40px}
+
+/* Make order-card buttons inside more touchable */
+.order-card button{min-height:36px;padding:8px 14px}
+
+/* ═══ DARK MODE ════════════════════════════════════════════════════════
+   Set <html data-theme="dark"> (boot script on each page). Structure is
+   variable-driven, so flipping the variables re-themes cards, topbar,
+   inputs and tables. The [style*=...] rules catch the recurring HARDCODED
+   inline colors so text never sits dark-on-dark. */
+html[data-theme="dark"]{
+  --primary:#43A047; --primary-d:var(--deep-2); --accent:#26A69A;
+  --deep:var(--deep-2); --deep-ink:#8CEFCD; --deep-2:#43A047;
+  --tint-2:#16281B; --tint-3:var(--deep-2);
+  --grad-1:#08281E; --grad-2:#0C6045; --grad-3:#128056;
+  --brand-tint:var(--brand-tint); --brand-ink:var(--brand-ink);
+  --surface:#151E18; --bg:#0B110D;
+  --sidebar:#080D0A; --sidebar-hv:#152119;
+  --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
+}
+
+/* -- Midnight blue -- */
+html[data-skin="midnight"]{
+  --primary:#1E5FA8; --primary-d:#16457B; --accent:#1976D2;
+  --deep:#123E6B; --deep-ink:#123E6B; --deep-2:#1B5FA8;
+  --tint-2:#E8F0FA; --tint-3:#90BFEA;
+  --grad-1:#0C2340; --grad-2:#164A82; --grad-3:#2E7DC4;
+  --brand-tint:#DCEAF9; --brand-ink:#16457B;
+  --side-accent:#64B5F6; --side-accent-soft:rgba(100,181,246,.16);
+  --surface:#FFFFFF; --bg:#EEF3FA;
+  --sidebar:#0C1A2E; --sidebar-hv:#12263F;
+  --text:#14202E; --text-lt:#5A6B80; --border:#DCE3EC;
+}
+html[data-skin="midnight"][data-theme="dark"]{
+  --primary:#4A90D9; --primary-d:#2E6FB5; --accent:#4FC3F7;
+  --deep:#1B4E86; --deep-ink:#9CC9F0; --deep-2:#2E6FB5;
+  --tint-2:#0F2136; --tint-3:#2E6FB5;
+  --grad-1:#071426; --grad-2:#0F2E52; --grad-3:#1B4E86;
+  --brand-tint:#12293F; --brand-ink:#9CC9F0;
+  --surface:#111C2B; --bg:#070E18;
+  --sidebar:#050B14; --sidebar-hv:#0E1B2B;
+  --text:#E4ECF5; --text-lt:#93A6BC; --border:#22334A;
+}
+
+/* -- True dark: black, for OLED screens and night shifts -- */
+html[data-skin="dark"]{
+  --primary:#26282B; --primary-d:#141618; --accent:#4A4E54;
+  --deep:#1A1D20; --deep-ink:#1A1D20; --deep-2:#33383D;
+  --tint-2:#F0F1F2; --tint-3:#B9BEC4;
+  --grad-1:#000000; --grad-2:#1C1F22; --grad-3:#33383D;
+  --brand-tint:#ECEDEF; --brand-ink:#1C1F22;
+  --side-accent:#B9BEC4; --side-accent-soft:rgba(185,190,196,.16);
+  --surface:#FFFFFF; --bg:#F4F5F6;
+  --sidebar:#000000; --sidebar-hv:#15181B;
+  --text:#0B0C0D; --text-lt:#5C6167; --border:#D6D9DC;
+}
+html[data-skin="dark"][data-theme="dark"]{
+  --primary:#2C3035; --primary-d:#1A1D20; --accent:#6B7178;
+  --deep:#33383D; --deep-ink:#D6D9DC; --deep-2:#4A4E54;
+  --tint-2:#17191B; --tint-3:#3A3F44;
+  --grad-1:#000000; --grad-2:#121417; --grad-3:#262A2F;
+  --brand-tint:#1A1D20; --brand-ink:#D6D9DC;
+  --surface:#0C0E10; --bg:#000000;
+  --sidebar:#000000; --sidebar-hv:#141719;
+  --text:#F2F3F4; --text-lt:#9AA0A6; --border:#24272A;
+}
+
+/* -- Clay: warm brown-grey -- */
+html[data-skin="clay"]{
+  --primary:#6D5B4E; --primary-d:#514239; --accent:#8D7864;
+  --deep:#4A3B31; --deep-ink:#4A3B31; --deep-2:#6D5B4E;
+  --tint-2:#F5EFE8; --tint-3:#C9B49F;
+  --grad-1:#3B2F27; --grad-2:#6D5B4E; --grad-3:#8D7864;
+  --brand-tint:#EFE7DF; --brand-ink:#514239;
+  --side-accent:#D7B899; --side-accent-soft:rgba(215,184,153,.18);
+  --surface:#FFFDFB; --bg:#F3EFEA;
+  --sidebar:#2B231D; --sidebar-hv:#3A3028;
+  --text:#241E19; --text-lt:#6E635B; --border:#E2D9D0;
+}
+html[data-skin="clay"][data-theme="dark"]{
+  --primary:#8D7864; --primary-d:#6D5B4E; --accent:#A8917A;
+  --deep:#5A4A3E; --deep-ink:#DCC9B6; --deep-2:#8D7864;
+  --tint-2:#241D18; --tint-3:#6D5B4E;
+  --grad-1:#1C1714; --grad-2:#3B2F27; --grad-3:#5A4A3E;
+  --brand-tint:#2A231D; --brand-ink:#DCC9B6;
+  --surface:#1B1613; --bg:#12100E;
+  --sidebar:#0F0C0A; --sidebar-hv:#201A16;
+  --text:#EFE7DF; --text-lt:#A89A8D; --border:#332B24;
+}
+html[data-theme="dark"] body{background:var(--bg);color:var(--text)}
+html[data-theme="dark"] .admin-topbar{background:var(--surface)}
+html[data-theme="dark"] .slide-tab{background:var(--surface);border-color:var(--border);color:var(--text-lt)}
+html[data-theme="dark"] .slide-tab.active{background:var(--deep-2);border-color:var(--deep-ink);color:#fff}
+html[data-theme="dark"] #slideTabs{background:var(--bg)}
+html[data-theme="dark"] input:not([type=checkbox]):not([type=radio]),
+html[data-theme="dark"] select, html[data-theme="dark"] textarea{
+  background:rgba(255,255,255,.06) !important; color:#E8F0EA !important;
+  border-color:#293630 !important;
+}
+html[data-theme="dark"] input::placeholder, html[data-theme="dark"] textarea::placeholder{color:var(--text-lt)}
+/* Recurring hardcoded inline styles → readable on dark */
+html[data-theme="dark"] [style*="background:#fff"],
+html[data-theme="dark"] [style*="background: #fff"],
+html[data-theme="dark"] [style*="background:#FFFFFF"],
+html[data-theme="dark"] [style*="background:#FAFFFE"],
+html[data-theme="dark"] [style*="background:#FBFEFC"],
+html[data-theme="dark"] [style*="background:#FAFAFA"]{background:#151E18 !important}
+html[data-theme="dark"] [style*="color:#202124"],
+html[data-theme="dark"] [style*="color:#111"],
+html[data-theme="dark"] [style*="color:#333"],
+html[data-theme="dark"] [style*="color:#1A1A1A"]{color:#E8F0EA !important}
+html[data-theme="dark"] [style*="color:#424242"],
+html[data-theme="dark"] [style*="color:#5F6368"],
+html[data-theme="dark"] [style*="color:#555"]{color:#C2D3C6 !important}
+html[data-theme="dark"] [style*="color:#9AA0A6"]{color:#93A697 !important}
+html[data-theme="dark"] [style*="border-bottom:1px solid #F5F5F5"],
+html[data-theme="dark"] [style*="border-bottom:1px solid #EEF5EF"]{border-bottom-color:#293630 !important}
+html[data-theme="dark"] [style*="background:var(--tint-2)"]{background:rgba(67,160,71,.16) !important}
+html[data-theme="dark"] [style*="background:#F3F4F6"]{background:rgba(255,255,255,.07) !important}
+/* Theme toggle button in the topbar */
+.theme-toggle-top{
+  width:38px;height:38px;border-radius:50%;border:1.5px solid var(--border);
+  background:transparent;color:var(--text-lt);display:flex;align-items:center;justify-content:center;
+  cursor:pointer;margin-right:8px;-webkit-tap-highlight-color:transparent;flex-shrink:0;
+}
+.theme-toggle-top .material-icons-outlined{font-size:19px}
+
+/* ═══ DARK MODE · consultation wizard + settings surfaces ═══════════════
+   These pages style their cards via their OWN classes (not inline styles),
+   so they need explicit dark variants. Kept together here so every page
+   that loads clinic.css gets them. */
+html[data-theme="dark"] .wiz-card{
+  background:var(--surface); box-shadow:0 1px 4px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.05); color:var(--text);
+}
+html[data-theme="dark"] .field-input{background:rgba(255,255,255,.06); color:var(--text); border-color:var(--border)}
+html[data-theme="dark"] .field-input::placeholder{color:var(--text-lt)}
+html[data-theme="dark"] .field-label,
+html[data-theme="dark"] .wiz-section-label{color:var(--text-lt)}
+html[data-theme="dark"] .patient-pill{background:rgba(67,160,71,.14); border-color:rgba(102,187,106,.4)}
+html[data-theme="dark"] .care-opt{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .care-opt.active{background:rgba(67,160,71,.18); border-color:var(--primary)}
+html[data-theme="dark"] :where(.sev-chip){background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] :where(.lab-chip){background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .lab-chip:hover{background:rgba(67,160,71,.12)}
+html[data-theme="dark"] .wiz-btn-back{background:var(--surface); color:var(--text-lt); border-color:var(--border)}
+html[data-theme="dark"] .wiz-dot{background:var(--surface); border-color:var(--border)}
+html[data-theme="dark"] .wiz-dot-line{background:var(--border)}
+html[data-theme="dark"] .autocomplete-item{background:var(--surface); color:var(--text)}
+html[data-theme="dark"] .autocomplete-item:hover{background:rgba(67,160,71,.14)}
+html[data-theme="dark"] .dmed-row{background:var(--surface); border-color:var(--border)}
+html[data-theme="dark"] .settings-card{background:var(--surface); box-shadow:0 2px 8px rgba(0,0,0,.4); color:var(--text)}
+html[data-theme="dark"] .settings-card-title{color:var(--text)}
+html[data-theme="dark"] :where(.facility-btn){background:var(--surface); border-color:var(--border); color:var(--text-lt)}
+html[data-theme="dark"] .qs-drug-card{background:#151E18 !important; border-color:#293630 !important; color:var(--text)}
+html[data-theme="dark"] #qsSheet{background:#151E18 !important}
+html[data-theme="dark"] .pp-alert{background:rgba(255,193,7,.12); color:#FFD54F}
+
+/* ═══ SMOOTH, UNIQUE NAVIGATION (Android + Windows) ═════════════════════ */
+html{scroll-behavior:smooth}
+body{overscroll-behavior-y:none}                 /* no rubber-band jolt */
+.admin-content, .hslide, #svBody, #qsDrugGrid, .admin-table-wrap{
+  -webkit-overflow-scrolling:touch;              /* momentum scrolling on Android */
+}
+@media (prefers-reduced-motion: reduce){ html{scroll-behavior:auto} }
+
+/* Slim brand scrollbars — the default grey Windows bars look foreign */
+*{scrollbar-width:thin; scrollbar-color:#9CB8A0 transparent}
+::-webkit-scrollbar{width:9px; height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#AFC7B3; border-radius:8px; border:2px solid transparent; background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:#7FA386; border:2px solid transparent; background-clip:content-box}
+html[data-theme="dark"] *{scrollbar-color:#3B4F41 transparent}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb{background:#3B4F41}
+html[data-theme="dark"] ::-webkit-scrollbar-thumb:hover{background:#527A5C}
+
+/* Soft page entrance — OPACITY ONLY. Animating transform on <body> makes it
+   the containing block for every position:fixed element (modals, the Quick
+   Sale sheet, referral dialogs), anchoring them to the PAGE instead of the
+   screen — they appeared wherever you'd scrolled and their buttons missed
+   taps. Never add transform here. */
+
+/* Dark-mode legibility fixes found by rendered-screenshot review */
+html[data-theme="dark"] .qs-drug-name{color:var(--text)}
+html[data-theme="dark"] .qs-drug-card:hover{background:rgba(67,160,71,.14); border-color:var(--deep-ink)}
+html[data-theme="dark"] .qs-drug-card.selected{background:rgba(67,160,71,.2)}
+html[data-theme="dark"] .care-opt div, html[data-theme="dark"] .care-opt-label{color:var(--text)}
+html[data-theme="dark"] .care-opt div:last-child{color:var(--text-lt)}
+
+/* Dark mode: SELECTED/ACTIVE states must outrank the dark base rules —
+   without these, severity and lab chips looked like they "didn't click"
+   (they selected fine, the highlight was just invisible). */
+/* Active chip colors come from each page's own rules (green severity,
+   orange severe / red critical, blue lab chips) — visible on dark because
+   the :where() base rules above no longer outrank them. */
+
+/* Dark mode: drug/patient autocomplete text was near-invisible */
+html[data-theme="dark"] .ac-name{color:#E8F0EA !important}
+html[data-theme="dark"] .ac-cat{color:var(--text-lt)}
+html[data-theme="dark"] .autocomplete-list, html[data-theme="dark"] .autocomplete-menu{background:var(--surface); border-color:var(--border)}
+
+/* Dark mode: Active Treatments / booking cards were still white (class bg) */
+html[data-theme="dark"] .order-card{background:var(--surface); border-color:var(--border); color:var(--text)}
+html[data-theme="dark"] .order-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.5)}
+
+/* Quick Sale dark: the amount box and Add-another button carry inline
+   light styling — concrete overrides (no var+!important, Chromium quirk) */
+html[data-theme="dark"] #qsTotalInput{background:rgba(255,255,255,.08) !important; color:#E8F0EA !important; border-color:#3B4F41 !important}
+html[data-theme="dark"] #qsAddMoreBtn{background:rgba(67,160,71,.18) !important; color:var(--tint-3) !important; border-color:rgba(102,187,106,.45) !important}
+html[data-theme="dark"] #qsCartWrap{background:#12190F !important; border-color:#293630 !important}
+html[data-theme="dark"] #qsSelectedPanel{background:#101812 !important; border-color:#293630 !important}
+
+/* ══ Active Treatments card + medication rows ═══════════════════════════════
+   Written as real classes with theme tokens. The previous cards used inline
+   colours, which a blanket dark-mode rule rewrote — it lightened the TEXT but
+   left the card background light, so drug names were white on white and could
+   not be read at all. Nothing here depends on that rule. */
+
+.dmed-row{
+  display:flex; align-items:center; gap:11px;
+  padding:10px 12px; margin-bottom:7px;
+  background:var(--bg,#F5F7F5); border:1px solid var(--border,#E8EAED);
+  border-radius:11px;
+}
+.dmed-row-ic{ font-size:19px; color:var(--primary,var(--deep)); flex-shrink:0 }
+.dmed-row-b { flex:1; min-width:0 }
+.dmed-row-n { font-size:13.5px; font-weight:700; color:var(--text,#111); line-height:1.3 }
+.dmed-row-s { font-size:11.5px; color:var(--text-lt,#5F6368); margin-top:2px }
+.dmed-row-q {
+  font-size:11px; font-weight:800; color:var(--primary,var(--deep));
+  background:var(--brand-tint); padding:3px 9px; border-radius:9px;
+  white-space:nowrap; flex-shrink:0;
+}
+html[data-theme="dark"] .dmed-row{ background:#151E18; border-color:#293630 }
+html[data-theme="dark"] .dmed-row-n{ color:#E8F0EA }
+html[data-theme="dark"] .dmed-row-s{ color:#A9BCAE }
+html[data-theme="dark"] .dmed-row-ic{ color:var(--brand-ink) }
+html[data-theme="dark"] .dmed-row-q{ background:rgba(67,160,71,.20); color:var(--tint-3) }
+
+.act-card{
+  margin:10px 16px; padding:14px 16px; cursor:pointer;
+  background:var(--surface,#fff); border:1px solid var(--border,#E8EAED);
+  border-radius:var(--radius,18px); box-shadow:var(--shadow,0 6px 18px rgba(20,24,43,.07));
+  transition:box-shadow .15s, transform .12s;
+}
+.act-card:active{ transform:scale(.995) }
+html[data-theme="dark"] .act-card{ background:#111A14; border-color:#243029 }
+
+.act-head{ display:flex; align-items:center; gap:11px; margin-bottom:9px }
+.act-avatar{
+  width:42px; height:42px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:15px; font-weight:800;
+  background:var(--brand-tint); color:var(--primary,var(--primary-d));
+}
+html[data-theme="dark"] .act-avatar{ background:rgba(67,160,71,.18); color:var(--tint-3) }
+.act-id{ flex:1; min-width:0 }
+.act-case{
+  font-size:14px; font-weight:800; letter-spacing:.4px;
+  color:var(--primary,var(--primary-d)); font-variant-numeric:tabular-nums;
+}
+html[data-theme="dark"] .act-case{ color:var(--brand-ink) }
+.act-who{ font-size:13px; font-weight:600; color:var(--text,#111); margin-top:1px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
+.act-who.unnamed{ font-weight:500; font-style:italic; color:var(--text-lt,#9AA0A6) }
+html[data-theme="dark"] .act-who{ color:#E8F0EA }
+html[data-theme="dark"] .act-who.unnamed{ color:#8FA394 }
+.act-sev{
+  flex-shrink:0; font-size:10.5px; font-weight:800; letter-spacing:.4px;
+  text-transform:uppercase; padding:4px 10px; border-radius:20px;
+  background:var(--bg,#F1F3F4); color:var(--text-lt,#5F6368);
+}
+html[data-theme="dark"] .act-sev{ background:rgba(255,255,255,.07); color:#B6C8BA }
+
+.act-dx{
+  font-size:15px; font-weight:700; color:var(--text,#111);
+  line-height:1.35; margin-bottom:7px;
+}
+html[data-theme="dark"] .act-dx{ color:#E8F0EA }
+.act-due{
+  display:inline-block; margin-left:8px; vertical-align:2px;
+  font-size:10px; font-weight:800; letter-spacing:.3px; text-transform:uppercase;
+  background:#FFEBEE; color:#B71C1C; padding:3px 8px; border-radius:20px;
+}
+html[data-theme="dark"] .act-due{ background:rgba(198,40,40,.22); color:#FFAFAF }
+
+.act-facts{
+  display:flex; flex-wrap:wrap; align-items:center; gap:7px;
+  font-size:12.5px; color:var(--text-lt,#5F6368);
+}
+html[data-theme="dark"] .act-facts{ color:#A9BCAE }
+.act-dot{ opacity:.45 }
+.act-owing{ font-weight:800; color:#C62828 }
+.act-settled{ font-weight:800; color:var(--primary,var(--deep)) }
+html[data-theme="dark"] .act-owing{ color:#FF8A80 }
+html[data-theme="dark"] .act-settled{ color:var(--tint-3) }
+
+.act-return{
+  display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+  margin-top:8px; padding-top:9px; border-top:1px solid var(--border,#EEF1EE);
+  font-size:12.5px; line-height:1.4;
+}
+html[data-theme="dark"] .act-return{ border-top-color:#243029 }
+.act-return .material-icons-outlined{ font-size:15px }
+.act-reason{ color:var(--text-lt,#5F6368); font-weight:500 }
+html[data-theme="dark"] .act-reason{ color:#93A697 }
+
+.act-foot{ display:flex; justify-content:flex-end; margin-top:11px }
+.act-btn{
+  display:inline-flex; align-items:center; gap:5px;
+  font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  padding:9px 16px; border:none; border-radius:22px;
+  background:var(--primary,var(--deep)); color:#fff;
+}
+.act-btn .material-icons-outlined{ font-size:15px }
+html[data-theme="dark"] .act-btn{ background:#2E7D46 }
+
+/* ══ Compact patient rows ═══════════════════════════════════════════════════
+   Today's Consultations and Active Treatments both use these. A clinic can
+   have a hundred open cases; each one must be scannable at a glance and fit
+   several to a screen. Two lines only:
+       19:10   Emmanuel Ssali              UGX 20,000
+               Typhoid fever                  PENDING
+   Everything else — drugs, return visit, history, discharge — is behind a tap.
+   The left edge is colour-coded so money state reads without being read. */
+
+.pt-row{
+  display:grid; grid-template-columns:auto 1fr auto;
+  column-gap:11px; row-gap:2px; align-items:baseline;
+  padding:11px 14px 11px 12px; margin:0 12px 7px;
+  background:var(--surface,#fff);
+  border:1px solid var(--border,#E8EAED); border-left:4px solid var(--border,#E8EAED);
+  border-radius:12px; cursor:pointer;
+}
+.pt-row:active{ background:var(--bg,#F7F9F7) }
+html[data-theme="dark"] .pt-row{ background:#111A14; border-color:#243029 }
+html[data-theme="dark"] .pt-row:active{ background:#17211A }
+
+.pt-row.owing  { border-left-color:#E5484D }
+.pt-row.settled{ border-left-color:var(--grad-3) }
+.pt-row.free   { border-left-color:#B9C4BC }
+
+/* line 1 — when they came in, who, how much */
+.pt-time{
+  grid-row:1; font-size:12.5px; font-weight:700; color:var(--text-lt,#5F6368);
+  font-variant-numeric:tabular-nums; white-space:nowrap;
+}
+.pt-who{
+  grid-row:1; font-size:14.5px; font-weight:700; color:var(--text,#111);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.pt-who.code{ color:var(--primary,var(--primary-d)); letter-spacing:.3px; font-variant-numeric:tabular-nums }
+.pt-amt{
+  grid-row:1; font-size:14px; font-weight:800; white-space:nowrap;
+  font-variant-numeric:tabular-nums; color:var(--text,#111);
+}
+html[data-theme="dark"] .pt-time{ color:#8FA394 }
+html[data-theme="dark"] .pt-who { color:#E8F0EA }
+html[data-theme="dark"] .pt-who.code{ color:var(--brand-ink) }
+html[data-theme="dark"] .pt-amt { color:#E8F0EA }
+
+/* line 2 — what is wrong, and whether it is paid */
+.pt-dx{
+  grid-row:2; grid-column:2; font-size:13px; color:var(--text-lt,#5F6368);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+html[data-theme="dark"] .pt-dx{ color:#A9BCAE }
+.pt-tag{
+  grid-row:2; grid-column:3; justify-self:end;
+  font-size:10px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+  padding:2px 8px; border-radius:20px; white-space:nowrap;
+}
+.pt-tag.paid   { background:#E6F6EE; color:var(--primary-d) }
+.pt-tag.owing  { background:#FDECEC; color:#B3261E }
+.pt-tag.waived { background:#FFF6E5; color:#8A5A06 }
+.pt-tag.credit { background:#E8F0FE; color:#0B5C8A }
+.pt-tag.flag   { background:#FDECEC; color:#B3261E }
+html[data-theme="dark"] .pt-tag.paid  { background:rgba(18,163,116,.20); color:var(--brand-ink) }
+html[data-theme="dark"] .pt-tag.owing,
+html[data-theme="dark"] .pt-tag.flag  { background:rgba(229,72,77,.20);  color:#FFAFAF }
+html[data-theme="dark"] .pt-tag.waived{ background:rgba(240,180,41,.18); color:#F5D08A }
+html[data-theme="dark"] .pt-tag.credit{ background:rgba(11,92,138,.25);  color:#9BD1F5 }
+
+/* line 3 — the one-tap fix when a row has no name or no number to call.
+   Folded into the row itself rather than a list of its own, so the nurse sees
+   the gap where the patient already is. */
+.pt-who.addable{
+  text-decoration:underline; text-decoration-style:dotted;
+  text-underline-offset:3px; cursor:pointer;
+}
+
+/* a small marker on line 2 when the patient is due back */
+.pt-due{
+  grid-row:2; grid-column:1; font-size:11px; font-weight:800; color:#E5484D;
+  white-space:nowrap; letter-spacing:.2px;
+}
+
+/* ── "Names to add" ───────────────────────────────────────────────────────
+   A walk-in is treated first and named later, so a case number is often all
+   there is. Each row is one tap from being filled in, and the patients who
+   were told to come back sit at the top — those are the ones somebody will
+   actually need to phone. */
+.nn-row{
+  display:flex; align-items:center; gap:10px;
+  padding:11px 14px; margin:0 12px 7px;
+  background:var(--surface,#fff);
+  border:1px solid var(--border,#E8EAED); border-left:4px solid var(--accent);
+  border-radius:12px; cursor:pointer;
+}
+.nn-row:active{ background:var(--bg,#F7F9F7) }
+html[data-theme="dark"] .nn-row{ background:#111A14; border-color:#243029; border-left-color:var(--accent) }
+html[data-theme="dark"] .nn-row:active{ background:#17211A }
+.nn-main{ flex:1; min-width:0 }
+.nn-top{ display:flex; align-items:center; gap:7px; flex-wrap:wrap }
+.nn-top strong{ font-size:13.5px; font-weight:800; color:var(--text,#111) }
+html[data-theme="dark"] .nn-top strong{ color:#E8F0EA }
+.nn-sub{
+  font-size:12px; color:var(--text-lt,#5F6368); margin-top:2px;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+html[data-theme="dark"] .nn-sub{ color:#A9BCAE }
+.nn-add{
+  flex-shrink:0; font-size:12px; font-weight:800; letter-spacing:.3px;
+  color:#fff; background:var(--accent); padding:6px 14px; border-radius:20px;
+}
+
+/* "+ Add name" — offered wherever a row shows a case number instead of a
+   patient. A debt or a missed return visit you cannot put a name to is hard
+   to chase, and the name is usually one tap away. */
+.px-add{
+  margin-top:4px; padding:3px 10px; border-radius:20px;
+  border:1.5px solid var(--accent); background:transparent; color:var(--accent);
+  font:inherit; font-size:11px; font-weight:800; letter-spacing:.2px;
+  cursor:pointer; touch-action:manipulation;
+}
+.px-add:active{ background:rgba(0,137,123,.12) }
+
+/* ═══ PATIENT RECORD SHEET ═══════════════════════════════════════════════
+   The modal a clinician opens from the active-visits list.
+
+   It used to be built from inline styles with hard-coded light-mode colours,
+   which dark mode then patched by matching those colours as SUBSTRINGS of the
+   style attribute:
+
+       html[data-theme="dark"] [style*="color:#5F6368"]{color:#C2D3C6!important}
+
+   Only the colours somebody remembered to list were caught. The balance card's
+   cream #FFF3E0 was not on the list, so it stayed cream — while the grey text
+   ON it was rewritten to a pale green-grey for dark mode. Pale grey on cream
+   measured 1.43:1, and "Total billed UGX 60,000 · Paid UGX 0" was, in the
+   clinician's words, not seen.
+
+   So the sheet is built from classes and theme variables instead. Nothing here
+   names a colour that only works in one theme. Status tints are translucent
+   over whatever surface is behind them, which is what lets one rule serve all
+   four skins in both themes.
+   ────────────────────────────────────────────────────────────────────────── */
+:root{
+  --pr-owe-bg:rgba(230,81,0,.10);  --pr-owe-fg:#B23C00; --pr-owe-bd:rgba(230,81,0,.32);
+  --pr-due-bg:rgba(21,101,192,.09);--pr-due-fg:#0D47A1; --pr-due-bd:rgba(21,101,192,.28);
+  --pr-ok-bg:rgba(46,125,50,.10);  --pr-ok-fg:#1B5E20;  --pr-ok-bd:rgba(46,125,50,.30);
+  --pr-late-bg:rgba(198,40,40,.10);--pr-late-fg:#B3261E;--pr-late-bd:rgba(198,40,40,.32);
+  /* White on the usual #E65100 measures 3.79:1 — under AA for a 12px label.
+     The button gets its own pair so it passes in both themes. */
+  --pr-act-bg:#A83900; --pr-act-fg:#FFFFFF;
+}
+html[data-theme="dark"]{
+  --pr-owe-bg:rgba(255,167,38,.14); --pr-owe-fg:#FFB870; --pr-owe-bd:rgba(255,167,38,.34);
+  --pr-due-bg:rgba(100,181,246,.13);--pr-due-fg:#8FC4F8; --pr-due-bd:rgba(100,181,246,.30);
+  --pr-ok-bg:rgba(102,187,106,.14); --pr-ok-fg:#8FE0A0;  --pr-ok-bd:rgba(102,187,106,.32);
+  --pr-late-bg:rgba(239,83,80,.15); --pr-late-fg:#FF9E99; --pr-late-bd:rgba(239,83,80,.34);
+  --pr-act-bg:#FFB870; --pr-act-fg:#241300;
+}
+
+.pr-body{ display:flex; flex-direction:column; gap:14px }
+
+/* The one thing the clinician came to read. */
+.pr-hero{ display:flex; align-items:flex-start; gap:10px; justify-content:space-between }
+.pr-hero-dx{ font-size:19px; font-weight:800; line-height:1.25; color:var(--text); min-width:0 }
+.pr-hero-when{ font-size:12px; color:var(--text-lt); margin-top:3px }
+.pr-sev{
+  flex-shrink:0; font-size:10px; font-weight:800; letter-spacing:.6px;
+  padding:4px 10px; border-radius:20px; text-transform:uppercase;
+  background:var(--pr-due-bg); color:var(--pr-due-fg);
+  border:1px solid var(--pr-due-bd);
+}
+.pr-sev.moderate{ background:var(--pr-owe-bg); color:var(--pr-owe-fg); border-color:var(--pr-owe-bd) }
+.pr-sev.severe, .pr-sev.critical{ background:var(--pr-late-bg); color:var(--pr-late-fg); border-color:var(--pr-late-bd) }
+
+/* Money and the return date: the two things that are ACTIONS, side by side at
+   the top, where they used to be two full-width blocks the medication list had
+   to be scrolled past. */
+.pr-strip{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+.pr-strip.one{ grid-template-columns:1fr }
+.pr-tile{
+  border-radius:12px; padding:11px 12px; border:1px solid var(--border);
+  background:var(--tint-2); min-width:0; display:flex; flex-direction:column; gap:2px;
+}
+.pr-tile.owe{ background:var(--pr-owe-bg); border-color:var(--pr-owe-bd) }
+.pr-tile.due{ background:var(--pr-due-bg); border-color:var(--pr-due-bd) }
+.pr-tile.ok{  background:var(--pr-ok-bg);  border-color:var(--pr-ok-bd) }
+.pr-tile.late{background:var(--pr-late-bg);border-color:var(--pr-late-bd) }
+.pr-tile-k{
+  font-size:10px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  color:var(--text-lt); display:flex; align-items:center; gap:4px;
+}
+.pr-tile.owe .pr-tile-k{ color:var(--pr-owe-fg) }
+.pr-tile.due .pr-tile-k{ color:var(--pr-due-fg) }
+.pr-tile.ok  .pr-tile-k{ color:var(--pr-ok-fg) }
+.pr-tile.late .pr-tile-k{ color:var(--pr-late-fg) }
+.pr-tile-k .material-icons-outlined{ font-size:13px }
+/* The figure never wraps: "UGX 60,000" split across two lines because a button
+   was sitting beside it. The button is now underneath. */
+.pr-tile-v{
+  font-size:17px; font-weight:800; color:var(--text);
+  line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.pr-tile.owe .pr-tile-v{ color:var(--pr-owe-fg) }
+.pr-tile.late .pr-tile-v{ color:var(--pr-late-fg) }
+.pr-tile-s{ font-size:11px; color:var(--text-lt); line-height:1.35 }
+.pr-tile-act{
+  margin-top:7px; width:100%; border:none; border-radius:9px; padding:8px;
+  font-family:inherit; font-size:12px; font-weight:800; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+  background:var(--pr-act-bg); color:var(--pr-act-fg);
+}
+.pr-tile-act .material-icons-outlined{ font-size:15px }
+.pr-tile-act:active{ filter:brightness(.92) }
+
+.pr-sec{
+  font-size:11px; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
+  color:var(--text-lt); display:flex; align-items:center; gap:6px;
+}
+.pr-sec::after{ content:''; flex:1; height:1px; background:var(--border) }
+.pr-sec b{ color:var(--text-lt); font-weight:800 }
+
+.pr-note{ font-size:12px; color:var(--text-lt); font-style:italic }
+
+/* Medications: one line each where it fits, so six drugs are a list and not a
+   scroll. The quantity is the thing the clinician counts out, so it keeps its
+   own column. */
+.pr-med{
+  display:flex; align-items:center; gap:10px; padding:9px 11px;
+  border:1px solid var(--border); border-radius:10px; background:var(--surface);
+}
+.pr-med + .pr-med{ margin-top:7px }
+/* --deep-ink, not --primary: the true-dark skin sets --primary to #2C3035, a
+   near-black grey by design, which on its near-black surface measured 1.46:1.
+   --deep-ink is the token that is readable ink in every skin. */
+.pr-med-ic{ font-size:17px; color:var(--deep-ink); flex-shrink:0 }
+.pr-med-b{ flex:1; min-width:0 }
+.pr-med-n{ font-size:13.5px; font-weight:700; color:var(--text); line-height:1.3 }
+.pr-med-s{ font-size:11.5px; color:var(--text-lt); margin-top:1px }
+.pr-med-q{
+  flex-shrink:0; font-size:12px; font-weight:800; color:var(--deep-ink);
+  background:var(--tint-2); border-radius:8px; padding:4px 9px; min-width:34px; text-align:center;
+}
+
+/* Previous visits fold away. The visit in front of you is the one that matters;
+   the history was pushing it off the screen. */
+.pr-past{ border:1px solid var(--border); border-radius:10px; background:var(--surface) }
+.pr-past > summary{
+  list-style:none; cursor:pointer; padding:11px 12px; display:flex;
+  align-items:center; gap:8px; font-size:12.5px; font-weight:700; color:var(--text);
+}
+.pr-past > summary::-webkit-details-marker{ display:none }
+.pr-past > summary .material-icons-outlined{ font-size:17px; color:var(--text-lt); transition:transform .18s }
+.pr-past[open] > summary .material-icons-outlined.pr-caret{ transform:rotate(180deg) }
+.pr-past-in{ padding:0 12px 12px }
+.pr-row{ padding:9px 0; border-top:1px solid var(--border) }
+.pr-row-t{ display:flex; justify-content:space-between; align-items:baseline; gap:8px }
+.pr-row-d{ font-size:12.5px; font-weight:700; color:var(--text) }
+.pr-row-f{ font-size:11.5px; color:var(--text-lt); white-space:nowrap }
+.pr-row-x{ font-size:12px; color:var(--text-lt); margin-top:2px }
+.pr-pill{
+  font-size:9.5px; font-weight:800; padding:2px 7px; border-radius:20px;
+  letter-spacing:.4px; margin-left:5px;
+}
+.pr-pill.paid{ background:var(--pr-ok-bg); color:var(--pr-ok-fg) }
+.pr-pill.pending{ background:var(--pr-late-bg); color:var(--pr-late-fg) }
+.pr-pill.waived{ background:var(--pr-owe-bg); color:var(--pr-owe-fg) }
+
+@media (max-width:360px){
+  .pr-strip{ grid-template-columns:1fr }
+}
+
+/* The same sheet reached the other way — from the patient-history search — was
+   still drawing itself with seventeen hard-coded colours. Same modal, same
+   #histModalBody: a clinician opening a record from the active list saw one
+   design and from the search saw another, and only one of them was legible in
+   the dark. */
+.pr-visit{
+  border:1px solid var(--border); border-radius:12px; padding:12px 14px;
+  background:var(--surface); margin-bottom:11px;
+}
+.pr-visit-h{ display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:9px }
+.pr-visit-n{ font-size:13.5px; font-weight:800; color:var(--text) }
+.pr-visit-t{ font-size:11px; color:var(--text-lt); font-weight:500; margin-top:1px }
+.pr-visit-r{ text-align:right; flex-shrink:0 }
+.pr-visit-f{ font-size:12px; font-weight:700; color:var(--text); margin-top:3px }
+
+.pr-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px }
+.pr-tag{
+  font-size:11px; padding:3px 9px; border-radius:20px; font-weight:700;
+  background:var(--tint-2); color:var(--text); border:1px solid var(--border);
+}
+.pr-tag.dx{ background:var(--pr-due-bg); color:var(--pr-due-fg); border-color:var(--pr-due-bd) }
+.pr-tag.on{ background:var(--pr-owe-bg); color:var(--pr-owe-fg); border-color:var(--pr-owe-bd) }
+.pr-tag.done{ background:var(--pr-ok-bg); color:var(--pr-ok-fg); border-color:var(--pr-ok-bd) }
+.pr-tag .material-icons-outlined{ font-size:13px; vertical-align:-2px }
+
+.pr-field{ margin-bottom:9px }
+.pr-field-k{
+  font-size:11px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+  color:var(--text-lt); margin-bottom:2px;
+}
+.pr-field-v{ font-size:13px; color:var(--text); white-space:pre-line; line-height:1.45 }
+
+.pr-fees{
+  background:var(--tint-2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px; margin-top:10px;
+}
+.pr-fee{ display:flex; justify-content:space-between; font-size:12px; color:var(--text-lt); margin-bottom:2px }
+.pr-fee.total{
+  font-size:13px; font-weight:800; color:var(--text);
+  border-top:1px solid var(--border); margin-top:5px; padding-top:5px;
+}
+.pr-fee.paid{ color:var(--pr-ok-fg); font-weight:700 }
+.pr-fee.due{ color:var(--pr-owe-fg); font-weight:800 }
+
+/* ═══ PATIENT HISTORY — the search results ═══════════════════════════════
+   These reused .order-card, which is a roomy dashboard card, inside a
+   container carrying text-align:center. The result was a 193px row per
+   patient with the avatar stranded at the top-left, the name floating in the
+   middle and the chevron alone at the bottom — three patients filled a phone.
+   A row here holds a name, what they last came with, and how to find them
+   again; that is two lines. */
+.ph-list{ text-align:left; display:flex; flex-direction:column; gap:7px }
+.ph-count{
+  text-align:left; font-size:11.5px; font-weight:700; letter-spacing:.3px;
+  text-transform:uppercase; color:var(--text-lt); padding:2px 2px 8px;
+}
+.ph-row{
+  display:flex; align-items:center; gap:11px; text-align:left;
+  padding:9px 11px; border:1px solid var(--border); border-radius:12px;
+  background:var(--surface); cursor:pointer;
+  transition:border-color .12s, transform .1s;
+}
+.ph-row:active{ transform:scale(.995) }
+.ph-row:hover{ border-color:var(--deep-2) }
+.ph-av{
+  width:36px; height:36px; border-radius:50%; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+  font-size:13px; font-weight:800; letter-spacing:.3px;
+  background:var(--tint-2); color:var(--deep-ink);
+}
+.ph-b{ flex:1; min-width:0 }
+.ph-n{
+  font-size:14px; font-weight:700; color:var(--text); line-height:1.25;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ph-s{
+  font-size:11.5px; color:var(--text-lt); margin-top:2px; line-height:1.3;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.ph-id{ font-weight:800; color:var(--deep-ink) }
+.ph-c{
+  flex-shrink:0; font-size:11px; font-weight:800; padding:3px 8px;
+  border-radius:20px; background:var(--tint-2); color:var(--deep-ink);
+}
+.ph-go{ flex-shrink:0; font-size:18px; color:var(--text-lt) }
+.ph-empty{ text-align:center; color:var(--text-lt); font-size:13px; padding:14px 0 }
+
+/* Searching inside ONE patient's record. Six visits is enough that finding
+   "the time they came with wounds" means scrolling past five others. */
+.ph-filter{
+  display:flex; align-items:center; gap:8px; margin-bottom:12px;
+  border:1px solid var(--border); border-radius:10px; background:var(--tint-2);
+  padding:8px 11px;
+}
+.ph-filter .material-icons-outlined{ font-size:17px; color:var(--text-lt); flex-shrink:0 }
+.ph-filter input{
+  flex:1; min-width:0; border:none; background:transparent; outline:none;
+  font-family:inherit; font-size:13.5px; color:var(--text); padding:0;
+}
+.ph-filter input::placeholder{ color:var(--text-lt) }
+.ph-filter button{
+  border:none; background:transparent; color:var(--text-lt); cursor:pointer;
+  font-family:inherit; font-size:12px; font-weight:700; padding:2px 4px; flex-shrink:0;
+}
+.ph-nohit{ text-align:center; color:var(--text-lt); font-size:13px; padding:18px 0; font-style:italic }
+.ph-visit{ display:block }
+.pr-field.inline{ display:flex; align-items:baseline; gap:8px; margin-bottom:6px }
+.pr-field.inline .pr-field-k{ margin-bottom:0; flex-shrink:0 }
+.pr-field.inline .pr-field-v{ min-width:0; overflow-wrap:anywhere }
+
+/* ═══ RECORD PAYMENT ═════════════════════════════════════════════════════
+   The same fault as the patient record, one modal along: the summary card was
+   background:#FFF8E1 — a cream not on the dark-mode substring list — carrying
+   text at color:#202124 and #5F6368, both of which ARE on it. Dark mode duly
+   rewrote the words to near-white and pale-grey and left the card cream, so
+   the patient's name and the amount they owed measured 1.09:1 and were simply
+   not there. Tokens below are the ones already proved on the record sheet. */
+.pay-sheet{
+  background:var(--surface); color:var(--text); border-radius:16px;
+  width:100%; max-width:460px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.3);
+  max-height:92vh; max-height:92dvh; overflow-y:auto;
+}
+.pay-head{ display:flex; align-items:center; gap:9px; margin-bottom:12px }
+.pay-head .material-icons-outlined{ color:var(--pr-owe-fg); font-size:24px }
+.pay-head h3{ font-size:17px; font-weight:800; margin:0; color:var(--text) }
+
+.pay-sum{
+  background:var(--pr-owe-bg); border:1px solid var(--pr-owe-bd);
+  border-radius:12px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.5;
+}
+.pay-who{ font-weight:800; font-size:14px; color:var(--text); margin-bottom:6px }
+.pay-line{ display:flex; justify-content:space-between; gap:10px; color:var(--text-lt) }
+.pay-line b{ font-weight:700; color:var(--text) }
+.pay-line.owed{
+  padding-top:7px; margin-top:7px; border-top:1px dashed var(--pr-owe-bd);
+  color:var(--pr-owe-fg); font-weight:700;
+}
+.pay-line.owed b{ color:var(--pr-owe-fg); font-weight:800; font-size:15px }
+.pay-line.paid b{ color:var(--pr-ok-fg) }
+
+.pay-lbl{
+  font-size:11.5px; font-weight:800; color:var(--text-lt); display:block;
+  margin-bottom:5px; text-transform:uppercase; letter-spacing:.4px;
+}
+.pay-in{
+  width:100%; padding:12px 14px; border:1.5px solid var(--border); border-radius:10px;
+  font-family:inherit; outline:none; box-sizing:border-box;
+  background:var(--surface); color:var(--text);
+}
+.pay-in::placeholder{ color:var(--text-lt) }
+.pay-in:focus{ border-color:var(--primary) }
+.pay-in.amount{ font-size:17px; font-weight:700 }
+
+.pay-quick{ display:flex; gap:7px; margin:8px 0 14px; flex-wrap:wrap }
+.pay-chip{
+  font-size:12.5px; font-weight:700; padding:7px 14px; border-radius:20px;
+  cursor:pointer; font-family:inherit;
+  background:var(--tint-2); border:1px solid var(--border); color:var(--text);
+}
+.pay-chip.full{ background:var(--pr-ok-bg); border-color:var(--pr-ok-bd); color:var(--pr-ok-fg) }
+.pay-chip:active{ transform:scale(.97) }
+
+.pay-grid{ display:grid; grid-template-columns:1fr 1fr; gap:11px; margin-bottom:14px }
+.pay-err{
+  display:none; background:var(--pr-late-bg); color:var(--pr-late-fg);
+  border:1px solid var(--pr-late-bd); border-radius:9px;
+  padding:10px 12px; font-size:13px; margin-bottom:14px; font-weight:600;
+}
+.pay-acts{ display:flex; gap:10px }
+.pay-btn{
+  padding:13px; border-radius:10px; font-size:14px; font-weight:700;
+  cursor:pointer; font-family:inherit; border:none;
+  display:flex; align-items:center; justify-content:center; gap:6px;
+}
+.pay-btn.ghost{ flex:1; background:transparent; color:var(--text-lt); border:1.5px solid var(--border) }
+.pay-btn.go{ flex:2; background:var(--pr-act-bg); color:var(--pr-act-fg) }
+.pay-btn.go .material-icons-outlined{ font-size:18px }
+.pay-btn:active{ filter:brightness(.94) }
+/* The native spinner sits as a white block on a dark field and is no use on a
+   phone anyway — the amount is typed or taken from the two chips below. */
+.pay-in.amount::-webkit-outer-spin-button,
+.pay-in.amount::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.pay-in.amount{ -moz-appearance:textfield; appearance:textfield }

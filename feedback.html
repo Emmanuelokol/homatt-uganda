@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>Homatt Health — Rate Your Experience</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/material-icons.css">
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <script>(function(){var t=localStorage.getItem("homatt_theme");if(t==="dark")document.documentElement.setAttribute("data-theme","dark");})()</script>
+  <style>
+    .fb-screen { flex:1; overflow-y:auto; padding:0 0 80px; }
+    .fb-hero { background:linear-gradient(135deg,#1B5E20,#4CAF50); padding:28px 24px 20px; color:#fff; text-align:center; }
+    .fb-hero-icon { width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;margin:0 auto 12px; }
+    .fb-hero h1 { font-size:20px;font-weight:700;margin-bottom:4px; }
+    .fb-hero p { font-size:13px;opacity:.85; }
+
+    .fb-section { margin:16px 16px 0; background:#fff; border-radius:16px; padding:16px; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+    .fb-section-title { font-size:13px;font-weight:700;color:#1B5E20;text-transform:uppercase;letter-spacing:.5px;margin-bottom:14px;display:flex;align-items:center;gap:6px; }
+
+    /* Star rating */
+    .star-row { display:flex; gap:6px; margin:8px 0 4px; }
+    .star-btn { font-size:32px; cursor:pointer; color:#E0E0E0; transition:color .15s, transform .15s; background:none;border:none;padding:2px;line-height:1; }
+    .star-btn.active { color:#F9A825; transform:scale(1.15); }
+    .star-label { font-size:12px; color:#9AA0A6; min-height:16px; margin-bottom:10px; }
+
+    /* Aspect scores */
+    .aspect-row { display:flex;flex-direction:column;gap:10px;margin-bottom:8px; }
+    .aspect-item { display:flex;align-items:center;justify-content:space-between; }
+    .aspect-name { font-size:13px;color:#333;font-weight:500;flex:1; }
+    .aspect-stars { display:flex;gap:3px; }
+    .aspect-star { font-size:22px;color:#E0E0E0;cursor:pointer;background:none;border:none;padding:0;line-height:1; }
+    .aspect-star.active { color:#F9A825; }
+
+    /* Comment box */
+    .fb-textarea { width:100%;border:1px solid #E0E0E0;border-radius:10px;padding:10px 12px;font-family:inherit;font-size:13px;resize:none;margin-top:6px;outline:none;transition:border-color .2s; }
+    .fb-textarea:focus { border-color:#1B5E20; }
+
+    /* Section toggle */
+    .fb-toggle { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px; }
+    .toggle-switch { position:relative;width:44px;height:24px; }
+    .toggle-switch input { opacity:0;width:0;height:0; }
+    .toggle-slider { position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:24px;transition:.3s; }
+    .toggle-slider:before { position:absolute;content:"";height:18px;width:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s; }
+    .toggle-switch input:checked + .toggle-slider { background:#1B5E20; }
+    .toggle-switch input:checked + .toggle-slider:before { transform:translateX(20px); }
+
+    .fb-submit-btn { width:calc(100% - 32px);margin:20px 16px 0;background:#1B5E20;color:#fff;border:none;border-radius:14px;padding:16px;font-size:15px;font-weight:600;font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px; }
+    .fb-submit-btn:active { background:#154d18; }
+    .fb-submit-btn:disabled { background:#9AA0A6;cursor:not-allowed; }
+
+    /* Success screen */
+    .fb-success { display:none;flex-direction:column;align-items:center;justify-content:center;padding:60px 32px;text-align:center; }
+    .fb-success-icon { width:80px;height:80px;border-radius:40px;background:#E8F5E9;display:flex;align-items:center;justify-content:center;margin-bottom:20px; }
+    .fb-success-icon .material-icons-outlined { font-size:40px;color:#1B5E20; }
+    .fb-success h2 { font-size:22px;font-weight:700;margin-bottom:8px; }
+    .fb-success p { font-size:14px;color:#5F6368;line-height:1.6;margin-bottom:24px; }
+    .fb-back-btn { background:#1B5E20;color:#fff;border:none;border-radius:12px;padding:14px 32px;font-size:14px;font-weight:600;font-family:inherit;cursor:pointer; }
+
+    .no-service-note { font-size:12px;color:#9AA0A6;font-style:italic;margin-top:6px; }
+  </style>
+</head>
+<body>
+<div class="phone-frame">
+  <div class="status-bar">
+    <span class="status-time" id="statusTime">9:41</span>
+    <div class="status-icons">
+      <span class="material-icons-outlined" style="font-size:16px">signal_cellular_alt</span>
+      <span class="material-icons-outlined" style="font-size:16px">wifi</span>
+      <span class="material-icons-outlined" style="font-size:16px">battery_full</span>
+    </div>
+  </div>
+
+  <div class="app-screen" style="display:flex;flex-direction:column;">
+
+    <!-- Top nav -->
+    <div style="display:flex;align-items:center;padding:12px 16px;background:#fff;border-bottom:1px solid #F0F0F0;position:sticky;top:0;z-index:10">
+      <button onclick="history.back()" style="background:none;border:none;cursor:pointer;padding:4px;margin-right:8px;display:flex">
+        <span class="material-icons-outlined" style="font-size:22px;color:#1B5E20">arrow_back</span>
+      </button>
+      <span style="font-size:16px;font-weight:600">Rate Your Experience</span>
+    </div>
+
+    <!-- Main feedback form -->
+    <div id="feedbackForm" class="fb-screen">
+      <div class="fb-hero">
+        <div class="fb-hero-icon"><span class="material-icons-outlined" style="font-size:30px">star</span></div>
+        <h1>How did we do?</h1>
+        <p>Your feedback helps us improve care for everyone in Uganda</p>
+      </div>
+
+      <!-- Clinic Rating -->
+      <div class="fb-section" id="clinicSection">
+        <div class="fb-toggle">
+          <div class="fb-section-title" style="margin-bottom:0">
+            <span class="material-icons-outlined" style="font-size:18px">local_hospital</span>
+            Rate Clinic Visit
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="clinicToggle" checked onchange="toggleSection('clinic')">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="clinicRatingBody">
+          <div style="font-size:13px;color:#5F6368;margin-bottom:10px" id="clinicName">Rate your most recent clinic visit</div>
+          <div class="star-row" id="clinicStars">
+            <button class="star-btn" data-val="1" onclick="setRating('clinic',1)">★</button>
+            <button class="star-btn" data-val="2" onclick="setRating('clinic',2)">★</button>
+            <button class="star-btn" data-val="3" onclick="setRating('clinic',3)">★</button>
+            <button class="star-btn" data-val="4" onclick="setRating('clinic',4)">★</button>
+            <button class="star-btn" data-val="5" onclick="setRating('clinic',5)">★</button>
+          </div>
+          <div class="star-label" id="clinicStarLabel">Tap to rate</div>
+          <div class="aspect-row">
+            <div class="aspect-item">
+              <span class="aspect-name">Wait time</span>
+              <div class="aspect-stars" id="as-clinic-wait"></div>
+            </div>
+            <div class="aspect-item">
+              <span class="aspect-name">Doctor / Staff quality</span>
+              <div class="aspect-stars" id="as-clinic-quality"></div>
+            </div>
+            <div class="aspect-item">
+              <span class="aspect-name">Communication</span>
+              <div class="aspect-stars" id="as-clinic-comms"></div>
+            </div>
+          </div>
+          <textarea class="fb-textarea" id="clinicComment" rows="3" placeholder="What went well? What could improve?"></textarea>
+        </div>
+      </div>
+
+      <!-- Pharmacy / Delivery Rating -->
+      <div class="fb-section" id="pharmacySection">
+        <div class="fb-toggle">
+          <div class="fb-section-title" style="margin-bottom:0">
+            <span class="material-icons-outlined" style="font-size:18px">local_pharmacy</span>
+            Rate Medicine Order
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="pharmacyToggle" checked onchange="toggleSection('pharmacy')">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="pharmacyRatingBody">
+          <div style="font-size:13px;color:#5F6368;margin-bottom:10px" id="pharmacyName">Rate your most recent medicine order</div>
+          <div class="star-row" id="pharmacyStars">
+            <button class="star-btn" data-val="1" onclick="setRating('pharmacy',1)">★</button>
+            <button class="star-btn" data-val="2" onclick="setRating('pharmacy',2)">★</button>
+            <button class="star-btn" data-val="3" onclick="setRating('pharmacy',3)">★</button>
+            <button class="star-btn" data-val="4" onclick="setRating('pharmacy',4)">★</button>
+            <button class="star-btn" data-val="5" onclick="setRating('pharmacy',5)">★</button>
+          </div>
+          <div class="star-label" id="pharmacyStarLabel">Tap to rate</div>
+          <div class="aspect-row">
+            <div class="aspect-item">
+              <span class="aspect-name">Delivery speed</span>
+              <div class="aspect-stars" id="as-pharmacy-speed"></div>
+            </div>
+            <div class="aspect-item">
+              <span class="aspect-name">Medicine quality / accuracy</span>
+              <div class="aspect-stars" id="as-pharmacy-quality"></div>
+            </div>
+            <div class="aspect-item">
+              <span class="aspect-name">Cost / value</span>
+              <div class="aspect-stars" id="as-pharmacy-cost"></div>
+            </div>
+          </div>
+          <textarea class="fb-textarea" id="pharmacyComment" rows="3" placeholder="Was the delivery on time? Were all medicines correct?"></textarea>
+        </div>
+      </div>
+
+      <!-- Delivery / Rider Rating -->
+      <div class="fb-section" id="riderSection">
+        <div class="fb-toggle">
+          <div class="fb-section-title" style="margin-bottom:0">
+            <span class="material-icons-outlined" style="font-size:18px">electric_moped</span>
+            Rate Delivery Rider
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="riderToggle" onchange="toggleSection('rider')">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div id="riderRatingBody" style="display:none">
+          <div class="star-row" id="riderStars">
+            <button class="star-btn" data-val="1" onclick="setRating('rider',1)">★</button>
+            <button class="star-btn" data-val="2" onclick="setRating('rider',2)">★</button>
+            <button class="star-btn" data-val="3" onclick="setRating('rider',3)">★</button>
+            <button class="star-btn" data-val="4" onclick="setRating('rider',4)">★</button>
+            <button class="star-btn" data-val="5" onclick="setRating('rider',5)">★</button>
+          </div>
+          <div class="star-label" id="riderStarLabel">Tap to rate</div>
+          <textarea class="fb-textarea" id="riderComment" rows="2" placeholder="Was the rider polite and on time?"></textarea>
+        </div>
+      </div>
+
+      <!-- Platform Feedback -->
+      <div class="fb-section">
+        <div class="fb-section-title">
+          <span class="material-icons-outlined" style="font-size:18px">phone_iphone</span>
+          Rate the Homatt App
+        </div>
+        <div class="star-row" id="platformStars">
+          <button class="star-btn" data-val="1" onclick="setRating('platform',1)">★</button>
+          <button class="star-btn" data-val="2" onclick="setRating('platform',2)">★</button>
+          <button class="star-btn" data-val="3" onclick="setRating('platform',3)">★</button>
+          <button class="star-btn" data-val="4" onclick="setRating('platform',4)">★</button>
+          <button class="star-btn" data-val="5" onclick="setRating('platform',5)">★</button>
+        </div>
+        <div class="star-label" id="platformStarLabel">Tap to rate</div>
+        <div style="margin-bottom:10px">
+          <div style="font-size:12px;font-weight:600;color:#5F6368;margin-bottom:8px">What category best describes your feedback?</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="fbCategoryChips">
+            <button class="fb-chip" onclick="selectCategory(this,'general')">General</button>
+            <button class="fb-chip" onclick="selectCategory(this,'app_speed')">App Speed</button>
+            <button class="fb-chip" onclick="selectCategory(this,'booking')">Clinic Booking</button>
+            <button class="fb-chip" onclick="selectCategory(this,'medicine')">Medicine Orders</button>
+            <button class="fb-chip" onclick="selectCategory(this,'delivery')">Delivery</button>
+            <button class="fb-chip" onclick="selectCategory(this,'payment')">Payment</button>
+            <button class="fb-chip" onclick="selectCategory(this,'support')">Support</button>
+          </div>
+        </div>
+        <textarea class="fb-textarea" id="platformComment" rows="3" placeholder="Tell us what you love or what needs improvement..."></textarea>
+        <div style="margin-top:10px">
+          <label style="font-size:13px;color:#333;display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="shareContact" style="width:16px;height:16px;accent-color:#1B5E20">
+            Allow Homatt to contact me about this feedback
+          </label>
+          <input type="email" id="contactEmail" placeholder="your@email.com" style="display:none;width:100%;margin-top:8px;border:1px solid #E0E0E0;border-radius:8px;padding:8px 12px;font-family:inherit;font-size:13px;outline:none">
+        </div>
+      </div>
+
+      <button class="fb-submit-btn" id="submitFeedbackBtn" onclick="submitFeedback()">
+        <span class="material-icons-outlined">send</span>
+        Submit Feedback
+      </button>
+      <div style="height:20px"></div>
+    </div>
+
+    <!-- Success screen -->
+    <div class="fb-success" id="feedbackSuccess">
+      <div class="fb-success-icon"><span class="material-icons-outlined">check_circle</span></div>
+      <h2>Thank you!</h2>
+      <p>Your feedback has been received. It helps us improve healthcare services for everyone in Uganda.</p>
+      <button class="fb-back-btn" onclick="window.location.href='dashboard.html'">Back to Home</button>
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .fb-chip { background:#F0F0F0;border:1px solid #E0E0E0;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:500;color:#333;cursor:pointer;font-family:inherit; }
+  .fb-chip.selected { background:#E8F5E9;border-color:#1B5E20;color:#1B5E20;font-weight:600; }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script>
+var ratings = { clinic:0, pharmacy:0, rider:0, platform:0 };
+var aspects = {
+  'clinic-wait':0, 'clinic-quality':0, 'clinic-comms':0,
+  'pharmacy-speed':0, 'pharmacy-quality':0, 'pharmacy-cost':0
+};
+var fbCategory = 'general';
+var recentBooking = null;
+var recentOrder = null;
+var _supa = null;
+
+var STAR_LABELS = ['','Terrible','Poor','OK','Good','Excellent'];
+
+/* ── Clock ── */
+(function tick() {
+  var el = document.getElementById('statusTime');
+  if (el) el.textContent = new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+  setTimeout(tick, 30000);
+})();
+
+/* ── Toggle sections ── */
+function toggleSection(type) {
+  var checked = document.getElementById(type + 'Toggle').checked;
+  var body = document.getElementById(type + 'RatingBody');
+  if (body) body.style.display = checked ? 'block' : 'none';
+}
+
+/* ── Star rating ── */
+function setRating(type, val) {
+  ratings[type] = val;
+  var stars = document.querySelectorAll('#' + type + 'Stars .star-btn');
+  stars.forEach(function(btn, i) {
+    btn.classList.toggle('active', i < val);
+  });
+  var lbl = document.getElementById(type + 'StarLabel');
+  if (lbl) lbl.textContent = STAR_LABELS[val] || '';
+}
+
+function setAspect(key, val) {
+  aspects[key] = val;
+  var stars = document.querySelectorAll('#as-' + key + ' .aspect-star');
+  stars.forEach(function(s, i) { s.classList.toggle('active', i < val); });
+}
+
+/* ── Build aspect stars ── */
+function buildAspectStars(containerId, key) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var html = '';
+  for (var i = 1; i <= 5; i++) {
+    html += '<button class="aspect-star" onclick="setAspect(\'' + key + '\',' + i + ')">★</button>';
+  }
+  el.innerHTML = html;
+}
+
+/* ── Category chips ── */
+function selectCategory(btn, cat) {
+  document.querySelectorAll('.fb-chip').forEach(function(c){c.classList.remove('selected');});
+  btn.classList.add('selected');
+  fbCategory = cat;
+}
+
+/* ── Email toggle ── */
+document.getElementById('shareContact').addEventListener('change', function() {
+  document.getElementById('contactEmail').style.display = this.checked ? 'block' : 'none';
+});
+
+/* ── Supabase init ── */
+function getSupa() {
+  if (_supa) return _supa;
+  var cfg = window.HOMATT_CONFIG || {};
+  if (window.supabase && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  }
+  return _supa;
+}
+
+/* ── Load recent services ── */
+async function loadRecentServices() {
+  var supa = getSupa();
+  if (!supa) return;
+  try {
+    var session = (await supa.auth.getSession()).data.session;
+    if (!session) return;
+    var uid = session.user.id;
+
+    var [bookRes, ordRes] = await Promise.all([
+      supa.from('bookings').select('id,clinic_id,patient_name,created_at').eq('user_id', uid).eq('status','attended').order('created_at',{ascending:false}).limit(1),
+      supa.from('pharmacy_orders').select('id,pharmacy_id,patient_name,created_at').eq('user_id', uid).eq('status','delivered').order('created_at',{ascending:false}).limit(1),
+    ]);
+
+    if (bookRes.data && bookRes.data.length) {
+      recentBooking = bookRes.data[0];
+      var nameEl = document.getElementById('clinicName');
+      if (nameEl) nameEl.textContent = 'Rating your visit on ' + new Date(recentBooking.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short'});
+    }
+    if (ordRes.data && ordRes.data.length) {
+      recentOrder = ordRes.data[0];
+      var nameEl2 = document.getElementById('pharmacyName');
+      if (nameEl2) nameEl2.textContent = 'Rating your order on ' + new Date(recentOrder.created_at).toLocaleDateString('en-UG',{day:'numeric',month:'short'});
+    }
+  } catch(e) {}
+}
+
+/* ── Submit ── */
+async function submitFeedback() {
+  var btn = document.getElementById('submitFeedbackBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  var supa = getSupa();
+  var userId = null;
+  if (supa) {
+    try {
+      var sess = (await supa.auth.getSession()).data.session;
+      if (sess) userId = sess.user.id;
+    } catch(e) {}
+  }
+
+  var clinicEnabled = document.getElementById('clinicToggle').checked;
+  var pharmacyEnabled = document.getElementById('pharmacyToggle').checked;
+  var riderEnabled = document.getElementById('riderToggle').checked;
+  var shareContact = document.getElementById('shareContact').checked;
+  var contactEmail = shareContact ? document.getElementById('contactEmail').value.trim() : null;
+
+  var inserts = [];
+
+  if (clinicEnabled && ratings.clinic > 0 && supa) {
+    inserts.push(supa.from('ratings').insert({
+      patient_id: userId,
+      booking_id: recentBooking ? recentBooking.id : null,
+      clinic_id: recentBooking ? recentBooking.clinic_id : null,
+      rating_type: 'clinic',
+      score: ratings.clinic,
+      score_speed: aspects['clinic-wait'] || null,
+      score_quality: aspects['clinic-quality'] || null,
+      score_comms: aspects['clinic-comms'] || null,
+      comment: document.getElementById('clinicComment').value.trim() || null,
+      created_at: new Date().toISOString()
+    }));
+  }
+
+  if (pharmacyEnabled && ratings.pharmacy > 0 && supa) {
+    inserts.push(supa.from('ratings').insert({
+      patient_id: userId,
+      order_id: recentOrder ? recentOrder.id : null,
+      pharmacy_id: recentOrder ? recentOrder.pharmacy_id : null,
+      rating_type: 'pharmacy',
+      score: ratings.pharmacy,
+      score_speed: aspects['pharmacy-speed'] || null,
+      score_quality: aspects['pharmacy-quality'] || null,
+      score_cost: aspects['pharmacy-cost'] || null,
+      comment: document.getElementById('pharmacyComment').value.trim() || null,
+      created_at: new Date().toISOString()
+    }));
+  }
+
+  if (riderEnabled && ratings.rider > 0 && supa) {
+    inserts.push(supa.from('ratings').insert({
+      patient_id: userId,
+      rating_type: 'rider',
+      score: ratings.rider,
+      comment: document.getElementById('riderComment').value.trim() || null,
+      created_at: new Date().toISOString()
+    }));
+  }
+
+  var platformScore = ratings.platform;
+  var platformMsg = document.getElementById('platformComment').value.trim();
+  if ((platformScore > 0 || platformMsg) && supa) {
+    inserts.push(supa.from('platform_feedback').insert({
+      patient_id: userId,
+      overall_score: platformScore || null,
+      category: fbCategory,
+      message: platformMsg || '',
+      contact_email: contactEmail || null,
+      status: 'new',
+      created_at: new Date().toISOString()
+    }));
+  }
+
+  try {
+    if (inserts.length) {
+      await Promise.all(inserts);
+    }
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">send</span> Submit Feedback';
+    alert('Something went wrong submitting your feedback. Please try again.');
+    return;
+  }
+
+  // Show success
+  document.getElementById('feedbackForm').style.display = 'none';
+  var successEl = document.getElementById('feedbackSuccess');
+  successEl.style.display = 'flex';
+  btn.disabled = false;
+}
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', function() {
+  buildAspectStars('as-clinic-wait', 'clinic-wait');
+  buildAspectStars('as-clinic-quality', 'clinic-quality');
+  buildAspectStars('as-clinic-comms', 'clinic-comms');
+  buildAspectStars('as-pharmacy-speed', 'pharmacy-speed');
+  buildAspectStars('as-pharmacy-quality', 'pharmacy-quality');
+  buildAspectStars('as-pharmacy-cost', 'pharmacy-cost');
+
+  // Select default category chip
+  var firstChip = document.querySelector('.fb-chip');
+  if (firstChip) firstChip.classList.add('selected');
+
+  // Pre-select some stars for good UX (no default — let user choose)
+  loadRecentServices();
+});
+</script>
+<script src="js/native-bridge.js"></script>
+</body>
+</html>

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Clinic</title>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20260915">
+  <meta name="color-scheme" content="light dark">
+  <script>
+    // Apply the saved (or system) theme BEFORE first paint — no flash.
+    (function () {
+      try {
+        var t = localStorage.getItem('homatt_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        // The colour family, set before the first paint for the same reason.
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+        // The Android status bar reads this tag, so it has to follow the look.
+        var C = { forest:'#0B3D2E', midnight:'#0C2340', dark:'#000000', clay:'#3B2F27' };
+        document.addEventListener('DOMContentLoaded', function () {
+          var m = document.querySelector('meta[name="theme-color"]');
+          if (m) m.setAttribute('content', C[s] || C.forest);
+        });
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    /* ── Homatt login design system (scoped to this page) ─────────────── */
+    :root{
+      --lg-bg1:#F3FAF4; --lg-bg2:#DFEFE3; --lg-glow:rgba(46,125,50,.14);
+      --lg-mark:rgba(27,94,32,.07);
+      --lg-card:rgba(255,255,255,.86); --lg-card-border:rgba(27,94,32,.10);
+      --lg-shadow:0 24px 70px rgba(21,64,28,.18);
+      --lg-text:#17251A; --lg-text-sub:#5B6B5E; --lg-label:#33473A;
+      --lg-input-bg:#FFFFFF; --lg-input-border:#D7E4D9; --lg-input-text:#17251A;
+      --lg-focus:var(--deep-2); --lg-focus-ring:rgba(46,125,50,.18);
+      --lg-btn1:var(--deep); --lg-btn2:var(--deep-2);
+      --lg-ghost-bg:rgba(27,94,32,.06); --lg-ghost-border:rgba(27,94,32,.16); --lg-ghost-text:var(--deep);
+      --lg-divider:#C9DACB; --lg-marker:#93A697;
+    }
+    html[data-theme="dark"]{
+      --lg-bg1:#07130B; --lg-bg2:#0C2415; --lg-glow:rgba(67,160,71,.13);
+      --lg-mark:rgba(255,255,255,.055);
+      --lg-card:rgba(17,29,20,.78); --lg-card-border:rgba(255,255,255,.09);
+      --lg-shadow:0 24px 70px rgba(0,0,0,.55);
+      --lg-text:#EAF3EC; --lg-text-sub:#9FB4A4; --lg-label:#C2D3C6;
+      --lg-input-bg:rgba(255,255,255,.06); --lg-input-border:rgba(255,255,255,.14); --lg-input-text:#EAF3EC;
+      --lg-focus:#66BB6A; --lg-focus-ring:rgba(102,187,106,.22);
+      --lg-btn1:var(--deep-2); --lg-btn2:#43A047;
+      --lg-ghost-bg:rgba(255,255,255,.05); --lg-ghost-border:rgba(255,255,255,.16); --lg-ghost-text:var(--tint-3);
+      --lg-divider:rgba(255,255,255,.14); --lg-marker:#5F7263;
+    }
+    .admin-login-page{
+      position:relative; overflow:hidden;
+      background:
+        radial-gradient(120vmin 120vmin at 82% -10%, var(--lg-glow), transparent 60%),
+        linear-gradient(160deg, var(--lg-bg1) 0%, var(--lg-bg2) 100%) !important;
+      transition:background .35s ease;
+    }
+    /* GIANT brand watermark — the helping-figures mark, quietly everywhere */
+    .login-watermark{
+      position:absolute; width:125vmin; height:125vmin;
+      right:-32vmin; bottom:-34vmin; transform:rotate(-9deg);
+      color:var(--lg-mark); pointer-events:none; user-select:none; z-index:0;
+    }
+    .login-watermark svg{width:100%;height:100%}
+    .admin-login-card{
+      position:relative; z-index:1;
+      background:var(--lg-card) !important;
+      -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px);
+      border:1px solid var(--lg-card-border);
+      border-radius:24px !important;
+      box-shadow:var(--lg-shadow) !important;
+      color:var(--lg-text);
+      animation:lg-rise .5s cubic-bezier(.2,.8,.3,1) both;
+    }
+    @keyframes lg-rise{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion: reduce){.admin-login-card{animation:none}}
+    .admin-login-title{color:var(--lg-text);font-size:21px;letter-spacing:-.2px}
+    .admin-login-sub{color:var(--lg-text-sub) !important}
+    .admin-login-logo-mark{box-shadow:0 10px 26px rgba(27,94,32,.35);border-radius:18px}
+    .login-field label{color:var(--lg-label) !important}
+    .login-field input{
+      background:var(--lg-input-bg) !important; color:var(--lg-input-text) !important;
+      border:1.5px solid var(--lg-input-border) !important; border-radius:12px !important;
+      transition:border-color .18s, box-shadow .18s;
+    }
+    .login-field input::placeholder{color:var(--lg-text-sub);opacity:.75}
+    .login-field input:focus{border-color:var(--lg-focus) !important;box-shadow:0 0 0 4px var(--lg-focus-ring)}
+    .login-btn{
+      background:linear-gradient(135deg, var(--lg-btn1), var(--lg-btn2)) !important;
+      border-radius:14px !important; letter-spacing:.2px;
+      box-shadow:0 10px 24px rgba(27,94,32,.30);
+      transition:transform .12s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .login-btn:active{transform:translateY(1px) scale(.995);box-shadow:0 5px 14px rgba(27,94,32,.28)}
+    .demo-btn{
+      background:var(--lg-ghost-bg) !important; color:var(--lg-ghost-text) !important;
+      border:1.5px solid var(--lg-ghost-border) !important; border-radius:14px !important;
+    }
+    .login-divider{color:var(--lg-text-sub)}
+    .login-divider::before,.login-divider::after{background:var(--lg-divider)}
+    #buildMarker{color:var(--lg-marker) !important}
+    #apkHint{color:var(--lg-text-sub) !important}
+    /* Theme toggle — top-right of the card */
+    .theme-toggle{
+      position:absolute; top:14px; right:14px; z-index:2;
+      width:40px; height:40px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      background:var(--lg-ghost-bg); border:1px solid var(--lg-ghost-border);
+      color:var(--lg-ghost-text); cursor:pointer;
+      transition:transform .15s ease, background .2s ease;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .theme-toggle:active{transform:scale(.92)}
+    .theme-toggle .material-icons-outlined{font-size:20px}
+  </style>
+</head>
+<body>
+<div class="admin-login-page">
+  <div class="login-watermark" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+      <g stroke="currentColor" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 206 168 C 172 212, 148 264, 140 318"/>
+        <path d="M 140 318 L 94 438"/>
+        <path d="M 140 318 L 228 386 L 212 462"/>
+        <path d="M 216 184 L 332 294"/>
+        <path d="M 416 270 C 438 314, 452 372, 456 430"/>
+        <path d="M 408 286 L 332 294"/>
+        <path d="M 456 430 L 350 378 L 302 458"/>
+      </g>
+      <circle cx="196" cy="102" r="49" fill="currentColor"/>
+      <circle cx="404" cy="214" r="45" fill="currentColor"/>
+    </svg>
+  </div>
+  <div class="admin-login-card">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch between light and dark mode">
+      <span class="material-icons-outlined" id="themeIcon">dark_mode</span>
+    </button>
+    <div class="admin-login-logo">
+      <div class="admin-login-logo-mark">
+        <img src="icons/logo-mark.svg?v=1" alt="Homatt Health" style="width:40px;height:40px" draggable="false">
+      </div>
+      <div class="admin-login-title">Clinic Portal</div>
+      <div class="admin-login-sub">Homatt Health — Uganda</div>
+    </div>
+
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="email">Staff Email</label>
+        <input type="text" id="email" name="clinic-login-id" placeholder="doctor@yourclinic.ug" required
+               inputmode="email" autocomplete="off" autocapitalize="none"
+               autocorrect="off" spellcheck="false" aria-autocomplete="none">
+      </div>
+      <div class="login-field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required
+               autocomplete="current-password" autocapitalize="none"
+               autocorrect="off" spellcheck="false">
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">
+        Sign In to Clinic Portal
+      </button>
+    </form>
+
+    <div class="login-divider">or</div>
+
+    <button class="demo-btn" id="demoBtn">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px">play_circle</span>
+      Open Demo Dashboard
+    </button>
+
+    <a id="apkDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">android</span>
+      Get the Android app (best offline — installs from a file)
+    </a>
+    <div id="apkHint" style="display:none;font-size:11px;color:#9AA0A6;text-align:center;margin-top:6px;line-height:1.5">
+      Opens fully offline on any phone. After downloading, tap the file and allow install.
+    </div>
+
+    <a id="pcDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/desktop-latest/HomattClinic-Setup.exe"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:#fff;font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">computer</span>
+      Get the Windows app (works fully offline)
+    </a>
+    <div id="pcHint" style="display:none;font-size:11px;color:#9AA0A6;text-align:center;margin-top:6px;line-height:1.5">
+      Or install from the browser: Chrome / Edge menu → "Install Homatt Clinic".
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+    <div id="buildMarker" style="text-align:center;margin-top:14px;font-size:10px;color:#B0BEC5;letter-spacing:.3px"></div>
+  </div>
+</div>
+<script>
+  // Visible build + LIVE DIAGNOSTICS marker. Tells us, from one screenshot,
+  // exactly why offline is or isn't working: the version, the launch mode, and
+  // — critically — whether the offline service worker is active and how many
+  // files it has actually cached. "SW:active cache:20" = offline will work;
+  // "SW:none" or "cache:0" pinpoints the real failure.
+  (function () {
+    var BUILD = 'v151';
+    var el = document.getElementById('buildMarker');
+    function set(t) { if (el) el.textContent = t; }
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    var standalone = window.matchMedia('(display-mode: standalone)').matches;
+    var mode = native ? 'app' : (standalone ? 'installed' : 'browser');
+    set('Homatt Clinic • ' + BUILD + ' • ' + mode);
+    (async function () {
+      var sw = 'no-SW-support', pages = 0;
+      try {
+        if ('serviceWorker' in navigator) {
+          var reg = await navigator.serviceWorker.getRegistration();
+          sw = !reg ? 'none' : (reg.active ? 'active' : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'reg')));
+        }
+      } catch (e) { sw = 'err'; }
+      try {
+        if (window.caches) {
+          var keys = await caches.keys();
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
+            var c = await caches.open(keys[i]);
+            pages += (await c.keys()).length;
+          }
+        }
+      } catch (e) {}
+      // The IndexedDB SECOND copy of the shell (survives cache wipes) and
+      // whether the OS granted persistent storage (protects against cleaners).
+      var idbN = 0, keep = '?';
+      try {
+        idbN = await new Promise(function (res) {
+          var q = indexedDB.open('homatt-shell', 1);
+          q.onupgradeneeded = function () { try { q.result.createObjectStore('files'); } catch (e) {} };
+          q.onsuccess = function () {
+            try {
+              var rq = q.result.transaction('files', 'readonly').objectStore('files').getAllKeys();
+              rq.onsuccess = function () { res((rq.result || []).length); };
+              rq.onerror = function () { res(0); };
+            } catch (e) { res(0); }
+          };
+          q.onerror = function () { res(0); };
+        });
+      } catch (e) {}
+      try {
+        if (navigator.storage && navigator.storage.persisted) {
+          keep = (await navigator.storage.persisted()) ? 'yes' : 'no';
+        }
+      } catch (e) {}
+      set('Homatt Clinic • ' + BUILD + ' • ' + mode + ' • SW:' + sw + ' • cache:' + pages + ' • idb:' + idbN + ' • keep:' + keep);
+    })();
+  })();
+</script>
+
+<script>
+  // Light/dark toggle — remembered on this device, defaults to the phone's own
+  // setting. The whole page re-themes through CSS variables instantly.
+  (function () {
+    var btn = document.getElementById('themeToggle');
+    var icon = document.getElementById('themeIcon');
+    function paint() {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (icon) icon.textContent = dark ? 'light_mode' : 'dark_mode';
+    }
+    if (btn) btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('homatt_theme', next); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+</script>
+
+<script src="js/vendor/supabase.min.js?v=2110"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic-offline.js?v=20260830a"></script>
+<!-- clinic.js registers the offline-sync handlers. Loading it here (not just on
+     the dashboard) lets the outbox process + self-heal from the LOGIN page too,
+     so a queued write that can never succeed no longer shows "Syncing…" forever
+     while you're signed out. It only defines functions + registers handlers —
+     no side effects that touch the login flow. -->
+<script src="js/clinic.js?v=20260831"></script>
+<script src="js/pwa-install.js?v=20260831"></script>
+<script>
+  (function() {
+    try {
+      const s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('clinic_session');
+  })();
+
+  // Offer the native Android app (best offline) on Android web browsers only —
+  // not inside an already-installed app, and not on desktop.
+  (function() {
+    try {
+      var isAndroid = /Android/i.test(navigator.userAgent || '');
+      var inApp = window.matchMedia('(display-mode: standalone)').matches ||
+                  !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      if (isAndroid && !inApp) {
+        var a = document.getElementById('apkDownload');
+        var h = document.getElementById('apkHint');
+        if (a) a.style.display = 'flex';
+        if (h) h.style.display = 'block';
+      }
+      // Desktop browser (not a phone, not already installed/native, not the
+      // desktop app itself which runs from file:) → offer the Windows app.
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      var isFile = location.protocol === 'file:';
+      if (!isMobile && !inApp && !isFile) {
+        var p = document.getElementById('pcDownload');
+        var ph = document.getElementById('pcHint');
+        if (p) p.style.display = 'flex';
+        if (ph) ph.style.display = 'block';
+      }
+    } catch(e) {}
+  })();
+
+  const cfg = window.HOMATT_CONFIG || {};
+  const _supa = (cfg.SUPABASE_URL && window.supabase)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
+      }) : null;
+
+  // IMPORTANT: never rewrite the field's value while the user is typing.
+  // Samsung/Gboard keyboards hold the current word in an IME composition
+  // buffer; changing input.value mid-composition makes the keyboard re-commit
+  // its whole buffer, which DUPLICATES the text (emmanuel@emmanuel@…).
+  // So we only sanitize when it's safe: after composition ends, on blur,
+  // and right before submitting.
+  const emailInput = document.getElementById('email');
+  let _composing = false;
+
+  function sanitizeEmail() {
+    if (_composing) return; // never touch the value mid-composition
+    const cleaned = emailInput.value.replace(/[^a-zA-Z0-9._%+@\-]/g, '');
+    if (cleaned !== emailInput.value) emailInput.value = cleaned;
+  }
+
+  emailInput.addEventListener('compositionstart', () => { _composing = true; });
+  emailInput.addEventListener('compositionend',   () => { _composing = false; sanitizeEmail(); });
+  emailInput.addEventListener('blur', sanitizeEmail);
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    _composing = false;
+    sanitizeEmail();
+    const email = document.getElementById('email').value.trim().toLowerCase();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('loginError');
+    err.style.display = 'none';
+
+    if (!_supa) {
+      localStorage.setItem('clinic_session', JSON.stringify({ email, staffName: email.split('@')[0], clinicName: 'Clinic Portal' }));
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    const { data: authData, error: authError } = await _supa.auth.signInWithPassword({ email, password });
+    if (authError) {
+      err.textContent = authError.message;
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Clinic Portal';
+      return;
+    }
+
+    const { data: pu } = await _supa
+      .from('portal_users')
+      .select('*, clinics(name)')
+      .eq('auth_user_id', authData.user.id)
+      .eq('role', 'clinic_staff')
+      .eq('is_active', true)
+      .single();
+
+    if (!pu) {
+      await _supa.auth.signOut();
+      err.textContent = 'No clinic staff account found for this email.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Clinic Portal';
+      return;
+    }
+
+    localStorage.setItem('clinic_session', JSON.stringify({
+      userId: authData.user.id,
+      staffName: pu.full_name || email,
+      clinicId: pu.clinic_id,
+      clinicName: pu.clinics?.name || 'Clinic',
+      staffRole: pu.staff_role || 'owner',
+      email
+    }));
+    window.location.href = 'dashboard.html';
+  });
+
+  document.getElementById('demoBtn').addEventListener('click', async () => {
+    // The demo is for showing OTHER people — it must never carry the real
+    // account's access with it. Sign the real login out first so nothing in
+    // demo mode can reach the clinic's actual data.
+    try { if (_supa) await Promise.race([_supa.auth.signOut(), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+    localStorage.setItem('clinic_session', JSON.stringify({
+      staffName: 'Dr. Demo',
+      clinicName: 'Kampala Medical Centre',
+      clinicId: null,
+      demo: true
+    }));
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>
