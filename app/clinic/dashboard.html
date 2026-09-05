@@ -37,7 +37,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260913">
+  <link rel="stylesheet" href="css/clinic.css?v=20260914">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -523,14 +523,14 @@
         <div style="padding:12px 14px">
           <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
             <input id="histSearchInput" type="text" placeholder="Search by name, phone or patient ID (HP-…)" autocomplete="off"
-              style="flex:1;min-width:200px;padding:11px 14px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none">
+              style="flex:1;min-width:180px;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:var(--surface);color:var(--text)">
             <button id="histSearchBtn" onclick="searchPatientHistory()"
               style="padding:11px 20px;background:var(--primary);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:6px">
               <span class="material-icons-outlined" style="font-size:18px">search</span> Search
             </button>
           </div>
-          <div id="histResults" style="min-height:40px;color:#9AA0A6;font-size:13px;text-align:center;padding:16px 0">
-            Enter a name or phone number to view a patient's full history.
+          <div id="histResults" style="min-height:40px">
+            <div class="ph-empty">Type a name, a phone number or a patient ID.</div>
           </div>
         </div>
       </div>
@@ -1883,11 +1883,11 @@
     var res = document.getElementById('histResults');
     if (!inp || !res) return;
     var q = inp.value.trim();
-    if (!q || q.length < 2) { res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Enter at least 2 characters to search.</div>'; return; }
+    if (!q || q.length < 2) { res.innerHTML = '<div class="ph-empty">Type a name, a phone number or a patient ID.</div>'; return; }
     if (!supabase) { res.innerHTML = '<div style="color:#C62828;text-align:center;padding:16px 0">Database not connected.</div>'; return; }
     var clinicId = await resolveClinicId();
-    if (!clinicId) { res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Account not linked to a clinic.</div>'; return; }
-    res.innerHTML = '<div style="color:#9AA0A6;text-align:center;padding:16px 0">Searching…</div>';
+    if (!clinicId) { res.innerHTML = '<div class="ph-empty">Account not linked to a clinic.</div>'; return; }
+    res.innerHTML = '<div class="ph-empty">Searching…</div>';
 
     var CO = window.ClinicOffline;
     var poolKey = 'hist_pool_' + clinicId;
@@ -1932,26 +1932,37 @@
         groups[key].records.push(row);
       });
       window._histGroups = groups;
-      res.innerHTML = (fromCache ? '<div style="font-size:11px;color:#9AA0A6;text-align:center;padding:4px 0 10px">Offline — showing saved records.</div>' : '')
-        + Object.keys(groups).map(function(k) {
+      var keys = Object.keys(groups);
+      if (!keys.length) {
+        res.innerHTML = '<div class="ph-empty">No patient matches that.</div>';
+        return;
+      }
+      // Two lines a patient: who they are, and enough to be sure it is them.
+      res.innerHTML =
+        (fromCache ? '<div class="ph-count">Offline — showing saved records</div>' : '')
+        + '<div class="ph-count">' + keys.length + ' patient' + (keys.length!==1?'s':'') + '</div>'
+        + '<div class="ph-list">' + keys.map(function(k) {
         var g = groups[k];
         var latest = g.records[0];
         var count = g.records.length;
-        var ini = (g.name||'?').split(' ').map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
-        return '<div class="order-card" style="cursor:pointer;margin-bottom:8px" onclick="openHistModal(\''+esc(k)+'\')">'
-          +'<div class="order-avatar" style="background:#E3F2FD;color:#1565C0">'+ini+'</div>'
-          +'<div class="order-info">'
-            +'<div class="order-patient">'+esc(g.name)+'</div>'
-            +'<div class="order-drug">'+esc(latest.confirmed_diagnosis||'Pending')+'</div>'
-            +'<div class="order-meta">'
-              +((typeof homattPatientId === 'function' && homattPatientId(g.phone || latest))
-                  ? '<span style="background:var(--brand-tint);color:var(--primary-d);font-weight:800;padding:1px 7px;border-radius:10px">'
-                    + esc(homattPatientId(g.phone || latest)) + '</span>' : '')
-              +'<span>'+count+' visit'+(count!==1?'s':'')+'</span>'+(g.phone?'<span>'+esc(g.phone)+'</span>':'')+'</div>'
+        var ini = (g.name||'?').split(' ').filter(Boolean)
+                    .map(function(x){return x[0];}).slice(0,2).join('').toUpperCase();
+        var hp = (typeof homattPatientId === 'function') ? homattPatientId(g.phone || latest) : '';
+        // Last seen for, then how to be sure it is the right person.
+        var sub = [];
+        if (latest.confirmed_diagnosis) sub.push(esc(latest.confirmed_diagnosis));
+        if (hp) sub.push('<span class="ph-id">' + esc(hp) + '</span>');
+        if (g.phone) sub.push(esc(g.phone));
+        return '<div class="ph-row" onclick="openHistModal(\''+esc(k)+'\')">'
+          +'<div class="ph-av">'+esc(ini)+'</div>'
+          +'<div class="ph-b">'
+            +'<div class="ph-n">'+esc(g.name)+'</div>'
+            +'<div class="ph-s">'+(sub.length?sub.join(' · '):'No diagnosis recorded')+'</div>'
           +'</div>'
-          +'<div class="order-right"><span class="material-icons-outlined" style="color:#9AA0A6;font-size:20px">chevron_right</span></div>'
-          +'</div>';
-      }).join('');
+          +'<span class="ph-c">'+count+'</span>'
+          +'<span class="material-icons-outlined ph-go">chevron_right</span>'
+        +'</div>';
+      }).join('') + '</div>';
     }
 
     // A patient ID (HP-XXXXXX) is computed locally, so resolve it from the pool.
@@ -1994,7 +2005,22 @@
   }
 
   var histInp = document.getElementById('histSearchInput');
-  if (histInp) histInp.addEventListener('keydown', function(e){ if(e.key==='Enter') searchPatientHistory(); });
+  if (histInp) {
+    histInp.addEventListener('keydown', function(e){ if(e.key==='Enter') searchPatientHistory(); });
+    // Search as the name is typed. Two characters is enough to start, and the
+    // pause means a clinician typing "emmanuel" makes one query, not eight.
+    var _histT = null;
+    histInp.addEventListener('input', function () {
+      clearTimeout(_histT);
+      var v = this.value.trim();
+      var res = document.getElementById('histResults');
+      if (v.length < 2) {
+        if (res) res.innerHTML = '<div class="ph-empty">Type a name, a phone number or a patient ID.</div>';
+        return;
+      }
+      _histT = setTimeout(searchPatientHistory, 320);
+    });
+  }
 
   // ── Patient history modal ──
   function openHistModal(groupKey) {
@@ -2016,9 +2042,65 @@
     var histFooter = document.getElementById('histModalFooter');
     if (histFooter) histFooter.style.display = 'none';
     modal.style.display = 'flex';
-    bodyEl.innerHTML = g.records.map(function(c, i) {
-      return renderHistVisitCard(c, g.records.length - i, i === 0);
+
+    // Searching inside one person's record. Six visits is enough that finding
+    // "the time they came with wounds" means scrolling past five others, so
+    // the box appears once there are three. It matches on what the visit was
+    // about — the diagnosis, the findings, the medicines, the clinician, the
+    // date — because that is how a clinician remembers a visit, not by number.
+    var many = g.records.length >= 3;
+    var cards = g.records.map(function(c, i) {
+      return '<div class="ph-visit" data-find="' + esc(visitHaystack(c)) + '">'
+        + renderHistVisitCard(c, g.records.length - i, i === 0) + '</div>';
     }).join('');
+
+    bodyEl.innerHTML =
+      (many
+        ? '<div class="ph-filter">'
+            + '<span class="material-icons-outlined">search</span>'
+            + '<input id="histVisitFilter" type="text" autocomplete="off" '
+            + 'placeholder="Search these ' + g.records.length + ' visits — a complaint, a medicine, a month">'
+            + '<button type="button" id="histVisitClear" style="display:none">Clear</button>'
+          + '</div>'
+        : '')
+      + '<div id="histVisitList">' + cards + '</div>'
+      + '<div id="histVisitNone" class="ph-nohit" style="display:none"></div>';
+
+    if (many) {
+      var fi = document.getElementById('histVisitFilter');
+      var clr = document.getElementById('histVisitClear');
+      var apply = function () {
+        var q = (fi.value || '').trim().toLowerCase();
+        clr.style.display = q ? 'block' : 'none';
+        var shown = 0;
+        bodyEl.querySelectorAll('.ph-visit').forEach(function (el) {
+          var hit = !q || (el.getAttribute('data-find') || '').indexOf(q) >= 0;
+          el.style.display = hit ? '' : 'none';
+          if (hit) shown++;
+        });
+        var none = document.getElementById('histVisitNone');
+        none.style.display = shown ? 'none' : 'block';
+        none.textContent = 'No visit here mentions “' + q + '”.';
+      };
+      fi.addEventListener('input', apply);
+      clr.addEventListener('click', function () { fi.value = ''; apply(); fi.focus(); });
+    }
+  }
+
+  // Everything about a visit that a clinician might search it by, lower-cased
+  // into one string. Built once when the record opens so typing stays instant.
+  function visitHaystack(c) {
+    var d = new Date(c.created_at);
+    var meds = (Array.isArray(c.prescription_items) ? c.prescription_items : [])
+      .map(function (m) { return m.drug_name || m.name || ''; }).join(' ');
+    return [
+      c.confirmed_diagnosis, c.severity, c.patient_type, c.ward, c.clinician_name,
+      c.clinical_findings, c.lab_tests_ordered, c.lab_results,
+      c.treatment_plan, c.patient_instructions, c.follow_up_reason, meds,
+      c.payment_status,
+      d.toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' }),
+      d.toLocaleDateString('en-UG', { month:'long' }),
+    ].filter(Boolean).join(' ').toLowerCase();
   }
 
   // Full clinical + financial detail for one past visit in the Patient History modal.
@@ -2050,7 +2132,10 @@
       }
       v = String(v).trim();
       if (!v) return '';
-      return '<div class="pr-field">'
+      // A short answer belongs beside its label, not under it. "Seen by /
+      // DANIEL MUSINGUZI" was taking two lines and 40px to say six words.
+      var inline = v.length <= 38 && v.indexOf('\n') < 0;
+      return '<div class="pr-field' + (inline ? ' inline' : '') + '">'
         +'<div class="pr-field-k">'+label+'</div>'
         +'<div class="pr-field-v">'+esc(v)+'</div>'
       +'</div>';
@@ -2086,7 +2171,7 @@
 
     // Medicines given
     var medsBlock = '<div class="pr-field">'
-      +'<div class="pr-field-k">Medicines given</div>'
+      +'<div class="pr-field-k">Medicines</div>'
       + renderMedsList(c.prescription_items)
       +'</div>';
 
@@ -2126,13 +2211,13 @@
         +courseChip
       +'</div>'
       + sect('Seen by', c.clinician_name)
-      + sect('Clinical findings / what was found', c.clinical_findings)
-      + sect('Lab tests ordered', c.lab_tests_ordered)
-      + sect('Lab results', labResultsTxt)
+      + sect('Findings', c.clinical_findings)
+      + sect('Lab tests', c.lab_tests_ordered)
+      + sect('Results', labResultsTxt)
       + medsBlock
-      + sect('Treatment plan', planTxt)
-      + sect('Patient instructions', c.patient_instructions)
-      + sect('Expected recovery by', c.expected_recovery ? new Date(c.expected_recovery).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '')
+      + sect('Plan', planTxt)
+      + sect('Told the patient', c.patient_instructions)
+      + sect('Recovery by', c.expected_recovery ? new Date(c.expected_recovery).toLocaleDateString('en-UG',{day:'numeric',month:'short',year:'numeric'}) : '')
       + followBlock
       + financialBlock
     +'</div>';
@@ -2236,7 +2321,14 @@
   }
 
   function renderMedsList(items) {
-    if (!Array.isArray(items) || !items.length) {
+    // A saved consultation can carry a placeholder where a medicine would go —
+    // the record showed a drug called "N/A", dosed 1x/day for 1 day. That is
+    // not a prescription and must not read like one.
+    items = (Array.isArray(items) ? items : []).filter(function (m) {
+      var n = String((m && (m.drug_name || m.name)) || '').trim();
+      return n && !/^(n\/?a|none|nil|-{1,2})$/i.test(n);
+    });
+    if (!items.length) {
       return '<div class="pr-note">No medicines recorded for this visit.</div>';
     }
     return items.map(function(m) {
