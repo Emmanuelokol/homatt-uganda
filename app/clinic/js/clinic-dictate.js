@@ -200,6 +200,78 @@
     sbp: 'Systolic', dbp: 'Diastolic',
   };
 
+  // ── Who the patient is ───────────────────────────────────────────────────
+  // Sex and age are patterned enough to read with rules. A NAME is not: Ugandan
+  // names are in no dictionary, and no rule can tell "Jackline Marcy came in
+  // with fever" from a place or a symptom. So a name is taken ONLY when the
+  // clinician marked it — "her name is", "the patient is", "called" — and
+  // anything less certain is left for the model pass, which can be wrong
+  // without being dangerous because the box is right there to correct.
+
+  // Sex, said outright. Relationship words are deliberately absent: "the mother
+  // says he is not feeding" is a male patient described by a female informant,
+  // and reading "mother" as the patient's sex would be wrong every time a
+  // parent brought a child in.
+  var SEX_WORD = [
+    ['female', /\b(?:female|woman|lady|girl|f\/(?:\d)|is a female)\b/i],
+    ['male',   /\b(?:male|man|gentleman|boy|m\/(?:\d)|is a male)\b/i],
+  ];
+  var SHE = /\b(?:she|her|hers|herself)\b/gi;
+  var HE  = /\b(?:he|him|his|himself)\b/gi;
+
+  // "32 years old", "a 32-year-old", "aged 32", "3 months old".
+  var AGE_Y = /\b(?:aged\s+)?(\d{1,3})\s*[-\s]?\s*(?:year|yr)s?\b(?:[\s-]*old)?/i;
+  var AGE_M = /\b(\d{1,3})\s*[-\s]?\s*(?:month|mo)s?\b[\s-]*old\b/i;
+  var AGE_BARE = /\baged\s+(\d{1,3})\b/i;
+
+  var NAME_CUE = /\b(?:(?:her|his|the patient'?s?|patient)\s+name\s+is|name\s+is|named|called|this\s+is|patient\s+is)\s+([A-Za-z][A-Za-z'’-]+(?:\s+[A-Za-z][A-Za-z'’-]+){0,2})/i;
+
+  function titleCase(s) {
+    return String(s || '').trim().split(/\s+/).map(function (w) {
+      return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+    }).join(' ');
+  }
+
+  // Words that follow a name cue but are plainly not a name.
+  var NOT_A_NAME = /^(?:a|an|the|complaining|complains|here|with|for|not|and|his|her|male|female|man|woman|boy|girl|child|baby|patient|feeling|having)\b/i;
+
+  /**
+   * Read who the patient is out of a dictated sentence.
+   * Returns { name, sex, age, ageUnit, heard } — only what was actually marked.
+   */
+  function parsePerson(spoken) {
+    var text = digitsFromWords(String(spoken || ''));
+    var out = { name: '', sex: '', age: '', ageUnit: '', heard: [] };
+
+    for (var i = 0; i < SEX_WORD.length; i++) {
+      if (SEX_WORD[i][1].test(text)) { out.sex = SEX_WORD[i][0]; break; }
+    }
+    if (!out.sex) {
+      // Whichever pronoun the clinician used for the patient, by weight of use.
+      var she = (text.match(SHE) || []).length;
+      var he = (text.match(HE) || []).length;
+      if (she > he) out.sex = 'female';
+      else if (he > she) out.sex = 'male';
+    }
+    if (out.sex) out.heard.push('Sex: ' + out.sex);
+
+    var m = AGE_M.exec(text);
+    if (m && +m[1] > 0 && +m[1] <= 36) {
+      out.age = m[1]; out.ageUnit = 'months';
+    } else {
+      m = AGE_Y.exec(text) || AGE_BARE.exec(text);
+      if (m && +m[1] > 0 && +m[1] <= 120) { out.age = m[1]; out.ageUnit = 'years'; }
+    }
+    if (out.age) out.heard.push('Age: ' + out.age + ' ' + out.ageUnit);
+
+    var n = NAME_CUE.exec(text);
+    if (n && !NOT_A_NAME.test(n[1].trim())) {
+      out.name = titleCase(n[1]);
+      out.heard.push('Name: ' + out.name);
+    }
+    return out;
+  }
+
   // ── The complaint and the story ──────────────────────────────────────────
   // Vitals are numbers, so the rule there is never to guess which box one
   // belongs to. Free text has the opposite failure: the danger is not a wrong
@@ -397,7 +469,7 @@
   async function transcribe(blob, mode) {
     var form = new FormData();
     form.append('audio', blob, 'clip.webm');
-    form.append('mode', mode || 'vitals');
+    form.append('mode', mode === 'vitals' ? 'vitals' : 'story');
     // _getClinicSupabase() is the app's one shared client — the page-level
     // `supabase` global is not safe to read here, because a page that assigns
     // to it replaces the library with the client.
@@ -409,6 +481,144 @@
     return (r.data && r.data.text) || '';
   }
 
+  // ── Filling in who the patient is ────────────────────────────────────────
+  function setSex(sex) {
+    if (!sex) return 0;
+    var b = document.querySelector('.it-sex-btn[data-sex="' + sex + '"]');
+    if (!b || b.classList.contains('on')) return 0;
+    b.click();
+    return 1;
+  }
+  function setAge(age, unit) {
+    if (!age) return 0;
+    var el = document.getElementById('itAge');
+    if (!el) return 0;
+    el.value = age;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    var u = document.querySelector('[data-unit="' + (unit || 'years') + '"]');
+    if (u && !u.classList.contains('on')) u.click();
+    return 1;
+  }
+  // The name is only ever written into an EMPTY box. A clinician who typed a
+  // spelling by hand has decided how it is spelled, and a recogniser's guess at
+  // a Ugandan name must not overwrite that.
+  function setName(name) {
+    var el = document.getElementById('quickPatientName');
+    if (!el || !name || String(el.value || '').trim()) return 0;
+    el.value = name;
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    return 1;
+  }
+
+  // Ask the server to split the transcript up. Returns {} on any failure —
+  // the rules below have already filled what they could, so a model that is
+  // slow, down or not configured costs the clinician nothing.
+  async function structure(text) {
+    try {
+      var sb = (typeof global._getClinicSupabase === 'function')
+        ? global._getClinicSupabase() : null;
+      if (!sb || !sb.functions) return {};
+      var r = await sb.functions.invoke('structure', { body: { transcript: text } });
+      if (r.error || !r.data || !r.data.fields) return {};
+      return r.data.fields;
+    } catch (e) { return {}; }
+  }
+
+  // Every word of the dictation must still be in one box or another. The rules
+  // guarantee that by construction; a model does not, so its split is only
+  // accepted when it demonstrably drops nothing. Otherwise the rules' split
+  // stands — worse organised, but complete, which is the way round that matters.
+  function keepsEverything(text, complaint, history, background) {
+    function bag(s) {
+      return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+        .split(/\s+/).filter(function (w) { return w.length > 2; });
+    }
+    var have = {};
+    bag(complaint + ' ' + history + ' ' + background).forEach(function (w) { have[w] = 1; });
+    var missing = bag(text).filter(function (w) { return !have[w]; });
+    // A few filler words may fall out in tidying; a sentence may not.
+    return missing.length <= 3;
+  }
+
+  /**
+   * The whole consultation, from one dictation.
+   *
+   * Rules run first and own anything measurable. The model runs second and may
+   * only improve the prose and name the patient — it is never shown a number
+   * and never asked for a diagnosis.
+   */
+  async function applyConsult(text) {
+    var lines = [];
+
+    // 1. Numbers, by rule. Never from a model.
+    var v = parseVitals(text);
+    var nv = fill(v.vitals);
+    if (nv) lines.push('Vitals: ' + v.heard.join(' · '));
+    v.ignored.forEach(function (g) {
+      lines.push('Ignored ' + g.key + ' ' + g.value + ' — ' + g.why);
+    });
+
+    // 2. Who they are, by rule.
+    var who = parsePerson(text);
+    var story = parseStory(text);
+
+    // 3. The model, for what rules cannot do — a Ugandan name above all.
+    var ai = await structure(text);
+
+    // A model may only report a name it actually heard. Asked to fill a form,
+    // a model will oblige — and a plausible Ugandan name on a consultation
+    // nobody named is worse than an empty box, because it looks like a record.
+    // So every word of a suggested name has to be in the transcript.
+    function saidAloud(candidate) {
+      if (!candidate) return false;
+      var hay = ' ' + String(text).toLowerCase().replace(/[^a-z0-9\s]/g, ' ') + ' ';
+      return String(candidate).toLowerCase().split(/\s+/).filter(Boolean)
+        .every(function (w) { return hay.indexOf(' ' + w + ' ') >= 0; });
+    }
+    var name = who.name || (saidAloud(ai.name) ? ai.name : '') || '';
+    var sex = who.sex || ai.sex || '';
+    var age = who.age || ai.age || '';
+    var unit = who.age ? who.ageUnit : (ai.ageUnit || 'years');
+
+    var complaint = story.complaint, history = story.history, background = '';
+    var usedModel = false;
+    if (ai.complaint || ai.history || ai.background) {
+      if (keepsEverything(text, ai.complaint || '', ai.history || '', ai.background || '')) {
+        complaint = ai.complaint || complaint;
+        history = ai.history || history;
+        background = ai.background || '';
+        usedModel = true;
+      }
+    }
+
+    var n = 0;
+    n += setName(name);
+    n += setSex(sex);
+    n += setAge(age, unit);
+    var chief = document.getElementById('itChief');
+    var chiefEmpty = chief && !String(chief.value || '').trim();
+    n += (chiefEmpty ? addTo('itChief', complaint) : 0);
+    n += addTo('itSubjective', chiefEmpty ? history : text);
+    if (background) n += addTo('itBackground', background);
+
+    // Always the words that were actually heard, first, before any tidying —
+    // a dropped "no" is invisible in the tidied version and obvious here.
+    var out = ['Heard: “' + text + '”'];
+    var placed = [];
+    if (name) placed.push('name ' + name);
+    if (sex) placed.push(sex);
+    if (age) placed.push(age + ' ' + unit);
+    if (complaint) placed.push('complaint: ' + complaint);
+    if (placed.length) out.push('Filled in: ' + placed.join(' · '));
+    out = out.concat(lines);
+    if (story.negations.length) {
+      out.push('You said: ' + story.negations.join(', ') + ' — check that is right');
+    }
+    if (!n) out.push('Nothing in that could be placed — the words are above, ' +
+                     'type what belongs where.');
+    return { text: out.join('  ·  '), ok: n > 0, usedModel: usedModel };
+  }
+
   // What to do with the transcript, and what to tell the clinician about it.
   //
   // The story mode always shows the transcript VERBATIM. That is not padding:
@@ -418,6 +628,7 @@
   // actually heard, so the denials are listed separately to draw the eye.
   function applied(mode, text) {
     text = String(text || '').trim();
+    if (mode === 'consult') return applyConsult(text);
     if (mode === 'story') {
       var got = parseStory(text);
       // The chief complaint is ONE thing — the reason they came. A clinician
@@ -466,7 +677,7 @@
     var btn = document.getElementById(btnId);
     var out = document.getElementById(sayId);
     if (!btn) return;
-    mode = mode === 'story' ? 'story' : 'vitals';
+    mode = (mode === 'story' || mode === 'consult') ? mode : 'vitals';
 
     btn.addEventListener('click', async function () {
       if (_rec) { stop(); btn.classList.remove('on'); say(out, 'Listening finished — reading it…'); return; }
@@ -505,19 +716,20 @@
                    'for now.', 'warn');
           return;
         }
-        var res = applied(mode, text);
+        var res = await applied(mode, text);
         say(out, res.text, res.ok ? 'ok' : 'warn');
       };
       _rec.start();
       btn.classList.add('on');
-      say(out, mode === 'story'
-        ? 'Listening — say what they came with, then tap again.'
-        : 'Listening — say the readings, then tap again.');
+      say(out, mode === 'vitals'
+        ? 'Listening — say the readings, then tap again.'
+        : 'Listening — say who it is and what they came with, then tap again.');
       _stopT = setTimeout(stop, MAX_MS);
     });
   }
 
   var API = { parseVitals: parseVitals, parseStory: parseStory,
+              parsePerson: parsePerson, applyConsult: applyConsult,
               digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

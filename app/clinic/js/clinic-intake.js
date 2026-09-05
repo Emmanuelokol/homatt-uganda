@@ -445,7 +445,9 @@
   function bindDictation() {
     if (window.HomattDictate && window.HomattDictate.attach) {
       window.HomattDictate.attach('itDictate', 'itDictateSay', 'vitals');
-      window.HomattDictate.attach('itDictateStory', 'itDictateStorySay', 'story');
+      // The whole consultation from one dictation: who it is, what they came
+      // with, and any readings said out loud.
+      window.HomattDictate.attach('itDictateStory', 'itDictateStorySay', 'consult');
     }
   }
 
