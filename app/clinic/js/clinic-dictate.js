@@ -568,27 +568,68 @@
       throw e0;
     }
     var r = await sb.functions.invoke('transcribe', { body: form });
-    // A non-2xx arrives as r.error, but the function's own JSON — which says
-    // WHICH fault it was — rides along in the context. Without reading it, an
-    // exhausted account is indistinguishable from a dropped connection.
-    if (r.error) {
-      var body = null;
-      try {
-        if (r.error.context && typeof r.error.context.json === 'function') {
-          body = await r.error.context.json();
-        }
-      } catch (e) {}
-      // With no reply to read, the connection is the likeliest fault, and the
-      // clinician needs the way round it in the same breath as the bad news —
-      // a message that only says something failed leaves them tapping the
-      // button again with a patient in front of them.
-      var err = new Error((body && body.error) ||
-        'Could not reach the dictation service. Type it in for now.');
-      err.kind = (body && body.kind) || 'unreachable';
-      throw err;
-    }
+    if (r.error) throw await faultFrom(r.error);
     noteFault(null);
     return (r.data && r.data.text) || '';
+  }
+
+  /**
+   * What actually went wrong, in words a clinician can act on.
+   *
+   * Every one of these looked identical before — "Could not reach the dictation
+   * service" — and they need four different people to fix them. The one that
+   * matters most is the FIRST one: a clinic that has not deployed the function
+   * yet has never had dictation, and telling them the network is bad sends them
+   * to the wrong problem for a week.
+   *
+   * A non-2xx arrives as an error whose `context` is the Response, so both the
+   * status and the function's own JSON are there to be read.
+   */
+  async function faultFrom(e) {
+    var ctx = e && e.context;
+    var status = (ctx && typeof ctx.status === 'number') ? ctx.status : 0;
+    var body = null;
+    try {
+      if (ctx && typeof ctx.json === 'function') body = await ctx.json();
+    } catch (e2) {}
+
+    // Our own function says which fault it is. Only its messages are shown
+    // verbatim — a gateway's "Requested function was not found" is true and
+    // useless to a nurse.
+    if (body && body.kind && body.error) {
+      var mine = new Error(String(body.error));
+      mine.kind = String(body.kind);
+      return mine;
+    }
+
+    var msg, kind;
+    if (status === 404) {
+      kind = 'unconfigured';
+      msg = 'Dictation has not been switched on for this clinic yet. Someone ' +
+            'has to set it up on the server — type the readings for now.';
+    } else if (status === 401 || status === 403) {
+      kind = 'signedout';
+      msg = 'You have been signed out, so dictation was refused. Sign in ' +
+            'again — type it in for now.';
+    } else if (status === 429) {
+      kind = 'busy';
+      msg = 'The dictation service is busy. Wait a moment and try again.';
+    } else if (status >= 500) {
+      kind = 'server';
+      msg = 'The dictation service had a problem at its end. Type it in for ' +
+            'now and try again later.';
+    } else {
+      // No status at all means the request never landed: no signal, a captive
+      // wifi, the phone asleep. The way round it goes in the same breath as
+      // the bad news — a message that only says something failed leaves the
+      // clinician tapping the button again with a patient in front of them.
+      kind = 'unreachable';
+      msg = 'Could not reach the dictation service. Type it in for now.';
+    }
+    var err = new Error(msg);
+    err.kind = kind;
+    err.status = status;
+    return err;
   }
 
   // ── Filling in who the patient is ────────────────────────────────────────
@@ -841,6 +882,132 @@
     clearTimeout(_stopT);
     if (_rec && _rec.state !== 'inactive') { try { _rec.stop(); } catch (e) {} }
     _rec = null;
+    liveOff();
+  }
+
+  // ── Showing that it is listening ─────────────────────────────────────────
+  //
+  // A button that only changes colour looks the same on a working microphone
+  // and a dead one, and a clinician who cannot tell will keep talking into
+  // nothing and lose the whole consultation. So the bars are driven by the
+  // ACTUAL level coming off the microphone: if they do not move, it is not
+  // hearing you, and that is worth knowing while there is still time to type.
+  var _live = { raf: 0, ctx: null, tick: 0, t0: 0 };
+
+  function liveEls() {
+    return { box: document.getElementById('itDictateLive'),
+             bars: document.getElementById('itDictateBars'),
+             time: document.getElementById('itDictateTime') };
+  }
+
+  function liveOn(stream) {
+    var el = liveEls();
+    if (!el.box) return;
+    el.box.hidden = false;
+    _live.t0 = Date.now();
+    if (el.time) el.time.textContent = '0:00';
+    _live.tick = setInterval(function () {
+      var s = Math.floor((Date.now() - _live.t0) / 1000);
+      if (el.time) {
+        el.time.textContent = Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      }
+    }, 500);
+
+    // The level meter is a bonus, not a requirement — an older WebView with no
+    // AudioContext still gets the dot, the clock and the hint.
+    var AC = global.AudioContext || global.webkitAudioContext;
+    if (!AC || !el.bars || !stream) return;
+    var bars = el.bars.querySelectorAll('i');
+    if (!bars.length) return;
+    try {
+      var ctx = new AC();
+      var src = ctx.createMediaStreamSource(stream);
+      var an = ctx.createAnalyser();
+      an.fftSize = 256;
+      an.smoothingTimeConstant = 0.6;
+      src.connect(an);
+      var buf = new Uint8Array(an.frequencyBinCount);
+      _live.ctx = ctx;
+      var draw = function () {
+        an.getByteFrequencyData(buf);
+        // One bar per slice of the spectrum, so speech moves them differently
+        // from a steady hum — a flat row of equal bars reads as "not hearing".
+        var per = Math.floor(buf.length / bars.length) || 1;
+        for (var i = 0; i < bars.length; i++) {
+          var sum = 0;
+          for (var j = 0; j < per; j++) sum += buf[i * per + j] || 0;
+          var v = Math.min(1, (sum / per) / 140);
+          bars[i].style.transform = 'scaleY(' + (0.18 + v * 0.82).toFixed(3) + ')';
+        }
+        _live.raf = requestAnimationFrame(draw);
+      };
+      draw();
+    } catch (e) { /* the clock and the dot are enough */ }
+  }
+
+  function liveOff() {
+    var el = liveEls();
+    if (el.box) el.box.hidden = true;
+    if (_live.raf) { cancelAnimationFrame(_live.raf); _live.raf = 0; }
+    if (_live.tick) { clearInterval(_live.tick); _live.tick = 0; }
+    if (_live.ctx) { try { _live.ctx.close(); } catch (e) {} _live.ctx = null; }
+    if (el.bars) {
+      [].forEach.call(el.bars.querySelectorAll('i'), function (b) { b.style.transform = ''; });
+    }
+  }
+
+  /**
+   * Open the microphone, and say something useful when it will not open.
+   *
+   * "The microphone is blocked" is true and unhelpful: on Android the fix is
+   * four taps deep in a settings screen the clinician has never seen, and
+   * "blocked" does not distinguish a refusal from a phone with no microphone
+   * at all. So the reasons are told apart and the way out is spelled out.
+   */
+  async function openMic() {
+    // A permission that was refused once and remembered will not prompt again,
+    // so the phone is asked first — otherwise the clinician taps a button that
+    // silently does nothing.
+    try {
+      if (navigator.permissions && navigator.permissions.query) {
+        var st = await navigator.permissions.query({ name: 'microphone' });
+        if (st && st.state === 'denied') {
+          var d = new Error('The microphone is turned off for this app. Open ' +
+            'the phone Settings → Apps → Homatt Clinic → Permissions → ' +
+            'Microphone and allow it, then tap again.');
+          d.kind = 'mic-denied';
+          throw d;
+        }
+      }
+    } catch (e) {
+      // Some WebViews throw on an unknown permission name. That is not an
+      // answer, so fall through and simply ask for the microphone.
+      if (e && e.kind === 'mic-denied') throw e;
+    }
+
+    try {
+      return await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      var name = (e && e.name) || '';
+      var err;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        err = new Error('The microphone was not allowed. Tap the button again ' +
+          'and choose Allow — or turn it on in Settings → Apps → Homatt ' +
+          'Clinic → Permissions → Microphone.');
+        err.kind = 'mic-denied';
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        err = new Error('This phone has no microphone the app can use. Type it in.');
+        err.kind = 'mic-missing';
+      } else if (name === 'NotReadableError') {
+        err = new Error('The microphone is being used by something else — end ' +
+          'the call or close the other app, then tap again.');
+        err.kind = 'mic-busy';
+      } else {
+        err = new Error('The microphone would not start. Type it in for now.');
+        err.kind = 'mic-failed';
+      }
+      throw err;
+    }
   }
 
   /**
@@ -867,19 +1034,32 @@
       }
 
       var stream;
+      say(out, 'Asking for the microphone…');
       try {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream = await openMic();
       } catch (e) {
-        say(out, 'The microphone is blocked. Allow it in the phone settings.', 'warn');
+        noteFault(e && e.kind, e && e.message);
+        say(out, (e && e.message) || 'The microphone would not start.', 'warn');
         return;
       }
 
       _chunks = [];
-      _rec = new MediaRecorder(stream);
+      try {
+        _rec = new MediaRecorder(stream);
+      } catch (e) {
+        // A microphone left open is a microphone still listening, in a room
+        // with a patient in it. If the recorder will not start, close it.
+        stream.getTracks().forEach(function (t) { t.stop(); });
+        _rec = null;
+        say(out, 'This phone will not record in a format the app can read. ' +
+                 'Type it in.', 'warn');
+        return;
+      }
       _rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _chunks.push(ev.data); };
       _rec.onstop = async function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
         btn.classList.remove('on');
+        liveOff();                       // the auto-stop timer comes here too
         var blob = new Blob(_chunks, { type: 'audio/webm' });
         if (!blob.size) { say(out, 'Nothing was recorded.', 'warn'); return; }
         say(out, 'Reading it…');
@@ -911,6 +1091,7 @@
       };
       _rec.start();
       btn.classList.add('on');
+      liveOn(stream);
       say(out, mode === 'vitals'
         ? 'Listening — say the readings, then tap again.'
         : 'Listening — say who it is and what they came with, then tap again.');

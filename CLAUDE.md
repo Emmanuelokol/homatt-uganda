@@ -87,8 +87,16 @@ four vitals boxes — never a diagnosis, never a medicine
 |------|-------|
 | `DEEPGRAM_API_KEY` | Supabase secret — **never** in code or a message |
 | `OPENAI_API_KEY` | Supabase secret (already expected by `ai-proxy`); the fallback |
-| `RECORD_AUDIO` | declared in `android/app/src/main/AndroidManifest.xml` |
+| `RECORD_AUDIO` **and** `MODIFY_AUDIO_SETTINGS` | both declared in `android/app/src/main/AndroidManifest.xml` |
 | Edge Functions | deploy `supabase/functions/transcribe` and `supabase/functions/structure` |
+
+**Both** Android permissions are required, not just the obvious one. Capacitor's
+`BridgeWebChromeClient.onPermissionRequest` asks Android for `RECORD_AUDIO` and
+`MODIFY_AUDIO_SETTINGS` together when a page calls `getUserMedia`, and only lets
+recording start when both come back granted. A permission that is not declared
+can never be granted, so omitting `MODIFY_AUDIO_SETTINGS` makes the microphone
+work perfectly in a browser and fail silently in the APK. Nothing in the web
+code can detect or work around that.
 
 With neither key the button reports "Dictation is not set up on this server"
 rather than failing silently.
@@ -114,6 +122,22 @@ Everything captured is then listed in one panel at the top of the intake screen
 (`#itCheck`) for the clinician to confirm before proceeding. A field nobody
 filled is marked; tapping a tile opens the box it belongs to.
 
+### Where the button is, and why
+`#itSpeak` sits at the very top of the intake screen — **before** the patient's
+name — because that is the order it happens in. The clinician is holding a phone
+in one hand and a cuff in the other; asking them to type a name before they can
+say anything puts the slowest thing first. One sentence fills the name, the sex,
+the age, the complaint, the story and the background.
+
+### Showing that it is listening
+While the microphone is open, `#itDictateLive` shows a blinking dot, a row of
+bars, and the elapsed time. The bars are driven by an `AnalyserNode` reading the
+**actual level** off the MediaStream, one bar per slice of the spectrum. That is
+deliberate: a label alone looks identical on a working microphone and a dead
+one, and a clinician who cannot tell will talk into nothing and lose the whole
+consultation. If the bars do not move, it is not hearing you. An older WebView
+with no `AudioContext` still gets the dot, the clock and the hint.
+
 ### Two buttons, two vocabularies
 `transcribe` takes a `mode` of `vitals` or `story`, which chooses the vocabulary
 the recogniser is told to expect. Biasing a history toward vitals makes it hear
@@ -134,10 +158,20 @@ faults are told apart and named:
 
 | kind | what it means | who can fix it |
 |------|---------------|----------------|
-| `credit` | the account is out of money (HTTP 402) | whoever pays the bill |
-| `auth` | the key is wrong, revoked or never set (401/403) | whoever holds the key |
+| `unconfigured` | the Edge Function is not deployed (404), or is deployed with no key (503) | whoever set the project up |
+| `credit` | the account is out of money (402) | whoever pays the bill |
+| `auth` | the key is wrong, revoked or never set (401/403 from Deepgram) | whoever holds the key |
+| `signedout` | the caller's session expired (401/403 from Supabase) | the clinician, by signing in |
 | `busy` | rate limited (429) | wait a moment |
+| `server` | the function itself failed (5xx) | try later |
 | `unreachable` | no reply at all | the connection |
+| `mic-denied` / `mic-busy` / `mic-missing` | the phone's microphone | the clinician, in phone settings |
+
+The first row is the one that used to be invisible. A clinic that has not
+deployed `transcribe` yet has *never* had dictation, and telling them "could not
+reach the dictation service" sends them to look at their internet for a week.
+The status decides the message; the gateway's own words ("Requested function was
+not found") are never shown to a nurse.
 
 Two places show it:
 - **On the phone**, the message appears under the button, and the last fault is
@@ -199,8 +233,30 @@ Two places show it:
 ### Key files
 | File | Purpose |
 |------|---------|
-| `app/clinic/js/clinic-dictate.js` | recording, the parsers, filling the boxes, remembering a fault |
+| `app/clinic/js/clinic-dictate.js` | recording, the level meter, the parsers, filling the boxes, naming a fault |
+| `app/clinic/new-order.html` | `#itSpeak` at the top of the intake screen, and its styles |
 | `app/clinic/js/clinic-intake.js` | the "Check this" panel at the top of the intake screen |
 | `app/clinic/settings.html` | Settings → Dictation: the live "is it working?" check |
 | `supabase/functions/transcribe/index.ts` | holds the keys, calls Deepgram/Whisper, caps the clip, answers the probe |
 | `supabase/functions/structure/index.ts` | splits a transcript into fields; whitelisted server-side |
+
+## The tests
+
+`tests/` — 46 files, ~530 checks. No framework: each file starts a web server
+over `app/`, opens a real page in Chromium with the network mocked, drives it,
+and prints `PASS`/`FAIL` with the evidence.
+
+```bash
+cd tests && npm install && node run-all.js     # all of them, ~25 min
+node run-all.js dictate                        # just the ones matching
+```
+
+`tests/README.md` says what each file protects and how to write another. Two
+rules worth repeating here:
+
+- **Never assert on a colour by name.** Measure the contrast ratio against the
+  computed background, in all four skins and both themes. Four separate
+  unreadable-text bugs got past eyes and were caught by a number.
+- **`measure-*.js` files are not tests** — they print a number (30/30
+  dictations placed correctly, 75% of doses read). Re-run them when changing
+  what they measure and put the number in the commit message.

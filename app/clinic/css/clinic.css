@@ -49,6 +49,18 @@
   --shadow-lg: 0 16px 38px rgba(20,24,43,0.13), 0 4px 10px rgba(20,24,43,0.06);
   --on-primary:#FFFFFF;   /* text that sits on a --primary fill; flips
                              dark where dark mode lightens the fill */
+  /* Two names new-order.html has always used and nothing ever defined. An
+     unresolvable var() makes the WHOLE declaration invalid, silently — which
+     is why the dictate button has never drawn its dashed border and its
+     status line has never been grey. Aliases, so both spellings now mean the
+     same thing and follow the skin. */
+  --muted: var(--text-lt);
+  --line:  var(--border);
+  /* Danger as TEXT, which is a different problem from danger as a FILL.
+     #D32F2F reads at 3.4:1 on a dark card — under the 4.5:1 a clinician needs
+     for the one line on the screen that says something went wrong. The fill
+     colour is left alone, because white on it is what the delete buttons use. */
+  --danger-ink:#C62828;
   --accent-v:      #6C5CE7;   /* violet — interactive highlights */
   --accent-v-tint: #ECE9FF;
 }
@@ -344,7 +356,7 @@ html[data-theme="dark"]{
   --surface:#151E18; --bg:#0B110D;
   --sidebar:#080D0A; --sidebar-hv:#152119;
   --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
-  --on-primary:#000000;
+  --on-primary:#000000; --danger-ink:#FF8A80;
 }
 
 /* -- Midnight blue -- */

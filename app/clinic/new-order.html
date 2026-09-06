@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260917">
+  <link rel="stylesheet" href="css/clinic.css?v=20260918">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -517,13 +517,50 @@
       margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;
       background:var(--tint-2);color:var(--brand-ink);font-weight:600;font-size:15px}
     .it-dict .material-icons-outlined{font-size:20px}
-    .it-dict.on{background:var(--primary);color:#fff;border-style:solid;
+    .it-dict.on{background:var(--primary);color:var(--on-primary);border-style:solid;
       animation:itPulse 1.1s ease-in-out infinite}
     .it-dict-say{margin-top:6px;font-size:13px;line-height:1.45;color:var(--muted)}
     .it-dict-say.ok{color:var(--brand-ink)}
-    .it-dict-say.warn{color:var(--danger,#b3261e)}
+    .it-dict-say.warn{color:var(--danger-ink,#b3261e)}
     .it-pulse{animation:itPulse 1.1s ease-in-out 2}
     @keyframes itPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.03)}}
+
+    /* ── Speak it: the first thing on the screen ──────────────────────────
+       It comes before the name because that is the order it happens in —
+       the clinician talks, and the form fills in behind them. */
+    .it-speak{border:1px solid var(--primary)}
+    .it-speak-h{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px}
+    .it-speak-h .material-icons-outlined{font-size:22px;color:var(--primary);flex:none}
+    .it-speak-h b{display:block;font-size:15px;color:var(--text);line-height:1.3}
+    .it-speak-h i{display:block;font-style:normal;font-size:12.5px;
+      color:var(--muted);margin-top:3px;line-height:1.45}
+    .it-dict-big{padding:16px 12px;font-size:16px;margin-top:0}
+    .it-dict-big .material-icons-outlined{font-size:24px}
+
+    /* While the microphone is open. The bars are driven by the real level
+       coming in, so a dead microphone looks different from a live one — a
+       label alone would look identical either way. */
+    .it-live{display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+      margin-top:10px;padding:9px 12px;border-radius:11px;
+      background:var(--tint-2);border:1px solid var(--line)}
+    .it-live[hidden]{display:none}
+    .it-live-dot{width:9px;height:9px;border-radius:50%;flex:none;
+      background:var(--danger,#b3261e);animation:itBlink 1s steps(2,end) infinite}
+    .it-live-bars{display:flex;align-items:center;gap:3px;height:22px;flex:none}
+    .it-live-bars i{display:block;width:3px;height:22px;border-radius:2px;
+      background:var(--primary);transform:scaleY(.18);transform-origin:center;
+      transition:transform 70ms linear}
+    .it-live-time{font-size:13px;font-weight:700;color:var(--text);
+      font-variant-numeric:tabular-nums;min-width:34px}
+    .it-live-hint{font-size:12px;color:var(--muted);line-height:1.4;flex:1 1 140px}
+    @keyframes itBlink{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
+    /* A moving row of bars is the point, so it stays — but nothing else has to
+       flash at someone who asked the phone to stop animating. */
+    @media (prefers-reduced-motion: reduce){
+      .it-dict.on{animation:none}
+      .it-live-dot{animation:none}
+      .it-pulse{animation:none}
+    }
     @media (max-width:380px){ .it-tab i{display:none} .it-vitals{grid-template-columns:1fr} }
 
     .ucg-childwarn{font-size:12px;color:#7A1C1C;background:#FDECEA;border-radius:9px;
@@ -646,7 +683,7 @@
            ════════════════════════════════════════════════════════ -->
       <section class="wiz-section" data-step="1">
         <div class="wiz-screen-title">New Treatment</div>
-        <div class="wiz-screen-sub">Who it is, then what they complain of, what you measure, and what you already know. Suggestions appear as you write. You confirm the diagnosis — the app never does.</div>
+        <div class="wiz-screen-sub">Speak it, or type it: who it is, what they complain of, what you measure, and what you already know. Suggestions appear as you write. You confirm the diagnosis — the app never does.</div>
 
         <!-- ── Check this — everything that was captured, in one place ──
              It sits ABOVE the form, not among the suggestions, because its job
@@ -668,8 +705,45 @@
           </details>
         </div>
 
-        <!-- ── Who is it? — FIRST, because the name is what the money, the
-             follow-up and the phone call all hang on. Still never required. -->
+        <!-- ── Speak it — BEFORE the name, because that is the order it
+             happens in. The clinician is holding a phone in one hand and a
+             cuff in the other; asking them to type a name before they can say
+             anything puts the slowest thing first. One sentence fills the
+             name, the sex, the age, the complaint, the story and the
+             background, and the panel above lists what it heard. -->
+        <div class="wiz-card it-speak" id="itSpeak">
+          <div class="it-speak-h">
+            <span class="material-icons-outlined">record_voice_over</span>
+            <div>
+              <b>Speak, and this form fills itself in</b>
+              <i>Who they are and what they came with — check it before you go on.</i>
+            </div>
+          </div>
+          <button type="button" id="itDictateStory" class="it-dict it-dict-big">
+            <span class="material-icons-outlined">mic</span>
+            <span>Say who it is and what they came with</span>
+          </button>
+          <!-- Shown only while the microphone is actually open. The bars move
+               with the sound coming in, so a clinician can see it is hearing
+               them rather than trusting a label that would look the same on a
+               dead microphone. -->
+          <div id="itDictateLive" class="it-live" hidden>
+            <span class="it-live-dot" aria-hidden="true"></span>
+            <span class="it-live-bars" id="itDictateBars" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+            <span class="it-live-time" id="itDictateTime">0:00</span>
+            <span class="it-live-hint">Tap the button again when you have finished</span>
+          </div>
+          <div id="itDictateStorySay" class="it-dict-say"></div>
+          <div class="helper">Say it the way you would tell a colleague:
+            <i>“Her name is Grace Nakato, 40 year old female, complains of cough
+            for a week, known asthmatic, temp 37.9.”</i> Nothing is saved until
+            you check it.</div>
+        </div>
+
+        <!-- ── Who is it? — the name is what the money, the follow-up and the
+             phone call all hang on. Still never required. -->
         <div class="wiz-card it-who">
           <div class="sec-label" style="margin:0 0 10px">
             <span class="material-icons-outlined" style="font-size:14px">person</span>
@@ -740,12 +814,7 @@
           <label class="field-label" for="itSubjective" style="margin-top:16px">The story — in the patient's own words</label>
           <textarea id="itSubjective" class="field-input" rows="4"
             placeholder="How long, how it started, what makes it better or worse, what they have already taken…"></textarea>
-          <button type="button" id="itDictateStory" class="it-dict">
-            <span class="material-icons-outlined">mic</span>
-            <span>Say who it is and what they came with</span>
-          </button>
-          <div id="itDictateStorySay" class="it-dict-say"></div>
-          <div class="helper">This is the <b>subjective</b> part of the record: what the patient reports, before you examine them.</div>
+          <div class="helper">This is the <b>subjective</b> part of the record: what the patient reports, before you examine them. You can <b>speak all of it</b> with the button at the top of this screen.</div>
         </div>
 
         <div class="wiz-card it-pane" id="itPane2" style="display:none">
@@ -1354,7 +1423,7 @@
 <script src="js/new-order-wizard.js?v=20260910"></script>
 <script src="js/ucg-autofill.js?v=20260911"></script>
 <script src="js/clinic-impression.js?v=20260911"></script>
-<script src="js/clinic-dictate.js?v=20260917"></script>
+<script src="js/clinic-dictate.js?v=20260918"></script>
 <script src="js/clinic-intake.js?v=20260917"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
