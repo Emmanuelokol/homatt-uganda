@@ -90,6 +90,19 @@ four vitals boxes — never a diagnosis, never a medicine
 | `RECORD_AUDIO` **and** `MODIFY_AUDIO_SETTINGS` | both declared in `android/app/src/main/AndroidManifest.xml` |
 | Edge Functions | deploy `supabase/functions/transcribe` and `supabase/functions/structure` |
 
+**Setting the key is not enough — the function has to exist.** The two are
+separate, and only one of them is visible in the Supabase dashboard's Secrets
+page. `DEEPGRAM_API_KEY` sat correctly in Secrets for days while `transcribe`
+had never been deployed at all, and the app could not say so: the gateway's 404
+for a missing function carries no CORS headers, so the browser refuses to show
+the reply to JavaScript and `fetch()` just rejects — identical, from inside the
+page, to having no signal.
+
+Both are now checked from **Settings → Dictation → Check now**, which says which
+of the two is missing. And the deploy workflow no longer has a hand-written list
+of functions: it deploys every directory under `supabase/functions/`, so a new
+one cannot be forgotten again.
+
 **Both** Android permissions are required, not just the obvious one. Capacitor's
 `BridgeWebChromeClient.onPermissionRequest` asks Android for `RECORD_AUDIO` and
 `MODIFY_AUDIO_SETTINGS` together when a page calls `getUserMedia`, and only lets
@@ -158,7 +171,7 @@ faults are told apart and named:
 
 | kind | what it means | who can fix it |
 |------|---------------|----------------|
-| `unconfigured` | the Edge Function is not deployed (404), or is deployed with no key (503) | whoever set the project up |
+| `unconfigured` | the Edge Function is not deployed, or is deployed with no key (503) | whoever set the project up |
 | `credit` | the account is out of money (402) | whoever pays the bill |
 | `auth` | the key is wrong, revoked or never set (401/403 from Deepgram) | whoever holds the key |
 | `signedout` | the caller's session expired (401/403 from Supabase) | the clinician, by signing in |
@@ -167,11 +180,25 @@ faults are told apart and named:
 | `unreachable` | no reply at all | the connection |
 | `mic-denied` / `mic-busy` / `mic-missing` | the phone's microphone | the clinician, in phone settings |
 
-The first row is the one that used to be invisible. A clinic that has not
-deployed `transcribe` yet has *never* had dictation, and telling them "could not
-reach the dictation service" sends them to look at their internet for a week.
-The status decides the message; the gateway's own words ("Requested function was
-not found") are never shown to a nurse.
+The first row is the one that used to be invisible, and it is worth
+understanding why, because the same trap is waiting for the next Edge Function.
+
+A function that has never been deployed answers **404 from the Supabase gateway
+with no CORS headers on it**. The browser therefore refuses to hand the reply to
+JavaScript at all: `functions.invoke` comes back with a `FunctionsFetchError`
+that has no status, no body, nothing. From inside the page that is *identical*
+to having no signal — so the app said "could not reach the dictation service",
+and a clinic went looking at their internet while dictation had simply never
+been installed.
+
+`faultFrom()` now asks a second question when there is nothing to read: it
+fetches `${SUPABASE_URL}/auth/v1/health` with `mode: 'no-cors'`. The reply is
+opaque and unreadable, but whether the *promise* resolves still answers "can
+this phone reach Supabase at all?" — and that is the whole question. Server
+answering + function silent = not deployed. Nothing answering = the connection.
+
+Where a status IS readable it decides the message, and the gateway's own words
+("Requested function was not found") are never shown to a nurse.
 
 Two places show it:
 - **On the phone**, the message appears under the button, and the last fault is

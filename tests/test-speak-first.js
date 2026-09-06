@@ -194,10 +194,62 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
   result('a server fault at their end is not blamed on the clinic\'s connection',
     /at its end/i.test(brokeDown.said), brokeDown.said.slice(0, 70));
 
-  const noReply = await serverSays(0, null);
-  result('and a request that never landed still says to type it in for now',
-    /Could not reach/i.test(noReply.said) && /type it in/i.test(noReply.said),
-    noReply.said.slice(0, 70));
+  // ── The case that actually happened, and was invisible ──────────────────
+  // A function that was never deployed answers 404 from the gateway with no
+  // CORS headers, so the browser hides it and fetch() just rejects — exactly
+  // like a dead connection. The app has to tell them apart by asking whether
+  // Supabase itself is reachable.
+  async function noStatusWith(supabaseUp) {
+    return page.evaluate(async (up) => {
+      Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+      navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop(){} }] });
+      window.MediaRecorder = function () {
+        this.state='recording'; this.start=()=>{};
+        this.stop=()=>{ this.state='inactive';
+          if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+          if(this.onstop) this.onstop(); };
+      };
+      // The CORS-blocked failure: an error with no readable status at all.
+      window._getClinicSupabase = () => ({ functions: { invoke: async () => ({
+        data: null, error: new TypeError('Failed to fetch'),
+      }) } });
+      // and whether a plain reachability check gets through
+      const realFetch = window.fetch;
+      window.__probed = null;
+      window.fetch = function (u, o) {
+        if (String(u).indexOf('/auth/v1/health') >= 0) {
+          window.__probed = String(u);
+          return up ? Promise.resolve(new Response(null, { status: 200 }))
+                    : Promise.reject(new TypeError('Failed to fetch'));
+        }
+        return realFetch.apply(this, arguments);
+      };
+      const btn = document.getElementById('itDictateStory');
+      btn.click(); await new Promise(r => setTimeout(r, 60));
+      btn.click(); await new Promise(r => setTimeout(r, 600));
+      window.fetch = realFetch;
+      return { said: (document.getElementById('itDictateStorySay')||{}).textContent || '',
+               stored: localStorage.getItem('homatt_dictation_fault') || '',
+               probed: window.__probed };
+    }, supabaseUp);
+  }
+
+  const serverUpFnMissing = await noStatusWith(true);
+  result('a server that answers but has no transcribe function says exactly that',
+    /not been switched on|never installed|not installed/i.test(serverUpFnMissing.said) &&
+    !/Could not reach/i.test(serverUpFnMissing.said) &&
+    /"kind":"unconfigured"/.test(serverUpFnMissing.stored),
+    serverUpFnMissing.said.slice(0, 100));
+  result('it works that out by asking whether Supabase answers at all',
+    /\/auth\/v1\/health$/.test(serverUpFnMissing.probed || ''),
+    String(serverUpFnMissing.probed));
+
+  const genuinelyOffline = await noStatusWith(false);
+  result('and a phone that truly cannot reach the server is still told so',
+    /Could not reach/i.test(genuinelyOffline.said) &&
+    /type it in/i.test(genuinelyOffline.said) &&
+    /"kind":"unreachable"/.test(genuinelyOffline.stored),
+    genuinelyOffline.said.slice(0, 70));
 
   const outOfCredit = await serverSays(402, {
     error: 'The dictation account is out of credit. Dictation will not work ' +

@@ -574,6 +574,30 @@
   }
 
   /**
+   * Can this phone reach Supabase at all?
+   *
+   * Asked only when a request failed with nothing to read, to tell a server
+   * that is not answering from one that is answering with something the
+   * browser will not show us. `mode: 'no-cors'` is the point: the reply is
+   * opaque and unreadable, but the PROMISE still tells us whether anything
+   * came back, and that is the whole question.
+   *
+   * Returns true (reached it), false (did not), or null (cannot tell).
+   */
+  async function supabaseReachable() {
+    var cfg = global.HOMATT_CONFIG || {};
+    var base = cfg.SUPABASE_URL;
+    if (!base || typeof fetch !== 'function') return null;
+    try {
+      await fetch(String(base).replace(/\/+$/, '') + '/auth/v1/health',
+                  { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * What actually went wrong, in words a clinician can act on.
    *
    * Every one of these looked identical before — "Could not reach the dictation
@@ -619,12 +643,32 @@
       msg = 'The dictation service had a problem at its end. Type it in for ' +
             'now and try again later.';
     } else {
-      // No status at all means the request never landed: no signal, a captive
-      // wifi, the phone asleep. The way round it goes in the same breath as
-      // the bad news — a message that only says something failed leaves the
-      // clinician tapping the button again with a patient in front of them.
-      kind = 'unreachable';
-      msg = 'Could not reach the dictation service. Type it in for now.';
+      // No status at all. This is the case that cost a clinic a week.
+      //
+      // An Edge Function that was never DEPLOYED answers 404 from the gateway
+      // with no CORS headers on it, so the browser refuses to show the reply
+      // to JavaScript and fetch() simply rejects. From in here that is
+      // indistinguishable from a dead connection — and it is by far the more
+      // likely of the two, because a function has to be deployed before it can
+      // ever answer, and nothing in the app says whether it was.
+      //
+      // So ask a second question the browser WILL answer: can this phone reach
+      // Supabase at all? If it can, the connection is not the problem and the
+      // clinic should be looking at their server, not their signal.
+      var reachable = await supabaseReachable();
+      if (reachable === true) {
+        kind = 'unconfigured';
+        msg = 'Dictation has not been switched on for this clinic yet — the ' +
+              'server is answering, but the dictation part of it was never ' +
+              'installed. Type it in for now and show this to whoever set the ' +
+              'app up.';
+      } else {
+        // The way round it goes in the same breath as the bad news — a message
+        // that only says something failed leaves the clinician tapping the
+        // button again with a patient in front of them.
+        kind = 'unreachable';
+        msg = 'Could not reach the dictation service. Type it in for now.';
+      }
     }
     var err = new Error(msg);
     err.kind = kind;

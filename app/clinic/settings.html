@@ -1900,8 +1900,32 @@ async function dictCheck() {
       } catch (e) {}
     }
     if (!body) {
-      dictShow('bad', 'Could not reach the server to check dictation.',
-        dictLastFaultHtml());
+      // Nothing to read means one of two very different things, and the
+      // browser will not tell us which: the server is not answering, or it IS
+      // answering with a 404 that carries no CORS headers because the
+      // dictation function was never deployed. The second is far more likely,
+      // and it is the one nobody can guess from "could not reach". So ask a
+      // question the browser will answer — is Supabase reachable at all?
+      var reachable = null;
+      try {
+        var cfg = window.HOMATT_CONFIG || {};
+        if (cfg.SUPABASE_URL) {
+          await fetch(String(cfg.SUPABASE_URL).replace(/\/+$/, '') + '/auth/v1/health',
+                      { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+          reachable = true;
+        }
+      } catch (e) { reachable = false; }
+      if (reachable === true) {
+        dictShow('bad', 'The dictation function is not installed on this ' +
+          'project. The server is answering, but there is no "transcribe" ' +
+          'function on it — deploy it, then check again.',
+          '<div class="dict-row">Run <b>supabase functions deploy transcribe</b>, ' +
+          'or push to <b>main</b> and let the Deploy Edge Functions action do it.</div>' +
+          dictLastFaultHtml());
+      } else {
+        dictShow('bad', 'Could not reach the server to check dictation.',
+          dictLastFaultHtml());
+      }
       return;
     }
     var kind = body.kind || (body.ok ? '' : 'bad');
