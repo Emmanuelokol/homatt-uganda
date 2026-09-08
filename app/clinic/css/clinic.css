@@ -1214,3 +1214,22 @@ html[data-theme="dark"]{
 .dict-btn:disabled{ opacity:.6; cursor:default }
 .dict-btn:active{ transform:scale(.98) }
 .dict-btn .material-icons-outlined{ font-size:18px }
+
+/* "Did you mean …?" — the clinic's own spelling of a name, offered after a
+   dictation. Never applied on its own: a wrong auto-correct on a name is a
+   record about the wrong person. */
+.it-check-alt{
+  display:flex; flex-wrap:wrap; gap:7px; align-items:center;
+  margin-bottom:10px; padding:10px 12px; border-radius:11px;
+  background:var(--brand-tint); color:var(--brand-ink);
+  font-size:12.5px; line-height:1.5;
+}
+.it-check-alt > span{ flex:1 1 100% }
+.it-check-alt b{ font-weight:700 }
+.it-alt{
+  background:var(--surface); color:var(--text);
+  border:1px solid var(--primary); border-radius:999px;
+  padding:7px 14px; font:inherit; font-size:13px; font-weight:600;
+  cursor:pointer; touch-action:manipulation;
+}
+.it-alt:active{ transform:scale(.97) }

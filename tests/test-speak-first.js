@@ -516,7 +516,76 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
     corrected.boxGone === true && /corrected/i.test(corrected.said),
     corrected.said.slice(0, 60));
 
-  // ── 8. Readable, in all four looks ──────────────────────────────────────
+  // ── 8. Ugandan names ────────────────────────────────────────────────────
+  // The hardest thing for an English recogniser, and the thing a clinic can
+  // least afford to get wrong. Three defences, tested here.
+  const spelled = await page.evaluate(() => {
+    const D = window.HomattDictate;
+    return {
+      hyphen: D.parsePerson('Her name is N-A-K-A-T-O Grace, female, 32 years').name,
+      cued: D.parsePerson('The name is spelt O K E L L O John, male, 40 years').name,
+      // A sentence with ordinary single letters must not be glued together.
+      safe: D.parsePerson('I am a nurse, the patient is Mukasa Peter, 40 years').name,
+    };
+  });
+  result('a name spelt out with hyphens is put back together',
+    spelled.hyphen === 'Nakato Grace', JSON.stringify(spelled.hyphen));
+  result('and one spelt after the word "spelt", without taking the cue with it',
+    spelled.cued === 'Okello John', JSON.stringify(spelled.cued));
+  result('but ordinary single letters are left alone',
+    spelled.safe === 'Mukasa Peter', JSON.stringify(spelled.safe));
+
+  // The clinic's own spelling beats the recogniser's guess — offered, never
+  // applied. This is what turns "Emmanuel Opal" back into "Emmanuel Opio".
+  const suggested = await page.evaluate(async () => {
+    // Stand in for the roster the debt check already loads.
+    const el = document.getElementById('quickPatientName');
+    el.value = 'Emmanuel Opal';
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    window._getClinicSupabase = () => ({ functions: { invoke: async () => ({ data: {} }) } });
+    // Seed the names the clinic has, through the same path the app uses.
+    if (window.ClinicOffline) {
+      window.ClinicOffline.cachedQuery = async () => ({ data: [
+        { patient_name: 'Emmanuel Opio', total_charged_ugx: 0, amount_paid: 0 },
+        { patient_name: 'Grace Nakato', total_charged_ugx: 0, amount_paid: 0 },
+      ] });
+    }
+    window._intakeCheck('Name of the person is Emmanuel Opal');
+    await new Promise(r => setTimeout(r, 600));
+    const alts = [...document.querySelectorAll('#itCheck .it-alt')].map(b => b.textContent.trim());
+    return { alts, name: el.value };
+  });
+  result('a misheard Ugandan name is matched to one the clinic already has',
+    suggested.alts.includes('Emmanuel Opio'), JSON.stringify(suggested.alts));
+  result('and it is only offered — the name is not changed behind your back',
+    suggested.name === 'Emmanuel Opal', JSON.stringify(suggested.name));
+
+  const accepted = await page.evaluate(async () => {
+    const b = document.querySelector('#itCheck .it-alt');
+    if (!b) return { ok: false };
+    b.click();
+    await new Promise(r => setTimeout(r, 300));
+    return { ok: true, name: document.getElementById('quickPatientName').value,
+             gone: !document.querySelector('#itCheck .it-alt') };
+  });
+  result('tapping the right spelling uses it, and the offer goes away',
+    accepted.ok && accepted.name === 'Emmanuel Opio' && accepted.gone,
+    JSON.stringify(accepted));
+
+  // ── 9. How to say it, on the screen where it is needed ──────────────────
+  const guide = await page.evaluate(() => {
+    const d = document.querySelector('.it-how');
+    if (!d) return null;
+    d.open = true;
+    const t = d.textContent.replace(/\s+/g, ' ');
+    return { text: t, len: t.length };
+  });
+  result('the screen itself says how to speak for the best result',
+    guide && /spelt/i.test(guide.text) && /male|female/i.test(guide.text) &&
+    /temp/i.test(guide.text) && /denials|denies/i.test(guide.text),
+    guide ? guide.text.slice(0, 90) : 'missing');
+
+  // ── 10. Readable, in all four looks ─────────────────────────────────────
   const contrast = [];
   for (const skin of ['forest','midnight','dark','clay']) {
     for (const theme of ['light','dark']) {
@@ -570,6 +639,14 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
         add('heardText', '#itHeardText');
         add('heardUse', '#itHeardUse');
         add('heardAgain', '#itHeardAgain');
+        const how = document.querySelector('.it-how');
+        if (how) how.open = true;
+        add('howSummary', '.it-how > summary');
+        add('howBody', '.it-how-body li');
+        add('howEg', '.it-how-eg');
+        const ck = document.getElementById('itCheck');
+        if (ck) ck.style.display = 'block';
+        add('altChip', '.it-alt');
         return out;
       });
       Object.entries(bad).forEach(([k,v]) => {

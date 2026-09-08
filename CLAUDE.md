@@ -293,6 +293,35 @@ What made the difference:
   it has to be a number a *person* is said to be, or it is how a temperature
   becomes an age.
 
+### Ugandan names, which are the hardest part
+An English-trained recogniser faced with "Okello" or "Nakato" returns the
+nearest English word it knows — "Emmanuel **Opio**" came back as "Emmanuel
+**Opal**". Nothing in the audio can fix that, so there are three defences,
+in the order they apply:
+
+1. **Boosted at the recogniser.** `BOOST_NAMES` in `transcribe` feeds Deepgram
+   ~75 common Ugandan name stems (Luganda, Acholi/Lango, Iteso, Basoga,
+   Runyankole) as `keywords`, at a modest weight. Boosting raises the odds of a
+   word the model would otherwise rank below a common English one. Names that
+   are *also* English words — Grace, Mercy, Innocent, Gift, Patience — are
+   deliberately left out: they are already recognised, and boosting them would
+   make every "grace period" a patient. Story mode only; a vitals reading has
+   no names in it.
+2. **Spelt out, when it matters.** "The name is spelt O-K-E-L-L-O" — hyphenated
+   runs are joined on sight; space-separated letters are joined only after a
+   spelling cue, or "I am a" would become "Iama".
+3. **Matched against the clinic's own records, on the phone.** `closeNames()`
+   compares the heard name to the ~400 recent patient names already in memory
+   for the unpaid-visit check — no extra request, and nothing leaves the
+   device. A shared word plus one near-miss word (edit distance ≤ 2) is the
+   shape of a misheard surname, so "Emmanuel Opal" offers "Emmanuel Opio".
+   It **offers**; it never renames. A wrong auto-correct on a name is a record
+   about the wrong person, which is worse than a misspelling.
+
+`.it-how` on the intake screen tells the clinician the rest — say the word
+"name", say "male"/"female" rather than relying on he/she, give the age its
+unit, label every reading, keep the denials, and never say the disease.
+
 ### The summary reads as a record, not a transcript
 Once the name, sex and age are in their own boxes, repeating them in the story
 is noise. `dropPersonBits()` removes a clause only when it is **nothing but**

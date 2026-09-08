@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260918">
+  <link rel="stylesheet" href="css/clinic.css?v=20260923">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -573,6 +573,23 @@
     .it-heard-use{background:var(--primary);color:var(--on-primary)}
     .it-heard-again{background:transparent;color:var(--brand-ink);
       border:1px solid var(--line)}
+    /* How to say it — folded away, because it is read once and then known. */
+    .it-how{margin-top:10px;border-top:1px solid var(--line);padding-top:9px}
+    .it-how > summary{font-size:13px;font-weight:600;color:var(--brand-ink);
+      cursor:pointer;list-style:none;padding:3px 0}
+    .it-how > summary::-webkit-details-marker{display:none}
+    .it-how > summary::before{content:'▸ ';color:var(--primary)}
+    .it-how[open] > summary::before{content:'▾ '}
+    .it-how-body{font-size:12.5px;color:var(--muted);line-height:1.55;padding-top:4px}
+    .it-how-eg{margin:0 0 9px;padding:9px 11px;border-radius:10px;
+      background:var(--surface);border:1px solid var(--line);
+      color:var(--text);font-style:italic}
+    .it-how-eg b{font-style:normal;color:var(--brand-ink)}
+    .it-how-body ul{margin:0;padding-left:18px}
+    .it-how-body li{margin-bottom:6px}
+    .it-how-body li b{color:var(--text)}
+    .it-how-tail{margin:9px 0 0}
+
     .it-heard-use .material-icons-outlined,
     .it-heard-again .material-icons-outlined{font-size:17px}
     @keyframes itBlink{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
@@ -781,10 +798,39 @@
             </div>
           </div>
           <div id="itDictateStorySay" class="it-dict-say"></div>
-          <div class="helper">Say it the way you would tell a colleague:
-            <i>“Her name is Grace Nakato, 40 year old female, complains of cough
-            for a week, known asthmatic, temp 37.9.”</i> Nothing is saved until
-            you check it.</div>
+          <details class="it-how">
+            <summary>How to say it so it comes out right</summary>
+            <div class="it-how-body">
+              <p class="it-how-eg">“Her name is <b>Grace Nakato</b>, she is
+                <b>female</b>, <b>40 years</b>, complains of <b>cough</b> for a
+                week, known <b>asthmatic</b>, temp <b>37.9</b>.”</p>
+              <ul>
+                <li><b>Say the word “name”.</b> “Her name is…”, “Patient name…”,
+                  “The name of the person is…” — any of them. A name on its own
+                  is not written down, because a word said on its own could be
+                  anything.</li>
+                <li><b>Spell a name it keeps getting wrong.</b> “The name is
+                  spelt O-K-E-L-L-O” — the letters are joined back into the
+                  word. Ugandan names are the hardest thing for it to hear, and
+                  spelling one costs three seconds.</li>
+                <li><b>Say “male” or “female”</b> rather than relying on he or
+                  she. Both work; the word is certain.</li>
+                <li><b>Say the age with its unit.</b> “40 years”, “8 months
+                  old”. A bare number is never taken as an age.</li>
+                <li><b>Say what the reading is</b> before the number: “temp
+                  38.5”, “BP 120 over 80”, “pulse 96”, “weight 62 kilos”. A
+                  number with no label fills nothing — that is deliberate.</li>
+                <li><b>Keep the denials.</b> “No vomiting”, “denies chest pain”.
+                  They are listed back to you separately.</li>
+                <li><b>Do not say the disease.</b> Say the symptoms; the
+                  suggestions below come from the guideline books, and you
+                  confirm the diagnosis by tapping.</li>
+              </ul>
+              <p class="it-how-tail">One long sentence is fine — pause where you
+                would put a comma. Nothing is saved until you check it, and the
+                words are shown back to you first.</p>
+            </div>
+          </details>
         </div>
 
         <!-- ── Who is it? — the name is what the money, the follow-up and the
@@ -1468,8 +1514,8 @@
 <script src="js/new-order-wizard.js?v=20260910"></script>
 <script src="js/ucg-autofill.js?v=20260911"></script>
 <script src="js/clinic-impression.js?v=20260911"></script>
-<script src="js/clinic-dictate.js?v=20260922"></script>
-<script src="js/clinic-intake.js?v=20260917"></script>
+<script src="js/clinic-dictate.js?v=20260923"></script>
+<script src="js/clinic-intake.js?v=20260923"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
 </body>

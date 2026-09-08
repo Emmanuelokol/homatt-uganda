@@ -273,11 +273,89 @@
           .limit(400);
       });
       var rows = (r && r.data) || [];
+      // Every name this clinic has written down recently, kept from the same
+      // fetch. It costs nothing extra and it is what lets a misheard Ugandan
+      // name be matched to the person it belongs to.
+      _seenNames = [];
+      var already = {};
+      rows.forEach(function (x) {
+        var n = String(x.patient_name || '').trim();
+        var k = n.toLowerCase();
+        if (n.length >= 3 && !already[k]) { already[k] = 1; _seenNames.push(n); }
+      });
       _debtCache = rows.filter(function (x) {
         return (Number(x.total_charged_ugx) || 0) - (Number(x.amount_paid) || 0) > 0;
       });
     } catch (e) { _debtCache = []; }
     return _debtCache;
+  }
+
+  /* ── Matching a heard name to a person this clinic already knows ──────────
+   *
+   * A recogniser trained on English hears "Emmanuel Opio" as "Emmanuel Opal".
+   * Nothing in the audio can fix that — but the clinic has almost certainly
+   * written the real spelling down before, and comparing against their own
+   * records is both the most accurate check available and the most private:
+   * it happens on the phone, against names the clinic already has.
+   *
+   * It NEVER renames anybody. A wrong auto-correct on a name is a record about
+   * the wrong person, which is worse than a misspelling. It offers, and the
+   * clinician taps.
+   */
+  var _seenNames = [];
+  var _nameAlts = [];
+
+  function fold(s) {
+    return String(s || '').toLowerCase().replace(/[^a-z\s]/g, ' ')
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  // How many single-letter edits apart, capped — full Levenshtein on 400 names
+  // on a cheap phone is wasted work when anything past 2 is not a match.
+  function editsWithin(a, b, cap) {
+    if (a === b) return 0;
+    if (Math.abs(a.length - b.length) > cap) return cap + 1;
+    var prev = [], cur = [], i, j;
+    for (j = 0; j <= b.length; j++) prev[j] = j;
+    for (i = 1; i <= a.length; i++) {
+      cur[0] = i;
+      var best = cur[0];
+      for (j = 1; j <= b.length; j++) {
+        cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1,
+                          prev[j - 1] + (a.charAt(i - 1) === b.charAt(j - 1) ? 0 : 1));
+        if (cur[j] < best) best = cur[j];
+      }
+      if (best > cap) return cap + 1;
+      prev = cur.slice();
+    }
+    return prev[b.length];
+  }
+
+  /** Names this clinic has, close enough to what was heard to be worth asking. */
+  function closeNames(heard) {
+    var h = fold(heard);
+    if (h.length < 4 || !_seenNames.length) return [];
+    var hw = h.split(' ');
+    var out = [];
+    _seenNames.forEach(function (known) {
+      var k = fold(known);
+      if (k === h) return;                       // already exactly right
+      var kw = k.split(' ');
+      // A shared word plus one near-miss word is the shape of a misheard
+      // surname: "Emmanuel Opal" against "Emmanuel Opio".
+      var exact = 0, near = 0;
+      hw.forEach(function (w) {
+        if (w.length < 3) return;
+        if (kw.indexOf(w) >= 0) { exact++; return; }
+        for (var i = 0; i < kw.length; i++) {
+          if (kw[i].length >= 4 && editsWithin(w, kw[i], 2) <= 2) { near++; return; }
+        }
+      });
+      if (exact >= 1 && near >= 1) out.push({ name: known, score: exact * 2 + near });
+      else if (!exact && near >= 2) out.push({ name: known, score: near });
+    });
+    out.sort(function (a, b) { return b.score - a.score; });
+    return out.slice(0, 3).map(function (x) { return x.name; });
   }
   function digits(s) { return String(s || '').replace(/\D/g, ''); }
   async function checkDebt() {
@@ -472,7 +550,19 @@
         '<b>' + esc(w.title) + '</b>' + esc(w.detail || '') + '</div>';
     }).join('');
 
-    $('itCheckWarn').innerHTML = warn;
+    // "Did you mean …?" — offered, never applied. The clinic's own spelling of
+    // a name beats a recogniser's guess at it every time, but only a person
+    // can say which patient this is.
+    var alt = (name && _nameAlts.length)
+      ? '<div class="it-check-alt"><span>Heard <b>' + esc(name) +
+        '</b> — this clinic has:</span>' +
+        _nameAlts.map(function (n) {
+          return '<button type="button" class="it-alt" data-name="' + esc(n) + '">' +
+                 esc(n) + '</button>';
+        }).join('') + '</div>'
+      : '';
+
+    $('itCheckWarn').innerHTML = warn + alt;
     $('itCheckGrid').innerHTML =
         checkTile('name', 'Name', name, 1, 'quickPatientName')
       + checkTile('sex', 'Sex', data.sex, 1, '')
@@ -510,6 +600,21 @@
     if (heardText !== undefined) _heardText = heardText;
     _checkOpen = true;
     renderCheck(_lastWarnings);
+    // Then ask, without blocking the panel, whether this clinic already has a
+    // closer spelling of the name. The roster is already in memory for the
+    // unpaid-visit check, so this costs nothing.
+    (async function () {
+      try {
+        var typed = ($('quickPatientName') || {}).value || '';
+        if (!typed) { _nameAlts = []; return; }
+        await loadOwing();
+        var alts = closeNames(typed);
+        if (alts.join('|') !== _nameAlts.join('|')) {
+          _nameAlts = alts;
+          renderCheck(_lastWarnings);
+        }
+      } catch (e) { _nameAlts = []; }
+    })();
     var el = $('itCheck');
     if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
   };
@@ -519,6 +624,20 @@
   // events, so the abnormal-reading colouring and the suggestions below react
   // exactly as they do to typing.
   function bindCheck() {
+    var host0 = $('itCheck');
+    if (host0 && !host0._altWired) {
+      host0._altWired = 1;
+      host0.addEventListener('click', function (ev) {
+        var b = ev.target.closest && ev.target.closest('.it-alt');
+        if (!b) return;
+        var el = $('quickPatientName');
+        if (!el) return;
+        el.value = b.dataset.name || '';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        _nameAlts = [];
+        renderCheck(_lastWarnings);
+      });
+    }
     var host = $('itCheck');
     if (!host) return;
     host.addEventListener('click', function (e) {

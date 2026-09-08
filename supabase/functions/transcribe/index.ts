@@ -48,12 +48,58 @@ const LOW_BALANCE = 5;
 // Deepgram boosts words you tell it to expect. These are the ones whose
 // mishearing costs the most: a missed "temp" leaves a reading unlabelled and
 // the app then refuses it, so the clinician types it anyway.
-const BOOST = [
+const BOOST_VITALS = [
   'temperature:3', 'temp:3', 'pulse:3', 'weight:3', 'BP:3',
   'blood pressure:3', 'systolic:2', 'diastolic:2', 'mmHg:2',
-  'celsius:2', 'kilograms:2', 'complains:3', 'presents:2',
-  'fever:2', 'headache:2', 'cough:2', 'vomiting:2', 'diarrhoea:2',
+  'celsius:2', 'kilograms:2',
 ];
+
+// What a clinician says while taking a history, and how they say it here.
+const BOOST_STORY = [
+  'complains:3', 'complaining:3', 'presents:2', 'presenting:2',
+  'fever:2', 'headache:2', 'cough:2', 'vomiting:2', 'diarrhoea:2',
+  'body hotness:2', 'running stomach:2', 'general body pain:2',
+  'boda boda:2', 'coartem:2', 'panadol:2',
+];
+
+/**
+ * Ugandan names, so the recogniser has heard of them.
+ *
+ * nova-2-medical is trained on English, and an English model faced with
+ * "Okello" or "Nakato" will produce the nearest English word it knows —
+ * "Emmanuel Opio" came back as "Emmanuel Opal". Keyword boosting is exactly
+ * the mechanism for this: it does not force a word, it raises the odds of one
+ * the model would otherwise rank below a common English word.
+ *
+ * These are name STEMS, chosen for how commonly they occur and how badly an
+ * English model mangles them. The weight is deliberately modest — a name is
+ * worth finding, but not at the cost of hearing "Kato" for "cardio".
+ *
+ * Names that are also ordinary English words (Grace, Mercy, Innocent, Gift,
+ * Patience, Peace, Blessing, Joy) are left out on purpose: they are already
+ * recognised, and boosting them would make every "grace period" a patient.
+ */
+const BOOST_NAMES = [
+  // Luganda / Baganda
+  'Nakato', 'Babirye', 'Wasswa', 'Kato', 'Mukasa', 'Lubega', 'Kiggundu',
+  'Ssemakula', 'Nabukenya', 'Namuli', 'Nakayima', 'Kizza', 'Ssebunya',
+  'Nalubega', 'Nassiwa', 'Kayemba', 'Ssentongo', 'Namusoke', 'Mubiru',
+  'Sserwadda', 'Nanyonga', 'Kaggwa', 'Nakiganda',
+  // Acholi / Lango / Alur
+  'Okello', 'Ocen', 'Opio', 'Odongo', 'Otim', 'Ojok', 'Oyella', 'Akello',
+  'Auma', 'Aber', 'Lakot', 'Adong', 'Okot', 'Oketa', 'Obalim', 'Anena',
+  // Iteso / Karimojong
+  'Emokol', 'Apio', 'Asio', 'Ekwaru', 'Ochen', 'Amuge', 'Ikile',
+  // Basoga
+  'Waiswa', 'Balikoowa', 'Mudondo', 'Kagoya', 'Isabirye',
+  // Banyankole / Bakiga / Batooro
+  'Tumusiime', 'Atuhaire', 'Byaruhanga', 'Katusiime', 'Mugisha',
+  'Kyomuhendo', 'Ninsiima', 'Ainembabazi', 'Twinomugisha', 'Asiimwe',
+  'Kembabazi', 'Muhumuza', 'Turyahabwe', 'Natukunda',
+  // Given names common here that an English model still gets wrong
+  'Nabirye', 'Namutebi', 'Ssekandi', 'Kirabo', 'Achieng', 'Adhiambo',
+  'Nangobi', 'Kabuye', 'Ssempala', 'Nakabugo',
+].map((n) => `${n}:2`);
 
 /**
  * What the clinic and the admin need to be told apart.
@@ -277,7 +323,12 @@ Deno.serve(async (req) => {
       model: 'nova-2-medical', language: 'en', smart_format: 'true',
       punctuate: 'true', numerals: 'true',
     });
-    BOOST.forEach((k) => q.append('keywords', k));
+    // Vitals mode hears numbers; story mode hears people and symptoms. Biasing
+    // one toward the other's vocabulary makes it hear things nobody said.
+    const boost = mode === 'vitals'
+      ? BOOST_VITALS
+      : BOOST_VITALS.concat(BOOST_STORY, BOOST_NAMES);
+    boost.forEach((k) => q.append('keywords', k));
     const r = await fetch(`${DEEPGRAM_URL}?${q}`, {
       method: 'POST',
       headers: { Authorization: `Token ${key}`,

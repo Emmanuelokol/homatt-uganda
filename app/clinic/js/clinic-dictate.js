@@ -262,7 +262,7 @@
   // Cue words that can end up glued to the front of a captured name when two
   // cues overlap ("this patient is called Grace"). Stripped rather than
   // rejected — the name after them is still a name.
-  var NAME_LEAD = /^(?:called|named|is|was|a|an|the|here|with|and)\s+/i;
+  var NAME_LEAD = /^(?:called|named|is|was|a|an|the|here|with|and|spelt|spelled|spelling)\s+/i;
   // …and not the word that happened to follow it. "We have Mukasa Peter here"
   // is a name plus a place-holder; the place-holder is not part of anybody's
   // name.
@@ -282,7 +282,7 @@
    * Returns { name, sex, age, ageUnit, heard } — only what was actually marked.
    */
   function parsePerson(spoken) {
-    var text = digitsFromWords(String(spoken || ''));
+    var text = digitsFromWords(joinSpelled(String(spoken || '')));
     var out = { name: '', sex: '', age: '', ageUnit: '', heard: [] };
 
     for (var i = 0; i < SEX_WORD.length; i++) {
@@ -493,6 +493,43 @@
       if (rest) keep.push(t);
     });
     return tidy(keep.join(' '));
+  }
+
+  // ── Names that were spelt out ────────────────────────────────────────────
+  //
+  // A recogniser trained on English will not spell Ugandan names reliably, and
+  // the clinician's way round that is the same as on the phone: spell it. The
+  // recogniser hands back the letters separately — "O-K-E-L-L-O", or "O K E L
+  // L O" after "spelt" — and they are joined back into a word here.
+  //
+  // Hyphens are joined on sight, because a run of single letters joined by
+  // hyphens is never ordinary prose. Space-separated letters are joined ONLY
+  // after a spelling cue, or "I am a" would become "Iama".
+  var SPELLED_HYPHEN = /\b([A-Za-z])(?:\s*[-–—.]\s*([A-Za-z])){2,}\b/g;
+  var SPELL_CUE = /\b(?:spelt|spelled|spelling|spell\s+it|that\s+is|which\s+is|letters?)\s*[:,]?\s*/i;
+
+  function joinSpelled(text) {
+    var out = String(text || '');
+
+    // "O-K-E-L-L-O" → "OKELLO"
+    out = out.replace(SPELLED_HYPHEN, function (whole) {
+      return whole.replace(/[^A-Za-z]/g, '');
+    });
+
+    // "spelt O K E L L O" → "spelt OKELLO"
+    var cue = SPELL_CUE.exec(out);
+    while (cue) {
+      var at = cue.index + cue[0].length;
+      var run = /^((?:[A-Za-z]\s+){2,}[A-Za-z])\b/.exec(out.slice(at));
+      if (!run) break;
+      var joined = run[1].replace(/\s+/g, '');
+      out = out.slice(0, at) + joined + out.slice(at + run[1].length);
+      SPELL_CUE.lastIndex = 0;
+      var next = SPELL_CUE.exec(out.slice(at + joined.length));
+      if (!next) break;
+      cue = { index: at + joined.length + next.index, 0: next[0] };
+    }
+    return out;
   }
 
   function tidy(s) {
@@ -1607,7 +1644,7 @@
               parsePerson: parsePerson, applyConsult: applyConsult,
               lastFault: lastFault, noteFault: noteFault,
               digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach,
-              dropPersonBits: dropPersonBits };
+              dropPersonBits: dropPersonBits, joinSpelled: joinSpelled };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   global.HomattDictate = API;
