@@ -142,6 +142,26 @@ in one hand and a cuff in the other; asking them to type a name before they can
 say anything puts the slowest thing first. One sentence fills the name, the sex,
 the age, the complaint, the story and the background.
 
+### What is actually recorded
+The clip is labelled with what the phone **really** produced, not with a
+constant. `MediaRecorder.mimeType` decides it, because that label is what the
+Edge Function forwards to Deepgram as the `Content-Type` — a WebView that
+records MP4 and is announced as WebM asks the recogniser to decode a container
+that is not there. Opus-in-WebM is asked for first (best fit, smallest upload
+on mobile data) and the list falls back through ogg, mp4 and aac; a WebView with
+no `isTypeSupported` at all still records with whatever the phone picks.
+
+`getUserMedia` asks for mono, echo cancellation, noise suppression and gain
+control as **ideal**, never as required — a hard constraint a phone cannot meet
+fails the whole call with `OverconstrainedError`, and a noisier recording is
+enormously better than none. If the shape of the request is rejected outright,
+it asks again the plain way before giving up.
+
+`start(1000)` rather than `start()`: if the WebView is pushed out of the
+foreground mid-sentence, what was already said has been handed over instead of
+being lost with the recorder. `onerror` puts the button back and says so —
+without it the button stayed lit over a recorder that had already died.
+
 ### Showing that it is listening
 While the microphone is open, `#itDictateLive` shows a blinking dot, a row of
 bars, and the elapsed time. The bars are driven by an `AnalyserNode` reading the

@@ -258,7 +258,132 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
     /out of credit/i.test(outOfCredit.said) && /"kind":"credit"/.test(outOfCredit.stored),
     outOfCredit.said.slice(0, 70));
 
-  // ── 5. Readable, in all four looks ──────────────────────────────────────
+  // ── 5. The recording itself ─────────────────────────────────────────────
+  // What the phone actually produced has to be what the clip is labelled,
+  // because that label is the Content-Type the recogniser is handed. A phone
+  // that records MP4 and is announced as WebM asks it to decode a container
+  // that is not there.
+  async function recordOn(supported, produced) {
+    return page.evaluate(async ([sup, prod]) => {
+      Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+      navigator.permissions = undefined;
+      window.__asked = [];
+      window.__constraints = null;
+      navigator.mediaDevices.getUserMedia = async (c) => {
+        window.__constraints = JSON.parse(JSON.stringify(c));
+        return { getTracks: () => [{ stop(){} }] };
+      };
+      function Rec(stream, opts) {
+        this.state = 'recording';
+        this.mimeType = (opts && opts.mimeType) || prod;
+        this.start = () => {};
+        this.stop = () => { this.state = 'inactive';
+          if (this.ondataavailable) this.ondataavailable({ data: new Blob(['x'], { type: this.mimeType }) });
+          if (this.onstop) this.onstop(); };
+      }
+      Rec.isTypeSupported = (t) => { window.__asked.push(t); return sup.indexOf(t) >= 0; };
+      window.MediaRecorder = Rec;
+      window.__sentType = null;
+      window._getClinicSupabase = () => ({ functions: { invoke: async (name, req) => {
+        if (name === 'transcribe' && req && req.body && req.body.get) {
+          const f = req.body.get('audio');
+          window.__sentType = f && f.type;
+        }
+        return { data: { text: 'complains of fever' } };
+      } } });
+      const btn = document.getElementById('itDictateStory');
+      btn.click(); await new Promise(r => setTimeout(r, 80));
+      btn.click(); await new Promise(r => setTimeout(r, 500));
+      return { asked: window.__asked, sentType: window.__sentType,
+               constraints: window.__constraints };
+    }, [supported, produced]);
+  }
+
+  const opus = await recordOn(['audio/webm;codecs=opus', 'audio/webm'], '');
+  result('it asks for opus in webm first — best for the recogniser, smallest to upload',
+    opus.asked[0] === 'audio/webm;codecs=opus' && /webm/.test(opus.sentType || ''),
+    'first asked ' + opus.asked[0] + ' · sent ' + opus.sentType);
+
+  // The Android WebViews that broke this: no webm at all, only MP4.
+  const mp4 = await recordOn(['audio/mp4'], 'audio/mp4');
+  result('a phone that can only record MP4 is labelled MP4, not WebM',
+    mp4.sentType === 'audio/mp4',
+    'sent ' + mp4.sentType + ' · asked ' + mp4.asked.length + ' types');
+
+  result('it asks the microphone for one channel, with the noise handling on',
+    !!(opus.constraints && opus.constraints.audio &&
+       opus.constraints.audio.channelCount &&
+       opus.constraints.audio.noiseSuppression),
+    JSON.stringify(opus.constraints));
+
+  // A phone too old to answer isTypeSupported must still record.
+  const noNegotiation = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop(){} }] });
+    function Rec() { this.state='recording'; this.mimeType='';
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+        if(this.onstop) this.onstop(); }; }
+    window.MediaRecorder = Rec;                 // no isTypeSupported at all
+    window.__sentType = null;
+    window._getClinicSupabase = () => ({ functions: { invoke: async (n, req) => {
+      if (n === 'transcribe' && req && req.body && req.body.get) {
+        const f = req.body.get('audio'); window.__sentType = f && f.type;
+      }
+      return { data: { text: 'complains of fever' } };
+    } } });
+    const btn = document.getElementById('itDictateStory');
+    btn.click(); await new Promise(r => setTimeout(r, 80));
+    btn.click(); await new Promise(r => setTimeout(r, 500));
+    return { sent: window.__sentType,
+             chief: document.getElementById('itChief').value };
+  });
+  result('an older phone that cannot say what it supports still records',
+    !!noNegotiation.sent && /fever/.test(noNegotiation.chief),
+    'sent ' + noNegotiation.sent);
+
+  // A recorder that dies mid-sentence must not leave the button lit.
+  const midFail = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop(){} }] });
+    function Rec() { this.state='recording'; this.mimeType='audio/webm';
+      this.start=() => { setTimeout(() => { if (this.onerror) this.onerror(new Event('error')); }, 80); };
+      this.stop=()=>{}; }
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    const btn = document.getElementById('itDictateStory');
+    btn.click();
+    await new Promise(r => setTimeout(r, 400));
+    return { lit: btn.classList.contains('on'),
+             live: !!(document.getElementById('itDictateLive')||{}).hidden,
+             said: (document.getElementById('itDictateStorySay')||{}).textContent || '' };
+  });
+  result('a recording that dies part way says so and puts the button back',
+    midFail.lit === false && midFail.live === true && /stopped part way/i.test(midFail.said),
+    midFail.said.slice(0, 70));
+
+  // Silence is not the same as a failure, and it has a different fix.
+  const silent = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop(){} }] });
+    function Rec() { this.state='recording'; this.mimeType='audio/webm';
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.onstop) this.onstop(); }; }        // no data at all
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    const btn = document.getElementById('itDictateStory');
+    btn.click(); await new Promise(r => setTimeout(r, 80));
+    btn.click(); await new Promise(r => setTimeout(r, 350));
+    return (document.getElementById('itDictateStorySay')||{}).textContent || '';
+  });
+  result('a recording with no sound in it says to check the microphone',
+    /no sound|nothing was recorded/i.test(silent) && /covering it|check/i.test(silent),
+    silent.slice(0, 80));
+
+  // ── 6. Readable, in all four looks ──────────────────────────────────────
   const contrast = [];
   for (const skin of ['forest','midnight','dark','clay']) {
     for (const theme of ['light','dark']) {

@@ -1029,29 +1029,102 @@
       if (e && e.kind === 'mic-denied') throw e;
     }
 
+    // What a clinic room actually is: two people talking, a corridor outside,
+    // a fan, and a phone held at arm's length. These are asked for as
+    // preferences, not requirements — a hard constraint a phone cannot meet
+    // fails the whole call with OverconstrainedError, and a slightly noisier
+    // recording is enormously better than none. Mono because the recogniser
+    // wants one channel and it halves what a clinic uploads on mobile data.
+    var WANT = {
+      audio: {
+        echoCancellation: { ideal: true },
+        noiseSuppression: { ideal: true },
+        autoGainControl:  { ideal: true },
+        channelCount:     { ideal: 1 },
+        sampleRate:       { ideal: 16000 },
+      },
+    };
+
     try {
-      return await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch (e) {
-      var name = (e && e.name) || '';
-      var err;
-      if (name === 'NotAllowedError' || name === 'SecurityError') {
-        err = new Error('The microphone was not allowed. Tap the button again ' +
-          'and choose Allow — or turn it on in Settings → Apps → Homatt ' +
-          'Clinic → Permissions → Microphone.');
-        err.kind = 'mic-denied';
-      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
-        err = new Error('This phone has no microphone the app can use. Type it in.');
-        err.kind = 'mic-missing';
-      } else if (name === 'NotReadableError') {
-        err = new Error('The microphone is being used by something else — end ' +
-          'the call or close the other app, then tap again.');
-        err.kind = 'mic-busy';
-      } else {
-        err = new Error('The microphone would not start. Type it in for now.');
-        err.kind = 'mic-failed';
+      return await navigator.mediaDevices.getUserMedia(WANT);
+    } catch (e0) {
+      // An older WebView can reject the shape of the request rather than the
+      // request itself. Ask again the plain way before giving up on it.
+      var n0 = (e0 && e0.name) || '';
+      if (n0 === 'OverconstrainedError' || n0 === 'TypeError' ||
+          n0 === 'NotSupportedError') {
+        try { return await navigator.mediaDevices.getUserMedia({ audio: true }); }
+        catch (e1) { e0 = e1; }
       }
-      throw err;
+      throw micFault(e0);
     }
+  }
+
+  /** Which microphone problem it is, in words that say what to do next. */
+  function micFault(e) {
+    var name = (e && e.name) || '';
+    var err;
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      err = new Error('The microphone was not allowed. Tap the button again ' +
+        'and choose Allow — or turn it on in Settings → Apps → Homatt ' +
+        'Clinic → Permissions → Microphone.');
+      err.kind = 'mic-denied';
+    } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      err = new Error('This phone has no microphone the app can use. Type it in.');
+      err.kind = 'mic-missing';
+    } else if (name === 'NotReadableError' || name === 'AbortError') {
+      err = new Error('The microphone is being used by something else — end ' +
+        'the call or close the other app, then tap again.');
+      err.kind = 'mic-busy';
+    } else {
+      err = new Error('The microphone would not start. Type it in for now.');
+      err.kind = 'mic-failed';
+    }
+    return err;
+  }
+
+  /**
+   * What this phone can actually record, in the order the recogniser prefers.
+   *
+   * The recording used to be labelled `audio/webm` whatever the phone had
+   * really produced, and that label is what the Edge Function forwards to
+   * Deepgram as the Content-Type. An Android WebView that hands back MP4 was
+   * therefore announced as WebM, and the recogniser was asked to decode a
+   * container that was not there. Opus in WebM is both the best fit and the
+   * smallest thing to upload from a clinic on mobile data, so it is asked for
+   * first — but what comes back is what gets labelled.
+   */
+  var RECORD_TYPES = [
+    'audio/webm;codecs=opus',
+    'audio/webm',
+    'audio/ogg;codecs=opus',
+    'audio/ogg',
+    'audio/mp4;codecs=mp4a.40.2',
+    'audio/mp4',
+    'audio/aac',
+  ];
+
+  function makeRecorder(stream) {
+    var MR = global.MediaRecorder;
+    if (MR && typeof MR.isTypeSupported === 'function') {
+      for (var i = 0; i < RECORD_TYPES.length; i++) {
+        if (MR.isTypeSupported(RECORD_TYPES[i])) {
+          try { return new MR(stream, { mimeType: RECORD_TYPES[i] }); }
+          catch (e) { /* supported in name only — try the next */ }
+        }
+      }
+    }
+    // No isTypeSupported, or nothing on the list worked: let the phone pick.
+    return new MR(stream);
+  }
+
+  /** What the recorder actually produced, for the Content-Type upstream. */
+  function recordedType(rec, chunks) {
+    var t = (rec && rec.mimeType) || '';
+    if (!t && chunks && chunks.length && chunks[0].type) t = chunks[0].type;
+    // MediaRecorder reports "audio/webm;codecs=opus"; the parameters are true
+    // but some upstreams are happier with the bare type.
+    return String(t || 'audio/webm').split(';')[0].trim() || 'audio/webm';
   }
 
   /**
@@ -1066,7 +1139,16 @@
     mode = (mode === 'story' || mode === 'consult') ? mode : 'vitals';
 
     btn.addEventListener('click', async function () {
-      if (_rec) { stop(); btn.classList.remove('on'); say(out, 'Listening finished — reading it…'); return; }
+      if (_rec) {
+        // Said BEFORE stopping, not after. A recorder can fire onstop
+        // synchronously, and onstop is what knows whether anything was
+        // actually recorded — saying "reading it…" afterwards overwrote the
+        // real answer with a lie that never changed.
+        say(out, 'Listening finished — reading it…');
+        stop();
+        btn.classList.remove('on');
+        return;
+      }
 
       if (offline()) {
         say(out, 'Dictation needs a connection. Type the readings for now.', 'warn');
@@ -1089,7 +1171,7 @@
 
       _chunks = [];
       try {
-        _rec = new MediaRecorder(stream);
+        _rec = makeRecorder(stream);
       } catch (e) {
         // A microphone left open is a microphone still listening, in a room
         // with a patient in it. If the recorder will not start, close it.
@@ -1099,13 +1181,37 @@
                  'Type it in.', 'warn');
         return;
       }
+      // stop() clears _rec synchronously and onstop fires afterwards, so hold
+      // on to the recorder here — it is the only thing that knows what format
+      // it recorded in.
+      var rec = _rec;
       _rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _chunks.push(ev.data); };
+      // A recorder can fail after it has started — the phone takes a call, the
+      // WebView is pushed out of memory. Without this the button stays lit and
+      // the clinician keeps talking into a recorder that stopped.
+      _rec.onerror = function () {
+        try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        _rec = null;
+        btn.classList.remove('on');
+        liveOff();
+        clearTimeout(_stopT);
+        say(out, 'The recording stopped part way. Tap again and say it once ' +
+                 'more, or type it in.', 'warn');
+      };
       _rec.onstop = async function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
         btn.classList.remove('on');
         liveOff();                       // the auto-stop timer comes here too
-        var blob = new Blob(_chunks, { type: 'audio/webm' });
-        if (!blob.size) { say(out, 'Nothing was recorded.', 'warn'); return; }
+        // Labelled with what the phone REALLY produced — that label is what
+        // the Edge Function passes to the recogniser as the Content-Type, and
+        // announcing MP4 as WebM asks it to decode a container that is not
+        // there.
+        var blob = new Blob(_chunks, { type: recordedType(rec, _chunks) });
+        if (!blob.size) {
+          say(out, 'Nothing was recorded — the microphone gave no sound. ' +
+                   'Check nothing is covering it and tap again.', 'warn');
+          return;
+        }
         say(out, 'Reading it…');
         var text;
         try {
@@ -1133,7 +1239,10 @@
         }
         show(await applied(mode, text, function (r) { show(r, true); }));
       };
-      _rec.start();
+      // A timeslice, not one blob at the end: if the WebView is pushed out of
+      // the foreground mid-sentence, what was already said has been handed
+      // over instead of being lost with the recorder.
+      _rec.start(1000);
       btn.classList.add('on');
       liveOn(stream);
       say(out, mode === 'vitals'

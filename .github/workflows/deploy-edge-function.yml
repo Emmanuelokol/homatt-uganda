@@ -4,7 +4,12 @@ on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/**'   # Only runs when an Edge Function changes
+      - 'supabase/functions/**'
+      # ...and when this file changes. The deploy list used to live in here, so
+      # a function could be added to the project and still never be deployed
+      # until somebody happened to edit its source again. Fixing the list has
+      # to be enough to make the fix take effect.
+      - '.github/workflows/deploy-edge-function.yml'
   workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
 
 env:

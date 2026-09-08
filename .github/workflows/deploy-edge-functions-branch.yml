@@ -7,6 +7,8 @@ on:
       - 'claude/**'
     paths:
       - 'supabase/functions/**'
+      # ...and when this file changes — see the note in deploy-edge-function.yml.
+      - '.github/workflows/deploy-edge-functions-branch.yml'
   workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
 
 env:
