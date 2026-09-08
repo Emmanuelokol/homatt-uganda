@@ -131,10 +131,11 @@ function upstreamFault(status: number): { kind: string; message: string } {
            message: 'The dictation service refused the recording.' };
 }
 
-// About a minute of the compressed audio a phone records. Long enough to read
-// four vitals aloud twice over; short enough that a forgotten recording is a
-// fraction of a cent rather than an afternoon.
-const MAX_BYTES = 2 * 1024 * 1024;
+// The phone now records the whole story rather than one blood pressure, at a
+// guaranteed 64 kbps floor: two minutes is about 960 KB. 4 MB leaves room for
+// a phone that chose a higher bitrate, and is still bounded — a forgotten
+// recording costs a fraction of a cent, not an afternoon.
+const MAX_BYTES = 4 * 1024 * 1024;
 
 // Whisper accepts a prompt to bias what it expects to hear. Feeding it the
 // vocabulary of a vitals reading measurably improves the numbers and the
@@ -319,8 +320,19 @@ Deno.serve(async (req) => {
   }
 
   async function viaDeepgram(key: string) {
+    // Which model, and why it can be changed without a deploy.
+    //
+    // nova-2-medical is tuned for dictated American medical notes. What this
+    // app actually hears is Ugandan-accented conversational English in a noisy
+    // room, and which model wins on that is a question about real audio, not
+    // one to settle by argument. DEEPGRAM_MODEL lets a clinic try another —
+    // nova-3, nova-2-general — and compare, with no code change and no deploy.
+    //
+    // nova-3 replaced `keywords` with `keyterm`, so the parameter follows the
+    // model rather than being hard-coded beside it.
+    const model = Deno.env.get('DEEPGRAM_MODEL') || 'nova-2-medical';
     const q = new URLSearchParams({
-      model: 'nova-2-medical', language: 'en', smart_format: 'true',
+      model, language: 'en', smart_format: 'true',
       punctuate: 'true', numerals: 'true',
     });
     // Vitals mode hears numbers; story mode hears people and symptoms. Biasing
@@ -328,7 +340,11 @@ Deno.serve(async (req) => {
     const boost = mode === 'vitals'
       ? BOOST_VITALS
       : BOOST_VITALS.concat(BOOST_STORY, BOOST_NAMES);
-    boost.forEach((k) => q.append('keywords', k));
+    const param = /^nova-3/.test(model) ? 'keyterm' : 'keywords';
+    boost.forEach((k) => {
+      // nova-3 takes the phrase without the :weight suffix nova-2 wants.
+      q.append(param, param === 'keyterm' ? k.replace(/:\d+$/, '') : k);
+    });
     const r = await fetch(`${DEEPGRAM_URL}?${q}`, {
       method: 'POST',
       headers: { Authorization: `Token ${key}`,

@@ -162,6 +162,76 @@ foreground mid-sentence, what was already said has been handed over instead of
 being lost with the recorder. `onerror` puts the button back and says so —
 without it the button stayed lit over a recorder that had already died.
 
+### Getting the words right, which is the whole point
+Accuracy is decided long before the recogniser sees anything. Five things in
+the capture chain were losing words, and four of them hurt a quiet speaker
+worst:
+
+- **The browser's noise suppressor was ON.** It is built for telephone calls,
+  not machine transcription, and it is a **gate**: it decides what is speech
+  and what is room, and removes the rest *before* the recogniser ever sees it.
+  A tired clinician half a metre from the phone at the end of a clinic is
+  exactly what it throws away. `noiseSuppression: false` and
+  `echoCancellation: false` now. A recogniser is trained on noisy audio; it
+  copes with a fan far better than with a sentence deleted before it arrived.
+  **Turning these back on "to clean the audio up" is the well-meant change that
+  would break dictation** — `test-speak-first.js` asserts they stay off.
+- **Automatic gain stays ON.** It lifts a quiet speaker, which is what we want.
+- **The sample rate was forced to 16 kHz**, making the phone resample from its
+  native 48 kHz with whatever resampler it had. Opus works at 48 kHz internally
+  regardless, so it cost quality and bought nothing. No longer constrained.
+- **The bitrate had no floor.** Some Android WebViews default mono Opus to a
+  call bitrate, and a heavily compressed quiet consonant is one the recogniser
+  has to guess at. `makeRecorder()` asks the recorder what it chose and rebuilds
+  it only if that is under 64 kbps — a floor, never a ceiling, so a phone that
+  already chose better is never dragged down.
+- **The recording stopped at 30 seconds, silently.** That limit was set when
+  the button only took a blood pressure; it now takes the name, sex, age,
+  complaint, story, denials, background and readings, and a clinician saying
+  all that at a natural pace runs past 30 seconds easily. Everything after the
+  cut was never recorded. Now 120 s for the story, 45 s for vitals — and when
+  it does fire, **it says so**, because a missing tail is otherwise invisible.
+
+### Making a quiet voice loud enough to hear
+Turning the gate off gives the recogniser the real signal. It does nothing
+about the real signal being too quiet, so the microphone is routed through
+`enhance()` before encoding — high-pass 85 Hz, compressor, makeup gain, and a
+limiter — and it is the conditioned audio that is sent.
+
+Measured through the real graph (`tests/measure-audio.js`):
+
+| speaker | raw RMS | conditioned | lift |
+|---|---|---|---|
+| very quiet | 0.0038 | 0.0483 | 12.6× |
+| quiet | 0.0115 | 0.1376 | 12.0× |
+| normal | 0.0383 | 0.2354 | 6.1× |
+| loud | 0.0958 | 0.2524 | 2.6× |
+
+A 25× spread of input arrives as a 5× spread; both quiet levels are rescued
+from under the 0.012 the app calls silence; nothing clips.
+
+**The limiter is not optional.** The first attempt used a makeup gain with no
+ceiling and drove *two of the four levels into clipping* — which is far worse
+for a recogniser than quietness, because it shatters exactly the consonants
+that tell "no" from "so". The measurement caught it; the settings were swept
+against it rather than guessed.
+
+The level meter still reads the **raw** microphone, not the conditioned signal,
+so "is it hearing anything" keeps answering for the microphone rather than for
+the gain, and the 0.012 silence threshold keeps its meaning.
+
+If the WebView has no `AudioContext`, or anything in the graph throws, the raw
+microphone is recorded exactly as before. A quiet dictation beats none.
+
+### Which model does the transcribing
+`DEEPGRAM_MODEL` (Supabase secret, default `nova-2-medical`). nova-2-medical is
+tuned for dictated American medical notes; what this app actually hears is
+Ugandan-accented conversational English in a noisy room, and which model wins on
+that is a question about real audio, not one to settle by argument. Set the
+secret to `nova-3` or `nova-2-general` and compare — no code change, no deploy.
+The keyword parameter follows the model (`keyterm` for nova-3, `keywords` for
+nova-2), so switching does not silently drop the Ugandan name boosting.
+
 ### Showing that it is listening
 While the microphone is open, `#itDictateLive` shows a blinking dot, a row of
 bars, the elapsed time, and — in words — whether anything is being heard. A

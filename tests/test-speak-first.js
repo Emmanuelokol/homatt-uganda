@@ -384,6 +384,58 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
     /Microphone|covering/i.test(silent),
     silent.slice(0, 80));
 
+  // ── 5b. What is asked of the microphone, and what is recorded ──────────
+  // The browser's noise suppressor is a telephony GATE: it removes what it
+  // decides is not speech before the recogniser ever sees it, and a quiet
+  // clinician half a metre from the phone is what it removes. It is off on
+  // purpose, and this asserts that, because turning it back on "to clean the
+  // audio up" is exactly the well-meant change that would break dictation.
+  const asked = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    window.__c = null;
+    const ac = new AudioContext();
+    const dest = ac.createMediaStreamDestination();
+    navigator.mediaDevices.getUserMedia = async (c) => {
+      window.__c = JSON.parse(JSON.stringify(c)); return dest.stream;
+    };
+    window.__bits = null;
+    function Rec(stream, opts) {
+      this.state='recording'; this.stream = stream;
+      this.mimeType = (opts && opts.mimeType) || 'audio/webm';
+      // Stand in for a WebView that defaults mono opus to a call bitrate.
+      this.audioBitsPerSecond = (opts && opts.audioBitsPerSecond) || 24000;
+      window.__bits = this.audioBitsPerSecond;
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+        if(this.onstop) this.onstop(); };
+    }
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    window._getClinicSupabase = () => ({ functions: { invoke: async () =>
+      ({ data: { text: 'complains of fever' } }) } });
+    const btn = document.getElementById('itDictateStory');
+    btn.click(); await new Promise(r => setTimeout(r, 400));
+    const recStream = window.__recStream;
+    btn.click(); await new Promise(r => setTimeout(r, 500));
+    try { ac.close(); } catch (e) {}
+    return { c: window.__c, bits: window.__bits };
+  });
+  result('the noise suppressor and echo canceller are OFF — they delete quiet speech',
+    asked.c && asked.c.audio &&
+    asked.c.audio.noiseSuppression && asked.c.audio.noiseSuppression.ideal === false &&
+    asked.c.audio.echoCancellation && asked.c.audio.echoCancellation.ideal === false,
+    JSON.stringify(asked.c && asked.c.audio));
+  result('automatic gain stays on, because it lifts a quiet speaker',
+    asked.c && asked.c.audio && asked.c.audio.autoGainControl &&
+    asked.c.audio.autoGainControl.ideal === true,
+    JSON.stringify(asked.c && asked.c.audio && asked.c.audio.autoGainControl));
+  result('the sample rate is not forced, so the phone is not made to resample',
+    asked.c && asked.c.audio && !('sampleRate' in asked.c.audio),
+    JSON.stringify(Object.keys((asked.c && asked.c.audio) || {})));
+  result('a phone that picked a call-quality bitrate is raised to a speech one',
+    asked.bits >= 64000, 'audioBitsPerSecond=' + asked.bits);
+
   // ── 6. It must actually hear, and say so while there is still time ──────
   // The meter is the only thing that tells a clinician the microphone is
   // alive. A new AudioContext starts SUSPENDED under the autoplay policy, and

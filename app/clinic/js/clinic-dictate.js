@@ -683,8 +683,25 @@
   // told to type.
   var FIELD = { sbp: 'itSbp', dbp: 'itDbp', temp: 'itTemp',
                 weight: 'itWeight', pulse: 'itPulse' };
-  var MAX_MS = 30000;                    // a vitals reading is one sentence
+  // How long one recording may run before it stops itself.
+  //
+  // 30 seconds was set when this button only took a blood pressure. It now
+  // takes the whole thing — the name, the sex, the age, the complaint, the
+  // story, what they deny, the background and the readings — and a clinician
+  // saying all of that at a natural pace runs past 30 seconds easily. The tail
+  // was simply cut off, silently, and the words after it were never recorded
+  // at all. That is not a recogniser fault; it is this number.
+  //
+  // The cap is a runaway guard, not a budget: the clinician stops it by
+  // tapping. At the 64 kbps floor below, two minutes is about 960 KB, inside
+  // the Edge Function's limit.
+  var MAX_MS = 120000;                   // the whole story, said unhurriedly
+  var MAX_VITALS_MS = 45000;             // four readings, said twice over
   var _rec = null, _chunks = [], _stopT = null;
+  // Set when the recording ran out of time rather than being stopped by hand.
+  // The clinician has to be told: the words after the cut were never recorded,
+  // and nothing else on the screen would show that.
+  var _autoStopped = false;
 
   function say(el, msg, kind) {
     if (!el) return;
@@ -1414,15 +1431,35 @@
     // a fan, and a phone held at arm's length. These are asked for as
     // preferences, not requirements — a hard constraint a phone cannot meet
     // fails the whole call with OverconstrainedError, and a slightly noisier
-    // recording is enormously better than none. Mono because the recogniser
-    // wants one channel and it halves what a clinic uploads on mobile data.
+    // recording is enormously better than none.
+    //
+    // NOISE SUPPRESSION AND ECHO CANCELLATION ARE DELIBERATELY OFF.
+    //
+    // They are built for telephone calls, not for machine transcription, and
+    // they are the reason a quietly-spoken sentence comes back as nothing.
+    // The browser's noise suppressor is a gate: it decides what is speech and
+    // what is room, and anything below its idea of speech is removed BEFORE
+    // the recogniser ever sees it. A tired clinician at the end of a clinic,
+    // half a metre from the phone, is exactly what it throws away. Echo
+    // cancellation applies a filter for a far-end signal that does not exist
+    // here and can only attenuate.
+    //
+    // A recogniser is trained on real, noisy audio. It copes with a fan far
+    // better than it copes with a sentence that was deleted before it arrived.
+    //
+    // Automatic gain stays ON: it lifts a quiet speaker, which is the thing we
+    // want, and the compressor below tidies up what it leaves.
+    //
+    // The sample rate is no longer constrained. Asking for 16 kHz made the
+    // phone resample from its native 48 kHz with whatever resampler it had,
+    // and Opus works at 48 kHz internally regardless — so it cost quality and
+    // bought nothing.
     var WANT = {
       audio: {
-        echoCancellation: { ideal: true },
-        noiseSuppression: { ideal: true },
+        echoCancellation: { ideal: false },
+        noiseSuppression: { ideal: false },
         autoGainControl:  { ideal: true },
         channelCount:     { ideal: 1 },
-        sampleRate:       { ideal: 16000 },
       },
     };
 
@@ -1464,6 +1501,92 @@
     return err;
   }
 
+  /* ── Making a quiet voice loud enough to hear ──────────────────────────────
+   *
+   * Turning the browser's noise suppressor off gives the recogniser the real
+   * signal, but it does nothing about the real signal being too quiet. So the
+   * microphone is routed through three stages before it is encoded, and it is
+   * the ENCODED, conditioned audio that is sent:
+   *
+   *   high-pass 85 Hz  — mains hum, a fan, a desk being knocked. None of it is
+   *                      speech, and all of it eats the compressor's headroom.
+   *   compressor       — the important one. It lifts quiet speech towards a
+   *                      usable level and holds loud speech back, so a
+   *                      clinician half a metre away and one leaning into the
+   *                      phone arrive at the recogniser at a similar level.
+   *   makeup gain      — puts back the loudness the compressor took off.
+   *   limiter          — a hard ceiling at -6 dB. Without it the makeup gain
+   *                      drove ordinary and loud speech into CLIPPING, which
+   *                      is far worse for a recogniser than quietness: it
+   *                      shatters exactly the consonants that tell "no" from
+   *                      "so". Measured, not assumed — the first attempt at
+   *                      this clipped two of four test levels.
+   *
+   * Measured through the real graph (tests/measure-audio.js), a 25x spread of
+   * input levels arrives at the recogniser as a 5x spread, with the quietest
+   * speaker four times above the level the app calls silence, and nothing
+   * clipping.
+   *
+   * This is ordinary broadcast conditioning, not cleverness, and it is the
+   * standard answer to "it does not hear me unless I shout".
+   *
+   * It is entirely optional: if this WebView has no AudioContext, or anything
+   * in the graph throws, the raw microphone is recorded exactly as before. A
+   * dictation that is merely quiet beats a dictation that did not happen.
+   */
+  function enhance(stream) {
+    var AC = global.AudioContext || global.webkitAudioContext;
+    var off = { stream: stream, close: function () {} };
+    if (!AC || typeof AC.prototype.createDynamicsCompressor !== 'function') return off;
+    try {
+      var ctx = new AC();
+      if (ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
+      if (typeof ctx.createMediaStreamDestination !== 'function') { ctx.close(); return off; }
+
+      var src = ctx.createMediaStreamSource(stream);
+
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 85;
+
+      var comp = ctx.createDynamicsCompressor();
+      // -34 dB starts working on ordinary indoor speech rather than only on
+      // shouting; 6:1 with a wide knee lifts without sounding pumped; 3 ms
+      // attack catches a consonant, 250 ms release does not chop the word
+      // after it.
+      comp.threshold.value = -34;
+      comp.knee.value = 24;
+      comp.ratio.value = 6;
+      comp.attack.value = 0.003;
+      comp.release.value = 0.25;
+
+      var gain = ctx.createGain();
+      gain.gain.value = 2.4;          // makeup — swept against clipping, see above
+
+      // The ceiling. A second compressor with a hard knee and a 20:1 ratio is
+      // a limiter: it does nothing at all until the signal reaches -6 dB and
+      // then refuses to let it past.
+      var lim = ctx.createDynamicsCompressor();
+      lim.threshold.value = -6;
+      lim.knee.value = 0;
+      lim.ratio.value = 20;
+      lim.attack.value = 0.001;
+      lim.release.value = 0.08;
+
+      var dest = ctx.createMediaStreamDestination();
+      src.connect(hp); hp.connect(comp); comp.connect(gain);
+      gain.connect(lim); lim.connect(dest);
+
+      if (!dest.stream || !dest.stream.getAudioTracks().length) { ctx.close(); return off; }
+      return {
+        stream: dest.stream,
+        close: function () { try { ctx.close(); } catch (e) {} },
+      };
+    } catch (e) {
+      return off;
+    }
+  }
+
   /**
    * What this phone can actually record, in the order the recogniser prefers.
    *
@@ -1485,18 +1608,39 @@
     'audio/aac',
   ];
 
+  // A floor, never a ceiling. Some Android WebViews default mono Opus to a
+  // bitrate meant for a voice call, and a heavily compressed quiet consonant
+  // is a consonant the recogniser has to guess at. 64 kbps mono Opus is
+  // transparent for speech and still only ~8 KB a second on a bought megabyte.
+  //
+  // The recorder is asked what it settled on rather than told what to do,
+  // because raising a phone that already chose better would be a loss. It is
+  // rebuilt only when what it picked is below the floor.
+  var MIN_BITS = 64000;
+
   function makeRecorder(stream) {
     var MR = global.MediaRecorder;
+    var rec = null;
     if (MR && typeof MR.isTypeSupported === 'function') {
       for (var i = 0; i < RECORD_TYPES.length; i++) {
         if (MR.isTypeSupported(RECORD_TYPES[i])) {
-          try { return new MR(stream, { mimeType: RECORD_TYPES[i] }); }
+          try { rec = new MR(stream, { mimeType: RECORD_TYPES[i] }); break; }
           catch (e) { /* supported in name only — try the next */ }
         }
       }
     }
     // No isTypeSupported, or nothing on the list worked: let the phone pick.
-    return new MR(stream);
+    if (!rec) rec = new MR(stream);
+
+    var got = Number(rec.audioBitsPerSecond) || 0;
+    if (got > 0 && got < MIN_BITS) {
+      try {
+        var opts = { audioBitsPerSecond: MIN_BITS };
+        if (rec.mimeType) opts.mimeType = rec.mimeType;
+        rec = new MR(stream, opts);
+      } catch (e) { /* keep the one that worked */ }
+    }
+    return rec;
   }
 
   /** What the recorder actually produced, for the Content-Type upstream. */
@@ -1532,11 +1676,16 @@
                           { kind: 'mic-missing' });
     }
     useLiveElements(opts.live);
+    _autoStopped = false;
     var stream = await openMic();
+    // Record the conditioned signal; meter the raw one, so "is it hearing
+    // anything" still answers for the microphone rather than for the gain.
+    var cond = enhance(stream);
     var rec;
     try {
-      rec = makeRecorder(stream);
+      rec = makeRecorder(cond.stream);
     } catch (e) {
+      cond.close();
       stream.getTracks().forEach(function (t) { t.stop(); });
       throw Object.assign(new Error('This phone will not record in a format ' +
         'the app can read.'), { kind: 'mic-format' });
@@ -1549,12 +1698,14 @@
     rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _chunks.push(ev.data); };
     rec.onerror = function () {
       try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      cond.close();
       _rec = null; liveOff(); clearTimeout(_stopT);
       fail(Object.assign(new Error('The recording stopped part way.'),
                          { kind: 'mic-failed' }));
     };
     rec.onstop = async function () {
       stream.getTracks().forEach(function (t) { t.stop(); });
+      cond.close();
       liveOff();
       var loud = loudestHeard();
       var blob = new Blob(_chunks, { type: recordedType(rec, _chunks) });
@@ -1564,6 +1715,7 @@
         return;
       }
       if (typeof opts.onReading === 'function') opts.onReading();
+      if (_autoStopped && typeof opts.onCut === 'function') opts.onCut();
       try {
         settle(await transcribe(blob, opts.mode === 'vitals' ? 'vitals' : 'story'));
       } catch (e) {
@@ -1574,7 +1726,11 @@
 
     rec.start(1000);
     liveOn(stream);
-    _stopT = setTimeout(function () { stop(); }, MAX_MS);
+    var cap = opts.mode === 'vitals' ? MAX_VITALS_MS : MAX_MS;
+    _stopT = setTimeout(function () {
+      _autoStopped = true;
+      stop();
+    }, cap);
     return {
       done: done,
       stop: function () { stop(); },
@@ -1618,6 +1774,7 @@
       var stream;
       hideHeard();                       // the last dictation's words are done
       useLiveElements(null);             // the meter belongs to this screen now
+      _autoStopped = false;
       say(out, 'Asking for the microphone…');
       try {
         stream = await openMic();
@@ -1628,11 +1785,13 @@
       }
 
       _chunks = [];
+      var cond = enhance(stream);
       try {
-        _rec = makeRecorder(stream);
+        _rec = makeRecorder(cond.stream);
       } catch (e) {
         // A microphone left open is a microphone still listening, in a room
         // with a patient in it. If the recorder will not start, close it.
+        cond.close();
         stream.getTracks().forEach(function (t) { t.stop(); });
         _rec = null;
         say(out, 'This phone will not record in a format the app can read. ' +
@@ -1649,6 +1808,7 @@
       // the clinician keeps talking into a recorder that stopped.
       _rec.onerror = function () {
         try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+        cond.close();
         _rec = null;
         btn.classList.remove('on');
         liveOff();
@@ -1658,6 +1818,7 @@
       };
       _rec.onstop = async function () {
         stream.getTracks().forEach(function (t) { t.stop(); });
+        cond.close();
         btn.classList.remove('on');
         liveOff();                       // the auto-stop timer comes here too
         // Labelled with what the phone REALLY produced — that label is what
@@ -1716,6 +1877,12 @@
         // there would be a tap that buys nothing.
         if (mode === 'consult') showHeard(text, mode, show);
         show(await applied(mode, text, function (r) { show(r, true); }));
+        if (_autoStopped) {
+          // Appended, not instead: what WAS heard is still worth reading.
+          say(out, (out.textContent || '') + '  ·  That was as long as one ' +
+                   'recording can run — anything said after it was not heard. ' +
+                   'Tap again to add the rest.', 'warn');
+        }
       };
       // A timeslice, not one blob at the end: if the WebView is pushed out of
       // the foreground mid-sentence, what was already said has been handed
@@ -1726,7 +1893,10 @@
       say(out, mode === 'vitals'
         ? 'Listening — say the readings, then tap again.'
         : 'Listening — say who it is and what they came with, then tap again.');
-      _stopT = setTimeout(stop, MAX_MS);
+      _stopT = setTimeout(function () {
+        _autoStopped = true;
+        stop();
+      }, mode === 'vitals' ? MAX_VITALS_MS : MAX_MS);
     });
   }
 

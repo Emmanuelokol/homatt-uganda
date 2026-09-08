@@ -164,6 +164,9 @@
       session = await D.listen({
         mode: 'story',
         live: { box: 'spListen', bars: 'spBars', time: 'spTime' },
+        onCut: function () {
+          el.title.textContent = 'That was as long as one recording can run';
+        },
         onReading: function () {
           el.title.textContent = 'Reading it…';
           var h = el.body.querySelector('.sp-hint');
