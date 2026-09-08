@@ -282,11 +282,36 @@
     function push(list) {
       for (var i = 0; i < list.length; i++) if (terms.indexOf(list[i]) < 0) terms.push(list[i]);
     }
+    // ── Which words get to do the searching ──────────────────────────────
+    //
+    // Only 22 terms are searched: BM25 over 713 documents with an unbounded
+    // bag of words is both slower and noisier, because every extra common
+    // word dilutes the ones that discriminate.
+    //
+    // The complaint and the vitals go in whole — between them that is rarely
+    // more than eight words, and they are the two things the clinician is
+    // most sure of. What is LEFT used to go to the story until it ran out,
+    // and only then to the background. On a wordy dictation that meant the
+    // background never reached the scorer at all: measured on four realistic
+    // consultations, "known peptic ulcer disease" — the single fact that most
+    // changes what abdominal pain might be — was cut off entirely.
+    //
+    // So the remainder is shared. The background is usually the shorter of
+    // the two, so it is offered a third of what is left; whatever either does
+    // not use goes to the other, and nothing is wasted.
+    var MAX_TERMS = 22;
     push(toks(input.chief));
     push(vitalTerms(input.vitals));
-    push(toks(input.subjective));
-    push(toks(input.background));
-    terms = terms.slice(0, 22);
+
+    var story = toks(input.subjective).filter(function (t) { return terms.indexOf(t) < 0; });
+    var back = toks(input.background).filter(function (t) { return terms.indexOf(t) < 0; });
+    var room = Math.max(0, MAX_TERMS - terms.length);
+    var backRoom = Math.min(back.length, Math.ceil(room / 3));
+    push(story.slice(0, room - backRoom));
+    push(back.slice(0, backRoom));
+    if (terms.length < MAX_TERMS) push(back.slice(backRoom));    // story left room
+    if (terms.length < MAX_TERMS) push(story.slice(room - backRoom));
+    terms = terms.slice(0, MAX_TERMS);
     if (!terms.length) return { ready: true, items: [], flags: vitalFlags(input.vitals) };
 
     var idf = {}, totIdf = 0;

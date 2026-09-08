@@ -251,6 +251,57 @@ PY`).toString());
   result('a diagnosis typed by hand still works — nothing above is required',
     blocked === false || blocked === null, 'nextDisabled=' + blocked);
 
+  // ── All three, weighed together ─────────────────────────────────────────
+  // The complaint, the readings and the background all feed the suggestion.
+  // The order they are collected in matters, because only 22 search terms are
+  // used: the complaint and the vitals go in whole, and what is left is SHARED
+  // between the story and the background. Before that sharing, a wordy story
+  // ate the whole budget and the background never reached the scorer at all.
+  const weighed = await page.evaluate(async () => {
+    await window.Impression.ready();
+    const base = { sex: 'male', age: '44', ageUnit: 'years',
+      chief: 'abdominal pain and vomiting',
+      subjective: 'started three days ago after eating, worse after food, has ' +
+        'vomited four times today, no diarrhoea, no blood in the vomit, took ' +
+        'metronidazole from a drug shop with no relief, cannot keep water down',
+      vitals: { temp: '37.4', pulse: '112' } };
+    const without = window.Impression.suggest(
+      Object.assign({}, base, { background: '' }), 3);
+    const withIt = window.Impression.suggest(
+      Object.assign({}, base, { background: 'known peptic ulcer disease, on omeprazole' }), 3);
+    const terms = withIt.terms || [];
+    return {
+      without: (without.items || []).map(i => i.title),
+      withIt: (withIt.items || []).map(i => i.title),
+      backReached: ['peptic', 'ulcer'].filter(t =>
+        terms.some(x => x.indexOf(t) === 0)).length,
+      termCount: terms.length,
+    };
+  });
+  result('the background reaches the engine even when the story is long',
+    weighed.backReached >= 2,
+    'terms=' + weighed.termCount + ' background terms kept=' + weighed.backReached);
+  result('and it changes the suggestion, which is the point of collecting it',
+    weighed.withIt.join('|') !== weighed.without.join('|') &&
+    /peptic|ulcer/i.test(weighed.withIt.join(' ')),
+    'without: ' + weighed.without.slice(0,2).join(', ') +
+    '   with: ' + weighed.withIt.slice(0,2).join(', '));
+
+  // The vitals are not decoration either — they become the words the books use.
+  const vitalsCount = await page.evaluate(async () => {
+    await window.Impression.ready();
+    const base = { sex: 'female', age: '30', ageUnit: 'years',
+      chief: 'headache', subjective: 'for two days', background: '' };
+    const cool = window.Impression.suggest(Object.assign({}, base, { vitals: {} }), 3);
+    const hot = window.Impression.suggest(
+      Object.assign({}, base, { vitals: { temp: '40.2' } }), 3);
+    return { cool: (cool.terms || []), hot: (hot.terms || []) };
+  });
+  result('a reading becomes a word the books know, and joins the search',
+    vitalsCount.hot.length > vitalsCount.cool.length &&
+    vitalsCount.hot.some(t => /fever|hyperpyrex/.test(t)),
+    JSON.stringify(vitalsCount.hot.slice(0, 6)));
+
   result('no page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await page.screenshot({ path: 'intake.png', fullPage: true });
   await b.close(); server.close();

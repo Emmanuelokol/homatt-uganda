@@ -230,6 +230,10 @@
     if (v.weight) vs.push(v.weight + ' kg');
     var age = facts.age ? facts.age + ' ' + facts.ageUnit : '';
 
+    // Every box the intake screen has, so nothing that was said is invisible
+    // here. The background was missing entirely — and it is the part that most
+    // changes what a complaint might be, so leaving it off the summary meant
+    // the clinician could not check the very thing the suggestion turned on.
     var html =
       '<div class="sp-grid">' +
         tile('Name', facts.name) + tile('Sex', facts.sex) +
@@ -239,6 +243,12 @@
       (facts.subjective
         ? '<div class="sp-story"><span class="sp-k">The story</span>' +
           esc(facts.subjective) + '</div>' : '') +
+      '<div class="sp-story' + (facts.background ? '' : ' missing') + '">' +
+        '<span class="sp-k">Background — what they already have</span>' +
+        (facts.background ? esc(facts.background)
+                          : 'nothing said — say “known diabetic”, “on ' +
+                            'metformin”, “asthmatic” if there is any') +
+      '</div>' +
       (facts.negations.length
         ? '<div class="sp-neg">You said: <b>' + esc(facts.negations.join(', ')) +
           '</b> — check that is right</div>' : '') +

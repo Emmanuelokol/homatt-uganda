@@ -444,6 +444,50 @@ point to it and the page it came from; the panel says *not a diagnosis, you
 decide*; none is preselected; and nothing is written anywhere until a person
 taps one.
 
+## How a suggestion is worked out
+
+`app/clinic/js/clinic-impression.js` · benchmark: `tests/measure-impression.js`
+
+**Everything the clinician recorded feeds it** — the complaint, the readings,
+the story and the background — and the readings are turned into the words the
+books actually use (`temp 40.2` → `hyperpyrexia`, `fever`; `pulse 130` →
+`tachycardia`). Scoring is BM25 over 729 documents, so a rare word counts for
+far more than a common one, and no field is privileged once its words are in.
+
+### The term budget, which is where the order matters
+Only **22 search terms** are used. More is both slower and noisier: every extra
+common word dilutes the ones that discriminate. So which 22 is a real decision.
+
+The complaint and the vitals go in whole — together rarely more than eight
+words, and the two things the clinician is surest of. What is left used to go
+to the story until it ran out, and only then to the background. Measured on
+four realistic dictations (`tests/measure-terms.js`), that meant:
+
+| dictation | background terms reaching the engine |
+|---|---|
+| short | 1/1 |
+| ordinary | 2/2 |
+| **wordy** | **0/11** ← "known peptic ulcer disease" never arrived |
+| **very wordy** | **3/10** |
+
+A wordy story ate the whole budget. The remainder is now **shared**: the
+background is offered a third of what is left, and whatever either does not use
+goes to the other. Same four dictations: 1/1, 2/2, **7/11**, **7/10** — and the
+wordy abdominal-pain case now returns **Peptic Ulcer Disease** first instead of
+"Worms".
+
+The WHO differential benchmark is unchanged by the sharing at **239/241 in the
+top 3 (99.2%)**, which is the point of having it: it proves the change did not
+cost anything elsewhere.
+
+### What it does NOT do
+It has no sense of **time**. "Fever for two days" and "fever for two months"
+score the same, though they are different diseases. Duration is in the story
+the clinician reads, but it is not weighed. The same goes for the order events
+happened in — "vomiting then headache" and "headache then vomiting" are the
+same bag of words to it. Worth knowing before trusting the ordering of the
+list, and worth doing one day.
+
 ## The tests
 
 `tests/` — 46 files, ~530 checks. No framework: each file starts a web server

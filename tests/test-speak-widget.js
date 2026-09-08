@@ -64,7 +64,8 @@ const FAKE_MIC = (said) => `
 
   // ── 1. It is there, on the screens a clinician is actually on ────────────
   const SAID = 'Her name is Grace Nakato, she is female, 40 years, complains of ' +
-               'fever and headache for two days, no vomiting, temp 38.5';
+               'fever and headache for two days, no vomiting, known diabetic on ' +
+               'metformin, temp 38.5';
 
   for (const pageName of ['dashboard', 'messages', 'new-order']) {
     await page.goto(`${ORIGIN}/clinic/${pageName}.html`, { waitUntil: 'domcontentloaded' });
@@ -187,6 +188,26 @@ const FAKE_MIC = (said) => `
     /38\.5/.test(by('Vitals')), by('Vitals'));
   result('what the clinician denied is drawn to their eye',
     /no vomiting/i.test(summary.neg), summary.neg.slice(0, 60));
+
+  // The background is what most changes what a complaint might be, and it is
+  // what the suggestion below turns on — so it has to be checkable here.
+  const back = await page.evaluate(() => {
+    const boxes = [...document.querySelectorAll('#spBody .sp-story')]
+      .map(b => b.textContent);
+    return { boxes, any: boxes.join(' | ') };
+  });
+  result('the background is in the summary, not silently swallowed',
+    /Background/i.test(back.any) && /diabetic/i.test(back.any),
+    back.any.slice(0, 110));
+
+  // And when nothing was said, it says so rather than looking complete.
+  const emptyBack = await page.evaluate(() => {
+    const b = [...document.querySelectorAll('#spBody .sp-story')]
+      .find(x => /Background/i.test(x.textContent));
+    return b ? { missing: b.classList.contains('missing') } : null;
+  });
+  result('a background that was given is not marked as missing',
+    emptyBack && emptyBack.missing === false, JSON.stringify(emptyBack));
   result('the words are kept verbatim, and can be corrected',
     summary.heard.indexOf('Grace Nakato') >= 0, summary.heard.slice(0, 60));
   result('and the listening animation stops when listening stops',
