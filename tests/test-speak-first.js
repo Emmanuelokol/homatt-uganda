@@ -380,10 +380,143 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
     return (document.getElementById('itDictateStorySay')||{}).textContent || '';
   });
   result('a recording with no sound in it says to check the microphone',
-    /no sound|nothing was recorded/i.test(silent) && /covering it|check/i.test(silent),
+    /nothing came through|heard almost nothing/i.test(silent) &&
+    /Microphone|covering/i.test(silent),
     silent.slice(0, 80));
 
-  // ── 6. Readable, in all four looks ──────────────────────────────────────
+  // ── 6. It must actually hear, and say so while there is still time ──────
+  // The meter is the only thing that tells a clinician the microphone is
+  // alive. A new AudioContext starts SUSPENDED under the autoplay policy, and
+  // a suspended analyser returns silence for ever — every bar flat, on a
+  // microphone working perfectly. That is the whole "it is not hearing me"
+  // complaint, so this test drives a real tone through a real AudioContext.
+  const heard = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    const ac = new AudioContext();
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    gain.gain.value = 0.8; osc.frequency.value = 300;
+    const dest = ac.createMediaStreamDestination();
+    osc.connect(gain); gain.connect(dest); osc.start();
+    navigator.mediaDevices.getUserMedia = async () => dest.stream;
+    function Rec() { this.state='recording'; this.mimeType='audio/webm';
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+        if(this.onstop) this.onstop(); }; }
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    window._getClinicSupabase = () => ({ functions: { invoke: async () =>
+      ({ data: { text: 'complains of fever for two days, no vomiting' } }) } });
+    const btn = document.getElementById('itDictateStory');
+    btn.click();
+    await new Promise(r => setTimeout(r, 1600));
+    const hint = document.querySelector('#itDictateLive .it-live-hint');
+    const bars = [...document.querySelectorAll('#itDictateBars i')]
+      .map(b => parseFloat((b.style.transform.match(/[\d.]+/) || [0])[0]));
+    const state = { hintText: hint ? hint.textContent : '',
+                    hintClass: hint ? hint.className : '',
+                    moved: bars.some(v => v > 0.2), bars };
+    btn.click();
+    await new Promise(r => setTimeout(r, 600));
+    try { osc.stop(); ac.close(); } catch (e) {}
+    return { ...state,
+             said: (document.getElementById('itDictateStorySay')||{}).textContent || '' };
+  });
+  result('with real sound going in, the bars actually move',
+    heard.moved, JSON.stringify(heard.bars));
+  result('and it says in words that it is hearing you, while you are still talking',
+    /hearing you/i.test(heard.hintText) && / good\b/.test(heard.hintClass),
+    heard.hintText);
+  result('a recording with sound in it is sent, not refused as silent',
+    !/nothing came through|barely moved/i.test(heard.said),
+    heard.said.slice(0, 70));
+
+  // Silence, on the other hand, must be named — and its likeliest cause given.
+  const deaf = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    const ac = new AudioContext();
+    const dest = ac.createMediaStreamDestination();   // nothing connected: silence
+    navigator.mediaDevices.getUserMedia = async () => dest.stream;
+    function Rec() { this.state='recording'; this.mimeType='audio/webm';
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+        if(this.onstop) this.onstop(); }; }
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    const btn = document.getElementById('itDictateStory');
+    btn.click();
+    await new Promise(r => setTimeout(r, 3000));
+    const hint = document.querySelector('#itDictateLive .it-live-hint');
+    const warned = { text: hint ? hint.textContent : '', cls: hint ? hint.className : '' };
+    btn.click();
+    await new Promise(r => setTimeout(r, 600));
+    try { ac.close(); } catch (e) {}
+    return { warned,
+             said: (document.getElementById('itDictateStorySay')||{}).textContent || '',
+             stored: localStorage.getItem('homatt_dictation_fault') || '' };
+  });
+  result('a dead microphone is called out DURING the recording, not after it',
+    /not hearing anything/i.test(deaf.warned.text) && / bad\b/.test(deaf.warned.cls),
+    deaf.warned.text.slice(0, 70));
+  result('and afterwards it names the likeliest cause instead of shrugging',
+    /permission|microphone/i.test(deaf.said) && /"kind":"mic-silent"/.test(deaf.stored),
+    deaf.said.slice(0, 100));
+
+  // ── 7. The words, shown back and correctable ────────────────────────────
+  const words = await page.evaluate(async () => {
+    Object.defineProperty(navigator, 'onLine', { get: () => true, configurable: true });
+    navigator.permissions = undefined;
+    navigator.mediaDevices.getUserMedia = async () => ({ getTracks: () => [{ stop(){} }] });
+    function Rec() { this.state='recording'; this.mimeType='audio/webm';
+      this.start=()=>{}; this.stop=()=>{ this.state='inactive';
+        if(this.ondataavailable) this.ondataavailable({data:new Blob(['x'])});
+        if(this.onstop) this.onstop(); }; }
+    Rec.isTypeSupported = () => true;
+    window.MediaRecorder = Rec;
+    ['itChief','itSubjective','itBackground'].forEach(id => {
+      const e = document.getElementById(id);
+      e.value=''; e.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    // The transcript with the dangerous kind of mistake in it: a dropped "no".
+    window._getClinicSupabase = () => ({ functions: { invoke: async (n) =>
+      n === 'transcribe'
+        ? { data: { text: 'complains of fever for two days, chest pain' } }
+        : { error: new Error('no model') } } });
+    const btn = document.getElementById('itDictateStory');
+    btn.click(); await new Promise(r => setTimeout(r, 80));
+    btn.click(); await new Promise(r => setTimeout(r, 600));
+    const box = document.getElementById('itHeardBox');
+    const ta = document.getElementById('itHeardText');
+    return { shown: box && !box.hidden, text: ta ? ta.value : '',
+             subjBefore: document.getElementById('itSubjective').value };
+  });
+  result('after dictating, the words are shown back in a box you can edit',
+    words.shown === true && /chest pain/.test(words.text),
+    JSON.stringify(words.text).slice(0, 80));
+
+  const corrected = await page.evaluate(async () => {
+    const ta = document.getElementById('itHeardText');
+    ta.value = 'complains of fever for two days, no chest pain';
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+    document.getElementById('itHeardUse').click();
+    await new Promise(r => setTimeout(r, 700));
+    return { chief: document.getElementById('itChief').value,
+             subj: document.getElementById('itSubjective').value,
+             boxGone: !!(document.getElementById('itHeardBox')||{}).hidden,
+             said: (document.getElementById('itDictateStorySay')||{}).textContent || '' };
+  });
+  result('correcting a word re-fills the form from the corrected sentence',
+    /no chest pain/.test(corrected.subj), JSON.stringify(corrected.subj).slice(0, 90));
+  result('and the old wrong version is gone, not sitting there twice',
+    (corrected.subj.match(/two days/g) || []).length === 1 &&
+    !/^(?!.*no ).*chest pain/.test(corrected.subj.replace(/no chest pain/g, '')),
+    JSON.stringify(corrected.subj).slice(0, 90));
+  result('the box puts itself away once the words are used',
+    corrected.boxGone === true && /corrected/i.test(corrected.said),
+    corrected.said.slice(0, 60));
+
+  // ── 8. Readable, in all four looks ──────────────────────────────────────
   const contrast = [];
   for (const skin of ['forest','midnight','dark','clay']) {
     for (const theme of ['light','dark']) {
@@ -398,12 +531,27 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
         const lum = c => { const m = c.match(/[\d.]+/g).map(Number);
           const f = v => { v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); };
           return 0.2126*f(m[0])+0.7152*f(m[1])+0.0722*f(m[2]); };
-        const bgOf = el => { let n = el;
+        // Composite every translucent layer over the one behind it, the way
+        // the browser actually paints. Taking rgba(255,255,255,.06) at face
+        // value reports a perfectly readable box as unreadable — the dark
+        // inputs are a 6% white wash over a dark card, not white.
+        const rgb = c => { const m = (c || '').match(/[\d.]+/g); return m ? m.map(Number) : null; };
+        const bgOf = el => {
+          let n = el; const layers = [];
           while (n && n !== document.documentElement) {
-            const c = getComputedStyle(n).backgroundColor;
-            if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c;
-            n = n.parentElement; }
-          return getComputedStyle(document.body).backgroundColor; };
+            const c = rgb(getComputedStyle(n).backgroundColor);
+            if (c) { const a = c.length > 3 ? c[3] : 1;
+              if (a > 0) { layers.push([c[0], c[1], c[2], a]); if (a >= 1) break; } }
+            n = n.parentElement;
+          }
+          const base = rgb(getComputedStyle(document.body).backgroundColor) || [255, 255, 255];
+          let out = [base[0], base[1], base[2]];
+          for (let i = layers.length - 1; i >= 0; i--) {
+            const [r, g, b, a] = layers[i];
+            out = [r * a + out[0] * (1 - a), g * a + out[1] * (1 - a), b * a + out[2] * (1 - a)];
+          }
+          return 'rgb(' + out.join(', ') + ')';
+        };
         const ratio = el => { const a = lum(getComputedStyle(el).color), c = lum(bgOf(el));
           return (Math.max(a,c)+0.05)/(Math.min(a,c)+0.05); };
         const out = {};
@@ -415,6 +563,13 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
         add('time', '#itDictateTime');
         add('hint', '.it-live-hint');
         add('say', '#itDictateStorySay');
+        const hb = document.getElementById('itHeardBox');
+        if (hb) hb.hidden = false;
+        add('heardTitle', '.it-heard-h b');
+        add('heardNote', '.it-heard-note');
+        add('heardText', '#itHeardText');
+        add('heardUse', '#itHeardUse');
+        add('heardAgain', '#itHeardAgain');
         return out;
       });
       Object.entries(bad).forEach(([k,v]) => {

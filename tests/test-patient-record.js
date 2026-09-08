@@ -56,9 +56,19 @@ const AUDIT = `(() => {
     const p=m[1].split(',').map(Number);return{r:p[0],g:p[1],b:p[2],a:p[3]===undefined?1:p[3]};}
   function lum(c){const f=v=>{v/=255;return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4);};
     return 0.2126*f(c.r)+0.7152*f(c.g)+0.0722*f(c.b);}
-  function bgOf(el){let n=el;while(n&&n!==document.documentElement){
-    const c=rgb(getComputedStyle(n).backgroundColor);if(c&&c.a>0.5)return c;n=n.parentElement;}
-    return {r:255,g:255,b:255,a:1};}
+  // Composite translucent layers instead of skipping anything under 50%
+  // alpha: a 6% white wash over a dark card is dark, not white, and treating
+  // it either way by a threshold gets some real failures wrong.
+  function bgOf(el){let n=el;const layers=[];
+    while(n&&n!==document.documentElement){
+      const c=rgb(getComputedStyle(n).backgroundColor);
+      if(c&&c.a>0){layers.push(c);if(c.a>=1)break;}
+      n=n.parentElement;}
+    const b=rgb(getComputedStyle(document.body).backgroundColor)||{r:255,g:255,b:255,a:1};
+    let out={r:b.r,g:b.g,b:b.b,a:1};
+    for(let i=layers.length-1;i>=0;i--){const c=layers[i];
+      out={r:c.r*c.a+out.r*(1-c.a),g:c.g*c.a+out.g*(1-c.a),b:c.b*c.a+out.b*(1-c.a),a:1};}
+    return out;}
   const body=document.getElementById('histModalBody');
   const low=[];
   body.querySelectorAll('*').forEach(el=>{

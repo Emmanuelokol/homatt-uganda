@@ -187,14 +187,26 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
           const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
           return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]);
         };
+        // Composite translucent layers over what is behind them, the way the
+        // browser paints. Reading rgba(255,255,255,.06) as opaque white makes
+        // a readable dark input look like a contrast failure — and, worse,
+        // could make a real one look fine.
+        const rgb = (c) => { const m = (c || '').match(/[\d.]+/g); return m ? m.map(Number) : null; };
         const bgOf = (el) => {
-          let n = el;
+          let n = el; const layers = [];
           while (n && n !== document.documentElement) {
-            const c = getComputedStyle(n).backgroundColor;
-            if (c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c;
+            const c = rgb(getComputedStyle(n).backgroundColor);
+            if (c) { const a = c.length > 3 ? c[3] : 1;
+              if (a > 0) { layers.push([c[0], c[1], c[2], a]); if (a >= 1) break; } }
             n = n.parentElement;
           }
-          return getComputedStyle(document.body).backgroundColor;
+          const base = rgb(getComputedStyle(document.body).backgroundColor) || [255, 255, 255];
+          let out = [base[0], base[1], base[2]];
+          for (let i = layers.length - 1; i >= 0; i--) {
+            const [r, g, b, a] = layers[i];
+            out = [r * a + out[0] * (1 - a), g * a + out[1] * (1 - a), b * a + out[2] * (1 - a)];
+          }
+          return 'rgb(' + out.join(', ') + ')';
         };
         const ratio = (el) => {
           const a = lum(getComputedStyle(el).color), c = lum(bgOf(el));

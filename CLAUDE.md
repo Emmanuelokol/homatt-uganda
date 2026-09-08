@@ -164,12 +164,45 @@ without it the button stayed lit over a recorder that had already died.
 
 ### Showing that it is listening
 While the microphone is open, `#itDictateLive` shows a blinking dot, a row of
-bars, and the elapsed time. The bars are driven by an `AnalyserNode` reading the
-**actual level** off the MediaStream, one bar per slice of the spectrum. That is
-deliberate: a label alone looks identical on a working microphone and a dead
-one, and a clinician who cannot tell will talk into nothing and lose the whole
-consultation. If the bars do not move, it is not hearing you. An older WebView
-with no `AudioContext` still gets the dot, the clock and the hint.
+bars, the elapsed time, and — in words — whether anything is being heard. A
+label alone looks identical on a working microphone and a dead one, and a
+clinician who cannot tell will talk into nothing and lose the whole
+consultation.
+
+Three things had to be right before the meter told the truth:
+
+- **`ctx.resume()`.** A new `AudioContext` starts *suspended* under the
+  autoplay policy, and a suspended analyser returns silence for ever. Every bar
+  sat flat on microphones that were working perfectly. This was the whole "it is
+  not hearing me" complaint, and it is one line.
+- **Only the speech band.** Averaging the whole spectrum across seven bars put
+  most of them in frequencies a human voice never reaches, so the right-hand
+  bars stayed dead however loudly anyone spoke. Bars now cover ~0–4 kHz.
+- **A logarithmic scale.** Loudness is logarithmic and a phone at arm's length
+  in a clinic is quiet; a linear `/140` left ordinary speech barely moving.
+
+The **decision** ("is it hearing anything?") comes from RMS on the time-domain
+data, not the bars — `_live.peak`, 0…1. Ordinary speech at arm's length measures
+0.05–0.3; below 0.012 is under a quiet room. After two and a half seconds of
+that the hint turns red and says so, while there is still time to do something
+about it, and a recording that never rose above it is refused with the likeliest
+cause named rather than sent off to be transcribed for money.
+
+That refusal is trusted **only when the meter actually ran** (`meterRan()`). On
+a WebView with no `AudioContext` the peak is zero because nothing measured it,
+and refusing every recording there would be a worse fault than the one it
+guards against.
+
+### The words, before they are filed
+After a consultation dictation, `#itHeardBox` shows the transcript **word for
+word in an editable box**, with *Use these words* and *Say it again*. Correcting
+a word clears the three prose boxes and re-runs the placement from the start, so
+a fix reaches every field it belongs in rather than one of them.
+
+This is the only defence against the fault nothing in the code can see: a
+recogniser that turns "no chest pain" into "chest pain" produces a sentence that
+reads perfectly well and means the opposite. A clinician reading it back can
+catch that; no amount of parsing can.
 
 ### Two buttons, two vocabularies
 `transcribe` takes a `mode` of `vitals` or `story`, which chooses the vocabulary
@@ -304,6 +337,10 @@ rules worth repeating here:
 - **Never assert on a colour by name.** Measure the contrast ratio against the
   computed background, in all four skins and both themes. Four separate
   unreadable-text bugs got past eyes and were caught by a number.
+- **Composite the background, do not take it at face value.** Dark-mode inputs
+  are a 6% white wash over a dark card; reading `rgba(255,255,255,.06)` as
+  opaque white reported a perfectly readable box as 1.16:1 — and would just as
+  easily hide a real failure behind a passing number.
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.

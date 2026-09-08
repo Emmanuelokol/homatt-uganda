@@ -929,6 +929,82 @@
     liveOff();
   }
 
+  // ── The words, before they are filed ─────────────────────────────────────
+  //
+  // A recogniser that turns "no chest pain" into "chest pain" produces a
+  // sentence that reads perfectly well and means the opposite, and nothing in
+  // this file can detect it — the transcript is the only place a human can.
+  // So it is shown large and in full, and it can be CORRECTED here, once,
+  // rather than in five separate boxes further down the screen. Correcting it
+  // re-runs the placement from the start, so a fixed word reaches every box it
+  // belongs in.
+  var _heardApply = null;
+
+  function showHeard(text, mode, show) {
+    var box = document.getElementById('itHeardBox');
+    var ta = document.getElementById('itHeardText');
+    if (!box || !ta) return;
+    ta.value = String(text || '');
+    box.hidden = false;
+    // Remember how to re-place it, so the "Use these words" button below does
+    // exactly what the dictation itself did.
+    _heardApply = { mode: mode, show: show, was: String(text || '') };
+    try { box.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {}
+  }
+
+  function hideHeard() {
+    var box = document.getElementById('itHeardBox');
+    if (box) box.hidden = true;
+    _heardApply = null;
+  }
+
+  /** Wired once, on whichever page has the box. */
+  function bindHeard() {
+    var use = document.getElementById('itHeardUse');
+    var again = document.getElementById('itHeardAgain');
+    var ta = document.getElementById('itHeardText');
+    var say0 = document.getElementById('itDictateStorySay');
+    if (use && !use._wired) {
+      use._wired = 1;
+      use.addEventListener('click', async function () {
+        if (!_heardApply || !ta) { hideHeard(); return; }
+        var fixed = String(ta.value || '').trim();
+        if (!fixed) { hideHeard(); return; }
+        // Unchanged words are already in the boxes — saying so beats silently
+        // appending the same sentence to the story a second time.
+        if (fixed === _heardApply.was.trim()) {
+          say(say0, 'Kept as heard.', 'ok');
+          hideHeard();
+          return;
+        }
+        var m = _heardApply.mode, sh = _heardApply.show;
+        clearForRedo();
+        var res = await applied(m, fixed, function (r) { sh(r, true); });
+        sh(res);
+        say(say0, 'Corrected, and filled in again from your words.', 'ok');
+        hideHeard();
+      });
+    }
+    if (again && !again._wired) {
+      again._wired = 1;
+      again.addEventListener('click', function () {
+        hideHeard();
+        var btn = document.getElementById('itDictateStory');
+        if (btn) btn.click();
+      });
+    }
+  }
+
+  // Placing corrected words on top of the old ones would append the story
+  // twice, so the boxes the dictation filled are emptied first. Only those:
+  // anything the clinician typed by hand is not ours to clear.
+  function clearForRedo() {
+    ['itChief', 'itSubjective', 'itBackground'].forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) { el.value = ''; el.dispatchEvent(new Event('input', { bubbles: true })); }
+    });
+  }
+
   // ── Showing that it is listening ─────────────────────────────────────────
   //
   // A button that only changes colour looks the same on a working microphone
@@ -936,7 +1012,7 @@
   // nothing and lose the whole consultation. So the bars are driven by the
   // ACTUAL level coming off the microphone: if they do not move, it is not
   // hearing you, and that is worth knowing while there is still time to type.
-  var _live = { raf: 0, ctx: null, tick: 0, t0: 0 };
+  var _live = { raf: 0, ctx: null, tick: 0, t0: 0, meter: 0, peak: 0, drew: 0, ran: false };
 
   function liveEls() {
     return { box: document.getElementById('itDictateLive'),
@@ -944,10 +1020,46 @@
              time: document.getElementById('itDictateTime') };
   }
 
+  /** How loud was the loudest moment of this recording, 0…1. */
+  function loudestHeard() { return _live.peak; }
+
+  /** Did the level meter actually run? Its silence only means something if so. */
+  function meterRan() { return !!_live.ran; }
+
+  /**
+   * Why a recording came back silent, in the order the causes are likely.
+   *
+   * "Nothing was recorded" is where a clinician gives up, and every one of
+   * these has a different fix. The level meter has been running the whole
+   * time, so this is not a guess: a peak of exactly zero means the audio
+   * pipeline delivered nothing at all, and a peak just above zero means it
+   * delivered a signal with no voice in it.
+   */
+  function silentWhy(peak) {
+    if (!peak) {
+      return 'Nothing came through the microphone at all. On the phone this ' +
+             'is almost always the app not having the microphone yet: open ' +
+             'Settings → Apps → Homatt Clinic → Permissions → Microphone and ' +
+             'allow it. If it is already allowed, close any app that might be ' +
+             'holding the microphone and tap again.';
+    }
+    return 'The microphone was working but heard almost nothing — the bars ' +
+           'barely moved. Hold the phone closer to your mouth, check nothing ' +
+           'is covering the microphone at the bottom, and say it again.';
+  }
+
   function liveOn(stream) {
     var el = liveEls();
+    _live.peak = 0;
+    _live.drew = 0;
+    _live.ran = false;
     if (!el.box) return;
     el.box.hidden = false;
+    var h0 = el.box.querySelector('.it-live-hint');
+    if (h0) {
+      h0.className = 'it-live-hint';
+      h0.textContent = 'Tap the button again when you have finished';
+    }
     _live.t0 = Date.now();
     if (el.time) el.time.textContent = '0:00';
     _live.tick = setInterval(function () {
@@ -965,27 +1077,81 @@
     if (!bars.length) return;
     try {
       var ctx = new AC();
+      // A new AudioContext starts SUSPENDED under the autoplay policy, and a
+      // suspended analyser returns silence for ever — every bar flat, on a
+      // microphone that is working perfectly. That is the whole "it is not
+      // hearing me" symptom, and it is one line to fix. resume() is safe to
+      // call when it is already running.
+      if (ctx.state === 'suspended' && ctx.resume) { try { ctx.resume(); } catch (e) {} }
       var src = ctx.createMediaStreamSource(stream);
       var an = ctx.createAnalyser();
-      an.fftSize = 256;
-      an.smoothingTimeConstant = 0.6;
+      an.fftSize = 512;
+      an.smoothingTimeConstant = 0.5;
       src.connect(an);
-      var buf = new Uint8Array(an.frequencyBinCount);
+      var freq = new Uint8Array(an.frequencyBinCount);
+      var wave = new Uint8Array(an.fftSize);
       _live.ctx = ctx;
+
+      // Speech lives between roughly 100 Hz and 4 kHz. Averaging the WHOLE
+      // spectrum across seven bars put most of them in frequencies a human
+      // voice never reaches, so the right-hand bars sat dead however loudly
+      // anyone spoke. Only the speech band is shown.
+      var nyquist = (ctx.sampleRate || 48000) / 2;
+      var topBin = Math.max(bars.length,
+        Math.min(freq.length, Math.round(4000 / nyquist * freq.length)));
+
       var draw = function () {
-        an.getByteFrequencyData(buf);
-        // One bar per slice of the spectrum, so speech moves them differently
-        // from a steady hum — a flat row of equal bars reads as "not hearing".
-        var per = Math.floor(buf.length / bars.length) || 1;
+        _live.drew++;
+        _live.ran = true;          // the meter is real, so its verdict counts
+        // RMS off the waveform is the honest answer to "is there any sound?".
+        // The frequency bins are for the shape of the bars; this is for the
+        // decision, and for telling the clinician afterwards.
+        an.getByteTimeDomainData(wave);
+        var sum2 = 0;
+        for (var k = 0; k < wave.length; k++) {
+          var d = (wave[k] - 128) / 128;
+          sum2 += d * d;
+        }
+        var rms = Math.sqrt(sum2 / wave.length);
+        if (rms > _live.peak) _live.peak = rms;
+
+        an.getByteFrequencyData(freq);
+        var per = Math.floor(topBin / bars.length) || 1;
         for (var i = 0; i < bars.length; i++) {
           var sum = 0;
-          for (var j = 0; j < per; j++) sum += buf[i * per + j] || 0;
-          var v = Math.min(1, (sum / per) / 140);
-          bars[i].style.transform = 'scaleY(' + (0.18 + v * 0.82).toFixed(3) + ')';
+          for (var j = 0; j < per; j++) sum += freq[i * per + j] || 0;
+          // Loudness is logarithmic and a phone at arm's length in a clinic is
+          // quiet. /140 on a linear scale left ordinary speech barely moving
+          // the bars, which reads as "not hearing me".
+          var lvl = (sum / per) / 255;
+          var v = Math.min(1, Math.pow(lvl, 0.55) * 1.6);
+          bars[i].style.transform = 'scaleY(' + (0.14 + v * 0.86).toFixed(3) + ')';
         }
         _live.raf = requestAnimationFrame(draw);
       };
       draw();
+
+      // requestAnimationFrame does not run when the WebView thinks the page is
+      // not visible, and some Android WebViews think that with the screen on.
+      // A slow timer keeps the level honest either way — and says, in words,
+      // whether it is hearing anything. The bars are the fast answer; this is
+      // the one a clinician can read at a glance while still talking, which is
+      // the only moment at which it is still worth knowing.
+      var hint = el.box.querySelector('.it-live-hint');
+      var began = Date.now();
+      _live.meter = setInterval(function () {
+        if (_live.drew === 0 && _live.ctx) draw();
+        _live.drew = 0;
+        if (!hint) return;
+        if (_live.peak >= 0.012) {
+          hint.textContent = 'Hearing you — tap the button again when you finish';
+          hint.className = 'it-live-hint good';
+        } else if (Date.now() - began > 2500) {
+          hint.textContent = 'Not hearing anything yet — speak up, or hold the ' +
+                             'phone closer';
+          hint.className = 'it-live-hint bad';
+        }
+      }, 400);
     } catch (e) { /* the clock and the dot are enough */ }
   }
 
@@ -994,6 +1160,7 @@
     if (el.box) el.box.hidden = true;
     if (_live.raf) { cancelAnimationFrame(_live.raf); _live.raf = 0; }
     if (_live.tick) { clearInterval(_live.tick); _live.tick = 0; }
+    if (_live.meter) { clearInterval(_live.meter); _live.meter = 0; }
     if (_live.ctx) { try { _live.ctx.close(); } catch (e) {} _live.ctx = null; }
     if (el.bars) {
       [].forEach.call(el.bars.querySelectorAll('i'), function (b) { b.style.transform = ''; });
@@ -1136,6 +1303,7 @@
     var btn = document.getElementById(btnId);
     var out = document.getElementById(sayId);
     if (!btn) return;
+    bindHeard();
     mode = (mode === 'story' || mode === 'consult') ? mode : 'vitals';
 
     btn.addEventListener('click', async function () {
@@ -1160,6 +1328,7 @@
       }
 
       var stream;
+      hideHeard();                       // the last dictation's words are done
       say(out, 'Asking for the microphone…');
       try {
         stream = await openMic();
@@ -1207,9 +1376,24 @@
         // announcing MP4 as WebM asks it to decode a container that is not
         // there.
         var blob = new Blob(_chunks, { type: recordedType(rec, _chunks) });
+        // Two very different failures used to share one message. The level
+        // meter has been measuring all along, so say which one it was.
+        var loud = loudestHeard();
         if (!blob.size) {
-          say(out, 'Nothing was recorded — the microphone gave no sound. ' +
-                   'Check nothing is covering it and tap again.', 'warn');
+          say(out, silentWhy(loud), 'warn');
+          noteFault('mic-silent', silentWhy(loud));
+          return;
+        }
+        // A recording that DID produce bytes but never rose above the noise
+        // floor is a muted microphone, and sending it costs money to be told
+        // nothing. 0.012 RMS is below a quiet room; ordinary speech at arm's
+        // length measures 0.05–0.3. Trusted only when the meter actually ran —
+        // on a WebView with no AudioContext the peak is zero because nothing
+        // measured it, and refusing every recording there would be a worse
+        // fault than the one this guards against.
+        if (meterRan() && loud < 0.012) {
+          say(out, silentWhy(loud), 'warn');
+          noteFault('mic-silent', silentWhy(loud));
           return;
         }
         say(out, 'Reading it…');
@@ -1237,6 +1421,11 @@
             setTimeout(function () { global._intakeCheck(text); }, 320);
           }
         }
+        // The words, before anything is filed, where they can be corrected.
+        // Only for the consultation button: the vitals boxes are numbers the
+        // clinician can see filled in directly, and a second confirmation
+        // there would be a tap that buys nothing.
+        if (mode === 'consult') showHeard(text, mode, show);
         show(await applied(mode, text, function (r) { show(r, true); }));
       };
       // A timeslice, not one blob at the end: if the WebView is pushed out of

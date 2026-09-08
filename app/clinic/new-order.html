@@ -553,6 +553,28 @@
     .it-live-time{font-size:13px;font-weight:700;color:var(--text);
       font-variant-numeric:tabular-nums;min-width:34px}
     .it-live-hint{font-size:12px;color:var(--muted);line-height:1.4;flex:1 1 140px}
+    .it-live-hint.good{color:var(--success,#2E7D32);font-weight:600}
+    .it-live-hint.bad{color:var(--danger-ink,#b3261e);font-weight:600}
+
+    /* What it heard, word for word, before anything is filed. */
+    .it-heard{margin-top:12px;padding:12px;border-radius:12px;
+      background:var(--tint-2);border:1px solid var(--primary)}
+    .it-heard[hidden]{display:none}
+    .it-heard-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px}
+    .it-heard-h .material-icons-outlined{font-size:18px;color:var(--primary)}
+    .it-heard-h b{font-size:14px;color:var(--text)}
+    .it-heard-note{font-size:11.5px;color:var(--muted);flex:1 1 100%}
+    .it-heard-t{width:100%;font-size:15px;line-height:1.5;resize:vertical;
+      background:var(--surface);color:var(--text);border:1px solid var(--line)}
+    .it-heard-acts{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+    .it-heard-use,.it-heard-again{display:inline-flex;align-items:center;gap:6px;
+      border-radius:11px;padding:10px 15px;font:inherit;font-size:13.5px;
+      font-weight:600;cursor:pointer;border:none;touch-action:manipulation}
+    .it-heard-use{background:var(--primary);color:var(--on-primary)}
+    .it-heard-again{background:transparent;color:var(--brand-ink);
+      border:1px solid var(--line)}
+    .it-heard-use .material-icons-outlined,
+    .it-heard-again .material-icons-outlined{font-size:17px}
     @keyframes itBlink{0%{opacity:1}50%{opacity:.25}100%{opacity:1}}
     /* A moving row of bars is the point, so it stays — but nothing else has to
        flash at someone who asked the phone to stop animating. */
@@ -734,6 +756,29 @@
             </span>
             <span class="it-live-time" id="itDictateTime">0:00</span>
             <span class="it-live-hint">Tap the button again when you have finished</span>
+          </div>
+          <!-- The words, exactly as they were heard, before anything is
+               filed. A recogniser that mishears "no chest pain" as "chest
+               pain" produces a sentence that reads perfectly well and means
+               the opposite, and nothing in the code can see that. A clinician
+               reading it back can — so it is shown large, and it can be
+               corrected here rather than in five separate boxes below. -->
+          <div id="itHeardBox" class="it-heard" hidden>
+            <div class="it-heard-h">
+              <span class="material-icons-outlined">hearing</span>
+              <b>What it heard</b>
+              <span class="it-heard-note">Read it — then fix any word that is wrong</span>
+            </div>
+            <textarea id="itHeardText" class="field-input it-heard-t" rows="3"
+              aria-label="What the microphone heard"></textarea>
+            <div class="it-heard-acts">
+              <button type="button" id="itHeardUse" class="it-heard-use">
+                <span class="material-icons-outlined">check</span> Use these words
+              </button>
+              <button type="button" id="itHeardAgain" class="it-heard-again">
+                <span class="material-icons-outlined">mic</span> Say it again
+              </button>
+            </div>
           </div>
           <div id="itDictateStorySay" class="it-dict-say"></div>
           <div class="helper">Say it the way you would tell a colleague:
@@ -1423,7 +1468,7 @@
 <script src="js/new-order-wizard.js?v=20260910"></script>
 <script src="js/ucg-autofill.js?v=20260911"></script>
 <script src="js/clinic-impression.js?v=20260911"></script>
-<script src="js/clinic-dictate.js?v=20260920"></script>
+<script src="js/clinic-dictate.js?v=20260921"></script>
 <script src="js/clinic-intake.js?v=20260917"></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 
