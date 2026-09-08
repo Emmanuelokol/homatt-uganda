@@ -91,9 +91,15 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co', ORIGIN='http://localhost:90
   const have = {};
   (shell.match(/'([^']+)'/g)||[]).forEach(m=>{ const u=m.slice(1,-1);
     (have[u.split('?')[0]] = have[u.split('?')[0]] || new Set()).add(u); });
-  const drift = Object.keys(have).filter(base=>{
-    const w=want[base]; if(!w) return false;
-    return ![...w].some(x=>have[base].has(x));
+  // EVERY version any page asks for has to be precached, not merely one of
+  // them. `.some()` here let a second version of the same file slip in on
+  // another page: it worked online and was a cache miss offline, which is the
+  // one condition this whole app is built for. Report the exact URL, because
+  // "drift" without it sends someone reading five files.
+  const drift = [];
+  Object.keys(want).forEach(base=>{
+    if(!have[base]) return;                    // not precached at all: not this check
+    [...want[base]].forEach(u=>{ if(!have[base].has(u)) drift.push(u); });
   });
   result('the service worker precaches the exact file versions the pages ask for',
     drift.length===0, drift.length?'DRIFTED: '+JSON.stringify(drift):Object.keys(have).length+' entries checked');
