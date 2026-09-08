@@ -350,6 +350,96 @@ result('moving background out still loses nothing',
   }));
 
 
+  // ── How people actually talk ────────────────────────────────────────────
+  // Clinicians do not dictate textbook sentences. These are the phrasings a
+  // real phone in a real clinic produced, including the recogniser's own
+  // punctuation and the speaker's "yeah" in the middle of a sentence.
+  const SPEECH = [
+    ["Name of the person is Emmanuel Opal. He is male, and, he's age 28 years old. Yeah. He has come with a fever and cough.",
+     { name: 'Emmanuel Opal', sex: 'male', age: '28', complaint: 'fever' }],
+    ['The name of the patient is Grace Nakato, she is female, 40 years.',
+     { name: 'Grace Nakato', sex: 'female', age: '40' }],
+    ['Patient name Okello John, male, 35 years old, complains of headache',
+     { name: 'Okello John', sex: 'male', age: '35', complaint: 'headache' }],
+    ['We have Mukasa Peter here, he is 52, complaining of chest pain',
+     { name: 'Mukasa Peter', sex: 'male', age: '52', complaint: 'chest pain' }],
+    ['This patient is called Nakimuli Sarah and she is 24 years',
+     { name: 'Nakimuli Sarah', sex: 'female', age: '24' }],
+    ['Am seeing Achieng Mary, 19 year old female with abdominal pain',
+     { name: 'Achieng Mary', sex: 'female', age: '19', complaint: 'abdominal pain' }],
+    ['The mother has brought a baby called Kato, 8 months old, with diarrhoea',
+     { name: 'Kato', age: '8', complaint: 'diarrhoea' }],
+    ['He is 60 years of age and has a cough',
+     { sex: 'male', age: '60', complaint: 'cough' }],
+    ["Erm, the patient, yeah, is a female, and, and she's 27, with, with a rash",
+     { sex: 'female', age: '27', complaint: 'rash' }],
+    ['Patient is a young man of 22 with a headache',
+     { sex: 'male', age: '22', complaint: 'headache' }],
+    ['The name is not known, male, 40 years, with a wound',
+     { name: '', sex: 'male', age: '40', complaint: 'wound' }],
+  ];
+  const spoke = await page.evaluate((rows) => rows.map(([t]) => {
+    const p = window.HomattDictate.parsePerson(t);
+    const s = window.HomattDictate.parseStory(t);
+    return { name: p.name || '', sex: p.sex || '', age: p.age || '',
+             complaint: (s.complaint || '').toLowerCase(), lost: s.lost || '' };
+  }), SPEECH);
+  const wrong = [];
+  SPEECH.forEach(([t, want], i) => {
+    const got = spoke[i];
+    Object.keys(want).forEach((k) => {
+      const ok = k === 'complaint'
+        ? (want[k] ? got[k].includes(want[k]) : got[k] === '')
+        : got[k] === want[k];
+      if (!ok) wrong.push(`${k}: want "${want[k]}" got "${got[k]}" ← ${t.slice(0, 40)}`);
+    });
+    if (got.lost.trim()) wrong.push(`lost "${got.lost}" ← ${t.slice(0, 40)}`);
+  });
+  result('who it is and what they came with, however plainly or clumsily said',
+    wrong.length === 0, wrong.slice(0, 3).join(' · ') || SPEECH.length + '/' + SPEECH.length);
+
+  // A disease the clinician says out loud is still never a field.
+  const noDx = await page.evaluate(() => {
+    const t = 'He is suffering from malaria symptoms, fever and joint pain, ' +
+              'I think it is typhoid';
+    const s = window.HomattDictate.parseStory(t);
+    const p = window.HomattDictate.parsePerson(t);
+    return { complaint: s.complaint, name: p.name || '' };
+  });
+  result('a disease said out loud never becomes the complaint or the name',
+    !/malaria|typhoid/i.test(noDx.complaint + ' ' + noDx.name) &&
+    /fever/i.test(noDx.complaint),
+    JSON.stringify(noDx));
+
+  // The summary must read as a record, not as a transcript: what is already in
+  // the name, sex and age boxes does not belong in the story as well.
+  const tidied = await page.evaluate(() => {
+    const t = "Name of the person is Emmanuel Opal. He is male, and, he's age " +
+              '28 years old. Yeah. He has come with a fever and cough.';
+    const p = window.HomattDictate.parsePerson(t);
+    const s = window.HomattDictate.parseStory(t);
+    return { story: window.HomattDictate.dropPersonBits(s.history, p),
+             complaint: s.complaint };
+  });
+  result('the name, the sex and the age do not appear again in the story',
+    !/Emmanuel|male|28|years old|yeah/i.test(tidied.story),
+    JSON.stringify(tidied.story));
+  result('and the complaint is the words, not the grammar around them',
+    tidied.complaint === 'fever and cough', JSON.stringify(tidied.complaint));
+
+  // Anything with a symptom or a denial in it is never tidied away.
+  const kept = await page.evaluate(() => {
+    const t = 'This is Okello John, 35 years old male. He fell from a boda and ' +
+              'has a wound on the leg, no bleeding now.';
+    const p = window.HomattDictate.parsePerson(t);
+    const s = window.HomattDictate.parseStory(t);
+    return { story: window.HomattDictate.dropPersonBits(s.history, p),
+             background: s.background, complaint: s.complaint };
+  });
+  result('how the injury happened is kept, and a boda is not an occupation',
+    /fell/.test(kept.story) && !/boda/.test(kept.background),
+    JSON.stringify({ s: kept.story, b: kept.background }));
+
   // ── The whole consultation, from one dictation ──────────────────────────
   // Rules own the numbers. The model may name the patient and improve the
   // prose. It may never set a vital and there is no field for a diagnosis.

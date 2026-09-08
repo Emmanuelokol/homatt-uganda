@@ -222,9 +222,51 @@
   // "32 years old", "a 32-year-old", "aged 32", "3 months old".
   var AGE_Y = /\b(?:aged\s+)?(\d{1,3})\s*[-\s]?\s*(?:year|yr)s?\b(?:[\s-]*old)?/i;
   var AGE_M = /\b(\d{1,3})\s*[-\s]?\s*(?:month|mo)s?\b[\s-]*old\b/i;
+  // Months without "old" — "a baby of six months", "she is 8 months". Only
+  // when a person word introduces it, because "cough for 6 months" is a
+  // duration and putting that in the age box would be a lie about a child.
+  var AGE_M2 = /\b(?:baby|infant|child|toddler|aged?|she\s+is|he\s+is|is)\s+(?:of\s+)?(\d{1,3})\s*months?\b/i;
   var AGE_BARE = /\baged\s+(\d{1,3})\b/i;
+  // A bare number that a person is said to BE. "he is 52", "she's 27",
+  // "the age is 45", "a young man of 22", "his age is 28". Never a bare number
+  // on its own — that is how a temperature becomes an age.
+  var AGE_SAID = new RegExp(
+    '\\b(?:' + [
+      '(?:the\\s+)?age\\s+(?:is|of)',
+      '(?:his|her|their)\\s+age\\s+(?:is)?',
+      "(?:he|she|they|patient|client|pt)\\s*(?:'s|s)?\\s+(?:is\\s+)?(?:age(?:d)?\\s+)?",
+      '(?:man|woman|lady|gentleman|boy|girl|child|baby|person|patient)\\s+of',
+    ].join('|') + ')\\s*(\\d{1,3})\\b(?!\\s*(?:%|kg|kilo|mm|degree|celsius|c\\b|/))', 'i');
 
-  var NAME_CUE = /\b(?:(?:her|his|the patient'?s?|patient)\s+name\s+is|name\s+is|named|called|this\s+is|patient\s+is)\s+([A-Za-z][A-Za-z'’-]+(?:\s+[A-Za-z][A-Za-z'’-]+){0,2})/i;
+  // How a name is actually announced. "name is" alone missed the commonest
+  // opening of all — "Name of the person is Emmanuel Opal" — because of the
+  // three words in the middle, so the possessive part is a slot rather than a
+  // fixed phrase. Ordered longest-first so "this patient is called X" does not
+  // match "patient is" and take "called X" as the name.
+  var NAME_CUE = new RegExp(
+    '\\b(?:' + [
+      // name of the person / of the patient / of this lady …
+      'name\\s+of\\s+(?:the|this)\\s+[a-z]+\\s+is',
+      "(?:the\\s+)?(?:her|his|their|patient'?s?|client'?s?)\\s+name\\s+(?:is|was)",
+      'name\\s+(?:is|was)',
+      'patient\\s+name',            // "Patient name Okello John" — no verb at all
+      'go(?:es)?\\s+by',
+      'named',
+      'called',
+      '(?:we|i)\\s+have',           // "We have Mukasa Peter here"
+      "(?:am|i\\s*am|i'm)\\s+(?:seeing|attending\\s+to|with)",
+      'this\\s+is',
+      'patient\\s+is',
+    ].join('|') + ')\\s+([A-Za-z][A-Za-z\'’-]+(?:\\s+[A-Za-z][A-Za-z\'’-]+){0,2})', 'i');
+
+  // Cue words that can end up glued to the front of a captured name when two
+  // cues overlap ("this patient is called Grace"). Stripped rather than
+  // rejected — the name after them is still a name.
+  var NAME_LEAD = /^(?:called|named|is|was|a|an|the|here|with|and)\s+/i;
+  // …and not the word that happened to follow it. "We have Mukasa Peter here"
+  // is a name plus a place-holder; the place-holder is not part of anybody's
+  // name.
+  var NAME_TAIL = /\s+(?:here|there|now|today|please|again|yeah|ok|okay|and|who|she|he|they|with|is|was|has|aged?)$/i;
 
   function titleCase(s) {
     return String(s || '').trim().split(/\s+/).map(function (w) {
@@ -233,7 +275,7 @@
   }
 
   // Words that follow a name cue but are plainly not a name.
-  var NOT_A_NAME = /^(?:a|an|the|complaining|complains|here|with|for|not|and|his|her|male|female|man|woman|boy|girl|child|baby|patient|feeling|having)\b/i;
+  var NOT_A_NAME = /^(?:a|an|the|complaining|complains|complained|here|with|for|not|and|his|her|male|female|man|woman|lady|gentleman|boy|girl|child|baby|infant|patient|client|person|feeling|having|has|had|suffering|presenting|presents|brought|coming|come|came|known|unknown|emergency|case|seeing|attending|age|aged|years?|months?)\b/i;
 
   /**
    * Read who the patient is out of a dictated sentence.
@@ -255,19 +297,32 @@
     }
     if (out.sex) out.heard.push('Sex: ' + out.sex);
 
-    var m = AGE_M.exec(text);
+    // Months first: an infant's age in months must not be read as years.
+    var m = AGE_M.exec(text) || AGE_M2.exec(text);
     if (m && +m[1] > 0 && +m[1] <= 36) {
       out.age = m[1]; out.ageUnit = 'months';
     } else {
-      m = AGE_Y.exec(text) || AGE_BARE.exec(text);
+      m = AGE_Y.exec(text) || AGE_BARE.exec(text) || AGE_SAID.exec(text);
       if (m && +m[1] > 0 && +m[1] <= 120) { out.age = m[1]; out.ageUnit = 'years'; }
     }
     if (out.age) out.heard.push('Age: ' + out.age + ' ' + out.ageUnit);
 
     var n = NAME_CUE.exec(text);
-    if (n && !NOT_A_NAME.test(n[1].trim())) {
-      out.name = titleCase(n[1]);
-      out.heard.push('Name: ' + out.name);
+    if (n) {
+      // Two cues can overlap — "this patient is called Grace" matches
+      // "patient is" first and hands back "called Grace". Peel the cue words
+      // off rather than throwing the name away.
+      var cand = n[1].trim();
+      for (var g = 0; g < 3 && NAME_LEAD.test(cand); g++) {
+        cand = cand.replace(NAME_LEAD, '').trim();
+      }
+      for (var g2 = 0; g2 < 3 && NAME_TAIL.test(cand); g2++) {
+        cand = cand.replace(NAME_TAIL, '').trim();
+      }
+      if (cand && !NOT_A_NAME.test(cand)) {
+        out.name = titleCase(cand);
+        out.heard.push('Name: ' + out.name);
+      }
     }
     return out;
   }
@@ -285,7 +340,7 @@
   // story is the safe place: it is a free textarea the clinician reads back.
 
   // The clinician saying, in so many words, "this is what they came with".
-  var COMPLAINT_CUE = /\b(?:complain(?:s|ing|ed)?\s+of|complaint\s+(?:is|of)|presents?\s+with|presenting\s+with|came\s+(?:in\s+)?with|comes?\s+in\s+with|here\s+(?:for|with)|c\s*\/\s*o)\b\s*/i;
+  var COMPLAINT_CUE = /\b(?:complain(?:s|ing|ed)?\s+of|complaint\s+(?:is|of)|presents?\s+with|presenting\s+with|(?:has|have|had)\s+come\s+(?:in\s+)?with|came\s+(?:in\s+)?with|comes?\s+in\s+with|brought\s+(?:in\s+)?(?:with|because\s+of)|here\s+(?:for|with)|the\s+(?:problem|complaint|trouble)\s+is|c\s*\/\s*o)\b\s*/i;
 
   // Where the complaint stops and the story starts: a duration, an onset, an
   // extra symptom, something already taken, or a denial.
@@ -317,7 +372,7 @@
   // Enough of a symptom vocabulary to recognise an opening line as a
   // complaint. It does not need to be complete — anything it does not know
   // simply goes to the story, which is the harmless direction.
-  var SYMPTOM = new RegExp('\\b(?:' + [
+  var SYMPTOM_WORDS = [
     'fever', 'hot body', 'body hotness', 'chills', 'rigors', 'shivering',
     'cough', 'coughing', 'catarrh', 'flu', 'cold',
     'headache', 'head ?ache', 'migraine', 'dizziness', 'dizzy', 'fainting',
@@ -340,7 +395,18 @@
     'stiff neck', 'neck stiffness', 'photophobia',
     'blurred vision', 'poor vision', 'red eye', 'eye pain', 'eye discharge',
     'pain',
-  ].join('|') + ')\\b', 'i');
+  ];
+  var SYMPTOM_SRC = SYMPTOM_WORDS.join('|');
+  var SYMPTOM = new RegExp('\\b(?:' + SYMPTOM_SRC + ')\\b', 'i');
+  // The same vocabulary, anchored — "do these words START with a symptom?"
+  var SYMPTOM_HEAD = new RegExp('^(?:' + SYMPTOM_SRC + ')\\b', 'i');
+
+  // Weak cues, trusted ONLY when a known symptom follows immediately.
+  // "with" and "has" are far too common to mark a complaint on their own, but
+  // "with a rash" and "has fever" are exactly how one is said out loud, and
+  // requiring the next words to be in the symptom vocabulary makes them safe:
+  // nothing that is not already a symptom can be turned into a complaint.
+  var WEAK_CUE = /\b(?:with|has|have|had|having|got|feeling|feels|reports?|reporting|presents?|presenting|shows?|showing)\s+(?:(?:a|an|the|some|this|got|been)\s+)*/gi;
 
   // The clinician's own denials, surfaced so their eye goes to them. A
   // recogniser that DROPS a "no" cannot be detected from the text it produced
@@ -351,7 +417,7 @@
   // What belongs in the background rather than in today's story: what they
   // already have, what they are already on, and who they are. A clinician says
   // these in the same breath as the complaint, so they arrive mixed in.
-  var BACKGROUND_CUE = /\b(?:(?<!\bnot\s)known\b|is\s+a\s+known|history\s+of|past\s+history|family\s+history|previously\s+(?:treated|diagnosed)|already\s+on|currently\s+on|is\s+on\s+(?:treatment|medication|art|arvs?|insulin|metformin)|on\s+(?:art|arvs?|insulin|metformin|treatment for)|hiv\s*(?:positive|negative|\+ve)|diabetic|hypertensive|asthmatic|epileptic|pregnan\w+|breast\s*feeding|smok\w+|drinks?\s+alcohol|alcoholic|lives\s+(?:in|with|alone)|works?\s+as|farmer|market\s+vendor|boda)\b/i;
+  var BACKGROUND_CUE = /\b(?:(?<!\bnot\s)known\b|is\s+a\s+known|history\s+of|past\s+history|family\s+history|previously\s+(?:treated|diagnosed)|already\s+on|currently\s+on|is\s+on\s+(?:treatment|medication|art|arvs?|insulin|metformin)|on\s+(?:art|arvs?|insulin|metformin|treatment for)|hiv\s*(?:positive|negative|\+ve)|diabetic|hypertensive|asthmatic|epileptic|pregnan\w+|breast\s*feeding|smok\w+|drinks?\s+alcohol|alcoholic|lives\s+(?:in|with|alone)|works?\s+as|farmer|market\s+vendor|boda\s*(?:boda)?\s+(?:rider|driver|man|cyclist|guy)|(?:is|works)\s+(?:as\s+)?a\s+boda)\b/i;
 
   // A clause that is nothing but "on <something>" is a medicine they are
   // already taking — "known heart problem, on furosemide". Tested on its own
@@ -359,6 +425,75 @@
   // not.
   var BACKGROUND_CLAUSE =
     /^on\s+(?!and\b|the\b|an?\b|his\b|her\b|their\b|both\b|exam|palpation)[a-z][a-z-]*[,.;]?$/i;
+
+  /** The first ordinary word that introduces a real symptom, or null. */
+  function weakCue(text) {
+    WEAK_CUE.lastIndex = 0;
+    var m;
+    while ((m = WEAK_CUE.exec(text))) {
+      var rest = text.slice(m.index + m[0].length);
+      if (SYMPTOM_HEAD.test(rest)) return { index: m.index, cue: m[0] };
+      // Keep looking: "brought with her mother, has a fever" has two.
+      if (WEAK_CUE.lastIndex <= m.index) WEAK_CUE.lastIndex = m.index + 1;
+    }
+    return null;
+  }
+
+  // Once the name, the sex and the age are in their own boxes, saying them
+  // again in the story is noise — and the story is the box a clinician reads
+  // as "what happened to this person today". Nothing is lost by moving them
+  // out: the words are still on the screen verbatim, in the box that can be
+  // corrected and again under "What was heard, word for word".
+  //
+  // A clause is dropped ONLY when it is nothing but scaffolding. It is kept
+  // the moment it contains a symptom or a denial, so the way this fails is by
+  // keeping too much — which is untidy, and safe.
+  var PERSON_VOCAB = new RegExp('\\b(?:' + [
+    'name', 'named', 'names', 'called', 'call', 'goes', 'go', 'by',
+    'of', 'the', 'this', 'that', 'these', 'a', 'an',
+    'his', 'her', 'their', 'its', 'our', 'my',
+    'patients?', 'clients?', 'person', 'people', 'case',
+    'is', 'was', 'are', 'am', 'be', 'been', 'being',
+    'he', 'she', 'they', 'it', 'we', 'i', 'you',
+    'have', 'has', 'had',
+    'male', 'female', 'man', 'woman', 'lady', 'gentleman', 'boy', 'girl',
+    'child', 'baby', 'infant', 'toddler', 'mr', 'mrs', 'miss', 'ms', 'dr',
+    'years?', 'yrs?', 'months?', 'old', 'age', 'aged',
+    'about', 'around', 'approximately', 'roughly',
+    'yeah', 'yes', 'ok', 'okay', 'so', 'well', 'erm', 'um', 'uh', 'er', 'ah',
+    'and', 'but', 'then', 'now', 'here', 'there', 'today',
+    'seeing', 'see', 'attending', 'attend', 'to', 'with', 'who', 'which',
+    'come', 'comes', 'came', 'coming', 'brought', 'bring', 'brings',
+    'arrived', 'arrives', 'presented', 'presenting', 'presents', 'visit',
+    'visited', 'seen',
+  ].join('|') + ')\\b', 'gi');
+
+  var HAS_NEGATION = /\b(?:no|not|denies|denied|without|never|nothing)\b/i;
+
+  function dropPersonBits(history, who) {
+    if (!history) return history;
+    var nameWords = String((who && who.name) || '').toLowerCase()
+      .split(/\s+/).filter(Boolean);
+    var keep = [];
+    history.split(/(?<=[,.;])\s*/).forEach(function (part) {
+      var t = part.trim();
+      if (!t) return;
+      // A symptom or a denial makes it the story, whatever else is in it.
+      if (SYMPTOM.test(t) || HAS_NEGATION.test(t)) { keep.push(t); return; }
+      var rest = t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+      nameWords.forEach(function (w) {
+        var safe = w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        rest = rest.replace(new RegExp('\\b' + safe + '\\b', 'g'), ' ');
+      });
+      PERSON_VOCAB.lastIndex = 0;
+      rest = rest.replace(PERSON_VOCAB, ' ')
+        .replace(/\b\d+\b/g, ' ')
+        .replace(/\b[a-z]\b/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+      if (rest) keep.push(t);
+    });
+    return tidy(keep.join(' '));
+  }
 
   function tidy(s) {
     return String(s || '')
@@ -398,9 +533,22 @@
       var subj = /(?:^|\s)((?:the\s+)?(?:patient|pt|client|mother|father|child|baby|infant|man|woman|lady|he|she|they)\s+)$/i
         .exec(text.slice(0, cutFrom));
       if (subj) { cutFrom -= subj[1].length; cueText = subj[1] + cueText; }
+    } else if (weakCue(text)) {
+      // No announced cue, but a known symptom is introduced by an ordinary
+      // word: "with a rash", "has fever", "feeling weak". This is how most
+      // people actually say it, and it is safe because the symptom vocabulary
+      // does the deciding — "with her mother" is not a complaint.
+      var w = weakCue(text);
+      cutFrom = w.index;
+      start = w.index + w.cue.length;
+      cueText = w.cue;
+      var wsubj = /(?:^|\s)((?:the\s+)?(?:patient|pt|client|mother|father|child|baby|infant|man|woman|lady|he|she|they)\s+)$/i
+        .exec(text.slice(0, cutFrom));
+      if (wsubj) { cutFrom -= wsubj[1].length; cueText = wsubj[1] + cueText; }
     } else {
-      // No cue, but the clinician opened on a symptom — "fever for three days
-      // getting worse at night". That is a complaint followed by its story.
+      // No cue at all, but the clinician opened on a symptom — "fever for
+      // three days getting worse at night". That is a complaint followed by
+      // its story.
       // The complaint begins AT the symptom, not at the first word: "she has
       // been feeling tired" would otherwise make "she" the complaint, because
       // "has been" is where the story starts.
@@ -433,7 +581,13 @@
         .exec(after.slice(0, end));
       if (tail) end -= tail[0].length;
       if (end > 0) {
+        // "a fever and cough" is how it is said and not how it is written
+        // down. The article is the only word dropped, and it carries nothing —
+        // but it is added to the cue text rather than simply discarded, so the
+        // "nothing spoken is lost" count below stays exactly true.
         complaint = tidy(after.slice(0, end));
+        var art = /^(?:a|an|the|some)\s+/i.exec(complaint);
+        if (art) { complaint = complaint.slice(art[0].length); cueText += ' ' + art[0]; }
         history = tidy(text.slice(0, cutFrom) + ' ' + text.slice(start + end));
       }
     }
@@ -820,7 +974,11 @@
     var chief = document.getElementById('itChief');
     var chiefEmpty = chief && !String(chief.value || '').trim();
     n += (chiefEmpty ? writeTo('itChief', story.complaint, wrote) : 0);
-    n += writeTo('itSubjective', chiefEmpty ? story.history : text, wrote);
+    // The story, with the "his name is X, he is male, 28 years old" scaffolding
+    // taken out — it is already in the three boxes above, and repeating it is
+    // what made the summary look like a transcript rather than a record.
+    n += writeTo('itSubjective',
+                 dropPersonBits(chiefEmpty ? story.history : text, who), wrote);
     if (story.background) n += writeTo('itBackground', story.background, wrote);
 
     function report(name, sex, age, unit, complaint, count) {
@@ -988,6 +1146,10 @@
     if (again && !again._wired) {
       again._wired = 1;
       again.addEventListener('click', function () {
+        // A re-take, not a second sentence. Saying it again means the first
+        // attempt was wrong, and appending it produced "Name of the person is
+        // Emmanuel Paul.. Name of the person is Emmanuel Opal." in the story.
+        clearForRedo();
         hideHeard();
         var btn = document.getElementById('itDictateStory');
         if (btn) btn.click();
@@ -1444,7 +1606,8 @@
   var API = { parseVitals: parseVitals, parseStory: parseStory,
               parsePerson: parsePerson, applyConsult: applyConsult,
               lastFault: lastFault, noteFault: noteFault,
-              digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach };
+              digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach,
+              dropPersonBits: dropPersonBits };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   global.HomattDictate = API;

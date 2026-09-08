@@ -262,6 +262,49 @@ Two places show it:
   costs nothing. Under $5 it warns while dictation still works; at zero it says
   the account is empty. It also shows what this device last ran into.
 
+### Reading how people actually talk
+Clinicians do not dictate textbook sentences. Measured over 27 real phrasings —
+Ugandan English, half-finished clauses, "yeah" mid-sentence, the recogniser's
+own commas (`measure-speech.js`): **name 27/27, sex 27/27, age 27/27,
+complaint 27/27, 0 words lost, 0 diagnoses leaked into a field.**
+
+What made the difference:
+
+- **The name cue is a slot, not a phrase.** "Name of the person is Emmanuel
+  Opal" — the commonest opening of all — did not match `name is`, because of
+  the three words in the middle. Also handled: "Patient name Okello John" (no
+  verb), "We have Mukasa Peter here", "Am seeing Achieng Mary". Cue words that
+  get glued to the front of a capture ("this patient is **called** Grace") are
+  peeled off rather than making the name unusable, and trailing filler
+  ("Mukasa Peter **here**") is trimmed.
+- **Weak cues, anchored to the symptom vocabulary.** "with", "has", "having",
+  "feeling" are far too common to mark a complaint on their own — but "with a
+  rash" and "has fever" are exactly how one is said aloud. They are trusted
+  only when a **known symptom** follows immediately, so nothing that is not
+  already a symptom can be promoted into a complaint. That alone took the
+  complaint from 18/27 to 25/27.
+- **An optional article must be a whole word.** `(?:a|an|the)?` inside the cue
+  ate the "a" of "**a**bdominal", leaving "bdominal pain" — which is not a
+  symptom, so the complaint was silently dropped. `(?:(?:a|an|the)\s+)*` fixes
+  it. Worth remembering: an optional group with no boundary will eat the start
+  of the next word.
+- **Ages as they are said**: "he is 52", "she's 27", "the age is 45", "a young
+  man of 22", "a baby of six months". A bare number is still never an age —
+  it has to be a number a *person* is said to be, or it is how a temperature
+  becomes an age.
+
+### The summary reads as a record, not a transcript
+Once the name, sex and age are in their own boxes, repeating them in the story
+is noise. `dropPersonBits()` removes a clause only when it is **nothing but**
+scaffolding, and keeps it the moment it contains a symptom or a denial — so the
+way it fails is by keeping too much, which is untidy and safe. The words are
+not lost: the transcript is shown verbatim in the correction box and again
+under "What was heard, word for word".
+
+*Say it again* is a **re-take**: it clears the three prose boxes first. Without
+that, a second attempt appended, and the story read "Name of the person is
+Emmanuel Paul.. Name of the person is Emmanuel Opal."
+
 ### The rules it follows, and why
 - **Nothing spoken is ever lost.** In the story, every word ends up in the
   complaint, the history or the background; anything ambiguous goes to the
