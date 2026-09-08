@@ -61,6 +61,7 @@
      for the one line on the screen that says something went wrong. The fill
      colour is left alone, because white on it is what the delete buttons use. */
   --danger-ink:#C62828;
+  --warning-ink:#B23C00;   /* warning as TEXT — #E65100 is 3.8:1 on a card */
   --accent-v:      #6C5CE7;   /* violet — interactive highlights */
   --accent-v-tint: #ECE9FF;
 }
@@ -356,7 +357,7 @@ html[data-theme="dark"]{
   --surface:#151E18; --bg:#0B110D;
   --sidebar:#080D0A; --sidebar-hv:#152119;
   --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
-  --on-primary:#000000; --danger-ink:#FF8A80;
+  --on-primary:#000000; --danger-ink:#FF8A80; --warning-ink:#FFB870;
 }
 
 /* -- Midnight blue -- */
@@ -1233,3 +1234,170 @@ html[data-theme="dark"]{
   cursor:pointer; touch-action:manipulation;
 }
 .it-alt:active{ transform:scale(.97) }
+
+/* ═══ The floating "say it" widget ═══════════════════════════════════════════
+   A microphone that follows the clinician around the app. See-through at rest
+   so it does not hide the screen underneath, solid the moment it is touched.
+   --sp-rest is set from the clinic's own setting; everything else follows it. */
+.sp-root{ --sp-rest:.55; }
+.sp-root[hidden]{ display:none }
+
+.sp-fab{
+  position:fixed; bottom:calc(18px + env(safe-area-inset-bottom, 0px));
+  right:16px; z-index:900;
+  width:60px; height:60px; border-radius:50%; border:none;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--primary); color:var(--on-primary);
+  box-shadow:0 8px 22px rgba(0,0,0,.28);
+  opacity:var(--sp-rest); cursor:pointer; touch-action:manipulation;
+  transition:opacity .18s ease, transform .12s ease;
+}
+.sp-root[data-side="left"] .sp-fab{ right:auto; left:16px }
+.sp-fab .material-icons-outlined{ font-size:28px }
+.sp-fab:hover, .sp-fab:focus-visible{ opacity:1 }
+.sp-fab:active{ transform:scale(.94); opacity:1 }
+/* While it is actually recording it must not be faint — that is the one
+   moment the clinician needs to see it is on. */
+.sp-root.sp-open .sp-fab, .sp-root.sp-hot .sp-fab{ opacity:1 }
+.sp-root.sp-hot .sp-fab{ animation:spThrob 1.1s ease-in-out infinite }
+@keyframes spThrob{
+  0%,100%{ box-shadow:0 8px 22px rgba(0,0,0,.28), 0 0 0 0 rgba(211,47,47,.55) }
+  50%    { box-shadow:0 8px 22px rgba(0,0,0,.28), 0 0 0 14px rgba(211,47,47,0) }
+}
+
+.sp-scrim{
+  position:fixed; inset:0; z-index:940; background:rgba(8,12,10,.45);
+  backdrop-filter:blur(2px);
+}
+.sp-scrim[hidden]{ display:none }
+
+.sp-sheet{
+  position:fixed; z-index:950; left:0; right:0;
+  bottom:0; max-height:86vh; overflow:auto;
+  background:var(--surface); color:var(--text);
+  border-top:1px solid var(--border);
+  border-radius:20px 20px 0 0;
+  padding:14px 16px calc(18px + env(safe-area-inset-bottom, 0px));
+  box-shadow:0 -14px 40px rgba(0,0,0,.3);
+  animation:spUp .18s ease-out;
+}
+.sp-sheet[hidden]{ display:none }
+@keyframes spUp{ from{ transform:translateY(18px); opacity:.6 } to{ transform:none; opacity:1 } }
+@media (min-width:720px){
+  .sp-sheet{ left:auto; right:16px; bottom:88px; width:420px;
+             border-radius:18px; border:1px solid var(--border) }
+}
+
+.sp-head{ display:flex; align-items:center; gap:10px; margin-bottom:12px }
+.sp-head b{ flex:1; font-size:15.5px; line-height:1.3 }
+.sp-x{ background:transparent; border:none; color:var(--text-lt);
+       padding:6px; cursor:pointer; border-radius:9px; line-height:0 }
+.sp-x .material-icons-outlined{ font-size:22px }
+
+/* Listening */
+.sp-listen{
+  display:flex; align-items:center; gap:9px; flex-wrap:wrap;
+  padding:11px 13px; border-radius:12px;
+  background:var(--tint-2); border:1px solid var(--line);
+}
+.sp-listen[hidden]{ display:none }
+.sp-dot{ width:10px; height:10px; border-radius:50%; flex:none;
+         background:var(--danger); animation:itBlink 1s steps(2,end) infinite }
+.sp-bars{ display:flex; align-items:center; gap:3px; height:24px; flex:none }
+.sp-bars i{ display:block; width:3px; height:24px; border-radius:2px;
+            background:var(--primary); transform:scaleY(.14);
+            transform-origin:center; transition:transform 70ms linear }
+.sp-time{ font-size:13.5px; font-weight:700; font-variant-numeric:tabular-nums;
+          min-width:36px; color:var(--text) }
+.sp-hint{ flex:1 1 150px }
+.sp-eg{ margin:10px 0 0; font-size:12.5px; color:var(--muted); line-height:1.55;
+        font-style:italic }
+.sp-eg b{ font-style:normal; color:var(--brand-ink) }
+
+.sp-say{ font-size:14px; line-height:1.55; color:var(--text); padding:4px 0 2px }
+.sp-say.warn{ color:var(--danger-ink) }
+
+.sp-acts{ display:flex; gap:9px; margin-top:14px; flex-wrap:wrap }
+.sp-go{
+  flex:1 1 auto; display:inline-flex; align-items:center; justify-content:center;
+  gap:7px; background:var(--primary); color:var(--on-primary);
+  border:none; border-radius:13px; padding:13px 16px;
+  font:inherit; font-size:14.5px; font-weight:700; cursor:pointer;
+  touch-action:manipulation;
+}
+.sp-go.ghost{ background:transparent; color:var(--brand-ink);
+              border:1px solid var(--line); font-weight:600 }
+.sp-go:active{ transform:scale(.98) }
+.sp-go .material-icons-outlined{ font-size:19px }
+
+/* The summary */
+.sp-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:9px }
+.sp-tile{ border:1px solid var(--line); border-radius:11px; padding:9px 11px;
+          background:var(--bg) }
+.sp-tile:nth-child(5){ grid-column:span 2 }
+.sp-tile.missing{ border-style:dashed }
+.sp-k{ display:block; font-size:10.5px; font-weight:700; letter-spacing:.04em;
+       text-transform:uppercase; color:var(--muted); margin-bottom:3px }
+.sp-v{ display:block; font-size:14px; color:var(--text); line-height:1.4;
+       font-weight:600 }
+.sp-tile.missing .sp-v{ font-weight:400; font-style:italic; color:var(--muted) }
+.sp-story{ border:1px solid var(--line); border-radius:11px; padding:9px 11px;
+           background:var(--bg); font-size:13.5px; line-height:1.5;
+           color:var(--text); margin-bottom:9px }
+.sp-neg{ font-size:12.5px; color:var(--warning-ink); line-height:1.5;
+         margin-bottom:7px }
+.sp-heard{ margin-bottom:11px }
+.sp-heard > summary{ font-size:12.5px; color:var(--brand-ink); cursor:pointer;
+                     font-weight:600; padding:4px 0 }
+.sp-heard-t{ width:100%; margin-top:6px; padding:9px 11px; font:inherit;
+             font-size:14px; line-height:1.5; border-radius:10px;
+             border:1px solid var(--line); background:var(--surface);
+             color:var(--text); box-sizing:border-box; resize:vertical }
+.sp-again{ margin-top:7px; background:transparent; color:var(--brand-ink);
+           border:1px solid var(--line); border-radius:10px; padding:8px 13px;
+           font:inherit; font-size:13px; font-weight:600; cursor:pointer }
+
+/* What the books think it might be */
+.sp-dx{ margin-top:4px }
+.sp-dx-wait{ font-size:12.5px; color:var(--muted); line-height:1.5; padding:8px 0 }
+.sp-dx-note{ font-size:12px; color:var(--muted); line-height:1.5;
+             margin-bottom:9px }
+.sp-dx-note b{ color:var(--text) }
+.sp-dx-b{
+  display:block; width:100%; text-align:left; margin-bottom:8px;
+  background:var(--surface); border:1.5px solid var(--primary);
+  border-radius:13px; padding:11px 13px; font:inherit; cursor:pointer;
+  touch-action:manipulation;
+}
+.sp-dx-b:active{ transform:scale(.99) }
+.sp-dx-name{ display:block; font-size:15px; font-weight:700; color:var(--text);
+             line-height:1.3 }
+.sp-dx-pct{ display:inline-block; font-size:12.5px; font-weight:700;
+            color:var(--brand-ink); margin-top:4px }
+.sp-dx-pct i{ font-style:normal; font-weight:400; color:var(--muted);
+              margin-left:4px }
+.sp-dx-why{ display:block; font-size:12px; color:var(--muted); line-height:1.45;
+            margin-top:4px }
+.sp-dx-why b{ color:var(--text); font-weight:600 }
+.sp-dx-src{ display:block; font-size:11px; color:var(--muted); margin-top:3px }
+
+@media (prefers-reduced-motion: reduce){
+  .sp-root.sp-hot .sp-fab{ animation:none }
+  .sp-dot{ animation:none }
+  .sp-sheet{ animation:none }
+}
+
+/* The floating microphone's own settings */
+.sp-range{ width:100%; accent-color:var(--primary); margin:4px 0 }
+.sp-range-note{ font-size:12px; color:var(--text-lt); line-height:1.5 }
+.sp-side{ display:flex; gap:8px }
+.sp-side-b{
+  flex:1; background:var(--bg); color:var(--text);
+  border:1px solid var(--border); border-radius:11px; padding:10px;
+  font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
+}
+.sp-side-b.on{ background:var(--primary); color:var(--on-primary);
+               border-color:var(--primary) }
+.sp-off{ display:flex; align-items:center; gap:9px; font-size:13.5px;
+         color:var(--text); cursor:pointer; margin-top:6px }
+.sp-off input{ width:18px; height:18px; accent-color:var(--primary) }

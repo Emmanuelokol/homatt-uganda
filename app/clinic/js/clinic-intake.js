@@ -669,9 +669,82 @@
     }
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () {
-      bind(); bindDictation(); bindCheck();
+  /* ── Arriving from the floating widget ────────────────────────────────────
+   *
+   * The clinician spoke somewhere else in the app, checked the summary, and
+   * tapped a condition. Everything they said is put into the boxes here and
+   * the one-tap package is opened on the condition they chose — so the tap
+   * that picked the condition is the same tap that opens the treatment.
+   *
+   * It fills EMPTY boxes only. If this screen already has a patient half
+   * entered, that is a different patient and their words are not ours to
+   * overwrite.
+   */
+  function setIfEmpty(id, value) {
+    var e = $(id);
+    if (!e || !value) return 0;
+    if (String(e.value || '').trim()) return 0;
+    e.value = value;
+    e.dispatchEvent(new Event('input', { bubbles: true }));
+    return 1;
+  }
+
+  function applyHandoff() {
+    if (!window.HomattSpeak || !window.HomattSpeak.takeHandoff) return;
+    var p = window.HomattSpeak.takeHandoff();
+    if (!p) return;
+
+    setIfEmpty('quickPatientName', p.name);
+    setIfEmpty('itChief', p.chief);
+    setIfEmpty('itSubjective', p.subjective);
+    setIfEmpty('itBackground', p.background);
+    setIfEmpty('itAge', p.age);
+    if (p.age) {
+      var u = document.querySelector('[data-unit="' + (p.ageUnit === 'months' ? 'months' : 'years') + '"]');
+      if (u && !u.classList.contains('on')) u.click();
+    }
+    if (p.sex) {
+      var b = document.querySelector('.it-sex-btn[data-sex="' + p.sex + '"]');
+      if (b && !b.classList.contains('on')) b.click();
+    }
+    var V = { sbp: 'itSbp', dbp: 'itDbp', temp: 'itTemp', weight: 'itWeight', pulse: 'itPulse' };
+    Object.keys(V).forEach(function (k) {
+      if (p.vitals && p.vitals[k]) setIfEmpty(V[k], p.vitals[k]);
     });
-  } else { bind(); bindDictation(); bindCheck(); }
+
+    // The summary panel, with the words that were actually said, so the check
+    // happens here too and not only in the widget that has now closed.
+    if (typeof window._intakeCheck === 'function') {
+      setTimeout(function () { window._intakeCheck(p.heard || ''); }, 250);
+    }
+
+    // Then the condition they picked — written into the confirmed-diagnosis
+    // box and handed to the one-tap package, which is the whole point of the
+    // journey. Delayed until the guideline database on this screen is open;
+    // tapping the button before it is ready does nothing at all.
+    if (!p.dx) return;
+    setIfEmpty('confirmedDx', p.dx);
+    var tries = 0;
+    (function openPackage() {
+      var btn = $('ucgOneTap');
+      var dx = $('confirmedDx');
+      if (btn && dx && String(dx.value || '').trim() === p.dx && !btn.disabled) {
+        btn.click();
+        return;
+      }
+      if (++tries < 40) setTimeout(openPackage, 250);   // up to 10s, then leave it
+    })();
+  }
+
+  function start() {
+    bind(); bindDictation(); bindCheck();
+    // After the screen is wired, so the boxes it fills are the live ones.
+    try { applyHandoff(); } catch (e) {}
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', start);
+  } else { start(); }
+  // The widget can also hand off while already on this screen.
+  window._speakHandoff = function () { try { applyHandoff(); } catch (e) {} };
 })();

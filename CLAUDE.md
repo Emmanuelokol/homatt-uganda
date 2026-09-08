@@ -392,6 +392,58 @@ Emmanuel Paul.. Name of the person is Emmanuel Opal."
 | `supabase/functions/transcribe/index.ts` | holds the keys, calls Deepgram/Whisper, caps the clip, answers the probe |
 | `supabase/functions/structure/index.ts` | splits a transcript into fields; whitelisted server-side |
 
+## The floating microphone
+
+**File:** `app/clinic/js/clinic-speak.js` · **on:** dashboard, messages,
+settings, new-order · **settings:** Settings → *The floating microphone*
+
+A microphone button that follows the clinician around the app. Tap it anywhere,
+say who the patient is and what they came with, check the summary, tap a
+condition — and the treatment opens already filled in, at the one-tap package.
+
+### Why it floats
+The dictate button on the intake screen is the right place when you are already
+there. You usually are not: you are on the dashboard or in a patient's history
+when someone walks in. Four taps to reach a microphone are four taps during
+which you are not listening to them.
+
+### Why it is see-through
+It sits on top of screens people are reading. At rest it is faint enough to
+read a table through and solid enough to find; `--sp-rest` comes from the
+clinic's own setting (25–100%), and it goes **fully solid the moment it is
+recording** — that is the one instant a clinician must be able to see it is on.
+It can be moved to the other side or turned off entirely: a floating thing that
+cannot be got out of the way is a nuisance, not a feature.
+
+### One microphone path, not two
+It calls `HomattDictate.listen()` — the same recorder, the same format
+negotiation, the same level meter, the same fault messages as the intake
+screen. `useLiveElements()` points the meter at whichever screen is asking.
+Two separate implementations would drift, and the second one would be the one
+nobody measured.
+
+### What it costs
+The suggestion engine needs `impression_index.db` (786 KB) and the SQLite WASM
+— **not** the 4 MB guidelines book, which is only needed for the one-tap
+package on the treatment screen. Both are cached by the service worker
+cache-first, so a clinic pays for them the first time the widget is used and
+never again. Nothing is loaded on page open.
+
+### The handoff
+Everything crosses in `localStorage` under `homatt_speak_handoff`, never in the
+URL — a query string carrying a patient's name and complaint ends up in
+history, in a shared phone's address bar, and in any log in between. The intake
+screen consumes it exactly once, ignores anything older than ten minutes, and
+**fills empty boxes only**: a screen with a patient half entered is a different
+patient, and their words are not ours to overwrite.
+
+### What it is not allowed to do
+Exactly what the intake screen is not allowed to do. The conditions it lists
+are suggestions from the books, each with a match strength, the findings that
+point to it and the page it came from; the panel says *not a diagnosis, you
+decide*; none is preselected; and nothing is written anywhere until a person
+taps one.
+
 ## The tests
 
 `tests/` — 46 files, ~530 checks. No framework: each file starts a web server

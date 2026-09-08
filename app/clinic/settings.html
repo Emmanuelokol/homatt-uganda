@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260923">
+  <link rel="stylesheet" href="css/clinic.css?v=20260924">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
@@ -574,6 +574,36 @@
           <div>Day</div><div>Opens</div><div>Closes</div><div>Closed?</div>
         </div>
         <div id="hoursContainer"></div>
+      </div>
+
+      <!-- The floating microphone -->
+      <div class="settings-card" id="speakCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">mic</span> The floating microphone
+        </div>
+        <p class="dict-note">
+          A microphone button that follows you around the app. Tap it anywhere,
+          say who the patient is and what they came with, and it opens the
+          treatment already filled in. It sits on top of the screen, so how
+          see-through it is matters — set it here, or turn it off.
+        </p>
+        <div class="form-row">
+          <label for="spOpacity">How see-through it is when you are not using it</label>
+          <input type="range" id="spOpacity" min="25" max="100" step="5" class="sp-range">
+          <div class="sp-range-note"><span id="spOpacityVal">55%</span> —
+            fainter on the left, solid on the right. It always goes solid while
+            it is listening.</div>
+        </div>
+        <div class="form-row">
+          <label>Which side of the screen</label>
+          <div class="sp-side">
+            <button type="button" class="sp-side-b" data-side="left">Left</button>
+            <button type="button" class="sp-side-b" data-side="right">Right</button>
+          </div>
+        </div>
+        <label class="sp-off">
+          <input type="checkbox" id="spOff"> Turn the floating microphone off
+        </label>
       </div>
 
       <!-- Dictation service -->
@@ -1949,7 +1979,50 @@ async function dictCheck() {
   }
 }
 
+/* ── The floating microphone: how faint, which side, or off ─────────────── */
+function spSettings() {
+  var range = document.getElementById('spOpacity');
+  var val = document.getElementById('spOpacityVal');
+  var off = document.getElementById('spOff');
+  var S = window.HomattSpeak;
+  if (!range || !S) return;
+
+  function read(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function write(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  var o = Math.round(parseFloat(read(S.KEY_OPACITY, '0.55')) * 100);
+  if (!isFinite(o) || o < 25 || o > 100) o = 55;
+  range.value = o;
+  val.textContent = o + '%';
+  off.checked = read(S.KEY_OFF, '') === '1';
+  var side = read(S.KEY_SIDE, 'right') === 'left' ? 'left' : 'right';
+  document.querySelectorAll('.sp-side-b').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.side === side);
+  });
+
+  range.addEventListener('input', function () {
+    val.textContent = range.value + '%';
+    write(S.KEY_OPACITY, String(range.value / 100));
+    S.applyLook();
+  });
+  off.addEventListener('change', function () {
+    write(S.KEY_OFF, off.checked ? '1' : '');
+    if (off.checked) S.applyLook(); else S.mount();
+    S.applyLook();
+  });
+  document.querySelectorAll('.sp-side-b').forEach(function (b) {
+    b.addEventListener('click', function () {
+      write(S.KEY_SIDE, b.dataset.side);
+      document.querySelectorAll('.sp-side-b').forEach(function (x) {
+        x.classList.toggle('on', x === b);
+      });
+      S.applyLook();
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(spSettings, 0);
   var btn = document.getElementById('dictCheckBtn');
   if (btn) btn.addEventListener('click', dictCheck);
   // Show what this device already knows without waiting to be asked; the live
@@ -1960,6 +2033,10 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 <script src="../js/native-bridge.js"></script>
 <script src="js/clinic-look.js?v=20260909"></script>
+<script src="js/vendor/sql-wasm.js"></script>
+<script src="js/clinic-impression.js?v=20260923" defer></script>
+<script src="js/clinic-dictate.js?v=20260924" defer></script>
+<script src="js/clinic-speak.js?v=20260924" defer></script>
 <script src="js/pwa-install.js?v=20260831"></script>
 </body>
 </html>

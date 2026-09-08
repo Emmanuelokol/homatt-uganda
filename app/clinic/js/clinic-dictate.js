@@ -1213,10 +1213,21 @@
   // hearing you, and that is worth knowing while there is still time to type.
   var _live = { raf: 0, ctx: null, tick: 0, t0: 0, meter: 0, peak: 0, drew: 0, ran: false };
 
+  // Which elements the meter drives. The intake screen by default; the
+  // floating widget points it at its own while its sheet is open, so there is
+  // one level meter in the app rather than two that can disagree.
+  var _liveIds = { box: 'itDictateLive', bars: 'itDictateBars', time: 'itDictateTime' };
+  function useLiveElements(ids) {
+    _liveIds = {
+      box: (ids && ids.box) || 'itDictateLive',
+      bars: (ids && ids.bars) || 'itDictateBars',
+      time: (ids && ids.time) || 'itDictateTime',
+    };
+  }
   function liveEls() {
-    return { box: document.getElementById('itDictateLive'),
-             bars: document.getElementById('itDictateBars'),
-             time: document.getElementById('itDictateTime') };
+    return { box: document.getElementById(_liveIds.box),
+             bars: document.getElementById(_liveIds.bars),
+             time: document.getElementById(_liveIds.time) };
   }
 
   /** How loud was the loudest moment of this recording, 0…1. */
@@ -1256,8 +1267,9 @@
     el.box.hidden = false;
     var h0 = el.box.querySelector('.it-live-hint');
     if (h0) {
-      h0.className = 'it-live-hint';
-      h0.textContent = 'Tap the button again when you have finished';
+      h0.classList.remove('good', 'bad');
+      h0.textContent = el.box.getAttribute('data-idle') ||
+        'Tap the button again when you have finished';
     }
     _live.t0 = Date.now();
     if (el.time) el.time.textContent = '0:00';
@@ -1343,12 +1355,15 @@
         _live.drew = 0;
         if (!hint) return;
         if (_live.peak >= 0.012) {
-          hint.textContent = 'Hearing you — tap the button again when you finish';
-          hint.className = 'it-live-hint good';
+          hint.textContent = 'Hearing you' + (el.box.getAttribute('data-finish') ||
+            ' — tap the button again when you finish');
+          hint.classList.remove('bad');
+          hint.classList.add('good');
         } else if (Date.now() - began > 2500) {
           hint.textContent = 'Not hearing anything yet — speak up, or hold the ' +
                              'phone closer';
-          hint.className = 'it-live-hint bad';
+          hint.classList.remove('good');
+          hint.classList.add('bad');
         }
       }, 400);
     } catch (e) { /* the clock and the dot are enough */ }
@@ -1494,6 +1509,80 @@
   }
 
   /**
+   * Record once, and give back what was said.
+   *
+   * This is the lower half of attach(), for callers that draw their own screen
+   * — the floating widget above all. Sharing it means there is one microphone
+   * path in the app: one set of format decisions, one level meter, one set of
+   * fault messages. Two would drift apart, and the second one would be the
+   * one nobody measured.
+   *
+   * Returns { stop(), done } where done resolves to the transcript, or
+   * rejects with an error carrying .kind (mic-denied, credit, unconfigured…).
+   */
+  async function listen(opts) {
+    opts = opts || {};
+    if (_rec) throw Object.assign(new Error('Already recording.'), { kind: 'busy-here' });
+    if (offline()) {
+      throw Object.assign(new Error('Dictation needs a connection. Type it in for now.'),
+                          { kind: 'offline' });
+    }
+    if (!navigator.mediaDevices || !global.MediaRecorder) {
+      throw Object.assign(new Error('This phone cannot record audio.'),
+                          { kind: 'mic-missing' });
+    }
+    useLiveElements(opts.live);
+    var stream = await openMic();
+    var rec;
+    try {
+      rec = makeRecorder(stream);
+    } catch (e) {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      throw Object.assign(new Error('This phone will not record in a format ' +
+        'the app can read.'), { kind: 'mic-format' });
+    }
+    _rec = rec;
+    _chunks = [];
+    var settle, fail;
+    var done = new Promise(function (res, rej) { settle = res; fail = rej; });
+
+    rec.ondataavailable = function (ev) { if (ev.data && ev.data.size) _chunks.push(ev.data); };
+    rec.onerror = function () {
+      try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+      _rec = null; liveOff(); clearTimeout(_stopT);
+      fail(Object.assign(new Error('The recording stopped part way.'),
+                         { kind: 'mic-failed' }));
+    };
+    rec.onstop = async function () {
+      stream.getTracks().forEach(function (t) { t.stop(); });
+      liveOff();
+      var loud = loudestHeard();
+      var blob = new Blob(_chunks, { type: recordedType(rec, _chunks) });
+      if (!blob.size || (meterRan() && loud < 0.012)) {
+        noteFault('mic-silent', silentWhy(loud));
+        fail(Object.assign(new Error(silentWhy(loud)), { kind: 'mic-silent' }));
+        return;
+      }
+      if (typeof opts.onReading === 'function') opts.onReading();
+      try {
+        settle(await transcribe(blob, opts.mode === 'vitals' ? 'vitals' : 'story'));
+      } catch (e) {
+        noteFault(e && e.kind, e && e.message);
+        fail(e);
+      }
+    };
+
+    rec.start(1000);
+    liveOn(stream);
+    _stopT = setTimeout(function () { stop(); }, MAX_MS);
+    return {
+      done: done,
+      stop: function () { stop(); },
+      peak: loudestHeard,
+    };
+  }
+
+  /**
    * Wire a "say the readings" button to the vitals boxes.
    *   btnId  — the button
    *   sayId  — a line under it where what was heard is written back
@@ -1528,6 +1617,7 @@
 
       var stream;
       hideHeard();                       // the last dictation's words are done
+      useLiveElements(null);             // the meter belongs to this screen now
       say(out, 'Asking for the microphone…');
       try {
         stream = await openMic();
@@ -1644,7 +1734,8 @@
               parsePerson: parsePerson, applyConsult: applyConsult,
               lastFault: lastFault, noteFault: noteFault,
               digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach,
-              dropPersonBits: dropPersonBits, joinSpelled: joinSpelled };
+              dropPersonBits: dropPersonBits, joinSpelled: joinSpelled,
+              listen: listen, useLiveElements: useLiveElements };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   global.HomattDictate = API;
