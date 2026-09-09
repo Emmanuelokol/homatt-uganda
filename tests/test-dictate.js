@@ -661,6 +661,20 @@ result('moving background out still loses nothing',
   });
   result('"Looks right" puts it away — it never blocks the clinician', dismissed);
 
+  // The panel is held open by a warning, so a warning that will not go away
+  // could make "Looks right" do nothing at all. It must put away what is on
+  // screen — and a NEW warning must still bring it back, or forcing it open
+  // would have no purpose.
+  const reopens = await page.evaluate(async () => {
+    const el = document.getElementById('itCheck');
+    const t = document.getElementById('itTemp');
+    t.value = '41.2';
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 900));
+    return getComputedStyle(el).display !== 'none';
+  });
+  result('but a new warning still brings it back', reopens);
+
   // ── The service being cut off must not read as a bad signal ─────────────
   async function faultOf(kind, message) {
     return page.evaluate(async ([k, m]) => {

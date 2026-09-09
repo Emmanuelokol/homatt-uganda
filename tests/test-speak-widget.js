@@ -286,13 +286,22 @@ const FAKE_MIC = (said) => `
     return {
       open: !!o && getComputedStyle(o).display !== 'none',
       asking: !!ask && getComputedStyle(ask).display !== 'none',
+      askTitle: (document.getElementById('ucgAskTitle') || {}).textContent || '',
       title: (document.getElementById('ucgTitle') || {}).textContent || '',
       body: (document.getElementById('ucgBody') || {}).textContent.slice(0, 60) || '',
     };
   });
-  result('the one-tap package opens on the condition that was picked',
-    pkg.open, 'open=' + pkg.open + ' asking=' + pkg.asking +
-    ' title="' + pkg.title.slice(0, 40) + '"');
+  // The journey ends in one of two right places, and which one depends on the
+  // condition rather than on the widget: a title that names exactly one
+  // section of the book opens its package, and a title that names more than
+  // one ("Osteomyelitis" is also "Osteomyelitis of the Jaw") asks which.
+  // Asserting only the first made this test depend on WHICH condition happened
+  // to rank first, so a change in scoring broke it while the journey worked.
+  result('the one-tap package opens on the condition that was picked, ' +
+    'or asks which section of the book it is',
+    pkg.open || (pkg.asking && /which one/i.test(pkg.askTitle)),
+    'open=' + pkg.open + ' asking=' + pkg.asking +
+    ' title="' + (pkg.open ? pkg.title : pkg.askTitle).slice(0, 40) + '"');
 
   // ── 8. It never overwrites a patient already being entered ──────────────
   const guarded = await page.evaluate(async () => {

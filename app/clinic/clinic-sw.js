@@ -45,7 +45,7 @@ const SHELL = [
   'js/clinic-impression.js?v=20260928',
   'js/clinic-dictate.js?v=20260927',
   'js/clinic-speak.js?v=20260928',
-  'js/clinic-intake.js?v=20260925',
+  'js/clinic-intake.js?v=20260928',
   'js/clinic-look.js?v=20260909',
   'manifest.json',
   'js/vendor/supabase.min.js?v=2110',

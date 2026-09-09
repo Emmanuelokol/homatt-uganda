@@ -521,6 +521,16 @@
   // warning worth reading. It is not a modal and never blocks: "Looks right"
   // puts it away, and any edit brings the current picture back.
   var _checkOpen = false, _heardText = '';
+  // What the clinician has already read and waved through. The panel is held
+  // open by a warning, so without this a warning that will not go away — a
+  // rule that moved a condition down, a fever that is still 39.8 — makes
+  // "Looks right" do nothing and the panel sits over the form for ever.
+  // Dismissing puts away exactly what is on screen; anything NEW brings it
+  // back, which is the only reason to force it open in the first place.
+  var _checkSeen = '';
+  function checkSig(warnings) {
+    return (warnings || []).map(function (w) { return w.title; }).join('|');
+  }
 
   function checkTile(key, label, value, tab, focusId) {
     var missing = !String(value || '').trim();
@@ -578,7 +588,8 @@
       $('itCheckHeardText').textContent = _heardText;
     } else { heard.style.display = 'none'; }
 
-    host.style.display = (_checkOpen || warn) ? 'block' : 'none';
+    host.style.display =
+      (_checkOpen || (warn && checkSig(warnings) !== _checkSeen)) ? 'block' : 'none';
   }
 
   // The engine's warnings, raised to the top where they are read in time.
@@ -642,7 +653,12 @@
     if (!host) return;
     host.addEventListener('click', function (e) {
       var ok = e.target.closest && e.target.closest('#itCheckOk');
-      if (ok) { _checkOpen = false; renderCheck(_lastWarnings); return; }
+      if (ok) {
+        _checkOpen = false;
+        _checkSeen = checkSig(_lastWarnings);
+        renderCheck(_lastWarnings);
+        return;
+      }
       var tile = e.target.closest && e.target.closest('.it-chk');
       if (!tile) return;
       // Tapping a line takes you to the box it came from, on the right tab.
