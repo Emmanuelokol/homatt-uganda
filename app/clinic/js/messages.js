@@ -36,7 +36,7 @@
   (async function boot() {
     if (session && session.demo) {
       document.getElementById('threadList').innerHTML =
-        '<div style="text-align:center;padding:30px;color:#9AA0A6;font-size:13px">Messaging is available when you sign in with a real clinic account.</div>';
+        '<div style="text-align:center;padding:30px;color:var(--text-lt, #5F6368);font-size:13px">Messaging is available when you sign in with a real clinic account.</div>';
       return;
     }
     try {
@@ -49,7 +49,7 @@
     if (!ME) { ME = session && session.userId; }
     if (!ME) {
       document.getElementById('threadList').innerHTML =
-        '<div style="text-align:center;padding:30px;color:#9AA0A6;font-size:13px">Could not verify your account — sign in again.</div>';
+        '<div style="text-align:center;padding:30px;color:var(--text-lt, #5F6368);font-size:13px">Could not verify your account — sign in again.</div>';
       return;
     }
     if (!MY_CLINIC) { try { MY_CLINIC = await resolveClinicId(); } catch (e) {} }
@@ -80,7 +80,7 @@
     var res = CO ? await CO.cachedQuery('msg_threads_' + ME, run) : await run();
     if (res.error && !(res.data || []).length) {
       var m = res.error.message || '';
-      list.innerHTML = '<div style="text-align:center;padding:30px;color:#9AA0A6;font-size:13px">'
+      list.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-lt, #5F6368);font-size:13px">'
         + (/message_threads|does not exist|schema cache/i.test(m)
             ? 'Messaging needs a database update — run 20260728_clinician_messenger.sql.'
             : 'Could not load chats.') + '</div>';
@@ -88,7 +88,7 @@
     }
     var rows = res.data || [];
     if (!rows.length) {
-      list.innerHTML = '<div style="text-align:center;padding:40px 24px;color:#9AA0A6;font-size:13px">'
+      list.innerHTML = '<div style="text-align:center;padding:40px 24px;color:var(--text-lt, #5F6368);font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:34px;display:block;margin-bottom:8px;color:#B0BEC5">forum</span>'
         + 'No chats yet. Tap <strong>New</strong> to message a clinician.</div>';
       return;
@@ -130,17 +130,17 @@
     var modal = document.getElementById('contactModal');
     var list = document.getElementById('contactList');
     modal.style.display = 'flex';
-    list.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading clinicians…</div>';
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading clinicians…</div>';
     var CO = window.ClinicOffline;
     var run = function () { return supabase.rpc('list_message_contacts'); };
     var res = CO ? await CO.cachedQuery('msg_contacts_' + ME, run) : await run();
     if (res.error && !(res.data || []).length) {
-      list.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Could not load clinicians.</div>';
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Could not load clinicians.</div>';
       return;
     }
     var rows = res.data || [];
     if (!rows.length) {
-      list.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">No other clinicians found yet.</div>';
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">No other clinicians found yet.</div>';
       return;
     }
     var html = '', lastGroup = null;

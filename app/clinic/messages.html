@@ -29,7 +29,7 @@
   <meta name="theme-color" content="#1B5E20">
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260929">
+  <link rel="stylesheet" href="css/clinic.css?v=20260930">
   <style>
     /* --msg-top is set by JS to the MEASURED topbar height (it's not 60px on
        every phone — the fixed topbar sizes to its buttons). On mobile the chat
@@ -66,7 +66,7 @@
     .thr-last{font-size:12.5px;color:var(--text-lt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
     .thr-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0}
     .thr-time{font-size:11px;color:var(--text-lt)}
-    .thr-badge{background:var(--primary);color:#fff;font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 6px}
+    .thr-badge{background:var(--primary);color:var(--on-primary, #fff);font-size:11px;font-weight:800;min-width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;padding:0 6px}
 
     /* Conversation */
     #convView{display:none;flex-direction:column;height:100%}
@@ -137,7 +137,7 @@
   <main class="admin-main">
     <div class="admin-topbar">
       <div class="admin-topbar-title">
-        <a href="dashboard.html" style="color:#5F6368;text-decoration:none;display:inline-flex;align-items:center;gap:4px">
+        <a href="dashboard.html" style="color:var(--text-lt, #5F6368);text-decoration:none;display:inline-flex;align-items:center;gap:4px">
           <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
         </a>
         Messages
@@ -156,7 +156,7 @@
             <button class="new-msg-btn" id="newMsgBtn"><span class="material-icons-outlined" style="font-size:18px">edit</span> New</button>
           </div>
           <div id="threadList">
-            <div style="text-align:center;padding:30px;color:#9AA0A6;font-size:13px">Loading chats…</div>
+            <div style="text-align:center;padding:30px;color:var(--text-lt, #5F6368);font-size:13px">Loading chats…</div>
           </div>
         </div>
 
@@ -192,7 +192,7 @@
   <div id="contactModal">
     <div class="cm-sheet">
       <div class="cm-head"><span>New message</span><button style="background:none;border:none;cursor:pointer;color:var(--text-lt)" id="cmClose"><span class="material-icons-outlined">close</span></button></div>
-      <div id="contactList"><div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading clinicians…</div></div>
+      <div id="contactList"><div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading clinicians…</div></div>
     </div>
   </div>
   <div class="img-lightbox" id="lightbox"><img id="lightboxImg" src="" alt=""></div>
@@ -200,13 +200,13 @@
 
   <script src="js/vendor/supabase.min.js?v=2110"></script>
   <script src="../js/config.js"></script>
-  <script src="js/clinic-offline.js?v=20260830a"></script>
-  <script src="js/clinic.js?v=20260831"></script>
-  <script src="js/messages.js?v=20260811"></script>
+  <script src="js/clinic-offline.js?v=20260930a"></script>
+  <script src="js/clinic.js?v=20260930"></script>
+  <script src="js/messages.js?v=20260930"></script>
   <script src="js/vendor/sql-wasm.js" defer></script>
-<script src="js/clinic-impression.js?v=20260928" defer></script>
-<script src="js/clinic-dictate.js?v=20260927" defer></script>
-<script src="js/clinic-speak.js?v=20260928" defer></script>
-<script src="js/pwa-install.js?v=20260831"></script>
+<script src="js/clinic-impression.js?v=20260930" defer></script>
+<script src="js/clinic-dictate.js?v=20260930" defer></script>
+<script src="js/clinic-speak.js?v=20260930" defer></script>
+<script src="js/pwa-install.js?v=20260930"></script>
 </body>
 </html>

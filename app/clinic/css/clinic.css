@@ -47,6 +47,9 @@
   --radius-lg: 24px;
   --shadow:    0 6px 18px rgba(20,24,43,0.07), 0 1px 4px rgba(20,24,43,0.05);
   --shadow-lg: 0 16px 38px rgba(20,24,43,0.13), 0 4px 10px rgba(20,24,43,0.06);
+  --primary-ink: var(--primary);  /* --primary used as TEXT. Same colour
+     everywhere except the skins where --primary is a near-black chrome
+     fill, which is unreadable as a word on their own dark surface. */
   --on-primary:#FFFFFF;   /* text that sits on a --primary fill; flips
                              dark where dark mode lightens the fill */
   /* Two names new-order.html has always used and nothing ever defined. An
@@ -85,7 +88,7 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .admin-sidebar{width:240px;background:var(--sidebar);color:#fff;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:100;overflow-y:auto}
 .sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.1)}
 .sidebar-logo-text{font-size:16px;font-weight:700;color:var(--side-accent)}
-.sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,0.45);margin-top:2px}
+.sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,0.62);margin-top:2px}
 .sidebar-nav{padding:12px 0;flex:1}
 .sidebar-section-label{font-size:10px;font-weight:600;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:1px;padding:12px 20px 6px}
 .sidebar-link{display:flex;align-items:center;gap:12px;padding:14px 20px;color:rgba(255,255,255,0.7);text-decoration:none;font-size:14px;transition:background .15s,color .15s;border-left:3px solid transparent;touch-action:manipulation;-webkit-tap-highlight-color:transparent;min-height:48px}
@@ -103,11 +106,11 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
 .admin-topbar-title{font-size:18px;font-weight:700}
 .admin-topbar-right{display:flex;align-items:center;gap:14px}
 .admin-user-chip{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-lt)}
-.clinic-exit-btn{display:inline-flex;align-items:center;gap:5px;background:var(--primary,var(--deep));color:#fff;border:none;border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
+.clinic-exit-btn{display:inline-flex;align-items:center;gap:5px;background:var(--primary,var(--deep));color:var(--on-primary, #fff);border:none;border-radius:8px;padding:7px 12px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap}
 .clinic-exit-btn.demo{background:#D32F2F}
 .clinic-exit-btn:active{opacity:.85}
 .clinic-demo-badge{background:#FFE082;color:#7A4F01;font-weight:800;font-size:11px;letter-spacing:.5px;padding:3px 8px;border-radius:6px;white-space:nowrap}
-.admin-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
+.admin-user-avatar{width:32px;height:32px;border-radius:50%;background:var(--primary);color:var(--on-primary, #fff);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700}
 .admin-content{padding:28px;flex:1;overflow-x:hidden}
 
 /* Global touch fix for all clinic portal interactive elements */
@@ -118,7 +121,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 
 /* ── Login ── */
 .admin-login-page{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0B1626 0%,#0D2137 100%)}
-.admin-login-card{background:#fff;border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
+.admin-login-card{background:var(--surface, #FFFFFF);border-radius:16px;padding:40px;width:380px;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
 .admin-login-logo{text-align:center;margin-bottom:28px}
 .admin-login-logo-mark{width:56px;height:56px;background:linear-gradient(135deg,var(--deep),#43A047);border-radius:16px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:28px;color:#fff}
 .admin-login-title{font-size:20px;font-weight:700}
@@ -127,7 +130,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .login-field label{display:block;font-size:13px;font-weight:500;margin-bottom:6px}
 .login-field input{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:16px;outline:none;transition:border-color .2s;min-height:48px;touch-action:manipulation}
 .login-field input:focus{border-color:var(--primary)}
-.login-btn{width:100%;background:var(--primary);color:#fff;border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s;min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.login-btn{width:100%;background:var(--primary);color:var(--on-primary, #fff);border:none;padding:14px;border-radius:8px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;transition:background .2s;min-height:52px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .login-btn:hover{background:var(--primary-d)}
 .login-btn:disabled{opacity:.7;cursor:not-allowed}
 .demo-btn{width:100%;background:#F3F4F6;color:var(--text);border:1px solid var(--border);padding:13px;border-radius:8px;font-size:15px;font-weight:500;cursor:pointer;margin-top:10px;transition:background .2s;min-height:48px;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
@@ -147,7 +150,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .stat-card:active{transform:scale(.985)}
 .stat-icon{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .stat-icon .material-icons-outlined{font-size:23px}
-.stat-icon.green{background:var(--brand-tint);color:var(--primary)}
+.stat-icon.green{background:var(--brand-tint);color:var(--primary-ink)}
 .stat-icon.blue{background:#E3F2FD;color:#1565C0}
 .stat-icon.orange{background:#FCEFCF;color:#C77E06}
 .stat-icon.red{background:#FBE1DE;color:#C62828}
@@ -162,9 +165,9 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .table-filter{display:flex;gap:10px;align-items:center}
 .table-filter select,.table-filter input{padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;outline:none}
 .admin-table{width:100%;border-collapse:collapse}
-.admin-table th{background:#F8F9FA;padding:12px 18px;text-align:left;font-size:12px;font-weight:600;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
-.admin-table td{padding:14px 18px;font-size:13px;border-bottom:1px solid #F0F0F0;vertical-align:middle}
-.admin-table tr:hover td{background:#F8F9FA}
+.admin-table th{background:var(--bg, #F5F5F5);padding:12px 18px;text-align:left;font-size:12px;font-weight:600;color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border)}
+.admin-table td{padding:14px 18px;font-size:13px;border-bottom:1px solid var(--border, #E0E0E0);vertical-align:middle}
+.admin-table tr:hover td{background:var(--bg, #F5F5F5)}
 .admin-table tr:last-child td{border-bottom:none}
 
 /* ── Status badges ── */
@@ -181,7 +184,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 
 /* ── Buttons ── */
 .btn-admin{display:inline-flex;align-items:center;gap:6px;padding:9px 17px;border-radius:12px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;text-decoration:none}
-.btn-admin.primary{background:var(--primary);color:#fff}
+.btn-admin.primary{background:var(--primary);color:var(--on-primary, #fff)}
 .btn-admin.primary:hover{background:var(--primary-d)}
 .btn-admin.secondary{background:#F3F4F6;color:var(--text);border:1px solid var(--border)}
 .btn-admin.secondary:hover{background:#E5E7EB}
@@ -190,7 +193,7 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 .btn-admin.sm{padding:5px 12px;font-size:12px}
 
 /* ── Queue number badge ── */
-.queue-number{width:28px;height:28px;border-radius:50%;background:var(--primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.queue-number{width:28px;height:28px;border-radius:50%;background:var(--primary);color:var(--on-primary, #fff);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center}
 
 /* ── Patient avatar ── */
 .patient-avatar{width:32px;height:32px;border-radius:50%;background:#E3F2FD;color:#1565C0;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -201,9 +204,9 @@ button,.btn-admin,.home-cta,a,.sidebar-link,.logout-sidebar-btn,.cbn-link,.order
 
 /* ── Appointment card ── */
 .appt-card{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow)}
-.appt-item{display:flex;gap:14px;align-items:flex-start;padding:14px 18px;border-bottom:1px solid #F0F0F0}
+.appt-item{display:flex;gap:14px;align-items:flex-start;padding:14px 18px;border-bottom:1px solid var(--border, #E0E0E0)}
 .appt-item:last-child{border-bottom:none}
-.appt-time{font-size:12px;font-weight:600;color:var(--primary);min-width:48px}
+.appt-time{font-size:12px;font-weight:600;color:var(--primary-ink);min-width:48px}
 .appt-info{flex:1}
 .appt-name{font-size:13px;font-weight:600;margin-bottom:2px}
 .appt-type{font-size:12px;color:var(--text-lt)}
@@ -358,6 +361,10 @@ html[data-theme="dark"]{
   --sidebar:#080D0A; --sidebar-hv:#152119;
   --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
   --on-primary:#000000; --danger-ink:#FF8A80; --warning-ink:#FFB870;
+  /* The brand colour as a WORD. Every skin already says what that is in dark
+     mode; without this, skins whose --primary is a near-black chrome fill
+     printed their labels at 1.5:1 on their own surface. */
+  --primary-ink: var(--deep-ink);
 }
 
 /* -- Midnight blue -- */
@@ -561,7 +568,7 @@ html[data-theme="dark"] #qsSelectedPanel{background:#101812 !important; border-c
 .dmed-row{
   display:flex; align-items:center; gap:11px;
   padding:10px 12px; margin-bottom:7px;
-  background:var(--bg,#F5F7F5); border:1px solid var(--border,#E8EAED);
+  background:var(--bg,#F5F7F5); border:1px solid var(--border, #E0E0E0);
   border-radius:11px;
 }
 .dmed-row-ic{ font-size:19px; color:var(--primary,var(--deep)); flex-shrink:0 }
@@ -581,7 +588,7 @@ html[data-theme="dark"] .dmed-row-q{ background:rgba(67,160,71,.20); color:var(-
 
 .act-card{
   margin:10px 16px; padding:14px 16px; cursor:pointer;
-  background:var(--surface,#fff); border:1px solid var(--border,#E8EAED);
+  background:var(--surface,#fff); border:1px solid var(--border, #E0E0E0);
   border-radius:var(--radius,18px); box-shadow:var(--shadow,0 6px 18px rgba(20,24,43,.07));
   transition:box-shadow .15s, transform .12s;
 }
@@ -652,7 +659,7 @@ html[data-theme="dark"] .act-reason{ color:#93A697 }
   display:inline-flex; align-items:center; gap:5px;
   font:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
   padding:9px 16px; border:none; border-radius:22px;
-  background:var(--primary,var(--deep)); color:#fff;
+  background:var(--primary,var(--deep)); color:var(--on-primary, #fff);
 }
 .act-btn .material-icons-outlined{ font-size:15px }
 html[data-theme="dark"] .act-btn{ background:#2E7D46 }
@@ -671,7 +678,7 @@ html[data-theme="dark"] .act-btn{ background:#2E7D46 }
   column-gap:11px; row-gap:2px; align-items:baseline;
   padding:11px 14px 11px 12px; margin:0 12px 7px;
   background:var(--surface,#fff);
-  border:1px solid var(--border,#E8EAED); border-left:4px solid var(--border,#E8EAED);
+  border:1px solid var(--border, #E0E0E0); border-left:4px solid var(--border, #E0E0E0);
   border-radius:12px; cursor:pointer;
 }
 .pt-row:active{ background:var(--bg,#F7F9F7) }
@@ -746,7 +753,7 @@ html[data-theme="dark"] .pt-tag.credit{ background:rgba(11,92,138,.25);  color:#
   display:flex; align-items:center; gap:10px;
   padding:11px 14px; margin:0 12px 7px;
   background:var(--surface,#fff);
-  border:1px solid var(--border,#E8EAED); border-left:4px solid var(--accent);
+  border:1px solid var(--border, #E0E0E0); border-left:4px solid var(--accent);
   border-radius:12px; cursor:pointer;
 }
 .nn-row:active{ background:var(--bg,#F7F9F7) }
@@ -1413,7 +1420,7 @@ html[data-theme="dark"]{
 }
 
 /* The floating microphone's own settings */
-.sp-range{ width:100%; accent-color:var(--primary); margin:4px 0 }
+.sp-range{ width:100%; accent-color:var(--primary-ink); margin:4px 0 }
 .sp-range-note{ font-size:12px; color:var(--text-lt); line-height:1.5 }
 .sp-side{ display:flex; gap:8px }
 .sp-side-b{
@@ -1425,4 +1432,4 @@ html[data-theme="dark"]{
                border-color:var(--primary) }
 .sp-off{ display:flex; align-items:center; gap:9px; font-size:13.5px;
          color:var(--text); cursor:pointer; margin-top:6px }
-.sp-off input{ width:18px; height:18px; accent-color:var(--primary) }
+.sp-off input{ width:18px; height:18px; accent-color:var(--primary-ink) }

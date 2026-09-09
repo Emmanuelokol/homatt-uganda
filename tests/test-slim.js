@@ -92,10 +92,13 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
   const row = posted[0]||null;
   result('diagnosis → suggestion → package → paid → saved, in one flow',
     picked && /malaria/i.test(picked) && posted.length===1 &&
-    row.payment_status==='paid' && Number(row.amount_paid)===Number(row.total_charged_ugx) &&
+    // amount_paid is 0 on the insert by design — record_payment adds to the
+    // row, so writing it here too booked the money twice. The ledger call is
+    // the single writer.
+    row.payment_status==='paid' && Number(row.amount_paid)===0 &&
     rpcs.length===1 && !row.patient_phone,
     'dx="'+picked+'" saved='+posted.length+' case='+(row&&row.case_code)+
-    ' paid='+(row&&row.amount_paid)+' ledger='+rpcs.length);
+    ' paid='+(row&&row.amount_paid)+' ledger='+rpcs.length+' total='+(row&&row.total_charged_ugx));
   result('no page errors', errs.length===0, errs.slice(0,3).join(' | '));
   await page.screenshot({path:'slim.png',fullPage:true});
   await b.close(); server.close();

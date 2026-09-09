@@ -154,7 +154,7 @@
       '.stk-top p{margin:3px 0 0;font-size:13px;color:var(--text-lt,#5F6368);line-height:1.45}',
       '.stk-body{padding:16px 20px;overflow-y:auto;flex:1}',
       '.stk-lbl{display:block;font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--text-lt,#5F6368);margin:0 0 6px}',
-      '.stk-in{width:100%;box-sizing:border-box;padding:13px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;font:inherit;font-size:16px;background:var(--surface,#fff);color:var(--text,#111)}',
+      '.stk-in{width:100%;box-sizing:border-box;padding:13px 14px;border:1.5px solid var(--border, #E0E0E0);border-radius:13px;font:inherit;font-size:16px;background:var(--surface,#fff);color:var(--text,#111)}',
       '.stk-in:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(14,124,90,.12)}',
       '#stkRes{margin-top:8px;border:1.5px solid var(--brand-tint);border-radius:12px;overflow:hidden;display:none;max-height:250px;overflow-y:auto}',
       '#stkRes div{padding:12px 14px;font-size:14px;cursor:pointer;border-bottom:1px solid var(--border,#EEF1EE);display:flex;justify-content:space-between;gap:8px;align-items:center}',
@@ -170,16 +170,16 @@
       '.stk-sum .note{font-size:12.5px;margin-top:7px;opacity:.9;line-height:1.45}',
       '.stk-foot{padding:14px 20px 18px;border-top:1px solid var(--border,#E8EAED);display:flex;gap:10px}',
       '.stk-btn{flex:1;padding:15px;border-radius:14px;border:none;font:inherit;font-size:15px;font-weight:800;cursor:pointer}',
-      '.stk-btn.ghost{flex:0 0 34%;background:transparent;border:1.5px solid var(--border,#E0E0E0);color:var(--text,#111)}',
+      '.stk-btn.ghost{flex:0 0 34%;background:transparent;border:1.5px solid var(--border, #E0E0E0);color:var(--text,#111)}',
       '.stk-btn.go{background:linear-gradient(135deg,var(--primary),var(--grad-3));color:#fff}',
       '.stk-btn:disabled{opacity:.5}',
       '.stk-known{margin-top:14px;padding:12px 14px;border-radius:13px;background:var(--bg,#F5F7F5);font-size:13px;color:var(--text-lt,#5F6368);line-height:1.5}',
       'html[data-theme="dark"] .stk-known{background:#151E18;color:#A9BCAE}',
       '.stk-known b{color:var(--text,#111)}',
       'html[data-theme="dark"] .stk-known b{color:#E8F0EA}',
-      '.stk-edit{background:none;border:none;color:var(--primary);font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;padding:0;margin-top:4px}',
+      '.stk-edit{background:none;border:none;color:var(--primary-ink);font:inherit;font-size:12.5px;font-weight:800;cursor:pointer;padding:0;margin-top:4px}',
       'html[data-theme="dark"] .stk-edit{color:var(--brand-ink)}',
-      '.stk-batches{margin-top:7px;border:1px solid var(--border,#E8EAED);border-radius:12px;overflow:hidden}',
+      '.stk-batches{margin-top:7px;border:1px solid var(--border, #E0E0E0);border-radius:12px;overflow:hidden}',
       'html[data-theme="dark"] .stk-batches{border-color:#243029}',
       '.stk-batch{display:flex;align-items:center;gap:10px;padding:10px 13px;font-size:13.5px;border-bottom:1px solid var(--border,#EEF1EE)}',
       'html[data-theme="dark"] .stk-batch{border-bottom-color:#1E2822}',
@@ -195,14 +195,14 @@
       'html[data-theme="dark"] .stk-batch.exp{background:rgba(229,72,77,.14)}',
       // What kind of thing is it — asked ONLY for a name nothing has heard of.
       '.stk-kind{display:flex;gap:10px;margin-top:14px}',
-      '.stk-kind button{flex:1;padding:16px 12px;border-radius:16px;border:1.5px solid var(--border,#E0E0E0);background:var(--surface,#fff);font:inherit;cursor:pointer;text-align:left;color:var(--text,#111)}',
+      '.stk-kind button{flex:1;padding:16px 12px;border-radius:16px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface,#fff);font:inherit;cursor:pointer;text-align:left;color:var(--text,#111)}',
       '.stk-kind button b{display:block;font-size:14.5px;font-weight:800;margin-bottom:2px}',
       '.stk-kind button span{font-size:11.5px;color:var(--text-lt,#5F6368);line-height:1.35;display:block}',
       '.stk-kind button:active{border-color:var(--primary)}',
       // Price block
       '.stk-price{margin-top:18px;padding:14px;border-radius:16px;border:1.5px solid var(--brand-tint);background:var(--surface,#fff)}',
       'html[data-theme="dark"] .stk-price{border-color:#22503F;background:#101A15}',
-      '.stk-price .cap{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--primary);margin-bottom:10px}',
+      '.stk-price .cap{font-size:11px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;color:var(--primary-ink);margin-bottom:10px}',
       'html[data-theme="dark"] .stk-price .cap{color:var(--brand-ink)}',
       '.stk-two{display:grid;grid-template-columns:1fr 1fr;gap:10px}',
       '.stk-mini{font-size:11px;font-weight:800;letter-spacing:.3px;text-transform:uppercase;color:var(--text-lt,#5F6368);display:block;margin-bottom:5px}',
@@ -462,17 +462,17 @@
                '<input id="stkUnitPrice" class="stk-in" type="number" inputmode="numeric" min="0" step="50" ' +
                'value="' + (st.unitPrice || '') + '" placeholder="e.g. 500"></div>' +
              '<div><label class="stk-mini" for="stkPackPrice">One ' +
-               esc(st.inner ? innerOne : outerOne) + ' <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span></label>' +
+               esc(st.inner ? innerOne : outerOne) + ' <span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--text-lt, #5F6368)">— optional</span></label>' +
                '<input id="stkPackPrice" class="stk-in" type="number" inputmode="numeric" min="0" step="100" ' +
                'value="' + (st.packPrice || '') + '" placeholder="worked out"></div>' +
            '</div>' +
-           '<div class="hint" id="stkPriceHint" style="font-size:12px;color:#5F6368;margin-top:7px;line-height:1.4"></div></div>';
+           '<div class="hint" id="stkPriceHint" style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:7px;line-height:1.4"></div></div>';
     }
 
     // Each delivery is its own batch with its own expiry — different boxes,
     // different dates. Asked here, on the batch being added.
     h += '<div class="stk-q"><label class="stk-lbl" for="stkExpiry">Expiry date of this batch ' +
-         '<span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional</span></label>' +
+         '<span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--text-lt, #5F6368)">— optional</span></label>' +
          '<input id="stkExpiry" class="stk-in" type="date" value="' + esc(st.expiry || '') + '">' +
          '<div class="hint">If this delivery expires sooner than what is already on the shelf, the app tracks the earlier date.</div></div>';
 

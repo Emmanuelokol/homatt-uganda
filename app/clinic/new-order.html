@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260929">
+  <link rel="stylesheet" href="css/clinic.css?v=20260930">
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
@@ -49,23 +49,23 @@
     }
     .wiz-dot-circle {
       width: 32px; height: 32px; border-radius: 50%;
-      border: 2px solid #E0E0E0; background: #fff;
+      border: 2px solid var(--border, #E0E0E0); background: var(--surface, #FFFFFF);
       display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 800; color: #BDBDBD;
+      font-size: 13px; font-weight: 800; color: var(--text-lt, #5F6368);
       transition: all .2s;
     }
     .wiz-dot.done .wiz-dot-circle {
-      background: var(--primary); border-color: var(--primary); color: #fff;
+      background: var(--primary); border-color:var(--primary); color:var(--on-primary, #fff);
     }
     .wiz-dot.current .wiz-dot-circle {
-      background: var(--tint-2); border-color: var(--primary); color: var(--primary);
+      background: var(--tint-2); border-color:var(--primary); color:var(--primary-ink);
     }
     .wiz-dot-label {
-      font-size: 10px; font-weight: 700; color: #BDBDBD;
+      font-size: 10px; font-weight: 700; color: var(--text-lt, #5F6368);
       text-transform: uppercase; letter-spacing: .5px; white-space: nowrap;
     }
     .wiz-dot.done .wiz-dot-label,
-    .wiz-dot.current .wiz-dot-label { color: var(--primary); }
+    .wiz-dot.current .wiz-dot-label { color:var(--primary-ink); }
     .wiz-dot-line {
       flex: 1; height: 2px; background: #E0E0E0;
       margin: 0 8px; margin-bottom: 20px;
@@ -79,12 +79,12 @@
       font-size: 24px; font-weight: 800; color: var(--text, #111); margin-bottom: 4px;
     }
     .wiz-screen-sub {
-      font-size: 13px; color: #5F6368; margin-bottom: 24px; line-height: 1.5;
+      font-size: 13px; color: var(--text-lt, #5F6368); margin-bottom: 24px; line-height: 1.5;
     }
 
     /* ── Section dividers ───────────────────────────────────────── */
     .sec-label {
-      font-size: 11px; font-weight: 700; color: #9AA0A6;
+      font-size: 11px; font-weight: 700; color: var(--text-lt, #5F6368);
       text-transform: uppercase; letter-spacing: .6px;
       margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
     }
@@ -107,7 +107,7 @@
 
     /* ── Inputs ─────────────────────────────────────────────────── */
     .field-label {
-      font-size: 11px; font-weight: 700; color: #424242;
+      font-size: 11px; font-weight: 700; color: var(--text, #1A1A1A);
       display: block; margin-bottom: 6px;
       text-transform: uppercase; letter-spacing: .4px;
     }
@@ -119,7 +119,7 @@
       background: var(--surface,#fff); box-sizing: border-box; color: var(--text,#111);
     }
     .field-input:focus {
-      border-color: var(--primary);
+      border-color:var(--primary);
       box-shadow: 0 0 0 3px rgba(27,94,32,.08);
     }
     textarea.field-input { resize: vertical; min-height: 70px; }
@@ -148,8 +148,8 @@
     .sum-line{display:flex;justify-content:space-between;gap:12px;align-items:baseline;
       font-size:13px;color:var(--text-lt,#5F6368);padding:4px 0;line-height:1.4}
     .sum-line b{color:var(--text,#111);font-weight:700;text-align:right;overflow-wrap:anywhere}
-    .sum-line.sum-total{border-top:1px solid var(--border,#E8EAED);margin-top:5px;padding-top:8px;font-size:14px}
-    .sum-line.sum-total b{font-size:17px;color:var(--primary);letter-spacing:-.02em}
+    .sum-line.sum-total{border-top:1px solid var(--border, #E0E0E0);margin-top:5px;padding-top:8px;font-size:14px}
+    .sum-line.sum-total b{font-size:17px;color:var(--primary-ink);letter-spacing:-.02em}
     .sum-line.sum-owing b{color:#C62828}
     .sum-line.sum-paid b{color:var(--deep-ink)}
     .sum-line.sum-sub{font-size:12px;opacity:.85}
@@ -164,11 +164,11 @@
       padding:5px 11px;border-radius:999px}
     .sum-none{font-size:12.5px;color:var(--text-lt,#9AA0A6);font-style:italic}
     .sum-actions{flex:none;padding:12px 18px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0px));
-      border-top:1px solid var(--border,#E8EAED);display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff)}
+      border-top:1px solid var(--border, #E0E0E0);display:flex;flex-direction:column;gap:8px;background:var(--surface,#fff)}
     .sum-btn{width:100%;padding:13px;border-radius:13px;font:inherit;font-size:14.5px;font-weight:800;
       cursor:pointer;font-family:inherit;touch-action:manipulation;
-      background:transparent;color:var(--primary);border:1.5px solid var(--primary)}
-    .sum-btn.primary{background:var(--primary);color:#fff;border-color:var(--primary)}
+      background:transparent;color:var(--primary-ink);border:1.5px solid var(--primary)}
+    .sum-btn.primary{background:var(--primary);color:var(--on-primary, #fff);border-color:var(--primary)}
     html[data-theme="dark"] .sum-med-q{background:rgba(67,160,71,.22);color:var(--tint-3)}
     html[data-theme="dark"] .sum-h{color:var(--brand-ink)}
     html[data-theme="dark"] .sum-case{background:rgba(14,124,90,.22);color:#7FD9B4}
@@ -176,8 +176,8 @@
     html[data-theme="dark"] .sum-line.sum-owing b{color:#FF9E93}
     html[data-theme="dark"] .sum-todo{color:#F5B160}
     html[data-theme="dark"] .sum-btn{color:var(--brand-ink);border-color:var(--deep-ink)}
-    html[data-theme="dark"] .sum-btn.primary{background:var(--primary);color:#fff}
-    .helper { font-size: 12px; color: #9AA0A6; margin-top: 5px; line-height: 1.4; }
+    html[data-theme="dark"] .sum-btn.primary{background:var(--primary);color:var(--on-primary, #fff)}
+    .helper { font-size: 12px; color: var(--text-lt, #5F6368); margin-top: 5px; line-height: 1.4; }
 
     /* ── Patient pill ───────────────────────────────────────────── */
     .patient-pill {
@@ -187,7 +187,7 @@
     }
     .patient-pill .avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background: var(--primary); color: #fff;
+      background: var(--primary); color:var(--on-primary, #fff);
       display: flex; align-items: center; justify-content: center;
       font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
@@ -196,7 +196,7 @@
     .patient-pill .phone { font-size: 12px; color: var(--deep-ink); margin-top: 1px; }
     .patient-pill .badge {
       font-size: 10px; font-weight: 700;
-      background: #fff; color: var(--deep-ink);
+      background: var(--surface, #FFFFFF); color: var(--deep-ink);
       padding: 3px 9px; border-radius: 10px; white-space: nowrap;
     }
     .patient-pill .change-btn {
@@ -208,7 +208,7 @@
     .autocomplete-wrap { position: relative; }
     .autocomplete-menu {
       position: absolute; top: 100%; left: 0; right: 0;
-      background: #fff; border: 1px solid var(--border);
+      background: var(--surface, #FFFFFF); border: 1px solid var(--border);
       border-radius: 12px; margin-top: 4px;
       max-height: 260px; overflow-y: auto;
       box-shadow: 0 8px 28px rgba(0,0,0,.12);
@@ -216,12 +216,12 @@
     }
     .autocomplete-item {
       padding: 11px 14px; cursor: pointer;
-      border-bottom: 1px solid #F5F5F5;
+      border-bottom: 1px solid var(--border, #E0E0E0);
     }
     .autocomplete-item:hover, .autocomplete-item.active { background: #F0F7FF; }
     .autocomplete-item:last-child { border-bottom: none; }
-    .ac-name { font-size: 14px; font-weight: 600; color: #212121; }
-    .ac-cat { font-size: 11px; color: #9AA0A6; text-transform: uppercase; letter-spacing: .3px; }
+    .ac-name { font-size: 14px; font-weight: 600; color: var(--text, #1A1A1A); }
+    .ac-cat { font-size: 11px; color: var(--text-lt, #5F6368); text-transform: uppercase; letter-spacing: .3px; }
 
     /* ── Lookup tabs ────────────────────────────────────────────── */
     .lookup-tab {
@@ -230,7 +230,7 @@
       display: flex; align-items: center; justify-content: center; gap: 5px;
     }
     .lookup-tab.active { background: #E3F2FD; color: #1565C0; font-weight: 700; }
-    .lookup-tab:not(.active) { background: transparent; color: #5F6368; }
+    .lookup-tab:not(.active) { background: transparent; color: var(--text-lt, #5F6368); }
 
     /* ── Severity chips ─────────────────────────────────────────── */
     .sev-chips { display: flex; gap: 8px; }
@@ -242,8 +242,8 @@
       color: var(--text-lt); font-family: inherit;
       text-align: center; transition: all .12s; letter-spacing: .2px;
     }
-    .sev-chip:hover { border-color: var(--primary); }
-    .sev-chip.active { background: var(--primary); color: #fff; box-shadow: 0 6px 14px rgba(14,124,90,.32); }
+    .sev-chip:hover { border-color:var(--primary); }
+    .sev-chip.active { background: var(--primary); color:var(--on-primary, #fff); box-shadow: 0 6px 14px rgba(14,124,90,.32); }
     .sev-chip[data-sev="severe"].active  { background: #E2960A; color:#fff; }
     .sev-chip[data-sev="critical"].active { background: #E0454B; color:#fff; }
 
@@ -251,20 +251,20 @@
     .care-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .care-opt {
       padding: 14px 12px; border: 2px solid var(--border); border-radius: 12px;
-      background: #fff; cursor: pointer; text-align: center;
+      background: var(--surface, #FFFFFF); cursor: pointer; text-align: center;
       transition: all .12s; font-family: inherit;
     }
-    .care-opt:hover { border-color: var(--primary); }
-    .care-opt.active { background: #E3F2FD; border-color: var(--primary); }
-    .care-opt .material-icons-outlined { font-size: 26px; color: var(--primary); display: block; margin-bottom: 4px; }
-    .care-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
-    .care-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
+    .care-opt:hover { border-color:var(--primary); }
+    .care-opt.active { background: #E3F2FD; border-color:var(--primary); }
+    .care-opt .material-icons-outlined { font-size: 26px; color:var(--primary-ink); display: block; margin-bottom: 4px; }
+    .care-opt-label { font-size: 13px; font-weight: 700; color: var(--text, #1A1A1A); }
+    .care-opt-desc { font-size: 11px; color: var(--text-lt, #5F6368); margin-top: 2px; }
 
     /* ── Lab test groups ────────────────────────────────────────── */
     .lab-group { margin-bottom: 14px; }
     .lab-group:last-child { margin-bottom: 0; }
     .lab-group-title {
-      font-size: 10px; font-weight: 700; color: #9AA0A6;
+      font-size: 10px; font-weight: 700; color: var(--text-lt, #5F6368);
       text-transform: uppercase; letter-spacing: .7px;
       margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
     }
@@ -281,9 +281,9 @@
       font-size: 12px; font-weight: 600; cursor: pointer;
       font-family: inherit; transition: all .12s; line-height: 1.3;
     }
-    .lab-chip:hover { border-color: var(--primary); background: #F1F8F1; }
+    .lab-chip:hover { border-color:var(--primary); background: #F1F8F1; }
     .lab-chip.active {
-      background: var(--primary); color: #fff; font-weight: 700; box-shadow: 0 6px 14px rgba(14,124,90,.3);
+      background: var(--primary); color:var(--on-primary, #fff); font-weight: 700; box-shadow: 0 6px 14px rgba(14,124,90,.3);
     }
     /* Malaria chips get a red accent when active */
     .lab-chip[data-group="malaria"].active {
@@ -301,7 +301,7 @@
       margin-bottom: 10px;
     }
     .med-num {
-      font-size: 11px; font-weight: 700; color: var(--primary);
+      font-size: 11px; font-weight: 700; color:var(--primary-ink);
       text-transform: uppercase; letter-spacing: .5px;
     }
     .med-del-btn {
@@ -319,18 +319,18 @@
     .stock-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .stock-opt {
       padding: 13px 14px; border: 1.5px solid var(--border);
-      border-radius: 12px; background: #fff; cursor: pointer;
+      border-radius: 12px; background: var(--surface, #FFFFFF); cursor: pointer;
       transition: all .12s; font-family: inherit; text-align: left;
     }
-    .stock-opt:hover { border-color: var(--primary); }
-    .stock-opt.active { background: var(--tint-2); border-color: var(--primary); }
-    .stock-opt-label { font-size: 13px; font-weight: 700; color: #212121; }
-    .stock-opt-desc { font-size: 11px; color: #5F6368; margin-top: 2px; }
+    .stock-opt:hover { border-color:var(--primary); }
+    .stock-opt.active { background: var(--tint-2); border-color:var(--primary); }
+    .stock-opt-label { font-size: 13px; font-weight: 700; color: var(--text, #1A1A1A); }
+    .stock-opt-desc { font-size: 11px; color: var(--text-lt, #5F6368); margin-top: 2px; }
 
     /* ── Collapsible materials section ──────────────────────────── */
     .collapse-toggle {
       display: flex; align-items: center; gap: 8px;
-      font-size: 13px; font-weight: 600; color: #5F6368;
+      font-size: 13px; font-weight: 600; color: var(--text-lt, #5F6368);
       cursor: pointer; padding: 10px 0; border: none; background: none;
       font-family: inherit; width: 100%; text-align: left;
     }
@@ -341,7 +341,7 @@
     .pay-chips { display: flex; gap: 8px; flex-wrap: wrap; }
     .pay-chip {
       padding: 8px 16px; border-radius: 22px; border: 1.5px solid var(--border);
-      background: #fff; color: var(--text-lt); font-size: 13px; font-weight: 600;
+      background: var(--surface, #FFFFFF); color: var(--text-lt); font-size: 13px; font-weight: 600;
       cursor: pointer; font-family: inherit;
       transition: all .15s; white-space: nowrap;
     }
@@ -352,20 +352,20 @@
       display: grid; grid-template-columns: 1fr auto;
       gap: 10px 14px; align-items: center;
     }
-    .fee-grid .fee-lbl { font-size: 13px; color: #424242; font-weight: 500; }
+    .fee-grid .fee-lbl { font-size: 13px; color: var(--text, #1A1A1A); font-weight: 500; }
     .fee-grid .fee-input-wrap { display: flex; align-items: center; gap: 5px; }
-    .fee-grid .fee-pfx { font-size: 11px; color: #9AA0A6; white-space: nowrap; }
+    .fee-grid .fee-pfx { font-size: 11px; color: var(--text-lt, #5F6368); white-space: nowrap; }
     .fee-grid input { width: 120px; text-align: right; }
     .fee-total-row {
-      border-top: 1.5px solid #E8EAED; margin-top: 4px; padding-top: 12px;
+      border-top: 1.5px solid var(--border, #E0E0E0); margin-top: 4px; padding-top: 12px;
       display: flex; justify-content: space-between; align-items: center;
     }
-    .fee-total-label { font-size: 13px; font-weight: 700; color: #212121; }
+    .fee-total-label { font-size: 13px; font-weight: 700; color: var(--text, #1A1A1A); }
     .fee-total-val {
-      font-size: 20px; font-weight: 800; color: var(--primary);
+      font-size: 20px; font-weight: 800; color:var(--primary-ink);
       display: flex; align-items: baseline; gap: 4px;
     }
-    .fee-total-val .fee-currency { font-size: 12px; font-weight: 600; color: #9AA0A6; }
+    .fee-total-val .fee-currency { font-size: 12px; font-weight: 600; color: var(--text-lt, #5F6368); }
 
     /* ── Live summary bar (top of screen 2) ─────────────────────── */
     .consult-summary-bar {
@@ -375,7 +375,7 @@
     }
     .csb-avatar {
       width: 40px; height: 40px; border-radius: 50%;
-      background: var(--primary); color: #fff;
+      background: var(--primary); color:var(--on-primary, #fff);
       display: flex; align-items: center; justify-content: center;
       font-size: 15px; font-weight: 700; flex-shrink: 0;
     }
@@ -426,13 +426,13 @@
     .it-sex-btn{flex:1;border:1.5px solid var(--border);background:var(--bg);font:inherit;
       font-size:13.5px;font-weight:700;color:var(--text-lt);padding:11px 8px;border-radius:11px;
       cursor:pointer;touch-action:manipulation}
-    .it-sex-btn.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-sex-btn.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary, #fff)}
     .it-age{display:flex;gap:6px;align-items:center}
     .it-age input{flex:1;min-width:0;text-align:center;font-weight:700}
     .it-unit{border:1.5px solid var(--border);background:var(--bg);font:inherit;font-size:11.5px;
       font-weight:700;color:var(--text-lt);padding:9px 8px;border-radius:9px;cursor:pointer;
       touch-action:manipulation}
-    .it-unit.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-unit.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary, #fff)}
     .it-whonote{display:none;font-size:11.5px;line-height:1.5;border-radius:10px;
       padding:9px 11px;margin-top:11px;background:#FFF4E0;color:#7A4F01}
     .it-whonote.child{background:var(--brand-tint);color:var(--brand-ink)}
@@ -445,11 +445,11 @@
     .it-tab b{display:block;font-size:12.5px;font-weight:800;color:var(--text)}
     .it-tab i{display:block;font-size:10.5px;font-style:normal;margin-top:1px}
     .it-tab.on{background:var(--primary)}
-    .it-tab.on b,.it-tab.on i{color:#fff}
+    .it-tab.on b,.it-tab.on i{color:var(--on-primary, #fff)}
     .it-tab.on i{opacity:.85}
     .it-tab.done::after{content:'';position:absolute;top:8px;right:9px;width:7px;height:7px;
       border-radius:50%;background:var(--grad-3)}
-    .it-tab.on.done::after{background:#fff}
+    .it-tab.on.done::after{background:var(--surface, #FFFFFF)}
     .it-tab.warn::after{background:#E2960A}
     .it-tab.alert::after{background:#E0454B;box-shadow:0 0 0 3px rgba(224,69,75,.22)}
 
@@ -457,7 +457,7 @@
     .it-cc{font-size:12.5px;font-weight:700;color:var(--text-lt);background:var(--bg);
       border:1.5px solid var(--border);border-radius:999px;padding:6px 12px;cursor:pointer;
       touch-action:manipulation}
-    .it-cc.on{background:var(--primary);border-color:var(--primary);color:#fff}
+    .it-cc.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary, #fff)}
 
     .it-vitals{display:grid;grid-template-columns:1fr 1fr;gap:12px}
     .it-v .field-label{margin-bottom:5px}
@@ -493,7 +493,7 @@
     html[data-theme="dark"] .it-dx.top{background:#10352A}
     .it-dx-h{display:flex;align-items:baseline;gap:10px}
     .it-dx-name{flex:1;font-size:15px;font-weight:800;color:var(--text);letter-spacing:-.01em}
-    .it-dx-pct{font-size:16px;font-weight:800;color:var(--primary);text-align:right;line-height:1}
+    .it-dx-pct{font-size:16px;font-weight:800;color:var(--primary-ink);text-align:right;line-height:1}
     .it-dx-pct i{display:block;font-style:normal;font-size:9.5px;font-weight:700;
       color:var(--text-lt);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
     .it-bar{height:5px;border-radius:999px;background:var(--border);margin:8px 0 10px;overflow:hidden}
@@ -503,7 +503,7 @@
       letter-spacing:.5px;width:100%}
     .it-ev{font-size:11.5px;font-weight:700;color:var(--primary-d);background:var(--brand-tint);
       border-radius:999px;padding:4px 10px}
-    .it-ev.src{color:#5F6368;background:var(--bg);border:1px solid var(--border);font-weight:600}
+    .it-ev.src{color:var(--text-lt, #5F6368);background:var(--bg);border:1px solid var(--border);font-weight:600}
     .it-ev.test{color:#1565A8;background:#E7F1FB}
     .it-note{font-size:11.5px;color:var(--text-lt);line-height:1.45;font-style:italic}
     .it-ev.seen{color:#7A4F01;background:#FFF4E0}
@@ -511,7 +511,7 @@
     html[data-theme="dark"] .it-ev{background:var(--brand-tint);color:var(--brand-ink)}
     html[data-theme="dark"] .it-ev.test{background:#12283A;color:#8FC9F5}
     .it-pick{width:100%;margin-top:5px;padding:11px;border:none;border-radius:11px;
-      background:var(--primary);color:#fff;font:inherit;font-size:13.5px;font-weight:800;
+      background:var(--primary);color:var(--on-primary, #fff);font:inherit;font-size:13.5px;font-weight:800;
       cursor:pointer;touch-action:manipulation}
     .it-dict{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
       margin-top:12px;padding:12px;border:1px dashed var(--line);border-radius:12px;
@@ -530,7 +530,7 @@
        the clinician talks, and the form fills in behind them. */
     .it-speak{border:1px solid var(--primary)}
     .it-speak-h{display:flex;gap:10px;align-items:flex-start;margin-bottom:12px}
-    .it-speak-h .material-icons-outlined{font-size:22px;color:var(--primary);flex:none}
+    .it-speak-h .material-icons-outlined{font-size:22px;color:var(--primary-ink);flex:none}
     .it-speak-h b{display:block;font-size:15px;color:var(--text);line-height:1.3}
     .it-speak-h i{display:block;font-style:normal;font-size:12.5px;
       color:var(--muted);margin-top:3px;line-height:1.45}
@@ -561,7 +561,7 @@
       background:var(--tint-2);border:1px solid var(--primary)}
     .it-heard[hidden]{display:none}
     .it-heard-h{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px}
-    .it-heard-h .material-icons-outlined{font-size:18px;color:var(--primary)}
+    .it-heard-h .material-icons-outlined{font-size:18px;color:var(--primary-ink)}
     .it-heard-h b{font-size:14px;color:var(--text)}
     .it-heard-note{font-size:11.5px;color:var(--muted);flex:1 1 100%}
     .it-heard-t{width:100%;font-size:15px;line-height:1.5;resize:vertical;
@@ -578,7 +578,7 @@
     .it-how > summary{font-size:13px;font-weight:600;color:var(--brand-ink);
       cursor:pointer;list-style:none;padding:3px 0}
     .it-how > summary::-webkit-details-marker{display:none}
-    .it-how > summary::before{content:'▸ ';color:var(--primary)}
+    .it-how > summary::before{content:'▸ ';color:var(--primary-ink)}
     .it-how[open] > summary::before{content:'▾ '}
     .it-how-body{font-size:12.5px;color:var(--muted);line-height:1.55;padding-top:4px}
     .it-how-eg{margin:0 0 9px;padding:9px 11px;border-radius:10px;
@@ -631,24 +631,24 @@
     .pp-alert.blood   { background: #F3E5F5; color: #6A1B9A; border-left: 4px solid #8E24AA; }
     .pp-alert.notes   { background: #F3F4F6; color: #374151; border-left: 4px solid #9CA3AF; }
     .pp-section-title {
-      font-size: 11px; font-weight: 700; color: #9AA0A6;
+      font-size: 11px; font-weight: 700; color: var(--text-lt, #5F6368);
       text-transform: uppercase; letter-spacing: .5px; margin: 12px 0 6px;
     }
     .pp-row {
       display: flex; justify-content: space-between; align-items: flex-start;
-      padding: 7px 0; border-bottom: 1px solid #F5F5F5; font-size: 13px;
+      padding: 7px 0; border-bottom: 1px solid var(--border, #E0E0E0); font-size: 13px;
     }
     .pp-row:last-child { border-bottom: none; }
-    .pp-row-label { color: #9AA0A6; font-weight: 600; min-width: 90px; flex-shrink: 0; }
-    .pp-row-value { color: #212121; flex: 1; text-align: right; }
+    .pp-row-label { color: var(--text-lt, #5F6368); font-weight: 600; min-width: 90px; flex-shrink: 0; }
+    .pp-row-value { color: var(--text, #1A1A1A); flex: 1; text-align: right; }
 
     /* ── Blood-group chips ──────────────────────────────────────── */
     .bg-chip {
       padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px;
-      background: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+      background: var(--surface, #FFFFFF); font-size: 13px; font-weight: 600; cursor: pointer;
       font-family: inherit; transition: all .12s;
     }
-    .bg-chip.active { background: #E3F2FD; border-color: var(--primary); color: var(--primary); }
+    .bg-chip.active { background: #E3F2FD; border-color:var(--primary); color:var(--primary-ink); }
 
     /* ── Return-visit row ───────────────────────────────────────── */
     .return-row {
@@ -678,7 +678,7 @@
     </nav>
     <div class="sidebar-footer">
       <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.62);margin:6px 0 10px" id="clinicUserDate"></div>
       <button class="logout-sidebar-btn" id="clinicLogoutBtn">
         <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
       </button>
@@ -688,7 +688,7 @@
   <main class="admin-main">
     <div class="admin-topbar">
       <div class="admin-topbar-title">
-        <a href="dashboard.html" style="color:#5F6368;text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px">
+        <a href="dashboard.html" style="color:var(--text-lt, #5F6368);text-decoration:none;display:inline-flex;align-items:center;gap:4px;font-size:13px">
           <span class="material-icons-outlined" style="font-size:18px">arrow_back</span>
         </a>
         New Treatment
@@ -1023,10 +1023,10 @@
         <!-- ── Patient details (optional — can be added later) ── -->
         <div class="sec-label">
           <span class="material-icons-outlined" style="font-size:14px">person</span>
-          Patient details <span style="text-transform:none;letter-spacing:0;font-weight:600;color:#9AA0A6">— optional, can be added later</span>
+          Patient details <span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--text-lt, #5F6368)">— optional, can be added later</span>
         </div>
         <div class="wiz-card" style="padding-top:14px">
-          <div style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">
+          <div style="font-size:12.5px;color:var(--text-lt, #5F6368);line-height:1.5;margin-bottom:14px">
             Not needed to record the treatment. The case number identifies this
             patient; the name and phone can be filled in afterwards from the dashboard.
           </div>
@@ -1095,9 +1095,9 @@
               autocomplete="off"
               style="padding-left:38px;padding-right:38px">
             <span class="material-icons-outlined"
-              style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:#9AA0A6;pointer-events:none">search</span>
+              style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:18px;color:var(--text-lt, #5F6368);pointer-events:none">search</span>
             <button id="labSearchClear" type="button"
-              style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:#9AA0A6">
+              style="display:none;position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:var(--text-lt, #5F6368)">
               <span class="material-icons-outlined" style="font-size:18px">close</span>
             </button>
           </div>
@@ -1247,13 +1247,13 @@
           <!-- Auto-dosing: set the patient's age once and every drug typed below
                fills its dose/frequency/duration for that age automatically.
                Pre-filled from the patient record when known. Always editable. -->
-          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;background:#fff;border:1px solid #E8EAED;border-radius:12px;padding:10px 14px">
+          <div id="dosingModeBar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;background:var(--surface, #FFFFFF);border:1px solid var(--border, #E0E0E0);border-radius:12px;padding:10px 14px">
             <span class="material-icons-outlined" style="font-size:17px;color:var(--deep-ink)">bolt</span>
-            <span style="font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">Auto-dose for age</span>
+            <span style="font-size:12px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px">Auto-dose for age</span>
             <div style="display:flex;align-items:center;gap:4px">
               <input id="patientAgeInput" type="number" min="0" max="120" inputmode="numeric"
                      placeholder="Age" autocomplete="off"
-                     style="width:62px;padding:7px 8px;border:1.5px solid #E8EAED;border-radius:9px;font-size:15px;font-family:inherit;text-align:center;outline:none">
+                     style="width:62px;padding:7px 8px;border:1.5px solid var(--border, #E0E0E0);border-radius:9px;font-size:15px;font-family:inherit;text-align:center;outline:none">
               <button type="button" id="ageUnitYrs" class="sev-chip active" style="padding:6px 10px">yrs</button>
               <button type="button" id="ageUnitMos" class="sev-chip" style="padding:6px 10px">mos</button>
             </div>
@@ -1265,7 +1265,7 @@
 
           <div id="medsContainer"></div>
 
-          <button id="addMedBtn" style="width:100%;padding:13px;background:#fff;color:var(--deep-ink);border:1.5px dashed var(--tint-3);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
+          <button id="addMedBtn" style="width:100%;padding:13px;background:var(--surface, #FFFFFF);color:var(--deep-ink);border:1.5px dashed var(--tint-3);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:8px;transition:background .12s">
             <span class="material-icons-outlined" style="font-size:20px">add_circle_outline</span>
             Add medication
           </button>
@@ -1276,11 +1276,11 @@
           <button class="collapse-toggle" id="materialsToggle">
             <span class="material-icons-outlined ct-icon">expand_more</span>
             <span>Materials &amp; consumables used</span>
-            <span style="font-size:11px;color:#9AA0A6;margin-left:auto">e.g. Drip set, Gloves, Syringe</span>
+            <span style="font-size:11px;color:var(--text-lt, #5F6368);margin-left:auto">e.g. Drip set, Gloves, Syringe</span>
           </button>
           <div id="materialsBody" style="display:none;margin-top:10px">
             <div id="materialsContainer">
-              <div id="materialsEmptyHint" style="font-size:12px;color:#9AA0A6;padding:2px 0">Stock auto-deducted on save.</div>
+              <div id="materialsEmptyHint" style="font-size:12px;color:var(--text-lt, #5F6368);padding:2px 0">Stock auto-deducted on save.</div>
             </div>
             <button id="addMaterialBtn" style="margin-top:10px;font-size:12px;padding:7px 14px;background:#E0F2F1;color:var(--accent);border:1px solid #80CBC4;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
               <span class="material-icons-outlined" style="font-size:14px">add</span> Add material
@@ -1325,7 +1325,7 @@
               <div style="display:flex;align-items:center;gap:6px">
                 <input id="followUpDays" type="number" min="0" max="365" step="1" class="field-input"
                   style="text-align:center;font-weight:700" placeholder="7" inputmode="numeric">
-                <span style="font-size:12px;color:#9AA0A6;white-space:nowrap">days</span>
+                <span style="font-size:12px;color:var(--text-lt, #5F6368);white-space:nowrap">days</span>
               </div>
             </div>
             <div class="rr-reason">
@@ -1334,7 +1334,7 @@
                 placeholder="e.g. BP recheck, refill Amlodipine" maxlength="200" autocomplete="off">
             </div>
           </div>
-          <div style="font-size:11px;color:#9AA0A6;margin-top:8px" id="followUpDateHint">—</div>
+          <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:8px" id="followUpDateHint">—</div>
         </div>
 
         <!-- ── Fees & payment ── -->
@@ -1379,10 +1379,24 @@
             <label class="field-label">Payment status</label>
             <div class="pay-chips">
               <button class="pay-chip active" data-pay="paid">✓ Paid</button>
-              <button class="pay-chip" data-pay="pending">⏳ Pending</button>
+              <button class="pay-chip" data-pay="partial">◐ Part payment</button>
               <button class="pay-chip" data-pay="credit">📋 Credit</button>
               <button class="pay-chip" data-pay="waived">🤝 Waived</button>
             </div>
+          </div>
+
+          <!-- What they actually handed over. Without a box to put it in, a
+               patient who paid 20,000 of 60,000 was recorded as having paid
+               nothing at all and the whole 60,000 went to the owing list. -->
+          <div id="payPartWrap" style="display:none;margin-top:12px">
+            <label class="field-label" for="payPartAmt">How much did they pay now?</label>
+            <div class="fee-input-wrap" style="justify-content:flex-start">
+              <span class="fee-pfx">UGX</span>
+              <input id="payPartAmt" class="field-input" type="number" min="0" step="500"
+                style="width:140px;text-align:right;padding:9px 10px" placeholder="0"
+                inputmode="numeric">
+            </div>
+            <div id="payPartNote" class="pay-part-note">Leave it at 0 if they have paid nothing yet.</div>
           </div>
         </div>
 
@@ -1400,7 +1414,7 @@
           Send Prescription &amp; Start Follow-up
         </button>
 
-        <div style="text-align:center;font-size:11px;color:#9AA0A6;margin-top:10px;margin-bottom:32px">
+        <div style="text-align:center;font-size:11px;color:var(--text-lt, #5F6368);margin-top:10px;margin-bottom:32px">
           Medication reminders, follow-up check-ins and inventory deduction happen automatically in the background.
         </div>
 
@@ -1413,12 +1427,12 @@
 
 <!-- Quick-register modal -->
 <div id="registerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:flex-end;justify-content:center">
-  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:24px 22px 28px;max-height:90%;overflow-y:auto">
+  <div style="background:var(--surface, #FFFFFF);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:24px 22px 28px;max-height:90%;overflow-y:auto">
     <h3 style="font-size:17px;font-weight:700;margin-bottom:6px;display:flex;align-items:center;gap:8px">
-      <span class="material-icons-outlined" style="color:var(--primary)">person_add</span>
+      <span class="material-icons-outlined" style="color:var(--primary-ink)">person_add</span>
       Register Patient
     </h3>
-    <p style="font-size:13px;color:#5F6368;margin-bottom:16px">No Homatt account found. Save them now — they'll get an SMS to finish their profile later.</p>
+    <p style="font-size:13px;color:var(--text-lt, #5F6368);margin-bottom:16px">No Homatt account found. Save them now — they'll get an SMS to finish their profile later.</p>
     <label class="field-label">Full name</label>
     <input id="regName" class="field-input" placeholder="e.g. Nakato Brenda" autocomplete="off">
     <div style="height:12px"></div>
@@ -1435,17 +1449,17 @@
 
 <!-- First-visit intake modal -->
 <div id="intakeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:flex-end;justify-content:center">
-  <div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:20px 20px 32px;max-height:92vh;overflow-y:auto;box-sizing:border-box">
+  <div style="background:var(--surface, #FFFFFF);border-radius:20px 20px 0 0;width:100%;max-width:600px;padding:20px 20px 32px;max-height:92vh;overflow-y:auto;box-sizing:border-box">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
       <h3 style="font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px">
         <span class="material-icons-outlined" style="color:#F57C00">assignment_ind</span>
         Patient Intake Form
       </h3>
-      <button id="intakeCancelBtn" style="background:#F5F5F5;border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer">
+      <button id="intakeCancelBtn" style="background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer">
         <span class="material-icons-outlined">close</span>
       </button>
     </div>
-    <p style="font-size:13px;color:#5F6368;margin:0 0 16px;line-height:1.5">
+    <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:0 0 16px;line-height:1.5">
       Captured once and stored securely. Helps all clinicians in the Homatt network provide safer care.
     </p>
 
@@ -1506,18 +1520,18 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=20260830a"></script>
-<script src="js/clinic.js?v=20260831"></script>
-<script src="js/msg-alerts.js?v=20260829"></script>
+<script src="js/clinic-offline.js?v=20260930a"></script>
+<script src="js/clinic.js?v=20260930"></script>
+<script src="js/msg-alerts.js?v=20260930"></script>
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-blueprints.js?v=20260906"></script>
-<script src="js/new-order-wizard.js?v=20260910"></script>
-<script src="js/ucg-autofill.js?v=20260929"></script>
-<script src="js/clinic-impression.js?v=20260928"></script>
-<script src="js/clinic-dictate.js?v=20260927"></script>
-<script src="js/clinic-speak.js?v=20260928"></script>
-<script src="js/clinic-intake.js?v=20260929"></script>
-<script src="js/pwa-install.js?v=20260831"></script>
+<script src="js/stock-blueprints.js?v=20260930"></script>
+<script src="js/new-order-wizard.js?v=20260930"></script>
+<script src="js/ucg-autofill.js?v=20260930"></script>
+<script src="js/clinic-impression.js?v=20260930"></script>
+<script src="js/clinic-dictate.js?v=20260930"></script>
+<script src="js/clinic-speak.js?v=20260930"></script>
+<script src="js/clinic-intake.js?v=20260930"></script>
+<script src="js/pwa-install.js?v=20260930"></script>
 
 </body>
 </html>

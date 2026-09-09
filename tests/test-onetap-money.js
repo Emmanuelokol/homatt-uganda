@@ -115,9 +115,17 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
     !after.toasts.some(t=>/choose the patient/i.test(t)),
     'saved='+posted.length+' focus="'+after.focus+'" blocked="'+after.blocked.slice(0,50)+'"');
   const total = row ? Number(row.total_charged_ugx) : -1;
-  result('the saved consultation is marked paid, with the FULL amount recorded',
-    row && row.payment_status==='paid' && total>0 && Number(row.amount_paid)===total,
-    'status='+(row&&row.payment_status)+' amount_paid='+(row&&row.amount_paid)+' total='+total);
+  // The row is inserted with amount_paid ZERO on purpose. record_payment()
+  // ADDS its amount to whatever the row already holds, so writing the figure
+  // here as well booked the money twice — a 62,000 bill came to rest at
+  // amount_paid 124,000. It went unnoticed because the balance is clamped at
+  // zero, so a fully paid visit still looked right; a PART payment would have
+  // come out with the debt understated by exactly what the patient handed
+  // over. The ledger call below is what carries the money now, and the
+  // function sets amount_paid itself.
+  result('the saved consultation is marked paid, and the money is booked ONCE',
+    row && row.payment_status==='paid' && total>0 && Number(row.amount_paid)===0,
+    'status='+(row&&row.payment_status)+' amount_paid on insert='+(row&&row.amount_paid)+' total='+total);
   result('a payment for exactly that amount reaches the ledger the dashboard reads',
     rpcs.length===1 && Number(rpcs[0].p_amount)===total && rpcs[0].p_diagnosis_id==='dx-1',
     'record_payment calls='+rpcs.length+' amount='+(rpcs[0]&&rpcs[0].p_amount)+' vs total='+total);

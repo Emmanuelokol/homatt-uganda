@@ -33,11 +33,11 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260929">
+  <link rel="stylesheet" href="css/clinic.css?v=20260930">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
-    .settings-card { background:#fff; border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+    .settings-card { background:var(--surface, #FFFFFF); border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
     /* ── Make it yours: the look picker and the clinician's photo ── */
     .look-lbl{font-size:11px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
       letter-spacing:.5px;margin-bottom:10px}
@@ -49,7 +49,7 @@
     .look-opt > i{display:block;font-size:11px;font-style:normal;color:var(--text-lt);margin-top:1px}
     .look-sw{display:flex;gap:4px}
     .look-sw i{width:26px;height:16px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.08)}
-    .look-tick{position:absolute;top:9px;right:9px;font-size:19px;color:var(--primary)}
+    .look-tick{position:absolute;top:9px;right:9px;font-size:19px;color:var(--primary-ink)}
     .look-note{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:11px}
 
     .portrait-row{display:flex;gap:16px;align-items:flex-start}
@@ -62,23 +62,23 @@
     .portrait-icon{color:var(--text-lt);font-size:26px}
     .portrait-txt{flex:1;min-width:0}
     .portrait-txt p{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:9px}
-    .portrait-btn{border:none;background:var(--primary);color:#fff;font:inherit;font-size:13px;
+    .portrait-btn{border:none;background:var(--primary);color:var(--on-primary, #fff);font:inherit;font-size:13px;
       font-weight:700;padding:9px 15px;border-radius:10px;cursor:pointer;margin-right:7px;
       touch-action:manipulation}
     .portrait-btn.ghost{background:transparent;color:var(--text-lt);border:1.5px solid var(--border)}
     .portrait-status{font-size:12px;color:var(--text-lt);margin-top:8px;min-height:1em;line-height:1.5}
     @media (max-width:520px){ .look-grid{grid-template-columns:1fr} }
 
-    .settings-card-title { font-size:14px; font-weight:700; color:var(--deep-ink); display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid #F0F0F0; }
+    .settings-card-title { font-size:14px; font-weight:700; color:var(--deep-ink); display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border, #E0E0E0); }
     .form-row { margin-bottom:14px; }
-    .form-row label { display:block; font-size:12px; font-weight:600; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
-    .form-input { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; transition:border-color .2s; }
+    .form-row label { display:block; font-size:12px; font-weight:600; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+    .form-input { width:100%; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; transition:border-color .2s; }
     .form-input:focus { border-color:var(--deep-ink); }
-    .form-textarea { width:100%; border:1px solid #E0E0E0; border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; resize:vertical; transition:border-color .2s; }
+    .form-textarea { width:100%; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; resize:vertical; transition:border-color .2s; }
     .form-textarea:focus { border-color:var(--deep-ink); }
 
     /* Chip tags */
-    .chip-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid #E0E0E0; border-radius:8px; padding:8px; min-height:44px; cursor:text; transition:border-color .2s; }
+    .chip-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:8px; min-height:44px; cursor:text; transition:border-color .2s; }
     .chip-wrap:focus-within { border-color:var(--deep-ink); }
     .chip { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:4px 11px; font-size:12px; font-weight:600; }
     .chip-del { background:none; border:none; cursor:pointer; padding:0; color:var(--deep-ink); font-size:16px; line-height:1; }
@@ -88,25 +88,25 @@
     .hours-table { width:100%; }
     .hours-row { display:grid; grid-template-columns:90px 1fr 1fr 70px; gap:8px; align-items:center; margin-bottom:8px; }
     .hours-row .day { font-weight:600; font-size:13px; }
-    .hours-input { border:1px solid #E0E0E0; border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; width:100%; }
+    .hours-input { border:1px solid var(--border, #E0E0E0); border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; width:100%; }
     .closed-toggle { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; color:#D32F2F; }
 
     /* Facilities */
     .facilities-grid { display:flex; flex-wrap:wrap; gap:8px; }
-    .facility-btn { border:1.5px solid #E0E0E0; border-radius:10px; padding:6px 14px; font-size:12px; font-weight:500; cursor:pointer; background:#fff; font-family:inherit; color:#555; transition:all .15s; }
+    .facility-btn { border:1.5px solid var(--border, #E0E0E0); border-radius:10px; padding:6px 14px; font-size:12px; font-weight:500; cursor:pointer; background:var(--surface, #FFFFFF); font-family:inherit; color:#555; transition:all .15s; }
     .facility-btn.active { border-color:var(--deep-ink); background:var(--tint-2); color:var(--deep-ink); font-weight:600; }
 
     /* Fee table */
     .fee-table { width:100%; border-collapse:collapse; }
-    .fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+    .fee-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
     .fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; }
-    .fee-input { border:1px solid #E0E0E0; border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:130px; text-align:right; }
+    .fee-input { border:1px solid var(--border, #E0E0E0); border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:130px; text-align:right; }
 
     /* Condition fee table */
     .cond-fee-table { width:100%; border-collapse:collapse; }
-    .cond-fee-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+    .cond-fee-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
     .cond-fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
-    .cond-fee-empty { text-align:center; padding:24px; color:#9AA0A6; font-size:13px; }
+    .cond-fee-empty { text-align:center; padding:24px; color:var(--text-lt, #5F6368); font-size:13px; }
     .cond-badge { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
     .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
 
@@ -119,7 +119,7 @@
       .fee-table, .fee-table tbody, .fee-table tr, .fee-table td { display:block; width:100%; }
       .fee-table thead { display:none; }
       .fee-table tr {
-        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
         padding:12px; margin-bottom:10px;
       }
       .fee-table td {
@@ -128,7 +128,7 @@
       }
       .fee-table td:first-child { padding-top:0; }
       .fee-table td::before {
-        content:attr(data-label); color:#5F6368; font-size:11px;
+        content:attr(data-label); color:var(--text-lt, #5F6368); font-size:11px;
         font-weight:700; text-transform:uppercase; letter-spacing:.4px;
       }
       .fee-table td:nth-child(1)::before { content:"Service Type"; }
@@ -139,7 +139,7 @@
       .cond-fee-table, .cond-fee-table tbody, .cond-fee-table tr, .cond-fee-table td { display:block; width:100%; }
       .cond-fee-table thead { display:none; }
       .cond-fee-table tr {
-        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
         padding:12px; margin-bottom:10px;
       }
       .cond-fee-table td {
@@ -148,7 +148,7 @@
       }
       .cond-fee-table td:first-child { padding-top:0; }
       .cond-fee-table td::before {
-        color:#5F6368; font-size:11px;
+        color:var(--text-lt, #5F6368); font-size:11px;
         font-weight:700; text-transform:uppercase; letter-spacing:.4px;
       }
       .cond-fee-table td:nth-child(1)::before { content:"Condition"; }
@@ -158,15 +158,15 @@
 
       /* Diagnostic tests table */
       .diag-table { width:100%; border-collapse:collapse; }
-      .diag-table th { font-size:11px; font-weight:700; color:#5F6368; text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid #F0F0F0; text-align:left; }
+      .diag-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
       .diag-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
       @media(max-width:600px){
         .diag-table, .diag-table tbody, .diag-table tr, .diag-table td { display:block; width:100%; }
         .diag-table thead { display:none; }
-        .diag-table tr { background:#FAFAFA; border:1px solid #EEE; border-radius:10px; padding:12px; margin-bottom:10px; }
+        .diag-table tr { background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px; padding:12px; margin-bottom:10px; }
         .diag-table td { padding:8px 0 0; border:none; font-size:13px; display:flex; flex-direction:column; gap:5px; }
         .diag-table td:first-child { padding-top:0; }
-        .diag-table td::before { color:#5F6368; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+        .diag-table td::before { color:var(--text-lt, #5F6368); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
         .diag-table td:nth-child(1)::before { content:"Test / Service"; }
         .diag-table td:nth-child(2)::before { content:"Disease / Condition"; }
         .diag-table td:nth-child(3)::before { content:"Price (UGX)"; }
@@ -177,7 +177,7 @@
       .hours-row {
         grid-template-columns:1fr 1fr;
         gap:8px;
-        background:#FAFAFA; border:1px solid #EEE; border-radius:10px;
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
         padding:12px; margin-bottom:10px;
       }
       .hours-row > div:nth-child(1) { grid-column:1 / -1; font-weight:700; color:var(--deep-ink); font-size:14px; }
@@ -204,7 +204,7 @@
     </nav>
     <div class="sidebar-footer">
       <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.62);margin:6px 0 10px" id="clinicUserDate"></div>
       <button class="logout-sidebar-btn" id="clinicLogoutBtn">
         <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
       </button>
@@ -294,7 +294,7 @@
         <div class="settings-card-title">
           <span class="material-icons-outlined">badge</span> Staff &amp; Access
         </div>
-        <p style="font-size:13px;color:#5F6368;margin:-6px 0 16px;line-height:1.5">
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 16px;line-height:1.5">
           Create logins for your team and choose what each person can see.
           <strong>Owners</strong> access everything — finances, stock, settings.
           <strong>Clinicians</strong> and <strong>nurses</strong> get treatments,
@@ -309,30 +309,30 @@
           Add staff account
         </button>
         <div id="staffList">
-          <div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading staff…</div>
+          <div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading staff…</div>
         </div>
         <div id="staffStatus" style="font-size:12px;color:#555;min-height:16px;margin-top:8px"></div>
       </div>
 
       <!-- Add Staff modal -->
       <div id="addStaffModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
-        <div style="background:#fff;border-radius:16px;max-width:440px;width:100%;padding:22px;max-height:90vh;overflow-y:auto">
-          <div style="font-size:17px;font-weight:800;color:#111;margin-bottom:4px">Add staff account</div>
-          <p style="font-size:12.5px;color:#5F6368;margin:0 0 16px;line-height:1.5">
+        <div style="background:var(--surface, #FFFFFF);border-radius:16px;max-width:440px;width:100%;padding:22px;max-height:90vh;overflow-y:auto">
+          <div style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);margin-bottom:4px">Add staff account</div>
+          <p style="font-size:12.5px;color:var(--text-lt, #5F6368);margin:0 0 16px;line-height:1.5">
             Creates a login for a team member at your clinic. Share the email and
             password with them — they can change the password later in Settings.
           </p>
-          <label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Full name</label>
+          <label class="field-label" style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Full name</label>
           <input id="asName" class="form-input" type="text" placeholder="e.g. Nakato Brenda" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Email (their login)</label>
+          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Email (their login)</label>
           <input id="asEmail" class="form-input" type="email" placeholder="nurse@yourclinic.ug" autocapitalize="none" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Password (min 8 characters)</label>
+          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Password (min 8 characters)</label>
           <input id="asPassword" class="form-input" type="text" placeholder="Set a starting password" autocapitalize="none" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Role — what they can access</label>
+          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Role — what they can access</label>
           <select id="asRole" class="form-input" style="width:100%;margin-bottom:14px"></select>
           <div id="asError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
+            <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
             <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
           </div>
         </div>
@@ -349,23 +349,23 @@
         </div>
         <div class="settings-grid">
           <div class="form-row" style="grid-column:span 2">
-            <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bugiri, Kampala, Jinja</span></label>
+            <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Bugiri, Kampala, Jinja</span></label>
             <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Bugiri" autocomplete="off">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Bukooli County</span></label>
+            <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Bukooli County</span></label>
             <input type="text" id="sClinicCounty" class="form-input" placeholder="e.g. Bukooli County" autocomplete="off">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">e.g. Butto, Ntinda, Naguru</span></label>
+            <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Butto, Ntinda, Naguru</span></label>
             <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Butto" autocomplete="off">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">most specific area</span></label>
+            <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">most specific area</span></label>
             <input type="text" id="sClinicParish" class="form-input" placeholder="e.g. Butto Parish" autocomplete="off">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>Full Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#9AA0A6">plot, street, landmarks</span></label>
+            <label>Full Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">plot, street, landmarks</span></label>
             <input type="text" id="sClinicAddress" class="form-input" placeholder="e.g. Plot 12, opposite Butto Trading Centre">
           </div>
         </div>
@@ -384,7 +384,7 @@
           </button>
           <span id="geocodeStatus" style="font-size:12px;color:#555"></span>
         </div>
-        <div style="margin-top:8px;font-size:11px;color:#5F6368;line-height:1.5">
+        <div style="margin-top:8px;font-size:11px;color:var(--text-lt, #5F6368);line-height:1.5">
           <strong>Tip:</strong> Stand in front of your clinic, then tap <em>Use my current location</em> for the most accurate position. This is the location patients will see when navigating to your clinic.
         </div>
 
@@ -415,9 +415,9 @@
           <span>Upload a clear photo of the front of your clinic. Patients will see this picture when they're choosing where to book — it helps them recognise the building and trust your clinic.</span>
         </div>
         <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
-          <div id="photoPreview" style="width:100%;max-width:320px;aspect-ratio:16/9;border:2px dashed #BDBDBD;border-radius:12px;background:#FAFAFA url() center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#9E9E9E;font-size:13px;text-align:center;padding:8px;overflow:hidden">
+          <div id="photoPreview" style="width:100%;max-width:320px;aspect-ratio:16/9;border:2px dashed #BDBDBD;border-radius:12px;background:var(--bg, #F5F5F5) url() center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#9E9E9E;font-size:13px;text-align:center;padding:8px;overflow:hidden">
             <span id="photoPlaceholder" style="display:flex;flex-direction:column;align-items:center;gap:6px">
-              <span class="material-icons-outlined" style="font-size:36px;color:#BDBDBD">add_photo_alternate</span>
+              <span class="material-icons-outlined" style="font-size:36px;color:var(--text-lt, #5F6368)">add_photo_alternate</span>
               No photo uploaded yet
             </span>
           </div>
@@ -447,10 +447,10 @@
           <div class="chip-wrap" id="specialtiesWrap" onclick="document.getElementById('specInput').focus()">
             <input class="chip-input" id="specInput" placeholder="e.g. Malaria, Diabetes, Maternity, Hypertension…" onkeydown="addSpec(event)">
           </div>
-          <div style="margin-top:6px;font-size:11px;color:#9AA0A6">Suggested: Malaria, Typhoid, Diabetes, Hypertension, Maternity, Paediatrics, Skin, Eye, Dental, TB, HIV, Surgery</div>
+          <div style="margin-top:6px;font-size:11px;color:var(--text-lt, #5F6368)">Suggested: Malaria, Typhoid, Diabetes, Hypertension, Maternity, Paediatrics, Skin, Eye, Dental, TB, HIV, Surgery</div>
         </div>
         <div style="margin-top:8px">
-          <div style="font-size:12px;font-weight:600;color:#5F6368;margin-bottom:8px">Quick add:</div>
+          <div style="font-size:12px;font-weight:600;color:var(--text-lt, #5F6368);margin-bottom:8px">Quick add:</div>
           <div style="display:flex;flex-wrap:wrap;gap:6px" id="suggestedSpecs"></div>
         </div>
       </div>
@@ -521,14 +521,14 @@
             <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)" checked>
             Accept online appointment bookings from patients
           </label>
-          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
+          <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
         </div>
         <div class="form-row" style="margin-top:4px">
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--deep-ink);text-transform:none;letter-spacing:0">
             <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)">
             Auto-confirm bookings (no manual review needed)
           </label>
-          <div style="font-size:11px;color:#9AA0A6;margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
+          <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
         </div>
       </div>
 
@@ -549,7 +549,7 @@
         <div class="settings-card-title">
           <span class="material-icons-outlined">local_hospital</span> Facility Level
         </div>
-        <div style="font-size:12px;color:#5F6368;margin:-4px 0 12px">
+        <div style="font-size:12px;color:var(--text-lt, #5F6368);margin:-4px 0 12px">
           Your level decides which medicines and supplies you may stock and prescribe,
           under the national <b>Essential Medicines &amp; Health Supplies List (EMHSLU 2023)</b>.
           The one-tap package warns you when a drug is above your level.
@@ -570,7 +570,7 @@
         <div class="settings-card-title">
           <span class="material-icons-outlined">schedule</span> Opening Hours
         </div>
-        <div class="hours-row" style="margin-bottom:10px;font-size:11px;font-weight:700;color:#5F6368;text-transform:uppercase">
+        <div class="hours-row" style="margin-bottom:10px;font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase">
           <div>Day</div><div>Opens</div><div>Closes</div><div>Closed?</div>
         </div>
         <div id="hoursContainer"></div>
@@ -636,7 +636,7 @@
           <div style="position:relative">
             <input type="password" class="form-input" id="currentPwd" placeholder="Enter your current password" autocomplete="current-password">
             <button type="button" onclick="togglePwd('currentPwd',this)" tabindex="-1"
-              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
               <span class="material-icons-outlined" style="font-size:18px">visibility</span>
             </button>
           </div>
@@ -646,7 +646,7 @@
           <div style="position:relative">
             <input type="password" class="form-input" id="newPwd" placeholder="Min 8 characters" autocomplete="new-password">
             <button type="button" onclick="togglePwd('newPwd',this)" tabindex="-1"
-              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
               <span class="material-icons-outlined" style="font-size:18px">visibility</span>
             </button>
           </div>
@@ -656,7 +656,7 @@
           <div style="position:relative">
             <input type="password" class="form-input" id="confirmPwd" placeholder="Repeat new password" autocomplete="new-password">
             <button type="button" onclick="togglePwd('confirmPwd',this)" tabindex="-1"
-              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:#9AA0A6">
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
               <span class="material-icons-outlined" style="font-size:18px">visibility</span>
             </button>
           </div>
@@ -672,7 +672,7 @@
         <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">
           <span class="material-icons-outlined">save</span> Save Profile
         </button>
-        <span id="saveMsg" style="font-size:13px;color:#9AA0A6"></span>
+        <span id="saveMsg" style="font-size:13px;color:var(--text-lt, #5F6368)"></span>
       </div>
 
     </div>
@@ -684,9 +684,9 @@
 
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
-<script src="js/clinic-offline.js?v=20260830a" defer></script>
-<script src="js/clinic.js?v=20260831" defer></script>
-<script src="js/msg-alerts.js?v=20260829" defer></script>
+<script src="js/clinic-offline.js?v=20260930a" defer></script>
+<script src="js/clinic.js?v=20260930" defer></script>
+<script src="js/msg-alerts.js?v=20260930" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -817,7 +817,7 @@ async function loadStaffList() {
     // directly threw and killed the rest of this render.
     var _ses = {};
     try { _ses = JSON.parse(localStorage.getItem('clinic_session') || '{}'); } catch (e) {}
-    list.innerHTML = '<div style="font-size:13px;color:#9AA0A6;padding:8px 0">Only the clinic owner\'s account can manage staff logins. You\'re signed in as <strong>'
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Only the clinic owner\'s account can manage staff logins. You\'re signed in as <strong>'
       + ((_ses && (_ses.email || _ses.staffName)) || 'a staff member') + '</strong>.</div>';
     return;
   }
@@ -836,11 +836,11 @@ async function loadStaffList() {
       + 'style="flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid ' + (active ? '#EF9A9A' : 'var(--tint-3)') + ';'
       + 'background:' + (active ? '#FFF5F5' : '#F1F8E9') + ';color:' + (active ? '#C62828' : 'var(--deep)') + ';font-weight:700;cursor:pointer;font-family:inherit">'
       + (active ? 'Deactivate' : 'Activate') + '</button>';
-    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid #F5F5F5;' + (active ? '' : 'opacity:.65') + '">'
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border, #E0E0E0);' + (active ? '' : 'opacity:.65') + '">'
       + '<div style="flex:1;min-width:150px">'
-      +   '<div style="font-weight:600;color:#202124;font-size:14px">' + escHtml(name)
+      +   '<div style="font-weight:600;color:var(--text, #1A1A1A);font-size:14px">' + escHtml(name)
       +     (s.is_self ? ' <span style="font-size:11px;color:var(--deep-ink);font-weight:700">(you)</span>' : '') + activeBadge + '</div>'
-      +   (s.email ? '<div style="font-size:12px;color:#9AA0A6">' + escHtml(s.email) + '</div>' : '')
+      +   (s.email ? '<div style="font-size:12px;color:var(--text-lt, #5F6368)">' + escHtml(s.email) + '</div>' : '')
       + '</div>'
       + '<select onchange="changeStaffRole(\'' + s.id + '\', this.value, this)" '
       +   (s.is_self ? 'disabled title="You cannot change your own role" ' : '')
@@ -1029,7 +1029,7 @@ function renderFeeTable() {
       '<td><input class="fee-input" style="width:100%;text-align:left" value="' + (f.type||'') + '" oninput="feesData[' + i + '].type=this.value" placeholder="Service name"></td>' +
       '<td><input class="fee-input" type="number" value="' + (f.fee||'') + '" oninput="feesData[' + i + '].fee=Number(this.value)" placeholder="Amount" min="0"></td>' +
       '<td style="display:flex;align-items:center;gap:6px"><input class="fee-input" style="flex:1;min-width:80px" value="' + (f.notes||'') + '" oninput="feesData[' + i + '].notes=this.value" placeholder="e.g. Includes basic exam">' +
-        '<button onclick="removeFeeRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:#9AA0A6;padding:0;font-size:18px;line-height:1">×</button>' +
+        '<button onclick="removeFeeRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--text-lt, #5F6368);padding:0;font-size:18px;line-height:1">×</button>' +
       '</td>' +
     '</tr>';
   }).join('');
@@ -2032,11 +2032,11 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/clinic-look.js?v=20260909"></script>
+<script src="js/clinic-look.js?v=20260930"></script>
 <script src="js/vendor/sql-wasm.js" defer></script>
-<script src="js/clinic-impression.js?v=20260928" defer></script>
-<script src="js/clinic-dictate.js?v=20260927" defer></script>
-<script src="js/clinic-speak.js?v=20260928" defer></script>
-<script src="js/pwa-install.js?v=20260831"></script>
+<script src="js/clinic-impression.js?v=20260930" defer></script>
+<script src="js/clinic-dictate.js?v=20260930" defer></script>
+<script src="js/clinic-speak.js?v=20260930" defer></script>
+<script src="js/pwa-install.js?v=20260930"></script>
 </body>
 </html>

@@ -103,6 +103,54 @@
     const total = c + l + m;
     const el = document.getElementById('feeTotal');
     if (el) el.textContent = total.toLocaleString('en-UG');
+    paintPartial();
+  }
+
+  // ── Part payment ────────────────────────────────────────────────────────
+  // A patient who hands over 20,000 of a 60,000 bill has paid 20,000. There
+  // was nowhere to put that figure, so the choice was "Paid" (untrue, and the
+  // clinic loses the debt) or "Pending" (untrue, and the clinic loses the
+  // 20,000 it is holding). The whole 60,000 went to the owing list either way.
+  //
+  // The amount decides the status, not the chip: nothing paid is still
+  // pending, part of it is partial, and paying the lot is simply paid. That
+  // way a slip of the finger cannot record a bill as settled.
+  function partialState() {
+    const total = (Number(state.feeConsult) || 0) + (Number(state.feeLab) || 0) +
+                  (Number(state.feeMeds) || 0);
+    const paid = Math.max(0, Number(state.amountPaid) || 0);
+    return { total: total, paid: Math.min(paid, total || paid), owing: Math.max(0, total - paid) };
+  }
+  function partialStatus() {
+    const p = partialState();
+    if (p.paid <= 0) return 'pending';
+    if (p.total > 0 && p.paid >= p.total) return 'paid';
+    return 'partial';
+  }
+  function paintPartial() {
+    const wrap = document.getElementById('payPartWrap');
+    if (!wrap) return;
+    const on = state.paymentStatus === 'partial';
+    wrap.style.display = on ? '' : 'none';
+    if (!on) return;
+    const note = document.getElementById('payPartNote');
+    if (!note) return;
+    const p = partialState();
+    const ugx = (n) => 'UGX ' + (Number(n) || 0).toLocaleString('en-UG');
+    if (!p.total) {
+      note.textContent = 'Put the fees in above first, then how much they paid.';
+      note.className = 'pay-part-note';
+    } else if (p.paid <= 0) {
+      note.textContent = 'Nothing paid yet — the whole ' + ugx(p.total) + ' will be owing.';
+      note.className = 'pay-part-note';
+    } else if (p.paid >= p.total) {
+      note.textContent = 'That is the whole bill — this will be recorded as paid in full.';
+      note.className = 'pay-part-note ok';
+    } else {
+      note.textContent = 'Paid ' + ugx(p.paid) + ' out of ' + ugx(p.total) +
+        ' — ' + ugx(p.owing) + ' still owing.';
+      note.className = 'pay-part-note owing';
+    }
   }
 
   // The clinic's own price list, shared with the one-tap package so a test
@@ -145,7 +193,13 @@
         document.querySelectorAll('.pay-chip').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.paymentStatus = btn.dataset.pay;
+        paintPartial();
       });
+    });
+    const partAmt = document.getElementById('payPartAmt');
+    if (partAmt) partAmt.addEventListener('input', () => {
+      state.amountPaid = Math.max(0, Number(partAmt.value) || 0);
+      paintPartial();
     });
     // Pre-fill consultation fee from clinic settings
     if (supabase && _clinicId) {
@@ -482,7 +536,7 @@
       return;
     }
 
-    card.innerHTML = '<div style="padding:10px;color:#9AA0A6;font-size:13px;text-align:center">Loading medical history…</div>';
+    card.innerHTML = '<div style="padding:10px;color:var(--text-lt, #5F6368);font-size:13px;text-align:center">Loading medical history…</div>';
     card.style.display = '';
 
     if (!supabase) { card.innerHTML = ''; card.style.display = 'none'; return; }
@@ -637,7 +691,7 @@
       </div>`;
     } else if (hasIntake && canEdit) {
       html += `<div style="text-align:right;margin-bottom:8px">
-        <button id="openIntakeBtn" style="padding:5px 12px;background:none;border:1px solid #E0E0E0;border-radius:8px;font-size:11px;color:#5F6368;cursor:pointer;font-family:inherit">
+        <button id="openIntakeBtn" style="padding:5px 12px;background:none;border:1px solid var(--border, #E0E0E0);border-radius:8px;font-size:11px;color:var(--text-lt, #5F6368);cursor:pointer;font-family:inherit">
           <span class="material-icons-outlined" style="font-size:13px;vertical-align:-2px">edit</span> Edit intake
         </button>
       </div>`;
@@ -696,7 +750,7 @@
         </div>`;
       });
       if (history.length > 3) {
-        html += `<div style="text-align:center;font-size:12px;color:#9AA0A6;padding-top:6px">${history.length - 3} more visit${history.length - 3 !== 1 ? 's' : ''} on record</div>`;
+        html += `<div style="text-align:center;font-size:12px;color:var(--text-lt, #5F6368);padding-top:6px">${history.length - 3} more visit${history.length - 3 !== 1 ? 's' : ''} on record</div>`;
       }
     }
 
@@ -1332,7 +1386,7 @@
       const hint = document.getElementById('patientResults');
       if (hint) {
         hint.style.display = 'block';
-        hint.innerHTML = '<div style="padding:12px;color:#5F6368;font-size:13px">Checking if this patient is already in your system…</div>';
+        hint.innerHTML = '<div style="padding:12px;color:var(--text-lt, #5F6368);font-size:13px">Checking if this patient is already in your system…</div>';
       }
       (async () => {
         let found = null;
@@ -2049,7 +2103,7 @@
     `).join('');
 
     menu.innerHTML = (invMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.4px;background:#F1F8E9">Clinic Stock</div>${invHtml}` : '')
-      + (formMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;background:#FAFAFA">Formulary</div>${formHtml}` : '');
+      + (formMatches.length ? `<div style="padding:4px 12px;font-size:10px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px;background:var(--bg, #F5F5F5)">Formulary</div>${formHtml}` : '');
     menu.style.display = 'block';
 
     menu.querySelectorAll('[data-inv-id]').forEach(el => {
@@ -2127,13 +2181,13 @@
       const inv     = state.clinicInventory.find(x => x.id === m.item_id);
       const stockTxt = inv ? ` (${inv.quantity} ${inv.unit} in stock)` : '';
       return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F5F5F5">
-        <span style="flex:1;font-size:13px;font-weight:600;color:#202124">${esc(m.item_name)}${esc(stockTxt)}</span>
+        <span style="flex:1;font-size:13px;font-weight:600;color:var(--text, #1A1A1A)">${esc(m.item_name)}${esc(stockTxt)}</span>
         <input type="number" min="1" step="1" value="${m.qty||1}"
           style="width:60px;padding:5px 8px;border:1.5px solid var(--accent);border-radius:8px;font-size:13px;text-align:center;font-family:inherit;outline:none"
           data-mat-idx="${i}" class="mat-qty-input">
-        <span style="font-size:12px;color:#9AA0A6">${esc(m.unit||'units')}</span>
+        <span style="font-size:12px;color:var(--text-lt, #5F6368)">${esc(m.unit||'units')}</span>
         <button class="mat-del-btn" data-idx="${i}" style="background:none;border:none;cursor:pointer;padding:2px">
-          <span class="material-icons-outlined" style="font-size:18px;color:#9AA0A6">delete_outline</span>
+          <span class="material-icons-outlined" style="font-size:18px;color:var(--text-lt, #5F6368)">delete_outline</span>
         </button>
       </div>`;
     }).join('');
@@ -2171,16 +2225,16 @@
         const stockBg  = inv.is_critical ? '#FFEBEE' : inv.is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
         const stockClr = inv.is_critical ? '#C62828' : inv.is_low_stock ? '#E65100' : 'var(--deep)';
         return `<div class="mat-picker-item" data-id="${esc(inv.id)}" data-name="${esc(inv.item_name)}" data-unit="${esc(inv.unit||'units')}"
-                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid #E8EAED;border-radius:10px;margin-bottom:8px;cursor:pointer">
+                     style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;margin-bottom:8px;cursor:pointer">
           <div>
             <div style="font-size:13px;font-weight:600">${esc(inv.item_name)}</div>
-            <div style="font-size:11px;color:#9AA0A6">${esc(inv.item_type)}</div>
+            <div style="font-size:11px;color:var(--text-lt, #5F6368)">${esc(inv.item_type)}</div>
           </div>
           <span style="font-size:11px;background:${stockBg};color:${stockClr};padding:2px 8px;border-radius:10px;font-weight:700">${inv.quantity} ${esc(inv.unit)}</span>
         </div>`;
       }).join('')}
       <button onclick="document.getElementById('matPickerSheet').remove()"
-        style="width:100%;padding:12px;margin-top:8px;background:#F5F5F5;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        style="width:100%;padding:12px;margin-top:8px;background:var(--bg, #F5F5F5);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
     </div>`;
     document.body.appendChild(sheet);
 
@@ -2551,12 +2605,18 @@
       lab_fee_ugx:          state.feeLab    || 0,
       meds_fee_ugx:         state.feeMeds   || 0,
       total_charged_ugx:    (state.feeConsult + state.feeLab + state.feeMeds) || 0,
-      payment_status:       state.paymentStatus || 'pending',
+      // "Part payment" is decided by the figure, not by the chip: nothing paid
+      // is still pending, and handing over the whole bill is simply paid.
+      payment_status: (state.paymentStatus === 'partial')
+        ? partialStatus()
+        : (state.paymentStatus || 'pending'),
       // Marking a visit PAID has to record the money, not just the word. This
       // was missing, so a paid consultation left Today's Money In at zero.
       amount_paid: (state.paymentStatus === 'paid')
         ? ((state.feeConsult + state.feeLab + state.feeMeds) || 0)
-        : (Number(state.amountPaid) > 0 ? Number(state.amountPaid) : 0),
+        : (state.paymentStatus === 'partial'
+            ? partialState().paid
+            : (Number(state.amountPaid) > 0 ? Number(state.amountPaid) : 0)),
     };
 
     // ── OFFLINE: queue the entire consultation and sync when back online ──
@@ -2621,10 +2681,22 @@
     // hang the wizard — and if it fails for network reasons, fall back to the
     // offline queue instead of losing the consultation.
     const _saveTO = (p) => (window.ClinicOffline ? ClinicOffline.withTimeout(p, 15000) : p);
+    // record_payment() ADDS to whatever amount_paid the row already holds, so
+    // inserting the figure here and then calling it books the money twice: a
+    // 60,000 bill settles at amount_paid 120,000. Nobody noticed because the
+    // balance is clamped at zero, so a fully paid visit still looked right —
+    // but a PART payment would come out with the debt understated by exactly
+    // what the patient handed over. Online, the row starts at zero and
+    // record_payment is the only thing that writes the figure.
+    //
+    // The offline copy keeps it: the queued replay in clinic.js does not call
+    // record_payment at all, so for a consultation saved offline this column
+    // is the only record that the money was taken.
+    const onlinePayload = Object.assign({}, dxPayload, { amount_paid: 0 });
     let dx, dxError;
     ({ data: dx, error: dxError } = await _saveTO(supabase
       .from('clinic_diagnoses')
-      .insert(dxPayload)
+      .insert(onlinePayload)
       .select().single()));
 
     // A column this build writes may not be migrated on this clinic's database
@@ -2635,9 +2707,9 @@
     for (let i = 0; i < OPTIONAL_COLS.length && dxError && dxError.message; i++) {
       const col = OPTIONAL_COLS[i];
       if (!dxError.message.includes(col)) continue;
-      const compatPayload = Object.assign({}, dxPayload);
+      const compatPayload = Object.assign({}, onlinePayload);
       delete compatPayload[col];
-      Object.assign(dxPayload, compatPayload);
+      delete dxPayload[col];
       OPTIONAL_COLS.forEach((c) => { if (!(c in compatPayload)) delete dxPayload[c]; });
       ({ data: dx, error: dxError } = await _saveTO(supabase
         .from('clinic_diagnoses')
@@ -2678,10 +2750,18 @@
         } else {
           const _pr = await _saveTO(supabase.rpc('record_payment', _args));
           // Lost connection, or the payments migration is not applied yet.
-          // amount_paid on the consultation still carries the figure, and the
-          // dashboard falls back to it when the ledger is unavailable.
-          if (_pr && _pr.error && CO && CO.isNetworkErr(_pr.error)) {
-            CO.enqueue('rpc', { fn: 'record_payment', args: _args });
+          if (_pr && _pr.error) {
+            if (CO && CO.isNetworkErr(_pr.error)) {
+              CO.enqueue('rpc', { fn: 'record_payment', args: _args });
+            }
+            // Either way the row was inserted with amount_paid 0 so that
+            // record_payment could not double it — so if that call did not
+            // land, put the figure on the row by hand. Money the clinic is
+            // holding must never be invisible because an RPC was missing.
+            try {
+              await _saveTO(supabase.from('clinic_diagnoses')
+                .update({ amount_paid: _paidNow }).eq('id', dx.id));
+            } catch (e) {}
           }
         }
       }

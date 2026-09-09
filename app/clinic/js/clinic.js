@@ -573,7 +573,7 @@ function homattBuildLine() {
   if (!el) {
     el = document.createElement('div');
     el.id = 'homattBuildLine';
-    el.style.cssText = 'font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.42);' +
+    el.style.cssText = 'font-size:10.5px;line-height:1.5;color:rgba(255,255,255,0.62);' +
       'margin-top:10px;letter-spacing:.2px;word-break:break-word';
     foot.appendChild(el);
   }

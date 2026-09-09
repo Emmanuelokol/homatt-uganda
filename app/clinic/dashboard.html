@@ -37,7 +37,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260929">
+  <link rel="stylesheet" href="css/clinic.css?v=20260930">
   <link rel="prefetch" href="new-order.html">
   <link rel="prefetch" href="settings.html">
   <style>
@@ -122,7 +122,7 @@
     .home-hero h1 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing:-.02em }
     .home-hero p  { font-size: 14px; opacity: .9 }
     .home-cta {
-      background: #fff; color: var(--primary-d);
+      background: var(--surface, #FFFFFF); color: var(--primary-d);
       padding: 14px 24px; border-radius: 15px;
       font-size: 15px; font-weight: 800;
       border: none; cursor: pointer;
@@ -192,7 +192,7 @@
     .order-info { flex: 1; min-width: 0 }
     .order-patient { font-size: 15px; font-weight: 700; margin-bottom: 3px }
     .order-drug { font-size: 13px; color: var(--text-lt); margin-bottom: 4px }
-    .order-meta { font-size: 12px; color: #9AA0A6; display: flex; gap: 10px; flex-wrap: wrap }
+    .order-meta { font-size: 12px; color: var(--text-lt, #5F6368); display: flex; gap: 10px; flex-wrap: wrap }
     .order-meta span { display: inline-flex; align-items: center; gap: 3px }
     .order-right { text-align: right; flex-shrink: 0 }
     .order-status { margin-bottom: 6px }
@@ -204,7 +204,7 @@
     }
     .completion-pending {
       width: 24px; height: 24px; border-radius: 50%;
-      background: #F5F5F5; color: #9AA0A6;
+      background: var(--bg, #F5F5F5); color: var(--text-lt, #5F6368);
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 14px;
     }
@@ -220,7 +220,7 @@
       margin-top: 18px;
       display: inline-flex; align-items: center; gap: 8px;
       padding: 11px 22px;
-      background: var(--primary); color: #fff;
+      background: var(--primary); color:var(--on-primary, #fff);
       border: none; border-radius: 10px;
       font-size: 14px; font-weight: 600; cursor: pointer;
       text-decoration: none;
@@ -264,7 +264,7 @@
     #qsSheet, #qsSellBtn { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
     #qsSheet input { user-select: text; -webkit-user-select: text; }
     .qs-drug-card {
-      background: #F8F9FA; border: 2px solid transparent; border-radius: 14px;
+      background: var(--bg, #F5F5F5); border: 2px solid transparent; border-radius: 14px;
       padding: 14px 10px 12px; text-align: center; cursor: pointer;
       transition: border-color .1s, background .1s; touch-action: manipulation;
       user-select: none;
@@ -281,15 +281,15 @@
       background: var(--tint-2); border-color: var(--deep-ink);
       box-shadow: 0 0 0 3px rgba(27,94,32,.22);
     }
-    .qs-drug-name  { font-size: 13px; font-weight: 700; color: #202124; margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
+    .qs-drug-name  { font-size: 13px; font-weight: 700; color: var(--text, #1A1A1A); margin-bottom: 4px; line-height: 1.3; word-break: break-word; }
     .qs-drug-price { font-size: 12px; color: var(--deep-ink); font-weight: 600; }
     .qs-drug-stock { font-size: 11px; margin-top: 2px; }
     .qs-pm-chip {
-      padding: 8px 16px; border-radius: 20px; border: 1.5px solid #E0E0E0;
-      background: transparent; color: #424242; font-size: 13px; font-weight: 700;
+      padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--border, #E0E0E0);
+      background: transparent; color: var(--text, #1A1A1A); font-size: 13px; font-weight: 700;
       cursor: pointer; touch-action: manipulation; font-family: inherit; transition: all .1s;
     }
-    .qs-pm-chip.selected { background: var(--deep); color: #fff; border-color: var(--deep-ink); }
+    .qs-pm-chip.selected { background: var(--deep); color:#fff; border-color: var(--deep-ink); }
     #qsSellBtn:disabled  { background: #BDBDBD !important; box-shadow: none !important; cursor: not-allowed; }
     @media (max-width: 480px) {
       #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
@@ -332,7 +332,7 @@
     </nav>
     <div class="sidebar-footer">
       <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
-      <div style="font-size:12px;color:rgba(255,255,255,0.45);margin:6px 0 10px" id="clinicUserDate"></div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.62);margin:6px 0 10px" id="clinicUserDate"></div>
       <button class="logout-sidebar-btn" id="clinicLogoutBtn">
         <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
       </button>
@@ -343,7 +343,7 @@
     <div class="admin-topbar">
       <div class="admin-topbar-title">Home</div>
       <div class="admin-topbar-right">
-        <span style="font-size:13px;color:#5F6368" id="liveClock"></span>
+        <span style="font-size:13px;color:var(--text-lt, #5F6368)" id="liveClock"></span>
         <div class="admin-user-chip">
           <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
           <span id="clinicUserNameTop">Clinic</span>
@@ -438,7 +438,7 @@
           <span id="pendingCount" style="font-size:13px;color:#E65100;font-weight:600"></span>
         </div>
         <div id="pendingBookingsList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading bookings… <small style="opacity:.5">[v20260502]</small></div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading bookings… <small style="opacity:.5">[v20260502]</small></div>
         </div>
       </div>
 
@@ -452,13 +452,13 @@
           <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
         </div>
         <div style="padding:8px 16px 4px;position:relative">
-          <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+          <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:var(--text-lt, #5F6368);font-size:18px;pointer-events:none">search</span>
           <input id="activeSearch" type="text" placeholder="Search by patient name or code…"
-            style="width:100%;padding:9px 12px 9px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;color:#111;outline:none;box-sizing:border-box"
+            style="width:100%;padding:9px 12px 9px 38px;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;font-size:13px;font-family:inherit;background:var(--surface, #FFFFFF);color:var(--text, #1A1A1A);outline:none;box-sizing:border-box"
             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
         </div>
         <div id="activeTreatmentsList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -472,7 +472,7 @@
           <span id="overdueCount" style="font-size:11px;background:#E65100;color:#fff;padding:2px 9px;border-radius:20px;font-weight:700;display:none"></span>
         </div>
         <div id="overdueFollowupList" style="padding:8px 0">
-          <div style="text-align:center;padding:16px;color:#9AA0A6;font-size:13px">Loading…</div>
+          <div style="text-align:center;padding:16px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -489,7 +489,7 @@
           </div>
         </div>
         <div id="pendingPaymentsList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -502,13 +502,13 @@
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="meds-period-btn active" data-mp="day"   onclick="setMedsPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #00ACC1;background:#00ACC1;color:#fff;cursor:pointer;font-weight:600;font-family:inherit;touch-action:manipulation">Today</button>
-            <button class="meds-period-btn"        data-mp="week"  onclick="setMedsPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
-            <button class="meds-period-btn"        data-mp="month" onclick="setMedsPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
-            <button class="meds-period-btn"        data-mp="year"  onclick="setMedsPeriod('year')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Year</button>
+            <button class="meds-period-btn"        data-mp="week"  onclick="setMedsPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="meds-period-btn"        data-mp="month" onclick="setMedsPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+            <button class="meds-period-btn"        data-mp="year"  onclick="setMedsPeriod('year')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">Year</button>
           </div>
         </div>
         <div id="medsDispensedList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -544,11 +544,11 @@
           </div>
           <div style="display:flex;gap:6px;align-items:center">
             <button onclick="setCondPeriod(30)" id="condBtn30" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--accent);background:var(--accent);color:#fff;cursor:pointer;font-weight:600;font-family:inherit">30 days</button>
-            <button onclick="setCondPeriod(90)" id="condBtn90" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">90 days</button>
+            <button onclick="setCondPeriod(90)" id="condBtn90" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">90 days</button>
           </div>
         </div>
         <div id="topConditionsBody" style="padding:16px">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>
         </div>
       </div>
 
@@ -566,7 +566,7 @@
           </div>
         </div>
         <div id="stockList" style="padding:8px 0">
-          <div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+          <div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading stock…</div>
         </div>
       </div>
 
@@ -574,13 +574,13 @@
       <div class="admin-table-wrap" data-cap="financials" style="padding:0;margin-bottom:12px" data-slide="money">
         <div class="table-header">
           <div class="table-title">
-            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--primary)">analytics</span>
+            <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--primary-ink)">analytics</span>
             Financial Overview
           </div>
           <div style="display:flex;gap:8px">
             <button class="fin-tab active" data-period="day"   onclick="setFinPeriod('day')"   style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer;font-weight:600;font-family:inherit">Today</button>
-            <button class="fin-tab"        data-period="week"  onclick="setFinPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Week</button>
-            <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid #E0E0E0;background:transparent;color:#424242;cursor:pointer;font-weight:600;font-family:inherit">Month</button>
+            <button class="fin-tab"        data-period="week"  onclick="setFinPeriod('week')"  style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">Week</button>
+            <button class="fin-tab"        data-period="month" onclick="setFinPeriod('month')" style="font-size:12px;padding:5px 12px;border-radius:20px;border:1.5px solid var(--border, #E0E0E0);background:transparent;color:var(--text, #1A1A1A);cursor:pointer;font-weight:600;font-family:inherit">Month</button>
           </div>
         </div>
         <div class="fin-wrap">
@@ -623,8 +623,8 @@
             Monthly Reports
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <select id="mrYear"  style="padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff"></select>
-            <select id="mrMonth" style="padding:7px 10px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
+            <select id="mrYear"  style="padding:7px 10px;border:1.5px solid var(--border, #E0E0E0);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:var(--surface, #FFFFFF)"></select>
+            <select id="mrMonth" style="padding:7px 10px;border:1.5px solid var(--border, #E0E0E0);border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:var(--surface, #FFFFFF)">
               <option value="1">January</option><option value="2">February</option>
               <option value="3">March</option><option value="4">April</option>
               <option value="5">May</option><option value="6">June</option>
@@ -644,11 +644,11 @@
         </div>
 
         <!-- Past summaries list -->
-        <div id="mrPastList" style="padding:8px 16px 4px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid #F0F0F0;min-height:38px"></div>
+        <div id="mrPastList" style="padding:8px 16px 4px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--border, #E0E0E0);min-height:38px"></div>
 
         <!-- Report body -->
         <div id="mrBody" style="padding:16px">
-          <div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">
+          <div style="text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">
             Select a year and month above, then tap <strong>View</strong>.
           </div>
         </div>
@@ -659,20 +659,20 @@
 
   <!-- Discharge confirmation modal -->
   <div id="dischargeModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
-    <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+    <div style="background:var(--surface, #FFFFFF);border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
         <span class="material-icons-outlined" style="color:var(--deep-ink);font-size:26px">task_alt</span>
         <h3 style="font-size:17px;font-weight:700;margin:0">Discharge Patient</h3>
       </div>
-      <p style="font-size:13px;color:#5F6368;margin:0 0 14px;line-height:1.5">
+      <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:0 0 14px;line-height:1.5">
         Marking <strong id="dischargePatientName">this patient</strong> as discharged will move them off the active list and notify them with their treatment summary.
       </p>
-      <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Discharge notes (optional)</label>
+      <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Discharge notes (optional)</label>
       <textarea id="dischargeNotes" rows="2" placeholder="e.g. Patient stable, no follow-up needed."
         style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;resize:vertical;box-sizing:border-box;margin-bottom:14px"></textarea>
       <div id="dischargeError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:14px"></div>
       <div style="display:flex;gap:10px">
-        <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+        <button id="dischargeCancelBtn" style="flex:1;padding:12px;background:transparent;color:var(--text-lt, #5F6368);border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
         <button id="dischargeConfirmBtn" style="flex:2;padding:12px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
           <span class="material-icons-outlined" style="font-size:18px">check_circle</span> Discharge &amp; Notify
         </button>
@@ -774,10 +774,10 @@
 
 <!-- ── Quick Sale POS Sheet ── -->
 <div id="qsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:500;align-items:flex-end;justify-content:center;overscroll-behavior:none" onclick="if(event.target===this)closeQuickSale()">
-  <div id="qsSheet" style="background:#fff;width:100%;max-width:600px;border-radius:24px 24px 0 0;height:85vh;height:85dvh;max-height:85vh;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative;overscroll-behavior:contain;touch-action:manipulation">
+  <div id="qsSheet" style="background:var(--surface, #FFFFFF);width:100%;max-width:600px;border-radius:24px 24px 0 0;height:85vh;height:85dvh;max-height:85vh;max-height:85dvh;display:flex;flex-direction:column;box-shadow:0 -8px 40px rgba(0,0,0,0.2);overflow:hidden;position:relative;overscroll-behavior:contain;touch-action:manipulation">
 
     <!-- Header -->
-    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #F0F0F0;flex-shrink:0;gap:8px">
+    <div style="padding:18px 20px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border, #E0E0E0);flex-shrink:0;gap:8px">
       <div style="display:flex;align-items:center;gap:10px;min-width:0">
         <span class="material-icons-outlined" style="color:var(--deep-ink);font-size:26px">point_of_sale</span>
         <span style="font-size:19px;font-weight:800;color:var(--deep-ink)">Quick Sale</span>
@@ -787,7 +787,7 @@
           style="background:var(--tint-2);border:1.5px solid var(--tint-3);color:var(--deep-ink);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
           <span class="material-icons-outlined" style="font-size:16px">add</span> New Item
         </button>
-        <button id="qsCloseBtn" type="button" style="background:#F5F5F5;border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
+        <button id="qsCloseBtn" type="button" style="background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
           <span class="material-icons-outlined">close</span>
         </button>
       </div>
@@ -802,10 +802,10 @@
          keyboard up this sheet has no spare height, and a row of its own was
          enough to push the Sell button off the bottom. -->
     <div style="padding:12px 16px 6px;flex-shrink:0;position:relative">
-      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+      <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:var(--text-lt, #5F6368);font-size:18px;pointer-events:none">search</span>
       <input id="qsSearch" type="text" placeholder="Search item…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
         oninput="filterQsDrugs(this.value)"
-        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
+        style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;touch-action:manipulation">
     </div>
 
     <!-- Add straight from the search — directly under the box, where it was
@@ -824,24 +824,24 @@
 
     <!-- Drug grid -->
     <div id="qsDrugGrid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;align-content:start;padding:10px 16px;overflow-y:auto;flex:1 1 0;min-height:0;overscroll-behavior:contain;touch-action:pan-y;-webkit-overflow-scrolling:touch">
-      <div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>
+      <div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">Loading stock…</div>
     </div>
 
     <!-- Selected drug + controls -->
     <div id="qsSelectedPanel" style="display:none;padding:12px 16px;border-top:1.5px solid var(--tint-2);background:#FAFFFE;flex-shrink:1;min-height:0;max-height:46vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
         <div id="qsSelName" style="font-size:16px;font-weight:800;color:var(--deep-ink);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
-        <span id="qsStockLeft" style="font-size:11px;color:#9AA0A6;white-space:nowrap"></span>
+        <span id="qsStockLeft" style="font-size:11px;color:var(--text-lt, #5F6368);white-space:nowrap"></span>
       </div>
-      <div id="qsSelPriceBreakdown" style="font-size:12px;color:#5F6368;margin-bottom:8px"></div>
+      <div id="qsSelPriceBreakdown" style="font-size:12px;color:var(--text-lt, #5F6368);margin-bottom:8px"></div>
       <!-- Unit type selector: Tab / Pack / Box — shown only when pack/box pricing is set -->
       <div id="qsUnitTypeRow" style="display:none;gap:6px;margin-bottom:10px;flex-wrap:wrap"></div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
-        <span style="font-size:13px;font-weight:600;color:#5F6368">Qty:</span>
-        <div style="display:flex;align-items:center;border:1.5px solid #E0E0E0;border-radius:10px;overflow:hidden">
-          <button id="qsQtyMinus" type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">−</button>
-          <div id="qsQtyVal" style="min-width:48px;text-align:center;font-size:18px;font-weight:800;color:#202124;padding:0 6px">1</div>
-          <button id="qsQtyPlus"  type="button" style="background:#F5F5F5;border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:#424242">+</button>
+        <span style="font-size:13px;font-weight:600;color:var(--text-lt, #5F6368)">Qty:</span>
+        <div style="display:flex;align-items:center;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;overflow:hidden">
+          <button id="qsQtyMinus" type="button" style="background:var(--bg, #F5F5F5);border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:var(--text, #1A1A1A)">−</button>
+          <div id="qsQtyVal" style="min-width:48px;text-align:center;font-size:18px;font-weight:800;color:var(--text, #1A1A1A);padding:0 6px">1</div>
+          <button id="qsQtyPlus"  type="button" style="background:var(--bg, #F5F5F5);border:none;width:40px;height:40px;font-size:22px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;touch-action:manipulation;color:var(--text, #1A1A1A)">+</button>
         </div>
         <div style="display:flex;gap:6px;margin-left:auto">
           <button id="qsPmCash" type="button" class="qs-pm-chip selected">Cash</button>
@@ -850,11 +850,11 @@
       </div>
       <div id="qsStockWarn" style="display:none;font-size:12px;color:#C62828;font-weight:600;margin-bottom:8px"></div>
       <div style="display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px;font-weight:600;color:#5F6368">UGX</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text-lt, #5F6368)">UGX</span>
         <input id="qsTotalInput" type="number" min="0" step="100" inputmode="numeric"
-          style="flex:1;padding:11px 14px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:18px;font-weight:800;color:#202124;font-family:inherit;outline:none;background:#fff;text-align:right;box-sizing:border-box">
+          style="flex:1;padding:11px 14px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:18px;font-weight:800;color:var(--text, #1A1A1A);font-family:inherit;outline:none;background:var(--surface, #FFFFFF);text-align:right;box-sizing:border-box">
         <button id="qsResetTotal" type="button" title="Reset to auto"
-          style="background:transparent;border:none;color:#9AA0A6;cursor:pointer;padding:6px;display:flex;align-items:center;touch-action:manipulation">
+          style="background:transparent;border:none;color:var(--text-lt, #5F6368);cursor:pointer;padding:6px;display:flex;align-items:center;touch-action:manipulation">
           <span class="material-icons-outlined" style="font-size:18px">refresh</span>
         </button>
       </div>
@@ -870,7 +870,7 @@
     <!-- Cart: the items in the current sale (shown once you Add another) -->
     <div id="qsCartWrap" style="display:none;padding:8px 16px 0;flex-shrink:1;min-height:0;max-height:30vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1.5px solid var(--tint-2);background:#FBFEFC">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-        <span style="font-size:11px;font-weight:800;color:#5F6368;text-transform:uppercase;letter-spacing:.4px">This sale</span>
+        <span style="font-size:11px;font-weight:800;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px">This sale</span>
         <button id="qsClearCart" type="button" style="background:none;border:none;color:#C62828;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;touch-action:manipulation">Clear</button>
       </div>
       <div id="qsCartList"></div>
@@ -895,22 +895,22 @@
 
 <!-- Verify Booking Code Modal -->
 <div id="verifyModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;padding:26px 24px 28px">
+  <div style="background:var(--surface, #FFFFFF);border-radius:16px;width:100%;max-width:440px;padding:26px 24px 28px">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
       <span class="material-icons-outlined" style="color:#1565C0;font-size:26px">qr_code_scanner</span>
       <h3 style="font-size:18px;font-weight:700;margin:0">Verify Patient</h3>
     </div>
-    <p style="font-size:13px;color:#5F6368;margin:0 0 18px;line-height:1.5">
+    <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:0 0 18px;line-height:1.5">
       Patient should show you their <strong>Booking Code</strong> (e.g. HO-928) and <strong>PIN</strong> (e.g. HK-AEK26W) from the Homatt app.
     </p>
 
-    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Booking Code</label>
+    <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">Booking Code</label>
     <input id="vmCode" type="text" placeholder="HO-928" autocomplete="off"
       style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:18px;font-weight:700;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:2px;text-align:center">
 
     <div style="height:14px"></div>
 
-    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">PIN</label>
+    <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.3px">PIN</label>
     <input id="vmPin" type="text" placeholder="HK-XXXXXX" autocomplete="off"
       style="width:100%;padding:14px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-weight:600;font-family:inherit;outline:none;box-sizing:border-box;text-transform:uppercase;letter-spacing:1.5px;text-align:center">
 
@@ -926,7 +926,7 @@
     </button>
     <div style="height:8px"></div>
     <button id="vmCancelBtn"
-      style="width:100%;padding:13px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
+      style="width:100%;padding:13px;background:transparent;color:var(--text-lt, #5F6368);border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">
       Cancel
     </button>
   </div>
@@ -934,58 +934,58 @@
 
 <!-- Add / Edit Stock Item Modal -->
 <div id="stockItemModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto">
+  <div style="background:var(--surface, #FFFFFF);border-radius:16px;width:100%;max-width:480px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3);max-height:90vh;overflow-y:auto">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <span class="material-icons-outlined" style="color:var(--accent);font-size:26px">inventory_2</span>
       <h3 id="stockModalTitle" style="font-size:17px;font-weight:700;margin:0">Add Stock Item</h3>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
       <div style="grid-column:1/-1">
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Item Name *</label>
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Item Name *</label>
         <input id="siName" type="text" placeholder="e.g. Amoxicillin 500mg" autocomplete="off"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Type *</label>
-        <select id="siType" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:#fff;box-sizing:border-box">
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Type *</label>
+        <select id="siType" style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;background:var(--surface, #FFFFFF);box-sizing:border-box">
           <option value="medicine">Medicine — sold in Quick Sale</option>
           <option value="consumable">Other item you sell (pampers, condoms…) — Quick Sale</option>
           <option value="material">Material — used in the clinic, not sold</option>
         </select>
-        <div style="font-size:11px;color:#9AA0A6;margin-top:4px">Medicines &amp; sellable items appear in Quick Sale. “Material” is for internal supplies (drip sets, gloves) used during treatments.</div>
+        <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px">Medicines &amp; sellable items appear in Quick Sale. “Material” is for internal supplies (drip sets, gloves) used during treatments.</div>
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Unit</label>
         <input id="siUnit" type="text" placeholder="tabs / ml / pieces" value="tabs"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Opening Stock *</label>
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Opening Stock *</label>
         <input id="siQty" type="number" min="0" step="1" placeholder="0"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Min Threshold</label>
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Min Threshold</label>
         <input id="siThreshold" type="number" min="0" step="1" placeholder="5"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Buying Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what you paid</span></label>
+        <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Buying Price (UGX) <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">what you paid</span></label>
         <input id="siCost" type="number" min="0" step="100" placeholder="0"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:var(--deep-ink);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:#9AA0A6;text-transform:none">what customer pays</span></label>
+        <label style="font-size:12px;font-weight:600;color:var(--deep-ink);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Selling Price (UGX) <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">what customer pays</span></label>
         <input id="siSellPrice" type="number" min="0" step="100" placeholder="Required for Quick Sale"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div>
-        <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Expiry Date <span style="font-weight:400;color:#9AA0A6;text-transform:none">(optional — enables expiry alerts)</span></label>
+        <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Expiry Date <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">(optional — enables expiry alerts)</span></label>
         <input id="siExpiry" type="date"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
       </div>
       <div style="grid-column:1/-1">
-        <label style="font-size:12px;font-weight:600;color:#5F6368;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Category / Illness <span style="font-weight:400;color:#9AA0A6;text-transform:none">what it treats — used for Quick Sale filter</span></label>
+        <label style="font-size:12px;font-weight:600;color:var(--text-lt, #5F6368);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Category / Illness <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">what it treats — used for Quick Sale filter</span></label>
         <input id="siCategory" type="text" list="siCategoryList" placeholder="e.g. Malaria, Antibiotics, Pain / Fever…" autocomplete="off"
           style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
         <datalist id="siCategoryList">
@@ -1008,7 +1008,7 @@
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
-            <label style="font-size:11px;font-weight:600;color:#424242;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px"># per pack <span style="font-weight:400;color:#9AA0A6;text-transform:none">(tabs/pack)</span></label>
+            <label style="font-size:11px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px"># per pack <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">(tabs/pack)</span></label>
             <input id="siTabsPerPack" type="number" min="1" step="1" placeholder="e.g. 10"
               style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
@@ -1018,7 +1018,7 @@
               style="width:100%;padding:10px 12px;border:1.5px solid var(--tint-3);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
           <div>
-            <label style="font-size:11px;font-weight:600;color:#424242;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Packs per box</label>
+            <label style="font-size:11px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Packs per box</label>
             <input id="siPacksPerBox" type="number" min="1" step="1" placeholder="e.g. 10"
               style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
           </div>
@@ -1032,7 +1032,7 @@
     </div>
     <div id="stockItemError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
-      <button onclick="document.getElementById('stockItemModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button onclick="document.getElementById('stockItemModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:var(--text-lt, #5F6368);border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
       <button id="stockItemSaveBtn" style="flex:2;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save Item</button>
     </div>
   </div>
@@ -1040,43 +1040,43 @@
 
 <!-- ── Section full view: Home shows summaries; this shows everything ── -->
 <div id="svOverlay" style="display:none;position:fixed;inset:0;background:#F5F7FA;z-index:550;flex-direction:column">
-  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#fff;border-bottom:1px solid #E0E0E0;flex-shrink:0">
-    <button onclick="closeSectionView()" style="background:#F5F5F5;border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;flex-shrink:0">
+  <div style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:var(--surface, #FFFFFF);border-bottom:1px solid var(--border, #E0E0E0);flex-shrink:0">
+    <button onclick="closeSectionView()" style="background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation;flex-shrink:0">
       <span class="material-icons-outlined">arrow_back</span>
     </button>
-    <div id="svTitle" style="font-size:17px;font-weight:800;color:#202124;flex:1;min-width:0"></div>
-    <div id="svCount" style="font-size:12px;color:#9AA0A6;white-space:nowrap"></div>
+    <div id="svTitle" style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);flex:1;min-width:0"></div>
+    <div id="svCount" style="font-size:12px;color:var(--text-lt, #5F6368);white-space:nowrap"></div>
   </div>
-  <div id="svSearchWrap" style="padding:10px 14px;background:#fff;border-bottom:1px solid #EEE;flex-shrink:0;position:relative">
-    <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:#9AA0A6;font-size:18px;pointer-events:none">search</span>
+  <div id="svSearchWrap" style="padding:10px 14px;background:var(--surface, #FFFFFF);border-bottom:1px solid var(--border, #E0E0E0);flex-shrink:0;position:relative">
+    <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:var(--text-lt, #5F6368);font-size:18px;pointer-events:none">search</span>
     <input id="svSearch" type="text" placeholder="Search…" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-      style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
+      style="width:100%;padding:10px 14px 10px 38px;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box">
   </div>
-  <div id="svBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 30px;background:#fff"></div>
+  <div id="svBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 14px 30px;background:var(--surface, #FFFFFF)"></div>
 </div>
 
 <!-- Restock Modal -->
 <div id="restockModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
+  <div style="background:var(--surface, #FFFFFF);border-radius:16px;width:100%;max-width:400px;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,0.3)">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <span class="material-icons-outlined" style="color:var(--accent);font-size:26px">add_shopping_cart</span>
       <div>
         <h3 style="font-size:17px;font-weight:700;margin:0" id="restockItemName">Restock</h3>
-        <div id="restockCurrentQty" style="font-size:12px;color:#9AA0A6;margin-top:2px"></div>
+        <div id="restockCurrentQty" style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px"></div>
       </div>
     </div>
-    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Quantity to Add *</label>
+    <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Quantity to Add *</label>
     <input id="restockQty" type="number" min="1" step="1" placeholder="Enter quantity"
       style="width:100%;padding:13px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:16px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
-    <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">New Expiry Date <span style="font-weight:400;color:#9AA0A6;text-transform:none">(optional — new batch)</span></label>
+    <label style="font-size:12px;font-weight:600;color:#E65100;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">New Expiry Date <span style="font-weight:400;color:var(--text-lt, #5F6368);text-transform:none">(optional — new batch)</span></label>
     <input id="restockExpiry" type="date"
       style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:10px">
-    <label style="font-size:12px;font-weight:600;color:#424242;display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes (optional)</label>
+    <label style="font-size:12px;font-weight:600;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.3px">Notes (optional)</label>
     <input id="restockNotes" type="text" placeholder="e.g. Supplier delivery" autocomplete="off"
       style="width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;outline:none;box-sizing:border-box;margin-bottom:14px">
     <div id="restockError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:8px;padding:10px 12px;font-size:13px;margin-bottom:12px"></div>
     <div style="display:flex;gap:10px">
-      <button onclick="document.getElementById('restockModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:#5F6368;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
+      <button onclick="document.getElementById('restockModal').style.display='none'" style="flex:1;padding:12px;background:transparent;color:var(--text-lt, #5F6368);border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>
       <button id="restockSaveBtn" style="flex:2;padding:12px;background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">
         <span class="material-icons-outlined" style="font-size:18px">add</span> Add Stock
       </button>
@@ -1089,15 +1089,15 @@
 
 <script src="js/vendor/supabase.min.js?v=2110"></script>
 <script src="../js/config.js"></script>
-<script src="js/clinic-offline.js?v=20260830a"></script>
+<script src="js/clinic-offline.js?v=20260930a"></script>
 <!-- Stock intake: three questions, the app does the arithmetic. The SQLite
      engine is only used to suggest names from the national medicines list,
      and the database itself is fetched on demand when the sheet opens. -->
 <script src="js/vendor/sql-wasm.js"></script>
-<script src="js/stock-blueprints.js?v=20260906"></script>
-<script src="js/stock-intake.js?v=20260902"></script>
-<script src="js/clinic.js?v=20260831"></script>
-<script src="js/msg-alerts.js?v=20260829"></script>
+<script src="js/stock-blueprints.js?v=20260930"></script>
+<script src="js/stock-intake.js?v=20260930"></script>
+<script src="js/clinic.js?v=20260930"></script>
+<script src="js/msg-alerts.js?v=20260930"></script>
 <script>
   // ─── Catch any JS error and show it on-screen so we can debug ───
   window.onerror = function(msg, src, line) {
@@ -1453,7 +1453,7 @@
         var remaining = list ? list.querySelectorAll('.order-card').length : 0;
         if (ct) ct.textContent = remaining ? remaining + ' waiting' : '';
         if (sp) sp.textContent = remaining;
-        if (list && !remaining) list.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings right now.<br><span style="font-size:12px;color:#BDBDBD">All caught up!</span></div>';
+        if (list && !remaining) list.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No pending bookings right now.<br><span style="font-size:12px;color:var(--text-lt, #5F6368)">All caught up!</span></div>';
       }, 320);
     } catch(e) { alert('Could not mark as done: ' + e.message); }
   }
@@ -1465,12 +1465,12 @@
     var sp = document.getElementById('statPending');
     if (!el) return;
     function msg(html) { el.innerHTML = html; if (ct) ct.textContent = ''; if (sp) sp.textContent = '0'; }
-    if (!supabase) { msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'); return; }
-    if (session && session.demo) { msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
+    if (!supabase) { msg('<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Database not connected.</div>'); return; }
+    if (session && session.demo) { msg('<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Demo mode — sign in with a real account.</div>'); return; }
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>');
+      msg('<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>');
       return;
     }
 
@@ -1490,7 +1490,7 @@
       }
       var rows = res.data || [];
       if (!rows.length) {
-        msg('<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:#BDBDBD">Use the panel above to verify a walk-in patient.</span></div>');
+        msg('<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No pending bookings in the last 48 hours.<br><span style="font-size:12px;color:var(--text-lt, #5F6368)">Use the panel above to verify a walk-in patient.</span></div>');
         return;
       }
       if (ct) ct.textContent = rows.length + ' waiting';
@@ -1681,19 +1681,19 @@
           + 'padding:20px;box-shadow:var(--shadow-lg,0 18px 50px rgba(0,0,0,.3))">'
         + '<div style="font-size:10.5px;font-weight:800;color:#6C5CE7;letter-spacing:.6px" id="pxCase"></div>'
         + '<h4 style="font-size:17px;font-weight:800;margin:4px 0 4px;color:var(--text,#111)">Patient details</h4>'
-        + '<p style="font-size:12.5px;color:#5F6368;line-height:1.5;margin-bottom:14px">'
+        + '<p style="font-size:12.5px;color:var(--text-lt, #5F6368);line-height:1.5;margin-bottom:14px">'
           + 'Fill these in whenever you have them — the case number does not change.</p>'
-        + '<label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin-bottom:6px">Full name</label>'
+        + '<label class="field-label" style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:6px">Full name</label>'
         + '<input id="pxName" type="text" autocomplete="off" placeholder="e.g. Okello John" '
           + 'style="width:100%;padding:12px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;'
           + 'font:inherit;font-size:15px;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#111)">'
-        + '<label class="field-label" style="font-size:11px;font-weight:700;color:#424242;display:block;margin:14px 0 6px">Phone number</label>'
+        + '<label class="field-label" style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin:14px 0 6px">Phone number</label>'
         + '<input id="pxPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="07XX XXX XXX" '
           + 'style="width:100%;padding:12px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;'
           + 'font:inherit;font-size:15px;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#111)">'
         + '<div id="pxMsg" style="font-size:12.5px;margin-top:10px;min-height:16px"></div>'
         + '<div style="display:flex;gap:9px;margin-top:12px">'
-          + '<button id="pxCancel" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border,#E0E0E0);'
+          + '<button id="pxCancel" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border, #E0E0E0);'
             + 'background:var(--surface,#fff);font:inherit;font-size:14px;font-weight:700;color:var(--text,#111);cursor:pointer">Cancel</button>'
           + '<button id="pxSave" style="flex:2;padding:13px;border-radius:13px;border:none;'
             + 'background:linear-gradient(135deg,var(--primary),var(--grad-3));color:#fff;font:inherit;font-size:14px;font-weight:800;cursor:pointer">Save details</button>'
@@ -1782,12 +1782,12 @@
     // A stub stands in for the missing list so every write below is harmless.
     var el = document.getElementById('ordersList')
           || { innerHTML: '', querySelectorAll: function () { return []; } };
-    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
-    if (session && session.demo) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Demo mode — sign in to see treatments.</div>'; return; }
+    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Database not connected.</div>'; return; }
+    if (session && session.demo) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Demo mode — sign in to see treatments.</div>'; return; }
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
+      el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Account not linked to a clinic.<br><span style="font-size:12px">Ask your admin to link you in portal_users.</span></div>';
       return;
     }
     try {
@@ -1832,7 +1832,7 @@
       var inpatient = rows2.filter(function(r){ return r.patient_type === 'inpatient'; }).length;
       var sd = document.getElementById('statDispatched'); if (sd) sd.textContent = inpatient;
       if (!rows2.length) {
-        el.innerHTML = '<div style="padding:22px 16px;text-align:center;color:#9AA0A6"><span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:5px">inbox</span>No treatments today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
+        el.innerHTML = '<div style="padding:22px 16px;text-align:center;color:var(--text-lt, #5F6368)"><span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:5px">inbox</span>No treatments today yet.<br><a href="new-order.html" style="color:#1565C0;font-weight:600">Start one</a></div>';
         return;
       }
       el.innerHTML = rows2.map(function(c) {
@@ -1912,8 +1912,8 @@
     function renderHist(rows, fromCache) {
       if (!rows.length) {
         res.innerHTML = fromCache
-          ? '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">cloud_off</span>You’re offline — no saved records match "'+esc(q)+'".<br><span style="font-size:12px">Patients you opened before are searchable offline.</span></div>'
-          : '<div style="color:#9AA0A6;text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">search_off</span>No records found for "'+esc(q)+'".</div>';
+          ? '<div style="color:var(--text-lt, #5F6368);text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">cloud_off</span>You’re offline — no saved records match "'+esc(q)+'".<br><span style="font-size:12px">Patients you opened before are searchable offline.</span></div>'
+          : '<div style="color:var(--text-lt, #5F6368);text-align:center;padding:24px 0"><span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px">search_off</span>No records found for "'+esc(q)+'".</div>';
         return;
       }
       var groups = {};
@@ -2242,7 +2242,7 @@
       metaEl.innerHTML = bits.join(' · ');
     }
     modal.style.display = 'flex';
-    bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6">Loading patient record…</div>';
+    bodyEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368)">Loading patient record…</div>';
 
     // Fetch past visits for the same patient (by phone). Exclude the current one.
     var history = [];
@@ -2474,7 +2474,7 @@
   // adds to the bill, optionally records a payment. Does NOT create a new case.
   function followupMedRowHTML(i) {
     return ''
-    + '<div class="fu-dmed-row" data-idx="'+i+'" style="border:1px solid #E8EAED;border-radius:10px;padding:10px 12px;margin-bottom:8px">'
+    + '<div class="fu-dmed-row" data-idx="'+i+'" style="border:1px solid var(--border, #E0E0E0);border-radius:10px;padding:10px 12px;margin-bottom:8px">'
       + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
         + '<div style="font-size:11px;font-weight:700;color:#1565C0;letter-spacing:.5px;text-transform:uppercase">Medication '+(i+1)+'</div>'
         + (i > 0 ? '<button type="button" class="fu-med-remove" style="background:transparent;border:none;color:#C62828;font-size:12px;cursor:pointer;font-family:inherit;padding:2px 6px">Remove</button>' : '')
@@ -2509,17 +2509,17 @@
         + '<strong>Follow-up visit</strong> — adds to the existing case for <strong>'+esc(current.patient_name||'this patient')+'</strong>. No new diagnosis created.'
       + '</div>'
 
-      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Add medications (optional)</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Add medications (optional)</div>'
       + '<div id="fuMedsContainer">' + followupMedRowHTML(0) + '</div>'
       + '<button type="button" id="fuAddMedBtn" style="width:100%;padding:10px;background:#F5F7F5;color:#1565C0;border:1px dashed #90CAF9;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:6px">'
         + '<span class="material-icons-outlined" style="font-size:16px">add</span> Add another medication'
       + '</button>'
 
-      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Additional charge (optional)</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Additional charge (optional)</div>'
       + '<input id="fuExtraCharge" class="field-input" type="number" min="0" step="500" placeholder="e.g. 10000" style="width:100%;margin-bottom:6px">'
-      + '<div style="font-size:11px;color:#9AA0A6;margin-bottom:16px">Adds to the bill. Current total: UGX '+fmtUGX(total)+(balance>0?' · Balance UGX '+fmtUGX(balance):'')+'</div>'
+      + '<div style="font-size:11px;color:var(--text-lt, #5F6368);margin-bottom:16px">Adds to the bill. Current total: UGX '+fmtUGX(total)+(balance>0?' · Balance UGX '+fmtUGX(balance):'')+'</div>'
 
-      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Payment now (optional)</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Payment now (optional)</div>'
       + '<input id="fuPaymentAmount" class="field-input" type="number" min="0" step="500" placeholder="Amount patient is paying today" style="width:100%;margin-bottom:6px">'
       + '<select id="fuPaymentMethod" class="field-input" style="width:100%;margin-bottom:16px">'
         + '<option value="cash">Cash</option>'
@@ -2528,20 +2528,20 @@
         + '<option value="insurance">Insurance</option>'
       + '</select>'
 
-      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Next return visit (optional)</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Next return visit (optional)</div>'
       + '<div style="display:flex;gap:8px;margin-bottom:6px">'
         + '<input id="fuNextDays" class="field-input" type="number" min="0" max="365" step="1" placeholder="Days from today" value="'+(Number(current.follow_up_days)>0?Number(current.follow_up_days):'')+'" style="flex:0 0 120px">'
         + '<input id="fuNextReason" class="field-input" type="text" maxlength="200" placeholder="For… e.g. BP recheck, refill" value="'+esc(current.follow_up_reason||'')+'" style="flex:1">'
       + '</div>'
-      + '<div id="fuNextDateHint" style="font-size:11px;color:#9AA0A6;margin-bottom:16px">—</div>'
+      + '<div id="fuNextDateHint" style="font-size:11px;color:var(--text-lt, #5F6368);margin-bottom:16px">—</div>'
 
-      + '<div style="font-size:11px;font-weight:700;color:#5F6368;letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Visit notes (optional)</div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);letter-spacing:.5px;text-transform:uppercase;margin-bottom:8px">Visit notes (optional)</div>'
       + '<textarea id="fuNotes" class="field-input" rows="2" placeholder="What happened in this visit — e.g. patient feeling better, BP rechecked, refilled meds…" style="width:100%;margin-bottom:18px"></textarea>'
 
       + '<div id="fuError" style="display:none;background:#FFEBEE;color:#C62828;padding:10px;border-radius:8px;font-size:12px;margin-bottom:12px"></div>'
 
       + '<div style="display:flex;gap:8px">'
-        + '<button id="fuCancelBtn" type="button" style="flex:1;padding:13px;background:#F5F5F5;color:#5F6368;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
+        + '<button id="fuCancelBtn" type="button" style="flex:1;padding:13px;background:var(--bg, #F5F5F5);color:var(--text-lt, #5F6368);border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancel</button>'
         + '<button id="fuSaveBtn" type="button" style="flex:2;padding:13px;background:#1565C0;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
           + '<span class="material-icons-outlined" style="font-size:18px">save</span> Save Follow-up'
         + '</button>'
@@ -2803,10 +2803,10 @@
     var el = document.getElementById('activeTreatmentsList');
     var ct = document.getElementById('activeCount');
     if (!el) return;
-    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Database not connected.</div>'; return; }
+    if (!supabase) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Database not connected.</div>'; return; }
 
     var clinicId = await resolveClinicId();
-    if (!clinicId) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>'; return; }
+    if (!clinicId) { el.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Account not linked to a clinic.</div>'; return; }
 
     _activeMigrationNeeded = false;
 
@@ -2965,9 +2965,9 @@
 
     if (!rows.length) {
       var emptyMsg = q
-        ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#BDBDBD">search_off</span>No patient matches "'+esc(q)+'".'
+        ? '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:var(--text-lt, #5F6368)">search_off</span>No patient matches "'+esc(q)+'".'
         : '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:var(--tint-3)">task_alt</span>No active cases. All caught up!';
-      el.innerHTML = notice + '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">' + emptyMsg + '</div>';
+      el.innerHTML = notice + '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">' + emptyMsg + '</div>';
       return;
     }
 
@@ -3051,7 +3051,7 @@
     }
 
     if (!overdue.length) {
-      el.innerHTML = '<div style="padding:16px 20px;text-align:center;color:#9AA0A6;font-size:13px">'
+      el.innerHTML = '<div style="padding:16px 20px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:var(--tint-3)">event_available</span>'
         + 'No missed return visits. All follow-ups on track.</div>';
       return;
@@ -3074,14 +3074,14 @@
         + '<div style="display:flex;align-items:center;gap:10px">'
         +   '<div style="width:38px;height:38px;border-radius:50%;background:' + urgColor + ';color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;flex-shrink:0">' + esc(ini) + '</div>'
         +   '<div style="flex:1;min-width:0">'
-        +     '<div style="font-size:14px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(_whoLabel(c)) + '</div>'
+        +     '<div style="font-size:14px;font-weight:700;color:var(--text, #1A1A1A);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(_whoLabel(c)) + '</div>'
         +     '<div style="font-size:12px;color:' + urgColor + ';font-weight:700;white-space:nowrap">' + dueLabel + '</div>'
         +   '</div>'
         + '</div>'
         + ((phone || c.follow_up_reason)
             ? '<div style="margin:6px 0 0 48px">'
-              + (phone ? '<div style="font-size:12px;color:#5F6368"><span class="material-icons-outlined" style="font-size:12px;vertical-align:-2px">phone</span> ' + esc(phone) + '</div>' : '')
-              + (c.follow_up_reason ? '<div style="font-size:12px;color:#5F6368;margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
+              + (phone ? '<div style="font-size:12px;color:var(--text-lt, #5F6368)"><span class="material-icons-outlined" style="font-size:12px;vertical-align:-2px">phone</span> ' + esc(phone) + '</div>' : '')
+              + (c.follow_up_reason ? '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:1px">For: ' + esc(c.follow_up_reason) + '</div>' : '')
               + '</div>'
             : '')
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px">'
@@ -3124,25 +3124,25 @@
     sheet.id = 'reminderSheet';
     sheet.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:900;display:flex;align-items:flex-end;justify-content:center';
     sheet.innerHTML =
-        '<div style="background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px 22px 28px;max-height:88vh;overflow-y:auto">'
+        '<div style="background:var(--surface, #FFFFFF);border-radius:20px 20px 0 0;width:100%;max-width:520px;padding:22px 22px 28px;max-height:88vh;overflow-y:auto">'
       +   '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'
-      +     '<div style="font-size:17px;font-weight:800;color:#111;display:flex;align-items:center;gap:8px">'
+      +     '<div style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);display:flex;align-items:center;gap:8px">'
       +       '<span class="material-icons-outlined" style="color:#E65100">contact_phone</span> Contact Patient'
       +     '</div>'
-      +     '<button type="button" id="reminderSheetClose" style="background:#F5F5F5;border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation"><span class="material-icons-outlined">close</span></button>'
+      +     '<button type="button" id="reminderSheetClose" style="background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:34px;height:34px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation"><span class="material-icons-outlined">close</span></button>'
       +   '</div>'
 
       +   '<div style="background:#FFF8F6;border:1px solid #FFCCBC;border-radius:14px;padding:14px;margin-bottom:18px">'
-      +     '<div style="font-size:15px;font-weight:800;color:#111;margin-bottom:2px">' + esc(c.patient_name || 'Patient') + '</div>'
+      +     '<div style="font-size:15px;font-weight:800;color:var(--text, #1A1A1A);margin-bottom:2px">' + esc(c.patient_name || 'Patient') + '</div>'
       +     (dueLabel ? '<div style="font-size:12px;font-weight:700;color:#C62828;margin-bottom:6px">' + esc(dueLabel) + '</div>' : '')
-      +     (c.confirmed_diagnosis ? '<div style="font-size:12px;color:#5F6368"><strong>Diagnosis:</strong> ' + esc(c.confirmed_diagnosis) + (c.severity ? ' · ' + esc(c.severity) : '') + '</div>' : '')
-      +     (c.follow_up_reason ? '<div style="font-size:12px;color:#5F6368;margin-top:3px"><strong>Return reason:</strong> ' + esc(c.follow_up_reason) + '</div>' : '')
-      +     (c.created_at ? '<div style="font-size:11px;color:#9AA0A6;margin-top:6px">Last seen: ' + new Date(c.created_at).toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + '</div>' : '')
+      +     (c.confirmed_diagnosis ? '<div style="font-size:12px;color:var(--text-lt, #5F6368)"><strong>Diagnosis:</strong> ' + esc(c.confirmed_diagnosis) + (c.severity ? ' · ' + esc(c.severity) : '') + '</div>' : '')
+      +     (c.follow_up_reason ? '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:3px"><strong>Return reason:</strong> ' + esc(c.follow_up_reason) + '</div>' : '')
+      +     (c.created_at ? '<div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:6px">Last seen: ' + new Date(c.created_at).toLocaleDateString('en-UG', { weekday:'short', day:'numeric', month:'short', year:'numeric' }) + '</div>' : '')
       +   '</div>'
 
       +   (phone
           ? '<div style="margin-bottom:14px">'
-          +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Phone</div>'
+          +   '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Phone</div>'
           +   '<div style="font-size:22px;font-weight:800;color:#1565C0;letter-spacing:.5px">' + esc(phone) + '</div>'
           + '</div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">'
@@ -3164,9 +3164,9 @@
           + '</div>'
           : '<div style="background:#FFEBEE;border-radius:10px;padding:12px;color:#C62828;font-size:13px;margin-bottom:14px">No phone number on file for this patient.</div>')
 
-      +   '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Suggested message</div>'
-      +   '<textarea id="reminderSheetMsg" rows="4" style="width:100%;padding:10px 12px;border:1.5px solid #E0E0E0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;color:#202124;background:#FAFAFA">' + esc(smsMsg) + '</textarea>'
-      +   '<button type="button" id="reminderSheetCopy" style="touch-action:manipulation;margin-top:8px;width:100%;padding:11px;background:#F5F5F5;color:#424242;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
+      +   '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">Suggested message</div>'
+      +   '<textarea id="reminderSheetMsg" rows="4" style="width:100%;padding:10px 12px;border:1.5px solid var(--border, #E0E0E0);border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box;resize:vertical;color:var(--text, #1A1A1A);background:var(--bg, #F5F5F5)">' + esc(smsMsg) + '</textarea>'
+      +   '<button type="button" id="reminderSheetCopy" style="touch-action:manipulation;margin-top:8px;width:100%;padding:11px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px">'
       +     '<span class="material-icons-outlined" style="font-size:16px">content_copy</span> Copy message'
       +   '</button>'
 
@@ -3215,7 +3215,7 @@
   async function loadMedsDispensed() {
     var el = document.getElementById('medsDispensedList');
     if (!el) return;
-    el.innerHTML = '<div style="text-align:center;padding:24px;color:#9AA0A6;font-size:13px">Loading…</div>';
+    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>';
 
     var now = new Date();
     var since;
@@ -3284,7 +3284,7 @@
     if (!data && !qsRows.length && !_offMeds.length) {
       el.innerHTML = (window.ClinicOffline && (ClinicOffline.isOffline() || ClinicOffline.isNetworkErr(dxRes && dxRes.error)))
         ? ClinicOffline.offlineHtml('Dispensing data will show here once loaded online.')
-        : '<div style="padding:16px;text-align:center;color:#9AA0A6;font-size:13px">Unable to load dispensing data.</div>';
+        : '<div style="padding:16px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Unable to load dispensing data.</div>';
       return;
     }
     data = data || [];
@@ -3324,7 +3324,7 @@
 
     if (!keys.length) {
       var periodLabel = { day:'today', week:'this week', month:'this month', year:'this year' }[_medsPeriod] || _medsPeriod;
-      el.innerHTML = '<div style="padding:20px;text-align:center;color:#9AA0A6;font-size:13px">'
+      el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:6px;color:#E0E0E0">medication</span>'
         + 'No medicines dispensed ' + periodLabel + '.</div>';
       return;
@@ -3339,7 +3339,7 @@
     headParts.push('top ' + topKeys.length + ' drugs');
 
     el.innerHTML = '<div style="padding:12px 16px 8px">'
-      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">'
+      + '<div style="font-size:11px;color:var(--text-lt, #5F6368);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">'
       + headParts.join(' · ') + '</div>'
       + topKeys.map(function(name, i) {
           var t = tally[name];
@@ -3353,7 +3353,7 @@
           return '<div style="margin-bottom:10px">'
             + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
             + '<span style="font-size:13px;font-weight:600;color:' + textColor + '">' + esc(name) + '</span>'
-            + '<span style="font-size:12px;color:#9AA0A6;margin-left:8px;white-space:nowrap">'
+            + '<span style="font-size:12px;color:var(--text-lt, #5F6368);margin-left:8px;white-space:nowrap">'
             + parts.join(' · ') + '</span>'
             + '</div>'
             + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
@@ -3361,7 +3361,7 @@
             + '</div>'
             + '</div>';
         }).join('')
-      + (keys.length > 12 ? '<div style="font-size:11px;color:#9AA0A6;text-align:center;padding-top:4px">+' + (keys.length - 12) + ' more drugs this period</div>' : '')
+      + (keys.length > 12 ? '<div style="font-size:11px;color:var(--text-lt, #5F6368);text-align:center;padding-top:4px">+' + (keys.length - 12) + ' more drugs this period</div>' : '')
       + '</div>';
   }
 
@@ -3375,14 +3375,14 @@
     ];
     var maxPts = demo[0].patients;
     el.innerHTML = '<div style="padding:12px 16px 8px">'
-      + '<div style="font-size:11px;color:#9AA0A6;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Demo data — connect database for live figures</div>'
+      + '<div style="font-size:11px;color:var(--text-lt, #5F6368);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:12px">Demo data — connect database for live figures</div>'
       + demo.map(function(d, i) {
           var pct = Math.round((d.patients / maxPts) * 100);
           var barColor = i === 0 ? '#00ACC1' : i < 3 ? '#26C6DA' : '#B2EBF2';
           return '<div style="margin-bottom:10px">'
             + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">'
             + '<span style="font-size:13px;font-weight:600;color:#006064">' + esc(d.name) + '</span>'
-            + '<span style="font-size:12px;color:#9AA0A6">' + d.patients + ' patients · ' + d.totalDays + 'd total</span>'
+            + '<span style="font-size:12px;color:var(--text-lt, #5F6368)">' + d.patients + ' patients · ' + d.totalDays + 'd total</span>'
             + '</div>'
             + '<div style="height:7px;background:#E0F7FA;border-radius:4px;overflow:hidden">'
             + '<div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px"></div>'
@@ -3579,7 +3579,7 @@
 
     var clinicId = await resolveClinicId();
     if (!clinicId) {
-      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Account not linked to a clinic.</div>';
       return;
     }
 
@@ -3590,7 +3590,7 @@
     function offlinePlaceholder() {
       listEl.innerHTML = CO
         ? CO.offlineHtml('Outstanding balances will show here once loaded online.')
-        : '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Offline.</div>';
+        : '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Offline.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '';
     }
@@ -3668,7 +3668,7 @@
     }
 
     if (!rows.length) {
-      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">No outstanding balances. All clear.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No outstanding balances. All clear.</div>';
       if (totalEl) totalEl.textContent = '';
       if (countEl) countEl.textContent = '0';
       return;
@@ -3717,27 +3717,27 @@
         +'<div style="padding:12px 16px;border-bottom:1px solid #F1F3F4">'
           +'<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px">'
             +'<div style="flex:1;min-width:0">'
-              +'<div style="font-size:14px;font-weight:700;color:#202124">'+esc(_whoLabel(r))+' '+statusBadge+'</div>'
+              +'<div style="font-size:14px;font-weight:700;color:var(--text, #1A1A1A)">'+esc(_whoLabel(r))+' '+statusBadge+'</div>'
               +(String(r.patient_name||'').trim() ? '' :
                 '<button type="button" class="px-add" data-dxid="'+esc(r.id)+'" data-name="" data-phone="'+esc(r.patient_phone||'')+'" data-case="'+esc(_caseCodeFor(r))+'">+ Add name</button>')
-              +'<div style="font-size:12px;color:#5F6368;margin-top:2px">'+esc(r.confirmed_diagnosis || 'No diagnosis recorded')+'</div>'
-              +(r.patient_phone ? '<div style="font-size:11px;color:#9AA0A6;margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
+              +'<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px">'+esc(r.confirmed_diagnosis || 'No diagnosis recorded')+'</div>'
+              +(r.patient_phone ? '<div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:2px"><span class="material-icons-outlined" style="font-size:11px;vertical-align:-1px">phone</span> '+esc(r.patient_phone)+'</div>' : '')
             +'</div>'
             +'<div style="text-align:right;flex-shrink:0">'
-              +'<div style="font-size:9.5px;font-weight:800;color:#9AA0A6;letter-spacing:.5px">STILL OWED</div>'
+              +'<div style="font-size:9.5px;font-weight:800;color:var(--text-lt, #5F6368);letter-spacing:.5px">STILL OWED</div>'
               +'<div style="font-size:17px;font-weight:800;color:#C62828;line-height:1.15">UGX '+fmtUGX(_owed)+'</div>'
               +'<div style="font-size:10px;color:'+ageColor+';background:'+ageBg+';padding:2px 7px;border-radius:10px;display:inline-block;margin-top:3px">'+timeAgo(r.created_at)+'</div>'
             +'</div>'
           +'</div>'
           // Spelled out, because "UGX 10,000" on its own was being read as the
           // whole bill when it was only the part still outstanding.
-          +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:11.5px;color:#5F6368;margin-bottom:5px">'
-            +'<span>Bill <b style="color:#202124">UGX '+fmtUGX(_bill)+'</b>'
+          +'<div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:11.5px;color:var(--text-lt, #5F6368);margin-bottom:5px">'
+            +'<span>Bill <b style="color:var(--text, #1A1A1A)">UGX '+fmtUGX(_bill)+'</b>'
               +' · Paid <b style="color:var(--deep-ink)">UGX '+fmtUGX(_paid)+'</b>'
               +' · Owing <b style="color:#C62828">UGX '+fmtUGX(_owed)+'</b></span>'
             +'<span>'+esc(lastPay)+'</span>'
           +'</div>'
-          +'<div style="height:5px;background:#F1F3F4;border-radius:3px;overflow:hidden;margin-bottom:8px">'
+          +'<div style="height:5px;background:var(--bg, #F5F5F5);border-radius:3px;overflow:hidden;margin-bottom:8px">'
             +'<div style="width:'+pct+'%;height:100%;background:var(--deep);transition:width .3s"></div>'
           +'</div>'
           +'<div style="display:flex;gap:6px">'
@@ -3780,7 +3780,7 @@
     _svSetCount(rows.length + ' owing · UGX ' + fmtUGX(total));
     body.innerHTML = rows.length
       ? rows.map(_payRowHtml).join('')
-      : '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No pending payments match.</div>';
+      : '<div style="padding:30px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No pending payments match.</div>';
     _wirePayButtons(body);
   }};
 
@@ -4012,17 +4012,17 @@
     if (footer) footer.style.display = 'none';
     var body = document.getElementById('histModalBody');
     if (!rows.length) {
-      body.innerHTML = '<div style="text-align:center;padding:40px;color:#9AA0A6;font-size:13px">No payments recorded yet.</div>';
+      body.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-lt, #5F6368);font-size:13px">No payments recorded yet.</div>';
     } else {
       body.innerHTML = rows.map(function(p){
         var d = new Date(p.created_at);
         return '<div style="padding:12px 0;border-bottom:1px solid #F1F3F4">'
           +'<div style="display:flex;justify-content:space-between;align-items:center">'
           +'<div style="font-size:14px;font-weight:700;color:var(--deep-ink)">UGX '+fmtUGX(p.amount_ugx)+'</div>'
-          +'<div style="font-size:11px;color:#9AA0A6">'+d.toLocaleString('en-UG')+'</div>'
+          +'<div style="font-size:11px;color:var(--text-lt, #5F6368)">'+d.toLocaleString('en-UG')+'</div>'
           +'</div>'
-          +'<div style="font-size:12px;color:#5F6368;margin-top:2px">Method: '+esc(p.method||'')+(p.reference?' • Ref: '+esc(p.reference):'')+'</div>'
-          +(p.notes ? '<div style="font-size:12px;color:#5F6368;margin-top:4px;font-style:italic">"'+esc(p.notes)+'"</div>' : '')
+          +'<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px">Method: '+esc(p.method||'')+(p.reference?' • Ref: '+esc(p.reference):'')+'</div>'
+          +(p.notes ? '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:4px;font-style:italic">"'+esc(p.notes)+'"</div>' : '')
           +'</div>';
       }).join('');
     }
@@ -4250,7 +4250,7 @@
     var clinicId = await resolveClinicId();
     var demoMode = !!(session && session.demo);
     if (!clinicId && !demoMode) {
-      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">Account not linked to a clinic.</div>';
+      listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">Account not linked to a clinic.</div>';
       return;
     }
 
@@ -4404,7 +4404,7 @@
       }
 
       if (!items.length) {
-        listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:#9AA0A6;font-size:13px">'
+        listEl.innerHTML = '<div style="padding:18px 14px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">'
           +'<span class="material-icons-outlined" style="font-size:28px;display:block;margin-bottom:8px">inventory_2</span>'
           +'No stock items yet. Add your medicines and materials to start tracking.'
           +'</div>';
@@ -4501,7 +4501,7 @@
     });
     _svSetCount(items.length + ' of ' + (_stockItems || []).length + ' items');
     if (!items.length) {
-      body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No items match.</div>';
+      body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No items match.</div>';
       return;
     }
     var groups = { medicine: [], material: [], consumable: [] };
@@ -4510,7 +4510,7 @@
     ['medicine','material','consumable'].forEach(function(type) {
       if (!groups[type].length) return;
       var label = { medicine:'Medicines', material:'Materials', consumable:'Consumables' }[type];
-      html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
+      html += '<div style="padding:8px 20px 4px;font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.5px">'+label+'</div>';
       html += groups[type].map(_stockRowHtml).join('');
     });
     body.innerHTML = html;
@@ -5267,12 +5267,12 @@
         var invRes = await supabase.from('clinic_inventory').select('id,item_name,unit').in('id', topIds);
         var invMap = {};
         (invRes.data||[]).forEach(function(i){ invMap[i.id]=i; });
-        tiEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:#9AA0A6;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Top Items Used</div>'
+        tiEl.innerHTML = '<div style="font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Top Items Used</div>'
           + topIds.map(function(id) {
               var item = invMap[id] || { item_name: id.slice(0,8)+'…', unit:'units' };
-              return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:13px">'
+              return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border, #E0E0E0);font-size:13px">'
                 +'<span>'+esc(item.item_name)+'</span>'
-                +'<span style="font-weight:700;color:#424242">'+usage[id]+' '+esc(item.unit)+'</span>'
+                +'<span style="font-weight:700;color:var(--text, #1A1A1A)">'+usage[id]+' '+esc(item.unit)+'</span>'
               +'</div>';
           }).join('');
       } else if (tiEl) {
@@ -5392,8 +5392,8 @@
       var unitTxt = d.unitType === 'tab' ? '' : ' (' + d.unitType + ')';
       return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid #EEF5EF">'
         + '<div style="flex:1;min-width:0">'
-        +   '<div style="font-size:13.5px;font-weight:700;color:#202124;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(d.name) + '</div>'
-        +   '<div style="font-size:11.5px;color:#5F6368">' + d.qty + ' × ' + esc(d.unitLabel) + unitTxt + '</div>'
+        +   '<div style="font-size:13.5px;font-weight:700;color:var(--text, #1A1A1A);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(d.name) + '</div>'
+        +   '<div style="font-size:11.5px;color:var(--text-lt, #5F6368)">' + d.qty + ' × ' + esc(d.unitLabel) + unitTxt + '</div>'
         + '</div>'
         + '<div style="font-size:14px;font-weight:800;color:var(--deep-ink);white-space:nowrap">UGX ' + fmtUGX(d.total) + '</div>'
         + '<button type="button" onclick="removeQsCartLine(' + i + ')" title="Remove" style="background:none;border:none;color:#C62828;cursor:pointer;font-size:20px;line-height:1;padding:2px 4px;touch-action:manipulation">×</button>'
@@ -5693,7 +5693,7 @@
       }
     }
     if (!hadInstant) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading stock…</div>';
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">Loading stock…</div>';
     }
 
     // OFFLINE: stop here — the cache (or a clear message) is all we can show.
@@ -5749,7 +5749,7 @@
         if (r._timeout || (window.ClinicOffline && ClinicOffline.isNetworkErr(r.error))) {
           grid.innerHTML = window.ClinicOffline
             ? ClinicOffline.offlineHtml('Slow connection — couldn’t load stock.<br><button onclick="loadQsDrugs()" style="margin-top:10px;background:var(--deep);color:#fff;border:none;border-radius:9px;padding:9px 16px;font-size:13px;font-weight:700;font-family:inherit">Retry</button>')
-            : '<div style="grid-column:1/-1;text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Slow connection — reopen Quick Sale to retry.</div>';
+            : '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">Slow connection — reopen Quick Sale to retry.</div>';
           return;
         }
         // Real account with no stock: show the empty state that prompts
@@ -5818,7 +5818,7 @@
     var grid = document.getElementById('qsDrugGrid');
     if (!grid) return;
     if (!items.length) {
-      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:#9AA0A6;font-size:13px">'
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:36px 20px;color:var(--text-lt, #5F6368);font-size:13px">'
         + '<span class="material-icons-outlined" style="font-size:36px;display:block;margin-bottom:10px;color:#CFD8DC">inventory_2</span>'
         + 'No sellable items in stock yet. Tap <strong style="color:var(--deep-ink)">+ New Item</strong> above to add medicines or other items you sell (pampers, condoms…).'
         + '</div>';
@@ -5850,7 +5850,7 @@
         + '<div class="qs-drug-stock" style="color:' + stockClr + '">' + item.quantity + ' ' + esc(item.unit||'') + '</div>'
         + '</div>';
     }).join('')
-      + '<div id="qsNoMatch" style="display:none;grid-column:1/-1;text-align:center;padding:24px;color:#9AA0A6;font-size:14px">No match found.</div>';
+      + '<div id="qsNoMatch" style="display:none;grid-column:1/-1;text-align:center;padding:24px;color:var(--text-lt, #5F6368);font-size:14px">No match found.</div>';
   }
 
   function renderQsCategoryChips() {
@@ -6080,13 +6080,13 @@
           : 'box (' + (d.packs_per_box || '?') + ' packs)';
         priceEl.innerHTML = uPrice
           ? 'Sell per ' + unitLabel + ': <b style="color:var(--deep-ink)">UGX ' + fmtUGX(uPrice) + '</b>'
-            + (sell ? ' &nbsp;<span style="color:#9AA0A6;font-size:11px">(' + fmtUGX(sell) + '/' + unit + ')</span>' : '')
+            + (sell ? ' &nbsp;<span style="color:var(--text-lt, #5F6368);font-size:11px">(' + fmtUGX(sell) + '/' + unit + ')</span>' : '')
           : '<span style="color:#E65100">⚠ No ' + unitLabel + ' price set</span>';
       } else {
         if (sell && buy) {
           priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &middot; Sell: <b style="color:var(--deep-ink)">UGX ' + fmtUGX(sell) + '</b> per ' + unit;
         } else if (sell) {
-          priceEl.innerHTML = 'Sell: <b style="color:var(--deep-ink)">UGX ' + fmtUGX(sell) + '</b> per ' + unit + ' &nbsp;<span style="color:#9AA0A6">(buy price not set)</span>';
+          priceEl.innerHTML = 'Sell: <b style="color:var(--deep-ink)">UGX ' + fmtUGX(sell) + '</b> per ' + unit + ' &nbsp;<span style="color:var(--text-lt, #5F6368)">(buy price not set)</span>';
         } else if (buy) {
           priceEl.innerHTML = 'Buy: <b>UGX ' + fmtUGX(buy) + '</b> &nbsp;<span style="color:#E65100">⚠ Set selling price for correct revenue</span>';
         } else {
@@ -6340,7 +6340,7 @@
     if (!clinicId) return;
     var body = document.getElementById('topConditionsBody');
     if (!body) return;
-    body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Loading…</div>';
+    body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>';
 
     var since = new Date(Date.now() - _condPeriodDays * 86400000).toISOString();
     // Always fetch the WIDEST window (90d) and cache it under ONE key, then
@@ -6374,7 +6374,7 @@
     if ((res.error && !condData.length) || condData.length === 0) {
       body.innerHTML = (CO && (CO.isOffline() || CO.isNetworkErr(res.error)))
         ? CO.offlineHtml('Conditions will show here once loaded online.')
-        : '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses recorded in this period.</div>';
+        : '<div style="padding:16px;color:var(--text-lt, #5F6368);font-size:13px;text-align:center">No diagnoses recorded in this period.</div>';
       return;
     }
 
@@ -6397,7 +6397,7 @@
     var all = Object.entries(dxCount).sort(function(a,b){ return b[1]-a[1]; });
 
     if (all.length === 0) {
-      body.innerHTML = '<div style="padding:16px;color:#9AA0A6;font-size:13px;text-align:center">No diagnoses with confirmed names yet.</div>';
+      body.innerHTML = '<div style="padding:16px;color:var(--text-lt, #5F6368);font-size:13px;text-align:center">No diagnoses with confirmed names yet.</div>';
       return;
     }
 
@@ -6409,7 +6409,7 @@
     var html = '<div style="display:flex;flex-direction:column;gap:14px">'
       + all.slice(0, COND_N).map(function(entry, idx) { return _condCardHtml(entry, idx); }).join('')
       + '</div>'
-      + '<div style="font-size:11px;color:#9AA0A6;padding:10px 0 0;text-align:right">'+totalCases+' total treatments in last '+_condPeriodDays+' days</div>'
+      + '<div style="font-size:11px;color:var(--text-lt, #5F6368);padding:10px 0 0;text-align:right">'+totalCases+' total treatments in last '+_condPeriodDays+' days</div>'
       + (all.length > COND_N ? _svViewAllBtn('conditions', 'View all ' + all.length + ' conditions') : '');
     body.innerHTML = html;
     refreshSectionView();
@@ -6438,11 +6438,11 @@
             return '<span style="background:'+ bgClr+';color:'+txtClr+';font-size:11px;font-weight:600;padding:3px 9px;border-radius:12px;border:1px solid '+txtClr+'33">💊 '+esc(dr)+'</span>';
           }).join('')
         + '</div>'
-      : '<div style="font-size:11px;color:#9AA0A6;margin-top:5px">No prescriptions recorded</div>';
+      : '<div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:5px">No prescriptions recorded</div>';
 
-    return '<div style="background:#FAFAFA;border-radius:12px;padding:12px 14px">'
+    return '<div style="background:var(--bg, #F5F5F5);border-radius:12px;padding:12px 14px">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
-      +   '<div style="font-size:13px;font-weight:700;color:#202124">'+(idx+1)+'. '+esc(label)+'</div>'
+      +   '<div style="font-size:13px;font-weight:700;color:var(--text, #1A1A1A)">'+(idx+1)+'. '+esc(label)+'</div>'
       +   '<div style="font-size:12px;font-weight:700;color:'+txtClr+'">'+count+' case'+(count!==1?'s':'')+' · '+pct+'%</div>'
       + '</div>'
       + '<div style="background:#E0E0E0;border-radius:4px;height:5px;overflow:hidden;margin-bottom:6px">'
@@ -6457,7 +6457,7 @@
     var d = _condData;
     if (!d || !d.all.length) {
       _svSetCount('');
-      body.innerHTML = '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No diagnoses recorded in this period yet.</div>';
+      body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No diagnoses recorded in this period yet.</div>';
       return;
     }
     var list = d.all.filter(function(e){ return !q || e[0].indexOf(q) >= 0; });
@@ -6466,7 +6466,7 @@
       ? '<div style="display:flex;flex-direction:column;gap:14px">'
         + list.map(function(entry, idx) { return _condCardHtml(entry, idx); }).join('')
         + '</div>'
-      : '<div style="padding:30px;text-align:center;color:#9AA0A6;font-size:13px">No conditions match.</div>';
+      : '<div style="padding:30px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">No conditions match.</div>';
   }};
 
   // ── Monthly Reports ──────────────────────────────────────
@@ -6505,7 +6505,7 @@
     };
     var res = window.ClinicOffline ? await ClinicOffline.cachedQuery('monthly_reports_' + clinicId, _mrQ) : await _mrQ();
     if (!res.data || !res.data.length) {
-      container.innerHTML = '<span style="font-size:12px;color:#9AA0A6;padding:6px 0">No reports yet — generates automatically on the last day of each month.</span>';
+      container.innerHTML = '<span style="font-size:12px;color:var(--text-lt, #5F6368);padding:6px 0">No reports yet — generates automatically on the last day of each month.</span>';
       return;
     }
     container.innerHTML = res.data.map(function(r) {
@@ -6585,13 +6585,13 @@
     var y = parseInt(document.getElementById('mrYear').value);
     var m = parseInt(document.getElementById('mrMonth').value);
     var body = document.getElementById('mrBody');
-    body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Loading…</div>';
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">Loading…</div>';
     var res = await supabase.from('clinic_monthly_summaries')
       .select('*').eq('clinic_id', clinicId).eq('year', y).eq('month', m).maybeSingle();
 
     // Table doesn't exist yet — compute live from raw tables
     if (res.error && (res.error.code === '42P01' || (res.error.message||'').includes('does not exist') || (res.error.message||'').includes('relation') || (res.error.message||'').includes('schema cache') || (res.error.message||'').includes('clinic_monthly_summaries'))) {
-      body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Computing from live data…</div>';
+      body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Computing from live data…</div>';
       var r = await computeMonthlyReportClientSide(clinicId, y, m);
       renderMonthlyReport(r);
       return;
@@ -6600,7 +6600,7 @@
     if (res.error) { body.innerHTML = '<div style="padding:16px;color:#C62828;font-size:13px">Error: ' + esc(res.error.message) + '</div>'; return; }
     if (!res.data) {
       body.innerHTML = '<div style="text-align:center;padding:32px">'
-        + '<div style="font-size:13px;color:#9AA0A6;margin-bottom:14px">No report found for ' + MONTH_NAMES[m] + ' ' + y + '.</div>'
+        + '<div style="font-size:13px;color:var(--text-lt, #5F6368);margin-bottom:14px">No report found for ' + MONTH_NAMES[m] + ' ' + y + '.</div>'
         + '<button onclick="generateMonthlyReport()" style="padding:10px 20px;background:#0277BD;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;touch-action:manipulation">Generate Now</button>'
         + '</div>';
       return;
@@ -6616,7 +6616,7 @@
     var btn  = document.getElementById('mrGenBtn');
     var body = document.getElementById('mrBody');
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-icons-outlined" style="font-size:15px">refresh</span> Generating…'; }
-    body.innerHTML = '<div style="text-align:center;padding:32px;color:#9AA0A6;font-size:13px">Generating report for ' + MONTH_NAMES[m] + ' ' + y + '…</div>';
+    body.innerHTML = '<div style="text-align:center;padding:32px;color:var(--text-lt, #5F6368);font-size:13px">Generating report for ' + MONTH_NAMES[m] + ' ' + y + '…</div>';
     var res = await supabase.rpc('generate_clinic_monthly_summary', {
       p_clinic_id: clinicId, p_year: y, p_month: m, p_manual: true
     });
@@ -6624,7 +6624,7 @@
     if (res.error) {
       // DB function not installed — fall back to client-side computation
       if (res.error.code === 'PGRST202' || (res.error.message||'').includes('function') || (res.error.message||'').includes('schema cache')) {
-        body.innerHTML = '<div style="text-align:center;padding:20px;color:#9AA0A6;font-size:13px">Computing live report…</div>';
+        body.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Computing live report…</div>';
         var r = await computeMonthlyReportClientSide(clinicId, y, m);
         renderMonthlyReport(r);
         return;
@@ -6670,11 +6670,11 @@
     if (pmKeys.length) {
       var pmLabels = { cash:'Cash', mobile_money:'Mobile Money', bank:'Bank', card:'Card', insurance:'Insurance', other:'Other' };
       pmHtml = '<div style="margin-bottom:20px">'
-             + '<div style="font-size:12px;font-weight:700;color:#424242;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Collections by Method</div>'
+             + '<div style="font-size:12px;font-weight:700;color:var(--text, #1A1A1A);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Collections by Method</div>'
              + '<div style="display:flex;flex-wrap:wrap;gap:8px">'
              + pmKeys.map(function(k) {
-                 return '<div style="background:#F5F5F5;border-radius:8px;padding:9px 14px;font-size:13px">'
-                      + '<span style="font-weight:600;color:#424242">' + (pmLabels[k]||k) + '</span>'
+                 return '<div style="background:var(--bg, #F5F5F5);border-radius:8px;padding:9px 14px;font-size:13px">'
+                      + '<span style="font-weight:600;color:var(--text, #1A1A1A)">' + (pmLabels[k]||k) + '</span>'
                       + '<span style="color:var(--deep-ink);font-weight:700;margin-left:8px">UGX ' + fmtUGX(pm[k]) + '</span>'
                       + '</div>';
                }).join('')
@@ -6686,9 +6686,9 @@
     var stockHtml = '';
     if (snapshot.length) {
       var rows = snapshot.map(function(s) {
-        return '<tr style="border-bottom:1px solid #F0F0F0">'
-          + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:#202124">' + esc(s.item_name) + '</td>'
-          + '<td style="padding:9px 10px;font-size:12px;color:#5F6368;text-align:center">' + esc(s.unit||'') + '</td>'
+        return '<tr style="border-bottom:1px solid var(--border, #E0E0E0)">'
+          + '<td style="padding:9px 10px;font-size:13px;font-weight:600;color:var(--text, #1A1A1A)">' + esc(s.item_name) + '</td>'
+          + '<td style="padding:9px 10px;font-size:12px;color:var(--text-lt, #5F6368);text-align:center">' + esc(s.unit||'') + '</td>'
           + '<td style="padding:9px 10px;font-size:13px;color:#C62828;text-align:right;font-weight:600">' + (s.qty_used||0) + '</td>'
           + '<td style="padding:9px 10px;font-size:13px;color:var(--deep-ink);text-align:right;font-weight:600">' + (s.qty_added||0) + '</td>'
           + '<td style="padding:9px 10px;font-size:13px;color:#0277BD;text-align:right;font-weight:600">' + (s.closing_qty||0) + '</td>'
@@ -6697,23 +6697,23 @@
           + '</tr>';
       }).join('');
       stockHtml = '<div>'
-        + '<div style="font-size:12px;font-weight:700;color:#424242;text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Stock Used This Month</div>'
+        + '<div style="font-size:12px;font-weight:700;color:var(--text, #1A1A1A);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px">Stock Used This Month</div>'
         + '<div style="overflow-x:auto">'
         + '<table style="width:100%;border-collapse:collapse;font-family:inherit">'
-        + '<thead><tr style="background:#F5F5F5">'
-        + '<th style="padding:8px 10px;font-size:11px;text-align:left;color:#424242;font-weight:700;text-transform:uppercase">Item</th>'
-        + '<th style="padding:8px 10px;font-size:11px;text-align:center;color:#424242;font-weight:700;text-transform:uppercase">Unit</th>'
+        + '<thead><tr style="background:var(--bg, #F5F5F5)">'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:left;color:var(--text, #1A1A1A);font-weight:700;text-transform:uppercase">Item</th>'
+        + '<th style="padding:8px 10px;font-size:11px;text-align:center;color:var(--text, #1A1A1A);font-weight:700;text-transform:uppercase">Unit</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#C62828;font-weight:700;text-transform:uppercase">Used</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:var(--deep-ink);font-weight:700;text-transform:uppercase">Restocked</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#0277BD;font-weight:700;text-transform:uppercase">Closing Stock</th>'
         + '<th style="padding:8px 10px;font-size:11px;text-align:right;color:#E65100;font-weight:700;text-transform:uppercase">Cost (UGX)</th>'
         + '</tr></thead><tbody>' + rows + '</tbody></table></div></div>';
     } else {
-      stockHtml = '<div style="font-size:13px;color:#9AA0A6;padding:8px 0">No stock activity recorded this month.</div>';
+      stockHtml = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">No stock activity recorded this month.</div>';
     }
 
     body.innerHTML = ''
-      + '<div style="font-size:11px;color:#9AA0A6;margin-bottom:16px">'
+      + '<div style="font-size:11px;color:var(--text-lt, #5F6368);margin-bottom:16px">'
       + MONTH_NAMES[r.month] + ' ' + r.year + ' · ' + genLabel + ' · ' + genAt
       + '</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px">'
@@ -6727,10 +6727,10 @@
   loadTopConditions();
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/clinic-look.js?v=20260909"></script>
-<script src="js/clinic-impression.js?v=20260928" defer></script>
-<script src="js/clinic-dictate.js?v=20260927" defer></script>
-<script src="js/clinic-speak.js?v=20260928" defer></script>
-<script src="js/pwa-install.js?v=20260831"></script>
+<script src="js/clinic-look.js?v=20260930"></script>
+<script src="js/clinic-impression.js?v=20260930" defer></script>
+<script src="js/clinic-dictate.js?v=20260930" defer></script>
+<script src="js/clinic-speak.js?v=20260930" defer></script>
+<script src="js/pwa-install.js?v=20260930"></script>
 </body>
 </html>

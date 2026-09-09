@@ -887,7 +887,7 @@
       '.ucg-tick{grid-column:1;grid-row:1;align-self:start;width:26px;height:26px;border-radius:9px;border:1.5px solid var(--border);' +
         'background:var(--surface);color:var(--text-lt);display:grid;place-items:center;cursor:pointer;font-family:inherit;flex:none;margin-right:2px}',
       '.ucg-tick .material-icons-outlined{font-size:16px}',
-      '.ucg-tick.on{background:var(--primary);border-color:var(--primary);color:#fff}',
+      '.ucg-tick.on{background:var(--primary);border-color:var(--primary);color:var(--on-primary, #fff)}',
       '.ucg-agefit{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--brand-tint);color:var(--brand-ink);vertical-align:middle}',
       '.ucg-ageno{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--pr-owe-bg);color:var(--pr-owe-fg);vertical-align:middle}',
       '.ucg-drug{display:grid;grid-template-columns:auto 1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px;opacity:.72}',
@@ -920,11 +920,11 @@
       '.ucg-lbl{font-size:9.5px;font-weight:700;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;text-align:center;display:block;margin-bottom:2px}',
       // A drip is hung here, not carried home — said plainly on the row.
       '.fields-here{grid-template-columns:1fr auto !important;align-items:center}',
-      '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--primary);line-height:1.3}',
+      '.ucg-here{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--primary-ink);line-height:1.3}',
       // The common drips, one tap each — on every condition, not just the few
       // the book happens to name a fluid for.
       '.ucg-qf{display:flex;flex-wrap:wrap;gap:6px;padding:10px 12px 12px}',
-      '.ucg-qfb{padding:6px 11px;border-radius:20px;border:1.5px dashed var(--border,#D7E4D9);background:transparent;color:var(--primary);font:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}',
+      '.ucg-qfb{padding:6px 11px;border-radius:20px;border:1.5px dashed var(--border,#D7E4D9);background:transparent;color:var(--primary-ink);font:inherit;font-size:12px;font-weight:700;cursor:pointer;touch-action:manipulation}',
       '.ucg-qfb:active{background:rgba(14,124,90,.10)}',
       'html[data-theme="dark"] .ucg-qfb{border-color:#3A4A40;color:var(--brand-ink)}',
       '.ucg-here .material-icons-outlined{font-size:15px}',
@@ -935,7 +935,7 @@
       '.ucg-money label{font-size:10px;font-weight:800;color:var(--text-lt);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px}',
       '.ucg-money input{width:100%;border:1.5px solid var(--border);border-radius:11px;padding:10px;font:inherit;font-size:15px;font-weight:700;background:var(--surface);color:var(--text);text-align:right}',
       '.ucg-total{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-top:1px solid var(--border);font-size:13px;font-weight:800;color:var(--text)}',
-      '.ucg-total b{font-size:18px;color:var(--primary);letter-spacing:-.02em}',
+      '.ucg-total b{font-size:18px;color:var(--primary-ink);letter-spacing:-.02em}',
       '.ucg-foot{flex:none;padding:12px 14px;border-top:1px solid var(--border);background:var(--surface);display:flex;gap:9px;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))}',
       '.ucg-btn{flex:1;border:none;border-radius:14px;padding:14px;font:inherit;font-size:14.5px;font-weight:800;cursor:pointer}',
       '.ucg-btn.ghost{background:var(--bg);color:var(--text-lt);flex:0 0 34%}',
@@ -967,7 +967,7 @@
       '.ucg-det{border-radius:12px;background:var(--bg);margin-bottom:7px;overflow:hidden}',
       '.ucg-det summary{display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer;list-style:none;font-size:13px;font-weight:700;color:var(--text)}',
       '.ucg-det summary::-webkit-details-marker{display:none}',
-      '.ucg-det summary .material-icons-outlined{font-size:18px;color:var(--primary);flex:none}',
+      '.ucg-det summary .material-icons-outlined{font-size:18px;color:var(--primary-ink);flex:none}',
       '.ucg-det summary .chev{margin-left:auto;color:var(--text-lt);transition:transform .18s}',
       '.ucg-det[open] summary .chev{transform:rotate(180deg)}',
       // The notes are real markup now (headings, paragraphs, bullets), not a
@@ -1932,7 +1932,7 @@
           var venTxt = { V: 'Vital', E: 'Essential', N: 'Necessary' }[m.ven] || '';
           var above = lvl && m.level && LEVELS.indexOf(m.level) > LEVELS.indexOf(lvl);
           return '<div data-i="' + i + '"><b>' + esc(m.name) + '</b>' +
-            (m.dose ? ' <span style="color:var(--primary);font-weight:700">' + esc(m.dose + (m.unit || '')) + '</span>' : '') +
+            (m.dose ? ' <span style="color:var(--primary-ink);font-weight:700">' + esc(m.dose + (m.unit || '')) + '</span>' : '') +
             (m.form ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.form) + '</span>' : '') +
             (m.route ? ' <span style="color:var(--text-lt);font-size:11.5px">' + esc(m.route) + '</span>' : '') +
             (m.level ? '<span class="em-tag' + (above ? ' warn' : '') + '">' + esc(m.level) + '</span>' : '') +

@@ -237,7 +237,7 @@
   }
   // Friendly placeholder to show in a section instead of a raw error offline.
   function offlineHtml(msg) {
-    return '<div style="padding:22px;text-align:center;color:#5F6368;font-size:13px">' +
+    return '<div style="padding:22px;text-align:center;color:var(--text-lt, #5F6368);font-size:13px">' +
       '<span class="material-icons-outlined" style="font-size:26px;display:block;margin-bottom:6px;color:#B0BEC5">cloud_off</span>' +
       (msg || 'You’re offline — reconnect to load this.') + '</div>';
   }
