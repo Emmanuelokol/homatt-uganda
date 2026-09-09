@@ -93,7 +93,8 @@
    'left right side both upper lower general normal abnormal past known case cases usually ' +
    'mild moderate severe severely acute chronic slight marked ' +
    'done taken take taking give given signs symptoms sign symptom favour episode episodes ' +
-   'often sometimes may commonly rare common associated including such').split(' ')
+   'often sometimes may commonly rare common associated including such present ' +
+   'one two three four five six seven eight nine ten').split(' ')
     .forEach(function (w) { STOP[w] = 1; });
 
   var SUFFIX = /(ing|ness|edly|ed|ies|es|s|ly)$/;
@@ -123,6 +124,85 @@
     }
     return out;
   }
+
+  // ── What the clinician said was NOT there ───────────────────────────────
+  //
+  // Until this existed, a denial was scored as evidence FOR the thing denied.
+  // "no rigidity, no guarding, no rebound" tokenised to rigidity/guard/rebound
+  // — three rare, high-IDF words — and put Peritonitis top at 79%, above the
+  // score the same engine gave when those signs were actually PRESENT (57%).
+  // Writing down a careful negative examination made the emergency look more
+  // likely, not less. That is the fault the rigidity guard below is built on,
+  // and it applies to every denial a clinician writes, not only these three.
+  //
+  // This is a small NegEx: find a cue, read forward a bounded distance, stop
+  // at the first thing that ends the denial. It runs on the QUERY only. The
+  // indexed documents are left exactly as the books wrote them — "in the
+  // absence of peritonitis there is no rigidity" is Acute Pancreatitis's own
+  // description of itself, and rewriting the book to match a phone would be a
+  // far larger and worse change.
+  var NEG_CUE = /^(?:no|not|denies|denied|denying|without|never|nil|none|nothing)$/;
+  var NEG_CUE2 = { negative: 'for', free: 'of' };
+  // A new clause ends the denial: "no vomiting BUT HAS diarrhoea".
+  var NEG_STOP = /^(?:but|however|although|though|except|apart|yet|plus|with|has|have|had|is|was|were|are|been|being|complains|complaining|reports|presents|presented|states|says|said|tells|told|positive|present|noted|noticed|seen|found|shows|showing|started|since|now|only|still|when|while|which|who|because|after|before|during)$/;
+  // ...but these keep a list of denied things running: "no fever or cough".
+  var NEG_CARRY = /^(?:or|and|nor|any|of|the|a|an|to|on|in|per|new)$/;
+  // "never HAD convulsions" — an auxiliary sitting directly on the cue is part
+  // of the denial; the same word later in the sentence starts a new clause.
+  var NEG_AUX = /^(?:had|has|have|is|was|were|been|being|got|gets)$/;
+  // "no fever AND THE mother says…" — a determiner after a conjunction opens a
+  // new noun phrase, so the list of denied things has ended.
+  var NEG_NEW = /^(?:the|a|an|she|he|they|it|we|i|you|his|her|their|this|that|my)$/;
+  var NEG_WINDOW = 4;
+
+  function denials(text) {
+    var s = expand(text);
+    var words = [], rx = /([^a-z]*)([a-z]+)/g, m;
+    while ((m = rx.exec(s))) {
+      words.push({ w: m[2], gap: m[1], a: m.index + m[1].length, b: rx.lastIndex });
+    }
+    var inScope = {}, spans = [];
+    for (var i = 0; i < words.length; i++) {
+      var start = -1;
+      if (NEG_CUE.test(words[i].w)) start = i + 1;
+      else if (NEG_CUE2[words[i].w] && words[i + 1] &&
+               words[i + 1].w === NEG_CUE2[words[i].w]) start = i + 2;
+      if (start < 0 || start >= words.length) continue;
+      var taken = 0, from = -1, to = -1;
+      for (var j = start; j < words.length; j++) {
+        var wd = words[j];
+        if (/[.;:!?,()\/]/.test(wd.gap)) break;                 // punctuation ends it
+        if (NEG_STOP.test(wd.w) && !(j === start && NEG_AUX.test(wd.w))) break;
+        if (NEG_CUE.test(wd.w) || NEG_CUE2[wd.w]) break;        // the next denial ends it
+        if (/^(?:and|or|nor)$/.test(wd.w) && words[j + 1] && NEG_NEW.test(words[j + 1].w)) break;
+        if (from < 0) from = wd.a;
+        to = wd.b;
+        inScope[j] = 1;
+        if (!NEG_CARRY.test(wd.w) && !STOP[wd.w]) { taken++; if (taken >= NEG_WINDOW) break; }
+      }
+      if (from >= 0) spans.push(s.slice(from, to).trim());
+      // i only ever moves forward, so no input can make this loop for ever.
+    }
+    // What is left once the denied words are taken out. Built by blanking
+    // those words where they stand rather than by joining the survivors,
+    // because the punctuation has to stay: the predicates below use a comma
+    // to tell "pain, urine is dark" from "pain on passing urine", and joining
+    // words would turn the first into the second.
+    var chars = s.split(''), denied = [];
+    for (var k = 0; k < words.length; k++) {
+      if (!inScope[k]) continue;
+      denied.push(words[k].w);
+      for (var c = words[k].a; c < words[k].b; c++) chars[c] = ' ';
+    }
+    var said = chars.join('');
+    var affirmed = toks(said);
+    // A word said plainly somewhere else is not denied. "pain in the lower
+    // abdomen, no pain on passing urine" must not lose "pain" — so the tokens
+    // to drop are the denied ones MINUS everything affirmed anywhere.
+    var drop = toks(denied.join(' ')).filter(function (t) { return affirmed.indexOf(t) < 0; });
+    return { drop: drop, spans: spans, said: ' ' + said + ' ', raw: s };
+  }
+  function deniedStem(neg, t) { return neg.drop.indexOf(t) >= 0; }
 
   // ── Vitals become the words the books use ───────────────────────────────
   // A temperature of 39.4 is not a word the guideline can match. "Fever" is.
@@ -167,6 +247,183 @@
       else if (s < 90) out.push({ k: 'danger', t: 'Low blood pressure (' + s + '/' + d + ')', w: 'Check for shock' });
     }
     return out;
+  }
+
+  // ── Two rules, and the lists they act on ────────────────────────────────
+  //
+  // Both lists are explicit title_normalized values, checked one by one
+  // against impression_index.db. They are NOT text matches, and that is the
+  // whole point: a search of the documents for "peritonitis" or "rebound"
+  // catches Typhoid Fever, Ectopic Pregnancy, PID, Acute Pancreatitis and
+  // Peptic Ulcer Disease, because each of those describes peritonitis as a
+  // complication of itself. A rule that demotes on a text match would suppress
+  // the ruptured ectopic in the same breath as the peritonitis.
+
+  // RULE 1 — demoted when rigidity and guarding are recorded as ABSENT.
+  // Only conditions whose diagnosis genuinely turns on those two signs. The
+  // list started at six and was cut to three on review; what came off, and
+  // why, matters more than what stayed:
+  //   • ectopic pregnancy   — an UNRUPTURED tubal pregnancy has a soft
+  //                           abdomen. It is the one window in which the woman
+  //                           can still be saved cheaply, and demoting it on a
+  //                           soft belly closes exactly that window.
+  //   • intestinal obstruction — distended, tympanitic and soft until it
+  //                           strangulates; the book names no peritoneal sign.
+  //   • intussusception     — in a screaming infant guarding cannot be
+  //                           assessed at all, so "no guarding" in a
+  //                           paediatric note is usually an artefact.
+  //   • acute pancreatitis  — the book says, in as many words, "in the absence
+  //                           of peritonitis there is no rigidity/rebound".
+  //   • spontaneous bacterial peritonitis — carries the word, is not a
+  //                           surgical abdomen, and has a soft belly by rule.
+  var ACUTE_ABDOMEN = ['peritonitis', 'acute appendicitis', 'appendicitis'];
+
+  // RULE 2 — moved up for a woman with lower-quadrant pain plus discharge or
+  // dysuria. Ectopic pregnancy is deliberately IN this list. It shares the
+  // trigger exactly — sexually active woman, lower abdominal pain, spotting,
+  // urinary frequency — and treating a discharge as evidence for PID and
+  // therefore against ectopic is the classic fatal error. It is boosted with
+  // the rest, never in place of them.
+  var GYNAE_URO = [
+    'pelvic inflammatory disease', 'abnormal vaginal discharge syndrome',
+    'vaginitis vulvovaginitis', 'candidiasis', 'trichomoniasis trichomonas vaginalis',
+    'gonorrhoea neisseria gonorrhoeae vesicle s or ulcer s present', 'urethritis',
+    'genital herpes', 'genital herpes herpes simplex virus 2', 'dysmenorrhoea',
+    'ectopic pregnancy', 'vaginal bleeding in early pregnancy abortion',
+    'puerperal fever sepsis',
+    'acute cystitis', 'acute pyelonephritis', 'urinary tract infection',
+    'urine tract infection', 'urinary tract infections in pregnancy',
+    'prostatitis', 'epididymoorchitis', 'painful scrotal swelling',
+    // Schistosomiasis is here, in the list that gets RAISED, and it is the
+    // single most important entry on either list. Its own UCG text reads:
+    // "In females: low abdominal pain and abnormal vaginal discharge" and
+    // "Frequent and painful micturition". That is this rule's trigger, word
+    // for word, produced by a worm — endemic around Victoria, Albert and the
+    // Nile. Filed as a parasite it would have been suppressed by the very
+    // presentation that should raise it, PID antibiotics would do nothing,
+    // and untreated female genital schistosomiasis raises HIV risk.
+    'schistosomiasis',
+  ];
+
+  // RULE 2 — hidden for that same presentation unless the bowel is part of the
+  // story. Deliberately short. A condition only belongs here if bowel symptoms
+  // are genuinely required for it to be the answer.
+  var GI_PARASITE = ['amoebiasis', 'giardiasis', 'intestinal worms',
+                     'taeniasis', 'worms', 'helminthes parasites'];
+
+  function inList(list, norm) { return list.indexOf(norm) >= 0; }
+
+  // ── Reading the presentation out of the prose ───────────────────────────
+  // These run on the text, not the tokens, because "lower", "left", "right"
+  // and "upper" are all STOP words and never survive toks().
+  var PAIN = '(?:pain(?!less)\\w*|ache\\w*|aching|cramp\\w*|colic|discomfort|tender\\w*|hurt\\w*|sore\\w*)';
+  var ABD = '(?:abdomen|abdomin\\w*|stomach\\w*|tummy|belly|bellie|pelvis|pelvic|womb|uterus|groin)';
+  // The gap between two ideas is a list of function words, never \w+ — an
+  // open gap turns "pain and normal urine" into dysuria.
+  var GAP = '(?:\\s+(?:in|on|at|of|the|her|his|she|he|is|was|are|and|to|from|around|a|an|it|that|there|this|below|down|part|region|area|side|feels|feeling|felt|has|have|had|with|complains|some|bad|really|just)){0,4}\\s+';
+  function near(a, b) { return new RegExp('(?:' + a + GAP + b + '|' + b + GAP + a + ')'); }
+
+  // A. Pain in the lower quadrants. Never tests the word "lower" on its own:
+  //    SAY_AS rewrites "chest in-drawing" to "lower chest wall indrawing", so
+  //    a bare lower+pain test fires on a child with pneumonia.
+  var LOW_SITE = '\\b(?:low|lower)\\s+(?:part\\s+(?:of\\s+)?(?:the\\s+|her\\s+)?)?' + ABD;
+  var A_SITE = near(LOW_SITE, PAIN);
+  var A_QUAD = /\b(?:left|right|l|r)?\s*lower\s+quadrant\b|\b[lr]\s*\.?\s*l\s*\.?\s*q\b|\b(?:left|right|l|r)\s*\.?\s*ilia?c\s+foss?a\b|\b[lr]\s*\.?\s*i\s*\.?\s*f\b/;
+  var A_PUBIC = /\bsupra[\s-]*(?:pubic|public|pubis)\b|\babove\s+the\s+(?:pubis|pubic\s+bone)\b/;
+  var A_PELVIC = new RegExp('\\bpelvi[cs]\\s+(?!inflammatory)(?:region\\s+|area\\s+)?' + PAIN +
+                            '|' + PAIN + GAP + 'pelvi[cs]\\b(?!\\s+inflammatory)');
+  var A_NAVEL = near(PAIN, '(?:below|under|beneath)\\s+(?:the\\s+|her\\s+)?(?:navel|naval|umbilicus|belly\\s*button)');
+  function lowerPain(x) {
+    return A_SITE.test(x) || A_QUAD.test(x) || A_PUBIC.test(x) ||
+           A_PELVIC.test(x) || A_NAVEL.test(x);
+  }
+
+  // B. Vaginal discharge. "discharg(es|ing)" cannot match "discharged", which
+  //    is what kills "discharged from hospital" at the word level.
+  var VAG = '(?:vagin\\w*|vajin\\w*|birth\\s+canal|private\\s+part\\w*|p\\s*\\/?\\s*v)';
+  var DIS = 'discharg(?:es?|ing)\\b';
+  var B_CLEAR = new RegExp('\\b' + VAG + '(?:\\s+\\w+){0,2}\\s+' + DIS + '|\\b' + DIS +
+                           '(?:\\s+\\w+){0,3}\\s+(?:from|per|through|out\\s+of|in)\\s+(?:the\\s+|her\\s+|a\\s+)?' + VAG);
+  var B_BARE = new RegExp('\\b(?:has|had|having|with|noticed|passing|complains\\s+of|there\\s+is|some|her|a|the|' +
+                          'smell\\w*|foul\\w*|offensive|itch\\w*|whit\\w*|yellow\\w*|green\\w*|creamy|curd\\w*|thick|watery|abnormal|bad|milky|brown\\w*)\\s+(?:\\w+\\s+){0,2}' + DIS);
+  var B_ELSEWHERE = /\b(?:nasal|nose|nostril\w*|ear|ears|aural|eye|eyes|conjunctiv\w*|wound\w*|umbilical|umbilicus|navel|cord|nipple|breast\w*|throat|sinus\w*|skin|ulcer\w*|penile|penis|urethral|anal|anus|rectal)(?:\s+\w+){0,2}\s+discharg/;
+  var B_HOSPITAL = /\bdischarg\w*(?:\s+\w+){0,2}\s+(?:from\s+)?(?:the\s+)?(?:hospital|ward|clinic|facility|health\s+centre)\b/;
+  function vaginalDischarge(x) {
+    if (B_CLEAR.test(x)) return true;               // said plainly — always counts
+    if (B_ELSEWHERE.test(x) || B_HOSPITAL.test(x)) return false;
+    return B_BARE.test(x);                          // "she has discharge", nothing else claiming it
+  }
+
+  // C. Painful urination. SAY_AS rewrites "passing urine" to "urination"
+  //    BEFORE it rewrites "pain(ful) urin*" to "dysuria", so "pain when
+  //    passing urine" arrives as "pain when urination" and never becomes
+  //    dysuria. Without the second branch this predicate misses the commonest
+  //    way a Ugandan patient says it.
+  var C_WORD = /\bd[iy]s+ur[ei][ao]?\b/;
+  var C_BURN = '(?:burn\\w*|scald\\w*|pain(?!less)\\w*|hurt\\w*|sting\\w*|hot|hotness|sharp)';
+  var C_URINE = '(?:urinat\\w*|urination|urine|micturit\\w*|short\\s+call|peeing|pee)';
+  var C_FILL = '(?:\\s+(?:when|whenever|while|during|on|upon|after|as|if|she|he|her|his|him|it|is|was|are|the|a|an|of|to|in|at|feel|feels|feeling|felt|sensation|passing|goes|going|there|that)){0,3}\\s+';
+  var C_NEAR = new RegExp('(?:' + C_BURN + C_FILL + C_URINE + '|' + C_URINE + C_FILL + C_BURN + ')');
+  function dysuria(x) { return C_WORD.test(x) || C_NEAR.test(x); }
+
+  // D. Is the bowel part of the story? This is what lets a parasite back in.
+  var D_DIARR = /\b(?:d[iy]a[rh]{1,4}[oe]{0,2}a|d[iy]s+ent[ae]?r[yi]\w*|d[iy]s+entry)\b/;
+  var D_STOOL = /\b(?:bloody|blood[\s-]*stained|mucoid|muco?us|slim(?:y|e)|watery|loose|frequent)\s+(?:\w+\s+){0,1}(?:stool\w*|motions?)\b|\b(?:blood|mucus|slime)\s+in\s+(?:the\s+|her\s+|his\s+)?stool\w*|\bloose\s+motions?\b|\brunn(?:ing|y)\s+(?:stomach|tummy|belly)\b|\bpurging\b|\bstooling\b/;
+  // Not diarrhoea, but still the bowel or the liver talking — and enough to
+  // stop a parasite being hidden. Amoebiasis has five presentations in the
+  // book and only ONE of them is dysentery: a liver abscess is right
+  // sub-costal pain, fever, chills, sweating and weight loss with no diarrhoea
+  // at all, and an amoeboma is a mass with constipation. Suppression keyed on
+  // the absence of a symptom must never be applied to a condition whose worst
+  // form does not have that symptom.
+  var D_OTHER = /\btenesmus\b|\bworms?\s+(?:seen|passed|in\s+(?:the\s+)?stool)|\bpass\w*\s+worms?\b|\b(?:right\s+)?(?:sub[\s-]*costal|upper\s+quadrant|hypochondri\w*)\b|\bliver\b|\bhepatomegal\w*|\bloss\s+of\s+weight\b|\bnight\s+sweats?\b|\bmass\b|\bswelling\s+in\s+(?:the\s+)?abdomen\b|\bconstipat\w*/;
+  function bowelInPlay(x) { return D_DIARR.test(x) || D_STOOL.test(x) || D_OTHER.test(x); }
+
+  // ── When the rigidity guard must NOT fire ───────────────────────────────
+  // A soft belly does not mean a safe belly. Peritonitis is present without
+  // rigidity in advanced HIV, in the elderly, in the malnourished, on
+  // steroids, and — the lethal one — in late decompensated disease, where the
+  // abdomen goes from rigid to flaccid as the patient deteriorates. At the
+  // point of maximum danger the guarding is gone. Late presentation is the
+  // Ugandan norm.
+  //
+  // Nor can the parser tell "examined, and it was soft" from "not examined"
+  // or "could not assess". The string is identical.
+  //
+  // So these suspend the demotion. Checked on the text as WRITTEN, not on the
+  // denial-stripped text, because some of the worst signs are phrased as
+  // negatives — "not passing stool", "no bowel sounds" — and stripping them as
+  // denials would delete the danger sign along with the reassurance.
+  var RED_SAID = /\bnot?\s+(?:passing|passed|opening|opened)\s+(?:any\s+)?(?:stool|flatus|gas|wind|urine|bowel)|\b(?:absent|no)\s+bowel\s+sounds?\b|\bnot?\s+(?:keep|keeping)\s+anything\s+down\b/;
+  var RED_FOUND = /\b(?:board|boardlike|board[\s-]like|hard|rigid|woody)\s+(?:and\s+\w+\s+)?(?:abdomen|belly|tummy)\b|\babdomen\s+(?:is\s+)?(?:hard|board\w*|rigid|woody)\b|\brebound\b|\bdisten[sd]\w*|\bswollen\s+(?:abdomen|belly|tummy)\b|\bbilious\b|\bfaeculent\b|\bvomit\w*\s+(?:green|everything)\b|\bshoulder\s+tip\b|\bcollapse\w*|\bconfus\w*|\bdrowsi?\w*|\bunconscious\w*|\bcold\s+(?:and\s+)?clammy\b|\bhiv\b|\bar[vt]s?\b|\bsteroid\w*|\blaparotom\w*|\bmissed\s+(?:her\s+)?period\b/;
+
+  function surgicalRedFlags(input, neg, band) {
+    var why = [];
+    var v = input.vitals || {};
+    var t = parseFloat(v.temp), p = parseFloat(v.pulse),
+        s = parseFloat(v.sbp), d = parseFloat(v.dbp);
+    // Under five, guarding is not a sign that can be taken to order.
+    if (band === 'paediatric') why.push('the patient is under five');
+    // One reason from the circulation, not four names for the same collapse.
+    // The shock index is the interesting one: it catches the compensating
+    // 22-year-old at 110/115, whom neither "pulse over 120" nor "systolic
+    // under 90" can see.
+    var circ = '';
+    if (isFinite(p) && isFinite(s) && s > 0 && p / s >= 0.9) {
+      circ = 'the pulse (' + p + ') has caught up with the systolic (' + s + ')';
+    } else if (isFinite(s) && s > 0 && s < 100) {
+      circ = 'the systolic is ' + s;
+    } else if (isFinite(p) && p >= 120) {
+      circ = 'the pulse is ' + p;
+    } else if (isFinite(d) && isFinite(s) && s > 0 && d > 0 && s - d <= 25) {
+      circ = 'the pulse pressure is narrow (' + s + '/' + d + ')';
+    }
+    if (circ) why.push(circ);
+    // Hypothermia in a belly is late sepsis. It must read as MORE dangerous
+    // than a fever, never as the absence of infection.
+    if (isFinite(t) && t > 25 && t < 36) why.push('temperature ' + t);
+    if (RED_SAID.test(neg.raw) || RED_FOUND.test(neg.said)) why.push('what was written');
+    return why;
   }
 
   // ── The index ───────────────────────────────────────────────────────────
@@ -276,7 +533,8 @@
   // ── The suggestion itself ───────────────────────────────────────────────
   function suggest(input, limit) {
     limit = limit || 3;
-    if (!IX) return { ready: false, items: [], flags: vitalFlags(input.vitals) };
+    if (!IX) return { ready: false, items: [], flags: vitalFlags(input.vitals),
+                      rules: [], moved: [], hidden: [], dropped: [], denied: [] };
 
     var terms = [];
     function push(list) {
@@ -300,11 +558,21 @@
     // the two, so it is offered a third of what is left; whatever either does
     // not use goes to the other, and nothing is wasted.
     var MAX_TERMS = 22;
-    push(toks(input.chief));
-    push(vitalTerms(input.vitals));
 
-    var story = toks(input.subjective).filter(function (t) { return terms.indexOf(t) < 0; });
-    var back = toks(input.background).filter(function (t) { return terms.indexOf(t) < 0; });
+    // Everything the clinician said was absent, worked out once over the whole
+    // record rather than field by field — "abdominal pain" in the complaint
+    // has to be able to protect the word "pain" from "no pain on passing
+    // urine" three lines down in the story.
+    var neg = denials([input.chief, input.subjective, input.background].join('. '));
+    function heard(list) {
+      return list.filter(function (t) { return neg.drop.indexOf(t) < 0; });
+    }
+
+    push(heard(toks(input.chief)));
+    push(vitalTerms(input.vitals));      // measured, never denied
+
+    var story = heard(toks(input.subjective)).filter(function (t) { return terms.indexOf(t) < 0; });
+    var back = heard(toks(input.background)).filter(function (t) { return terms.indexOf(t) < 0; });
     var room = Math.max(0, MAX_TERMS - terms.length);
     var backRoom = Math.min(back.length, Math.ceil(room / 3));
     push(story.slice(0, room - backRoom));
@@ -312,7 +580,9 @@
     if (terms.length < MAX_TERMS) push(back.slice(backRoom));    // story left room
     if (terms.length < MAX_TERMS) push(story.slice(room - backRoom));
     terms = terms.slice(0, MAX_TERMS);
-    if (!terms.length) return { ready: true, items: [], flags: vitalFlags(input.vitals) };
+    if (!terms.length) return { ready: true, items: [], flags: vitalFlags(input.vitals),
+                                rules: [], moved: [], hidden: [],
+                                dropped: neg.drop, denied: neg.spans };
 
     var idf = {}, totIdf = 0;
     terms.forEach(function (t) { idf[t] = idfOf(t); totIdf += idf[t]; });
@@ -386,6 +656,104 @@
       // a little, but cannot overtake a much better match.
       if (o.seen) o.rank += Math.min(0.06, 0.02 * Math.log(1 + o.seen));
     });
+    // ── The two rules ────────────────────────────────────────────────────
+    // Applied to the ranks BEFORE the list is cut to three, so a demoted
+    // condition actually leaves the list and something better takes the place,
+    // rather than sitting in it with a small number beside it.
+    var flags = vitalFlags(input.vitals);
+    var rules = [], moved = [], hidden = [];
+
+    // A percentage here is relative to the best match in the list, so the top
+    // suggestion always carries a big-looking number even when there was
+    // almost nothing to match on. That was survivable while a denial padded
+    // the query with words; now that denials are removed, a careful negative
+    // examination can leave two words standing — and two generic words return
+    // a confident-looking list of nonsense. Say so.
+    if (terms.length < 4) {
+      flags.push({ k: 'warn', rule: 'thin',
+        t: 'Only ' + terms.length + ' word' + (terms.length === 1 ? '' : 's') +
+           ' to go on: ' + terms.join(', '),
+        w: 'The percentages below are worked out against each other, not ' +
+           'against the disease, so the top one always looks high. With this ' +
+           'little written down it is close to a guess — add what else you ' +
+           'found, or what they told you, before you use this list.' });
+      rules.push('thin');
+    }
+    var DEMOTED = 0.09;      // ranks map to pct as round(100 * rank), so < 10%
+
+    // RULE 1 — the rigidity guard.
+    // Fires only when rigidity or guarding is written as absent AND neither
+    // they nor rebound are affirmed anywhere else in the record. "Rigidity
+    // present, no guarding" is a contradiction, not a soft belly.
+    var saidSoft = deniedStem(neg, 'rigidity') || deniedStem(neg, 'rigid') ||
+                   deniedStem(neg, 'guard');
+    var stillFirm = /\b(?:rigid|guard|rebound)/.test(neg.said);
+    if (saidSoft && !stillFirm) {
+      var red = surgicalRedFlags(input, neg, band);
+      if (red.length) {
+        // The guard is suspended, and that is worth more words than the
+        // demotion would have been.
+        flags.push({ k: 'danger', rule: 'rigidity-held',
+          t: 'A soft belly is not a safe belly here',
+          w: 'You wrote that there is no rigidity or guarding — but ' +
+             red.join(', ') + '. Peritonitis and appendicitis have been LEFT ' +
+             'in the list on purpose. A late or exhausted abdomen goes soft, ' +
+             'and that is when it is most dangerous.' });
+        rules.push('rigidity-held');
+      } else {
+        out.forEach(function (o) {
+          if (!inList(ACUTE_ABDOMEN, o.norm)) return;
+          var was = o.rank;
+          o.rank = Math.min(was, DEMOTED) * (0.9 + 0.1 * Math.min(1, was));
+          o.demoted = true;
+          moved.push(o.title);
+        });
+        if (moved.length) {
+          // Quote the denials that actually caused this, not the first three
+          // in the record — "no fever, no vomiting, no rigidity" must not tell
+          // the clinician that the fever is why appendicitis moved.
+          var why = neg.spans.filter(function (sp) { return /rigid|guard|rebound/.test(sp); });
+          if (!why.length) why = neg.spans.slice(0, 2);
+          flags.push({ k: 'warn', rule: 'rigidity',
+            t: moved.join(', ') + ' moved to the bottom',
+            w: 'Because you wrote "' + why.slice(0, 3).join('", "') +
+               '". A soft belly does not rule a surgical abdomen out — in late ' +
+               'disease, in advanced HIV and in the elderly the guarding is gone ' +
+               'while the peritonitis is not. If you did not actually press on ' +
+               'the belly and let go, delete those words. If it is distended or ' +
+               'silent, or nothing is passing, refer now whatever this list says.' });
+          rules.push('rigidity');
+        }
+      }
+    }
+
+    // RULE 2 — reproductive priority.
+    if (sex === 'f' && lowerPain(neg.said) &&
+        (vaginalDischarge(neg.said) || dysuria(neg.said))) {
+      out.forEach(function (o) {
+        if (inList(GYNAE_URO, o.norm)) { o.rank *= 1.30; o.grouped = true; }
+      });
+      if (!bowelInPlay(neg.said)) {
+        out = out.filter(function (o) {
+          if (!inList(GI_PARASITE, o.norm)) return true;
+          hidden.push(o.title);
+          return false;
+        });
+      }
+      rules.push('pelvic');
+      flags.push({ k: 'warn', rule: 'pelvic',
+        t: 'Grouped toward the gynaecological and urinary causes' +
+           (hidden.length ? ' — ' + hidden.join(', ') + ' left out' : ''),
+        w: 'Lower abdominal pain in a woman with discharge or pain on passing ' +
+           'urine. This is an assumption, not a finding' +
+           (hidden.length ? ', and it is why the bowel parasites are not shown — ' +
+             'say so if there is diarrhoea, dysentery, weight loss or a mass and ' +
+             'they come back' : '') + '. Before you act on it: has she missed a ' +
+           'period? Is the pain worse on the right? Is the temperature over 38? ' +
+           'Those are ectopic, appendicitis and malaria, and a discharge is ' +
+           'common enough in a well woman to be beside the point.' });
+    }
+
     out.sort(function (a, b) { return b.rank - a.rank; });
     out = out.slice(0, limit);
     out.forEach(function (o) {
@@ -394,8 +762,12 @@
       o.pct = Math.max(5, Math.min(95, Math.round(100 * o.rank)));
       o.tests = testsFor(o);
     });
-    return { ready: true, items: out, flags: vitalFlags(input.vitals), terms: terms,
-             sexBlocked: sex ? 0 : blocked, band: band };
+    return { ready: true, items: out, flags: flags, terms: terms,
+             sexBlocked: sex ? 0 : blocked, band: band,
+             // What the rules did, so a test — and the screen — can see it
+             // rather than infer it from an ordering.
+             rules: rules, moved: moved, hidden: hidden,
+             dropped: neg.drop, denied: neg.spans };
   }
 
   // ── What would confirm it ───────────────────────────────────────────────
@@ -424,6 +796,7 @@
     vitalFlags: vitalFlags,
     ageBand: ageBand,
     _toks: toks,          // exposed so the tests can check parity with the tuning
+    _denials: denials,    // and so the negation scoper can be tested on its own
     _size: function () { return IX ? IX.N : 0; },
   };
 })();

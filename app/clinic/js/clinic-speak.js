@@ -325,12 +325,23 @@
       return;
     }
     var items = (res && res.items) || [];
+    // A rule that moved a condition down, or left one out, has to say so HERE
+    // as well as on the intake screen. This panel is one tap from a filled-in
+    // treatment, so it is the last place anybody reads before acting — and a
+    // suggestion that is missing looks exactly like a suggestion that was
+    // never worth making.
+    var said = (res && res.flags || []).filter(function (f) { return f.rule; })
+      .map(function (f) {
+        return '<div class="sp-dx-rule' + (f.k === 'danger' ? ' bad' : '') + '">' +
+          '<b>' + esc(f.t) + '</b>' + (f.w ? '<span>' + esc(f.w) + '</span>' : '') +
+        '</div>';
+      }).join('');
     if (!items.length) {
-      host.innerHTML = '<div class="sp-dx-wait">Nothing in the books matches this ' +
+      host.innerHTML = said + '<div class="sp-dx-wait">Nothing in the books matches this ' +
         'yet. Open the treatment and type the diagnosis there.</div>';
       return;
     }
-    host.innerHTML =
+    host.innerHTML = said +
       '<div class="sp-dx-note">Suggestions <b>from the books</b>, not a diagnosis. ' +
         'The figure is how strongly what you said matches how the guideline ' +
         'describes it — not a chance of having it. <b>You decide.</b></div>' +

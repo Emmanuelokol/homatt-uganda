@@ -517,6 +517,8 @@ taps one.
 ## How a suggestion is worked out
 
 `app/clinic/js/clinic-impression.js` · benchmark: `tests/measure-impression.js`
+· rules and the negation scoper: `tests/test-guards.js` · before/after by hand:
+`tests/probe-guards.js`
 
 **Everything the clinician recorded feeds it** — the complaint, the readings,
 the story and the background — and the readings are turned into the words the
@@ -550,6 +552,160 @@ The WHO differential benchmark is unchanged by the sharing at **239/241 in the
 top 3 (99.2%)**, which is the point of having it: it proves the change did not
 cost anything elsewhere.
 
+### A denial used to count as evidence FOR the thing denied
+This was the worst fault in the engine and nothing in the interface could show
+it. `toks()` drops "no" (the regex is `[a-z]{3,}`) and "not"/"without" (STOP),
+so **"no rigidity, no guarding, no rebound" reached the scorer as the terms
+`rigidity`, `guard`, `rebound`** — three rare, high-IDF words. Measured:
+
+| what the clinician wrote | Peritonitis |
+|---|---|
+| "no rigidity, no guarding, no rebound tenderness" | **79%, first** |
+| "rigidity, guarding and rebound tenderness" | 57%, fifth |
+
+Writing down a careful **negative** examination made the emergency look *more*
+likely than writing down a positive one. Every denial in the record did this,
+not only these three.
+
+`denials()` is a small NegEx over the query: find a cue (no, not, denies,
+denied, without, never, nil, none, nothing, negative for, free of), read
+forward a bounded window, stop at the first thing that closes it. What closes
+it is where the accuracy lives:
+
+- **Punctuation, and the next cue.** "No rigidity, no guarding" is two denials,
+  not one running one.
+- **A new clause** — but/however/except, and any verb that starts one
+  (has, is, complains, says, noted, present). "No vomiting **but has**
+  diarrhoea" keeps the diarrhoea.
+- **…except an auxiliary sitting directly on the cue**, because "never **had**
+  convulsions" is one denial and "no vomiting **and has** diarrhoea" is not.
+- **A determiner after a conjunction**: "no fever **and the** mother says…"
+  ends the list of denied things. Without this the window ate "mother".
+- **A word said plainly somewhere else is not denied.** "Pain in the lower
+  abdomen, no pain on passing urine" must not lose the word "pain". So the
+  tokens dropped are the denied ones *minus everything affirmed anywhere*.
+
+It fails by **under-negating** — a comma ends the scope, so "no fever, cough or
+vomiting" only drops the fever. That is the safe direction: leaving a word in
+is the noise we already had, while over-negating deletes findings that were
+never denied.
+
+It runs on the **query only**. The books are indexed exactly as they were
+written, because "in the absence of peritonitis there is no rigidity/rebound
+tenderness" is Acute Pancreatitis describing *itself*, and rewriting the book
+to suit a phone would be a far larger and worse change.
+
+`_denials()` is exported so `test-guards.js` can test it directly, including
+hostile input: a cue with nothing after it ("abdominal pain, no") used to be
+able to reset the scan to zero and **loop for ever**, which on a phone is a
+frozen screen. It is now word-indexed and the index only moves forward.
+
+### The rigidity guard
+When rigidity or guarding is recorded **absent**, peritonitis and appendicitis
+are put below 10% and out of the three the clinician reads. The screen names
+them, quotes the words that did it, and says a soft belly does not rule a
+surgical abdomen out.
+
+**Which conditions.** An explicit list of `title_normalized` values, never a
+text match — searching the documents for "peritonitis" or "rebound" catches
+Typhoid Fever, Ectopic Pregnancy, PID, Acute Pancreatitis and Peptic Ulcer
+Disease, because each describes peritonitis as a complication of *itself*. A
+text-matching rule would suppress the ruptured ectopic in the same breath as
+the peritonitis.
+
+The list started at six and was cut to **three** — peritonitis, appendicitis,
+acute appendicitis. What came off matters more than what stayed, and each has
+a test:
+
+| taken off | because |
+|---|---|
+| ectopic pregnancy | an **unruptured** one has a soft abdomen, and that is the only window in which she can still be saved cheaply |
+| intestinal obstruction | distended, tympanitic and soft until it strangulates; the book names no peritoneal sign |
+| intussusception | in a screaming infant guarding cannot be assessed at all, so "no guarding" is usually an artefact |
+| acute pancreatitis | the book says, in as many words, "in the absence of peritonitis there is no rigidity/rebound tenderness" |
+| spontaneous bacterial peritonitis | carries the word, is not a surgical abdomen, has a soft belly by rule |
+
+**When the guard must NOT fire.** A soft belly is not a safe belly, and this is
+the part that keeps the rule from killing someone. Peritonitis is present
+without rigidity in advanced HIV, in the elderly, in the malnourished, on
+steroids — and, the lethal one, in **late decompensated disease, where the
+abdomen goes from rigid to flaccid as the patient deteriorates**. At the point
+of maximum danger the guarding is gone. Late presentation is the Ugandan norm.
+
+Nor can any parser tell "examined, and it was soft" from "not examined" from
+"could not assess". The string is identical.
+
+So the demotion is suspended, with a red note saying why, on any of:
+under five · systolic < 100 · **shock index** (pulse ÷ systolic ≥ 0.9, which
+catches the compensating 22-year-old at 110/115 that neither "pulse over 120"
+nor "systolic under 90" can see) · pulse ≥ 120 · pulse pressure ≤ 25 ·
+temperature < 36 (hypothermia in a belly is late sepsis, and must read as
+*more* dangerous than fever) · or the record itself saying board-like abdomen,
+rebound, distension, bilious vomiting, HIV, a previous laparotomy, a missed
+period, collapse — or **"not passing stool or flatus"**, **"absent bowel
+sounds"**, which are checked against the text **as written** rather than the
+denial-stripped text, because those danger signs are *phrased* as negatives and
+stripping them would delete the finding along with the reassurance.
+
+### Reproductive priority
+A woman with lower-quadrant pain plus vaginal discharge or pain on passing
+urine is grouped toward the gynaecological and urinary causes, and the bowel
+parasites are left out unless the bowel is part of the story.
+
+**Ectopic pregnancy is deliberately in the RAISED list.** It shares the trigger
+exactly — sexually active woman, lower abdominal pain, spotting, urinary
+frequency — and treating a discharge as evidence *for* PID and therefore
+*against* ectopic is the classic fatal error. The screen asks, every time the
+rule fires: has she missed a period, is the pain worse on the right, is the
+temperature over 38 — ectopic, appendicitis, malaria.
+
+**Schistosomiasis is in the raised list, not the parasite list**, and this is
+the single most important entry on either. Its own UCG text (p.161) reads *"In
+females: low abdominal pain and abnormal vaginal discharge"* and *"Frequent and
+painful micturition"* — this rule's trigger, word for word, produced by a worm,
+endemic around Victoria, Albert and the Nile. Filed as a parasite it would have
+been hidden by the very presentation that should raise it, PID antibiotics
+would do nothing, and untreated female genital schistosomiasis raises HIV risk.
+
+**Getting the parasites back** takes more than diarrhoea. Amoebiasis has five
+presentations in the book and only one is dysentery: a liver abscess is right
+sub-costal pain, fever, chills and weight loss with **no diarrhoea at all**,
+and an amoeboma is a mass with constipation. So the suppression is lifted by
+diarrhoea or dysentery *or* by tenesmus, worms seen, right sub-costal or liver
+pain, weight loss, night sweats, a mass, or constipation. Suppression keyed on
+the absence of a symptom must never be applied to a condition whose worst form
+does not have that symptom.
+
+Pinworm is **not** on the parasite list either — in a girl it causes
+vulvovaginitis and dysuria, so it is a real answer to this presentation.
+
+**What must not trigger it**, each with a test: a man; upper or epigastric
+pain; an ear, eye, nose or wound discharge; "discharged from hospital"; a
+*denied* discharge; and — the trap — a child with **chest in-drawing**, because
+`SAY_AS` rewrites that to "lower chest **wall** indrawing" and a rule that
+tested for "lower" plus "pain" would fire on a paediatric pneumonia. The site
+word is always required to be an abdominal one.
+
+`SAY_AS` also rewrites "passing urine" → "urination" **before** "pain(ful)
+urin\*" → "dysuria", so "pain when passing urine" arrives as "pain when
+urination" and never becomes dysuria on its own. The dysuria predicate has to
+catch that itself, and it is the commonest way a patient says it.
+
+### When there is almost nothing to go on
+The percentage is worked out against the rest of the list, not against the
+disease, so **the top suggestion always carries a big-looking number**. That
+was survivable while a denial padded the query out; now that denials are
+removed, a careful negative examination can leave two words standing —
+"abdominal pain" — and two generic words return a confident-looking list of
+nonsense. Under four search terms the screen now says so and prints the words
+it actually used.
+
+Two words were also added to `STOP` on the same measurement: **`present`**
+("bowel sounds present" is not a finding to search on) and the **number words
+one…ten** (the engine has no sense of time, so "for two days" is pure noise).
+Both are neutral on the WHO benchmark at 239/241 and both improve the thin
+queries the negation scoper now produces.
+
 ### What it does NOT do
 It has no sense of **time**. "Fever for two days" and "fever for two months"
 score the same, though they are different diseases. Duration is in the story
@@ -560,7 +716,7 @@ list, and worth doing one day.
 
 ## The tests
 
-`tests/` — 46 files, ~530 checks. No framework: each file starts a web server
+`tests/` — 48 files, ~635 checks. No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 
@@ -579,6 +735,11 @@ rules worth repeating here:
   are a 6% white wash over a dark card; reading `rgba(255,255,255,.06)` as
   opaque white reported a perfectly readable box as 1.16:1 — and would just as
   easily hide a real failure behind a passing number.
+- **A rule that hides a clinical suggestion needs a test for what it must NOT
+  hide, not only for what it hides.** Every condition taken off the rigidity
+  guard's demotion list has its own assertion in `test-guards.js`, because the
+  next person to read that list will see three entries and reasonably wonder
+  why obstruction and ectopic are missing. The test answers them.
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.

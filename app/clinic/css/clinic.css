@@ -1365,6 +1365,18 @@ html[data-theme="dark"]{
 .sp-dx-note{ font-size:12px; color:var(--muted); line-height:1.5;
              margin-bottom:9px }
 .sp-dx-note b{ color:var(--text) }
+/* A rule moved something down, or left something out. Same tokens as the
+   intake screen's "Check this" panel, because it is the same kind of thing
+   being said and it must not read as a different class of message here. */
+.sp-dx-rule{
+  background:var(--pr-owe-bg); border:1px solid var(--pr-owe-bd); border-radius:10px;
+  padding:9px 11px; margin-bottom:9px; font-size:12.5px; line-height:1.45;
+  color:var(--text);
+}
+.sp-dx-rule b{ color:var(--pr-owe-fg); display:block; margin-bottom:2px }
+.sp-dx-rule span{ display:block }
+.sp-dx-rule.bad{ background:var(--pr-late-bg); border-color:var(--pr-late-bd) }
+.sp-dx-rule.bad b{ color:var(--pr-late-fg) }
 .sp-dx-b{
   display:block; width:100%; text-align:left; margin-bottom:8px;
   background:var(--surface); border:1.5px solid var(--primary);
