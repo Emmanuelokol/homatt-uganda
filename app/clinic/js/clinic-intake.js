@@ -194,6 +194,11 @@
   }
 
   // ── Confirming one ──────────────────────────────────────────────────────
+  // Tests that are on this visit BECAUSE a suggestion was confirmed, and only
+  // those. A test the clinician ticked themselves, or one the package brought,
+  // is never in here and is never taken away again.
+  var _dxTests = [];
+
   function confirmDx(i) {
     var it = lastItems[i];
     if (!it) return;
@@ -203,22 +208,46 @@
       box.dispatchEvent(new Event('input', { bubbles: true }));
     }
     // The tests the book named are ordered with it — the nurse asked for the
-    // condition, not for a second round of typing.
+    // condition, not for a second round of typing. These are real orders with
+    // a price on them, so two things have to happen that did not before.
+    var added = [], dropped = [];
     try {
       var s = state();
-      if (it.tests && it.tests.length && Array.isArray(s.labTests)) {
-        it.tests.forEach(function (t) { if (s.labTests.indexOf(t) < 0) s.labTests.push(t); });
+      if (Array.isArray(s.labTests)) {
+        // ONE — take back what the previous suggestion put on the bill. Tapping
+        // a second condition used to leave the first one's tests behind, so a
+        // clinician who changed their mind still charged the patient for the
+        // diagnosis they had discarded, and nothing on screen said so.
+        _dxTests.forEach(function (t) {
+          var k = s.labTests.indexOf(t);
+          if (k >= 0) { s.labTests.splice(k, 1); dropped.push(t); }
+        });
+        _dxTests = [];
+        (it.tests || []).forEach(function (t) {
+          if (s.labTests.indexOf(t) < 0) { s.labTests.push(t); _dxTests.push(t); added.push(t); }
+        });
       }
     } catch (e) {}
     publish();
+    // TWO — show it. Until this call the tray stayed hidden, no chip lit and
+    // the lab fee did not move, so a test was added to the visit AND to the
+    // bill with nothing anywhere on the screen to show that it had been.
+    try {
+      if (typeof window._wizRefreshAfterAutofill === 'function') window._wizRefreshAfterAutofill();
+    } catch (e) {}
+
     var tap = $('ucgOneTap');
     if (tap) {
       tap.scrollIntoView({ behavior: 'smooth', block: 'center' });
       tap.classList.add('it-pulse');
       setTimeout(function () { tap.classList.remove('it-pulse'); }, 2200);
     }
-    try { showToast('Diagnosis set to “' + it.title + '”. Tap the standard package.', 'success'); }
-    catch (e) {}
+    var note = 'Diagnosis set to “' + it.title + '”.';
+    if (dropped.length) note += ' ' + dropped.length + ' test' + (dropped.length !== 1 ? 's' : '') +
+      ' from the last one taken off.';
+    if (added.length) note += ' ' + added.length + ' test' + (added.length !== 1 ? 's' : '') + ' added.';
+    note += ' Tap the standard package.';
+    try { showToast(note, 'success'); } catch (e) {}
   }
 
   function ageYears() {
@@ -572,7 +601,25 @@
         }).join('') + '</div>'
       : '';
 
-    $('itCheckWarn').innerHTML = warn + alt;
+    // A handoff that belongs to a different patient. Nothing has been written
+    // anywhere yet and nothing will be until this is answered — but the screen
+    // is not blocked either: ignoring it and carrying on typing is a valid
+    // answer, and the words that were said are still shown below.
+    var hand = _pending
+      ? '<div class="it-check-warn danger"><b>This screen already has someone else on it</b>' +
+        'What was said belongs to ' + esc(_pending.p.name || 'a different patient') +
+        ', but this treatment already has ' + esc(_pending.who) + ' in it. ' +
+        'Nothing has been filled in, because one record must never end up ' +
+        'describing two people.' +
+        '<div class="it-check-pick">' +
+          '<button type="button" class="it-hand" data-hand="use">' +
+            'Clear this and use what was said</button>' +
+          '<button type="button" class="it-hand" data-hand="keep">' +
+            'Keep what is on the screen</button>' +
+        '</div></div>'
+      : '';
+
+    $('itCheckWarn').innerHTML = hand + warn + alt;
     $('itCheckGrid').innerHTML =
         checkTile('name', 'Name', name, 1, 'quickPatientName')
       + checkTile('sex', 'Sex', data.sex, 1, '')
@@ -588,8 +635,10 @@
       $('itCheckHeardText').textContent = _heardText;
     } else { heard.style.display = 'none'; }
 
+    // A pending handoff holds the panel open on its own: it is a question
+    // waiting for an answer, not a warning that can be waved through.
     host.style.display =
-      (_checkOpen || (warn && checkSig(warnings) !== _checkSeen)) ? 'block' : 'none';
+      (_pending || _checkOpen || (warn && checkSig(warnings) !== _checkSeen)) ? 'block' : 'none';
   }
 
   // The engine's warnings, raised to the top where they are read in time.
@@ -639,8 +688,18 @@
     if (host0 && !host0._altWired) {
       host0._altWired = 1;
       host0.addEventListener('click', function (ev) {
+        var h = ev.target.closest && ev.target.closest('.it-hand');
+        if (h) {
+          var pend = _pending && _pending.p;
+          _pending = null;
+          if (h.dataset.hand === 'use' && pend) fillFrom(pend, true);
+          renderCheck(_lastWarnings);
+          return;
+        }
         var b = ev.target.closest && ev.target.closest('.it-alt');
-        if (!b) return;
+        // Without the dataset guard, any other button that happens to carry
+        // this class would blank the patient's name on its way past.
+        if (!b || !b.dataset.name) return;
         var el = $('quickPatientName');
         if (!el) return;
         el.value = b.dataset.name || '';
@@ -705,16 +764,62 @@
     return 1;
   }
 
-  function applyHandoff() {
-    if (!window.HomattSpeak || !window.HomattSpeak.takeHandoff) return;
-    var p = window.HomattSpeak.takeHandoff();
-    if (!p) return;
+  // ── Is this the same patient as the one already on the screen? ──────────
+  //
+  // "Fills empty boxes only" was written to protect a half-entered patient,
+  // and it does protect the boxes that are already full. What it does NOT do
+  // is notice that the words belong to somebody else: with "Okello John" and
+  // "headache" typed in, a handoff for Nakato Sarah quietly wrote HER story,
+  // HER temperature of 39.5 and HER diagnosis of malaria into the empty boxes,
+  // and what came out was one record describing two people.
+  //
+  // That is worse than either overwriting or refusing, because nothing on the
+  // screen shows it happened. So the two are told apart first, and where they
+  // disagree a person decides.
+  function sameThing(a, b) {
+    a = String(a || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    b = String(b || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    return !a || !b || a === b;      // one of them empty is not a disagreement
+  }
+  function clashesWith(p) {
+    if (!sameThing(($('quickPatientName') || {}).value, p.name)) return 'name';
+    if (!sameThing(($('itChief') || {}).value, p.chief)) return 'complaint';
+    return '';
+  }
+  function whoIsOnScreen() {
+    var n = String((($('quickPatientName') || {}).value) || '').trim();
+    var c = String((($('itChief') || {}).value) || '').trim();
+    return n || c || 'someone else';
+  }
 
-    setIfEmpty('quickPatientName', p.name);
-    setIfEmpty('itChief', p.chief);
-    setIfEmpty('itSubjective', p.subjective);
-    setIfEmpty('itBackground', p.background);
-    setIfEmpty('itAge', p.age);
+  var _pending = null;                 // a handoff waiting for a person to decide
+
+  function fillFrom(p, over) {
+    var put = over
+      ? function (id, v) {
+          var e = $(id);
+          if (!e || !v) return;
+          e.value = v;
+          e.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      : setIfEmpty;
+    if (over) {
+      // Replacing means replacing: a box left over from the other patient must
+      // not survive just because this dictation had nothing to put in it.
+      ['quickPatientName', 'itChief', 'itSubjective', 'itBackground', 'itAge',
+       'itSbp', 'itDbp', 'itTemp', 'itWeight', 'itPulse', 'confirmedDx']
+        .forEach(function (id) {
+          var e = $(id);
+          if (!e) return;
+          e.value = '';
+          e.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+    }
+    put('quickPatientName', p.name);
+    put('itChief', p.chief);
+    put('itSubjective', p.subjective);
+    put('itBackground', p.background);
+    put('itAge', p.age);
     if (p.age) {
       var u = document.querySelector('[data-unit="' + (p.ageUnit === 'months' ? 'months' : 'years') + '"]');
       if (u && !u.classList.contains('on')) u.click();
@@ -725,7 +830,7 @@
     }
     var V = { sbp: 'itSbp', dbp: 'itDbp', temp: 'itTemp', weight: 'itWeight', pulse: 'itPulse' };
     Object.keys(V).forEach(function (k) {
-      if (p.vitals && p.vitals[k]) setIfEmpty(V[k], p.vitals[k]);
+      if (p.vitals && p.vitals[k]) put(V[k], p.vitals[k]);
     });
 
     // The summary panel, with the words that were actually said, so the check
@@ -739,7 +844,7 @@
     // journey. Delayed until the guideline database on this screen is open;
     // tapping the button before it is ready does nothing at all.
     if (!p.dx) return;
-    setIfEmpty('confirmedDx', p.dx);
+    put('confirmedDx', p.dx);
     var tries = 0;
     (function openPackage() {
       var btn = $('ucgOneTap');
@@ -748,8 +853,26 @@
         btn.click();
         return;
       }
+      // If the box already holds a DIFFERENT diagnosis, nothing here will ever
+      // match — stop rather than waking up forty times to find that out.
+      if (dx && String(dx.value || '').trim() && String(dx.value || '').trim() !== p.dx) return;
       if (++tries < 40) setTimeout(openPackage, 250);   // up to 10s, then leave it
     })();
+  }
+
+  function applyHandoff() {
+    if (!window.HomattSpeak || !window.HomattSpeak.takeHandoff) return;
+    var p = window.HomattSpeak.takeHandoff();
+    if (!p) return;
+
+    var clash = clashesWith(p);
+    if (clash) {
+      _pending = { p: p, what: clash, who: whoIsOnScreen() };
+      _checkOpen = true;
+      renderCheck(_lastWarnings);
+      return;
+    }
+    fillFrom(p, false);
   }
 
   function start() {

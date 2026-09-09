@@ -888,6 +888,8 @@
         'background:var(--surface);color:var(--text-lt);display:grid;place-items:center;cursor:pointer;font-family:inherit;flex:none;margin-right:2px}',
       '.ucg-tick .material-icons-outlined{font-size:16px}',
       '.ucg-tick.on{background:var(--primary);border-color:var(--primary);color:#fff}',
+      '.ucg-agefit{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--brand-tint);color:var(--brand-ink);vertical-align:middle}',
+      '.ucg-ageno{display:inline-block;margin-left:7px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--pr-owe-bg);color:var(--pr-owe-fg);vertical-align:middle}',
       '.ucg-drug{display:grid;grid-template-columns:auto 1fr auto;gap:8px 9px;padding:11px;border-radius:12px;background:var(--bg);margin-bottom:8px;opacity:.72}',
       '.ucg-drug.on{opacity:1;background:var(--brand-tint,#EAF7F1)}',
       'html[data-theme="dark"] .ucg-drug.on{background:rgba(14,124,90,.20)}',
@@ -1113,6 +1115,57 @@
       var b = (state && state.ageBand) || '';
       return b === 'paediatric' || b === 'child';
     } catch (e) { return false; }
+  }
+
+  // ── Which of these sections is for THIS patient's age ────────────────────
+  //
+  // "Pneumonia" is five sections in the book, three of them split by age: an
+  // infant up to 2 months, a child of 2 months to 5 years, and children over 5
+  // with adults. The age is already on the screen above — offering those three
+  // as equal, unmarked choices is how a tired clinician opens the adult page
+  // for a three-year-old, which is the one thing the child gate exists to
+  // prevent.
+  //
+  // So the ones that fit are marked and sorted first. Nothing is ever removed
+  // and nothing is chosen: the book sometimes genuinely wants the other page,
+  // and only a person can know that.
+  var _MO = 1 / 12;
+  function _span(n, unit) {
+    n = Number(n) || 0;
+    if (/week/.test(unit)) return n / 52;
+    if (/month/.test(unit)) return n * _MO;
+    return n;
+  }
+  function _ageRange(title) {
+    var t = String(title || '').toLowerCase(), m;
+    // Only when the title is talking about a PERSON's age. "Postpartum
+    // Examination of the Mother Up to 6 Weeks" counts weeks since delivery,
+    // not the age of the patient, and must not be marked wrong for an adult.
+    if (!/\b(child|children|infant|newborn|neonat\w*|adult|adults|adolescen\w*|age|boy|girl)\b/.test(t)) return null;
+    if ((m = /up\s+to\s+(\d+)\s*(month|week|year)/.exec(t))) return [0, _span(m[1], m[2])];
+    if ((m = /(\d+)\s*(month|week|year)s?\s*(?:-|–|to)\s*(\d+)\s*(month|week|year)/.exec(t)))
+      return [_span(m[1], m[2]), _span(m[3], m[4])];
+    if ((m = /(?:under|below|less\s+than|<)\s*(\d+)\s*(month|week|year)/.exec(t))) return [0, _span(m[1], m[2])];
+    if ((m = /(?:>|over|above|older\s+than)\s*(\d+)\s*(month|week|year)/.exec(t))) return [_span(m[1], m[2]), 200];
+    if (/\b(?:newborn|neonat\w*)\b/.test(t)) return [0, _MO];
+    if (/\byoung\s+infant\b/.test(t)) return [0, 2 * _MO];
+    if (/\binfant\b/.test(t)) return [0, 1];
+    // "adults" only when children are not mentioned in the same breath —
+    // "Dehydration in Older Children and Adults" covers both and is left alone.
+    if (/\badults?\b/.test(t) && !/child|infant|newborn|neonat|paediatric|pediatric/.test(t)) return [13, 200];
+    return null;
+  }
+  function _ageYears() {
+    var raw = state ? state.patientAgeYears : null;
+    if (raw === null || raw === undefined || raw === '') return NaN;
+    var y = Number(raw);
+    return isFinite(y) && y >= 0 ? y : NaN;
+  }
+  function _ageFit(title, years) {
+    if (!isFinite(years)) return '';
+    var r = _ageRange(title);
+    if (!r) return '';
+    return (years >= r[0] && years < r[1]) ? 'fits' : 'no';
   }
 
   // ── Things run into a vein, not handed over a counter ────────────────────
@@ -1396,22 +1449,18 @@
               'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
               '</div>'
             : '') +
+          // The child warning belongs above this, once. It had been pasted in
+          // here twice more, in the middle of this sentence — so a child whose
+          // clinician ticked an unpriced medicine read "2 ticked medicine",
+          // then a block saying nothing was ticked, then "s are not priced in
+          // your stock, so", then the same block again. Three copies of the
+          // one warning, a sentence cut in half mid-word, and the two halves
+          // contradicting each other, on the one screen where a dose is being
+          // decided for a child.
           (pkg.unpricedDrugs
             ? '<div class="ucg-unpriced">' + pkg.unpricedDrugs + ' ticked medicine' +
-              (_isChild()
-            ? '<div class="ucg-childwarn"><b>This is a child.</b> Nothing is ticked, ' +
-              'because every dose in this book is an adult dose. Take the dose from ' +
-              'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
-              '</div>'
-            : '') +
-          (pkg.unpricedDrugs !== 1 ? 's are' : ' is') + ' not priced in your stock, so ' +
-              (_isChild()
-            ? '<div class="ucg-childwarn"><b>This is a child.</b> Nothing is ticked, ' +
-              'because every dose in this book is an adult dose. Take the dose from ' +
-              'the child\'s weight: <b>Guidelines &rarr; Children &rarr; Child doses</b>.' +
-              '</div>'
-            : '') +
-          (pkg.unpricedDrugs !== 1 ? 'they add' : 'it adds') + ' nothing to this total. ' +
+              (pkg.unpricedDrugs !== 1 ? 's are' : ' is') + ' not priced in your stock, so ' +
+              (pkg.unpricedDrugs !== 1 ? 'they add' : 'it adds') + ' nothing to this total. ' +
               'Set a selling price in Stock, or type the figure above.</div>'
             : '') +
         // Saving straight from here means the money has to be settled here too.
@@ -2047,17 +2096,36 @@
     close();
     var ask = document.getElementById('ucgAsk');
     document.getElementById('ucgAskTitle').textContent = 'Which one?';
+    // Mark and reorder by the age already recorded, fits first. A manual
+    // partition rather than .sort(), because an unstable sort would shuffle
+    // sections that carry no age at all into a different order every time.
+    var years = _ageYears();
+    var tagged = list.map(function (h) { return { h: h, fit: _ageFit(h.title, years) }; });
+    var pick = function (f) { return tagged.filter(function (x) { return x.fit === f; }); };
+    tagged = pick('fits').concat(pick(''), pick('no'));
+    list = tagged.map(function (x) { return x.h; });
+
+    var marked = tagged.some(function (x) { return x.fit; });
     document.getElementById('ucgAskText').textContent =
-      'Sections under “' + term + '” that carry a treatment package';
-    document.getElementById('ucgAskDiff').innerHTML = list.map(function (h, i) {
+      'Sections under “' + term + '” that carry a treatment package' +
+      (marked && isFinite(years)
+        ? ' — marked against the age on the screen (' +
+          (years < 1 ? Math.round(years * 12) + ' months' : Math.round(years) + ' years') +
+          '). You still choose.'
+        : '');
+    document.getElementById('ucgAskDiff').innerHTML = tagged.map(function (x, i) {
+      var h = x.h;
       // Say what is in each one, so the choice can be made without opening
       // them all to find out.
       var what = [];
       if (h.n)     what.push(h.n + ' medicine' + (h.n !== 1 ? 's' : ''));
       if (h.tests) what.push(h.tests + ' lab test' + (h.tests !== 1 ? 's' : ''));
       if (h.from)  what.push('from the ' + esc(h.from) + ' page');
+      var tag = x.fit === 'fits'
+        ? '<span class="ucg-agefit">for this age</span>'
+        : (x.fit === 'no' ? '<span class="ucg-ageno">not this age group</span>' : '');
       return '<div data-h="' + i + '" style="cursor:pointer;padding:11px 4px;border-bottom:1px solid var(--border)">' +
-        '<div style="font-weight:700;line-height:1.35">' + esc(h.title) + '</div>' +
+        '<div style="font-weight:700;line-height:1.35">' + esc(h.title) + tag + '</div>' +
         (what.length ? '<div style="font-size:11.5px;font-weight:600;color:var(--text-lt);margin-top:2px">' +
           what.join(' · ') + '</div>' : '') +
         '</div>';

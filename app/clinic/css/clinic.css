@@ -1234,6 +1234,17 @@ html[data-theme="dark"]{
   cursor:pointer; touch-action:manipulation;
 }
 .it-alt:active{ transform:scale(.97) }
+/* Two patients, one screen — the answer is a real choice, so the buttons are
+   full width and neither is styled as the obvious one to press. */
+.it-check-pick{ display:flex; flex-direction:column; gap:7px; margin-top:9px }
+.it-hand{
+  display:block; width:100%; text-align:left;
+  background:var(--surface); color:var(--text);
+  border:1.5px solid var(--pr-late-bd); border-radius:11px;
+  padding:10px 13px; font:inherit; font-size:13px; font-weight:700;
+  cursor:pointer; touch-action:manipulation;
+}
+.it-hand:active{ transform:scale(.99) }
 
 /* ═══ The floating "say it" widget ═══════════════════════════════════════════
    A microphone that follows the clinician around the app. See-through at rest

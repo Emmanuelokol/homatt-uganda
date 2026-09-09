@@ -514,6 +514,66 @@ point to it and the page it came from; the panel says *not a diagnosis, you
 decide*; none is preselected; and nothing is written anywhere until a person
 taps one.
 
+## Walking the journey, which is how these four were found
+
+`tests/test-journey.js` · by hand: `tests/probe-journey.js`
+
+Reading the code found none of these. Driving the real screens end to end —
+type a treatment, tap a suggestion, hand off from the widget, open the package
+— found all four in one pass, and they were all in the part of the journey no
+single file owns.
+
+### A lab test was ordered, and charged, with nothing on screen to show it
+Confirming a suggestion pushes the tests the book names into `state.labTests`,
+which is what gets **priced** and saved as `lab_tests_ordered`. It never called
+`window._wizRefreshAfterAutofill()`, so the tray stayed hidden, no chip lit and
+the lab fee did not move. The test was on the visit and on the bill, and the
+clinician had seen nothing happen. One line, and it is the kind of line that is
+invisible in review and obvious the moment you tap the button.
+
+### Changing your mind still charged for the diagnosis you discarded
+Tapping a second condition added its tests and left the first one's behind. A
+clinician comparing two suggestions silently accumulated billable tests.
+`_dxTests` now remembers what a *confirmed suggestion* put there — and only
+that, so a test the clinician ticked themselves, or one the package brought, is
+never taken away again.
+
+### A handoff could put two patients in one record
+"Fills empty boxes only" was written to protect a half-entered patient, and it
+does protect the boxes that are full. What it did not do is notice that the
+words belong to somebody else: with **Okello John** and **headache** already
+typed, a handoff for **Nakato Sarah** wrote her story, her temperature of 39.5
+and her diagnosis of malaria into the empty boxes. One record, two people, and
+nothing on screen to say so.
+
+The two are now told apart before anything is written — a name that disagrees,
+or a complaint that disagrees — and where they disagree a person decides:
+*clear this and use what was said*, or *keep what is on the screen*. The same
+patient half entered is not a disagreement, so the ordinary case still just
+fills the empty boxes.
+
+### A child's package printed the same warning three times, mid-sentence
+The "This is a child — nothing is ticked" block had been pasted into the
+unpriced-medicines sentence twice more, so a child whose clinician ticked an
+unpriced medicine read: *"2 ticked medicine"*, then a block saying nothing was
+ticked, then *"s are not priced in your stock, so"*, then the same block again.
+Three copies, a sentence cut in half mid-word, and the two halves contradicting
+each other — on the one screen where a dose is being decided for a child.
+
+### And one thing that was not a bug, but was still wrong
+"Pneumonia" is five sections in the book, three split by age: an infant up to
+2 months, a child of 2 months to 5 years, and children over 5 with adults. The
+app asks which — correctly, because only a person can choose — but it offered
+all five **unmarked**, while the age was already on the screen above. That is
+how the adult page gets opened for a three-year-old.
+
+The sections that fit the recorded age are now marked *for this age* and sorted
+first; ones that cannot apply are marked *not this age group*. Nothing is
+removed and nothing is chosen. The matcher is deliberately narrow — it reads a
+range only from titles that are talking about a **person's** age, so
+"Postpartum Examination of the Mother Up to 6 Weeks" (which counts weeks since
+delivery) is left alone rather than marked wrong for an adult woman.
+
 ## How a suggestion is worked out
 
 `app/clinic/js/clinic-impression.js` · benchmark: `tests/measure-impression.js`
@@ -716,7 +776,7 @@ list, and worth doing one day.
 
 ## The tests
 
-`tests/` — 48 files, ~635 checks. No framework: each file starts a web server
+`tests/` — 49 files, ~665 checks. No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 
@@ -740,6 +800,11 @@ rules worth repeating here:
   guard's demotion list has its own assertion in `test-guards.js`, because the
   next person to read that list will see three entries and reasonably wonder
   why obstruction and ectopic are missing. The test answers them.
+- **Walk the journey, do not only read it.** Four faults in the treatment
+  process — an invisible charge, a bill that kept a discarded diagnosis's
+  tests, a record describing two patients, and a warning printed three times
+  mid-sentence — were all invisible in the code and obvious within one pass of
+  `probe-journey.js` driving the real screens.
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.
