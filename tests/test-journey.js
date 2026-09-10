@@ -262,6 +262,56 @@ const PORT = 8943, ORIGIN = 'http://localhost:' + PORT;
   result('and nothing is ticked for a child',
     kid.ticked === 0, kid.ticked + ' of ' + kid.drugs + ' medicines ticked');
 
+  // ── Part payment, on the package panel ──────────────────────────────────
+  // "Pending" could only say the whole bill was unpaid. A patient who hands
+  // over part of it is the ordinary case, and the clinic was losing either the
+  // debt (calling it Paid) or the money it was holding (calling it Pending).
+  await page.evaluate((p) => localStorage.setItem('homatt_speak_handoff', JSON.stringify(p)),
+    payload({ name: 'Part Payer', sex: 'female', age: '30', ageUnit: 'years',
+              chief: 'fever', subjective: 'fever for three days', dx: 'Malaria',
+              vitals: { temp: '39.1', pulse: '104', sbp: '110', dbp: '70', weight: '58' } }));
+  await openIntake();
+  await page.waitForTimeout(7000);
+  await page.evaluate(() => {
+    const a = document.getElementById('ucgAsk');
+    if (a && getComputedStyle(a).display !== 'none') {
+      const f = document.querySelector('#ucgAskDiff [data-h]'); if (f) f.click();
+    }
+  });
+  await page.waitForTimeout(2500);
+  const chips = await page.evaluate(() =>
+    [...document.querySelectorAll('#ucgPay [data-pay]')].map(b => b.dataset.pay));
+  result('the package panel offers Part payment instead of Pending',
+    chips.indexOf('partial') >= 0 && chips.indexOf('pending') < 0, JSON.stringify(chips));
+
+  const part = await page.evaluate(async () => {
+    const l = document.getElementById('ucgFeeL');
+    if (l) { l.value = '60000'; l.dispatchEvent(new Event('input', { bubbles: true })); }
+    const b = document.querySelector('#ucgPay [data-pay="partial"]');
+    if (b) b.click();
+    await new Promise(r => setTimeout(r, 250));
+    const w = document.getElementById('ucgPartWrap');
+    const shown = w ? getComputedStyle(w).display !== 'none' : false;
+    const i = document.getElementById('ucgPartAmt');
+    if (i) { i.value = '20000'; i.dispatchEvent(new Event('input', { bubbles: true })); }
+    await new Promise(r => setTimeout(r, 250));
+    return { shown, note: (document.getElementById('ucgPartNote') || {}).textContent || '' };
+  });
+  result('tapping it asks how much they paid', part.shown, 'box shown: ' + part.shown);
+  result('and says what was paid and what is still owed',
+    /Paid UGX 20,000 out of UGX 60,000/.test(part.note) && /40,000 still owing/.test(part.note),
+    part.note);
+
+  const applied = await page.evaluate(async () => {
+    const a = document.getElementById('ucgApply');
+    if (a) a.click();
+    await new Promise(r => setTimeout(r, 1200));
+    return { status: (window._wizState || {}).paymentStatus,
+             paid: (window._wizState || {}).amountPaid };
+  });
+  result('and the visit carries the figure, not just the word',
+    applied.status === 'partial' && Number(applied.paid) === 20000, JSON.stringify(applied));
+
   result('no page errors', errs.length === 0, errs.slice(0, 3).join(' | '));
   await b.close(); server.close();
 })().catch(e => { console.error('CRASH', e.message); process.exit(1); });

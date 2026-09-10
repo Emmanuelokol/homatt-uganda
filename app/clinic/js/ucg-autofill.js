@@ -38,7 +38,11 @@
   // so the money can be closed off without leaving the package.
   var PAY_OPTS = [
     { k: 'paid',    label: 'Paid',    icon: '\u2713', hint: 'Money received in full — goes into Money In today.' },
-    { k: 'pending', label: 'Pending', icon: '\u23F3', hint: 'Not paid yet — shows under Pending Payments.' },
+    // "Pending" could only say the whole bill was unpaid. A patient who hands
+    // over part of it is the ordinary case, and the clinic was losing either
+    // the debt (calling it Paid) or the money it was holding (calling it
+    // Pending). Tapping this asks how much, and says what is still owed.
+    { k: 'partial', label: 'Part payment', icon: '\u25D0', hint: 'Say how much they paid; the rest stays owing.' },
     { k: 'credit',  label: 'Credit',  icon: '\uD83D\uDCCB', hint: 'On credit — shows under Pending Payments until paid.' },
     { k: 'waived',  label: 'Waived',  icon: '\uD83E\uDD1D', hint: 'No charge — nothing owed, nothing collected.' },
   ];
@@ -959,6 +963,12 @@
       '.em-tag.ven-N{background:var(--bg);color:var(--text-lt)}',
       '.ucg-paylbl{margin:14px 0 7px;font-size:10.5px;font-weight:800;color:var(--text-lt);letter-spacing:.6px;text-transform:uppercase}',
       '.ucg-pay{display:grid;grid-template-columns:1fr 1fr;gap:8px}',
+      '.ucg-partwrap{margin-top:10px;padding:11px 12px;border-radius:12px;background:var(--brand-tint);color:var(--brand-ink)}',
+      '.ucg-partwrap label{display:block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px}',
+      '.ucg-partrow{display:flex;align-items:center;gap:7px}',
+      '.ucg-partrow span{font-size:11px;font-weight:800;opacity:.8}',
+      '.ucg-partrow input{width:140px;border:1.5px solid var(--border);border-radius:11px;padding:9px 10px;font:inherit;font-size:15px;font-weight:800;background:var(--surface);color:var(--text);text-align:right}',
+      '.ucg-partnote{margin-top:8px;font-size:12.5px;font-weight:700;line-height:1.45}',
       '.ucg-paychip{padding:12px 8px;border:1.5px solid var(--border);border-radius:14px;background:var(--surface,#fff);'
         + 'font:inherit;font-size:13.5px;font-weight:700;color:var(--text);cursor:pointer;text-align:center}',
       '.ucg-paychip.on{border-color:var(--primary);background:var(--brand-tint);color:var(--brand-ink);box-shadow:0 0 0 3px rgba(14,124,90,.10)}',
@@ -1474,6 +1484,14 @@
           }).join('') +
         '</div>' +
         '<div class="ucg-payhint" id="ucgPayHint"></div>' +
+        // Only shown when Part payment is chosen.
+        '<div class="ucg-partwrap" id="ucgPartWrap" style="display:none">' +
+          '<label for="ucgPartAmt">How much did they pay now?</label>' +
+          '<div class="ucg-partrow"><span>UGX</span>' +
+            '<input type="number" min="0" step="500" inputmode="numeric" id="ucgPartAmt" placeholder="0">' +
+          '</div>' +
+          '<div class="ucg-partnote" id="ucgPartNote"></div>' +
+        '</div>' +
         '</div>' +
 
       // ④ Clinical guidance from the guideline — tap to open
@@ -1724,9 +1742,13 @@
         repaintMoney();
       };
     });
+    // Set once the payment chips are wired below; the fee boxes above need to
+    // refresh the "still owing" line whenever a figure changes.
+    var _repaintPart = null;
     ['C:consult', 'L:lab', 'M:meds'].forEach(function (pair) {
       var p = pair.split(':'), el = document.getElementById('ucgFee' + p[0]);
-      if (el) el.oninput = function () { pkg.fees[p[1]] = Math.max(0, Number(el.value) || 0); recalc(); };
+      if (el) el.oninput = function () { pkg.fees[p[1]] = Math.max(0, Number(el.value) || 0); recalc();
+        if (typeof _repaintPart === 'function') _repaintPart(); };
     });
     // Payment chips — pick how the visit was settled without leaving the panel.
     var payHint = document.getElementById('ucgPayHint');
@@ -1738,10 +1760,33 @@
       });
       if (payHint) payHint.textContent = opt ? opt.hint : '';
     }
+    var partWrap = document.getElementById('ucgPartWrap');
+    var partAmt  = document.getElementById('ucgPartAmt');
+    var partNote = document.getElementById('ucgPartNote');
+    function money(n) { return 'UGX ' + (Number(n) || 0).toLocaleString('en-UG'); }
+    function paintPart() {
+      if (!partWrap) return;
+      var on = pkg.paymentStatus === 'partial';
+      partWrap.style.display = on ? '' : 'none';
+      if (!on || !partNote) return;
+      var total = (pkg.fees.consult || 0) + (pkg.fees.lab || 0) + (pkg.fees.meds || 0);
+      var paid  = Math.min(Math.max(0, Number(pkg.amountPaid) || 0), total || Infinity);
+      var owing = Math.max(0, total - paid);
+      if (!total)      partNote.textContent = 'Put the fees in above first, then how much they paid.';
+      else if (paid <= 0)    partNote.textContent = 'Nothing paid yet — the whole ' + money(total) + ' is owing.';
+      else if (paid >= total) partNote.textContent = 'That is the whole bill — it will be recorded as paid in full.';
+      else partNote.textContent = 'Paid ' + money(paid) + ' out of ' + money(total) +
+             ' — ' + money(owing) + ' still owing.';
+    }
+    if (partAmt) partAmt.oninput = function () {
+      pkg.amountPaid = Math.max(0, Number(partAmt.value) || 0);
+      paintPart();
+    };
     body.querySelectorAll('[data-pay]').forEach(function (b) {
-      b.onclick = function () { pkg.paymentStatus = b.dataset.pay; paintPay(); };
+      b.onclick = function () { pkg.paymentStatus = b.dataset.pay; paintPay(); paintPart(); };
     });
-    paintPay();
+    paintPay(); paintPart();
+    _repaintPart = paintPart;
 
     var fu = document.getElementById('ucgFollow');
     if (fu) fu.onchange = function () { pkg.followUpDays = Math.max(0, Number(fu.value) || 0); };
@@ -2015,7 +2060,7 @@
     // Not in the guidelines at all → open a blank worksheet the clinician fills
     // in (and can save as a clinic standard for next time).
     if (!condId) {
-      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: null, title: title };
+      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', amountPaid: 0, followUpDays: 7, page: null, title: title };
       srcPkg = JSON.parse(JSON.stringify(pkg));
       document.getElementById('ucgKicker').textContent = 'New package · not in the guidelines';
       document.getElementById('ucgTags').innerHTML =
@@ -2075,7 +2120,7 @@
       };
     } else {
       pkg = buildFromGuideline(ctx.sourceId || condId, severity) ||
-        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', followUpDays: 7, page: page, title: title };
+        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', amountPaid: 0, followUpDays: 7, page: page, title: title };
     }
     normaliseGivenHere(pkg);
     srcPkg = JSON.parse(JSON.stringify(pkg));
@@ -2328,7 +2373,16 @@
     // Carry the payment choice through, so saving from the panel settles the
     // money too. "Paid" is what writes the amount into the payments ledger.
     if (pkg.paymentStatus) {
-      state.paymentStatus = pkg.paymentStatus;
+      // The amount decides it, not the chip: nothing paid is still pending,
+      // and handing over the whole bill is simply paid.
+      if (pkg.paymentStatus === 'partial') {
+        var _t = (pkg.fees.consult || 0) + (pkg.fees.lab || 0) + (pkg.fees.meds || 0);
+        var _p = Math.max(0, Number(pkg.amountPaid) || 0);
+        state.amountPaid = Math.min(_p, _t || _p);
+        state.paymentStatus = _p <= 0 ? 'pending' : (_t > 0 && _p >= _t ? 'paid' : 'partial');
+      } else {
+        state.paymentStatus = pkg.paymentStatus;
+      }
       // Keep the wizard's own chips in step, so screen 2 shows the same choice.
       document.querySelectorAll('.pay-chip[data-pay]').forEach(function (c) {
         c.classList.toggle('active', c.dataset.pay === pkg.paymentStatus);

@@ -163,6 +163,14 @@ const MEASURE_IN = (sel) => {
     }
     await page.evaluate(() => {
       document.querySelectorAll('#ucgOverlay details').forEach(d => { d.open = true; });
+      // Part payment is hidden until it is chosen; its colours still have to
+      // be readable when it is.
+      const pay = document.querySelector('#ucgPay [data-pay="partial"]');
+      if (pay) pay.click();
+      const l = document.getElementById('ucgFeeL');
+      if (l) { l.value = '60000'; l.dispatchEvent(new Event('input', { bubbles: true })); }
+      const amt = document.getElementById('ucgPartAmt');
+      if (amt) { amt.value = '20000'; amt.dispatchEvent(new Event('input', { bubbles: true })); }
     });
     await page.waitForTimeout(300);
     const pres = await page.evaluate(MEASURE_IN, '#ucgOverlay');

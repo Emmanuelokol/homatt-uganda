@@ -608,6 +608,33 @@ range only from titles that are talking about a **person's** age, so
 "Postpartum Examination of the Mother Up to 6 Weeks" (which counts weeks since
 delivery) is left alone rather than marked wrong for an adult woman.
 
+## Part payment, and the screen it actually belongs on
+
+`app/clinic/js/ucg-autofill.js` (`PAY_OPTS`, `#ucgPartWrap`) ·
+`app/clinic/new-order.html` (the fees card) · `tests/test-journey.js`
+
+**There are TWO payment rows in a treatment**, and this is worth knowing before
+changing either: the fees card on the wizard screen (`.pay-chips`), and the one
+inside the one-tap package panel (`#ucgPay`, built from `PAY_OPTS` in
+`ucg-autofill.js`). A clinician saving straight from the package never sees the
+first one. Changing only the wizard's row looks like nothing happened.
+
+"Pending" could only ever say the whole bill was unpaid, so a patient who hands
+over part of it left two untrue choices: **Paid**, and the clinic loses the
+debt; or **Pending**, and the clinic loses the money it is holding. Either way
+the whole amount went to the owing list.
+
+Both rows now offer **Part payment**. Tapping it opens a box for the figure and
+says, as it is typed:
+
+> Paid UGX 20,000 out of UGX 60,000 — UGX 40,000 still owing.
+
+**The amount decides the status, not the chip.** Nothing entered is still
+`pending`, part of it is `partial`, and entering the whole bill is simply
+`paid` — so a slip of the finger cannot record a bill as settled, and a clinic
+cannot lose a debt by mistapping. `'partial'` was already a valid
+`payment_status`; the migration that added `record_payment` added it too.
+
 ## Why the installed app never changed
 
 `app/clinic/clinic-sw.js` · `tools/make_version_json.py` ·
