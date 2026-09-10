@@ -574,6 +574,110 @@ range only from titles that are talking about a **person's** age, so
 "Postpartum Examination of the Mother Up to 6 Weeks" (which counts weeks since
 delivery) is left alone rather than marked wrong for an adult woman.
 
+## Every word, in every colour
+
+`tests/measure-contrast.js` (the survey) · `tests/test-readable.js` (the guard)
+· `tools/tokenise_colours.py` (the sweep)
+
+Four skins × two themes is **eight** combinations. A colour written as a
+literal instead of a token is readable in the one the author was looking at and
+invisible in the other seven, and no amount of looking finds that. A number
+does:
+
+| | unreadable text |
+|---|---|
+| the treatment screen, before | **49** |
+| all six screens, after | **0** of 4,632 measured |
+
+Worst offenders: *"Total charged"* at **1.06:1**, *"Clinic stock"* at
+**1.01:1**, *"Drug 1"* and the dictate icon at **1.46:1**.
+
+### The sweep, and why it is safe
+`tools/tokenise_colours.py` made **388** replacements. It is safe by
+construction: every literal it replaces is EXACTLY the light-mode value of the
+token replacing it (`--text` is #1A1A1A, `--text-lt` is #5F6368, `--border` is
+#E0E0E0, `--surface` is #FFFFFF), so light mode renders identically and only
+dark mode changes. It skips rules already scoped to `[data-theme="dark"]`,
+skips `--token:` definitions, skips the service worker's self-contained offline
+page (which never loads clinic.css, so a token there would resolve to nothing),
+and writes fallbacks — `var(--text-lt, #5F6368)` — so a missing token can never
+blank a colour.
+
+### Four faults a sweep cannot see, found by measuring
+- **`--primary` used as a WORD.** In the "dark" skin `--primary` is `#2C3035`,
+  a near-black chrome fill, and 53 places used it as a text colour — 1.46:1 on
+  that skin's own near-black surface. **`--primary-ink`** now carries "the brand
+  colour as text" and follows `--deep-ink` in dark mode, which every skin
+  already defines.
+- **White on a `--primary` fill.** `--on-primary` exists for exactly this and
+  flips to black in dark mode; 32 places hardcoded `#fff` and sat at 3.3:1.
+- **`--deep` is not `--primary`.** It stays dark in midnight, dark and clay,
+  but the forest dark theme redefines it to a *light* green — so neither white
+  nor black clears the bar on all four. **`--on-deep`** is defined beside it,
+  per skin.
+- **`--info` and `--danger` as words.** Fill colours again: `#1565C0` is 2.97:1
+  and `#D32F2F` 3.81:1 on a dark card. `--info-ink` joins the `--danger-ink` /
+  `--warning-ink` that were already there.
+
+**The rule worth keeping: a fill colour and the text that sits on it must be
+defined as a PAIR, in the same place, for every skin.** Every failure above is
+the same mistake — a fill token borrowed for words, or a word colour written
+next to a fill that changes underneath it.
+
+## Staying signed in
+
+`app/clinic/js/clinic.js` · `tests/test-signin-sticks.js`
+
+Clinics were being put back on the sign-in page in the middle of a working day,
+on phones that had never signed out.
+
+**What I could and could not prove.** I have NOT reproduced the exact symptom
+from here — `test-signin-sticks.js` drives the real Supabase library with only
+the network mocked, and the old code passes every case in it. So what follows
+is a set of faults that are real in the code and would each produce that
+symptom, not a demonstrated cure. If it happens again, the app now says why
+(below), and that answer is worth more than another guess.
+
+### getSession() gives the same answer to two different questions
+`supabase.auth.getSession()` returns `{ session: null }` **without throwing**
+both when there is no sign-in at all and when there is a perfectly good refresh
+token it could not reach the server to exchange. The guard read that null as
+"this localStorage was faked", deleted the session and redirected — so the
+`catch()` branch commented "Network error — allow offline access" could never
+run, because nothing had been thrown.
+
+"You are not signed in" and "I could not check right now" must not have the
+same consequence: one is a security measure, the other is a clinician losing
+the patient in front of them. The guard now asks, in order — is there a session
+(yes: only a *different user* is grounds to leave); is there a stored sign-in at
+all (no: genuinely out); is the phone offline (yes: stay, the whole app is
+built to work without a connection); and only then asks the server, where only
+an explicit refusal counts.
+
+### A refresh token is used ONCE, and this app opens several pages
+Each page makes its own Supabase client. Two renewing in the same moment means
+the slower one is told **"Invalid Refresh Token: Already Used"** for a token
+that was good a second earlier. That is indistinguishable, at the call site,
+from a real expiry. So a refusal is now re-checked once after a short pause: if
+another page has since written a fresh session to the same storage, it was a
+race and nobody is disturbed.
+
+### A timer does not run in a suspended WebView
+The library renews on a timer. Android suspends the WebView, so a phone that
+spent the morning in a pocket wakes holding an expired token and the first
+thing the clinician taps is what discovers it. `_keepSignedIn()` renews when
+the app returns to the front, when focus comes back, and when the connection
+returns — five minutes before expiry rather than after, and never as grounds
+for signing anybody out.
+
+### And when it does happen, the app says why
+"It logs me out sometimes" is not something anybody can chase. Every exit now
+goes through `_signOutBecause()`, which records the reason, the time and
+whether the phone had a connection; the sign-in page reads it back — *"You were
+asked to sign in again 3 minutes ago because the server refused the saved
+sign-in. The phone had no connection at the time."* The next report will name
+the cause instead of describing the symptom.
+
 ## How a suggestion is worked out
 
 `app/clinic/js/clinic-impression.js` · benchmark: `tests/measure-impression.js`
@@ -776,7 +880,7 @@ list, and worth doing one day.
 
 ## The tests
 
-`tests/` — 49 files, ~665 checks. No framework: each file starts a web server
+`tests/` — 51 files, ~680 checks. No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 

@@ -89,7 +89,7 @@
     var rows = res.data || [];
     if (!rows.length) {
       list.innerHTML = '<div style="text-align:center;padding:40px 24px;color:var(--text-lt, #5F6368);font-size:13px">'
-        + '<span class="material-icons-outlined" style="font-size:34px;display:block;margin-bottom:8px;color:#B0BEC5">forum</span>'
+        + '<span class="material-icons-outlined" style="font-size:34px;display:block;margin-bottom:8px;color:var(--text-lt, #5F6368);opacity:.6">forum</span>'
         + 'No chats yet. Tap <strong>New</strong> to message a clinician.</div>';
       return;
     }

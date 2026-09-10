@@ -40,14 +40,87 @@ function _getClinicSupabase() {
   return _supaClient;
 }
 
+// Does this device hold a real sign-in? Supabase keeps it under its own
+// storageKey, so this is the same thing the library reads — if a refresh token
+// is sitting there, somebody signed in on this phone and has not signed out.
+function _hasStoredLogin() {
+  try {
+    var raw = localStorage.getItem('sb-homatt-clinic-auth');
+    if (!raw) return false;
+    var t = JSON.parse(raw);
+    // Newer clients wrap it; older ones do not.
+    var sess = (t && t.currentSession) || t;
+    return !!(sess && (sess.refresh_token || sess.access_token));
+  } catch (e) { return false; }
+}
+
+// Did the SERVER refuse the refresh token, or did we simply not reach it?
+// Only the first is a reason to make a clinician sign in again.
+function _isAuthRejection(err) {
+  if (!err) return false;
+  var status = Number(err.status || err.code || 0);
+  if (status === 400 || status === 401 || status === 403) return true;
+  var msg = String(err.message || err.error_description || '').toLowerCase();
+  if (/failed to fetch|networkerror|network request failed|load failed|timeout|abort/.test(msg)) return false;
+  return /invalid refresh token|refresh token not found|already used|revoked|jwt expired|invalid claim|user not found|not authenticated/.test(msg);
+}
+
+// Every way out of the app, written down. A clinic that is suddenly looking at
+// a sign-in screen has no idea why, and neither did anybody they could ask —
+// "it logs me out sometimes" is not something that can be chased. Now the
+// reason and the time are kept, and the sign-in page says which it was.
+function _signOutBecause(why) {
+  try {
+    localStorage.setItem('homatt_last_signout', JSON.stringify({
+      why: String(why || 'unknown'),
+      at: new Date().toISOString(),
+      online: navigator.onLine !== false,
+    }));
+  } catch (e) {}
+  try { localStorage.removeItem('clinic_session'); } catch (e) {}
+  window.location.href = 'index.html';
+}
+
+// An access token lasts an hour and the library renews it on a timer. A timer
+// does not run in an Android WebView that Android has suspended, so a phone
+// that spent the morning in a pocket wakes up holding an expired token and the
+// very next thing the clinician does fails. Renew when the app comes back to
+// the front, and when the connection returns — quietly, and never as grounds
+// for signing anybody out.
+function _keepSignedIn() {
+  var busy = false;
+  async function renew() {
+    if (busy || navigator.onLine === false) return;
+    if (!_hasStoredLogin()) return;
+    busy = true;
+    try {
+      var supa = _getClinicSupabase();
+      if (supa) {
+        var g = await supa.auth.getSession();
+        var sess = g && g.data && g.data.session;
+        // Renew a little before it expires rather than after it has, so the
+        // first thing the clinician taps is not the thing that discovers it.
+        var soon = !sess || !sess.expires_at ||
+                   (sess.expires_at * 1000 - Date.now()) < 5 * 60 * 1000;
+        if (soon) await supa.auth.refreshSession();
+      }
+    } catch (e) { /* network. Try again next time the app is opened. */ }
+    busy = false;
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) renew();
+  });
+  window.addEventListener('online', renew);
+  window.addEventListener('focus', renew);
+}
+
 function requireClinic() {
   // Hide content immediately so there's no flash of protected content before redirect
   document.body.style.visibility = 'hidden';
   let s;
   try { s = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
   if (!s || typeof s !== 'object' || Array.isArray(s)) {
-    localStorage.removeItem('clinic_session');
-    window.location.href = 'index.html';
+    _signOutBecause('the saved sign-in on this device could not be read');
     return null;
   }
   // Auth passed — show the page
@@ -60,30 +133,73 @@ function requireClinic() {
   if (el2) el2.textContent = name;
   if (av)  av.textContent  = name[0].toUpperCase();
 
-  // Non-demo: validate Supabase session in background.
-  // If the stored session is a fake (no real Supabase token), redirect after short delay.
-  // This prevents URL manipulation while still showing the page immediately for real users.
+  // Non-demo: validate the Supabase session in the background, to stop a faked
+  // localStorage entry walking straight into the app.
+  //
+  // The trap here, and the reason clinics were being thrown back to the sign-in
+  // page in the middle of a working day: getSession() returns
+  // { session: null } WITHOUT THROWING when it has a perfectly good refresh
+  // token but could not reach the server to exchange it. An access token lasts
+  // an hour; a phone that has been in a pocket, or on a connection that drops
+  // for thirty seconds, comes back with an expired one. The old code read that
+  // null as "the storage was faked", deleted the session and redirected — so
+  // the catch() branch labelled "allow offline access" never ran, because
+  // nothing had been thrown.
+  //
+  // "You are not signed in" and "I could not check right now" are the same
+  // return value. They must not have the same consequence: one is a security
+  // measure, the other is a clinician losing the patient in front of them.
   if (!s.demo) {
     setTimeout(async () => {
       try {
         const supa = _getClinicSupabase();
         if (!supa) return;
         const { data } = await supa.auth.getSession();
-        if (!data?.session) {
-          // No valid Supabase session — the localStorage was faked or expired
-          localStorage.removeItem('clinic_session');
-          window.location.href = 'index.html';
+        if (data && data.session) {
+          // Signed in. The only thing left to check is that it is the SAME
+          // person the stored session claims — that one is a real mismatch and
+          // is never a network problem.
+          if (s.userId && data.session.user.id !== s.userId) {
+            _signOutBecause('this browser is signed in as a different user');
+          }
           return;
         }
-        // Verify the session belongs to the stored user
-        if (s.userId && data.session.user.id !== s.userId) {
-          localStorage.removeItem('clinic_session');
-          window.location.href = 'index.html';
+        // No session came back. Before touching anything, ask whether this
+        // device actually holds a sign-in.
+        if (!_hasStoredLogin()) {
+          _signOutBecause('there is no sign-in stored on this device');
+          return;
         }
-      } catch(e) { /* Network error — allow offline access */ }
+        // It does. So this is a renewal that did not happen, not a fake.
+        // Offline is not a reason to sign anybody out — the whole app is built
+        // to work without a connection.
+        if (navigator.onLine === false) return;
+        // Online: ask the server directly. Only the server saying the refresh
+        // token is no good is grounds for signing out; anything that smells of
+        // the network is left alone and tried again on the next page.
+        const r = await supa.auth.refreshSession();
+        if (r && r.data && r.data.session) return;                 // renewed
+        if (r && r.error && _isAuthRejection(r.error)) {
+          // One more look before anybody is put out. A refresh token is used
+          // ONCE: if two of these pages renew at the same moment — and this app
+          // opens several, each with its own client — the slower one is told
+          // "Already Used" for a token that was perfectly good a moment ago.
+          // The winner has by now written a fresh session to the same storage,
+          // so asking again a second later is the difference between a race and
+          // a real expiry.
+          await new Promise(function (ok) { setTimeout(ok, 1200); });
+          try {
+            const again = await supa.auth.getSession();
+            if (again && again.data && again.data.session) return;  // it was a race
+          } catch (e) { return; }
+          _signOutBecause('the server refused the saved sign-in: ' +
+            String((r.error && r.error.message) || 'rejected'));
+        }
+      } catch (e) { /* threw = network. Keep them signed in. */ }
     }, 200);
   }
 
+  if (!s.demo) _keepSignedIn();
   return s;
 }
 

@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20260930">
+  <link rel="stylesheet" href="css/clinic.css?v=20261002">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
@@ -89,7 +89,7 @@
     .hours-row { display:grid; grid-template-columns:90px 1fr 1fr 70px; gap:8px; align-items:center; margin-bottom:8px; }
     .hours-row .day { font-weight:600; font-size:13px; }
     .hours-input { border:1px solid var(--border, #E0E0E0); border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; width:100%; }
-    .closed-toggle { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; color:#D32F2F; }
+    .closed-toggle { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; color:var(--danger-ink, #C62828); }
 
     /* Facilities */
     .facilities-grid { display:flex; flex-wrap:wrap; gap:8px; }
@@ -110,7 +110,7 @@
     .cond-badge { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
     .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
 
-    .save-btn { background:var(--deep); color:#fff; border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .save-btn { background:var(--deep); color:var(--on-deep, #fff); border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
     .save-btn:active { background:#154d18; }
     .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
 
@@ -304,7 +304,7 @@
           attendants get only quick sale and stock — ideal for a drug shop.
         </p>
         <button type="button" onclick="openAddStaffModal()"
-                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
           <span class="material-icons-outlined" style="font-size:17px">person_add</span>
           Add staff account
         </button>
@@ -333,7 +333,7 @@
           <div id="asError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
           <div style="display:flex;gap:8px">
             <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
-            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:var(--deep);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
+            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
           </div>
         </div>
       </div>
@@ -373,7 +373,7 @@
         <!-- Auto-geocode + GPS buttons -->
         <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
-            style="display:flex;align-items:center;gap:6px;background:var(--deep);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            style="display:flex;align-items:center;gap:6px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
             <span class="material-icons-outlined" style="font-size:16px">my_location</span>
             Find GPS from address
           </button>
@@ -425,7 +425,7 @@
           <input type="hidden" id="sFrontPhotoUrl">
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
             <button type="button" onclick="document.getElementById('frontPhotoInput').click()"
-              style="display:flex;align-items:center;gap:6px;background:var(--deep);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              style="display:flex;align-items:center;gap:6px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
               <span class="material-icons-outlined" style="font-size:16px">upload</span>
               <span id="photoUploadLabel">Upload photo</span>
             </button>
@@ -477,7 +477,7 @@
         </table>
         <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
           <button onclick="addCondFeeRow()" style="background:none;border:1px dashed var(--deep);color:var(--deep-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
-          <button onclick="populateFromSpecialties()" style="background:none;border:1px solid #1565C0;color:#1565C0;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+          <button onclick="populateFromSpecialties()" style="background:none;border:1px solid var(--info-ink);color:var(--info-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
             <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
           </button>
         </div>
@@ -662,7 +662,7 @@
           </div>
         </div>
         <div id="pwdMsg" style="font-size:13px;margin-bottom:12px;display:none"></div>
-        <button class="save-btn" id="changePwdBtn" onclick="changePassword()" style="background:#1565C0">
+        <button class="save-btn" id="changePwdBtn" onclick="changePassword()" style="background:#0D47A1;color:#fff">
           <span class="material-icons-outlined">lock_reset</span> Change Password
         </button>
       </div>
@@ -684,9 +684,9 @@
 
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
-<script src="js/clinic-offline.js?v=20260930a" defer></script>
-<script src="js/clinic.js?v=20260930" defer></script>
-<script src="js/msg-alerts.js?v=20260930" defer></script>
+<script src="js/clinic-offline.js?v=20261002a" defer></script>
+<script src="js/clinic.js?v=20261002" defer></script>
+<script src="js/msg-alerts.js?v=20261002" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -2032,11 +2032,11 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/clinic-look.js?v=20260930"></script>
+<script src="js/clinic-look.js?v=20261002"></script>
 <script src="js/vendor/sql-wasm.js" defer></script>
-<script src="js/clinic-impression.js?v=20260930" defer></script>
-<script src="js/clinic-dictate.js?v=20260930" defer></script>
-<script src="js/clinic-speak.js?v=20260930" defer></script>
-<script src="js/pwa-install.js?v=20260930"></script>
+<script src="js/clinic-impression.js?v=20261002" defer></script>
+<script src="js/clinic-dictate.js?v=20261002" defer></script>
+<script src="js/clinic-speak.js?v=20261002" defer></script>
+<script src="js/pwa-install.js?v=20261002"></script>
 </body>
 </html>
