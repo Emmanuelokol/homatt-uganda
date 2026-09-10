@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v171';
+const CACHE = 'homatt-clinic-v172';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -39,29 +39,29 @@ const SHELL = [
   'settings.html',
   'messages.html',
   'guidelines.html',
-  'js/guidelines.js?v=20261006',
+  'js/guidelines.js?v=20261007',
   'js/vendor/sql-wasm.js',
-  'js/ucg-autofill.js?v=20261006',
-  'js/clinic-impression.js?v=20261006',
-  'js/clinic-dictate.js?v=20261006',
-  'js/clinic-speak.js?v=20261006',
-  'js/clinic-intake.js?v=20261006',
-  'js/clinic-look.js?v=20261006',
+  'js/ucg-autofill.js?v=20261007',
+  'js/clinic-impression.js?v=20261007',
+  'js/clinic-dictate.js?v=20261007',
+  'js/clinic-speak.js?v=20261007',
+  'js/clinic-intake.js?v=20261007',
+  'js/clinic-look.js?v=20261007',
   'manifest.json',
   'js/vendor/supabase.min.js?v=2110',
   'fonts/material-icons.css?v=1',
   'fonts/material-icons-outlined.woff2?v=1',
   'fonts/inter.css?v=1',
   'fonts/inter-latin.woff2?v=1',
-  'css/clinic.css?v=20261006',
-  'js/clinic.js?v=20261006',
-  'js/messages.js?v=20261006',
-  'js/clinic-offline.js?v=20261006a',
-  'js/stock-blueprints.js?v=20261006',
-  'js/stock-intake.js?v=20261006',
-  'js/new-order-wizard.js?v=20261006',
-  'js/msg-alerts.js?v=20261006',
-  'js/pwa-install.js?v=20261006',
+  'css/clinic.css?v=20261007',
+  'js/clinic.js?v=20261007',
+  'js/messages.js?v=20261007',
+  'js/clinic-offline.js?v=20261007a',
+  'js/stock-blueprints.js?v=20261007',
+  'js/stock-intake.js?v=20261007',
+  'js/new-order-wizard.js?v=20261007',
+  'js/msg-alerts.js?v=20261007',
+  'js/pwa-install.js?v=20261007',
   '../js/config.js',
   '../js/native-bridge.js',
   'icons/clinic-192.png?v=3',
@@ -90,7 +90,23 @@ let _lastSelfUpdateCheck = 0;
 // been fetched successfully, so a connection that dies halfway leaves the
 // working app exactly as it was. The worst outcome is the one we already had:
 // no update.
-const UPDATE_BASE = 'https://emmanuelokol.github.io/homatt-uganda/clinic/';
+// Where a newer build can be fetched from, tried in order.
+//
+// Two of them, because this whole mechanism depends on one thing that cannot
+// be checked from a development machine: whether the host sends
+// `Access-Control-Allow-Origin`. A service worker on https://localhost reading
+// another origin is a cross-origin fetch, and without that header the browser
+// refuses to hand over the response — which arrives here as an ordinary
+// network failure, indistinguishable from having no signal.
+//
+// raw.githubusercontent.com is the second source precisely because it exists
+// to be read by programs and says so in its headers. If the first is blocked,
+// the second answers, and a clinic never learns the difference.
+const UPDATE_SOURCES = [
+  'https://emmanuelokol.github.io/homatt-uganda/clinic/',
+  'https://raw.githubusercontent.com/Emmanuelokol/homatt-uganda/gh-pages/clinic/',
+];
+const UPDATE_BASE = UPDATE_SOURCES[0];
 const UPDATE_EVERY = 6 * 60 * 60 * 1000;
 let _lastBuildCheck = 0;
 let _updating = false;
@@ -113,8 +129,11 @@ function localIsStale() { return !!_appliedBuild && canFetchNewBuild(); }
 // Only an install that is NOT already served from the update origin can be
 // behind it. On the web the browser's own worker update does this properly.
 function canFetchNewBuild() {
-  try { return new URL(UPDATE_BASE).origin !== self.location.origin; }
-  catch (e) { return false; }
+  for (var i = 0; i < UPDATE_SOURCES.length; i++) {
+    try { if (new URL(UPDATE_SOURCES[i]).origin !== self.location.origin) return true; }
+    catch (e) {}
+  }
+  return false;
 }
 
 async function tellPages(msg) {
@@ -138,17 +157,20 @@ async function fetchNewBuild(force) {
   _lastBuildCheck = now;
   _updating = true;
   try {
-    let manifest;
-    try {
-      const r = await fetch(UPDATE_BASE + 'version.json', { cache: 'no-store' });
-      if (!r || !r.ok) return { checked: true, reason: 'no answer from the update server' };
-      manifest = await r.json();
-    } catch (e) {
-      return { checked: true, reason: 'no connection' };
+    // Ask each source in turn. A source that cannot be read — no signal, or no
+    // CORS header on the reply — is skipped rather than being the end of it.
+    let manifest = null, base = null, lastWhy = 'no connection';
+    for (let si = 0; si < UPDATE_SOURCES.length && !manifest; si++) {
+      const src = UPDATE_SOURCES[si];
+      try {
+        const r = await fetch(src + 'version.json', { cache: 'no-store' });
+        if (!r || !r.ok) { lastWhy = 'the update server answered ' + (r ? r.status : '?'); continue; }
+        const j = await r.json();
+        if (j && j.cache && Array.isArray(j.files)) { manifest = j; base = src; }
+        else lastWhy = 'the update server sent something unreadable';
+      } catch (e) { lastWhy = 'could not reach the update server'; }
     }
-    if (!manifest || !manifest.cache || !Array.isArray(manifest.files)) {
-      return { checked: true, reason: 'the update server sent something unreadable' };
-    }
+    if (!manifest) return { checked: true, updated: false, reason: lastWhy };
     const running = _appliedBuild || CACHE;
     if (manifest.cache === running) {
       return { checked: true, current: running, latest: manifest.cache, updated: false,
@@ -173,7 +195,7 @@ async function fetchNewBuild(force) {
       const rel = wanted[i];
       let res;
       try {
-        res = await fetch(UPDATE_BASE + (rel === './' ? '' : rel), { cache: 'no-store' });
+        res = await fetch(base + (rel === './' ? '' : rel), { cache: 'no-store' });
       } catch (e) {
         await caches.delete(STAGE);
         return { checked: true, updated: false, reason: 'the connection dropped part-way' };
@@ -206,7 +228,7 @@ async function fetchNewBuild(force) {
     catch (e) {}
     await tellPages({ type: 'homatt-updated', version: manifest.cache });
     return { checked: true, current: manifest.cache, latest: manifest.cache, updated: true,
-             reason: 'updated' };
+             source: base, reason: 'updated' };
   } finally {
     _updating = false;
   }

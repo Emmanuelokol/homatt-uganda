@@ -21,9 +21,10 @@ const { chromium } = require('playwright');
 const http = require('http'); const fs = require('fs');
 const MIME = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.svg':'image/svg+xml','.png':'image/png','.wasm':'application/wasm','.db':'application/octet-stream'};
 
-const INSTALLED_PORT = 8933, WEB_PORT = 8934;
+const INSTALLED_PORT = 8933, WEB_PORT = 8934, WEB2_PORT = 8932;
 const INSTALLED = 'http://localhost:' + INSTALLED_PORT;
 const WEB = 'http://localhost:' + WEB_PORT;
+const WEB2 = 'http://localhost:' + WEB2_PORT;
 
 // The "web" side serves the real app but pretending to be a NEWER build, and
 // with CORS on, which is what GitHub Pages does.
@@ -47,7 +48,7 @@ const NEWV = 'homatt-clinic-v999';
 (async () => {
   const installed = serve(INSTALLED_PORT, {});
   const web = serve(WEB_PORT, {
-    cors: true,
+    cors: false,   // deliberately unreadable — see web2 below
     rewrite(p, d) {
       // Pretend this side is a newer build.
       if (p.endsWith('version.json')) {
@@ -57,6 +58,27 @@ const NEWV = 'homatt-clinic-v999';
       }
       // Something visible in the served page, so "did the new code arrive?"
       // is answered by the page itself and not by a cache name.
+      if (p.endsWith('/clinic/dashboard.html')) {
+        return Buffer.from(d.toString('utf8')
+          .replace('</title>', '</title><meta name="homatt-build" content="NEW">'));
+      }
+      return null;
+    },
+  });
+
+  // The SECOND source. The whole mechanism rests on something that cannot be
+  // checked from a development machine — whether the host sends
+  // Access-Control-Allow-Origin. Without it a service worker's cross-origin
+  // read fails and looks exactly like having no signal. So the first source
+  // here is deliberately served WITHOUT that header, and the update has to
+  // come from the second anyway.
+  const web2 = serve(WEB2_PORT, {
+    cors: true,
+    rewrite(p, d) {
+      if (p.endsWith('version.json')) {
+        const j = JSON.parse(d.toString('utf8')); j.cache = NEWV;
+        return Buffer.from(JSON.stringify(j));
+      }
       if (p.endsWith('/clinic/dashboard.html')) {
         return Buffer.from(d.toString('utf8')
           .replace('</title>', '</title><meta name="homatt-build" content="NEW">'));
@@ -75,7 +97,7 @@ const NEWV = 'homatt-clinic-v999';
   // Everything else off the network, as in the other tests.
   await page.route('**/*', r => {
     const u = r.request().url();
-    if (u.startsWith(INSTALLED) || u.startsWith(WEB)) return r.continue();
+    if (u.startsWith(INSTALLED) || u.startsWith(WEB) || u.startsWith(WEB2)) return r.continue();
     return r.abort();
   });
 
@@ -84,8 +106,8 @@ const NEWV = 'homatt-clinic-v999';
   const swPath = path.join(APP, 'clinic', 'clinic-sw.js');
   const swReal = fs.readFileSync(swPath, 'utf8');
   let swTest = swReal.replace(
-    /const UPDATE_BASE = '[^']*';/,
-    "const UPDATE_BASE = '" + WEB + "/clinic/';");
+    /const UPDATE_SOURCES = \[[^\]]*\];/,
+    "const UPDATE_SOURCES = ['" + WEB + "/clinic/', '" + WEB2 + "/clinic/'];");
   if (process.env.SWLOG) {
     swTest = swTest.replace('const CACHE =',
       'const _origOpen = caches.open.bind(caches);\n' +
@@ -173,6 +195,7 @@ const NEWV = 'homatt-clinic-v999';
 
     // A dead update server must leave the working app alone.
     await new Promise(r => web.close(r));
+    await new Promise(r => web2.close(r));
     const dead = await page.evaluate(() => new Promise((resolve) => {
       const ch = new MessageChannel();
       let done = false;
@@ -192,6 +215,7 @@ const NEWV = 'homatt-clinic-v999';
   } finally {
     fs.writeFileSync(swPath, swReal);          // always put the worker back
     try { installed.close(); } catch (e) {}
+    try { web2.close(); } catch (e) {}
     try { web.close(); } catch (e) {}
   }
 })().catch(e => { console.error('CRASH', e.message); process.exit(1); });

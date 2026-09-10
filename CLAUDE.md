@@ -692,6 +692,29 @@ put the old version straight back:
 own origin is the stale one.** Anything that "refreshes from the network" has
 to know that, or it will helpfully restore the old app.
 
+### The header nobody had checked, and the test that hid it
+The mechanism rests on one thing that cannot be verified from a development
+machine: whether the host sends **`Access-Control-Allow-Origin`**. A worker on
+`https://localhost` reading another origin is a cross-origin fetch, and without
+that header the browser refuses to hand over the response — which arrives here
+as an ordinary network failure, **indistinguishable from having no signal**.
+
+`test-selfupdate.js` served its stand-in web host **with CORS switched on**, so
+it passed while proving nothing about the real one. Run the same test with the
+header off and both assertions fail:
+
+```
+FAIL  it finds the newer build and takes it   — reason: "no connection"
+FAIL  the app now serves the NEW build        — (old)
+```
+
+A test that only passes against a permissive mock proves less than it looks
+like it proves. The first stand-in is now served **deliberately unreadable**,
+and the update has to arrive anyway — from `UPDATE_SOURCES[1]`,
+`raw.githubusercontent.com`, which exists to be read by programs and says so in
+its headers. Each source is tried in turn for `version.json`, and every file of
+the build then comes from whichever one answered.
+
 ### What this still costs, once
 The mechanism is in the worker, and the worker ships inside the APK — so it
 takes **one more APK install** to get it. After that one, the portal updates
