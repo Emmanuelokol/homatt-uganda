@@ -449,8 +449,42 @@ Emmanuel Paul.. Name of the person is Emmanuel Opal."
 - Cost is a fraction of a US cent per consultation on Deepgram's per-minute
   rate; the Edge Function caps a clip at ~1 minute so a stuck microphone cannot
   run up a bill.
-- **A key pasted into a chat is a burnt key.** Rotate it, and put the
-  replacement in Supabase secrets only.
+- **A key pasted into a chat is a burnt key.** Rotate it — and read the next
+  section first, because rotating it in the wrong place undoes itself.
+
+### Rotating the Deepgram key, and the trap in it
+**Supabase is not the only place the key lives.** Both deploy workflows carry
+it from GitHub:
+
+```
+keep DEEPGRAM_API_KEY "$DEEPGRAM_API_KEY"     # deploy-edge-function.yml:59
+supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF"
+```
+
+`keep` sets a secret only when the GitHub value is **non-empty**, and leaves
+the project's own value alone when it is empty. So:
+
+- If `DEEPGRAM_API_KEY` **is** in GitHub → Actions → Secrets, then setting a
+  new key in the Supabase dashboard works until the next push, and the next
+  push **silently puts the old, burnt key back**. Rotate it in **GitHub**.
+- If it is **not** in GitHub Secrets, Supabase is the only home and setting it
+  there is enough.
+
+Safe either way: set the new key in **both**, in this order.
+
+1. Deepgram dashboard → new API key. Do not delete the old one yet.
+2. GitHub → Settings → Secrets and variables → Actions → `DEEPGRAM_API_KEY`.
+3. `supabase secrets set DEEPGRAM_API_KEY=<new> --project-ref <ref>`, or push
+   anything so the deploy action carries it across.
+4. **Settings → Dictation → Check now**, and read the key tag (below).
+5. Only once the tag shows the NEW key: delete the old one in Deepgram.
+
+**How to see WHICH key is live.** "Dictation is working" reads identically for
+the burnt key and its replacement, which is what makes a half-finished rotation
+so easy to believe in. The probe now returns `keyTag()` — the last four
+characters and nothing else — and Settings shows it beside the provider. Four
+characters of a 40-character key name it without being usable; the key itself
+never leaves the Edge Function.
 
 ### Key files
 | File | Purpose |

@@ -173,6 +173,16 @@ function json(body: unknown, status = 200) {
   });
 }
 
+/** Enough of a key to tell one from another, and not enough to use.
+ *  Rotating a key is only half done until somebody can SEE that the new one is
+ *  the one in use — and "dictation works" reads identically for the burnt key
+ *  and its replacement. Four characters name it; the rest never leaves here. */
+function keyTag(key: string): string {
+  const k = String(key || '');
+  if (k.length < 8) return '????';
+  return '…' + k.slice(-4);
+}
+
 /**
  * Is dictation actually working, and how much is left?
  *
@@ -188,12 +198,13 @@ async function probeDeepgram(key: string) {
     r = await fetch(`${DEEPGRAM_API}/projects`, { headers: head });
   } catch {
     return { name: 'deepgram', ok: false, kind: 'unreachable', balance: null,
+             key: keyTag(key),
              message: 'Could not reach Deepgram from this server.' };
   }
   if (!r.ok) {
     const f = upstreamFault(r.status);
     return { name: 'deepgram', ok: false, kind: f.kind, balance: null,
-             message: f.message };
+             key: keyTag(key), message: f.message };
   }
 
   // The key works. What is left on it is a separate question, and a project
@@ -217,15 +228,18 @@ async function probeDeepgram(key: string) {
 
   if (amount !== null && amount <= 0) {
     return { name: 'deepgram', ok: false, kind: 'credit', balance: amount,
+             key: keyTag(key),
              message: 'The Deepgram account is empty. Dictation will not work ' +
                       'until it is topped up.' };
   }
   if (amount !== null && amount < LOW_BALANCE) {
     return { name: 'deepgram', ok: true, kind: 'low', balance: amount,
+             key: keyTag(key),
              message: `Dictation is working, but only $${amount.toFixed(2)} is ` +
                       'left on the Deepgram account. Top it up before it runs out.' };
   }
   return { name: 'deepgram', ok: true, kind: '', balance: amount,
+           key: keyTag(key),
            message: amount === null
              ? 'Dictation is working. The balance on this key cannot be read.'
              : `Dictation is working. $${amount.toFixed(2)} left on the account.` };

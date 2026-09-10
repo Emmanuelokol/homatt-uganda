@@ -1194,6 +1194,15 @@ html[data-theme="dark"]{
  * empty" is the difference between waiting a minute and paying a bill. Every
  * colour is a token, so the four skins and both themes carry it.
  */
+/* The last four characters of the key that is actually live. After rotating,
+   "dictation works" reads identically for the burnt key and its replacement —
+   this is the only way to see WHICH one the server is holding. */
+.dict-key{
+  display:inline-block; margin-left:6px; padding:1px 7px; border-radius:999px;
+  font-size:11px; font-weight:800;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  background:var(--brand-tint); color:var(--brand-ink);
+}
 .dict-note{
   font-size:13px; color:var(--text-lt); margin:-6px 0 14px; line-height:1.55;
 }
