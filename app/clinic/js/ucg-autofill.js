@@ -839,7 +839,7 @@
       tests: extractTests(c.investigations, c.full_text),
       drugs: drugs,
       fees: { consult: 0, lab: 0, meds: 0 },
-      paymentStatus: 'pending',
+      paymentStatus: 'partial',
       followUpDays: 7,
       page: c.page, title: c.title,
     };
@@ -2060,7 +2060,7 @@
     // Not in the guidelines at all → open a blank worksheet the clinician fills
     // in (and can save as a clinic standard for next time).
     if (!condId) {
-      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', amountPaid: 0, followUpDays: 7, page: null, title: title };
+      pkg = { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'partial', amountPaid: 0, followUpDays: 7, page: null, title: title };
       srcPkg = JSON.parse(JSON.stringify(pkg));
       document.getElementById('ucgKicker').textContent = 'New package · not in the guidelines';
       document.getElementById('ucgTags').innerHTML =
@@ -2120,7 +2120,7 @@
       };
     } else {
       pkg = buildFromGuideline(ctx.sourceId || condId, severity) ||
-        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'pending', amountPaid: 0, followUpDays: 7, page: page, title: title };
+        { tests: [], drugs: [], fees: { consult: 0, lab: 0, meds: 0 }, paymentStatus: 'partial', amountPaid: 0, followUpDays: 7, page: page, title: title };
     }
     normaliseGivenHere(pkg);
     srcPkg = JSON.parse(JSON.stringify(pkg));

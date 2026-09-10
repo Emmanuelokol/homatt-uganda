@@ -64,9 +64,16 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
              on:g?(g.querySelector('.on')||{}).dataset?.pay:null,
              hint:(document.getElementById('ucgPayHint')||{}).textContent||'' };
   });
-  result('Paid / Pending / Credit / Waived are in the one-tap panel',
-    chips.n===4 && ['paid','pending','credit','waived'].every(k=>chips.labels.includes(k)),
+  // "Pending" became "Part payment": it could only ever say the whole bill was
+  // unpaid, and a patient handing over part of it is the ordinary case. Part
+  // payment with nothing entered IS pending, and still saves as pending.
+  result('Paid / Part payment / Credit / Waived are in the one-tap panel',
+    chips.n===4 && ['paid','partial','credit','waived'].every(k=>chips.labels.includes(k)),
     JSON.stringify(chips.labels)+' selected='+chips.on);
+  // A row where nothing is highlighted leaves a clinician guessing what the
+  // visit will be saved as.
+  result('and one of them is selected when the panel opens',
+    !!chips.on && chips.labels.includes(chips.on), 'selected=' + chips.on);
 
   // ── 2. Lab test auto-suggestion ────────────────────────────────────────
   const sug = await page.evaluate(async ()=>{
