@@ -33,7 +33,7 @@ const PORT = 8935, ORIGIN = 'http://localhost:' + PORT;
 const COMBOS = [['dark','dark'], ['forest','dark'], ['clay','light']];
 const PAGES = ['new-order.html', 'dashboard.html'];
 
-const MEASURE = () => {
+const MEASURE_IN = (sel) => {
   function parse(c){var m=String(c).match(/rgba?\(([^)]+)\)/);if(!m)return null;
     var p=m[1].split(',').map(function(x){return parseFloat(x)});
     return {r:p[0],g:p[1],b:p[2],a:p.length>3?p[3]:1};}
@@ -56,7 +56,9 @@ const MEASURE = () => {
     return {bg:base,gradient:grad};}
   function ownText(el){var t='';for(var i=0;i<el.childNodes.length;i++)
     if(el.childNodes[i].nodeType===3)t+=el.childNodes[i].nodeValue;return t.trim();}
-  var bad=[],n=0,all=document.querySelectorAll('body *');
+  var root = sel ? document.querySelector(sel) : document.body;
+  if (!root) return { n: 0, bad: [] };
+  var bad=[],n=0,all=root.querySelectorAll('*');
   for(var i=0;i<all.length;i++){var el=all[i],text=ownText(el);
     if(!text||text.length<2)continue;
     var cs=getComputedStyle(el);
@@ -118,13 +120,58 @@ const MEASURE = () => {
         });
       }
       await page.waitForTimeout(300);
-      const res = await page.evaluate(MEASURE);
+      const res = await page.evaluate(MEASURE_IN, null);
       checked += res.n;
       result('every word is readable — ' + p + ' [' + skin + '/' + theme + ']',
         res.bad.length === 0, res.n + ' checked' +
         (res.bad.length ? ', unreadable: ' + res.bad.slice(0, 4).join(' | ') : ''));
     }
   }
+  // ── The one-tap package panel ───────────────────────────────────────────
+  // The sweep above cannot reach this screen: its stylesheet is injected at
+  // runtime and the panel only exists while it is open. That is how it came to
+  // be the one screen a clinician photographed — test chips at 1:1, a payment
+  // button showing nothing but its emoji — while every page measured clean.
+  for (const [skin, theme] of [['dark','dark'], ['clay','light']]) {
+    await page.evaluate(([s2,t2]) => {
+      localStorage.setItem('homatt_skin', s2); localStorage.setItem('homatt_theme', t2);
+      localStorage.setItem('homatt_speak_handoff', JSON.stringify({
+        at: Date.now(), heard: 'x', dx: 'Malaria', name: 'A B', sex: 'female',
+        age: '30', ageUnit: 'years', chief: 'fever',
+        subjective: 'fever for three days with headache', background: '',
+        vitals: { temp: '39.1', pulse: '104', sbp: '110', dbp: '70', weight: '58' } }));
+    }, [skin, theme]);
+    await page.goto(ORIGIN + '/clinic/new-order.html', { waitUntil: 'load' });
+    await page.waitForTimeout(6500);
+    await page.evaluate(([s2,t2]) => {
+      document.documentElement.setAttribute('data-skin', s2);
+      document.documentElement.setAttribute('data-theme', t2);
+      const a = document.getElementById('ucgAsk');
+      if (a && getComputedStyle(a).display !== 'none') {
+        const f = document.querySelector('#ucgAskDiff [data-h]');
+        if (f) f.click();
+      }
+    }, [skin, theme]);
+    await page.waitForTimeout(2500);
+    const isOpen = await page.evaluate(() => {
+      const o = document.getElementById('ucgOverlay');
+      return !!o && getComputedStyle(o).display !== 'none';
+    });
+    if (!isOpen) {
+      result('the package panel opened — [' + skin + '/' + theme + ']', false, 'it did not open');
+      continue;
+    }
+    await page.evaluate(() => {
+      document.querySelectorAll('#ucgOverlay details').forEach(d => { d.open = true; });
+    });
+    await page.waitForTimeout(300);
+    const pres = await page.evaluate(MEASURE_IN, '#ucgOverlay');
+    checked += pres.n;
+    result('every word is readable — the package panel [' + skin + '/' + theme + ']',
+      pres.bad.length === 0, pres.n + ' checked' +
+      (pres.bad.length ? ', unreadable: ' + pres.bad.slice(0, 4).join(' | ') : ''));
+  }
+
   result('and enough of the app was actually looked at', checked > 600, checked + ' pieces of text across ' + (PAGES.length * COMBOS.length) + ' passes');
   await b.close(); server.close();
 })().catch(e => { console.error('CRASH', e.message); process.exit(1); });

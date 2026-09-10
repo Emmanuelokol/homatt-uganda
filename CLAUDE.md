@@ -700,6 +700,34 @@ page (which never loads clinic.css, so a token there would resolve to nothing),
 and writes fallbacks — `var(--text-lt, #5F6368)` — so a missing token can never
 blank a colour.
 
+### The screen the sweep could not see, which was the one being complained about
+"0 unreadable" was true of the **pages** and said nothing about the screen a
+clinician actually photographed. The one-tap package panel's stylesheet is
+**injected by `ucg-autofill.js` at runtime**, and the panel only exists while
+it is open — so a page sweep walks straight past it. Measured properly
+(`tests/measure-panel-contrast.js`, six skin/theme combinations, 1,542
+elements): **36 unreadable, three of them at 1:1** — literally invisible:
+
+| what | ratio | which is |
+|---|---|---|
+| `.ucg-chip` "Malaria RDT" | **1:1** | the empty dark pills in the photograph |
+| `.ucg-paychip.on` "⏳ Pending" | **1:1** | the chip showing only its emoji |
+
+`--brand-tint` is a background and `--brand-ink` is the text that goes on it —
+defined as a pair, per skin. Both chips used **`--primary-d`**, a darker *fill*
+variant, which in the "dark" skin is the same value as `--brand-tint`. Dark
+grey on dark grey.
+
+**And a specificity bug hiding behind it.** `.ucg-drug .nm span` is (0,2,1) and
+beats `.ucg-rank.r-first` (0,2,0), so a generic grey won over *every* rank and
+stock colour — FIRST LINE, ALTERNATIVE and "not in your stock" all came out the
+same faint grey whatever they were meant to be, and no amount of correcting the
+colours would have shown until the selector was fixed. Now `span.ucg-rank.…`,
+which ties the specificity and wins on order.
+
+`test-readable.js` opens the panel and measures inside it, so this screen can
+never drift back out of view again.
+
 ### Four faults a sweep cannot see, found by measuring
 - **`--primary` used as a WORD.** In the "dark" skin `--primary` is `#2C3035`,
   a near-black chrome fill, and 53 places used it as a text colour — 1.46:1 on
