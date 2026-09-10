@@ -33,7 +33,7 @@
   <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
-  <link rel="stylesheet" href="css/clinic.css?v=20261003">
+  <link rel="stylesheet" href="css/clinic.css?v=20261004">
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
@@ -626,6 +626,28 @@
         </button>
       </div>
 
+      <!-- App version -->
+      <div class="settings-card" id="appVersionCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">system_update</span> App version
+        </div>
+        <p class="dict-note">
+          The installed Android app has the whole portal baked into it, so on its
+          own it can never change — which is why it looked frozen while the web
+          version moved on. It now fetches new versions itself. Nothing is
+          swapped in until the whole thing has arrived, so a connection that
+          drops leaves the working app exactly as it was.
+        </p>
+        <div class="dict-state" id="verState">
+          <span class="dict-dot" id="verDot"></span>
+          <span class="dict-msg" id="verMsg">Checking…</span>
+        </div>
+        <div class="dict-detail" id="verDetail"></div>
+        <button type="button" class="dict-btn" id="verCheckBtn">
+          <span class="material-icons-outlined">refresh</span> Check for updates
+        </button>
+      </div>
+
       <!-- Change Password -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -684,9 +706,9 @@
 
 <script src="js/vendor/supabase.min.js?v=2110" defer></script>
 <script src="../js/config.js" defer></script>
-<script src="js/clinic-offline.js?v=20261003a" defer></script>
-<script src="js/clinic.js?v=20261003" defer></script>
-<script src="js/msg-alerts.js?v=20261003" defer></script>
+<script src="js/clinic-offline.js?v=20261004a" defer></script>
+<script src="js/clinic.js?v=20261004" defer></script>
+<script src="js/msg-alerts.js?v=20261004" defer></script>
 <script>
 var _clinicId = null;
 var _supa = null;
@@ -2029,6 +2051,9 @@ document.addEventListener('DOMContentLoaded', function () {
   setTimeout(spSettings, 0);
   var btn = document.getElementById('dictCheckBtn');
   if (btn) btn.addEventListener('click', dictCheck);
+  var vbtn = document.getElementById('verCheckBtn');
+  if (vbtn) vbtn.addEventListener('click', function () { verCheck(true); });
+  verCheck(false);
   // Show what this device already knows without waiting to be asked; the live
   // check costs a request, so it stays on the button.
   var last = dictLastFaultHtml();
@@ -2036,11 +2061,84 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 <script src="../js/native-bridge.js"></script>
-<script src="js/clinic-look.js?v=20261003"></script>
+<script src="js/clinic-look.js?v=20261004"></script>
 <script src="js/vendor/sql-wasm.js" defer></script>
-<script src="js/clinic-impression.js?v=20261003" defer></script>
-<script src="js/clinic-dictate.js?v=20261003" defer></script>
-<script src="js/clinic-speak.js?v=20261003" defer></script>
-<script src="js/pwa-install.js?v=20261003"></script>
+<script src="js/clinic-impression.js?v=20261004" defer></script>
+<script src="js/clinic-dictate.js?v=20261004" defer></script>
+<script src="js/clinic-speak.js?v=20261004" defer></script>
+<script src="js/pwa-install.js?v=20261004"></script>
+
+<script>
+// ── App version, and fetching a newer one ───────────────────────────────────
+// The Android build cannot update itself: the worker's own update call
+// re-fetches from its origin, which inside the APK is the installed file. The
+// worker knows how to go and get a newer build instead; this asks it to, and
+// says what happened rather than leaving somebody to guess.
+function verShow(state, msg, detail) {
+  var dot = document.getElementById('verDot');
+  var m   = document.getElementById('verMsg');
+  var d   = document.getElementById('verDetail');
+  if (dot) dot.className = 'dict-dot ' + (state || '');
+  if (m)   m.textContent = msg || '';
+  if (d)   d.innerHTML = detail || '';
+}
+async function verCheck(force) {
+  var here = 'unknown';
+  try {
+    var ks = await caches.keys();
+    var mine = ks.filter(function (k) { return k.indexOf('homatt-clinic-v') === 0 &&
+                                               k.indexOf('-incoming') < 0; });
+    if (mine.length) here = mine.sort().pop();
+  } catch (e) {}
+  var line = '<div class="dict-row">This app is <b>' + escHtml(here) + '</b></div>';
+
+  if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+    verShow('', 'Running from the browser — it updates itself every time you open it.', line);
+    return;
+  }
+  if (force) verShow('busy', 'Looking for a newer version…', line);
+
+  var reply = await new Promise(function (resolve) {
+    var ch = new MessageChannel();
+    var done = false;
+    ch.port1.onmessage = function (ev) { done = true; resolve(ev.data || {}); };
+    try {
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'checkForUpdate' }, [ch.port2]);
+    } catch (e) { resolve({ reason: 'could not ask the worker' }); return; }
+    setTimeout(function () { if (!done) resolve({ reason: 'timed out' }); }, 90000);
+  });
+
+  if (reply && reply.updated) {
+    verShow('ok', 'Updated to ' + (reply.latest || 'the newest version') +
+      '. Close the app and open it again to use it.',
+      line + '<div class="dict-row">Everything was downloaded before anything ' +
+      'was replaced, so nothing was left half-changed.</div>');
+    return;
+  }
+  if (reply && reply.reason === 'this copy updates itself') {
+    verShow('', 'This copy updates itself every time you open it.', line);
+    return;
+  }
+  if (reply && reply.latest && reply.latest === reply.current) {
+    verShow('ok', 'This is the newest version.', line);
+    return;
+  }
+  verShow(force ? 'bad' : '', force
+    ? 'Could not update: ' + escHtml((reply && reply.reason) || 'no answer')
+    : 'Not checked yet.', line);
+}
+// The worker announces an update it took on its own, so somebody who never
+// opens this screen still learns the app has changed underneath them.
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', function (ev) {
+    if (ev.data && ev.data.type === 'homatt-updated') {
+      try { showToast('The app has been updated. Close it and open it again.', 'success'); }
+      catch (e) {}
+      try { verCheck(false); } catch (e) {}
+    }
+  });
+}
+</script>
 </body>
 </html>

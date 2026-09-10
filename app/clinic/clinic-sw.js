@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v168';
+const CACHE = 'homatt-clinic-v169';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -39,29 +39,29 @@ const SHELL = [
   'settings.html',
   'messages.html',
   'guidelines.html',
-  'js/guidelines.js?v=20261003',
+  'js/guidelines.js?v=20261004',
   'js/vendor/sql-wasm.js',
-  'js/ucg-autofill.js?v=20261003',
-  'js/clinic-impression.js?v=20261003',
-  'js/clinic-dictate.js?v=20261003',
-  'js/clinic-speak.js?v=20261003',
-  'js/clinic-intake.js?v=20261003',
-  'js/clinic-look.js?v=20261003',
+  'js/ucg-autofill.js?v=20261004',
+  'js/clinic-impression.js?v=20261004',
+  'js/clinic-dictate.js?v=20261004',
+  'js/clinic-speak.js?v=20261004',
+  'js/clinic-intake.js?v=20261004',
+  'js/clinic-look.js?v=20261004',
   'manifest.json',
   'js/vendor/supabase.min.js?v=2110',
   'fonts/material-icons.css?v=1',
   'fonts/material-icons-outlined.woff2?v=1',
   'fonts/inter.css?v=1',
   'fonts/inter-latin.woff2?v=1',
-  'css/clinic.css?v=20261003',
-  'js/clinic.js?v=20261003',
-  'js/messages.js?v=20261003',
-  'js/clinic-offline.js?v=20261003a',
-  'js/stock-blueprints.js?v=20261003',
-  'js/stock-intake.js?v=20261003',
-  'js/new-order-wizard.js?v=20261003',
-  'js/msg-alerts.js?v=20261003',
-  'js/pwa-install.js?v=20261003',
+  'css/clinic.css?v=20261004',
+  'js/clinic.js?v=20261004',
+  'js/messages.js?v=20261004',
+  'js/clinic-offline.js?v=20261004a',
+  'js/stock-blueprints.js?v=20261004',
+  'js/stock-intake.js?v=20261004',
+  'js/new-order-wizard.js?v=20261004',
+  'js/msg-alerts.js?v=20261004',
+  'js/pwa-install.js?v=20261004',
   '../js/config.js',
   '../js/native-bridge.js',
   'icons/clinic-192.png?v=3',
@@ -70,6 +70,163 @@ const SHELL = [
 ];
 
 let _lastSelfUpdateCheck = 0;
+
+// ── Updating an app that cannot update itself ────────────────────────────────
+//
+// The Android build has this whole folder baked into the APK. Inside it,
+// `self.registration.update()` re-fetches the worker from its OWN origin —
+// which is the installed file — so it always finds itself, and a clinic sees
+// no change until somebody downloads a new APK. That is why the portal looked
+// frozen while the web version moved on.
+//
+// So: fetch the newer build from where the web version lives, and write it
+// into THIS origin's cache. The origin never changes, which is the whole
+// point — localStorage, IndexedDB, the offline outbox of unsynced
+// consultations and the clinic's settings are all per-origin, and moving the
+// app to a different one would strand every last thing a clinic had not yet
+// synced.
+//
+// It fails safe. Nothing is swapped in until every file of the new build has
+// been fetched successfully, so a connection that dies halfway leaves the
+// working app exactly as it was. The worst outcome is the one we already had:
+// no update.
+const UPDATE_BASE = 'https://emmanuelokol.github.io/homatt-uganda/clinic/';
+const UPDATE_EVERY = 6 * 60 * 60 * 1000;
+let _lastBuildCheck = 0;
+let _updating = false;
+// The remote build this install has taken, if any. CACHE is a constant inside
+// the worker, and the worker is part of the APK — so after an update it still
+// reads v168 for ever. Only this can answer "what am I actually running?".
+let _appliedBuild = null;
+async function loadAppliedBuild() {
+  try {
+    const r = await idbGet('__meta__appliedBuild');
+    _appliedBuild = (r && r.body) ? String(r.body) : null;
+  } catch (e) { _appliedBuild = null; }
+}
+// Once a newer build has been fetched over the top, the LOCAL origin is the
+// stale one: inside the APK it is the old file the app shipped with. Anything
+// that "refreshes from the network" would quietly put the old version back,
+// which is how an update undoes itself a few hours after it worked.
+function localIsStale() { return !!_appliedBuild && canFetchNewBuild(); }
+
+// Only an install that is NOT already served from the update origin can be
+// behind it. On the web the browser's own worker update does this properly.
+function canFetchNewBuild() {
+  try { return new URL(UPDATE_BASE).origin !== self.location.origin; }
+  catch (e) { return false; }
+}
+
+async function tellPages(msg) {
+  try {
+    const cs = await self.clients.matchAll({ includeUncontrolled: true });
+    cs.forEach((c) => { try { c.postMessage(msg); } catch (e) {} });
+  } catch (e) {}
+}
+
+/**
+ * Is there a newer build, and if so, take it.
+ * Returns { checked, current, latest, updated, reason }.
+ */
+async function fetchNewBuild(force) {
+  if (!canFetchNewBuild()) return { checked: false, reason: 'this copy updates itself' };
+  if (_updating) return { checked: false, reason: 'already running' };
+  const now = Date.now();
+  if (!force && now - _lastBuildCheck < UPDATE_EVERY) {
+    return { checked: false, reason: 'checked recently' };
+  }
+  _lastBuildCheck = now;
+  _updating = true;
+  try {
+    let manifest;
+    try {
+      const r = await fetch(UPDATE_BASE + 'version.json', { cache: 'no-store' });
+      if (!r || !r.ok) return { checked: true, reason: 'no answer from the update server' };
+      manifest = await r.json();
+    } catch (e) {
+      return { checked: true, reason: 'no connection' };
+    }
+    if (!manifest || !manifest.cache || !Array.isArray(manifest.files)) {
+      return { checked: true, reason: 'the update server sent something unreadable' };
+    }
+    const running = _appliedBuild || CACHE;
+    if (manifest.cache === running) {
+      return { checked: true, current: running, latest: manifest.cache, updated: false,
+               reason: 'already the newest' };
+    }
+
+    // The books are 4 MB and cache-first; they are only worth sending when the
+    // book itself has been rebuilt, which is what dataVersion says.
+    const wanted = manifest.files.slice();
+    if (manifest.dataVersion && manifest.dataVersion !== DATA_VERSION &&
+        Array.isArray(manifest.data)) {
+      wanted.push.apply(wanted, manifest.data);
+    }
+
+    // Stage first. Nothing the app serves is touched until the whole build is
+    // on the phone — a clinic on a connection that drops must not end up with
+    // half of one version and half of another.
+    const STAGE = CACHE + '-incoming';
+    await caches.delete(STAGE);
+    const stage = await caches.open(STAGE);
+    for (let i = 0; i < wanted.length; i++) {
+      const rel = wanted[i];
+      let res;
+      try {
+        res = await fetch(UPDATE_BASE + (rel === './' ? '' : rel), { cache: 'no-store' });
+      } catch (e) {
+        await caches.delete(STAGE);
+        return { checked: true, updated: false, reason: 'the connection dropped part-way' };
+      }
+      if (!res || !res.ok || res.redirected) {
+        await caches.delete(STAGE);
+        return { checked: true, updated: false,
+                 reason: 'a file of the new version could not be fetched' };
+      }
+      // Keyed by the LOCAL address, because that is what the pages will ask
+      // for once the new HTML is in place.
+      try { await stage.put(new URL(rel, self.location.href).href, res.clone()); }
+      catch (e) {
+        await caches.delete(STAGE);
+        return { checked: true, updated: false, reason: 'no room to store the update' };
+      }
+    }
+
+    // Complete. Now, and only now, move it across.
+    const live = await caches.open(CACHE);
+    const keys = await stage.keys();
+    for (let i = 0; i < keys.length; i++) {
+      const hit = await stage.match(keys[i]);
+      if (hit) await live.put(keys[i], hit.clone());
+    }
+    await caches.delete(STAGE);
+    await idbPutAll(keys, live);
+    _appliedBuild = manifest.cache;
+    try { await idbPut('__meta__appliedBuild', { body: manifest.cache, ct: 'text/plain' }); }
+    catch (e) {}
+    await tellPages({ type: 'homatt-updated', version: manifest.cache });
+    return { checked: true, current: manifest.cache, latest: manifest.cache, updated: true,
+             reason: 'updated' };
+  } finally {
+    _updating = false;
+  }
+}
+
+// The second copy of the shell, so an update survives a phone that wipes Cache
+// Storage. Best effort — a failure here never fails the update.
+async function idbPutAll(keys, live) {
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      const hit = await live.match(keys[i]);
+      if (!hit) continue;
+      const key = idbKeyFor(keys[i].url);
+      if (!key) continue;
+      const body = await hit.clone().arrayBuffer();
+      // Same record shape idbServe() reads back: the bytes and the type.
+      await idbPut(key, { body: body, ct: hit.headers.get('Content-Type') || ctFor(key) });
+    } catch (e) {}
+  }
+}
 
 // ── IndexedDB shell store ────────────────────────────────────────────────────
 // A SECOND, independent copy of the app shell. Some phones (Samsung cleaners,
@@ -237,12 +394,19 @@ function isImmutable(url) {
 }
 
 async function ensureShellCached(cache, force) {
+  try { await _appliedReady; } catch (e) {}
   const now = Date.now();
   if (!force && now - _shellEnsuredAt < 45 * 1000) return;   // throttle unless forced
   _shellEnsuredAt = now;
+  // "force" means re-fetch every shell file from the network to repair a bad
+  // cache. But once a newer build has been fetched over the top, the network
+  // for this install is the OLD copy inside the APK — so forcing here would
+  // walk the update back, file by file, on the next page open. When the local
+  // origin is the stale one, a file we already hold is the good one.
+  const stale = localIsStale();
   await Promise.all(SHELL.map(async (u) => {
     try {
-      const cached = !force && await cache.match(u);
+      const cached = (!force || stale) && await cache.match(u);
       if (cached) {
         // Cache already has it — make sure the IndexedDB mirror does too, by
         // copying the CACHED body across (no network). Without this the mirror
@@ -259,6 +423,11 @@ async function ensureShellCached(cache, force) {
         }
         return;
       }
+      // Repairing a missing file from the local origin is right until this
+      // install has taken a newer build — after that the local origin holds
+      // the OLD copy, and "repairing" with it puts the old page back. A gap is
+      // better than a mixture of two versions.
+      if (stale) return;
       const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
       if (r && r.ok && !r.redirected) {
         await cache.put(u, r.clone());
@@ -290,6 +459,20 @@ self.addEventListener('message', (event) => {
   // The page asks for it as soon as it notices; take over immediately.
   if (data && data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // "Check for updates", from Settings. Answers on the port the page opened,
+  // so the screen can say what happened instead of leaving somebody guessing.
+  if (data && data.type === 'checkForUpdate') {
+    event.waitUntil((async () => {
+      let out;
+      try { out = await fetchNewBuild(true); }
+      catch (e) { out = { checked: true, updated: false, reason: (e && e.message) || 'failed' }; }
+      out.current = out.current || CACHE;
+      try {
+        if (event.ports && event.ports[0]) event.ports[0].postMessage(out);
+        else await tellPages({ type: 'homatt-update-result', result: out });
+      } catch (e) {}
+    })());
   }
 });
 
@@ -416,6 +599,10 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Read it at start-up too: a worker that has just been woken for a single
+// fetch has not run activate, and must still not overwrite a newer build.
+const _appliedReady = loadAppliedBuild();
+
 self.addEventListener('activate', (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
@@ -461,6 +648,7 @@ self.addEventListener('activate', (event) => {
     await Promise.all(CORE_PAGES.map(async (u) => {
       try {
         if (await target.match(u)) return;
+        if (localIsStale()) return;     // see ensureShellCached
         const r = await fetch(u, { cache: 'no-cache' });
         if (r && r.ok && !r.redirected) await target.put(u, r.clone());
       } catch (e) {}
@@ -572,6 +760,9 @@ self.addEventListener('fetch', (event) => {
     if (now - _lastSelfUpdateCheck > 6 * 60 * 60 * 1000) {
       _lastSelfUpdateCheck = now;
       try { self.registration.update().catch(() => {}); } catch (e) {}
+      // ...and the one that works inside the Android app, where the line above
+      // can only ever re-find the copy baked into the installed file.
+      try { event.waitUntil(fetchNewBuild(false).catch(() => {})); } catch (e) {}
     }
     event.respondWith((async () => {
       // ABSOLUTE RULE: this function must ALWAYS resolve with a Response. A
@@ -579,6 +770,9 @@ self.addEventListener('fetch', (event) => {
       // Chrome show ITS OWN dark "You're offline" screen — the exact dead end
       // this worker exists to prevent. Hence the outer try/catch and navSafe().
       try {
+        // Before anything can decide to overwrite, know whether this install
+        // has already taken a newer build than the origin it sits on.
+        try { await _appliedReady; } catch (e) {}
         // Background revalidate — never blocks the response; refreshes the
         // cache (and the whole shell) for next time. Never rejects.
         //
@@ -588,12 +782,16 @@ self.addEventListener('fetch', (event) => {
         // six hours keeps a clinic on current code within a day, for a
         // twentieth of the data.
         const lastRev = await metaGet(url.pathname);
-        const dueForRefresh = (now - lastRev) > REVALIDATE_EVERY;
+        const dueForRefresh = !localIsStale() && (now - lastRev) > REVALIDATE_EVERY;
         const netUpdate = !dueForRefresh ? Promise.resolve(null) :
           fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
           .then((res) => {
             metaSet(url.pathname, Date.now());
-            if (res && res.ok && !res.redirected) {
+            // Checked again HERE, not only when this fetch was started. An
+            // update can finish while this request is still in flight, and
+            // writing the local origin's answer afterwards would put the old
+            // page straight back over the new one.
+            if (res && res.ok && !res.redirected && !localIsStale()) {
               const copy = res.clone();
               caches.open(CACHE).then((c) => {
                 c.put(req, copy).catch(() => {});
@@ -656,21 +854,25 @@ self.addEventListener('fetch', (event) => {
   // cached file) then the IndexedDB shell copy — so scripts/CSS/fonts always
   // load even if a page requests a slightly different asset version than the
   // shell precached.
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(async () => cached ||
-          (await caches.match(req, { ignoreSearch: true })) ||
-          (await idbServe(url.pathname)) ||
-          Response.error());
-      return cached || network;
-    })
-  );
+  event.respondWith((async () => {
+    try { await _appliedReady; } catch (e) {}
+    const cached = await caches.match(req);
+    // Once a newer build has been fetched over the top, a cache hit is the NEW
+    // file and the local origin holds the OLD one the APK shipped with.
+    // Writing that back would undo the update file by file.
+    if (cached && localIsStale()) return cached;
+    const network = fetch(req)
+      .then((res) => {
+        if (res && res.status === 200 && !localIsStale()) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(async () => cached ||
+        (await caches.match(req, { ignoreSearch: true })) ||
+        (await idbServe(url.pathname)) ||
+        Response.error());
+    return cached || network;
+  })());
 });

@@ -608,6 +608,69 @@ range only from titles that are talking about a **person's** age, so
 "Postpartum Examination of the Mother Up to 6 Weeks" (which counts weeks since
 delivery) is left alone rather than marked wrong for an adult woman.
 
+## Why the installed app never changed
+
+`app/clinic/clinic-sw.js` · `tools/make_version_json.py` ·
+`tests/test-selfupdate.js` · Settings → *App version*
+
+A clinic reported seeing none of the work: "I have not seen any updates in
+clinic portal, do you want me to download the app every time I update?"
+
+They were right, and it was not a bug in any of it. `capacitor.config.json`
+has `"webDir": "app"` and **no `server.url`**, so the Android build bakes this
+entire folder into the APK. Inside it `self.registration.update()` re-fetches
+the worker from its OWN origin — the installed file — so it always finds
+itself. The web version at GitHub Pages updated on every push; the installed
+app could not change until somebody downloaded a new APK.
+
+### Why not simply point the app at the website
+Because `localStorage`, IndexedDB and the offline outbox of unsynced
+consultations are **per-origin**. Setting `server.url` moves the app from
+`https://localhost` to the Pages origin, and every consultation a clinic had
+recorded but not yet synced becomes invisible on the first launch. An update
+that silently strands a day of work is worse than no update.
+
+### What it does instead
+The worker fetches the newer build from where the web version lives and writes
+it into **this** origin's cache. The origin never changes, so nothing local
+moves. `version.json` (generated from clinic-sw.js, so it can never disagree
+with the worker beside it) names the build and lists its files; the 4 MB books
+are only sent when `dataVersion` says the book itself was rebuilt.
+
+It is staged: nothing is swapped in until every file has arrived, so a
+connection that dies half-way leaves the working app exactly as it was. The
+worst case is the one we already had — no update.
+
+### The four things that quietly undid it
+Every one of these was found by driving it, and each on its own was enough to
+put the old version straight back:
+
+- **`CACHE` cannot answer "what am I running?"** It is a constant inside the
+  worker, and the worker is part of the APK, so it reads v168 for ever no
+  matter what has been fetched over the top. The applied build is kept in
+  IndexedDB instead.
+- **The background revalidate.** Navigations refresh from the network — and
+  for an installed app "the network" is the old file inside the APK. It has to
+  be checked again when the fetch *completes*, not when it starts, because an
+  update can finish while the request is still in flight.
+- **The shell repair.** `ensureShellCached(cache, force)` re-fetches every
+  shell file to repair a damaged cache. Forced, it skips the cache check
+  entirely — and the page asks for it on load, so the update was being walked
+  back file by file on the very next page open.
+- **A worker woken for one request.** It has not run `activate`, so it does
+  not yet know the local origin is behind. Every path that can overwrite now
+  waits on the same promise before deciding.
+
+**The rule underneath all four: once an install has taken a newer build, its
+own origin is the stale one.** Anything that "refreshes from the network" has
+to know that, or it will helpfully restore the old app.
+
+### What this still costs, once
+The mechanism is in the worker, and the worker ships inside the APK — so it
+takes **one more APK install** to get it. After that one, the portal updates
+itself, and Settings → *App version* says which build it is running and lets
+somebody check on demand.
+
 ## Every word, in every colour
 
 `tests/measure-contrast.js` (the survey) · `tests/test-readable.js` (the guard)
@@ -914,7 +977,7 @@ list, and worth doing one day.
 
 ## The tests
 
-`tests/` — 51 files, ~680 checks. No framework: each file starts a web server
+`tests/` — 52 files, ~690 checks. No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 
