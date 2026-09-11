@@ -127,6 +127,12 @@
   }
 
   function applyThreads(rows, alertNew) {
+    // message_threads resolves the caller through portal_users, and a visiting
+    // clinician who arrived by QR code has no row there — so this can come back
+    // as null, or as an error object, rather than as the list of threads it
+    // returns for staff. Without this line that lands as "rows.reduce is not a
+    // function" and takes the whole dashboard down on first paint.
+    if (!Array.isArray(rows)) rows = [];
     UNREAD = rows.reduce(function (n, t) { return n + (parseInt(t.unread, 10) || 0); }, 0);
     FROMS = rows.filter(function (t) { return (parseInt(t.unread, 10) || 0) > 0; })
       .map(function (t) { return { name: t.other_name || 'Clinician', clinic: t.other_clinic || '' }; });

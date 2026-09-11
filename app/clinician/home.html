@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Homatt — My clinician account</title>
+  <link href="../clinic/fonts/inter.css?v=1" rel="stylesheet">
+  <link href="../clinic/fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="stylesheet" href="../clinic/css/clinic.css?v=20261007">
+  <link rel="stylesheet" href="css/clinician.css?v=20260911">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1B5E20">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('homatt_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+      } catch (e) {}
+    })();
+  </script>
+  <style> body { background: var(--bg, #F5F7F6); margin: 0; } </style>
+</head>
+<body>
+
+<div class="cl-top">
+  <div class="cl-title">
+    <span data-clinician-name>Clinician</span>
+    <span class="cl-sub" id="clWho">—</span>
+  </div>
+  <button type="button" id="clThemeBtn" aria-label="Switch between light and dark mode">
+    <span class="material-icons-outlined" id="clThemeIcon">dark_mode</span>
+  </button>
+  <button type="button" id="clOutBtn">
+    <span class="material-icons-outlined">logout</span> Sign out
+  </button>
+</div>
+
+<div class="cl-wrap">
+
+  <div id="clOffline" class="cl-msg warn" style="margin-top:14px">
+    No connection — showing what was on this phone the last time it could look.
+  </div>
+
+  <!-- ── Where I am working ─────────────────────────────────────────── -->
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">local_hospital</span> Where I am working</h2>
+    <p class="cl-hint">
+      Scan a clinic's code to start work there. Access is temporary — the clinic
+      sets how long, and either of you can end it.
+    </p>
+    <div id="clClinics"><div class="cl-empty">Loading…</div></div>
+    <button type="button" class="cl-btn" id="clJoinBtn" style="margin-top:12px">
+      <span class="material-icons-outlined">qr_code_scanner</span> Scan a clinic's code
+    </button>
+  </div>
+
+  <!-- ── My work ────────────────────────────────────────────────────── -->
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">history_edu</span> My work</h2>
+    <p class="cl-hint">
+      This is yours and it follows you. It records what you treated and where —
+      never who. Patient records stay with the clinic that made them.
+    </p>
+    <div class="cl-stats">
+      <div class="cl-stat"><div class="n" id="stTreat">—</div><div class="l">treatments</div></div>
+      <div class="cl-stat"><div class="n" id="stClinics">—</div><div class="l">clinics</div></div>
+      <div class="cl-stat"><div class="n" id="stRating">—</div><div class="l">rating</div></div>
+    </div>
+    <div id="clConditions" style="margin-top:14px"></div>
+  </div>
+
+  <!-- ── What clinics said about me ─────────────────────────────────── -->
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">workspace_premium</span> References</h2>
+    <p class="cl-hint">What an owner wrote when a job ended. You cannot change it, and neither can they once it is written.</p>
+    <div id="clRatings"><div class="cl-empty">Loading…</div></div>
+  </div>
+
+  <!-- ── My details ─────────────────────────────────────────────────── -->
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">badge</span> My details</h2>
+    <p class="cl-hint">A clinic owner sees these before they let you in, so keep them right.</p>
+    <form id="clProfile">
+      <div class="cl-field">
+        <label for="pfName">Full name</label>
+        <input type="text" id="pfName" required>
+      </div>
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="pfProfession">Profession</label>
+          <input type="text" id="pfProfession">
+        </div>
+        <div class="cl-field">
+          <label for="pfCadre">Cadre</label>
+          <input type="text" id="pfCadre">
+        </div>
+      </div>
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="pfRegBody">Registered with</label>
+          <input type="text" id="pfRegBody">
+        </div>
+        <div class="cl-field">
+          <label for="pfRegNo">Registration number</label>
+          <input type="text" id="pfRegNo" autocapitalize="characters" spellcheck="false">
+        </div>
+      </div>
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="pfQual">Qualification</label>
+          <input type="text" id="pfQual">
+        </div>
+        <div class="cl-field">
+          <label for="pfYears">Years working</label>
+          <input type="number" id="pfYears" min="0" max="60" inputmode="numeric">
+        </div>
+      </div>
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="pfDistrict">District where you stay</label>
+          <input type="text" id="pfDistrict">
+        </div>
+        <div class="cl-field">
+          <label for="pfPhone">Phone</label>
+          <input type="tel" id="pfPhone" inputmode="tel">
+        </div>
+      </div>
+      <div class="cl-field">
+        <label for="pfLangs">Languages you speak</label>
+        <input type="text" id="pfLangs">
+      </div>
+      <button type="submit" class="cl-btn ghost" id="pfBtn">
+        <span class="material-icons-outlined">save</span> Save my details
+      </button>
+    </form>
+    <div id="pfMsg" class="cl-msg"></div>
+  </div>
+
+</div>
+
+<script src="../clinic/js/vendor/supabase.min.js?v=2110"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinician.js?v=20260911"></script>
+<script>
+(function () {
+  var C = window.HomattClinician;
+  var esc = C.esc, when = C.when;
+  var session = C.requireClinician();
+  if (!session) return;
+  C.keepSignedIn();
+
+  var CACHE_KEY = 'clinician_home_cache';
+
+  document.getElementById('clOutBtn').addEventListener('click', function () { C.signOut(); });
+  document.getElementById('clJoinBtn').addEventListener('click', function () {
+    window.location.href = 'join.html';
+  });
+
+  (function theme() {
+    var btn = document.getElementById('clThemeBtn'), ic = document.getElementById('clThemeIcon');
+    function paint() {
+      ic.textContent = document.documentElement.getAttribute('data-theme') === 'dark'
+        ? 'light_mode' : 'dark_mode';
+    }
+    btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('homatt_theme', next); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+
+  // ── Painting ──────────────────────────────────────────────────────────
+
+  function pillFor(link) {
+    if (link.status === 'active') {
+      var ms = link.expires_at ? (new Date(link.expires_at).getTime() - Date.now()) : Infinity;
+      if (ms < 0) return '<span class="cl-pill stopped">Ended</span>';
+      if (ms < 3 * 86400000) return '<span class="cl-pill soon">Ends ' + esc(when(link.expires_at)) + '</span>';
+      return '<span class="cl-pill live">Working here</span>';
+    }
+    if (link.status === 'revoked') return '<span class="cl-pill stopped">Stopped by the clinic</span>';
+    if (link.status === 'expired') return '<span class="cl-pill done">Time ran out</span>';
+    return '<span class="cl-pill done">Finished</span>';
+  }
+
+  function paintClinics(links) {
+    var box = document.getElementById('clClinics');
+    if (!links || !links.length) {
+      box.innerHTML = '<div class="cl-empty">' +
+        '<span class="material-icons-outlined">qr_code_scanner</span>' +
+        'You are not attached to any clinic yet.<br>Scan a clinic\'s code to start work.</div>';
+      return;
+    }
+    box.innerHTML = links.map(function (l) {
+      var live = l.status === 'active' &&
+        (!l.expires_at || new Date(l.expires_at).getTime() > Date.now());
+      var meta = [];
+      if (l.clinic_district) meta.push(esc(l.clinic_district));
+      meta.push((l.treatments || 0) + ' treatment' + (l.treatments === 1 ? '' : 's'));
+      meta.push('started ' + esc(when(l.started_at)));
+      if (live && l.expires_at) meta.push('access ends ' + esc(when(l.expires_at)));
+      if (!live && l.ended_at)  meta.push('ended ' + esc(when(l.ended_at)));
+
+      return '<div class="cl-clinic">' +
+        '<div class="cl-c-main">' +
+          '<div class="cl-c-name">' + esc(l.clinic_name || 'Clinic') + '</div>' +
+          '<div class="cl-c-meta">' + meta.join(' · ') + '</div>' +
+          '<div style="margin-top:7px">' + pillFor(l) + '</div>' +
+          (live
+            ? '<button type="button" class="cl-btn" data-enter="' + esc(l.clinic_id) +
+              '" data-name="' + esc(l.clinic_name || 'Clinic') +
+              '" data-stint="' + esc(l.id) + '" data-exp="' + esc(l.expires_at || '') +
+              '" style="margin-top:10px;width:auto;padding:9px 14px">' +
+              '<span class="material-icons-outlined">arrow_forward</span> Work here now</button>' +
+              '<button type="button" class="cl-btn ghost" data-leave="' + esc(l.id) + '"' +
+              ' style="margin-top:8px;width:auto;padding:9px 14px">Leave this clinic</button>'
+            : '') +
+        '</div></div>';
+    }).join('');
+
+    box.querySelectorAll('[data-enter]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        C.enterClinic({
+          clinic_id:   b.getAttribute('data-enter'),
+          clinic_name: b.getAttribute('data-name'),
+          stint_id:    b.getAttribute('data-stint'),
+          expires_at:  b.getAttribute('data-exp') || null,
+        });
+        window.location.href = '../clinic/dashboard.html';
+      });
+    });
+    box.querySelectorAll('[data-leave]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        if (!confirm('Leave this clinic? You will need a new code to come back.')) return;
+        var supa = C.supa(); if (!supa) return;
+        b.disabled = true;
+        try {
+          await supa.rpc('end_clinician_stint', { p_stint_id: b.getAttribute('data-leave'), p_reason: null });
+          C.leaveClinic();
+          load();
+        } catch (e) { b.disabled = false; alert(C.saySorry(e, 'Could not leave just now.')); }
+      });
+    });
+  }
+
+  function paintStats(stats, ratings) {
+    document.getElementById('stTreat').textContent = (stats && stats.treatments) || 0;
+    document.getElementById('stClinics').textContent = (stats && stats.clinics) || 0;
+    var avg = null;
+    if (ratings && ratings.length) {
+      var sum = 0, n = 0;
+      ratings.forEach(function (r) { if (r.rating) { sum += r.rating; n++; } });
+      if (n) avg = Math.round((sum / n) * 10) / 10;
+    }
+    document.getElementById('stRating').textContent = avg == null ? '—' : avg;
+
+    var cbox = document.getElementById('clConditions');
+    var conds = (stats && stats.conditions) || [];
+    if (!conds.length) {
+      cbox.innerHTML = '<div class="cl-empty" style="padding:12px">Nothing recorded yet. ' +
+        'Treatments you record at a clinic will show up here.</div>';
+      return;
+    }
+    cbox.innerHTML =
+      '<div style="font-size:12px;font-weight:700;color:var(--text-lt, #5F6368);margin-bottom:7px">' +
+      'What you have treated most</div><div class="cl-chips">' +
+      conds.map(function (c) {
+        return '<span class="cl-chip">' + esc(c.condition) + ' <b>' + (c.n || 0) + '</b></span>';
+      }).join('') + '</div>';
+  }
+
+  function stars(n) {
+    var out = '<span class="cl-stars">';
+    for (var i = 1; i <= 5; i++) {
+      out += '<span class="material-icons-outlined' + (i <= (n || 0) ? '' : ' off') + '">star</span>';
+    }
+    return out + '</span>';
+  }
+
+  function paintRatings(ratings) {
+    var box = document.getElementById('clRatings');
+    if (!ratings || !ratings.length) {
+      box.innerHTML = '<div class="cl-empty">' +
+        '<span class="material-icons-outlined">workspace_premium</span>' +
+        'No references yet. A clinic can leave one when a job ends.</div>';
+      return;
+    }
+    box.innerHTML = ratings.map(function (r) {
+      return '<div class="cl-clinic"><div class="cl-c-main">' +
+        '<div class="cl-c-name">' + esc(r.clinic_name || 'A clinic') + '</div>' +
+        '<div style="margin:5px 0">' + stars(r.rating) + '</div>' +
+        (r.reference_note
+          ? '<div style="font-size:13px;line-height:1.55;color:var(--text, #1A1A1A);margin-top:4px">' +
+            '“' + esc(r.reference_note) + '”</div>' : '') +
+        '<div class="cl-c-meta">' +
+          (r.would_rehire === true ? 'Would work with again · ' : '') +
+          (r.rater_name ? esc(r.rater_name) + ' · ' : '') +
+          esc(when(r.created_at)) +
+        '</div></div></div>';
+    }).join('');
+  }
+
+  function fillProfile(p) {
+    if (!p) return;
+    var set = function (id, v) { var e = document.getElementById(id); if (e) e.value = v == null ? '' : v; };
+    set('pfName', p.full_name);        set('pfProfession', p.profession);
+    set('pfCadre', p.cadre);           set('pfRegBody', p.registration_body);
+    set('pfRegNo', p.registration_no); set('pfQual', p.qualification);
+    set('pfYears', p.years_experience);set('pfDistrict', p.district);
+    set('pfPhone', p.phone);           set('pfLangs', p.languages);
+
+    document.querySelectorAll('[data-clinician-name]').forEach(function (e) {
+      e.textContent = p.full_name || 'Clinician';
+    });
+    document.getElementById('clWho').textContent =
+      [p.profession, p.registration_no].filter(Boolean).join(' · ') || 'Your own account';
+  }
+
+  function paintAll(d) {
+    fillProfile(d.profile);
+    paintClinics(d.links || []);
+    paintStats(d.stats, d.ratings);
+    paintRatings(d.ratings || []);
+  }
+
+  // ── Loading ───────────────────────────────────────────────────────────
+  // Paint from the phone first so the screen is never blank, then replace it
+  // with the server's answer. On a connection that comes and goes, a screen
+  // that shows yesterday's truth beats a spinner that shows nothing.
+  async function load() {
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) {}
+    if (cached) paintAll(cached);
+
+    var supa = C.supa();
+    if (!supa || navigator.onLine === false) {
+      document.getElementById('clOffline').classList.toggle('show', !!cached);
+      if (!cached) {
+        document.getElementById('clClinics').innerHTML =
+          '<div class="cl-empty">No connection, and nothing saved on this phone yet.</div>';
+        document.getElementById('clRatings').innerHTML = '';
+      }
+      return;
+    }
+
+    try {
+      var r = await supa.rpc('my_clinician_home');
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.ok) {
+        // Signed in, but no clinician row — an account made before the profile
+        // was saved. Send them back to finish it rather than showing an empty
+        // screen with no way forward.
+        document.getElementById('clClinics').innerHTML =
+          '<div class="cl-empty">Your details are not saved yet. Fill them in below and save.</div>';
+        document.getElementById('clRatings').innerHTML = '';
+        return;
+      }
+      document.getElementById('clOffline').classList.remove('show');
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(r.data)); } catch (e) {}
+      paintAll(r.data);
+
+      var s = C.session() || {};
+      if (r.data.profile) {
+        s.name = r.data.profile.full_name || s.name;
+        s.clinicianId = r.data.profile.id;
+        s.profession = r.data.profile.profession;
+        C.setSession(s);
+      }
+    } catch (e) {
+      document.getElementById('clOffline').classList.toggle('show', !!cached);
+      if (!cached) {
+        document.getElementById('clClinics').innerHTML =
+          '<div class="cl-empty">' + esc(C.saySorry(e, 'Could not load just now.')) + '</div>';
+      }
+    }
+  }
+
+  // ── Saving the profile ────────────────────────────────────────────────
+  document.getElementById('clProfile').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var btn = document.getElementById('pfBtn'), m = document.getElementById('pfMsg');
+    var v = function (id) { return (document.getElementById(id).value || '').trim(); };
+    var p = {
+      full_name: v('pfName'), profession: v('pfProfession'), cadre: v('pfCadre'),
+      registration_body: v('pfRegBody'), registration_no: v('pfRegNo'),
+      qualification: v('pfQual'), years_experience: v('pfYears'),
+      district: v('pfDistrict'), phone: v('pfPhone'), languages: v('pfLangs'),
+    };
+    if (!p.full_name) { m.className = 'cl-msg show bad'; m.textContent = 'Your name is required.'; return; }
+
+    var supa = C.supa();
+    if (!supa || navigator.onLine === false) {
+      m.className = 'cl-msg show warn';
+      m.textContent = 'No connection. Your details were not saved — try again when you have signal.';
+      return;
+    }
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      var r = await supa.rpc('save_my_clinician_profile', { p: p });
+      if (r.error) throw r.error;
+      if (r.data && r.data.ok === false) throw new Error(r.data.error);
+      m.className = 'cl-msg show good'; m.textContent = 'Saved.';
+      load();
+    } catch (err) {
+      m.className = 'cl-msg show bad'; m.textContent = C.saySorry(err, 'Could not save just now.');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">save</span> Save my details';
+    }
+  });
+
+  window.addEventListener('online', load);
+  load();
+})();
+</script>
+</body>
+</html>
