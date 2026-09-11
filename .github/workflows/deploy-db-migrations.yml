@@ -8,6 +8,10 @@ on:
     branches: [main, 'claude/**']
     paths:
       - 'supabase/migrations/**'
+      # And when THIS file changes. Fixing the thing that applies migrations
+      # did not re-apply them, so the fix sat there proving nothing while the
+      # database stayed exactly as behind as it was before.
+      - '.github/workflows/deploy-db-migrations.yml'
   workflow_dispatch:
 
 env:
