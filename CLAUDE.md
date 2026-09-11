@@ -1194,9 +1194,147 @@ The test's most important assertion is not that the buttons go: it is that
 every box they used to fill can still be typed into by hand, and that hiding
 the readings button did not take the readings with it.
 
+## Looking a word up in the book
+
+`app/clinic/js/guidelines.js` · `tests/measure-search.js` ·
+`tests/test-guidelines-search.js`
+
+A clinician typed **Family** into the guideline search and was told "Nothing
+in this book matches". Chapter 15 of the Uganda Clinical Guidelines **is**
+"FAMILY PLANNING (FP)". The book was not missing it; the search could not see
+it.
+
+### Every index in every book is FTS5, and the engine has no FTS5
+`conditions_fts`, `drugs_fts`, `differentials_fts`, `emhslu_fts` are all
+`CREATE VIRTUAL TABLE … USING fts5`. The SQLite compiled into
+`js/vendor/sql-wasm.wasm` has FTS3 and FTS4 and **not FTS5** — `grep fts5` on
+the file returns nothing. So `MATCH` threw `no such module: fts5` on every
+search ever run in this app, a `catch` swallowed it, and what actually ran was
+the fallback: `title LIKE '%term%'`.
+
+A section could therefore only be found if the typed word was in its **own
+heading**. Nothing in the body of the book was reachable, and neither was the
+chapter a section sits in — which is the whole reason "family planning",
+"immunisation" and "nutrition" read as missing. **This is the trap to
+remember: a `try/catch` around a query turns a missing engine feature into a
+silently worse product, and the app cannot tell you.**
+
+The fix is not a bigger binary. 551 rows are already in memory; scoring them
+in one pass needs no module, takes a few milliseconds, and can weigh a heading
+against a chapter against a passing mention, which `rank` cannot. One search
+path now, for every book, and it is the one the tests measure.
+
+| | words a clinician types, of 45 |
+|---|---|
+| title-only fallback (what shipped) | **27** |
+| scanning the book (now) | **45** |
+| things that worked and stopped working | **0** |
+
+Recovered: family · family planning · immunisation · oncology · radiology ·
+bed nets · mosquito · rehydration · referral · weight band · chest indrawing ·
+coartem · artemether · ceftriaxone · metformin · 19.2 · 15.2
+
+Four things the measurement made visible that reading never would:
+
+- **A section NUMBER must not be tokenised.** "19.2" became the tokens "19"
+  and "2", and "19" matched the heading "COVID-**19** Disease" at full heading
+  weight, which outranked Malnutrition. A number now goes straight to the
+  section that has it.
+- **The start of a word beats the middle of one.** "ORS" put "Refractive
+  Err**ors**" first. Every short name a clinician types has this problem.
+- **A chapter is an answer.** "Family planning" is a chapter, not a condition,
+  so the chapter is offered and opens the contents page there.
+- **A brand name is not in the book.** Coartem, Panadol, Septrin, Flagyl,
+  jiggers, piles — `SAY_ALSO` is consulted **only when the book's own words
+  return nothing**, and the screen says which word it substituted. It changes
+  what can be found and nothing else; no card ever shows an alias as the
+  book's wording.
+
+### Two ways a card could open with nothing on it
+Reported together as "no context", and they are different faults:
+
+- **53 sections are headings with no text of their own** — 19.2 Malnutrition,
+  19.1 Nutrition Guidelines in Special Populations, 15.2 Overview of Key
+  Contraceptive Methods. The book prints the heading and then its
+  sub-sections, and all the text is in those. The card said the content "is in
+  the sections listed under it" and then listed nothing, anywhere. It now
+  lists them, in the book's own numbering, tappable.
+- **12 more parsed only their SECONDARY fields** and rendered as a title with
+  two or three grey folded panels and not one readable word. "Clinical
+  Features of HIV" was one of them, and the parse had captured **8 of its 203
+  distinct words**. Measured for all twelve: `full_text` holds everything the
+  parsed fields hold and **2–195 words more**, so where the substance was not
+  found the book's own text is now shown in full.
+
+The rule underneath the second one: **ask whether the extraction found the
+substance, not whether it found anything.** `hasPrimary` is clinical features,
+investigations, management, treatment steps or medicines — a differential and
+a note are not a section.
+
+## Which condition a dose belongs to
+
+`app/clinic/js/ucg-sections.js` · `tests/measure-doses.js` ·
+`tests/test-doses.js`
+
+The one-tap package reads `medicines WHERE condition_id = ?` and offers every
+row as that condition's drug — dose, tick box, price, onto the visit and onto
+the bill. So "is this drug printed under this heading?" is the question.
+
+| over all 1,008 medicine rows | |
+|---|---|
+| source line verbatim in its own section | 1008 of 1008 |
+| dose readable in that line | 982 of 982 |
+| route readable in that line | all |
+| **printed under a different heading** | **26** |
+
+**The first three rows are why this was invisible.** Every row is a real line
+of the real book, and every row is inside the `full_text` of the condition it
+is filed under — because that condition's text ran past its own end and
+swallowed six more sections. One section in 551 does it: **9.2.4.1 Postnatal
+Psychosis**, 21,058 characters where its neighbours are two or three thousand,
+absorbing Anxiety, Depression, Postnatal Depression, Suicidal Behaviour,
+Bipolar Disorder and Psychosis.
+
+On screen that meant a woman who had just given birth, and is breastfeeding,
+was offered a package built from **lithium, carbamazepine, clozapine,
+alprazolam, fluoxetine and bupropion** — four sections' drugs, none of them
+hers, each with a dose and a tick.
+
+**How a boundary is found, and the half that matters.** A numbered heading
+part-way down the text whose number **and** title both belong to a section the
+book really has. Both halves are required. "Benzathine penicillin **2.4** MU
+IM single dose" wrapping onto a new line is indistinguishable from a heading
+numbered 2.4, and the looser rule condemned the whole genital ulcer disease
+page and took congenital syphilis with it. It fails by finding too **few**
+boundaries, which is the state we were already in.
+
+Nothing is deleted. The package takes them out of what it offers and names
+them, with the section they belong to, at the top of the guideline notes — a
+drug that silently disappears is its own kind of wrong. The guideline screen
+is reference rather than prescribing, so it keeps every row and labels the
+ones the book prints elsewhere.
+
+### The change the measurement told me not to make
+The package lays out guideline text with its own rule; the guideline screen
+uses the `ranToMargin` rule that was measured at 0 words lost. Making the two
+the same is the obvious change, and `tests/measure-panel-text.js` says it is
+the wrong one:
+
+| | the panel's rule | the screen's rule |
+|---|---|---|
+| sentences cut in half | **0** | 1,723 |
+| sentences welded together | **110** | 180 |
+| letters lost | 0 | 0 |
+
+The screen is fed raw wrapped pages, where line length is evidence of a
+wrap. The panel is fed the already-split fields — short bullets and list
+items — where it is evidence of nothing. **Same job, different input, and the
+input decides.** Recorded because the next reader will propose it again.
+
 ## The tests
 
-`tests/` — 57 files, ~800 checks. No framework: each file starts a web server
+`tests/` — 63 files, ~870 checks (plus 13 `measure-*.js`, which print numbers
+rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 
@@ -1235,6 +1373,21 @@ rules worth repeating here:
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.
+- **A metric that the current code satisfies by construction proves nothing.**
+  `measure-panel-text.js` counts "sentences cut in half" as exactly the pairs
+  the shipped rule joins, so the shipped rule scores 0 whatever it does. The
+  file says so in its own header. A comparison is only worth reading when the
+  thing being measured could have come out badly.
+- **Be willing to publish the measurement that says no.** The panel's layout
+  rule was going to be replaced with the guideline screen's, because two rules
+  for one job drift. The numbers said the screen's rule would cut 1,723
+  sentences in half here. The change was dropped and the number kept, so
+  nobody spends the afternoon rediscovering it.
+- **A `try/catch` around a query can hide a missing engine, not a missing
+  row.** Every FTS index in every book is FTS5 and the shipped WASM has none,
+  so `MATCH` threw on every search for the life of the app and the catch
+  quietly downgraded it to `title LIKE`. It passed every test, because the
+  tests searched for words that were in titles.
 - **Check the test is looking at the page it thinks it is.** Three clinician
   screens all reported a confident pass at 36 elements each — the same 36,
   because the session sent every one of them to the sign-up page. A count that
