@@ -105,6 +105,62 @@
     .g-sec h3{font-size:14px;font-weight:800;color:var(--text);margin-bottom:9px;
       letter-spacing:-.01em}
     .g-text{font-size:14px;color:var(--text);line-height:1.55;white-space:pre-line}
+    /* A section that has been laid out is real HTML, so pre-line would add a
+       blank line after every block it already spaces. */
+    .g-text.g-outline{white-space:normal}
+    /* ── The contents page ─────────────────────────────────────────────── */
+    .g-browse{margin-top:14px}
+    .g-browse-h{
+      display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;
+      color:var(--text);margin:0 2px 10px
+    }
+    .g-browse-h .material-icons-outlined{font-size:19px;color:var(--primary-ink)}
+    .g-browse-n{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--text-lt)}
+    .g-ch{
+      background:var(--surface);border:1px solid var(--border);border-radius:12px;
+      margin-bottom:8px;overflow:hidden
+    }
+    .g-ch>summary{
+      list-style:none;cursor:pointer;padding:12px 14px;display:flex;align-items:center;
+      gap:10px;font-size:13.5px;font-weight:700;color:var(--text)
+    }
+    .g-ch>summary::-webkit-details-marker{display:none}
+    .g-ch-n{
+      flex:0 0 auto;min-width:26px;height:26px;border-radius:8px;display:flex;
+      align-items:center;justify-content:center;background:var(--brand-tint);
+      color:var(--brand-ink);font-size:12px;font-weight:800
+    }
+    .g-ch-t{flex:1;min-width:0;line-height:1.35;overflow-wrap:anywhere}
+    .g-ch-c{
+      flex:0 0 auto;font-size:11px;font-weight:800;color:var(--text-lt);
+      background:var(--brand-tint);border-radius:20px;padding:3px 9px
+    }
+    .g-ch[open]>summary{border-bottom:1px solid var(--border)}
+    .g-ch-list{padding:6px}
+    .g-ch-item{
+      width:100%;text-align:left;background:none;border:none;cursor:pointer;
+      font:inherit;font-size:13px;color:var(--text);padding:10px 10px;border-radius:9px;
+      display:flex;align-items:baseline;gap:10px
+    }
+    .g-ch-item:hover,.g-ch-item:focus{background:var(--brand-tint);color:var(--brand-ink);outline:none}
+    .g-ci-t{flex:1;min-width:0;line-height:1.4;overflow-wrap:anywhere}
+    .g-ci-p{flex:0 0 auto;font-size:11px;color:var(--text-lt);font-weight:700}
+    .g-ch-item:hover .g-ci-p{color:var(--brand-ink)}
+    .g-ch-empty{padding:12px;font-size:12.5px;color:var(--text-lt)}
+    .g-outline .g-ol{margin:2px 0 12px;padding-left:22px}
+    .g-outline .g-ol li{margin:0 0 7px;line-height:1.55;padding-left:2px}
+    .g-outline .g-ol li::marker{color:var(--primary-ink);font-weight:700}
+    .g-outline ol.g-ol li::marker{font-weight:800}
+    .g-outline .g-ol .g-ol{margin-bottom:4px}
+    /* A heading the book set in capitals. Kept as it is written — this is a
+       reference text, and re-casing it would be editing the guideline. */
+    .g-outline .g-oh{
+      margin:14px 0 6px;font-size:12px;font-weight:800;letter-spacing:.4px;
+      color:var(--primary-ink);text-transform:none
+    }
+    .g-outline .g-oh:first-child{margin-top:0}
+    .g-outline .g-op{margin:0 0 10px;line-height:1.55}
+    .g-outline .g-op:last-child,.g-outline .g-ol:last-child{margin-bottom:0}
     .g-sevbox{background:var(--brand-tint)}
     html[data-theme="dark"] .g-sevbox{background:var(--brand-tint)}
     .g-sevnote{font-size:11.5px;color:var(--text-lt);margin-top:8px;font-style:italic}
@@ -254,7 +310,11 @@
         <div class="g-searchwrap">
           <div class="g-searchbox">
             <span class="material-icons-outlined">search</span>
-            <input id="gSearch" type="text" placeholder="Type a disease or condition — e.g. malaria, pneumonia…"
+            <!-- Not "a disease or condition". A quarter of this book is not a
+                 disease — family planning, immunisation, nutrition, palliative
+                 care — and a box that asks for a disease tells a clinician
+                 those chapters are not in here. -->
+            <input id="gSearch" type="text" placeholder="Search anything in the guideline — malaria, implants, immunisation…"
               autocomplete="off" spellcheck="false" disabled>
           </div>
           <div id="gResults"></div>
@@ -274,9 +334,17 @@
 
         <div id="gEmpty" class="g-empty">
           <span class="material-icons-outlined">menu_book</span>
-          Search a condition to open its treatment summary.<br>
+          Search above, or open a chapter below to read the whole book.<br>
           <span style="font-size:12px">Works fully offline — the guideline is stored on this device.</span>
         </div>
+
+        <!-- ── The whole book, browsable ──────────────────────────────────
+             Search alone hides everything you cannot already name. Nobody
+             searches for "Condom (Male)" or "Vitamin A Deficiency" unless
+             they already know the section exists, so 551 sections across 24
+             chapters were reachable only by guessing. This is the contents
+             page: every chapter, every section, nothing filtered. -->
+        <div id="gBrowse" class="g-browse"></div>
 
         <div id="gCard"></div>
       </div>

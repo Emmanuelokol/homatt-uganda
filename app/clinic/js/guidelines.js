@@ -111,6 +111,7 @@
     try {
       await openBook('ucg');
       badge();
+      buildBrowse();          // the contents page, once the book is open
       $('gSearch').disabled = false;
       $('gSearch').focus();
     } catch (e) {
@@ -261,8 +262,126 @@
       .replace(/\*+/g, '')
       .replace(/<\/?u>/g, '');
   }
+  /* ── The book, laid out as the book ──────────────────────────────────────
+   *
+   * The guideline text comes out of the PDF with its shape flattened. Every
+   * line has zero indentation, bullets are a literal tilde, and a single
+   * bullet is broken across as many lines as the column was wide:
+   *
+   *     ~ Keep emergency drugs at hand at health facilities and in
+   *     situatiuons where risk of anaphlaxis is high, e.g. visiting
+   *     bee hives or places that usually harbour snakes
+   *
+   * Shown raw, that reads as three separate lines and a stray "~". There are
+   * 8,014 of those tildes across the book, so almost every clinical list in it
+   * was being shown broken.
+   *
+   * NOTHING IS DROPPED. The markers become real bullets and the wrapped lines
+   * are rejoined into the sentence they were always part of; every word
+   * survives. tests/measure-guidelines.js proves that across all 551 sections
+   * and every text column — word for word, not by inspection — because a
+   * renderer that quietly loses a line of a treatment is far worse than one
+   * that shows a tilde.
+   */
+  var MARK_RE = /^\s*([~•\-–—*>]|\d{1,2}[.)]|[a-z][.)])\s+/;
+
+  // A heading inside a section: the book sets these in capitals, e.g.
+  // "INSTRUCTIONS LOC", "DIAGNOSIS". Short, no lower case, not a sentence.
+  function isHeading(line) {
+    var s = line.trim();
+    if (s.length < 2 || s.length > 60) return false;
+    if (MARK_RE.test(s)) return false;
+    if (!/[A-Z]/.test(s)) return false;
+    if (/[a-z]/.test(s)) return false;
+    return /^[A-Z0-9 ()/&,.'’\-:%]+$/.test(s);
+  }
+
+  function outline(t) {
+    var raw = String(t == null ? '' : t);
+    if (!raw.trim()) return '';
+    var lines = raw.split('\n');
+    var blocks = [];      // {kind:'h'|'li'|'p', text, ord:bool}
+    var cur = null;
+
+    function close() { if (cur) { blocks.push(cur); cur = null; } }
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      if (!line.trim()) { close(); continue; }
+
+      if (isHeading(line)) { close(); blocks.push({ kind: 'h', text: line.trim() }); continue; }
+
+      var m = line.match(MARK_RE);
+      if (m) {
+        close();
+        var lead = m[1];
+        var num = lead.match(/^(\d{1,2})[.)]$/);
+        var letter = /^[a-z][.)]$/.test(lead);
+        cur = {
+          kind: 'li',
+          /* A NUMBER IS NOT A BULLET. "2." in the book means the second step,
+           * and a list that renumbers from 1 because the section happened to
+           * start at 2 is a different instruction. The source number is kept
+           * and forced onto the item, never regenerated.
+           *
+           * A lettered marker (a. b. c.) keeps its letter inline for the same
+           * reason — CSS counters would not reproduce the book's sequence. */
+          ord: !!num,
+          value: num ? num[1] : '',
+          text: (letter ? lead + ' ' : '') + line.slice(m[0].length).trim(),
+        };
+        continue;
+      }
+
+      /* No marker. Two very different cases, and treating them the same was
+       * wrong in a way that mattered.
+       *
+       * INSIDE A BULLET, this is the rest of that bullet, wrapped by the PDF
+       * column. Joining it back is the whole point.
+       *
+       * OUTSIDE ONE, it is a line of the book's own prose — and joining those
+       * produced a wall of run-on text, because the extraction dropped the
+       * full stops with the layout: Malaria's clinical features came out as
+       * "…or severe illness (severe malaria) Intermittent fever is the most
+       * characteristic symptom…", two sentences welded together with nothing
+       * between them. There is no punctuation left to tell where one ends, so
+       * the book's line breaks are the only structure remaining and they are
+       * kept exactly as they are.
+       */
+      if (cur && cur.kind === 'li') { cur.text += ' ' + line.trim(); }
+      else if (cur && cur.kind === 'p') { cur.lines.push(line.trim()); }
+      else { cur = { kind: 'p', lines: [line.trim()] }; }
+    }
+    close();
+
+    var out = '', open = null;
+    function shut() { if (open) { out += '</' + open + '>'; open = null; } }
+    for (var b = 0; b < blocks.length; b++) {
+      var blk = blocks[b];
+      if (blk.kind === 'h') { shut(); out += '<h4 class="g-oh">' + markSeverity(blk.text) + '</h4>'; continue; }
+      if (blk.kind === 'p') {
+        shut();
+        // One paragraph block, the book's line breaks kept inside it.
+        out += '<p class="g-op">' + blk.lines.map(markSeverity).join('<br>') + '</p>';
+        continue;
+      }
+      var want = blk.ord ? 'ol' : 'ul';
+      if (open !== want) { shut(); out += '<' + want + ' class="g-ol">'; open = want; }
+      out += '<li' + (blk.ord && blk.value ? ' value="' + esc(blk.value) + '"' : '') + '>' +
+        markSeverity(blk.text) + '</li>';
+    }
+    shut();
+    return out;
+  }
+
   function asText(t) {
-    return '<div class="g-text">' + markSeverity(book === 'who' ? deMark(t) : t) + '</div>';
+    var src = book === 'who' ? deMark(t) : t;
+    var laid = outline(src);
+    // outline() returning nothing for text that HAS content would silently
+    // blank a clinical section, so the raw form is the fallback rather than
+    // an empty box.
+    if (!laid) return '<div class="g-text">' + markSeverity(src) + '</div>';
+    return '<div class="g-text g-outline">' + laid + '</div>';
   }
 
   // A markdown table, rendered as a table. The book's dosing and differential
@@ -540,6 +659,65 @@
     return html;
   }
 
+  /* ── The contents page ───────────────────────────────────────────────────
+   *
+   * Search alone hides everything a clinician cannot already name. Nobody
+   * types "Condom (Male)", "Vitamin A Deficiency" or "Kangaroo Mother Care"
+   * unless they already know the section is in there — so 551 sections across
+   * 24 chapters were reachable only by guessing the right word, and four whole
+   * chapters that are not diseases at all (family planning, immunisation,
+   * nutrition, palliative care) looked as though they were missing.
+   *
+   * Every chapter, every section, nothing filtered and nothing capped. It is
+   * built once and kept, because it is the same 551 rows every time.
+   */
+  var _browseBuilt = false;
+  function buildBrowse() {
+    var host = $('gBrowse');
+    if (!host || _browseBuilt || !cur().db) return;
+    if (book !== 'ucg') { host.innerHTML = ''; return; }
+
+    var chs = rows('SELECT number, title FROM chapters ORDER BY number');
+    if (!chs.length) return;
+    var secs = rows('SELECT id, number, title, chapter_number, page FROM conditions ' +
+                    'ORDER BY chapter_number, id');
+    var by = {};
+    secs.forEach(function (s) {
+      var k = String(s.chapter_number);
+      (by[k] = by[k] || []).push(s);
+    });
+
+    var html = '<div class="g-browse-h">' +
+      '<span class="material-icons-outlined">list_alt</span>' +
+      'Everything in the guideline' +
+      '<span class="g-browse-n">' + secs.length + ' sections · ' + chs.length + ' chapters</span>' +
+      '</div>';
+
+    chs.forEach(function (ch) {
+      var list = by[String(ch.number)] || [];
+      html += '<details class="g-ch"><summary>' +
+        '<span class="g-ch-n">' + esc(String(ch.number)) + '</span>' +
+        '<span class="g-ch-t">' + esc(ch.title) + '</span>' +
+        '<span class="g-ch-c">' + list.length + '</span>' +
+        '</summary><div class="g-ch-list">' +
+        (list.length ? list.map(function (s) {
+          return '<button type="button" class="g-ch-item" data-open="' + esc(String(s.id)) + '">' +
+            '<span class="g-ci-t">' + esc(s.title) + '</span>' +
+            (s.page ? '<span class="g-ci-p">p.' + esc(String(s.page)) + '</span>' : '') +
+            '</button>';
+        }).join('') : '<div class="g-ch-empty">No sections listed for this chapter.</div>') +
+        '</div></details>';
+    });
+
+    host.innerHTML = html;
+    _browseBuilt = true;
+    host.addEventListener('click', function (e) {
+      var b = e.target.closest && e.target.closest('[data-open]');
+      if (!b) return;
+      open(Number(b.getAttribute('data-open')));
+    });
+  }
+
   // ── Opening a result ────────────────────────────────────────────────────
   function open(id) {
     $('gResults').style.display = 'none';
@@ -556,6 +734,7 @@
     card.innerHTML = html;
     card.style.display = 'block';
     $('gEmpty').style.display = 'none';
+    if ($('gBrowse')) $('gBrowse').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   function reopen() {
@@ -577,7 +756,10 @@
       ? 'Type a medicine — e.g. amoxicillin, paracetamol…'
       : book === 'who'
         ? 'Type a child’s problem — e.g. cough, diarrhoea, fever…'
-        : 'Type a disease or condition — e.g. malaria, pneumonia…';
+        // NOT "a disease or condition": a quarter of this book is neither —
+        // family planning, immunisation, nutrition, palliative care — and a box
+        // asking for a disease tells a clinician those chapters are not here.
+        : 'Search anything in the guideline — malaria, implants, immunisation…';
     var d = $('gWhoNote');
     if (d) d.style.display = book === 'who' ? 'block' : 'none';
     badge();
@@ -607,6 +789,7 @@
     $('gCard').style.display = 'none';
     $('gCard').removeAttribute('data-cid');
     $('gEmpty').style.display = 'block';
+    if ($('gBrowse')) { $('gBrowse').style.display = book === 'ucg' ? 'block' : 'none'; }
     $('gResults').style.display = 'none';
     paint();
     var term = $('gSearch').value.trim();
@@ -684,6 +867,7 @@
       $('gCard').style.display = 'none';
       $('gCard').removeAttribute('data-cid');
       $('gEmpty').style.display = 'block';
+      if ($('gBrowse')) { $('gBrowse').style.display = book === 'ucg' ? 'block' : 'none'; }
       paint();
       var term = $('gSearch').value.trim();
       if (term.length >= 2) onType(); else $('gResults').style.display = 'none';

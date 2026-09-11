@@ -1,0 +1,157 @@
+// Can a clinician actually FIND everything in the guideline, and read it?
+//
+// Two faults, reported together: the book was rendering its bullets as a
+// literal "~" with every wrapped line broken, and there was no way to browse
+// it at all — 551 sections behind a search box that said "Type a disease or
+// condition", so the four chapters that are not diseases (family planning,
+// immunisation, nutrition, palliative care) read as missing.
+//
+// This drives the real screen against the real 4 MB book. It is slower than the
+// other tests because it loads the whole database in the browser, which is
+// exactly what a clinician's phone does.
+const APP = require('path').join(__dirname, '..', 'app');
+const CHROME = process.env.HOMATT_CHROME || require('./chrome').find();
+const { chromium } = require('playwright');
+const http = require('http'); const fs = require('fs'); const path = require('path');
+const MIME = {'.html':'text/html','.js':'application/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.svg':'image/svg+xml','.png':'image/png','.wasm':'application/wasm','.db':'application/octet-stream'};
+const server = http.createServer((rq, rs) => {
+  let p = decodeURIComponent(rq.url.split('?')[0]); if (p.endsWith('/')) p += 'index.html';
+  fs.readFile(path.join(APP, p), (e, d) => {
+    if (e) { rs.writeHead(404); rs.end('nf'); return; }
+    rs.writeHead(200, { 'Content-Type': MIME[path.extname(p)] || 'application/octet-stream' }); rs.end(d);
+  });
+});
+
+const SB = 'https://kgkdiykzmqjougwzzewi.supabase.co';
+const PORT = 8951, ORIGIN = 'http://localhost:' + PORT;
+const CID = '11111111-1111-4111-8111-111111111111';
+const UID = '22222222-2222-4222-8222-222222222222';
+
+let pass = 0, fail = 0;
+const result = (n, ok, x) => {
+  console.log((ok ? 'PASS' : 'FAIL') + '  ' + n + (x ? '  — ' + x : ''));
+  ok ? pass++ : fail++;
+};
+
+(async () => {
+  await new Promise(r => server.listen(PORT, r));
+  const b = await chromium.launch({ executablePath: CHROME, args: ['--no-sandbox'] });
+  const page = await (await b.newContext({ viewport: { width: 430, height: 1400 } })).newPage();
+  const errors = [];
+  page.on('pageerror', e => errors.push(String(e.message)));
+  await page.route('**/*', r => {
+    const u = r.request().url();
+    if (u.startsWith(ORIGIN)) return r.continue();
+    const H = { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' };
+    if (u.startsWith(SB)) return r.fulfill({ status: 200, headers: H, body: '[]' });
+    return r.abort();
+  });
+
+  await page.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(([cid, uid]) => {
+    localStorage.clear();
+    localStorage.setItem('clinic_session', JSON.stringify({
+      userId: uid, staffName: 'D', clinicName: 'K', clinicId: cid, staffRole: 'owner', level: 'HC3' }));
+    localStorage.setItem('sb-homatt-clinic-auth', JSON.stringify({
+      access_token: 't', refresh_token: 'r', token_type: 'bearer', expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid } }));
+  }, [CID, UID]);
+
+  await page.goto(ORIGIN + '/clinic/guidelines.html', { waitUntil: 'load' });
+  // The book is 4 MB and is parsed in the browser by SQLite-WASM.
+  await page.waitForFunction(() => {
+    const el = document.getElementById('gBrowse');
+    return el && el.querySelectorAll('details').length > 0;
+  }, { timeout: 60000 }).catch(() => {});
+
+  // ── 1. The whole book is browsable ───────────────────────────────────
+  const browse = await page.evaluate(() => {
+    const el = document.getElementById('gBrowse');
+    if (!el) return { there: false };
+    const chs = Array.from(el.querySelectorAll('details'));
+    return {
+      there: true,
+      chapters: chs.length,
+      sections: el.querySelectorAll('.g-ch-item').length,
+      titles: chs.map(d => (d.querySelector('.g-ch-t') || {}).textContent || ''),
+      header: (el.querySelector('.g-browse-n') || {}).textContent || '',
+    };
+  });
+  result('there is a contents page, not only a search box', browse.there === true);
+  result('every chapter of the book is listed', browse.chapters === 24, 'chapters=' + browse.chapters);
+  result('and every section in it', browse.sections === 551, 'sections=' + browse.sections);
+  result('the count is stated plainly on screen', /551 sections · 24 chapters/.test(browse.header), browse.header);
+
+  // The chapters he said looked missing, because they are not diseases.
+  for (const want of ['FAMILY PLANNING', 'IMMUNIZATION', 'NUTRITION', 'PALLIATIVE CARE', 'ORAL AND DENTAL']) {
+    result('the chapter "' + want + '" is there',
+      (browse.titles || []).some(t => t.toUpperCase().includes(want)));
+  }
+
+  // ── 2. A non-disease section opens from the contents page ────────────
+  const opened = await page.evaluate(async () => {
+    const items = Array.from(document.querySelectorAll('.g-ch-item'));
+    const target = items.find(i => /condom|implant|injectable|pill/i.test(i.textContent));
+    if (!target) return { found: false, sample: items.slice(0, 3).map(i => i.textContent.trim()) };
+    target.click();
+    await new Promise(r => setTimeout(r, 700));
+    const card = document.getElementById('gCard');
+    return {
+      found: true, label: target.textContent.trim(),
+      shown: card && getComputedStyle(card).display !== 'none',
+      title: (card.querySelector('h2') || {}).textContent || '',
+      browseHidden: getComputedStyle(document.getElementById('gBrowse')).display === 'none',
+    };
+  });
+  result('a family-planning section can be opened straight from the contents',
+    opened.found && opened.shown, opened.found ? opened.title : JSON.stringify(opened.sample));
+  result('and the contents page steps out of the way while it is open', opened.browseHidden === true);
+
+  // ── 3. The text is laid out, not dumped ──────────────────────────────
+  const laid = await page.evaluate(() => {
+    const card = document.getElementById('gCard');
+    const outs = card.querySelectorAll('.g-outline');
+    const body = card.innerText;
+    // The raw source panel is deliberately raw, so it is excluded here.
+    const src = card.querySelector('#gSourcePanel');
+    const srcText = src ? src.innerText : '';
+    const bodyMinusSource = body.replace(srcText, '');
+    return {
+      outlines: outs.length,
+      bullets: card.querySelectorAll('.g-outline li').length,
+      tildesInBody: (bodyMinusSource.match(/(^|\s)~(\s|$)/g) || []).length,
+      hasSourcePanel: !!src,
+    };
+  });
+  result('the section is laid out as an outline', laid.outlines > 0, 'blocks=' + laid.outlines);
+  result('with real bullets', laid.bullets > 0, 'bullets=' + laid.bullets);
+  result('and NO stray "~" left in the readable text',
+    laid.tildesInBody === 0, 'tildes=' + laid.tildesInBody);
+  result('the raw source panel is still there, for checking against the book',
+    laid.hasSourcePanel === true);
+
+  // ── 4. Searching still works, and finds a non-disease topic ──────────
+  await page.evaluate(() => {
+    const s = document.getElementById('gSearch');
+    s.value = 'immuni';
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.waitForTimeout(900);
+  const hits = await page.evaluate(() => {
+    const box = document.getElementById('gResults');
+    return { shown: box && getComputedStyle(box).display !== 'none',
+             text: box ? box.innerText : '' };
+  });
+  result('searching a non-disease topic returns something',
+    hits.shown && hits.text.trim().length > 0 && !/Nothing in this book/.test(hits.text),
+    hits.text.split('\n').slice(0, 2).join(' / '));
+
+  const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
+    !/ServiceWorker|service worker/i.test(e));
+  result('nothing threw', real.length === 0, real.slice(0, 2).join(' | '));
+
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  await b.close(); server.close();
+  process.exit(fail ? 1 : 0);
+})().catch(e => { console.error('CRASH', e.message); process.exit(1); });
