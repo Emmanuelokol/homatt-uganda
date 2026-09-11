@@ -183,13 +183,16 @@ html[data-theme="dark"] {
 
 /* ── Stars ─────────────────────────────────────────────────────────────── */
 .cl-stars { display: flex; gap: 3px; }
-.cl-stars .material-icons-outlined { font-size: 18px; color: var(--warning); }
+/* --warning is a FILL colour; --warning-ink is the same idea as TEXT, and a
+   star glyph is text. The fill measured 3.73:1 against the clay light card —
+   the exact mistake this project documented: a fill token borrowed for words. */
+.cl-stars .material-icons-outlined { font-size: 18px; color: var(--warning-ink); }
 .cl-stars .material-icons-outlined.off { color: var(--border, #E0E0E0); }
 .cl-starpick button {
   background: none; border: none; cursor: pointer; padding: 2px; font: inherit;
   color: var(--border, #E0E0E0);
 }
-.cl-starpick button.on { color: var(--warning); }
+.cl-starpick button.on { color: var(--warning-ink); }
 .cl-starpick .material-icons-outlined { font-size: 30px; }
 
 /* ── The QR itself ─────────────────────────────────────────────────────── */

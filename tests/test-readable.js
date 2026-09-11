@@ -31,7 +31,38 @@ const PORT = 8935, ORIGIN = 'http://localhost:' + PORT;
 // near-black chrome fill that was being used as words; and forest dark, where
 // --primary lightens and white stopped being readable on it.
 const COMBOS = [['dark','dark'], ['forest','dark'], ['clay','light']];
-const PAGES = ['new-order.html', 'dashboard.html'];
+// The clinician portal's three screens are in here for the same reason as the
+// rest: they define two colours of their own (--cl-danger-bg, --cl-warn-bg),
+// and a background token defined in one theme and forgotten in the other is
+// exactly the fault this file exists to catch.
+const PAGES = ['new-order.html', 'dashboard.html',
+               'clinician/index.html', 'clinician/home.html', 'clinician/join.html'];
+
+// One fixture, used both to seed the phone's cache and to answer the server.
+const CLINICIAN_HOME = {
+  ok: true,
+  profile: { id:'c1', full_name:'Dr Okello John', profession:'Medical Doctor',
+             cadre:'Medical Officer', registration_no:'UMDPC/12345',
+             registration_body:'UMDPC', qualification:'MBChB', years_experience:6,
+             phone:'0772000111', district:'Lira', languages:'English, Luo' },
+  links: [
+    { id:'s1', clinic_id:CID, clinic_name:'Kampala Clinic', clinic_district:'Kampala',
+      status:'active', role:'visiting_clinician',
+      started_at:new Date(Date.now()-86400000*10).toISOString(),
+      expires_at:new Date(Date.now()+86400000*2).toISOString(),
+      ended_at:null, ended_by:null, treatments:14 },
+    { id:'s0', clinic_id:'x', clinic_name:'Gulu Clinic', clinic_district:'Gulu',
+      status:'ended', role:'visiting_clinician',
+      started_at:new Date(Date.now()-86400000*200).toISOString(),
+      expires_at:null, ended_at:new Date(Date.now()-86400000*90).toISOString(),
+      ended_by:'owner', treatments:61 },
+  ],
+  stats: { treatments:75, clinics:2,
+           conditions:[{condition:'Malaria',n:31},{condition:'Pneumonia',n:12}] },
+  ratings: [{ clinic_name:'Gulu Clinic', rating:5, would_rehire:true,
+              reference_note:'Careful with children. Would have back.',
+              rater_name:'Owner B', created_at:new Date().toISOString() }],
+};
 
 const MEASURE_IN = (sel) => {
   function parse(c){var m=String(c).match(/rgba?\(([^)]+)\)/);if(!m)return null;
@@ -85,6 +116,15 @@ const MEASURE_IN = (sel) => {
   await page.route('**/*', r => {
     const u = r.request().url();
     if (u.startsWith(ORIGIN)) return r.continue();
+    // my_clinician_home has to be answered for real. Left as [], the home
+    // screen treats it as "no profile", WIPES the cached paint, and this file
+    // then measures three empty cards and reports a confident pass — which is
+    // the failure mode the whole file exists to avoid.
+    if (u.startsWith(SB + '/rest/v1/rpc/my_clinician_home')) {
+      return r.fulfill({ status: 200,
+        headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' },
+        body: JSON.stringify(CLINICIAN_HOME) });
+    }
     if (u.startsWith(SB)) return r.fulfill({ status: 200, headers: { 'Content-Type':'application/json','Access-Control-Allow-Origin':'*' }, body: '[]' });
     return r.abort();
   });
@@ -92,6 +132,31 @@ const MEASURE_IN = (sel) => {
   await page.evaluate(([cid,uid]) => { localStorage.clear();
     localStorage.setItem('clinic_session', JSON.stringify({staffName:'D',clinicName:'K',clinicId:cid,staffRole:'owner',userId:uid,level:'HC3'}));
     localStorage.setItem('sb-homatt-clinic-auth', JSON.stringify({access_token:'t',refresh_token:'r',token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid}}));
+    // The clinician portal's own session, plus the cache its home screen
+    // paints from. Without the cache that screen is three empty cards and
+    // measures almost nothing — a pass that proves the page loaded, not that
+    // anybody can read it.
+    localStorage.setItem('clinician_session', JSON.stringify({userId:uid,email:'d@t',name:'Dr Okello John',clinicianId:'c1',profession:'Medical Doctor'}));
+    localStorage.setItem('clinician_home_cache', JSON.stringify({
+      ok:true,
+      profile:{id:'c1',full_name:'Dr Okello John',profession:'Medical Doctor',cadre:'Medical Officer',
+               registration_no:'UMDPC/12345',registration_body:'UMDPC',qualification:'MBChB',
+               years_experience:6,phone:'0772000111',district:'Lira',languages:'English, Luo'},
+      links:[{id:'s1',clinic_id:cid,clinic_name:'Kampala Clinic',clinic_district:'Kampala',
+              status:'active',role:'visiting_clinician',
+              started_at:new Date(Date.now()-86400000*10).toISOString(),
+              expires_at:new Date(Date.now()+86400000*2).toISOString(),
+              ended_at:null,ended_by:null,treatments:14},
+             {id:'s0',clinic_id:'x',clinic_name:'Gulu Clinic',clinic_district:'Gulu',
+              status:'ended',role:'visiting_clinician',
+              started_at:new Date(Date.now()-86400000*200).toISOString(),
+              expires_at:null,ended_at:new Date(Date.now()-86400000*90).toISOString(),
+              ended_by:'owner',treatments:61}],
+      stats:{treatments:75,clinics:2,conditions:[{condition:'Malaria',n:31},{condition:'Pneumonia',n:12}]},
+      ratings:[{clinic_name:'Gulu Clinic',rating:5,would_rehire:true,
+                reference_note:'Careful with children. Would have back.',
+                rater_name:'Owner B',created_at:new Date().toISOString()}],
+    }));
   }, [CID,UID]);
 
   let checked = 0;
@@ -100,6 +165,21 @@ const MEASURE_IN = (sel) => {
       await page.evaluate(([s,t]) => {
         localStorage.setItem('homatt_skin', s); localStorage.setItem('homatt_theme', t);
       }, [skin, theme]);
+      /* clinician/index.html sends anybody holding a session straight to
+       * home.html, and home.html and join.html send anybody WITHOUT one back
+       * to index.html. So the session is set per page rather than once:
+       * deleting it for the sign-up screen and leaving it deleted made all
+       * three pages measure the same 36 elements of index.html, and every one
+       * of them passed. */
+      await page.evaluate(([page, uid]) => {
+        if (page === 'clinician/index.html') {
+          localStorage.removeItem('clinician_session');
+        } else {
+          localStorage.setItem('clinician_session', JSON.stringify({
+            userId: uid, email: 'd@t', name: 'Dr Okello John',
+            clinicianId: 'c1', profession: 'Medical Doctor' }));
+        }
+      }, [p, UID]);
       await page.goto(ORIGIN + '/clinic/' + p, { waitUntil: 'load' });
       await page.waitForTimeout(1600);
       await page.evaluate(([s,t]) => {
@@ -109,6 +189,21 @@ const MEASURE_IN = (sel) => {
       // Open what a clinician taps, so a fault inside a panel is not missed.
       // A panel that is display:none on load is still a screen people read,
       // and a colour fault inside one is exactly the kind that survives review.
+      // Every message style on the clinician screens is display:none until
+      // something goes wrong, so they have to be brought out to be measured —
+      // a red error nobody can read is only ever seen on the worst day.
+      if (p.indexOf('clinician/') === 0) {
+        await page.evaluate(() => {
+          document.querySelectorAll('.cl-msg').forEach(function (el, i) {
+            el.classList.add('show', ['bad','good','warn'][i % 3]);
+            if (!el.textContent.trim()) el.textContent = 'Something needs saying here.';
+          });
+          var up = document.getElementById('formUp');
+          if (up) up.style.display = '';
+          var wrap = document.getElementById('clScanWrap');
+          if (wrap) wrap.style.display = 'block';
+        });
+      }
       if (p === 'new-order.html') {
         await page.evaluate(() => {
           document.querySelectorAll('.wiz-step, .wiz-pane, [data-step]').forEach(function (el) {

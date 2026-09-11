@@ -27,7 +27,7 @@ const server = http.createServer((rq, rs) => {
 });
 
 const SB = 'https://kgkdiykzmqjougwzzewi.supabase.co';
-const PORT = 8943, ORIGIN = 'http://localhost:' + PORT;
+const PORT = 8947, ORIGIN = 'http://localhost:' + PORT;
 const CID = '11111111-1111-4111-8111-111111111111';
 const UID = '22222222-2222-4222-8222-222222222222';
 

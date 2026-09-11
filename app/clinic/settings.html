@@ -1222,7 +1222,7 @@ function ccPaintStars() {
       b.setAttribute('aria-label', n + ' out of 5');
       b.innerHTML = '<span class="material-icons-outlined" style="font-size:30px">star</span>';
       b.style.cssText = 'background:none;border:none;cursor:pointer;padding:2px;font:inherit;color:'
-        + (n <= _ccStars ? 'var(--warning)' : 'var(--border, #E0E0E0)');
+        + (n <= _ccStars ? 'var(--warning-ink)' : 'var(--border, #E0E0E0)');
       b.onclick = function () { _ccStars = n; ccPaintStars(); };
       box.appendChild(b);
     })(i);

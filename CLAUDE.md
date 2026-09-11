@@ -1053,16 +1053,164 @@ happened in — "vomiting then headache" and "headache then vomiting" are the
 same bag of words to it. Worth knowing before trusting the ordering of the
 list, and worth doing one day.
 
+## The clinician portal
+
+`app/clinic/clinician/` · `supabase/migrations/20260911_clinician_portal.sql` ·
+`tests/test-clinician.js`, `tests/test-clinic-clinicians.js`,
+`tests/test-clinician-gating.js` · SQL: `tests/run-sql.sh`
+
+A clinician is a person, not a seat at one clinic. They sign up once, hold
+their own profile and their own work record, and attach **temporarily** to a
+clinic by scanning its QR code.
+
+### The one rule the whole design exists to keep
+**Patient identity never travels with the clinician.** `clinician_activity` —
+the table that follows somebody from clinic to clinic — has no patient name, no
+phone, no patient id, and *no column that could hold one*. It records that
+Malaria was treated, at which clinic, on which day. That is a professional
+record. A list of the people somebody treated is a medical record, and it
+belongs to the clinic that made it.
+
+This is structural, not a policy: there is nothing to leak, and the change to
+stop in review is the one that adds a column. The owner *can* see who a
+clinician treated — through `clinic_clinician_detail()`, reading the clinic's
+own `clinic_diagnoses`, inside their own clinic only.
+
+### Where the clinical work happens — not here
+Once attached, the clinician is sent into the **ordinary clinic portal**: the
+same intake screen, the same suggestion engine, the same treatment wizard, the
+same offline outbox, carrying `staffRole: 'visiting_clinician'`. A second copy
+of the treatment screen would be a second thing to keep correct, and the second
+one is always the one nobody measured. The clinician portal is three screens —
+sign up, your own record, and joining a clinic.
+
+### Why it lives inside `/clinic/`
+`clinic-sw.js` registers with scope `'./'`, so it can only intercept, serve,
+cache and self-update files under `/clinic/`. At `/clinician/` these pages
+would have loaded from whatever shipped in the APK and could **never change** —
+the exact fault the self-update mechanism exists to fix. They are in `SHELL`.
+
+### The handshake
+| | the CODE | the ACCESS it grants |
+|---|---|---|
+| how long | 24 hours | whatever the owner chose (1 day – 1 year) |
+| why | a photograph of the screen is worthless next week | a month's work should not need a new code every morning |
+
+Eight characters, no `0 O 1 I L` because it gets read off a screen and typed by
+somebody whose camera would not focus. Single-use by default. A wrong code and
+a spent code return the **identical sentence**, so guessing tells an attacker
+nothing about which clinics exist.
+
+Scanning uses `BarcodeDetector`, which is already in the Android WebView — no
+library, no download. Where it is missing the typed code is the route, which is
+why typing has its own heading and its own card rather than being a fallback
+bolted on the end.
+
+### What a visiting clinician cannot reach
+Cut: the money, the payments ledger, quick sale, restock and adding stock, the
+monthly reports, settings. Kept: treatments, patient history, bookings,
+medicines — and the stock **list**, read-only (`stockview`). Whether the
+amoxicillin is on the shelf is a clinical question; what it cost is not.
+
+**The money leaves the record, not only the screen.** The fees card is hidden,
+so every fee would be whatever the form defaulted to — and a default is not a
+price anybody agreed to. Left alone it goes on the clinic's books as a real
+charge against a real patient, set by somebody who never saw the number. The
+wizard zeroes every money field when `!clinicCan('payments')`. Hiding the card
+alone would have been the bug.
+
+`clinicRole()`'s fail-safe hands out FULL access when the role is missing, which
+is right for a clinic's own staff and exactly wrong for a guest — so it is
+inverted when the session says `clinician: true`.
+
+### Sub-account creation is gone, from both portals
+It made an account that belonged to the clinic: the clinic chose the email, set
+the password, and who treated whom was a name typed into a box. Somebody who
+worked at three clinics had three logins and no history of their own, and a
+clinic that let one go still held their password. Joining is the QR code now.
+The list of existing logins stays, and `create_staff_account` is left in the
+database, so nothing already working breaks — but nothing calls it.
+
+### The SQL is tested against a real Postgres
+`./tests/run-sql.sh` starts one, applies the migrations, applies this one twice
+to check the idempotency every migration here claims, and drives it: sign up
+with no clinic, be refused a code as a clinician, mint one as the owner, scan
+it, treat two people, read the log back, end the job, carry the rating to the
+next clinic. **51 checks.** The browser tests mock the network and never reach
+a database, so nothing they do could check an RLS policy, a security-definer
+RPC or a trigger — and this feature's whole security model is those three
+things.
+
+The walls are checked by reading the tables **directly**, not through the RPCs:
+those are `security definer` and so never see RLS at all.
+
+### Logging is a trigger, not a client call
+`trg_log_clinician_activity` on `clinic_diagnoses`. A log the phone is asked to
+write is missing exactly when it matters — the consultation replayed from the
+offline outbox, the one the app crashed after, the screen somebody adds next
+year and forgets to wire up. The row goes in beside the treatment or not at
+all, and a failure to log can never cost a clinic the consultation it was
+logging.
+
+### The QR encoder, and why it is written out
+`app/clinic/clinician/js/qr.js` · `tests/measure-qr.js`
+
+The code is shown to somebody standing in the room, which is the moment nothing
+is set up and the connection is worst. A CDN library works perfectly on the
+laptop it was written on and shows an empty box in Gulu. Byte mode, versions
+1–10, all four correction levels, ~9 KB.
+
+Verified against python-qrcode: **51 payloads × 8 masks = 408 symbols, every
+module compared, 408/408 identical**, and the mask-penalty scorer agrees on 96
+of 96 scores. A wrong encoder does not look wrong — it draws a tidy square that
+will not scan — and the measurement found three bugs that reading never would:
+
+- the 15 format bits laid down least-significant first (13 modules of 441);
+- format bit 7 written at `(size-8, 8)` and then overwritten by the always-dark
+  module, so one bit of the format simply did not exist (1 module);
+- alignment patterns skipped wherever the centre was already occupied, which is
+  right up to version 6 and from version 7 drops the six patterns crossing the
+  timing line, shifting every data module after them (hundreds).
+
+The third only appeared because the comparison covered all ten versions rather
+than the one this feature actually uses.
+
+## Speaking is optional
+
+`homatt_voice_off` · Settings → *Dictation* · `tests/test-voice-optional.js`
+
+One switch turns off **all three** microphones: the big one at the top of
+intake, the one beside the vitals, and the floating one. A switch that
+quietened one and left two would be worse than none — somebody who asked not to
+have voice recognition would still be looking at microphones and would
+reasonably conclude the setting does nothing.
+
+Per device, not per clinic: the phone with the broken microphone, the one in
+the noisy room, and the clinician who would rather type are one phone's
+business. Default is on. Hidden rather than greyed out — a disabled microphone
+still asks to be pressed and still takes up the top of the screen.
+
+The test's most important assertion is not that the buttons go: it is that
+every box they used to fill can still be typed into by hand, and that hiding
+the readings button did not take the readings with it.
+
 ## The tests
 
-`tests/` — 52 files, ~690 checks. No framework: each file starts a web server
+`tests/` — 57 files, ~800 checks. No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
 
 ```bash
 cd tests && npm install && node run-all.js     # all of them, ~25 min
 node run-all.js dictate                        # just the ones matching
+./tests/run-sql.sh                             # the SQL half, real Postgres
+node tests/measure-qr.js                       # the QR encoder vs a reference
 ```
+
+**Give every test its own port.** They are separate processes run in sequence,
+so a duplicate looks harmless — and then one of them starts finding an empty
+page and failing only inside the suite, never on its own.
+`grep -ho "PORT = [0-9]*" test-*.js | sort | uniq -d` answers it.
 
 `tests/README.md` says what each file protects and how to write another. Two
 rules worth repeating here:
@@ -1087,3 +1235,12 @@ rules worth repeating here:
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.
+- **Check the test is looking at the page it thinks it is.** Three clinician
+  screens all reported a confident pass at 36 elements each — the same 36,
+  because the session sent every one of them to the sign-up page. A count that
+  is suspiciously equal across different screens is the tell.
+- **Some of this cannot be tested from the browser at all.** RLS policies,
+  security-definer RPCs and triggers are never reached by a test that mocks the
+  network. `tests/run-sql.sh` applies the real migrations to a real Postgres and
+  drives them; it is also the only thing that checks the "idempotent" every
+  migration in this repo claims, by applying it twice.
