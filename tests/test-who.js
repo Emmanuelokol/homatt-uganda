@@ -154,8 +154,20 @@ print(json.dumps({'amox':{'name':d[1],'bands':bands},'pneu':{'title':pneu[1],'ca
     back.card === 'none' && back.sev !== 'none' && back.mode === 'none' && /551 conditions/.test(back.info),
     JSON.stringify(back));
 
+  /* Wait for THIS search, not for whatever is on screen.
+   *
+   * Switching books re-runs the search with whatever is still in the box, and
+   * the box still holds "amoxicillin" from the dose test above. That used to
+   * show "Nothing in this book matches", because the Uganda search could only
+   * ever match a word in a section's own heading — so `waitForSelector` was
+   * guaranteed to be waiting for the new results.
+   *
+   * Now that the whole book is searched, "amoxicillin" legitimately returns
+   * Wounds, Anthrax and Fractures, which name it in their management. The
+   * selector matched those instantly and the test read the previous query's
+   * answer. Nothing was wrong with the app; the test was racing it. */
   await page.fill('#gSearch', 'malaria');
-  await page.waitForSelector('.g-ac-item', { timeout: 8000 });
+  await page.waitForTimeout(1200);          // the 120 ms debounce, and the scan
   const ug = await page.evaluate(() => [...document.querySelectorAll('.g-ac-item .g-ac-title')].map(x => x.textContent));
   result('the Uganda book still searches as before', ug.length > 0 && /malaria/i.test(ug[0]), ug.slice(0, 3).join(' | '));
 
