@@ -1341,6 +1341,30 @@ drug that silently disappears is its own kind of wrong. The guideline screen
 is reference rather than prescribing, so it keeps every row and labels the
 ones the book prints elsewhere.
 
+### The run-on text was in THREE places, and the table was the smallest
+Cutting the medicines table looked like the fix and was a third of one. Each
+of the other two was found by driving the screen and asking where a drug name
+could still be coming from:
+
+| where | what it did |
+|---|---|
+| `medicines` rows | 28 drugs offered for the wrong condition |
+| the section's **prose** | `findMissingDrugs()` re-reads management/prevention/notes against the national medicines list to recover drugs the extraction missed — a feature severe malaria depends on. Reading the uncut text put alprazolam, bupropion, carbamazepine and fluoxetine straight back after they had been removed. The same text also decides which drug is "first line". |
+| the **treatment steps** | the largest. "Treatment steps by level of care" for Postnatal Psychosis was 7,682 characters of four other sections' protocols, printed as the steps for this one. |
+
+**And the fields cannot be cut the way the table was.** `management` for that
+row is 7,709 characters holding all six drugs and **not one heading** — the
+extraction took the headings out when it split the fields. There is nothing in
+that string to cut at.
+
+So `full_text` is the arbiter, because it is the only field that still carries
+the book's structure. Everything before the first boundary is the section; a
+line of any other field, and any treatment step, is kept only if it is in
+there. Both screens cut once and everything downstream reads the cut text, and
+both say on the card that they did — the source panel still holds the whole
+stretch as printed, so nothing is hidden, only moved out of the place it was
+pretending to belong.
+
 ### The change the measurement told me not to make
 The package lays out guideline text with its own rule; the guideline screen
 uses the `ranToMargin` rule that was measured at 0 words lost. Making the two
