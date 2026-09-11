@@ -18,7 +18,7 @@
   'use strict';
 
   // ?v= must match DATA_VERSION in clinic-sw.js — see guidelines.js.
-  var DB_URL = 'data/uganda_clinical_guidelines_2023.db?v=144';
+  var DB_URL = 'data/uganda_clinical_guidelines_2023.db?v=145';
   var EM_URL = 'data/emhslu_2023.db';       // national essential medicines list
   var db = null, loading = null;
   var emdb = null, emLoading = null;

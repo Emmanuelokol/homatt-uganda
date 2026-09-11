@@ -250,7 +250,7 @@ const result = (n, ok, x) => {
    *
    * The duplicate title is not a mistake in this test. The extraction really
    * did produce two "Postnatal Psychosis" rows, and both ran on. */
-  result('across all 551 sections, exactly three are affected',
+  result('across all 565 sections, exactly three are affected',
     sweep.sections === 3, sweep.sections + ': ' + sweep.names.join(', '));
   result('and exactly 28 medicines are marked, book-wide',
     sweep.marked === 28, String(sweep.marked));
@@ -337,6 +337,44 @@ const result = (n, ok, x) => {
   }
   result('but it still offers what the book DOES print under it',
     /\w/.test(built.drugs || ''), (built.drugs || '(nothing)').slice(0, 80));
+
+  /* ── 5. The reference chapter can never prescribe ───────────────────
+   *
+   * Chapter 25 is the book outside its numbered spine: prescribing rules,
+   * injections, abbreviations, infection control and the national laboratory
+   * test menu. It is thick with drug names — used as EXAMPLES of how to write
+   * a prescription — and with test names. Parsed as medicines they would
+   * become rows a one-tap package could offer to a patient, with a dose taken
+   * from a worked example. The build skips them; this proves it stayed
+   * skipped, because the failure would be silent and would look like content.
+   */
+  const refSafe = await page.evaluate(async () => {
+    const S = await initSqlJs({ locateFile: f => 'js/vendor/' + f });
+    const buf = await (await fetch('data/uganda_clinical_guidelines_2023.db?v=145')).arrayBuffer();
+    const db = new S.Database(new Uint8Array(buf));
+    const one = (sql) => {
+      const st = db.prepare(sql); let v = null;
+      try { if (st.step()) v = st.getAsObject(); } finally { st.free(); }
+      return v;
+    };
+    const out = {
+      refs: one('SELECT COUNT(*) n FROM conditions WHERE chapter_number = 25').n,
+      meds: one('SELECT COUNT(*) n FROM medicines m JOIN conditions c ON c.id = m.condition_id'
+                + ' WHERE c.chapter_number = 25').n,
+      steps: one('SELECT COUNT(*) n FROM treatments t JOIN conditions c ON c.id = t.condition_id'
+                 + ' WHERE c.chapter_number = 25').n,
+      letters: one('SELECT SUM(LENGTH(COALESCE(full_text,""))) n FROM conditions'
+                   + ' WHERE chapter_number = 25').n,
+    };
+    db.close();
+    return out;
+  });
+  result('the reference matter is in the book', refSafe.refs === 14, refSafe.refs + ' sections');
+  result('carrying the text that had no section at all',
+    refSafe.letters > 80000, refSafe.letters + ' characters');
+  result('and it offers NO medicine a patient could be given',
+    refSafe.meds === 0, refSafe.meds + ' medicine rows');
+  result('and NO treatment step', refSafe.steps === 0, refSafe.steps + ' steps');
 
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     !/ServiceWorker|service worker/i.test(e));

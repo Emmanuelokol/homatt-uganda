@@ -78,13 +78,18 @@ const result = (n, ok, x) => {
     };
   });
   result('there is a contents page, not only a search box', browse.there === true);
-  result('every chapter of the book is listed', browse.chapters === 24, 'chapters=' + browse.chapters);
-  // 551 rows in the book's own table, plus the 7 recovered from inside their
+  // 24 clinical chapters, plus chapter 25 — the reference matter the book
+  // prints outside its numbered spine (prescribing rules, injections,
+  // antimicrobial resistance, abbreviations, and the four appendices
+  // including the national laboratory test menu). It had no section at all
+  // until measure-book-coverage.js counted what a clinician could not reach.
+  result('every chapter of the book is listed', browse.chapters === 25, 'chapters=' + browse.chapters);
+  // 565 rows in the book's own table, plus the 7 recovered from inside their
   // neighbour — which are real sections of the book with no row of their own.
   result('and every section in it, including the ones with no entry of their own',
-    browse.sections === 558, 'sections=' + browse.sections);
+    browse.sections === 572, 'sections=' + browse.sections);
   result('the count on screen matches the list under it',
-    new RegExp(browse.sections + ' sections · 24 chapters').test(browse.header), browse.header);
+    new RegExp(browse.sections + ' sections · 25 chapters').test(browse.header), browse.header);
 
   // The chapters he said looked missing, because they are not diseases.
   for (const want of ['FAMILY PLANNING', 'IMMUNIZATION', 'NUTRITION', 'PALLIATIVE CARE', 'ORAL AND DENTAL']) {

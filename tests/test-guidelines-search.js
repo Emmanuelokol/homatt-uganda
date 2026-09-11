@@ -164,7 +164,59 @@ const result = (n, ok, x) => {
   result('and the screen says which word it searched instead',
     /lumefantrine/i.test(r.alias), r.alias.replace(/\s+/g, ' ').slice(0, 90));
 
-  // ── 5. Nothing that worked before may have stopped working ───────────
+  /* ── 5. The reference matter, which had no section at all ────────────
+   *
+   * measure-book-coverage.js counted what a clinician could not reach: the
+   * book prints 91,666 characters outside its numbered spine and the app had
+   * none of it. Not front matter in any dismissible sense — PRESCRIPTION
+   * WRITING RULES, INJECTIONS, antimicrobial resistance, and Appendix 3, the
+   * national laboratory test menu, which says which tests an HC II or HC IV
+   * can actually run. */
+  for (const [term, want] of [
+    ['prescription writing', /prescription/i],
+    ['antimicrobial resistance', /antimicrobial|resistance/i],
+    ['laboratory test menu', /laboratory|test menu/i],
+    ['abbreviations', /abbreviation/i],
+    ['infection control', /infection/i],
+    ['pharmacovigilance', /pharmacovigilance|adverse/i],
+  ]) {
+    r = await type(term);
+    result('"' + term + '" is in the book, and now in the app',
+      r.n > 0 && !r.empty && want.test(r.text), r.first.slice(0, 56) || r.text.slice(0, 56));
+  }
+
+  // Opening one shows the book's own words, laid out, with no page cited —
+  // the front matter is paginated in roman numerals the index does not carry,
+  // and a wrong page on a card that cites the book is worse than none.
+  const ref = await page.evaluate(async () => {
+    const s = document.getElementById('gSearch');
+    s.value = 'prescription writing';
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(res => setTimeout(res, 900));
+    const f = document.querySelector('#gResults .g-ac-item');
+    if (!f) return { opened: false };
+    f.click();
+    await new Promise(res => setTimeout(res, 900));
+    const c = document.getElementById('gCard');
+    const src = c.querySelector('#gSourcePanel');
+    return {
+      opened: true,
+      title: (c.querySelector('h2') || {}).textContent || '',
+      chips: Array.from(c.querySelectorAll('.g-chip')).map(e => e.textContent).join(' | '),
+      body: c.innerText.replace((src || {}).innerText || '', ''),
+      bullets: c.querySelectorAll('.g-outline li').length,
+    };
+  });
+  result('a reference section opens', ref.opened && /prescription/i.test(ref.title), ref.title);
+  result('with the book\'s own rules in it, laid out',
+    /legal document|dose size|duration of treatment|generic/i.test(ref.body || '') && ref.bullets > 0,
+    'bullets=' + ref.bullets);
+  result('filed under the reference chapter, not a clinical one',
+    /REFERENCE/i.test(ref.chips || ''), ref.chips.slice(0, 70));
+  result('and it cites no page, because the book numbers this part in roman',
+    !/p\.\d/.test(ref.chips || ''), ref.chips.slice(0, 70));
+
+  // ── 6. Nothing that worked before may have stopped working ───────────
   for (const [term, want] of [['malaria', /malaria/i], ['typhoid', /typhoid/i],
                               ['asthma', /asthma/i], ['cataract', /cataract/i]]) {
     r = await type(term);

@@ -151,7 +151,7 @@ print(json.dumps({'amox':{'name':d[1],'bands':bands},'pneu':{'title':pneu[1],'ca
     info: document.getElementById('gDbInfo').textContent,
   }));
   result('switching back to Uganda clears the children’s card',
-    back.card === 'none' && back.sev !== 'none' && back.mode === 'none' && /551 conditions/.test(back.info),
+    back.card === 'none' && back.sev !== 'none' && back.mode === 'none' && /565 conditions/.test(back.info),
     JSON.stringify(back));
 
   /* Wait for THIS search, not for whatever is on screen.

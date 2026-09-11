@@ -40,6 +40,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import ucg_clean
 import ucg_fields
+import ucg_reference
 import ucg_spine
 
 
@@ -483,14 +484,43 @@ def build_sections(lines):
     return chapters, seq, unmatched, orphans
 
 
+def build_reference(lines, chapters, seq, mask):
+    """The book outside its numbered spine, which had no section at all.
+
+    Measured against the source: 64,670 letters before the first numbered
+    heading and 27,087 after the last one. The first block is not front
+    matter in any dismissible sense — it holds PRESCRIPTION WRITING RULES,
+    INJECTIONS, Antimicrobial Resistance and Appropriate Medicines Use. The
+    second holds the National Laboratory Test Menu, which answers "can this
+    health centre run that test" and was asked of the book every day.
+    """
+    if not seq:
+        return []
+    front_lo, front_hi = 0, seq[0]['line']
+    back_lo, back_hi = back_matter_start(lines, seq[-1]['line']), len(lines)
+    ref = ucg_reference.sections(lines, mask, front_lo, front_hi, back_lo, back_hi)
+    chapters[ucg_reference.CHAPTER_NO] = ucg_reference.CHAPTER_TITLE
+    return ref
+
+
 def main(src, dst):
     lines = ucg_spine.load_lines(src)
     chapters, seq, unmatched, orphans = build_sections(lines)
     drop = ucg_clean.furniture_mask(lines, chapters)
     pidx = ucg_clean.page_index(lines, chapters)
 
+    # The book outside its numbered spine. Added AFTER the mask is built, so
+    # the reference sections are cut from the same de-furnitured lines as
+    # everything else, and appended to `seq` so they go through exactly the
+    # same field split, page lookup and insert as a condition does. They are
+    # not conditions, but they are sections of this book, and the one thing
+    # that must not happen is a second, slightly different path for them.
+    reference = build_reference(lines, chapters, seq, drop)
+    seq = seq + reference
+
     print(f'  chapters         : {len(chapters)}')
-    print(f'  sections         : {len(seq)}  ({len(orphans)} not listed in the contents)')
+    print(f'  sections         : {len(seq)}  ({len(orphans)} not listed in the contents,'
+          f' {len(reference)} reference)')
     print(f'  unmatched        : {len(unmatched)}')
     print(f'  furniture lines  : {len(drop)}')
 
@@ -512,14 +542,27 @@ def main(src, dst):
         # notes a thing that exists in two places at once, and full_text - which
         # the app already shows under "View source guideline text" - carries it
         # verbatim and in the right order.
-        f, _lead = ucg_fields.split(body)
-
         ch_no = int(v['number'].split('.')[0]) if v['number'].split('.')[0].isdigit() else None
+        is_ref = (ch_no == ucg_reference.CHAPTER_NO)
+
+        # A reference section is not a condition, and must not be split like
+        # one. "Prescribing Guidelines" contains the word Management, and
+        # "Appendix 3" is a list of laboratory tests — run through the field
+        # splitter they would come out as a condition's Management and
+        # Investigations, which is exactly the kind of misplacement this round
+        # of work exists to remove. full_text carries them verbatim, and the
+        # app renders a section with no parsed fields as the book prints it.
+        f = {} if is_ref else ucg_fields.split(body)[0]
+
         icd = clean_icd(v.get('icd10')) or \
             clean_icd(ucg_spine.icd_below(lines, v['line']))
         if icd:
             n_icd += 1
-        page = v.get('page') or ucg_clean.page_at(pidx, v['line'])
+        # The front matter is paginated in roman numerals, which this index
+        # does not carry, so asking it for a page returns the nearest ARABIC
+        # one — a number from a different part of the book. Better no page
+        # than a wrong one on a card that cites the book.
+        page = None if is_ref else (v.get('page') or ucg_clean.page_at(pidx, v['line']))
 
         cur = db.execute(
             'INSERT INTO conditions(number,title,depth,chapter_number,chapter_title,'
@@ -532,6 +575,17 @@ def main(src, dst):
              f.get('investigations'), f.get('management'), f.get('prevention'),
              f.get('complications'), f.get('notes'), full_text))
         cid = cur.lastrowid
+
+        # NO MEDICINES AND NO TREATMENT STEPS FROM A REFERENCE SECTION.
+        #
+        # This is the one line in this file that could do real harm. The
+        # prescribing chapter is full of drug names used as EXAMPLES of how to
+        # write a prescription, and Appendix 3 is a list of laboratory tests.
+        # Parsed as medicines they would become rows a one-tap package could
+        # offer to a patient, with a dose taken from a worked example. The
+        # whole point of a reference section is that nobody is treated from it.
+        if is_ref:
+            continue
 
         mgmt = f.get('management') or ''
         if not mgmt:

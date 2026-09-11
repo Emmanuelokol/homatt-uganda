@@ -271,6 +271,17 @@ def main(who_path, ucg_path, out_path):
                          'investigations, full_text FROM conditions'):
         if NOT_DX.search(r['title'] or ''):
             continue
+        # CHAPTER 25 IS REFERENCE, NOT DIAGNOSIS.
+        #
+        # It carries the prescribing rules, the abbreviations list, infection
+        # control and the national laboratory test menu — 91,666 characters
+        # thick with clinical vocabulary and not one condition. Indexed as
+        # documents they would score against any query rich in drug and test
+        # words, and a clinician typing a fever would be offered "Prescription
+        # Writing" as an impression. It is searchable in the guideline screen,
+        # where a person is looking it up on purpose, and nowhere else.
+        if r['chapter_number'] == 25:
+            continue
         feats = trim_field(r['clinical_features'])
         has = 1 if feats else 0
         if not feats:

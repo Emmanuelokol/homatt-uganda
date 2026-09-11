@@ -11,13 +11,13 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v179';
+const CACHE = 'homatt-clinic-v180';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
 // install that the book underneath it has changed. It must match the DATA_V
 // used to build the .db URLs in the pages that load them.
-const DATA_VERSION = '144';
+const DATA_VERSION = '145';
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
