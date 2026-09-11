@@ -125,6 +125,14 @@ const result = (n, ok, x) => {
         cleanNames: rows.filter(r => !r.classList.contains('g-md-else'))
           .map(r => (r.querySelector('.g-md-name') || {}).textContent || '').join(' | '),
         warn: !!c.querySelector('.g-verify-warn'),
+        ranOn: (c.querySelector('.g-ranon-note') || {}).innerText || '',
+        // The PROSE panels only. The medicines table deliberately keeps all 26
+        // rows here — this is the reference screen, and a labelled row is the
+        // right answer on it — so counting the table would measure the opposite
+        // of what this checks.
+        prose: Array.from(c.querySelectorAll('.g-sec')).filter(function (s) {
+          return !s.querySelector('table.g-table') && s.id !== 'gSourcePanel';
+        }).map(function (s) { return s.innerText; }).join('\n'),
         under: Array.from(c.querySelectorAll('.g-md-under')).map(e => e.textContent).join(' | '),
       };
     });
@@ -143,6 +151,20 @@ const result = (n, ok, x) => {
     /Bipolar/.test(r.under) && /Psychosis/.test(r.under), r && r.under.slice(0, 100));
   result('and the reader is told why, in the book\'s terms',
     r && r.warn === true);
+  // The medicines table was not the only thing carrying another section's
+  // content: the Management panel was showing Depression's and Psychosis's
+  // management as this condition's.
+  result('the card says the section runs on, and names what it swallowed',
+    !!r && /runs on into the next one/i.test(r.ranOn) &&
+    /Anxiety|Depression|Psychosis/.test(r.ranOn), r && r.ranOn.slice(0, 100));
+  result('and the Management panel is cut back to this heading',
+    !!r && !/lithium|clozapine|bupropion/i.test(r.prose || ''),
+    ((r && r.prose || '').match(/lithium|clozapine|bupropion/gi) || []).join(','));
+  result('while the source panel still holds the whole stretch as printed',
+    await page.evaluate(() => {
+      const p = document.querySelector('#gSourcePanel');
+      return !!p && /lithium/i.test(p.textContent || '');
+    }));
 
   // ── 2. Where it must NOT fire ───────────────────────────────────────
   // A wrapped dose looks exactly like a numbered heading. "Benzathine

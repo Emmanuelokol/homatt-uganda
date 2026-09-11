@@ -654,12 +654,83 @@
     return direct.length ? direct : kids;
   }
 
+  /* Where a section stops being itself — the two-kinds lookup, shared by the
+   * medicines table below and by the fields. Kept in one place so a heading
+   * this screen calls a boundary in one paragraph cannot be ignored in the
+   * next. */
+  function sectionLookup(c) {
+    return function (num, headingText) {
+      var t = String(headingText || '').trim();
+      var tt = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
+      var row = one('SELECT id, title FROM conditions WHERE number = ? LIMIT 1', [num]);
+      // The number alone is not enough: the extraction mis-numbered part of
+      // the book, so the row numbered 6.5.4.2 is titled "Spontaneous Bacterial
+      // Peritonitis" while the heading printed there reads "Oesophageal
+      // Varices". A row whose title is not the words on the page is not this
+      // heading — ask the second question instead.
+      if (row && tt(t).indexOf(tt(row.title).slice(0, 12)) === 0) return row;
+      // One of the seven headings the import buried inside a neighbour, which
+      // have no row at all — and which this screen already lists on its
+      // contents page. Same test as findBuried(), so the two can never
+      // disagree about what a section is.
+      if (t.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(t)) return null;
+      if (String(num).split('.')[0] !== String(c.chapter_number)) return null;
+      var k = tt(t);
+      if (!k || knownTitles()[k]) return null;
+      return { title: t, buried: true };
+    };
+  }
+
   function renderUcg(id) {
     var c = one(
       'SELECT id, number, title, chapter_number, chapter_title, icd10, page, causes, ' +
       'clinical_features, differential, investigations, management, prevention, ' +
       'complications, notes, full_text FROM conditions WHERE id = ? LIMIT 1', [id]);
     if (!c) return '';
+
+    /* ── Where this section ends ─────────────────────────────────────────
+     *
+     * Three rows of 551 run past their own end and carry the next sections'
+     * text — the worst is "Postnatal Psychosis", 21,058 characters holding
+     * Anxiety, Depression, Bipolar Disorder and Psychosis. Their management
+     * was being shown, under this heading, as this condition's management.
+     *
+     * The fields cannot be cut by heading: `management` for that row is 7,709
+     * characters with NOT ONE heading in it, because the extraction took them
+     * out when it split the fields. full_text is the only field that still
+     * carries the book's structure, so it is the arbiter — a line of any other
+     * field is kept only if it is inside this section's own stretch of it.
+     *
+     * Nothing is lost: the source panel at the bottom of every card still
+     * shows the section exactly as the book sets it, run-on and all, and the
+     * card says plainly that it was cut. */
+    var ranOn = false, ownText = null;
+    try {
+      if (window.HomattUcgSections && c.full_text) {
+        var bs = window.HomattUcgSections.boundaries(c, sectionLookup(c));
+        if (bs.length) {
+          ownText = String(c.full_text).slice(0, bs[0].at).replace(/\s+/g, ' ').toLowerCase();
+          ['causes', 'clinical_features', 'differential', 'investigations',
+           'management', 'prevention', 'complications', 'notes'].forEach(function (k) {
+            if (!c[k]) return;
+            var lines = String(c[k]).split('\n'), out = [], dropped = false;
+            lines.forEach(function (ln) {
+              var f = ln.replace(/\s+/g, ' ').trim().toLowerCase();
+              // A blank or a scrap too short to locate follows the line above
+              // it rather than being judged on its own.
+              if (f.length < 4) { if (out.length) out.push(ln); return; }
+              if (ownText.indexOf(f) >= 0) out.push(ln); else dropped = true;
+            });
+            if (dropped) { c[k] = out.join('\n'); ranOn = true; }
+          });
+          // The note goes on whenever a boundary exists, not only when a line
+          // was dropped: the treatment steps are filtered further down, after
+          // the card's header has already been built, and a cut nobody was
+          // told about is the thing this note exists to prevent.
+          c._ranOn = bs.map(function (b) { return b.title; });
+        }
+      }
+    } catch (e) {}
 
     var tr = rows(
       'SELECT level_of_care, treatment, step_order FROM treatments ' +
@@ -683,26 +754,7 @@
      * (tests/measure-doses.js) */
     try {
       if (window.HomattUcgSections) {
-        meds = window.HomattUcgSections.attribute(c, meds, function (num, headingText) {
-          var t = String(headingText || '').trim();
-          var tt = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
-          var row = one('SELECT id, title FROM conditions WHERE number = ? LIMIT 1', [num]);
-          // The number alone is not enough: the extraction mis-numbered part of
-          // the book, so the row numbered 6.5.4.2 is titled "Spontaneous
-          // Bacterial Peritonitis" while the heading printed there reads
-          // "Oesophageal Varices". A row whose title is not the words on the
-          // page is not this heading — ask the second question instead.
-          if (row && tt(t).indexOf(tt(row.title).slice(0, 12)) === 0) return row;
-          // One of the seven headings the import buried inside a neighbour,
-          // which have no row at all — and which this screen already lists on
-          // its contents page. Same test as findBuried(), so the two can
-          // never disagree about what is a section.
-          if (t.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(t)) return null;
-          if (String(num).split('.')[0] !== String(c.chapter_number)) return null;
-          var k = tt(t);
-          if (!k || knownTitles()[k]) return null;
-          return { title: t, buried: true };
-        });
+        meds = window.HomattUcgSections.attribute(c, meds, sectionLookup(c));
       }
     } catch (e) {}
 
@@ -735,6 +787,18 @@
         (_sevSel ? '<span class="g-chip sev">' + esc(_sevSel) + '</span>' : '') +
       '</div></div>';
     var html = head;
+
+    if (c._ranOn && c._ranOn.length) {
+      html += '<div class="g-sec g-ranon-note">' +
+        '<b>This section runs on into the next one in the printed book.</b> ' +
+        'The extraction did not stop where the book does, so what was filed ' +
+        'here also held ' +
+        c._ranOn.map(function (t) { return '“' + esc(t) + '”'; }).join(', ') +
+        '. The parts below have been cut back to what the guideline prints ' +
+        'under <i>' + esc(c.title) + '</i>. Nothing is lost — the whole ' +
+        'stretch, run-on and all, is at the bottom of this card exactly as ' +
+        'the book sets it.</div>';
+    }
 
     /* Did the extraction find the SUBSTANCE of this section?
      *
@@ -769,6 +833,19 @@
     html += section('Clinical features', c.clinical_features ? asText(c.clinical_features) : '');
     html += section('Investigations / lab tests', c.investigations ? asText(c.investigations) : '');
     html += section('Management', c.management ? asText(c.management) : '');
+
+    /* The treatment STEPS carry it too, and they were the last place it hid.
+     * "Treatment steps by level of care" for this row was 7,682 characters of
+     * four other sections' protocols, printed as the steps for this one. A
+     * step is a line of the same page, so the same arbiter answers it. */
+    if (ownText) {
+      var before = tr.length;
+      tr = tr.filter(function (t) {
+        var f = String(t.treatment || '').replace(/\s+/g, ' ').trim().toLowerCase();
+        return f.length < 4 || ownText.indexOf(f) >= 0;
+      });
+      if (tr.length !== before) ranOn = true;
+    }
 
     if (tr.length) {
       var byLoc = {}, order = [];
