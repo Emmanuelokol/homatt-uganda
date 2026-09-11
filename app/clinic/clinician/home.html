@@ -194,9 +194,26 @@
   function paintClinics(links) {
     var box = document.getElementById('clClinics');
     if (!links || !links.length) {
-      box.innerHTML = '<div class="cl-empty">' +
-        '<span class="material-icons-outlined">qr_code_scanner</span>' +
-        'You are not attached to any clinic yet.<br>Scan a clinic\'s code to start work.</div>';
+      /* This is the answer to "where are the features".
+       *
+       * There is nothing clinical to do until a clinic has let you in, and an
+       * empty card that only says "you are not attached to any clinic" reads
+       * like an app with nothing in it. Say what happens the moment you scan —
+       * because what happens is the whole product. */
+      box.innerHTML = '<div class="cl-empty" style="text-align:left;padding:16px 4px">' +
+        '<div style="text-align:center"><span class="material-icons-outlined">qr_code_scanner</span></div>' +
+        '<div style="font-weight:800;color:var(--text, #1A1A1A);font-size:13.5px;margin-bottom:6px;text-align:center">' +
+          'You are not working at a clinic yet</div>' +
+        '<div style="margin-bottom:8px">Scan a clinic\'s code and you get their portal, the same one their own staff use:</div>' +
+        '<ul style="margin:0 0 8px;padding-left:20px;line-height:1.7">' +
+          '<li>Record a treatment — complaint, readings, the story</li>' +
+          '<li>The condition suggestions and the one-tap treatment package</li>' +
+          '<li>Patient history at that clinic</li>' +
+          '<li>Check what medicines are on their shelf</li>' +
+        '</ul>' +
+        '<div>Every treatment you record is added to <b>your own</b> record above, and goes with you ' +
+        'to the next clinic. You never see their money, their takings or their reports.</div>' +
+      '</div>';
       return;
     }
     box.innerHTML = links.map(function (l) {
@@ -335,18 +352,50 @@
   // Paint from the phone first so the screen is never blank, then replace it
   // with the server's answer. On a connection that comes and goes, a screen
   // that shows yesterday's truth beats a spinner that shows nothing.
+  /* Nothing on this screen may be left saying "Loading…".
+   *
+   * Every box that starts as a placeholder has to be written over on EVERY
+   * path out of load(), including the ones nobody expects to take. The catch()
+   * below used to replace the clinics box and not the references box, so a
+   * clinician whose server had no clinician tables watched a spinner that was
+   * never going to stop — with no clue that anything was wrong, because a
+   * spinner reads as "nearly there".
+   *
+   * So the two are cleared together, here, and this is the only place that
+   * writes either of them when something has gone wrong.
+   */
+  function trouble(why, kindClass) {
+    document.getElementById('clClinics').innerHTML =
+      '<div class="cl-empty"><span class="material-icons-outlined">info</span>' + esc(why) + '</div>';
+    document.getElementById('clRatings').innerHTML =
+      '<div class="cl-empty">Nothing to show yet.</div>';
+    var banner = document.getElementById('clOffline');
+    banner.textContent = why;
+    banner.className = 'cl-msg show ' + (kindClass || 'warn');
+  }
+
+  // What they typed at sign-up, so the form is never blank in front of the
+  // person who filled it in five minutes ago.
+  function paintKept() {
+    var kept = C.keptProfile();
+    if (kept) fillProfile(kept);
+    return kept;
+  }
+
   async function load() {
     var cached = null;
     try { cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) {}
     if (cached) paintAll(cached);
+    else paintKept();
 
     var supa = C.supa();
     if (!supa || navigator.onLine === false) {
-      document.getElementById('clOffline').classList.toggle('show', !!cached);
       if (!cached) {
-        document.getElementById('clClinics').innerHTML =
-          '<div class="cl-empty">No connection, and nothing saved on this phone yet.</div>';
-        document.getElementById('clRatings').innerHTML = '';
+        trouble('No connection. This is what was typed on this phone — it will be saved when there is signal.', 'warn');
+      } else {
+        var b = document.getElementById('clOffline');
+        b.textContent = 'No connection — showing what was on this phone the last time it could look.';
+        b.className = 'cl-msg show warn';
       }
       return;
     }
@@ -355,17 +404,19 @@
       var r = await supa.rpc('my_clinician_home');
       if (r.error) throw r.error;
       if (!r.data || !r.data.ok) {
-        // Signed in, but no clinician row — an account made before the profile
-        // was saved. Send them back to finish it rather than showing an empty
-        // screen with no way forward.
-        document.getElementById('clClinics').innerHTML =
-          '<div class="cl-empty">Your details are not saved yet. Fill them in below and save.</div>';
-        document.getElementById('clRatings').innerHTML = '';
+        // Signed in, but no clinician row yet — the profile save never landed.
+        // Their details are still on the phone, so show those and say what is
+        // needed rather than presenting ten empty boxes.
+        paintKept();
+        trouble('Your details are not saved on the server yet. Check them below and tap "Save my details".', 'warn');
         return;
       }
-      document.getElementById('clOffline').classList.remove('show');
+      document.getElementById('clOffline').className = 'cl-msg';
       try { localStorage.setItem(CACHE_KEY, JSON.stringify(r.data)); } catch (e) {}
       paintAll(r.data);
+      // Keep the phone's copy in step, so it is the server's truth that
+      // survives the next time there is no server.
+      if (r.data.profile) C.keepProfile(r.data.profile);
 
       var s = C.session() || {};
       if (r.data.profile) {
@@ -375,10 +426,18 @@
         C.setSession(s);
       }
     } catch (e) {
-      document.getElementById('clOffline').classList.toggle('show', !!cached);
-      if (!cached) {
-        document.getElementById('clClinics').innerHTML =
-          '<div class="cl-empty">' + esc(C.saySorry(e, 'Could not load just now.')) + '</div>';
+      paintKept();
+      if (C.isNotSetUp(e)) {
+        // The commonest state for a fresh install, and the one that looked
+        // exactly like a broken phone: the app is live, the database update is
+        // not. Say so, and say who can fix it, because the clinician cannot.
+        trouble(C.NOT_SET_UP, 'bad');
+      } else if (cached) {
+        var b2 = document.getElementById('clOffline');
+        b2.textContent = 'Could not reach the server — showing what was on this phone last time.';
+        b2.className = 'cl-msg show warn';
+      } else {
+        trouble(C.saySorry(e, 'Could not load just now.'), 'warn');
       }
     }
   }
@@ -396,10 +455,15 @@
     };
     if (!p.full_name) { m.className = 'cl-msg show bad'; m.textContent = 'Your name is required.'; return; }
 
+    // Kept on the phone the moment it is typed, before anything is sent. Then
+    // the worst case is "not saved to the server yet" rather than "typed twice
+    // and lost twice".
+    C.keepProfile(p);
+
     var supa = C.supa();
     if (!supa || navigator.onLine === false) {
       m.className = 'cl-msg show warn';
-      m.textContent = 'No connection. Your details were not saved — try again when you have signal.';
+      m.textContent = 'No connection — kept on this phone. Tap Save again when you have signal.';
       return;
     }
     btn.disabled = true; btn.textContent = 'Saving…';
@@ -410,7 +474,12 @@
       m.className = 'cl-msg show good'; m.textContent = 'Saved.';
       load();
     } catch (err) {
-      m.className = 'cl-msg show bad'; m.textContent = C.saySorry(err, 'Could not save just now.');
+      // Named, not swallowed. "Could not save" over an empty form is the
+      // message that sent somebody looking at their own internet while the
+      // database had simply never been updated.
+      m.className = 'cl-msg show ' + (C.isNotSetUp(err) ? 'bad' : 'warn');
+      m.textContent = C.saySorry(err, 'Could not save just now.') +
+        (C.isNotSetUp(err) ? ' Your details are kept on this phone until then.' : '');
     } finally {
       btn.disabled = false;
       btn.innerHTML = '<span class="material-icons-outlined">save</span> Save my details';

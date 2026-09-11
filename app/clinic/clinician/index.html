@@ -309,6 +309,13 @@
     var supa = C.supa();
     if (!supa) { say('This device cannot reach the server yet. Check the connection.'); return; }
 
+    // Kept on the phone BEFORE anything is sent, and kept whatever happens
+    // next. Ten fields somebody carefully filled in must not vanish because a
+    // server was unreachable, or had never had its database update applied —
+    // which is exactly what happened: a clinician signed up, landed on his own
+    // screen, and found every box empty with nothing saying why.
+    C.keepProfile(profile);
+
     btn.disabled = true; btn.textContent = 'Creating your account…';
     try {
       var res = await supa.auth.signUp({
@@ -328,6 +335,14 @@
       }
 
       var saved = await supa.rpc('save_my_clinician_profile', { p: profile });
+      // A server with no clinician tables is not a reason to strand somebody on
+      // the sign-up screen: the account exists, the details are on the phone,
+      // and the home screen will show them and say what is missing. Stopping
+      // here would leave them with a working login and no way to reach it.
+      if (saved && saved.error && !C.isNotSetUp(saved.error)) {
+        say(C.saySorry(saved.error, 'The account was made but the details did not save. Sign in and finish your profile.'), 'warn');
+        return;
+      }
       if (saved && saved.data && saved.data.ok === false) {
         say(C.saySorry(saved.data.error, 'The account was made but the details did not save. Sign in and finish your profile.'), 'warn');
         return;

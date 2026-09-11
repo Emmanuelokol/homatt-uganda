@@ -234,7 +234,38 @@
   // Turn a thrown/returned Supabase problem into something a person can act on.
   // The library's own wording ("FunctionsFetchError", "JWT expired") tells a
   // clinician nothing and worries them.
+  /* Has the database update never been applied?
+   *
+   * PostgREST answers a call to a function that does not exist with PGRST202
+   * and the sentence "Could not find the function public.x in the schema
+   * cache". That is a true and completely useless thing to show a clinician:
+   * it reads like a fault in their phone, it names a thing they have never
+   * heard of, and it does not tell them who can fix it.
+   *
+   * It is also the single most likely state for a new install to be in — the
+   * app ships the moment the code is pushed, the migration only lands when
+   * somebody's token is still valid. So it is worth telling apart by name.
+   */
+  function isNotSetUp(err) {
+    if (!err) return false;
+    var code = String(err.code || '');
+    var status = Number(err.status || 0);
+    var msg = String(err.message || err.error_description || '');
+    if (code === 'PGRST202' || code === 'PGRST205') return true;
+    if (status === 404 && /function|relation|schema cache/i.test(msg)) return true;
+    return /schema cache|could not find the (function|table)|relation .* does not exist/i.test(msg);
+  }
+
+  var NOT_SET_UP =
+    'This Homatt server has not been set up for clinician accounts yet — the ' +
+    'database update has not been applied. Nothing you do here can fix that; ' +
+    'ask whoever runs the system to apply it.';
+
   function saySorry(err, fallback) {
+    // Checked BEFORE the network cases: a 404 for a missing function is not a
+    // bad connection, and telling somebody to wait for better signal would
+    // have them waiting for ever.
+    if (isNotSetUp(err)) return NOT_SET_UP;
     var msg = String((err && (err.message || err.error_description)) || err || '');
     if (!msg) return fallback || 'That did not work. Try again.';
     if (/failed to fetch|networkerror|network request failed|load failed|timeout|abort/i.test(msg)) {
@@ -265,6 +296,22 @@
     leaveClinic: leaveClinic,
     currentClinic: currentClinic,
     esc: esc, when: when, dayMonth: dayMonth, saySorry: saySorry,
+    isNotSetUp: isNotSetUp, NOT_SET_UP: NOT_SET_UP,
+    /* What the clinician typed when they signed up, kept on the phone.
+     *
+     * The server is the right home for it — but on a server that has not been
+     * set up, or a phone with no signal on the day, there IS no server, and ten
+     * fields somebody carefully filled in would otherwise vanish between the
+     * sign-up screen and the next one. They typed it; the least the app can do
+     * is still have it. */
+    LOCAL_PROFILE: 'clinician_profile_local',
+    keepProfile: function (p) {
+      try { localStorage.setItem('clinician_profile_local', JSON.stringify(p)); } catch (e) {}
+    },
+    keptProfile: function () {
+      try { return JSON.parse(localStorage.getItem('clinician_profile_local') || 'null'); }
+      catch (e) { return null; }
+    },
     AUTH_KEY: AUTH_KEY, SESSION_KEY: SESSION_KEY, CLINIC_KEY: CLINIC_KEY,
   };
 })(typeof window !== 'undefined' ? window : globalThis);
