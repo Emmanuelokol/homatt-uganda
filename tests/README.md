@@ -78,6 +78,37 @@ Copy the top of any file. The parts that matter:
 - **Never assert on a colour by name.** Measure the contrast ratio against the
   computed background, in all four skins and both themes. Three separate
   unreadable-text bugs got through eyes and were caught by a number.
+## A known flake, so nobody chases it as a regression
+
+`test-dictate.js` crashes roughly one run in four with:
+
+```
+CRASH page.evaluate: Execution context was destroyed, most likely because
+      of a navigation
+```
+
+always at the same place — the first `speak()`, which holds one `evaluate()`
+open for about 460 ms while it drives the dictate button. It stops the file at
+14 of 52 checks, which reads exactly like a real regression in dictation.
+
+It is not one, and that was measured rather than assumed:
+
+- the identical crash, at the identical step, happens on the code from **before**
+  the clinician-portal branch (checked out in a worktree at 1ac2510: 5 full runs,
+  1 crash, out of 6 — against 5 and 3 of 8 on the branch);
+- driving that exact click sequence on its own — stub the microphone, stub
+  MediaRecorder, click, wait, click — succeeded 8 times out of 8;
+- nothing navigates: a probe listening on `framenavigated` recorded only the
+  `goto` itself, and `pwa-install.js` deliberately does **not** reload on
+  `controllerchange`.
+
+So the app is not reloading itself under a clinician; the harness is losing the
+renderer. Re-run the file on its own before believing it.
+
+**Do not "fix" it by waiting for `load` instead of `domcontentloaded`.** That was
+tried: it made the crash go from intermittent to **every single run**, because
+waiting longer lands the evaluate squarely in the window where the context goes.
+
 - **Give it a port nobody else uses.** They run as separate processes in
   sequence, so a duplicate looks harmless — and then one of them starts finding
   an empty page and failing only inside the suite, never on its own.
