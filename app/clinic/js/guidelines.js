@@ -285,10 +285,14 @@
     // And the chapter itself, when that is what was typed. "Family planning"
     // is a chapter, not a condition; offering the way in to all of it is a
     // better answer than the first twelve of its sections.
+    // Only for the Uganda book: tapping one opens the contents page, and the
+    // contents page is built from that book. Offering it on the children's
+    // book would hand the clinician a chapter list of a different book.
     var chs = [];
     try {
-      chs = rows('SELECT number, title FROM chapters WHERE title LIKE ? ORDER BY number',
-                 ['%' + toks[0] + '%']).map(function (ch) {
+      chs = (book !== 'ucg' ? [] :
+        rows('SELECT number, title FROM chapters WHERE title LIKE ? ORDER BY number',
+             ['%' + toks[0] + '%'])).map(function (ch) {
         return { id: 'ch:' + ch.number, number: String(ch.number),
                  title: ch.title, chapter_title: 'whole chapter · tap to open',
                  chapter: true };
