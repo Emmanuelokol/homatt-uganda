@@ -279,8 +279,17 @@
             <input type="text" id="sClinicWhatsapp" class="form-input" placeholder="+256 7XX XXX XXX">
           </div>
           <div class="form-row" style="grid-column:span 2">
-            <label>Email Address</label>
+            <!-- Said plainly, because an owner changed this one and then could
+                 not sign in. It goes to the clinics table; the login lives in
+                 the authentication system and is changed further down. -->
+            <label>Clinic Contact Email
+              <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">
+                shown to patients — not your sign-in email</span>
+            </label>
             <input type="email" id="sClinicEmail" class="form-input" placeholder="clinic@example.com">
+            <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;line-height:1.5">
+              To change the address you <b>sign in</b> with, use <b>Sign-in email</b> lower down this page.
+            </div>
           </div>
           <div class="form-row" style="grid-column:span 2">
             <label>Contact Person / Manager</label>
@@ -714,6 +723,44 @@
         </button>
       </div>
 
+      <!-- ══ Sign-in email ══════════════════════════════════════════════
+           The EMAIL ADDRESS higher up this page is the CLINIC's — the one
+           patients are given. It is not the login, and changing it never was:
+           an owner changed it, tried to sign in with the new address and got
+           "Invalid login credentials", which is exactly what should happen and
+           tells them nothing about why.
+           The login lives in the authentication system, and this is the only
+           thing on this page that can move it. -->
+      <div class="settings-card" id="signinEmailCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">alternate_email</span> Sign-in email
+        </div>
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 14px;line-height:1.55">
+          The address you type to sign in. This is <strong>not</strong> the same as the
+          clinic's contact email higher up the page — that one is for patients and
+          changing it does not change how you sign in.
+        </p>
+        <div class="form-row">
+          <label>You sign in with</label>
+          <input type="email" class="form-input" id="seCurrent" readonly
+                 style="opacity:.75" value="—">
+        </div>
+        <div class="form-row">
+          <label>New sign-in email</label>
+          <input type="email" class="form-input" id="seNew" placeholder="you@example.com"
+                 autocomplete="username" autocapitalize="none" spellcheck="false">
+        </div>
+        <div style="font-size:12px;color:var(--text-lt, #5F6368);line-height:1.55;margin:-4px 0 12px">
+          We send a confirmation link to the new address. <strong>Your old email keeps
+          working until you open that link</strong> — so if the new address is wrong, or
+          you cannot reach it, nothing is lost and you are not locked out.
+        </div>
+        <div id="seMsg" style="font-size:13px;margin-bottom:12px;display:none;line-height:1.5"></div>
+        <button class="save-btn" id="seBtn" onclick="changeSigninEmail()" style="background:#0D47A1;color:#fff">
+          <span class="material-icons-outlined">mark_email_read</span> Change sign-in email
+        </button>
+      </div>
+
       <!-- Change Password -->
       <div class="settings-card">
         <div class="settings-card-title">
@@ -867,6 +914,10 @@ document.addEventListener('DOMContentLoaded', async function() {
   var _ccBtn = document.getElementById('ccMakeBtn');
   if (_ccBtn) _ccBtn.addEventListener('click', ccMakeCode);
   ccLoadList();
+
+  // Show which address actually signs this person in, so the difference
+  // between it and the clinic's contact email is visible rather than assumed.
+  paintSigninEmail();
 });
 
 /* ── Staff & Access ────────────────────────────────────────── */
@@ -2184,6 +2235,97 @@ async function saveSettings() {
   msg.style.color = '#33691E';
   msg.textContent = 'Saved ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
   showToast('Clinic profile updated!', 'success');
+}
+
+/* ── Changing the address you SIGN IN with ────────────────────────────────
+ *
+ * The "Clinic Contact Email" field higher up this page writes to the clinics
+ * table — it is the address patients are given. It is not the login, and never
+ * was: an owner changed it, tried to sign in with the new address, and got
+ * "Invalid login credentials". The app was behaving correctly and explaining
+ * nothing, which is the worst combination.
+ *
+ * The login lives in Supabase auth, and only auth.updateUser can move it.
+ *
+ * THE OLD ADDRESS KEEPS WORKING until the link in the new inbox is opened.
+ * That is Supabase's behaviour and it is the right one: a typo in the new
+ * address, or an inbox nobody can reach, would otherwise lock a clinic out of
+ * its own records for good. The screen says so before they press the button,
+ * because somebody who does not know it will wonder why nothing changed.
+ */
+async function currentSigninEmail() {
+  try {
+    var s = await _supa.auth.getSession();
+    return (s && s.data && s.data.session && s.data.session.user && s.data.session.user.email) || '';
+  } catch (e) { return ''; }
+}
+
+async function paintSigninEmail() {
+  var el = document.getElementById('seCurrent');
+  if (!el || !_supa) return;
+  var email = await currentSigninEmail();
+  el.value = email || '(not signed in on this device)';
+}
+
+async function changeSigninEmail() {
+  var msg = document.getElementById('seMsg');
+  var btn = document.getElementById('seBtn');
+  var next = (document.getElementById('seNew').value || '').trim().toLowerCase();
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--deep-ink)' : 'var(--danger-ink)';
+    msg.style.background = ok ? 'var(--brand-tint)' : 'var(--cl-danger-bg, #FFEBEE)';
+    msg.style.padding = '10px 14px';
+    msg.style.borderRadius = '8px';
+    msg.style.display = 'block';
+  }
+
+  if (!_supa) { showMsg('Not connected. Try reloading.', false); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) {
+    showMsg('Enter a valid email address.', false); return;
+  }
+  if (navigator.onLine === false) {
+    showMsg('Changing your sign-in email needs a connection — it has to send you a confirmation link.', false);
+    return;
+  }
+  var now = await currentSigninEmail();
+  if (now && now.toLowerCase() === next) {
+    showMsg('That is already your sign-in email.', false); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Sending…';
+  try {
+    var res = await _supa.auth.updateUser({ email: next });
+    if (res.error) {
+      var m = String(res.error.message || '');
+      if (/already|registered|exists/i.test(m)) {
+        showMsg('Another account already uses that email.', false);
+      } else if (/rate|too many/i.test(m)) {
+        showMsg('Too many attempts. Wait a few minutes and try again.', false);
+      } else {
+        showMsg(m || 'Could not change the sign-in email.', false);
+      }
+      return;
+    }
+    showMsg('Check ' + next + ' and open the link we just sent. Until you do, keep signing in with ' +
+            (now || 'your current email') + ' — it still works.', true);
+    showToast('Confirmation link sent to ' + next, 'success');
+    // portal_users carries a copy for the staff list; keep it in step so the
+    // app does not show two different addresses for one person. The login
+    // itself only moves when the link is opened.
+    try {
+      var sess = await _supa.auth.getSession();
+      var uid = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
+      if (uid) await _supa.from('portal_users').update({ email: next }).eq('auth_user_id', uid);
+    } catch (e) {}
+  } catch (e) {
+    showMsg('Unexpected error: ' + (e.message || e), false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">mark_email_read</span> Change sign-in email';
+  }
 }
 
 // ── Password change ──
