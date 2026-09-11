@@ -190,6 +190,41 @@ const result = (n, ok, x) => {
   result('and it says where the book prints it',
     buriedOpen.note === true && /Atrophic Rhinitis/i.test(buriedOpen.text || ''));
 
+  // ── 6. Sections the extraction could not split ──────────────────────
+  // 148 of the 551 carry no named field at all. Every one of them used to
+  // open as an empty card with a collapsed "view source" panel — a quarter of
+  // the book looking missing, and readable only as raw text. This is the
+  // section from the first photograph.
+  const asPrinted = await page.evaluate(async () => {
+    const s = document.getElementById('gSearch');
+    s.value = 'malaria prevention';
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 900));
+    const f = document.querySelector('#gResults .g-ac-item');
+    if (!f) return { opened: false };
+    f.click();
+    await new Promise(r => setTimeout(r, 900));
+    const c = document.getElementById('gCard');
+    const src = c.querySelector('#gSourcePanel');
+    const body = c.innerText.replace(src ? src.innerText : '', '');
+    return {
+      opened: true,
+      title: (c.querySelector('h2') || {}).textContent || '',
+      bullets: c.querySelectorAll('.g-outline li').length,
+      note: !!c.querySelector('.g-asprinted-note'),
+      tildes: (body.match(/(^|\s)~(\s|$)/g) || []).length,
+      body: body,
+    };
+  });
+  result('a section the extraction could not split still shows its content',
+    asPrinted.opened && asPrinted.bullets > 0,
+    asPrinted.title + ', bullets=' + asPrinted.bullets);
+  result('laid out, with no raw "~" left in it', asPrinted.tildes === 0, 'tildes=' + asPrinted.tildes);
+  result('and it says plainly that this is the book\'s own wording',
+    asPrinted.note === true);
+  result('the clinical content is actually there',
+    /bed nets|insecticide|stagnant water/i.test(asPrinted.body || ''));
+
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     !/ServiceWorker|service worker/i.test(e));
   result('nothing threw', real.length === 0, real.slice(0, 2).join(' | '));

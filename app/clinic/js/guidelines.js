@@ -304,10 +304,48 @@
     return /^[A-Z0-9 ()/&,.'’\-:%]+$/.test(s);
   }
 
+  /* Was this line WRAPPED, or did it end on purpose?
+   *
+   * This is the whole question, and the text carries the answer physically.
+   * The PDF set the book to a fixed column, so a line that ran to the margin
+   * was broken by the typesetter and continues below; a line that stopped
+   * short ended because the sentence or the item ended. Measured across the
+   * whole book: lines pile up to about 60 characters and fall off a shelf
+   * after that — only 3.2% exceed 72.
+   *
+   * The width is not the same everywhere (tables and two-column pages are
+   * narrower), so it is measured per block rather than assumed. The 85th
+   * percentile, not the maximum: one freak 127-character line in the
+   * malnutrition notes would otherwise raise the bar above every real line
+   * and nothing would join at all.
+   *
+   * This is what tells "…mild illness (uncomplicated malaria) or" + "severe
+   * illness (severe malaria)" — one sentence, wrapped — from the next line
+   * "Intermittent fever is the most characteristic symptom", which is a new
+   * one. Joining blindly welds those two together; never joining leaves the
+   * book unreadable. The margin knows.
+   */
+  function wrapWidth(lines) {
+    var lens = [];
+    for (var i = 0; i < lines.length; i++) {
+      var s = lines[i].replace(/\s+$/, '');
+      if (s.trim()) lens.push(s.length);
+    }
+    if (!lens.length) return 0;
+    lens.sort(function (a, b) { return a - b; });
+    var p85 = lens[Math.min(lens.length - 1, Math.floor(lens.length * 0.85))];
+    return p85;
+  }
+
   function outline(t) {
     var raw = String(t == null ? '' : t);
     if (!raw.trim()) return '';
     var lines = raw.split('\n');
+    var W = wrapWidth(lines);
+    // 12 characters of slack: the typesetter broke at a word boundary, so a
+    // wrapped line stops a little short of the margin.
+    var FULL = Math.max(24, W - 12);
+    var ranToMargin = function (s) { return s.replace(/\s+$/, '').length >= FULL; };
     var blocks = [];      // {kind:'h'|'li'|'p', text, ord:bool}
     var cur = null;
 
@@ -337,6 +375,7 @@
           ord: !!num,
           value: num ? num[1] : '',
           text: (letter ? lead + ' ' : '') + line.slice(m[0].length).trim(),
+          lastRaw: line,
         };
         continue;
       }
@@ -356,9 +395,23 @@
        * the book's line breaks are the only structure remaining and they are
        * kept exactly as they are.
        */
-      if (cur && cur.kind === 'li') { cur.text += ' ' + line.trim(); }
-      else if (cur && cur.kind === 'p') { cur.lines.push(line.trim()); }
-      else { cur = { kind: 'p', lines: [line.trim()] }; }
+      /* Join it to what is above only if that line ran to the margin. A short
+       * line ended on purpose — the sentence finished, or it is the next item
+       * in a list the book set without bullets — and welding those together is
+       * what made the malaria features read as one run-on wall. */
+      if (cur && cur.kind === 'li') {
+        if (ranToMargin(cur.lastRaw)) { cur.text += ' ' + line.trim(); }
+        else { close(); cur = { kind: 'p', lines: [line.trim()] }; }
+      } else if (cur && cur.kind === 'p') {
+        if (ranToMargin(cur.lastRaw)) {
+          cur.lines[cur.lines.length - 1] += ' ' + line.trim();
+        } else {
+          cur.lines.push(line.trim());
+        }
+      } else {
+        cur = { kind: 'p', lines: [line.trim()] };
+      }
+      if (cur) cur.lastRaw = line;
     }
     close();
 
@@ -454,7 +507,7 @@
       RR: 'RR — Regional Referral', NR: 'NR — National Referral',
     };
 
-    var html = '<div class="g-head">' +
+    var head = '<div class="g-head">' +
       '<div class="g-head-num">' + esc(c.number || '') + '</div>' +
       '<h2>' + esc(c.title) + '</h2>' +
       '<div class="g-chips">' +
@@ -476,6 +529,7 @@
         (c.page ? '<span class="g-chip">UCG 2023 p.' + esc(c.page) + '</span>' : '') +
         (_sevSel ? '<span class="g-chip sev">' + esc(_sevSel) + '</span>' : '') +
       '</div></div>';
+    var html = head;
 
     var sev = severityBlock(c.management || c.full_text);
     if (sev) {
@@ -524,6 +578,38 @@
     html += section('Complications', c.complications ? asText(c.complications) : '', { collapsible: true });
     html += section('Prevention', c.prevention ? asText(c.prevention) : '', { collapsible: true });
     html += section('Notes', c.notes ? asText(c.notes) : '', { collapsible: true });
+
+    /* ── When the automatic split found nothing ──────────────────────────
+     *
+     * 148 of the book's 551 sections carry no named field at all — no
+     * clinical features, no management, no steps — because the extraction
+     * could not find the headings it looks for. 95 of those DO have the
+     * book's text; some of it substantial (HIV-exposed infant care is nearly
+     * 11,000 characters).
+     *
+     * Until now every one of them opened as an empty card with a collapsed
+     * "view source" panel underneath: a quarter of the book looked missing
+     * and read as raw text when anybody went looking for it.
+     *
+     * So where nothing was parsed, the book's own text IS the section —
+     * laid out like everything else, and labelled honestly so nobody thinks
+     * it has been through the same tidying as a parsed card.
+     */
+    if (!/<section|<details/.test(html.slice(head.length))) {
+      if (c.full_text && c.full_text.trim()) {
+        html += '<div class="g-sec g-asprinted-note">' +
+          'The automatic split found no named parts in this section, so it is ' +
+          'shown here as the book sets it, in full.' +
+          '</div>' +
+          section('As printed in the guideline', asText(c.full_text));
+      } else {
+        html += '<div class="g-sec g-asprinted-note">' +
+          'This is a heading in the book with no text of its own — its content ' +
+          'is in the sections listed under it.' +
+          '</div>';
+      }
+    }
+
     html += sourcePanel(c.full_text, 'UCG 2023' + (c.page ? ', p.' + c.page : ''));
     return html;
   }

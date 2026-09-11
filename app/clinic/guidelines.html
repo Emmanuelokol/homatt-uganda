@@ -261,9 +261,23 @@
     /* Source panel */
     .g-source{border:1.5px solid var(--brand-tint)}
     .g-srcnote{font-size:11.5px;color:var(--text-lt);margin-bottom:9px}
-    .g-src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
-      line-height:1.55;color:var(--text);background:var(--bg);border-radius:10px;
-      padding:12px;max-height:60vh;overflow:auto;white-space:pre-wrap;word-break:break-word;margin:0}
+    .g-asprinted-note{
+      font-size:12px;line-height:1.6;color:var(--text-lt);
+      background:var(--brand-tint);color:var(--brand-ink);
+      border-radius:12px;padding:11px 14px
+    }
+    /* The raw panel keeps the book's own line breaks — that is its entire
+       job, since it is what the laid-out version above is checked against.
+       It stays monospace for the same reason: a proportional font hides where
+       the typesetter actually broke the line. But it was needlessly hard on
+       the eye on a phone, so it reads at the same size as the rest of the
+       page now, with the left rule marking it as a quotation rather than
+       text to treat from. */
+    .g-src{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;
+      line-height:1.7;color:var(--text-lt);background:var(--bg);border-radius:10px;
+      border-left:3px solid var(--border);
+      padding:12px 14px;max-height:60vh;overflow:auto;white-space:pre-wrap;
+      word-break:normal;overflow-wrap:anywhere;margin:0}
     @media (max-width:768px){ .admin-content{padding:70px 12px 20px} }
   </style>
 </head>

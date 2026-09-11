@@ -40,6 +40,7 @@ const sandbox = new Function(`
   var _sevSel = null;
   function markSeverity(t){ return esc(t); }
   ${lift('isHeading')}
+  ${lift('wrapWidth')}
   ${lift('outline')}
   return { outline: outline, isHeading: isHeading };
 `)();
@@ -108,8 +109,11 @@ print(json.dumps(out))
       bullets  += (html.match(/<li>/g) || []).length;
       headings += (html.match(/<h4/g) || []).length;
       // A line the PDF wrapped that is now part of the sentence above it.
+      // A source line that is no longer a line of its own: it was joined to
+      // the one above because that one ran to the margin.
       joined += Math.max(0, String(src).split('\n').filter(l => l.trim()).length -
-                            ((html.match(/<li>/g) || []).length +
+                            ((html.match(/<li/g) || []).length +
+                             (html.match(/<br>/g) || []).length +
                              (html.match(/<p /g) || []).length +
                              (html.match(/<h4/g) || []).length));
 
