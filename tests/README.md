@@ -47,6 +47,17 @@ quickly.
 | `test-look.js`, `test-tidy.js`, `test-compact.js`, `test-patient-record.js` | the four looks, dark mode, and that every word is readable |
 | `test-noreferral.js` | the words the app is not allowed to use on screen |
 | `test-version.js` | the service worker's cache list matching what the pages actually ask for |
+| `test-clinician.js` | a clinician signing up with no clinic, their own record, and joining one by code |
+| `test-clinic-clinicians.js` | the owner's side — the QR, who joined, who they treated, ending it, the reference |
+| `test-clinician-gating.js` | what a visiting clinician cannot reach, and that the money leaves the saved record as well as the screen |
+| `test-voice-optional.js` | all three microphones going away together, and every box they filled still being typeable |
+
+Two of these are not browser tests at all:
+
+| | |
+|---|---|
+| `run-sql.sh` | starts a real Postgres, applies the real migrations, and drives the RLS policies, the security-definer RPCs and the trigger. Nothing that mocks the network can reach any of those. |
+| `measure-qr.js` | compares the QR encoder against python-qrcode, every module of every symbol, 10 versions × 4 levels × 8 masks. |
 
 `measure-*.js` and `audit-*.js` are not tests — they print a measurement (how
 many of 30 dictations land in the right box, how many of the 750 essential
@@ -67,3 +78,11 @@ Copy the top of any file. The parts that matter:
 - **Never assert on a colour by name.** Measure the contrast ratio against the
   computed background, in all four skins and both themes. Three separate
   unreadable-text bugs got through eyes and were caught by a number.
+- **Give it a port nobody else uses.** They run as separate processes in
+  sequence, so a duplicate looks harmless — and then one of them starts finding
+  an empty page and failing only inside the suite, never on its own.
+  `grep -ho "PORT = [0-9]*" test-*.js | sort | uniq -d` should print nothing.
+- **Check it is looking at the page it thinks it is.** Three clinician screens
+  once reported a confident pass at exactly 36 elements each — the same 36,
+  because a shared session sent every one of them to the sign-up page. A count
+  that is suspiciously equal across different screens is the tell.

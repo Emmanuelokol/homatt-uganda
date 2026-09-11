@@ -190,6 +190,21 @@
 
     <div class="login-divider">or</div>
 
+    <!-- A clinician who moves between clinics has their own account, not one
+         of this clinic's logins. Without this line the only way to find that
+         portal is to be told the address, which nobody would be. -->
+    <a href="clinician/index.html" id="clinicianPortalLink"
+       style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:12px;padding:12px;
+              border:1.5px solid var(--lg-ghost-border);border-radius:10px;background:var(--lg-ghost-bg);
+              color:var(--lg-ghost-text);font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">badge</span>
+      I am a clinician — my own account
+    </a>
+    <div style="font-size:11px;color:var(--lg-text-sub);text-align:center;margin:-6px 0 14px;line-height:1.5">
+      For doctors, clinical officers and nurses who work at more than one clinic.
+      Your record goes with you.
+    </div>
+
     <button class="demo-btn" id="demoBtn">
       <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px">play_circle</span>
       Open Demo Dashboard
