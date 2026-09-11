@@ -52,7 +52,7 @@ jobs:
       - name: Apply all migrations via Supabase API
         run: |
           set +e
-          APPLIED=0; WARNED=0; FAILED_FILES=""
+          APPLIED=0; WARNED=0; FAILED_FILES=""; LAST_BODY=""
           for SQL_FILE in $(ls supabase/migrations/*.sql | sort); do
             echo "──────────────────────────────────────────"
             echo "Applying: $SQL_FILE"
@@ -69,6 +69,7 @@ jobs:
 
             HTTP_CODE=$(echo "$RESPONSE" | tail -1)
             BODY=$(echo "$RESPONSE" | head -c 400)
+            LAST_BODY="$BODY"
 
             if [ "$CURL_RC" != "0" ]; then
               echo "::warning::Could not reach Supabase for $SQL_FILE (curl exit $CURL_RC)"
@@ -88,6 +89,25 @@ jobs:
           # which migration did not go in, which is the only thing worth knowing.
           if [ -n "$FAILED_FILES" ]; then
             echo "::warning::Did not apply cleanly:$FAILED_FILES"
+          fi
+
+          # A run where NOTHING went in is not a run with some warnings, and it
+          # must never be green. Tolerating individual failures was the point of
+          # `set +e` above; tolerating total failure would just replace a red
+          # build that was honestly broken with a green one that is still broken
+          # — and the second is far harder to notice.
+          #
+          # 401 on every file means the token, not the SQL: SUPABASE_ACCESS_TOKEN
+          # is expired, revoked, or belongs to an account without access to this
+          # project. Supabase personal access tokens do expire.
+          if [ "$APPLIED" = "0" ] && [ "$WARNED" != "0" ]; then
+            echo "::error::NOTHING was applied — $WARNED of $WARNED migrations failed."
+            if echo "$LAST_BODY" | grep -qi unauthorized; then
+              echo "::error::Every call came back 401 Unauthorized, so this is the TOKEN, not the SQL."
+              echo "::error::Make a new one: Supabase dashboard → Account → Access Tokens,"
+              echo "::error::then replace SUPABASE_ACCESS_TOKEN at GitHub → Settings → Secrets → Actions."
+            fi
+            exit 1
           fi
           echo "✓ Migration run complete"
         env:
