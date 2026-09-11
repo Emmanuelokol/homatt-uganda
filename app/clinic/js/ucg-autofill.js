@@ -654,6 +654,48 @@
     } catch (e) {}
   }
 
+  /* Answers, for one numbered heading found inside `host`'s text: is this a
+   * different section of the book?
+   *
+   * Two ways it can be. It has a row of its own — then the heading's words
+   * must match that row's title, and ucg-sections checks that. Or it is one
+   * of the seven headings the import buried inside a neighbour with no row at
+   * all (Oesophageal Varices, Alcohol Use Disorders, Adenoid Disease…), which
+   * is decided here by exactly the test the guideline screen's contents page
+   * uses: a title nothing else in the book carries, in this chapter.
+   */
+  function _sectionAt(host) {
+    var seen = null;
+    var tt = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
+    var chapterOf = function (h) {
+      return String(h.chapter_number || String(h.number || '').split('.')[0]);
+    };
+    return function (num, headingText) {
+      var t = String(headingText || '').trim();
+      var row = rows('SELECT id,title FROM conditions WHERE number=? LIMIT 1', [num])[0];
+      /* THE NUMBER ALONE IS NOT ENOUGH, and assuming it was is what hid two
+       * of these. The extraction mis-numbered part of the book: the row
+       * numbered "6.5.4.2" carries the title "Spontaneous Bacterial
+       * Peritonitis" while the heading actually printed at 6.5.4.2 reads
+       * "Oesophageal Varices". Taking the row on its number alone found a
+       * title that did not match the words on the page, rejected it, and
+       * never asked the second question. */
+      if (row && tt(t).indexOf(tt(row.title).slice(0, 12)) === 0) return row;
+      // Not a section with a row. Is it one of the seven headings the import
+      // buried inside a neighbour, with no row at all? Same test the guideline
+      // screen's contents page uses, so the two can never disagree.
+      if (t.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(t)) return null;
+      if (String(num).split('.')[0] !== chapterOf(host)) return null;
+      if (seen === null) {
+        seen = {};
+        rows('SELECT title FROM conditions', []).forEach(function (r) { seen[tt(r.title)] = 1; });
+      }
+      var k = tt(t);
+      if (!k || seen[k]) return null;
+      return { title: t, buried: true };
+    };
+  }
+
   function buildFromGuideline(condId, sev) {
     var c = rows('SELECT id,number,title,page,causes,clinical_features,differential,investigations,' +
       'management,complications,prevention,notes,full_text FROM conditions WHERE id=? LIMIT 1', [condId])[0];
@@ -692,9 +734,7 @@
     var elsewhere = [];
     try {
       if (window.HomattUcgSections) {
-        meds = window.HomattUcgSections.attribute(c, meds, function (num) {
-          return rows('SELECT id,title FROM conditions WHERE number=? LIMIT 1', [num])[0] || null;
-        });
+        meds = window.HomattUcgSections.attribute(c, meds, _sectionAt(c));
         elsewhere = meds.filter(function (m) { return m.printedUnder; });
         meds = meds.filter(function (m) { return !m.printedUnder; });
       }

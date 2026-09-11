@@ -627,6 +627,18 @@
   }
 
   // ── Render: Uganda Clinical Guidelines ──────────────────────────────────
+  // Every title the book gives a section of its own, keyed for comparison.
+  // Built once — it is asked per heading, per card.
+  var _titles = null;
+  function knownTitles() {
+    if (_titles) return _titles;
+    _titles = {};
+    rows('SELECT title FROM conditions', []).forEach(function (r) {
+      _titles[String(r.title || '').toLowerCase().replace(/[^a-z]/g, '')] = 1;
+    });
+    return _titles;
+  }
+
   // The sections the book prints under a heading. The numbering is the book's
   // own — 19.2.1 and 19.2.2 sit under 19.2 — so nothing is guessed. Direct
   // children only: tapping one that is itself a heading shows ITS children,
@@ -671,8 +683,25 @@
      * (tests/measure-doses.js) */
     try {
       if (window.HomattUcgSections) {
-        meds = window.HomattUcgSections.attribute(c, meds, function (num) {
-          return one('SELECT id, title FROM conditions WHERE number = ? LIMIT 1', [num]);
+        meds = window.HomattUcgSections.attribute(c, meds, function (num, headingText) {
+          var t = String(headingText || '').trim();
+          var tt = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
+          var row = one('SELECT id, title FROM conditions WHERE number = ? LIMIT 1', [num]);
+          // The number alone is not enough: the extraction mis-numbered part of
+          // the book, so the row numbered 6.5.4.2 is titled "Spontaneous
+          // Bacterial Peritonitis" while the heading printed there reads
+          // "Oesophageal Varices". A row whose title is not the words on the
+          // page is not this heading — ask the second question instead.
+          if (row && tt(t).indexOf(tt(row.title).slice(0, 12)) === 0) return row;
+          // One of the seven headings the import buried inside a neighbour,
+          // which have no row at all — and which this screen already lists on
+          // its contents page. Same test as findBuried(), so the two can
+          // never disagree about what is a section.
+          if (t.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(t)) return null;
+          if (String(num).split('.')[0] !== String(c.chapter_number)) return null;
+          var k = tt(t);
+          if (!k || knownTitles()[k]) return null;
+          return { title: t, buried: true };
         });
       }
     } catch (e) {}

@@ -17,7 +17,9 @@
 //      (If this fails the row was assembled, not extracted.)
 //   2. The condition's full_text does not run past its own section into a
 //      NUMBERED HEADING that belongs to a different section — and, where it
-//      does, no medicine is taken from beyond that heading.
+//      does, no medicine is taken from beyond that heading. Both kinds of
+//      heading count: one with a row of its own, and one the import buried
+//      with no row at all.
 //   3. The parsed dose, unit and route are readable in the line they came
 //      from, so the table is not reporting a figure the book did not print
 //      beside that drug.
@@ -48,12 +50,21 @@ print(json.dumps([list(r) for r in c.execute(${JSON.stringify(sql)})]))
 const tight = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
 const flat = s => String(s || '').replace(/\s+/g, ' ').trim();
 
-/* A numbered heading in the middle of a section's text. This is the same shape
- * the app's findBuried() looks for, and it has to be strict: "Benzathine
- * penicillin 2.4 MU IM" wrapping onto a new line looks exactly like a heading
- * numbered 2.4, and reading it as one would condemn the whole of the genital
- * ulcer disease page. So a heading only counts when its TEXT is the title of a
- * section the book really has. */
+/* A numbered heading in the middle of a section's text, of either kind: a
+ * section that has a row of its own, or one of the seven the import buried
+ * inside a neighbour with no row at all (Oesophageal Varices, Alcohol Use
+ * Disorders, Adenoid Disease…) — which the app already lists as real sections.
+ *
+ * It has to be strict. "Benzathine penicillin 2.4 MU IM" wrapping onto a new
+ * line looks exactly like a heading numbered 2.4, and reading it as one
+ * condemns the whole of the genital ulcer disease page.
+ *
+ * And the NUMBER ALONE IS NOT ENOUGH, which is what hid two of these. The
+ * extraction mis-numbered part of the book: the row numbered 6.5.4.2 carries
+ * the title "Spontaneous Bacterial Peritonitis" while the heading actually
+ * printed at 6.5.4.2 reads "Oesophageal Varices". Looking the number up,
+ * finding a title that did not match the words on the page and stopping there
+ * missed a boundary that was plainly in the text. */
 const HEAD = /(?:^|\n)[ \t]*(\d{1,2}(?:\.\d{1,2}){1,3})[ \t]+([A-Z][^\n]{2,80})/g;
 
 (function main() {
@@ -64,10 +75,11 @@ const HEAD = /(?:^|\n)[ \t]*(\d{1,2}(?:\.\d{1,2}){1,3})[ \t]+([A-Z][^\n]{2,80})/
   } catch (e) { console.log('SKIP  could not read the guideline database — ' + e.message); return; }
 
   const C = {};
-  const byNum = {};
+  const byNum = {}, titles = {};
   for (const [id, number, title, ch, page, ft] of conds) {
     C[id] = { id, number, title, ch, page, ft: ft || '' };
     byNum[number] = id;
+    titles[tight(title)] = 1;
   }
 
   // ── Where each section stops being itself ──────────────────────────────
@@ -79,11 +91,24 @@ const HEAD = /(?:^|\n)[ \t]*(\d{1,2}(?:\.\d{1,2}){1,3})[ \t]+([A-Z][^\n]{2,80})/
     while ((m = HEAD.exec(v.ft)) !== null) {
       const num = m[1];
       if (num === v.number) continue;
-      const other = byNum[num];
-      if (other === undefined || String(other) === String(id)) continue;
       const t = m[2].replace(/\s*ICD[- ]?10.*$/i, '').replace(/\s*CODE:.*$/i, '').trim();
-      if (!tight(t).startsWith(tight(C[other].title).slice(0, 12))) continue;
-      (boundary[id] = boundary[id] || []).push({ at: m.index, number: num, title: C[other].title, id: other });
+      const other = byNum[num];
+      // A section that has a row of its own — but the NUMBER alone is not
+      // enough. The extraction mis-numbered part of the book, so the row
+      // numbered 6.5.4.2 is titled "Spontaneous Bacterial Peritonitis" while
+      // the heading printed there says "Oesophageal Varices".
+      if (other !== undefined && String(other) !== String(id) &&
+          tight(t).startsWith(tight(C[other].title).slice(0, 12))) {
+        (boundary[id] = boundary[id] || []).push({ at: m.index, number: num, title: C[other].title, id: other });
+        continue;
+      }
+      // Or one of the seven headings the import buried with no row at all,
+      // which the app already lists as real sections. Same test as
+      // findBuried() in guidelines.js.
+      if (t.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(t)) continue;
+      if (String(num).split('.')[0] !== String(v.ch)) continue;
+      if (!tight(t) || titles[tight(t)]) continue;
+      (boundary[id] = boundary[id] || []).push({ at: m.index, number: num, title: t, id: null, buried: true });
     }
     if (boundary[id]) boundary[id].sort((a, b) => a.at - b.at);
   }
@@ -104,7 +129,8 @@ const HEAD = /(?:^|\n)[ \t]*(\d{1,2}(?:\.\d{1,2}){1,3})[ \t]+([A-Z][^\n]{2,80})/
       const rawAt = v.ft.indexOf(src);
       const owner = rawAt >= 0 ? b.filter(x => x.at <= rawAt).pop() : null;
       if (owner) {
-        stray.push({ mid, host: v.title, real: owner.title, realId: owner.id,
+        stray.push({ mid, host: v.title, real: owner.title + (owner.buried ? ' (no section of its own)' : ''),
+                     realId: owner.id,
                      name, dose: [dose, unit].filter(Boolean).join(''), line });
         continue;         // its dose belongs to another section; don't judge it here
       }

@@ -58,13 +58,27 @@
 
   /* Every point in `cond.full_text` where the text stops being this section.
    *
-   *   cond      {number, title, full_text}
-   *   lookup    function(number) -> {id, title} | null   — the book's own
-   *             numbering, supplied by the caller so this file needs no
-   *             database of its own.
+   *   cond      {id, number, title, full_text}
+   *   lookup    function(number, headingText) -> one of
+   *               {id, title}            a section that has its own row. The
+   *                                      heading's words are checked against
+   *                                      that title here.
+   *               {title, buried:true}   a real heading of the book with NO
+   *                                      row — the caller has already decided
+   *                                      (same test as findBuried()), and it
+   *                                      is trusted.
+   *               null                   not a heading.
+   *             Supplied by the caller so this file needs no database.
    *
-   * Returns [{at, number, title, id}], in order. Empty for 550 of the 551
+   * Returns [{at, number, title, id}], in order. Empty for 548 of the 551
    * sections, which is the point: this costs nothing almost everywhere.
+   *
+   * Both kinds carry medicines. Oesophageal Varices has no row of its own and
+   * its propranolol was filed under Hepatic Encephalopathy; Alcohol Use
+   * Disorders likewise, and its thiamine went to Postnatal Psychosis. Exactly
+   * two rows book-wide, and no false positives — the app already lists these
+   * seven buried headings as real sections on its contents page, so treating
+   * them as boundaries here is the same decision made twice, not a new guess.
    */
   function boundaries(cond, lookup) {
     var text = String((cond && cond.full_text) || '');
@@ -76,16 +90,20 @@
     while ((m = HEAD.exec(text)) !== null) {
       var num = m[1];
       if (num === own) continue;
-      var other = null;
-      try { other = lookup(num); } catch (e) { other = null; }
-      if (!other || !other.title) continue;
-      if (cond.id != null && String(other.id) === String(cond.id)) continue;
-      // The heading's words must BE that section's title, not merely sit
-      // beside its number. This is the half that keeps a wrapped dose from
-      // reading as a heading.
       var t = m[2].replace(/\s*ICD[- ]?10.*$/i, '').replace(/\s*CODE:.*$/i, '').trim();
-      if (tight(t).indexOf(tight(other.title).slice(0, 12)) !== 0) continue;
-      out.push({ at: m.index, number: num, title: other.title, id: other.id });
+      var other = null;
+      try { other = lookup(num, t); } catch (e) { other = null; }
+      if (!other || !other.title) continue;
+      if (cond.id != null && other.id != null && String(other.id) === String(cond.id)) continue;
+      // For a section that HAS a row, the heading's words must BE that
+      // section's title, not merely sit beside its number. This is the half
+      // that keeps a wrapped dose from reading as a heading: "Benzathine
+      // penicillin 2.4 MU IM single dose" breaking across a line is
+      // indistinguishable from a heading numbered 2.4, and without this it
+      // condemned the whole genital ulcer disease page.
+      if (!other.buried && tight(t).indexOf(tight(other.title).slice(0, 12)) !== 0) continue;
+      out.push({ at: m.index, number: num, title: other.title,
+                 id: other.id == null ? null : other.id, buried: !!other.buried });
     }
     out.sort(function (a, b) { return a.at - b.at; });
     return out;

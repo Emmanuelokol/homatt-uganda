@@ -1234,6 +1234,16 @@ Recovered: family · family planning · immunisation · oncology · radiology ·
 bed nets · mosquito · rehydration · referral · weight band · chest indrawing ·
 coartem · artemether · ceftriaxone · metformin · 19.2 · 15.2
 
+**It is fast enough to type into.** Timed in the real WASM against the real
+book: 1.8 ms for a single letter, 8.2 ms for "family", 8.7 ms for "chest
+indrawing". A clinic phone several times slower than the machine that measured
+it still lands inside the 120 ms the box already waits before searching. Two
+things keep it there, and both matter: the WHERE filters before the score is
+computed, so 551 rows are scanned once and a dozen are scored; and nothing is
+`lower()`ed, because SQLite's LIKE is already case-insensitive for ASCII and
+lowering a 21,000-character `full_text` per row per token is the one change
+that would make this slow enough to feel.
+
 Four things the measurement made visible that reading never would:
 
 - **A section NUMBER must not be tokenised.** "19.2" became the tokens "19"
@@ -1283,30 +1293,47 @@ the bill. So "is this drug printed under this heading?" is the question.
 | over all 1,008 medicine rows | |
 |---|---|
 | source line verbatim in its own section | 1008 of 1008 |
-| dose readable in that line | 982 of 982 |
+| dose readable in that line | 980 of 980 |
 | route readable in that line | all |
-| **printed under a different heading** | **26** |
+| **printed under a different heading** | **28** |
 
 **The first three rows are why this was invisible.** Every row is a real line
 of the real book, and every row is inside the `full_text` of the condition it
 is filed under — because that condition's text ran past its own end and
-swallowed six more sections. One section in 551 does it: **9.2.4.1 Postnatal
-Psychosis**, 21,058 characters where its neighbours are two or three thousand,
-absorbing Anxiety, Depression, Postnatal Depression, Suicidal Behaviour,
-Bipolar Disorder and Psychosis.
+swallowed the sections after it. Three rows of 551 do it:
+
+| the row | swallowed | rows |
+|---|---|---|
+| **9.2.4.1 Postnatal Psychosis** (21,058 chars where its neighbours are two or three thousand) | Anxiety, Depression, Postnatal Depression, Suicidal Behaviour, Bipolar Disorder, Psychosis | 26 |
+| **9.1.1.1 Postnatal Psychosis** — a *second* row with the same title | Alcohol Use Disorders | 1 |
+| **6.5.4.3 Hepatic Encephalopathy** | Oesophageal Varices | 1 |
 
 On screen that meant a woman who had just given birth, and is breastfeeding,
 was offered a package built from **lithium, carbamazepine, clozapine,
 alprazolam, fluoxetine and bupropion** — four sections' drugs, none of them
 hers, each with a dose and a tick.
 
-**How a boundary is found, and the half that matters.** A numbered heading
-part-way down the text whose number **and** title both belong to a section the
-book really has. Both halves are required. "Benzathine penicillin **2.4** MU
-IM single dose" wrapping onto a new line is indistinguishable from a heading
-numbered 2.4, and the looser rule condemned the whole genital ulcer disease
-page and took congenital syphilis with it. It fails by finding too **few**
-boundaries, which is the state we were already in.
+**How a boundary is found, and the two things that were nearly wrong.** A
+numbered heading part-way down the text that is a section of the book — either
+one with a row of its own, or one of the seven the import buried with no row
+(Oesophageal Varices, Alcohol Use Disorders, Adenoid Disease…), decided by the
+same test the contents page uses, so the two can never disagree about what a
+section is.
+
+- **The title must match the words on the page.** "Benzathine penicillin
+  **2.4** MU IM single dose" wrapping onto a new line is indistinguishable
+  from a heading numbered 2.4, and without the title check it condemned the
+  whole genital ulcer disease page and took congenital syphilis with it.
+- **…but the number alone is not enough either**, and that hid two of these.
+  The extraction mis-numbered part of the book: the row numbered `6.5.4.2` is
+  titled "Spontaneous Bacterial Peritonitis" while the heading printed at
+  6.5.4.2 reads "Oesophageal Varices". Looking the number up, finding a title
+  that did not match, and stopping there missed a boundary that was plainly in
+  the text. A mismatch has to fall through to the second question, not to
+  `null`.
+
+It fails by finding too **few** boundaries, which is the state we were already
+in.
 
 Nothing is deleted. The package takes them out of what it offers and names
 them, with the section they belong to, at the top of the guideline notes — a

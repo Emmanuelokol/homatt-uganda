@@ -9,7 +9,7 @@
 //
 //   source line verbatim in its own section : 1008 of 1008
 //   dose readable in that line              :  982 of 982
-//   MEDICINES PRINTED UNDER ANOTHER HEADING :   26
+//   MEDICINES PRINTED UNDER ANOTHER HEADING :   28
 //
 // The first two lines are why this was invisible. Every row IS a real line of
 // the book and IS inside the full_text it is filed under — because one section
@@ -21,6 +21,10 @@
 // The consequence: a woman who had just given birth, and is breastfeeding, was
 // offered a package built from lithium, carbamazepine, clozapine, alprazolam,
 // fluoxetine and bupropion.
+//
+// Two more sit under a heading the import buried with NO row of its own:
+// Oesophageal Varices' propranolol, filed under Hepatic Encephalopathy, and
+// Alcohol Use Disorders' thiamine. 28 rows in all, across two sections.
 //
 // This drives the real guideline screen against the real 4 MB book, and tests
 // the boundary finder directly on the cases where it must NOT fire — which is
@@ -167,25 +171,61 @@ const result = (n, ok, x) => {
       try { st.bind(p || []); while (st.step()) out.push(st.getAsObject()); } finally { st.free(); }
       return out;
     };
-    const conds = all('SELECT id, number, title, full_text FROM conditions');
-    const byNum = {};
-    conds.forEach(c => { byNum[c.number] = { id: c.id, title: c.title }; });
-    const lookup = n => byNum[n] || null;
+    const conds = all('SELECT id, number, title, chapter_number, full_text FROM conditions');
+    const byNum = {}, titles = {};
+    conds.forEach(c => {
+      byNum[c.number] = { id: c.id, title: c.title };
+      titles[String(c.title || '').toLowerCase().replace(/[^a-z]/g, '')] = 1;
+    });
+    // The same two-kinds lookup the screens use: a section with a row, or one
+    // of the seven headings the import buried inside a neighbour.
+    const tt = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+    const lookupFor = host => (n, t) => {
+      const s = String(t || '').trim();
+      // The number alone is not enough — the extraction mis-numbered part of
+      // the book, so a row can carry a number whose heading says something
+      // else entirely.
+      if (byNum[n] && tt(s).indexOf(tt(byNum[n].title).slice(0, 12)) === 0) return byNum[n];
+      if (s.length < 4 || /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i.test(s)) return null;
+      if (String(n).split('.')[0] !== String(host.chapter_number)) return null;
+      const k = s.toLowerCase().replace(/[^a-z]/g, '');
+      if (!k || titles[k]) return null;
+      return { title: s, buried: true };
+    };
     let sections = 0, marked = 0, names = [];
     for (const c of conds) {
       const meds = all('SELECT name, source_line FROM medicines WHERE condition_id = ?', [c.id]);
       if (!meds.length) continue;
-      const done = window.HomattUcgSections.attribute(c, meds, lookup);
+      const done = window.HomattUcgSections.attribute(c, meds, lookupFor(c));
       const n = done.filter(m => m.printedUnder).length;
       if (n) { sections++; marked += n; names.push(c.title + ' (' + n + ')'); }
     }
     db.close();
     return { total: conds.length, sections, marked, names };
   });
-  result('across all 551 sections, exactly one is affected',
-    sweep.sections === 1, sweep.sections + ': ' + sweep.names.join(', '));
-  result('and exactly 26 medicines are marked, book-wide',
-    sweep.marked === 26, String(sweep.marked));
+  /* Three section ROWS, 28 medicines. Worth reading slowly, because the shape
+   * of the damage is the evidence that the rule is finding real boundaries
+   * and not inventing them:
+   *
+   *   Postnatal Psychosis  (26)  the row numbered 9.2.4.1, which swallowed
+   *                              Anxiety, Depression, Postnatal Depression,
+   *                              Suicidal Behaviour, Bipolar and Psychosis —
+   *                              all six have rows of their own.
+   *   Postnatal Psychosis   (1)  a SECOND row with the same title, numbered
+   *                              9.1.1.1, which swallowed Alcohol Use
+   *                              Disorders. Its thiamine.
+   *   Hepatic Encephalopathy (1) Oesophageal Varices' propranolol. That
+   *                              heading has no row at all.
+   *
+   * The duplicate title is not a mistake in this test. The extraction really
+   * did produce two "Postnatal Psychosis" rows, and both ran on. */
+  result('across all 551 sections, exactly three are affected',
+    sweep.sections === 3, sweep.sections + ': ' + sweep.names.join(', '));
+  result('and exactly 28 medicines are marked, book-wide',
+    sweep.marked === 28, String(sweep.marked));
+  result('including the two under a heading that has no section of its own',
+    /Hepatic Encephalopathy[^,]*\(1\)/.test(sweep.names.join(', ')) &&
+    /Postnatal Psychosis \(1\)/.test(sweep.names.join(', ')), sweep.names.join(', '));
 
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     !/ServiceWorker|service worker/i.test(e));
