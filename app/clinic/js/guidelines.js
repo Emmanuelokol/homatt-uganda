@@ -139,52 +139,189 @@
       .split(/\s+/).filter(Boolean);
   }
 
+  /* ── Searching a book whose index this engine cannot read ────────────────
+   *
+   * Every index in every book here is `CREATE VIRTUAL TABLE … USING fts5`,
+   * and the SQLite compiled into the WASM we ship has FTS3 and FTS4 but NOT
+   * FTS5 (`grep fts5 js/vendor/sql-wasm.wasm` — nothing). So `MATCH` has
+   * always thrown "no such module: fts5", the catch has always swallowed it,
+   * and every search in this app has quietly been `title LIKE '%term%'`.
+   *
+   * That is a far bigger fault than it sounds. It means a section could only
+   * ever be found if the typed word was in its own heading — nothing in the
+   * body of the book was reachable, and neither was the chapter it sits in.
+   * Typing "Family" returned "Nothing in this book matches" while chapter 15
+   * IS "FAMILY PLANNING (FP)", because not one of its twenty-two sections is
+   * titled "family". The book was not missing it; the search could not see it.
+   *
+   * The fix is not a bigger binary. This is 551 rows that are already in
+   * memory — scoring them in one pass needs no module at all, is a few
+   * milliseconds, and can weigh a heading against a chapter against a passing
+   * mention, which `rank` cannot. So there is now ONE search path, used by
+   * every book, and it is the one the tests measure.
+   */
+
+  // The columns that hold the words of the book, per book. full_text alone is
+  // not enough: 148 of the named field values are not inside it (the parser
+  // rewrote whitespace, and inherited text carries a note), so a word can be
+  // in Management and nowhere else.
+  var BODY_COLS = {
+    ucg: ['causes', 'clinical_features', 'differential', 'investigations',
+          'management', 'prevention', 'complications', 'notes', 'full_text'],
+    who: ['definition', 'causes', 'history', 'examination', 'clinical_features',
+          'differential', 'investigations', 'diagnosis', 'management', 'treatment',
+          'referral', 'follow_up', 'prevention', 'counselling', 'complications',
+          'monitoring', 'red_flags', 'cautions', 'notes', 'full_text', 'tables_text'],
+  };
+
+  /* What a match is worth.
+   *   heading      — the clinician typed the name of the thing. Nothing beats it.
+   *   chapter      — they typed the topic ("family planning", "immunisation").
+   *                  This is the one that was missing entirely.
+   *   number       — "19.2" should go straight there.
+   *   body         — a mention. Worth having, never worth beating a heading. */
+  var W_TITLE = 120, W_TITLE_START = 70, W_WORD = 60, W_CHAPTER = 45,
+      W_NUMBER = 90, W_BODY = 8;
+
+  /* Words a clinician says that the book does not use.
+   *
+   * This changes what can be FOUND and nothing else — no alias is ever shown
+   * as the book's wording, and the card that opens is the book's own section,
+   * unaltered. It is only consulted when the book's own words return nothing,
+   * and the screen says plainly that it substituted a word.
+   *
+   * Brand names are in here because that is what is written on the box in a
+   * Ugandan pharmacy; the guideline only ever prints the generic. */
+  var SAY_ALSO = [
+    ['coartem', 'lumefantrine'], ['panadol', 'paracetamol'],
+    ['septrin', 'cotrimoxazole'], ['septrine', 'cotrimoxazole'],
+    ['flagyl', 'metronidazole'], ['amoxil', 'amoxicillin'],
+    ['piriton', 'chlorphenamine'], ['brufen', 'ibuprofen'],
+    ['bp', 'blood pressure'], ['sugars', 'diabetes'], ['sugar disease', 'diabetes'],
+    ['tb', 'tuberculosis'], ['fp', 'contracept'], ['anc', 'antenatal'],
+    ['jiggers', 'tungiasis'], ['ringworm', 'tinea'], ['piles', 'haemorrhoid'],
+    ['sickle cells', 'sickle cell'], ['high blood', 'hypertension'],
+  ];
+  function alsoTry(term) {
+    var t = String(term).toLowerCase().trim();
+    for (var i = 0; i < SAY_ALSO.length; i++) {
+      if (SAY_ALSO[i][0] === t) return SAY_ALSO[i][1];
+    }
+    return '';
+  }
+  var _alias = '';   // what was substituted for the last search, if anything
+
+  // SQLite's LIKE is case-insensitive for ASCII, so nothing is lowered here —
+  // lower()ing a 21,000-character full_text once per row per token is the one
+  // thing that would make this slow enough to feel.
+  function scanConditions(toks) {
+    var cols = BODY_COLS[book] || BODY_COLS.ucg;
+    var bodyOr = cols.map(function (c) { return "ifnull(" + c + ",'') LIKE ?"; }).join(' OR ');
+    var score = [], where = [], sp = [], wp = [];
+    toks.forEach(function (t) {
+      var any = '%' + t + '%', start = t + '%';
+      score.push(
+        '(CASE WHEN title LIKE ? THEN ' + W_TITLE + ' ELSE 0 END)' +
+        '+(CASE WHEN title LIKE ? THEN ' + W_TITLE_START + ' ELSE 0 END)' +
+        // At the start of a WORD in the heading, not buried inside one. Without
+        // this, "ORS" put "Refractive Err-ors" above oral rehydration salts,
+        // and every short name a clinician types has the same problem.
+        '+(CASE WHEN title LIKE ? OR title LIKE ? THEN ' + W_WORD + ' ELSE 0 END)' +
+        "+(CASE WHEN ifnull(chapter_title,'') LIKE ? THEN " + W_CHAPTER + ' ELSE 0 END)' +
+        "+(CASE WHEN ifnull(number,'') LIKE ? THEN " + W_NUMBER + ' ELSE 0 END)' +
+        '+(CASE WHEN ' + bodyOr + ' THEN ' + W_BODY + ' ELSE 0 END)');
+      sp.push(any, start, '% ' + t + '%', '%(' + t + '%', any, start);
+      cols.forEach(function () { sp.push(any); });
+      // Every word has to appear SOMEWHERE — "malaria child" must not return
+      // every section that mentions a child.
+      where.push("(title LIKE ? OR ifnull(chapter_title,'') LIKE ? OR " +
+                 "ifnull(number,'') LIKE ? OR " + bodyOr + ')');
+      wp.push(any, any, start);
+      cols.forEach(function () { wp.push(any); });
+    });
+    try {
+      return rows(
+        'SELECT id, number, title, chapter_title, page, ' + score.join('+') + ' AS _s ' +
+        'FROM conditions WHERE ' + where.join(' AND ') +
+        ' ORDER BY _s DESC, length(title) ASC LIMIT 12', sp.concat(wp));
+    } catch (e) { return []; }
+  }
+
   function searchConditions(term) {
+    _alias = '';
     var toks = ftsTokens(term);
     if (!toks.length) return [];
-    var q = toks.map(function (t) { return '"' + t + '"*'; }).join(' AND ');
-    var out = [];
-    try {
-      out = rows(
-        'SELECT c.id, c.number, c.title, c.chapter_title, c.page ' +
-        'FROM conditions_fts f JOIN conditions c ON c.id = f.rowid ' +
-        'WHERE conditions_fts MATCH ? ORDER BY rank LIMIT 12', [q]);
-    } catch (e) { out = []; }
-    // A section the import buried inside its neighbour has no row and no FTS
-    // entry, so it can only be found by looking at the list we built.
-    var hidden = findBuried().filter(function (b) {
-      return b.title.toLowerCase().indexOf(String(term).toLowerCase()) >= 0;
+
+    // The book's own addressing. "19.2" must open 19.2 Malnutrition — it used
+    // to be split into the tokens "19" and "2", and "19" matched the title
+    // "COVID-19 Disease" as a heading word, which outranked everything.
+    var raw = String(term).trim();
+    if (/^\d{1,2}(?:\.\d{1,3})*\.?$/.test(raw)) {
+      var byNum = rows('SELECT id, number, title, chapter_title, page FROM conditions ' +
+                       'WHERE number = ? OR number LIKE ? ORDER BY length(number), id LIMIT 12',
+                       [raw.replace(/\.$/, ''), raw.replace(/\.$/, '') + '.%']);
+      if (byNum.length) return byNum;
+    }
+
+    var out = scanConditions(toks);
+    // A word the book does not use. Only ever consulted when the book's own
+    // words found nothing, and the screen says what was substituted.
+    if (!out.length) {
+      var also = alsoTry(raw);
+      if (also) {
+        var second = scanConditions(ftsTokens(also));
+        if (second.length) { _alias = also; out = second; }
+      }
+    }
+    // A section the import buried inside its neighbour has no row of its own,
+    // so it can only be found by looking at the list we built.
+    var lower = String(term).toLowerCase();
+    var hidden = (book === 'ucg' ? findBuried() : []).filter(function (b) {
+      return b.title.toLowerCase().indexOf(lower) >= 0;
     }).map(function (b) {
       return { id: b.key, number: b.number, title: b.title,
                chapter_title: 'in ' + b.hostTitle, page: b.page };
     });
-    if (out.length || hidden.length) return hidden.concat(out).slice(0, 12);
-    return rows(
-      'SELECT id, number, title, chapter_title, page FROM conditions ' +
-      'WHERE title LIKE ? ORDER BY length(title) LIMIT 12', ['%' + term + '%']);
+    // And the chapter itself, when that is what was typed. "Family planning"
+    // is a chapter, not a condition; offering the way in to all of it is a
+    // better answer than the first twelve of its sections.
+    var chs = [];
+    try {
+      chs = rows('SELECT number, title FROM chapters WHERE title LIKE ? ORDER BY number',
+                 ['%' + toks[0] + '%']).map(function (ch) {
+        return { id: 'ch:' + ch.number, number: String(ch.number),
+                 title: ch.title, chapter_title: 'whole chapter · tap to open',
+                 chapter: true };
+      });
+    } catch (e) { chs = []; }
+    return chs.concat(hidden, out).slice(0, 12);
   }
 
   // Drug search groups the annex rows by name: one drug, one result, however
-  // many formulations the book lists under it.
+  // many formulations the book lists under it. Same reason as above — the
+  // FTS5 index is unreadable here, so what the book says a drug is FOR was
+  // never searchable either.
   function searchDrugs(term) {
     var toks = ftsTokens(term);
     if (!toks.length) return [];
-    var q = toks.map(function (t) { return '"' + t + '"*'; }).join(' AND ');
+    var score = [], where = [], sp = [], wp = [];
+    toks.forEach(function (t) {
+      var any = '%' + t + '%', start = t + '%';
+      score.push('(CASE WHEN name LIKE ? THEN ' + W_TITLE + ' ELSE 0 END)' +
+                 '+(CASE WHEN name LIKE ? THEN ' + W_TITLE_START + ' ELSE 0 END)' +
+                 "+(CASE WHEN ifnull(indication,'') LIKE ? THEN " + W_BODY + ' ELSE 0 END)');
+      sp.push(any, start, any);
+      where.push("(name LIKE ? OR ifnull(indication,'') LIKE ?)");
+      wp.push(any, any);
+    });
     var out = [];
     try {
       out = rows(
-        'SELECT d.name_normalized AS key, MIN(d.name) AS title, ' +
-        "GROUP_CONCAT(DISTINCT d.indication) AS chapter_title, COUNT(*) AS n " +
-        'FROM drugs_fts f JOIN drugs d ON d.id = f.rowid ' +
-        'WHERE drugs_fts MATCH ? GROUP BY d.name_normalized LIMIT 12', [q]);
-    } catch (e) { out = []; }
-    if (!out.length) {
-      out = rows(
         'SELECT name_normalized AS key, MIN(name) AS title, ' +
-        "GROUP_CONCAT(DISTINCT indication) AS chapter_title, COUNT(*) AS n " +
-        'FROM drugs WHERE name LIKE ? GROUP BY name_normalized ' +
-        'ORDER BY length(name) LIMIT 12', ['%' + term + '%']);
-    }
+        "GROUP_CONCAT(DISTINCT indication) AS chapter_title, MAX(" + score.join('+') + ') AS _s ' +
+        'FROM drugs WHERE ' + where.join(' AND ') + ' GROUP BY name_normalized ' +
+        'ORDER BY _s DESC, length(MIN(name)) ASC LIMIT 12', sp.concat(wp));
+    } catch (e) { out = []; }
     return out.map(function (r) {
       return { id: r.key, number: '', title: r.title, chapter_title: r.chapter_title || '', drug: true };
     });
@@ -195,13 +332,18 @@
     _acItems = items; _acIndex = -1;
     if (!items.length) {
       box.innerHTML = '<div class="g-ac-empty">Nothing in this book matches “' +
-        esc(term) + '”.' + (book === 'ucg'
-          ? ' Try the children’s book above for a paediatric topic.' : '') + '</div>';
+        esc(term) + '”. Every word of the guideline is searched, not just the ' +
+        'headings, so try another word for it — or use the contents page below, ' +
+        'which lists the whole book.' + (book === 'ucg'
+          ? ' The children’s book above has the paediatric doses by weight.' : '') + '</div>';
       box.style.display = 'block';
       return;
     }
-    box.innerHTML = items.map(function (r, i) {
-      return '<div class="g-ac-item" data-i="' + i + '">' +
+    box.innerHTML = (_alias
+      ? '<div class="g-ac-alias">The guideline does not use the word “' + esc(term) +
+        '”. Showing what it calls “' + esc(_alias) + '”.</div>'
+      : '') + items.map(function (r, i) {
+      return '<div class="g-ac-item' + (r.chapter ? ' g-ac-chapter' : '') + '" data-i="' + i + '">' +
         '<span class="g-ac-num">' + esc(r.number || '') + '</span>' +
         '<span class="g-ac-title">' + esc(r.title) + '</span>' +
         '<span class="g-ac-ch">' + esc(r.chapter_title || '') + '</span></div>';
@@ -485,6 +627,21 @@
   }
 
   // ── Render: Uganda Clinical Guidelines ──────────────────────────────────
+  // The sections the book prints under a heading. The numbering is the book's
+  // own — 19.2.1 and 19.2.2 sit under 19.2 — so nothing is guessed. Direct
+  // children only: tapping one that is itself a heading shows ITS children,
+  // which is exactly how the printed contents page reads.
+  function childrenOf(c) {
+    var num = String(c.number || '').trim();
+    if (!num) return [];
+    var kids = rows('SELECT id, number, title, page FROM conditions ' +
+                    'WHERE number LIKE ? ORDER BY id', [num + '.%']);
+    var direct = kids.filter(function (k) {
+      return String(k.number || '').slice(num.length + 1).indexOf('.') < 0;
+    });
+    return direct.length ? direct : kids;
+  }
+
   function renderUcg(id) {
     var c = one(
       'SELECT id, number, title, chapter_number, chapter_title, icd10, page, causes, ' +
@@ -531,6 +688,28 @@
       '</div></div>';
     var html = head;
 
+    /* Did the extraction find the SUBSTANCE of this section?
+     *
+     * "Did it find anything at all" is the wrong question, and asking it was
+     * a real fault. Twelve sections parsed only the secondary fields — a
+     * differential, a note — and nothing else. They rendered as a title with
+     * two or three grey folded panels under it and not one readable word:
+     * indistinguishable, to a clinician, from a section the app does not
+     * have. "Clinical Features of HIV" was one of them, and the parse had
+     * captured 8 of its 203 distinct words.
+     *
+     * Measured for all twelve: full_text contains everything the parsed
+     * fields contain and between 2 and 195 words more. So where the substance
+     * was not found, the book's own text IS the section — complete, laid out
+     * like everything else, and labelled as the book's own wording. Nothing
+     * is lost and nothing is invented, which is the only trade worth making
+     * in a book people treat from.
+     */
+    var hasPrimary = !!(String(c.clinical_features || '').trim() ||
+                        String(c.investigations || '').trim() ||
+                        String(c.management || '').trim() ||
+                        tr.length || meds.length);
+
     var sev = severityBlock(c.management || c.full_text);
     if (sev) {
       html += '<section class="g-sec g-sevbox"><h3>Management for ' + esc(_sevSel) +
@@ -573,11 +752,13 @@
         '<div class="g-verify">Verify every dose against the source text below before prescribing.</div>');
     }
 
-    html += section('Causes', c.causes ? asText(c.causes) : '', { collapsible: true });
-    html += section('Differential diagnosis', c.differential ? asText(c.differential) : '', { collapsible: true });
-    html += section('Complications', c.complications ? asText(c.complications) : '', { collapsible: true });
-    html += section('Prevention', c.prevention ? asText(c.prevention) : '', { collapsible: true });
-    html += section('Notes', c.notes ? asText(c.notes) : '', { collapsible: true });
+    if (hasPrimary) {
+      html += section('Causes', c.causes ? asText(c.causes) : '', { collapsible: true });
+      html += section('Differential diagnosis', c.differential ? asText(c.differential) : '', { collapsible: true });
+      html += section('Complications', c.complications ? asText(c.complications) : '', { collapsible: true });
+      html += section('Prevention', c.prevention ? asText(c.prevention) : '', { collapsible: true });
+      html += section('Notes', c.notes ? asText(c.notes) : '', { collapsible: true });
+    }
 
     /* ── When the automatic split found nothing ──────────────────────────
      *
@@ -595,7 +776,7 @@
      * laid out like everything else, and labelled honestly so nobody thinks
      * it has been through the same tidying as a parsed card.
      */
-    if (!/<section|<details/.test(html.slice(head.length))) {
+    if (!hasPrimary) {
       if (c.full_text && c.full_text.trim()) {
         html += '<div class="g-sec g-asprinted-note">' +
           'The automatic split found no named parts in this section, so it is ' +
@@ -603,10 +784,39 @@
           '</div>' +
           section('As printed in the guideline', asText(c.full_text));
       } else {
+        /* ── A heading with nothing under it but its own children ───────
+         *
+         * 53 of the 551 sections hold no text at ALL — not a named field,
+         * not even full_text. They are the numbered headings the book uses
+         * to group things: "19.2 Malnutrition", "19.1 Nutrition Guidelines
+         * in Special Populations", "15.2 Overview of Key Contraceptive
+         * Methods". In the printed book the heading is followed straight
+         * away by its sub-sections, and all of the text is in those.
+         *
+         * Opening one used to give a title, a sentence saying the content
+         * "is in the sections listed under it" — and then no list. Nothing
+         * was listed anywhere on the card. A clinician who searched
+         * "Malnutrition" got a card with no malnutrition in it.
+         *
+         * So the heading now shows what is actually under it, tappable, in
+         * the book's own order. That IS the content of a heading.
+         */
+        var kids = childrenOf(c);
         html += '<div class="g-sec g-asprinted-note">' +
-          'This is a heading in the book with no text of its own — its content ' +
-          'is in the sections listed under it.' +
+          'This is a heading in the book. The guideline prints no text under it ' +
+          'directly — everything it covers is in the ' + kids.length + ' section' +
+          (kids.length === 1 ? '' : 's') + ' below.' +
           '</div>';
+        if (kids.length) {
+          html += section('What this heading covers',
+            '<div class="g-kidlist">' + kids.map(function (k) {
+              return '<button type="button" class="g-kid" data-open="' + esc(String(k.id)) + '">' +
+                '<span class="g-kid-n">' + esc(k.number || '') + '</span>' +
+                '<span class="g-kid-t">' + esc(k.title) + '</span>' +
+                (k.page ? '<span class="g-kid-p">p.' + esc(String(k.page)) + '</span>' : '') +
+                '</button>';
+            }).join('') + '</div>');
+        }
       }
     }
 
@@ -910,7 +1120,7 @@
 
     chs.forEach(function (ch) {
       var list = by[String(ch.number)] || [];
-      html += '<details class="g-ch"><summary>' +
+      html += '<details class="g-ch" data-ch="' + esc(String(ch.number)) + '"><summary>' +
         '<span class="g-ch-n">' + esc(String(ch.number)) + '</span>' +
         '<span class="g-ch-t">' + esc(ch.title) + '</span>' +
         '<span class="g-ch-c">' + list.length + '</span>' +
@@ -939,6 +1149,12 @@
   function open(id) {
     $('gResults').style.display = 'none';
     if (!cur().db) return;
+    // A whole chapter — "family planning", "immunisation". Not a card: the
+    // contents page already lists exactly what is in it, so open it there.
+    if (typeof id === 'string' && id.indexOf('ch:') === 0) {
+      openChapter(id.slice(3));
+      return;
+    }
     var card = $('gCard');
     card.setAttribute('data-cid', id);
     card.setAttribute('data-book', book);
@@ -958,6 +1174,23 @@
   function reopen() {
     var id = $('gCard').getAttribute('data-cid');
     if (id) open(book === 'who' && mode === 'doses' ? id : Number(id));
+  }
+
+  // Show the contents page with one chapter open and in view. This is the
+  // answer to "where is family planning" — the chapter is the thing, and its
+  // twenty-two sections are already listed here in the book's own order.
+  function openChapter(num) {
+    var host = $('gBrowse');
+    if (!host) return;
+    buildBrowse();
+    $('gCard').style.display = 'none';
+    $('gEmpty').style.display = 'none';
+    host.style.display = 'block';
+    var want = host.querySelector('details[data-ch="' + String(num).replace(/"/g, '') + '"]');
+    Array.prototype.forEach.call(host.querySelectorAll('details'), function (d) {
+      d.open = (d === want);
+    });
+    if (want && want.scrollIntoView) want.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   // ── Switching book / mode ───────────────────────────────────────────────
@@ -1026,7 +1259,10 @@
       _acIndex += (e.key === 'ArrowDown' ? 1 : -1);
       if (_acIndex < 0) _acIndex = _acItems.length - 1;
       if (_acIndex >= _acItems.length) _acIndex = 0;
-      Array.prototype.forEach.call(box.children, function (el, i) {
+      // The rows, not box.children — there may be a note above them saying a
+      // word was substituted, and counting that as a row put the highlight on
+      // the wrong one.
+      Array.prototype.forEach.call(box.querySelectorAll('.g-ac-item'), function (el, i) {
         el.classList.toggle('active', i === _acIndex);
       });
     } else if (e.key === 'Enter') {
@@ -1063,10 +1299,13 @@
       }, 280);
     }
   });
-  // "Open <host>" inside a buried section.
+  // "Open <host>" inside a buried section, and the sections listed under a
+  // heading that has no text of its own.
   $('gCard').addEventListener('click', function (e) {
     var oh = e.target.closest && e.target.closest('[data-openhost]');
     if (oh) { open(Number(oh.getAttribute('data-openhost'))); return; }
+    var kid = e.target.closest && e.target.closest('.g-kid');
+    if (kid) { open(Number(kid.getAttribute('data-open'))); return; }
   });
   $('gCard').addEventListener('click', function (e) {
     var clear = e.target.closest && e.target.closest('#gWeightClear');

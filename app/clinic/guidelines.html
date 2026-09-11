@@ -70,7 +70,9 @@
     .g-ac-title{font-size:14px;font-weight:700;color:var(--text);flex:1}
     .g-ac-ch{font-size:11px;color:var(--text-lt);white-space:nowrap;overflow:hidden;
       text-overflow:ellipsis;max-width:38%}
-    .g-ac-empty{padding:14px 16px;font-size:13px;color:var(--text-lt)}
+    .g-ac-empty{padding:14px 16px;font-size:13px;color:var(--text-lt);line-height:1.6}
+    .g-ac-alias{padding:10px 16px;font-size:12px;line-height:1.55;
+      background:var(--brand-tint);color:var(--brand-ink);font-weight:600}
 
     /* Severity */
     .g-sevrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:18px}
@@ -266,6 +268,28 @@
       background:var(--brand-tint);color:var(--brand-ink);
       border-radius:12px;padding:11px 14px
     }
+    /* What a heading covers: the sections the book prints under it. 53 of the
+       551 sections are headings with no text of their own, and they used to
+       open as a card with nothing on it at all. */
+    .g-kidlist{display:flex;flex-direction:column;gap:2px}
+    .g-kid{display:flex;align-items:baseline;gap:10px;width:100%;text-align:left;
+      background:none;border:0;border-radius:10px;padding:10px 10px;cursor:pointer;
+      font:inherit;font-size:13.5px;color:var(--text);border-bottom:1px solid var(--border)}
+    .g-kid:last-child{border-bottom:0}
+    .g-kid:hover,.g-kid:focus{background:var(--brand-tint);color:var(--brand-ink);outline:none}
+    .g-kid-n{flex:0 0 auto;font-size:11.5px;font-weight:800;color:var(--text-lt);
+      font-variant-numeric:tabular-nums;min-width:44px}
+    .g-kid-t{flex:1;min-width:0;line-height:1.4;overflow-wrap:anywhere;font-weight:600}
+    .g-kid-p{flex:0 0 auto;font-size:11px;color:var(--text-lt);font-weight:700}
+    .g-kid:hover .g-kid-n,.g-kid:hover .g-kid-p{color:var(--brand-ink)}
+
+    /* A whole chapter offered as a search result — "family planning" is a
+       chapter, not a condition. */
+    .g-ac-item.g-ac-chapter{background:var(--brand-tint)}
+    .g-ac-item.g-ac-chapter .g-ac-title{color:var(--brand-ink);text-transform:none}
+    .g-ac-item.g-ac-chapter .g-ac-num,
+    .g-ac-item.g-ac-chapter .g-ac-ch{color:var(--brand-ink)}
+
     /* The raw panel keeps the book's own line breaks — that is its entire
        job, since it is what the laid-out version above is checked against.
        It stays monospace for the same reason: a proportional font hides where
