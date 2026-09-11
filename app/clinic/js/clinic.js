@@ -237,6 +237,27 @@ function setupClinicMobileNav() {
   );
 }
 
+/* Merge a change into the session as it is RIGHT NOW.
+ *
+ * Both background refreshers below build their new session from a copy taken
+ * before an `await`. Anything written while the request was in flight is then
+ * silently undone when the reply lands — including, for a clinician who walked
+ * into a clinic, the role that says they are a guest. A late write putting
+ * back a stale role is exactly the "once an install has taken a newer build,
+ * its own origin is the stale one" mistake in a different costume.
+ *
+ * So the patch is applied to whatever is stored at the moment of writing, not
+ * to what was stored when the request went out.
+ */
+function _mergeClinicSession(patch) {
+  var now = null;
+  try { now = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch (e) {}
+  if (!now || typeof now !== 'object' || Array.isArray(now)) return null;
+  var merged = Object.assign({}, now, patch);
+  try { localStorage.setItem('clinic_session', JSON.stringify(merged)); } catch (e) {}
+  return merged;
+}
+
 // Is the person using this clinic portal a clinician who scanned in, rather
 // than one of the clinic's own people? Written only by the clinician portal.
 function _isVisitingClinician() {
@@ -373,12 +394,11 @@ async function resolveClinicId(supabase, session) {
       .single();
 
     if (pu?.clinic_id) {
-      const updated = Object.assign({}, session, {
+      _mergeClinicSession({
         clinicId: pu.clinic_id,
         clinicName: pu.clinics?.name || session.clinicName || 'Clinic',
         staffRole: pu.staff_role || session.staffRole || 'owner',
       });
-      localStorage.setItem('clinic_session', JSON.stringify(updated));
       return pu.clinic_id;
     }
   } catch (e) { /* network error — fail gracefully */ }
@@ -564,11 +584,14 @@ async function refreshClinicTier(supabase, session) {
       .eq('id', session.clinicId)
       .single();
     if (res.error || !res.data) return;                 // column missing / offline → keep fail-open
-    var updated = Object.assign({}, session, {
+    // Merged into the session as it is NOW, not as it was when this request
+    // went out — see _mergeClinicSession(). This one used to write back a whole
+    // captured session, so a tier lookup that took two seconds could put back
+    // the role, the clinic and the guest flag from before the clinician moved.
+    _mergeClinicSession({
       tier:        res.data.subscription_tier || 'premium',
       trialEndsAt: res.data.trial_ends_at || null,
     });
-    localStorage.setItem('clinic_session', JSON.stringify(updated));
     applyTierGating();
   } catch (e) { /* offline — cached tier (or fail-open) stands */ }
 }
