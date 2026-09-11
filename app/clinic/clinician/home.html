@@ -365,8 +365,17 @@
    * writes either of them when something has gone wrong.
    */
   function trouble(why, kindClass) {
-    document.getElementById('clClinics').innerHTML =
-      '<div class="cl-empty"><span class="material-icons-outlined">info</span>' + esc(why) + '</div>';
+    /* The problem AND what this screen is for.
+     *
+     * Replacing the card with an error alone answers "what is wrong" and
+     * leaves "what is this thing supposed to do" unanswered — which was the
+     * actual question: "where are the features?". Somebody whose server is not
+     * ready should still be able to see what they are waiting for.
+     */
+    paintClinics([]);
+    document.getElementById('clClinics').insertAdjacentHTML('afterbegin',
+      '<div class="cl-msg show ' + (kindClass || 'warn') + '" style="margin:0 0 14px">' +
+      esc(why) + '</div>');
     document.getElementById('clRatings').innerHTML =
       '<div class="cl-empty">Nothing to show yet.</div>';
     var banner = document.getElementById('clOffline');

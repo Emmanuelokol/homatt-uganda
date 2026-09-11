@@ -172,6 +172,14 @@ const NO_FUNCTION = {
     /set up|administrator|database/i.test(saveMsg) && !/schema cache|PGRST/i.test(saveMsg),
     saveMsg.slice(0, 100) || '(nothing said)');
 
+  // Even when the server is not ready, the screen has to say what it is FOR —
+  // "where are the features?" was the actual question behind the report.
+  result('it still says what scanning a clinic\'s code would give them',
+    /Record a treatment/i.test(body) && /medicines are on their shelf|medicine/i.test(body),
+    (body.split('\n').find(l => /Record a treatment/i.test(l)) || '(nothing)').slice(0, 70));
+  result('and that their own record travels with them',
+    /goes with you|your own/i.test(body));
+
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     // Registering the service worker races the next navigation in a
     // headless run and throws "The object is in an invalid state".
