@@ -36,6 +36,12 @@
 
   var KEY_OPACITY = 'homatt_speak_opacity';   // 0.25 … 1
   var KEY_OFF     = 'homatt_speak_off';       // '1' hides it entirely
+  /* The master switch, shared with the dictate buttons on the intake screen.
+   * KEY_OFF above turns off THIS button; VOICE_OFF turns off speaking
+   * altogether. Two switches, and the wider one wins — somebody who has asked
+   * not to have voice recognition must not still find a microphone floating
+   * over every screen. */
+  var VOICE_OFF   = 'homatt_voice_off';
   var KEY_SIDE    = 'homatt_speak_side';      // 'right' | 'left'
   var HANDOFF     = 'homatt_speak_handoff';   // what the intake screen picks up
 
@@ -102,7 +108,11 @@
     if (!isFinite(o) || o < 0.2 || o > 1) o = 0.55;
     el.root.style.setProperty('--sp-rest', String(o));
     el.root.setAttribute('data-side', pref(KEY_SIDE, 'right') === 'left' ? 'left' : 'right');
-    el.root.hidden = pref(KEY_OFF, '') === '1';
+    el.root.hidden = hiddenByPref();
+  }
+
+  function hiddenByPref() {
+    return pref(VOICE_OFF, '') === '1' || pref(KEY_OFF, '') === '1';
   }
 
   // ── Opening, and asking for the microphone ───────────────────────────────
@@ -401,7 +411,7 @@
   }
 
   function mount() {
-    if (pref(KEY_OFF, '') === '1') return;
+    if (hiddenByPref()) return;
     build();
   }
 
@@ -415,5 +425,6 @@
     open: open, close: close, mount: mount,
     applyLook: applyLook, takeHandoff: takeHandoff,
     KEY_OPACITY: KEY_OPACITY, KEY_OFF: KEY_OFF, KEY_SIDE: KEY_SIDE,
+    VOICE_OFF: VOICE_OFF,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

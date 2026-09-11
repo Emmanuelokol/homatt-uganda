@@ -1444,7 +1444,13 @@
         '</div></div>' +
 
       // ③ Charges
-      '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">3</span>' +
+      //
+      // There are TWO payment rows in a treatment and this is the second one —
+      // a clinician who saves straight from this panel never sees the wizard's.
+      // So the whole block goes for a visiting clinician, who does not price
+      // anybody; hiding only the wizard's card would look right and leave this
+      // one sitting here asking a guest what to charge.
+      '<div class="ucg-block" data-cap="payments"><div class="ucg-bh"><span class="ucg-step">3</span>' +
         '<h4>Charges (UGX)</h4><span class="ucg-count">you enter</span></div>' +
         '<div class="ucg-money">' +
           '<div><label>Treatment</label><input type="number" min="0" id="ucgFeeC" value="' + (pkg.fees.consult || 0) + '"></div>' +
@@ -1510,6 +1516,14 @@
         '</div></div>';
 
     wireRows();
+    /* This panel is built at runtime, long after the page-load pass of
+     * applyRoleGating() has run — so it must be gated again here, or a visiting
+     * clinician is shown the charges block whatever the markup says.
+     *
+     * Exactly the fault that let this screen ship with unreadable chips: it
+     * does not exist until somebody opens it, so anything that sweeps the page
+     * once walks straight past it. */
+    try { if (typeof applyRoleGating === 'function') applyRoleGating(); } catch (e) {}
   }
 
   // ── Making the guideline readable ─────────────────────────────────────────

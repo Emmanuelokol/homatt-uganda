@@ -20,7 +20,7 @@ const os = require('os');
 
 // Load the encoder the same way a browser would, with its internals exposed so
 // every mask can be compared and not only the one it would choose.
-const raw = fs.readFileSync(path.join(__dirname, '..', 'app', 'clinician', 'js', 'qr.js'), 'utf8');
+const raw = fs.readFileSync(path.join(__dirname, '..', 'app', 'clinic', 'clinician', 'js', 'qr.js'), 'utf8');
 const src = raw.replace(
   'global.HomattQR = { encode: encode, toSVG: toSVG, toCanvas: toCanvas };',
   'global.HomattQR = { encode: encode, toSVG: toSVG, toCanvas: toCanvas, _int: { makeCodewords, newMatrix, placeFunction, placeData, functionMap, applyMask, placeFormat, penalty } };');

@@ -1337,13 +1337,19 @@
           <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:8px" id="followUpDateHint">—</div>
         </div>
 
-        <!-- ── Fees & payment ── -->
-        <div class="sec-label">
+        <!-- ── Fees & payment ──
+             Hidden from a visiting clinician, who is here to treat people and
+             not to price them. What the clinic charges is the clinic's own
+             business, and a guest deciding it — or seeing it — is neither
+             expected nor wanted. The wizard also strips every money field out
+             of what it saves for them, so this is the face of that rule and
+             not the whole of it. -->
+        <div class="sec-label" data-cap="payments">
           <span class="material-icons-outlined" style="font-size:14px">payments</span>
           Fees &amp; Payment
         </div>
 
-        <div class="wiz-card" id="feesCard">
+        <div class="wiz-card" id="feesCard" data-cap="payments">
           <div class="fee-grid">
             <div class="fee-lbl">Treatment fee</div>
             <div class="fee-input-wrap">

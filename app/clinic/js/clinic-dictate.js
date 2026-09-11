@@ -1743,10 +1743,49 @@
    *   btnId  — the button
    *   sayId  — a line under it where what was heard is written back
    */
+  /* Is speaking switched off on this device?
+   *
+   * One switch for ALL of it — the dictate buttons on the intake screen and the
+   * floating microphone both — because "optional" has to mean the whole thing.
+   * A setting that quietened the floating button and left two more on the
+   * intake screen would be a worse answer than none: the clinician would still
+   * be looking at microphones they had asked not to have.
+   *
+   * It is per-device, not per-clinic. The phone with the broken microphone, the
+   * one in the noisy room, and the clinician who would simply rather type are
+   * all one phone's business, and none of them is a decision for the clinic's
+   * whole account.
+   *
+   * Default is ON: dictation is the reason most of this app is fast, and it
+   * measured 30/30 on placement. Somebody who does not want it says so once.
+   */
+  var VOICE_OFF_KEY = 'homatt_voice_off';
+  function voiceOff() {
+    try { return localStorage.getItem(VOICE_OFF_KEY) === '1'; } catch (e) { return false; }
+  }
+  function setVoiceOff(off) {
+    try { localStorage.setItem(VOICE_OFF_KEY, off ? '1' : ''); } catch (e) {}
+  }
+
   function attach(btnId, sayId, mode) {
     var btn = document.getElementById(btnId);
     var out = document.getElementById(sayId);
     if (!btn) return;
+
+    // Hidden rather than disabled. A greyed-out microphone still asks to be
+    // pressed, and still takes up the top of the screen the button was put at
+    // the top of precisely because it is the first thing you reach for.
+    if (voiceOff()) {
+      // #itDictateStory sits inside the .it-speak card, which is nothing but
+      // the dictate button and its hint, so the whole card goes. #itDictate is
+      // a bare button among the vitals inputs, so closest() finds nothing and
+      // only the button goes — taking its card would take the readings with it.
+      var holder = (btn.closest && btn.closest('.it-speak')) || btn;
+      holder.style.display = 'none';
+      if (out) out.style.display = 'none';
+      return;
+    }
+
     bindHeard();
     mode = (mode === 'story' || mode === 'consult') ? mode : 'vitals';
 
@@ -1905,7 +1944,9 @@
               lastFault: lastFault, noteFault: noteFault,
               digitsFromWords: digitsFromWords, RANGE: RANGE, attach: attach,
               dropPersonBits: dropPersonBits, joinSpelled: joinSpelled,
-              listen: listen, useLiveElements: useLiveElements };
+              listen: listen, useLiveElements: useLiveElements,
+              voiceOff: voiceOff, setVoiceOff: setVoiceOff,
+              VOICE_OFF_KEY: VOICE_OFF_KEY };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   global.HomattDictate = API;

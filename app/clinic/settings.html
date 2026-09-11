@@ -289,51 +289,103 @@
         </div>
       </div>
 
-      <!-- Staff & Access -->
-      <div class="settings-card" id="staffAccessCard">
+      <!-- ══ Clinicians ═════════════════════════════════════════════════
+           How somebody joins this clinic now. Show the code, they scan it,
+           they are in — with their own account, their own record and their
+           own name on every treatment they record here. -->
+      <div class="settings-card" id="cliniciansCard">
         <div class="settings-card-title">
-          <span class="material-icons-outlined">badge</span> Staff &amp; Access
+          <span class="material-icons-outlined">qr_code_2</span> Clinicians
         </div>
         <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 16px;line-height:1.5">
-          Create logins for your team and choose what each person can see.
+          A clinician holds their own Homatt account. Show them this code and they
+          can work here — recording treatments under their own name — for as long
+          as you allow. They never see your money, your stock counts or your
+          reports, and you can stop their access at any moment.
+        </p>
+
+        <div id="ccCodeBox" style="display:none;text-align:center;margin-bottom:16px">
+          <!-- The QR keeps its own white ground in BOTH themes. A code
+               inverted by a dark theme does not scan on many Android
+               cameras, and the clinician holding the phone has no way to
+               know that is why. -->
+          <canvas id="ccQR" style="display:block;margin:0 auto;width:240px;max-width:100%;height:auto;background:#FFFFFF;padding:10px;border-radius:12px;border:1px solid var(--border, #E0E0E0)"></canvas>
+          <div id="ccCode" style="text-align:center;font-size:27px;font-weight:800;letter-spacing:4px;color:var(--text, #1A1A1A);margin:12px 0 2px;font-variant-numeric:tabular-nums"></div>
+          <div id="ccCodeHint" style="text-align:center;font-size:12px;color:var(--text-lt, #5F6368);line-height:1.5"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+          <div style="flex:1;min-width:130px">
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text, #1A1A1A);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">They can work here for</label>
+            <select id="ccDays" class="form-input" style="width:100%">
+              <option value="1">1 day</option>
+              <option value="7">1 week</option>
+              <option value="30" selected>1 month</option>
+              <option value="90">3 months</option>
+              <option value="365">1 year</option>
+            </select>
+          </div>
+          <button type="button" id="ccMakeBtn"
+                  style="display:inline-flex;align-items:center;gap:6px;padding:11px 16px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:17px">qr_code_2</span>
+            Show a code
+          </button>
+        </div>
+        <div id="ccMsg" style="display:none;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:12px"></div>
+
+        <div id="ccList">
+          <div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading clinicians…</div>
+        </div>
+      </div>
+
+      <!-- Who already has a login here.
+           The "Add staff account" button and its modal are gone on purpose:
+           joining is the QR code above, so that everybody who treats a patient
+           has their own account and their own record rather than a shared login
+           that belongs to the clinic. The list stays so existing logins keep
+           working and their roles can still be changed. -->
+      <div class="settings-card" id="staffAccessCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">badge</span> Existing logins
+        </div>
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 16px;line-height:1.5">
+          Logins already created for this clinic, and what each one can reach.
           <strong>Owners</strong> access everything — finances, stock, settings.
           <strong>Clinicians</strong> and <strong>nurses</strong> get treatments,
           patient history, bookings, quick sale and stock — but not financial
-          reports. <strong>Receptionists</strong> handle the front desk — bookings,
-          history, payments and quick sales. <strong>Sales / Drug shop</strong>
-          attendants get only quick sale and stock — ideal for a drug shop.
+          reports. <strong>Receptionists</strong> handle the front desk.
+          <strong>Sales / Drug shop</strong> attendants get only quick sale and stock.
+          <br><br>
+          To bring somebody new in, use <strong>Clinicians</strong> above.
         </p>
-        <button type="button" onclick="openAddStaffModal()"
-                style="display:inline-flex;align-items:center;gap:6px;margin-bottom:14px;padding:10px 16px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
-          <span class="material-icons-outlined" style="font-size:17px">person_add</span>
-          Add staff account
-        </button>
         <div id="staffList">
           <div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading staff…</div>
         </div>
-        <div id="staffStatus" style="font-size:12px;color:#555;min-height:16px;margin-top:8px"></div>
+        <div id="staffStatus" style="font-size:12px;color:var(--text-lt, #5F6368);min-height:16px;margin-top:8px"></div>
       </div>
 
-      <!-- Add Staff modal -->
-      <div id="addStaffModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+      <!-- Ending a clinician's time here, and saying how they did -->
+      <div id="ccRateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
         <div style="background:var(--surface, #FFFFFF);border-radius:16px;max-width:440px;width:100%;padding:22px;max-height:90vh;overflow-y:auto">
-          <div style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);margin-bottom:4px">Add staff account</div>
-          <p style="font-size:12.5px;color:var(--text-lt, #5F6368);margin:0 0 16px;line-height:1.5">
-            Creates a login for a team member at your clinic. Share the email and
-            password with them — they can change the password later in Settings.
+          <div style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);margin-bottom:4px" id="ccRateTitle">How did they do?</div>
+          <p style="font-size:12.5px;color:var(--text-lt, #5F6368);margin:0 0 14px;line-height:1.5">
+            This goes with them to their next clinic, so write what you would
+            want to read. You cannot change it afterwards.
           </p>
-          <label class="field-label" style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Full name</label>
-          <input id="asName" class="form-input" type="text" placeholder="e.g. Nakato Brenda" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Email (their login)</label>
-          <input id="asEmail" class="form-input" type="email" placeholder="nurse@yourclinic.ug" autocapitalize="none" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Password (min 8 characters)</label>
-          <input id="asPassword" class="form-input" type="text" placeholder="Set a starting password" autocapitalize="none" style="width:100%;margin-bottom:12px">
-          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Role — what they can access</label>
-          <select id="asRole" class="form-input" style="width:100%;margin-bottom:14px"></select>
-          <div id="asError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
+          <div id="ccStarPick" class="cl-starpick" style="display:flex;justify-content:center;gap:2px;margin-bottom:6px"></div>
+          <div id="ccStarWord" style="text-align:center;font-size:12.5px;font-weight:700;color:var(--text-lt, #5F6368);min-height:18px;margin-bottom:14px"></div>
+
+          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">A few words — optional</label>
+          <textarea id="ccNote" class="form-input" rows="3" style="width:100%;margin-bottom:12px;resize:vertical" placeholder="e.g. Careful with children. Kept good records."></textarea>
+
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text, #1A1A1A);margin-bottom:14px;cursor:pointer">
+            <input type="checkbox" id="ccRehire" checked> I would work with them again
+          </label>
+
+          <div id="ccRateErr" style="display:none;background:var(--cl-danger-bg, #FFEBEE);color:var(--danger-ink);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
           <div style="display:flex;gap:8px">
-            <button type="button" id="asCancelBtn" style="flex:1;padding:12px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Cancel</button>
-            <button type="button" id="asCreateBtn" style="flex:2;padding:12px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Create account</button>
+            <button type="button" id="ccRateCancel" style="flex:1;padding:12px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>
+            <button type="button" id="ccRateSave" style="flex:2;padding:12px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save</button>
           </div>
         </div>
       </div>
@@ -616,6 +668,20 @@
           them. It is paid for by the minute, so it stops when the account runs
           out. Check here before you are told by a dead button.
         </p>
+
+        <!-- The master switch. One setting for ALL of it, because "optional"
+             has to mean the whole thing — a switch that quietened the floating
+             button and left two microphones on the intake screen would be a
+             worse answer than none. -->
+        <label class="sp-off" style="margin-bottom:12px">
+          <input type="checkbox" id="voiceOff"> Turn speaking off on this phone — type everything
+        </label>
+        <div style="font-size:11.5px;color:var(--text-lt, #5F6368);line-height:1.55;margin:-6px 0 14px;padding-left:28px">
+          Hides every microphone: the two on the treatment screen and the floating
+          one. Nothing else changes and nothing is lost — every box can be typed,
+          and the suggestions read what is typed exactly the same way.
+          This is per phone, not per clinic.
+        </div>
         <div class="dict-state" id="dictState">
           <span class="dict-dot" id="dictDot"></span>
           <span class="dict-msg" id="dictMsg">Not checked yet.</span>
@@ -796,6 +862,11 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Staff & access management (owner only)
   loadStaffList();
+
+  // Clinicians who joined by scanning a code (owner only)
+  var _ccBtn = document.getElementById('ccMakeBtn');
+  if (_ccBtn) _ccBtn.addEventListener('click', ccMakeCode);
+  ccLoadList();
 });
 
 /* ── Staff & Access ────────────────────────────────────────── */
@@ -889,99 +960,21 @@ async function changeStaffActive(targetId, active, btn) {
   loadStaffList();
 }
 
-/* ── Add staff account (owner creates a login for a team member) ── */
-function openAddStaffModal() {
-  var m = document.getElementById('addStaffModal');
-  if (!m) return;
-  if (_sessionIsDemo) { showToast('Demo mode — sign in as a clinic owner to add staff', 'info'); return; }
-  if (window.ClinicOffline && ClinicOffline.isOffline()) {
-    showToast('Creating staff accounts needs an internet connection', 'error');
-    return;
-  }
-  ['asName','asEmail','asPassword'].forEach(function(id){ var el = document.getElementById(id); if (el) el.value = ''; });
-  var sel = document.getElementById('asRole');
-  if (sel) sel.innerHTML = STAFF_ROLE_OPTIONS
-    .map(function(o){ return '<option value="' + o.value + '"' + (o.value === 'clinician' ? ' selected' : '') + '>' + o.label + '</option>'; })
-    .join('');
-  var err = document.getElementById('asError'); if (err) err.style.display = 'none';
-  m.style.display = 'flex';
-}
+/* Creating a login from inside the portal is GONE, on purpose.
+ *
+ * It made an account that belonged to the clinic: the clinic chose the
+ * email, the clinic set the password, and the record of who treated whom
+ * was a name typed into a box. Somebody who worked at three clinics had
+ * three logins and no history of their own, and a clinic that let one go
+ * still held their password.
+ *
+ * Joining is the QR code now (see the Clinicians card above). The person
+ * brings their own account, their own registration number and their own
+ * record; the clinic grants time-limited access and can end it. The
+ * create_staff_account RPC is left in the database so nothing that
+ * already exists breaks, but nothing calls it from here any more.
+ */
 
-(function wireAddStaff() {
-  var m = document.getElementById('addStaffModal');
-  if (!m) return;
-  m.addEventListener('click', function(e){ if (e.target === m) m.style.display = 'none'; });
-  var cancel = document.getElementById('asCancelBtn');
-  if (cancel) cancel.onclick = function() { m.style.display = 'none'; };
-  var create = document.getElementById('asCreateBtn');
-  if (!create) return;
-  create.onclick = async function() {
-    var errEl = document.getElementById('asError');
-    function fail(msg) { if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } }
-    if (errEl) errEl.style.display = 'none';
-
-    var fullName = (document.getElementById('asName').value || '').trim();
-    var email    = (document.getElementById('asEmail').value || '').trim().toLowerCase();
-    var password = document.getElementById('asPassword').value || '';
-    var role     = document.getElementById('asRole').value;
-    if (!fullName) return fail('Enter the staff member’s full name.');
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('Enter a valid email address.');
-    if (password.length < 8) return fail('Password must be at least 8 characters.');
-    if (navigator.onLine === false) return fail('You’re offline — creating accounts needs a connection.');
-
-    create.disabled = true;
-    create.textContent = 'Creating…';
-    try {
-      // PRIMARY ROUTE: the create_staff_account database function — installed
-      // by migrations alone, no separate edge-function deploy to go wrong.
-      var rpc = await _supa.rpc('create_staff_account', {
-        p_full_name: fullName, p_email: email, p_password: password, p_role: role,
-      });
-      var rpcMissing = rpc.error && /could not find the function|schema cache|does not exist/i.test(rpc.error.message || '');
-      if (!rpcMissing) {
-        if (rpc.error) return fail(rpc.error.message || 'Could not create the account.');
-        var d = rpc.data || {};
-        if (d.ok === false) return fail(d.error || 'Could not create the account.');
-        m.style.display = 'none';
-        showToast('Account created for ' + fullName + ' — share the email & password with them', 'success');
-        loadStaffList();
-        return;
-      }
-
-      // FALLBACK: the create-staff edge function (older DBs without the RPC).
-      var r = await _supa.functions.invoke('create-staff', {
-        body: { fullName: fullName, email: email, password: password, staffRole: role },
-      });
-      // supabase-js surfaces non-2xx as error with the response in context —
-      // pull the function's own message out so the owner sees the real reason.
-      if (r.error) {
-        var msg = 'Could not create the account.';
-        try {
-          var ctx = r.error.context;
-          if (ctx && typeof ctx.json === 'function') {
-            var body = await ctx.json();
-            if (body && body.error) msg = body.error;
-          } else if (r.error.message) msg = r.error.message;
-        } catch (_) { if (r.error.message) msg = r.error.message; }
-        if (/not deployed|Failed to send|relay/i.test(msg)) {
-          msg = 'Staff creation needs a database update — run 20260712_create_staff_rpc.sql in the Supabase SQL Editor and retry.';
-        }
-        return fail(msg);
-      }
-      var data = r.data || {};
-      if (data.ok === false) return fail(data.error || 'Could not create the account.');
-
-      m.style.display = 'none';
-      showToast('Account created for ' + fullName + ' — share the email & password with them', 'success');
-      loadStaffList();
-    } catch (e) {
-      fail('Error: ' + (e.message || e));
-    } finally {
-      create.disabled = false;
-      create.textContent = 'Create account';
-    }
-  };
-})();
 
 async function changeStaffRole(targetId, role, selectEl) {
   var status = document.getElementById('staffStatus');
@@ -998,6 +991,287 @@ async function changeStaffRole(targetId, role, selectEl) {
   if (status) { status.style.color = 'var(--deep)'; status.textContent = 'Role updated ✓'; }
   setTimeout(function() { if (status) status.textContent = ''; }, 2500);
 }
+
+
+/* ══ Clinicians — the QR handshake, and how they did ═══════════════════
+ *
+ * The owner shows a code; a clinician scans it and can work here until it
+ * runs out. Everything below talks to the RPCs in
+ * 20260911_clinician_portal.sql, which do the checking — this screen is
+ * only the face of it, and is never the thing deciding who gets in.
+ */
+var _ccCurrent = null;          // the stint being rated
+var _ccStars = 5;
+
+function ccSay(text, kind) {
+  var el = document.getElementById('ccMsg');
+  if (!el) return;
+  if (!text) { el.style.display = 'none'; return; }
+  var bg = kind === 'bad' ? 'var(--cl-danger-bg, #FFEBEE)'
+         : kind === 'warn' ? 'var(--cl-warn-bg, #FFF8E1)' : 'var(--brand-tint)';
+  var fg = kind === 'bad' ? 'var(--danger-ink)'
+         : kind === 'warn' ? 'var(--warning-ink)' : 'var(--brand-ink)';
+  el.style.background = bg; el.style.color = fg;
+  el.textContent = text; el.style.display = 'block';
+}
+
+async function ccMakeCode() {
+  var btn = document.getElementById('ccMakeBtn');
+  if (_sessionIsDemo) { showToast('Demo mode — sign in as a clinic owner', 'info'); return; }
+  if (navigator.onLine === false) {
+    ccSay('Making a code needs a connection — it has to be written into the clinic’s own record so the clinician’s phone can check it.', 'warn');
+    return;
+  }
+  var days = parseInt(document.getElementById('ccDays').value, 10) || 30;
+  btn.disabled = true; btn.textContent = 'Making a code…';
+  try {
+    // The CODE is good for 24 hours — long enough to show somebody today,
+    // short enough that a photograph of this screen is worthless next week.
+    // The ACCESS it grants is the number of days chosen above; the two are
+    // deliberately different lengths.
+    var r = await _supa.rpc('create_clinic_link_code', {
+      p_hours: 24, p_max_uses: 1, p_access_days: days, p_role: 'visiting_clinician',
+    });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) { ccSay((r.data && r.data.error) || 'Could not make a code.', 'bad'); return; }
+
+    document.getElementById('ccCode').textContent = r.data.code;
+    document.getElementById('ccCodeHint').innerHTML =
+      'They can read this off the screen, or you can read it out.<br>' +
+      'This code stops working in 24 hours. Once used, it lets them work here for ' +
+      days + ' day' + (days === 1 ? '' : 's') + '.';
+    document.getElementById('ccCodeBox').style.display = 'block';
+
+    // The QR carries the tagged form, not a link. A URL in a QR opens a
+    // browser, and the clinician is holding the app — the app reads the tag
+    // directly and joins without leaving.
+    try {
+      if (window.HomattQR) {
+        window.HomattQR.toCanvas(document.getElementById('ccQR'),
+          'HOMATT-CLINIC:' + r.data.code, { size: 240, level: 'M' });
+      }
+    } catch (e) { /* the typed code still works, which is the point of it */ }
+
+    ccSay('', null);
+    ccLoadList();
+  } catch (e) {
+    ccSay((e && e.message) || 'Could not make a code just now.', 'bad');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:17px">qr_code_2</span> Show a code';
+  }
+}
+
+function ccPill(c) {
+  var live = c.status === 'active' &&
+    (!c.expires_at || new Date(c.expires_at).getTime() > Date.now());
+  if (live) return '<span style="background:var(--brand-tint);color:var(--brand-ink);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Working here</span>';
+  if (c.status === 'revoked') return '<span style="background:var(--cl-danger-bg, #FFEBEE);color:var(--danger-ink);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Stopped</span>';
+  if (c.status === 'expired') return '<span style="background:var(--cl-quiet-bg, #ECEFF1);color:var(--text-lt, #5F6368);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Time ran out</span>';
+  return '<span style="background:var(--cl-quiet-bg, #ECEFF1);color:var(--text-lt, #5F6368);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Finished</span>';
+}
+
+function ccAgo(iso) {
+  if (!iso) return '';
+  var d = new Date(iso).getTime() - Date.now();
+  if (!isFinite(d)) return '';
+  var ahead = d > 0, s = Math.abs(d) / 1000, n, u;
+  if (s < 90) return ahead ? 'in a moment' : 'just now';
+  if (s < 5400) { n = Math.round(s / 60); u = 'minute'; }
+  else if (s < 129600) { n = Math.round(s / 3600); u = 'hour'; }
+  else if (s < 5184000) { n = Math.round(s / 86400); u = 'day'; }
+  else { n = Math.round(s / 2592000); u = 'month'; }
+  var t = n + ' ' + u + (n === 1 ? '' : 's');
+  return ahead ? 'in ' + t : t + ' ago';
+}
+
+async function ccLoadList() {
+  var box = document.getElementById('ccList');
+  if (!box) return;
+  if (_sessionIsDemo) {
+    box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Demo mode — no clinicians to show.</div>';
+    return;
+  }
+  try {
+    var r = await _supa.rpc('clinic_clinicians_list');
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) {
+      box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">'
+        + escHtml((r.data && r.data.error) || 'Only the clinic owner can see this.') + '</div>';
+      return;
+    }
+    var rows = r.data.clinicians || [];
+    if (!rows.length) {
+      box.innerHTML = '<div style="text-align:center;padding:20px 12px;color:var(--text-lt, #5F6368);font-size:13px;line-height:1.55">'
+        + 'No clinician has joined yet.<br>Show a code above and they can start today.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (c) {
+      var live = c.status === 'active' &&
+        (!c.expires_at || new Date(c.expires_at).getTime() > Date.now());
+      var meta = [];
+      if (c.profession) meta.push(escHtml(c.profession));
+      if (c.registration_no) meta.push(escHtml(c.registration_no));
+      if (c.phone) meta.push(escHtml(c.phone));
+      var work = [(c.treatments || 0) + ' treatment' + (c.treatments === 1 ? '' : 's')];
+      if (c.last_seen) work.push('last ' + ccAgo(c.last_seen));
+      if (live && c.expires_at) work.push('access ends ' + ccAgo(c.expires_at));
+      if (!live && c.ended_at) work.push('ended ' + ccAgo(c.ended_at));
+
+      return '<div style="padding:13px 0;border-bottom:1px solid var(--border, #E0E0E0)">'
+        + '<div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">'
+        +   '<div style="flex:1;min-width:150px">'
+        +     '<div style="font-weight:700;color:var(--text, #1A1A1A);font-size:14.5px">' + escHtml(c.full_name || 'Clinician') + '</div>'
+        +     '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px;line-height:1.5">' + meta.join(' · ') + '</div>'
+        +     '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px;line-height:1.5">' + work.join(' · ') + '</div>'
+        +     '<div style="margin-top:7px">' + ccPill(c)
+        +       (c.rated ? ' <span style="font-size:11px;color:var(--text-lt, #5F6368);font-weight:700">· you rated them ' + (c.rating || '?') + '/5</span>' : '')
+        +     '</div>'
+        +   '</div>'
+        + '</div>'
+        /* Data attributes and addEventListener, NOT inline onclick with the
+         * name interpolated into it.
+         *
+         * A name goes through escHtml on the way in, so an apostrophe becomes
+         * &#39; — and the HTML parser turns that back into a plain ' BEFORE the
+         * JavaScript in an onclick attribute is parsed. So O'Brien breaks a
+         * single-quoted argument, and JSON.stringify's double quotes end the
+         * attribute itself. Both produce "Unexpected end of input" on click,
+         * and the button silently does nothing.
+         *
+         * The name never has to survive two rounds of quoting if it is never
+         * put into markup as code. */
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+        +   '<button type="button" class="cc-act" data-act="work" data-stint="' + escHtml(c.stint_id) + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--brand-tint);color:var(--brand-ink);font-weight:700;cursor:pointer;font-family:inherit">Who they treated</button>'
+        +   (live ? '<button type="button" class="cc-act" data-act="end" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--danger);background:var(--cl-danger-bg, #FFF5F5);color:var(--danger-ink);font-weight:700;cursor:pointer;font-family:inherit">End their access</button>' : '')
+        +   '<button type="button" class="cc-act" data-act="rate" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface, #fff);color:var(--text, #1A1A1A);font-weight:700;cursor:pointer;font-family:inherit">' + (c.rated ? 'Change the reference' : 'Leave a reference') + '</button>'
+        + '</div>'
+        + '<div id="ccWork_' + escHtml(c.stint_id) + '" style="display:none;margin-top:10px"></div>'
+        + '</div>';
+    }).join('');
+
+    box.querySelectorAll('.cc-act').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-stint');
+        var nm = btn.getAttribute('data-name');
+        if (btn.getAttribute('data-act') === 'work') return ccSeeWork(id, btn);
+        if (btn.getAttribute('data-act') === 'end')  return ccEnd(id, nm);
+        return ccRate(id, nm);
+      });
+    });
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Could not load just now.</div>';
+  }
+}
+
+/* Who a clinician treated — inside THIS clinic only.
+ * These names come from the clinic's own records and stay here. They are not
+ * in the clinician's travelling record and they do not follow them out. */
+async function ccSeeWork(stintId, btn) {
+  var box = document.getElementById('ccWork_' + stintId);
+  if (!box) return;
+  if (box.style.display === 'block') { box.style.display = 'none'; btn.textContent = 'Who they treated'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Loading…</div>';
+  btn.textContent = 'Hide';
+  try {
+    var r = await _supa.rpc('clinic_clinician_detail', { p_stint_id: stintId });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) { box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">' + escHtml((r.data && r.data.error) || 'Not available.') + '</div>'; return; }
+    var work = r.data.work || [];
+    if (!work.length) { box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Nothing recorded yet.</div>'; return; }
+    box.innerHTML = '<div style="background:var(--brand-tint);border-radius:11px;padding:10px 12px;max-height:280px;overflow-y:auto">'
+      + work.slice(0, 60).map(function (w) {
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:12.5px;color:var(--brand-ink);line-height:1.5">'
+            + '<strong>' + escHtml(w.patient_name || w.case_code || 'Walk-in') + '</strong> — '
+            + escHtml(w.diagnosis || '—')
+            + '<span style="opacity:.75"> · ' + ccAgo(w.created_at) + '</span></div>';
+        }).join('')
+      + (work.length > 60 ? '<div style="font-size:11px;color:var(--brand-ink);opacity:.8;padding-top:8px">…and ' + (work.length - 60) + ' more</div>' : '')
+      + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Could not load just now.</div>';
+  }
+}
+
+async function ccEnd(stintId, name) {
+  if (!confirm('End ' + name + '’s access to this clinic?\n\nThey will not be able to record anything here until you give them a new code. Everything they already recorded stays on this clinic’s record.')) return;
+  try {
+    var r = await _supa.rpc('end_clinician_stint', { p_stint_id: stintId, p_reason: null });
+    if (r.error) throw r.error;
+    showToast('Access ended', 'success');
+    ccLoadList();
+    // Ask for the reference straight away. Asked a week later it is not
+    // written at all, and a clinician arriving at their next clinic has
+    // nothing to show for the months they worked here.
+    setTimeout(function () { ccRate(stintId, name); }, 400);
+  } catch (e) {
+    showToast((e && e.message) || 'Could not end access', 'error');
+  }
+}
+
+function ccPaintStars() {
+  var box = document.getElementById('ccStarPick');
+  var words = ['', 'Poor', 'Not good', 'Fine', 'Good', 'Very good'];
+  box.innerHTML = '';
+  for (var i = 1; i <= 5; i++) {
+    (function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = n <= _ccStars ? 'on' : '';
+      b.setAttribute('aria-label', n + ' out of 5');
+      b.innerHTML = '<span class="material-icons-outlined" style="font-size:30px">star</span>';
+      b.style.cssText = 'background:none;border:none;cursor:pointer;padding:2px;font:inherit;color:'
+        + (n <= _ccStars ? 'var(--warning)' : 'var(--border, #E0E0E0)');
+      b.onclick = function () { _ccStars = n; ccPaintStars(); };
+      box.appendChild(b);
+    })(i);
+  }
+  document.getElementById('ccStarWord').textContent = words[_ccStars] || '';
+}
+
+function ccRate(stintId, name) {
+  _ccCurrent = stintId; _ccStars = 5;
+  document.getElementById('ccRateTitle').textContent = 'How did ' + name + ' do?';
+  document.getElementById('ccNote').value = '';
+  document.getElementById('ccRehire').checked = true;
+  document.getElementById('ccRateErr').style.display = 'none';
+  ccPaintStars();
+  document.getElementById('ccRateModal').style.display = 'flex';
+}
+
+(function wireRate() {
+  var m = document.getElementById('ccRateModal');
+  if (!m) return;
+  m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+  var cancel = document.getElementById('ccRateCancel');
+  if (cancel) cancel.onclick = function () { m.style.display = 'none'; };
+  var save = document.getElementById('ccRateSave');
+  if (!save) return;
+  save.onclick = async function () {
+    var err = document.getElementById('ccRateErr');
+    err.style.display = 'none';
+    save.disabled = true; save.textContent = 'Saving…';
+    try {
+      var r = await _supa.rpc('rate_clinician', { p: {
+        stint_id: _ccCurrent,
+        rating: String(_ccStars),
+        would_rehire: String(document.getElementById('ccRehire').checked),
+        reference_note: (document.getElementById('ccNote').value || '').trim(),
+      } });
+      if (r.error) throw r.error;
+      if (r.data && r.data.ok === false) throw new Error(r.data.error);
+      m.style.display = 'none';
+      showToast('Reference saved — it goes with them', 'success');
+      ccLoadList();
+    } catch (e) {
+      err.textContent = (e && e.message) || 'Could not save just now.';
+      err.style.display = 'block';
+    } finally {
+      save.disabled = false; save.textContent = 'Save';
+    }
+  };
+})();
 
 function buildSuggestedSpecs() {
   var el = document.getElementById('suggestedSpecs');
@@ -2005,6 +2279,28 @@ async function dictCheck() {
   }
 }
 
+/* ── Speaking: on or off, for everything ────────────────────────────────── */
+function voiceSwitch() {
+  var box = document.getElementById('voiceOff');
+  if (!box) return;
+  var KEY = (window.HomattDictate && window.HomattDictate.VOICE_OFF_KEY) || 'homatt_voice_off';
+  try { box.checked = localStorage.getItem(KEY) === '1'; } catch (e) {}
+  box.addEventListener('change', function () {
+    try { localStorage.setItem(KEY, box.checked ? '1' : ''); } catch (e) {}
+    // The floating microphone is on THIS page, so it can be put away at once.
+    // The dictate buttons live on the treatment screen and are read when that
+    // screen is built, so they follow on its next open — which is why the note
+    // under the switch says "on this phone" rather than promising "now".
+    try {
+      if (window.HomattSpeak) {
+        if (box.checked) window.HomattSpeak.applyLook();
+        else { window.HomattSpeak.mount(); window.HomattSpeak.applyLook(); }
+      }
+    } catch (e) {}
+    showToast(box.checked ? 'Speaking is off on this phone' : 'Speaking is back on', 'success');
+  });
+}
+
 /* ── The floating microphone: how faint, which side, or off ─────────────── */
 function spSettings() {
   var range = document.getElementById('spOpacity');
@@ -2048,6 +2344,7 @@ function spSettings() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(voiceSwitch, 0);
   setTimeout(spSettings, 0);
   var btn = document.getElementById('dictCheckBtn');
   if (btn) btn.addEventListener('click', dictCheck);
@@ -2067,6 +2364,9 @@ document.addEventListener('DOMContentLoaded', function () {
 <script src="js/clinic-dictate.js?v=20261007" defer></script>
 <script src="js/clinic-speak.js?v=20261007" defer></script>
 <script src="js/pwa-install.js?v=20261007"></script>
+<!-- Draws the clinician handshake QR. No CDN: the code is shown to somebody
+     standing in the room, which is exactly when the connection is worst. -->
+<script src="clinician/js/qr.js?v=20260911"></script>
 
 <script>
 // ── App version, and fetching a newer one ───────────────────────────────────

@@ -122,7 +122,7 @@ function rpcReply(name, body) {
   });
 
   // ── 1. Signing up, with no clinic anywhere in sight ──────────────────
-  await page.goto(ORIGIN + '/clinician/index.html', { waitUntil: 'load' });
+  await page.goto(ORIGIN + '/clinic/clinician/index.html', { waitUntil: 'load' });
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: 'load' });
   await page.waitForTimeout(400);
@@ -246,7 +246,7 @@ function rpcReply(name, body) {
       bare:  codeFrom('ABCD2345'),
       lower: codeFrom('abcd2345'),
       tagged: codeFrom('HOMATT-CLINIC:ABCD2345'),
-      url:   codeFrom('https://example.org/clinician/join.html?c=ABCD2345'),
+      url:   codeFrom('https://example.org/clinic/clinician/join.html?c=ABCD2345'),
       junk:  codeFrom('https://some-other-site.example/thing'),
     };
   });

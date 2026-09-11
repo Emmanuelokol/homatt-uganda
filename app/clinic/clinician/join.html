@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Homatt — Join a clinic</title>
-  <link href="../clinic/fonts/inter.css?v=1" rel="stylesheet">
-  <link href="../clinic/fonts/material-icons.css?v=1" rel="stylesheet">
-  <link rel="stylesheet" href="../clinic/css/clinic.css?v=20261007">
+  <link href="../fonts/inter.css?v=1" rel="stylesheet">
+  <link href="../fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="stylesheet" href="../css/clinic.css?v=20261007">
   <link rel="stylesheet" href="css/clinician.css?v=20260911">
   <meta name="color-scheme" content="light dark">
   <meta name="theme-color" content="#1B5E20">
@@ -85,8 +85,8 @@
   </div>
 </div>
 
-<script src="../clinic/js/vendor/supabase.min.js?v=2110"></script>
-<script src="../js/config.js"></script>
+<script src="../js/vendor/supabase.min.js?v=2110"></script>
+<script src="../../js/config.js"></script>
 <script src="js/clinician.js?v=20260911"></script>
 <script>
 (function () {
@@ -139,7 +139,7 @@
       }
       show(msgEl, 'You are in — ' + r.data.clinic_name + '. Opening the clinic…', 'good');
       C.enterClinic(r.data);
-      setTimeout(function () { window.location.href = '../clinic/dashboard.html'; }, 700);
+      setTimeout(function () { window.location.href = '../dashboard.html'; }, 700);
     } catch (e) {
       show(msgEl, C.saySorry(e, 'Could not join just now.'));
     } finally {

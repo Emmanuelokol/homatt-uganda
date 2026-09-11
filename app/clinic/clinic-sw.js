@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v172';
+const CACHE = 'homatt-clinic-v173';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -39,6 +39,19 @@ const SHELL = [
   'settings.html',
   'messages.html',
   'guidelines.html',
+  /* The clinician portal lives INSIDE /clinic/ for one reason: scope.
+   *
+   * This worker is registered with scope './', so it can only intercept — and
+   * therefore only serve, cache and self-update — files under /clinic/. Put at
+   * /clinician/ these three pages would load from whatever shipped in the APK
+   * and could never change, which is exactly the fault the self-update
+   * mechanism below exists to fix. */
+  'clinician/index.html',
+  'clinician/home.html',
+  'clinician/join.html',
+  'clinician/css/clinician.css?v=20260911',
+  'clinician/js/clinician.js?v=20260911',
+  'clinician/js/qr.js?v=20260911',
   'js/guidelines.js?v=20261007',
   'js/vendor/sql-wasm.js',
   'js/ucg-autofill.js?v=20261007',

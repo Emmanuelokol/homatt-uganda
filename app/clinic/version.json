@@ -1,5 +1,5 @@
 {
-  "cache": "homatt-clinic-v172",
+  "cache": "homatt-clinic-v173",
   "dataVersion": "144",
   "files": [
     "./",
@@ -9,6 +9,13 @@
     "settings.html",
     "messages.html",
     "guidelines.html",
+    "./",
+    "clinician/index.html",
+    "clinician/home.html",
+    "clinician/join.html",
+    "clinician/css/clinician.css?v=20260911",
+    "clinician/js/clinician.js?v=20260911",
+    "clinician/js/qr.js?v=20260911",
     "js/guidelines.js?v=20261007",
     "js/vendor/sql-wasm.js",
     "js/ucg-autofill.js?v=20261007",

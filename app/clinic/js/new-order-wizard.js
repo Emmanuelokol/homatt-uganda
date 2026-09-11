@@ -2619,6 +2619,28 @@
             : (Number(state.amountPaid) > 0 ? Number(state.amountPaid) : 0)),
     };
 
+    /* A visiting clinician does not price anybody.
+     *
+     * The fees card is hidden from them, so every fee above is whatever the
+     * form defaulted to — and a default is not a price somebody agreed to. Left
+     * alone it would go onto the clinic's books as a real charge, recorded
+     * against a patient, by somebody who never saw the number and has no
+     * standing to set it. The clinic would then chase a debt it invented.
+     *
+     * So the money is stripped out rather than zeroed-by-accident, and the
+     * visit is left unpriced for the clinic's own people to settle. Hiding the
+     * card alone would have been the bug: the screen would look right and the
+     * ledger would be wrong.
+     */
+    if (typeof clinicCan === 'function' && !clinicCan('payments')) {
+      dxPayload.consultation_fee_ugx = 0;
+      dxPayload.lab_fee_ugx          = 0;
+      dxPayload.meds_fee_ugx         = 0;
+      dxPayload.total_charged_ugx    = 0;
+      dxPayload.amount_paid          = 0;
+      dxPayload.payment_status       = 'pending';
+    }
+
     // ── OFFLINE: queue the entire consultation and sync when back online ──
     // Used both when the device is plainly offline AND when an online save hits
     // a network error/timeout on a flaky link — so a consultation is NEVER lost.

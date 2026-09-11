@@ -360,8 +360,24 @@ var CLINIC_ROLE_CAPS = {
   owner:        ['*'],
   // Clinicians & nurses: clinical work + selling + stock (view/restock/add
   // item) — but NOT financial reports, payments ledger or settings.
-  clinician:    ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock'],
-  nurse:        ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock'],
+  clinician:    ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock', 'stockview'],
+  nurse:        ['consultations', 'history', 'bookings', 'meds', 'quicksale', 'stock', 'stockview'],
+  /* A clinician who arrived by scanning this clinic's QR code.
+   *
+   * They are here to treat people, and that is all they are here to do. The
+   * clinic's money is not theirs to see — not the takings, not who owes what,
+   * not the monthly report — and neither is the business of running the
+   * shelves: no restock, no quick sale, no adding an item, no prices.
+   *
+   * 'stockview' IS granted, and the distinction is the whole point: a
+   * clinician has to know whether the amoxicillin is on the shelf before
+   * prescribing it, which is a clinical question. How much it cost, how much
+   * it sells for and when it was last bought are not.
+   *
+   * They are a guest in somebody else's clinic. This list is what a guest
+   * needs, and nothing beyond it.
+   */
+  visiting_clinician: ['consultations', 'history', 'bookings', 'meds', 'stockview'],
   // Receptionists: the front desk — bookings, history, recording payments and
   // quick sales. No clinical notes, no stock, no finances, no settings.
   receptionist: ['bookings', 'history', 'payments', 'quicksale'],
@@ -373,6 +389,7 @@ var CLINIC_ROLE_CAPS = {
 
 var CLINIC_ROLE_LABELS = {
   owner:        'Owner / Manager',
+  visiting_clinician: 'Visiting clinician',
   clinician:    'Clinician (Doctor)',
   nurse:        'Nurse',
   receptionist: 'Receptionist',
@@ -383,8 +400,18 @@ function clinicRole() {
   try {
     var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
     if (s && s.staffRole && CLINIC_ROLE_CAPS[s.staffRole]) return s.staffRole;
+    /* The fail-safe below hands out FULL access, which is right for a clinic's
+     * own staff — a missing column or an older session must never lock an owner
+     * out of their own clinic. It is exactly wrong for a visiting clinician: a
+     * corrupted or half-written session would hand somebody else's clinic its
+     * takings, its stock and its reports.
+     *
+     * So the fail-safe is inverted for a guest. `clinician: true` is written
+     * only by the clinician portal, and once it is there the answer is the
+     * narrow role whatever else is missing. */
+    if (s && s.clinician === true) return 'visiting_clinician';
   } catch (e) {}
-  return 'owner';   // fail-safe: full access
+  return 'owner';   // fail-safe: full access for a clinic's own people
 }
 
 function clinicCan(cap) {

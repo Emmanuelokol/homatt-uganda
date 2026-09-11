@@ -317,7 +317,7 @@
       </a>
       <a href="messages.html" class="sidebar-link"><span class="material-icons-outlined">forum</span> Messages</a>
       <a href="guidelines.html" class="sidebar-link"><span class="material-icons-outlined">menu_book</span> Clinical Guidelines</a>
-      <a href="#" class="sidebar-link" data-nav-cap="stock" onclick="openSectionView('stock');return false;">
+      <a href="#" class="sidebar-link" data-nav-cap="stockview" onclick="openSectionView('stock');return false;">
         <span class="material-icons-outlined">inventory_2</span> Stock — full list
       </a>
       <a href="#" class="sidebar-link" data-nav-cap="payments" onclick="openSectionView('payments');return false;">
@@ -553,13 +553,18 @@
       </div>
 
       <!-- Stock Tracker -->
-      <div class="admin-table-wrap" data-cap="stock" style="padding:0;margin-bottom:12px;background:none;box-shadow:none" data-slide="stock">
+      <!-- SEEING what is on the shelf is a clinical question — there is no
+           point prescribing amoxicillin that ran out on Tuesday — so the list
+           itself is data-cap="stockview", which a visiting clinician has.
+           CHANGING the shelf is the clinic's own business, so Add Item keeps
+           data-cap="stock", which they do not. -->
+      <div class="admin-table-wrap" data-cap="stockview" style="padding:0;margin-bottom:12px;background:none;box-shadow:none" data-slide="stock">
         <div class="table-header" style="justify-content:space-between;border-bottom:none;padding-left:2px;padding-right:2px">
           <div class="table-title">
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:var(--accent)">inventory_2</span>
             Stock Tracker
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
+          <div style="display:flex;gap:8px;align-items:center" data-cap="stock">
             <button onclick="(window.StockIntake?window.StockIntake.start(null):openAddStockModal())" style="font-size:12px;padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-family:inherit;display:flex;align-items:center;gap:4px">
               <span class="material-icons-outlined" style="font-size:15px">add</span> Add Item
             </button>
