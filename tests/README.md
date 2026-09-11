@@ -51,6 +51,9 @@ quickly.
 | `test-clinic-clinicians.js` | the owner's side — the QR, who joined, who they treated, ending it, the reference |
 | `test-clinician-gating.js` | what a visiting clinician cannot reach, and that the money leaves the saved record as well as the screen |
 | `test-voice-optional.js` | all three microphones going away together, and every box they filled still being typeable |
+| `test-guidelines-browse.js` | the contents page, the sections the import buried, and text laid out rather than dumped |
+| `test-guidelines-search.js` | that a word anywhere in the book can be found — not only a word in a heading — and that a bare heading lists what is under it |
+| `test-doses.js` | that a drug is only ever offered for the condition the book prints it under, and the cases where that rule must NOT fire |
 
 Two of these are not browser tests at all:
 
@@ -63,6 +66,14 @@ Two of these are not browser tests at all:
 many of 30 dictations land in the right box, how many of the 750 essential
 medicines the dose parser reads). Run them when changing the thing they
 measure, and put the number in the commit message.
+
+Three worth knowing about, because they answer questions that reading cannot:
+
+| | |
+|---|---|
+| `measure-search.js` | what a clinician can and cannot find. It also reports whether the shipped WASM has FTS5 — it does not, which is why every search in this app quietly ran as `title LIKE` until it was measured. |
+| `measure-doses.js` | every one of the 1,008 medicine rows against the book text it came from: is the line really in that section, is the dose readable in that line, and is the section printed under that heading at all. |
+| `measure-panel-text.js` | **a measurement that says no.** It was written to justify replacing the package's layout rule with the guideline screen's, and it showed that rule would cut 1,723 sentences in half here. The change was dropped and the number kept. |
 
 ## Writing another one
 
