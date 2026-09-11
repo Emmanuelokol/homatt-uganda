@@ -731,14 +731,66 @@
      * bottom of the panel saying where it belongs — because a drug that
      * silently disappears is its own kind of wrong.
      */
-    var elsewhere = [];
+    var elsewhere = [], ranOn = null;
     try {
       if (window.HomattUcgSections) {
-        meds = window.HomattUcgSections.attribute(c, meds, _sectionAt(c));
+        var look = _sectionAt(c);
+        meds = window.HomattUcgSections.attribute(c, meds, look);
         elsewhere = meds.filter(function (m) { return m.printedUnder; });
         meds = meds.filter(function (m) { return !m.printedUnder; });
+
+        /* CUTTING THE MEDICINES TABLE IS NOT ENOUGH, and finding that out is
+         * the reason the test drives this screen rather than reading it.
+         *
+         * Lithium and clozapine went, because those came from the medicines
+         * table. Alprazolam, bupropion, carbamazepine and fluoxetine came
+         * straight back — because findMissingDrugs() reads the section's PROSE
+         * again, against the national medicines list, to recover drugs the
+         * extraction never pulled out. That prose is the same run-on text, so
+         * the recovery path handed back exactly what had just been removed.
+         *
+         * The same run-on text also decides which drug is "first line", so a
+         * ranking word printed under Psychosis could label a drug here.
+         *
+         * So the section is cut where the book ends it, once, and everything
+         * downstream reads the cut text. The rule holds wherever the book's
+         * words are used, not only where the table was.
+         */
+        var bounds = window.HomattUcgSections.boundaries(c, look);
+        if (bounds.length) {
+          /* THE FIELDS CANNOT BE CUT THE SAME WAY, and this is the part that
+           * is not obvious. `management` for this row is 7,709 characters
+           * holding all six drugs and NOT ONE HEADING — the extraction took
+           * the headings out when it split the fields. There is nothing in
+           * that string to cut at.
+           *
+           * So `full_text` is the arbiter, because it is the only field that
+           * still has the book's structure in it. Everything before the first
+           * boundary is this section; a line of any other field is kept only
+           * if it is in there. */
+          var own = String(c.full_text || '').slice(0, bounds[0].at)
+            .replace(/\s+/g, ' ').toLowerCase();
+          var keepOwn = function (t) {
+            var lines = String(t).split('\n'), out = [], dropped = false;
+            for (var i = 0; i < lines.length; i++) {
+              var f = lines[i].replace(/\s+/g, ' ').trim().toLowerCase();
+              // A blank or a scrap too short to locate follows the line above
+              // it rather than being judged on its own.
+              if (f.length < 4) { if (out.length) out.push(lines[i]); continue; }
+              if (own.indexOf(f) >= 0) out.push(lines[i]); else dropped = true;
+            }
+            return { text: out.join('\n'), dropped: dropped };
+          };
+          ['management', 'prevention', 'notes', 'clinical_features', 'investigations',
+           'differential', 'complications', 'causes'].forEach(function (k) {
+            if (!ctx.info[k]) return;
+            var r = keepOwn(ctx.info[k]);
+            if (r.dropped) { ctx.info[k] = r.text; ranOn = true; }
+          });
+        }
       }
     } catch (e) { elsewhere = []; }
+    ctx.ranOn = !!ranOn;
     ctx.elsewhere = elsewhere.map(function (m) {
       return { drug: (m.name || '') + (m.dose ? ' ' + m.dose + (m.unit || '') : ''),
                under: m.printedUnder.title, id: m.printedUnder.id };
@@ -781,7 +833,12 @@
     // Anything the guideline names that never made it into the medicines table
     // at all. No dose is invented for these — the guideline's own words are
     // shown instead, and the clinician sets the dose if they give it.
-    var prose = [c.management, c.prevention, c.notes].filter(Boolean).join('\n');
+    // ctx.info, not c — these have been cut where the book ends the section,
+    // and this prose is what recovers drugs and reads the "first line" /
+    // "alternative" ranking off the page. Reading the uncut text here put four
+    // of the drugs that had just been removed straight back.
+    var prose = [ctx.info.management, ctx.info.prevention, ctx.info.notes]
+      .filter(Boolean).join('\n');
     var known = drugs.map(function (d) { return d.drug || d.text || ''; });
     var marks = rankMarkers(prose);
     findMissingDrugs(prose, known, marks).forEach(function (mm) {
@@ -1769,21 +1826,33 @@
    * past its own end (tests/measure-doses.js). */
   function elsewhereHtml() {
     var e = (ctx && ctx.elsewhere) || [];
-    if (!e.length) return '';
+    var ranOn = !!(ctx && ctx.ranOn);
+    if (!e.length && !ranOn) return '';
     var by = {};
     e.forEach(function (x) { (by[x.under] = by[x.under] || []).push(x.drug); });
     return '<div class="ucg-elsewhere">' +
       '<div class="ucg-el-h"><span class="material-icons-outlined">report_problem</span>' +
-      'Left out: ' + e.length + ' medicine' + (e.length === 1 ? '' : 's') +
-      ' the guideline prints under another heading</div>' +
+      (e.length
+        ? 'Left out: ' + e.length + ' medicine' + (e.length === 1 ? '' : 's') +
+          ' the guideline prints under another heading'
+        : 'This section’s text runs on into the next one') +
+      '</div>' +
       Object.keys(by).map(function (k) {
         return '<div class="ucg-el-g"><b>' + esc(k) + '</b> — ' +
           esc(by[k].join(', ')) + '</div>';
       }).join('') +
-      '<div class="ucg-el-n">The page these were lifted from runs on past the ' +
-      'end of this section in the printed book, so they were filed here by ' +
-      'mistake. They are not this condition\'s treatment and are not offered ' +
-      'for it. Open the section named above if one of them is what you want.' +
+      '<div class="ucg-el-n">' +
+      (e.length
+        ? 'The page these were lifted from runs on past the end of this ' +
+          'section in the printed book, so they were filed here by mistake. ' +
+          'They are not this condition’s treatment and are not offered for ' +
+          'it. Open the section named above if one of them is what you want. '
+        : '') +
+      (ranOn
+        ? 'The notes below have been cut back to what the book prints under ' +
+          'this heading. Anything belonging to the sections after it is in ' +
+          'those sections, where it can be read in its own context.'
+        : '') +
       '</div></div>';
   }
 

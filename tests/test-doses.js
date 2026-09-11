@@ -8,7 +8,7 @@
 // Measured over all 1,008 rows (tests/measure-doses.js):
 //
 //   source line verbatim in its own section : 1008 of 1008
-//   dose readable in that line              :  982 of 982
+//   dose readable in that line              :  980 of 980
 //   MEDICINES PRINTED UNDER ANOTHER HEADING :   28
 //
 // The first two lines are why this was invisible. Every row IS a real line of
@@ -24,7 +24,16 @@
 //
 // Two more sit under a heading the import buried with NO row of its own:
 // Oesophageal Varices' propranolol, filed under Hepatic Encephalopathy, and
-// Alcohol Use Disorders' thiamine. 28 rows in all, across two sections.
+// Alcohol Use Disorders' thiamine. 28 rows in all, across three section rows —
+// there are TWO rows titled "Postnatal Psychosis" and both ran on.
+//
+// And cutting the medicines table is NOT enough, which only driving the real
+// package screen showed: lithium and clozapine went, and alprazolam,
+// bupropion, carbamazepine and fluoxetine came straight back, because
+// findMissingDrugs() re-reads the section's PROSE against the national
+// medicines list to recover drugs the extraction missed. That prose is the
+// same run-on text. The section is now cut once, and everything downstream
+// reads the cut text.
 //
 // This drives the real guideline screen against the real 4 MB book, and tests
 // the boundary finder directly on the cases where it must NOT fire — which is
@@ -226,6 +235,86 @@ const result = (n, ok, x) => {
   result('including the two under a heading that has no section of its own',
     /Hepatic Encephalopathy[^,]*\(1\)/.test(sweep.names.join(', ')) &&
     /Postnatal Psychosis \(1\)/.test(sweep.names.join(', ')), sweep.names.join(', '));
+
+  /* ── 4. The screen that actually prescribes ─────────────────────────
+   *
+   * Everything above is the reference screen, where a labelled row is the
+   * right answer. The one-tap package is the screen that hands the patient
+   * the medicine and puts it on the bill, and there a labelled row is not
+   * enough: it must not be offered at all. This drives the real intake
+   * screen, types the condition and opens the package. */
+  await page.goto(ORIGIN + '/clinic/new-order.html', { waitUntil: 'load' });
+  await page.waitForTimeout(4500);
+  const pack = await page.evaluate(async () => {
+    const set = (id, v) => {
+      const e = document.getElementById(id);
+      if (!e) return;
+      e.value = v; e.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+    set('confirmedDx', 'Postnatal Psychosis');
+    // The screen's own entry point, which is what every route into the package
+    // eventually calls — the suggestion list, the wizard button and the
+    // floating microphone's handoff all end here.
+    await window.UCGPackage.start('Postnatal Psychosis', '', window._wizState);
+    await new Promise(r => setTimeout(r, 3000));
+    const o = document.getElementById('ucgOverlay');
+    // Some conditions ask which section first.
+    const ask = document.querySelector('#ucgAskDiff [data-h]');
+    if (ask && (!o || getComputedStyle(o).display === 'none')) {
+      ask.click();
+      await new Promise(r => setTimeout(r, 2500));
+    }
+    const panel = document.getElementById('ucgPanel');
+    const names = Array.from(document.querySelectorAll('.ucg-drug')).map(d => d.textContent).join(' | ');
+    const el = document.querySelector('.ucg-elsewhere');
+    return {
+      open: o ? getComputedStyle(o).display : '(none)',
+      drugs: document.querySelectorAll('.ucg-drug').length,
+      names: names,
+      note: el ? el.innerText.replace(/\s+/g, ' ') : '',
+      all: panel ? panel.innerText.replace(/\s+/g, ' ') : '',
+    };
+  });
+  result('the package for the corrupted section opens', pack.open === 'flex', 'overlay ' + pack.open);
+  result('and it says what was left out, and where the book prints it',
+    /left out/i.test(pack.note) && /under another heading/i.test(pack.note),
+    pack.note.slice(0, 110));
+  result('naming the drug, so nothing vanishes silently',
+    /thiamine|lithium|clozapine/i.test(pack.note), pack.note.slice(0, 90));
+  result('and that the notes were cut back to this heading',
+    /cut back to what the book prints under this heading/i.test(pack.note),
+    pack.note.slice(-110));
+  // The guideline notes must not carry another section's management either —
+  // cutting the medicines table alone left four of the drugs to come straight
+  // back through the prose that findMissingDrugs() re-reads.
+  result('the guideline notes no longer carry the swallowed sections\' text',
+    !/lithium|clozapine|bupropion/i.test(pack.all.replace(pack.note, '')),
+    (pack.all.match(/lithium|clozapine|bupropion/gi) || []).join(','));
+
+  /* The title "Postnatal Psychosis" is ambiguous — the extraction produced TWO
+   * rows with it, and the one the screen resolves to is the 9.1.1.1 one. So
+   * the six drugs that made this dangerous are checked against the OTHER row
+   * by its number, through the same builder the screen uses. Asserting only on
+   * whichever row happened to open would have passed while proving nothing. */
+  const built = await page.evaluate(async () => {
+    const db = window.UCGPackage.db();
+    const st = db.prepare('SELECT id FROM conditions WHERE number = ? LIMIT 1');
+    let id = null;
+    try { st.bind(['9.2.4.1']); if (st.step()) id = st.getAsObject().id; } finally { st.free(); }
+    if (id == null) return { id: null };
+    const p = await window.UCGPackage._build(id, '');
+    return { id: id, drugs: (p && p.drugs || []).map(d => d.drug || d.text || '').join(' | ') };
+  });
+  result('the other row of the same name is reachable', built.id != null, 'id ' + built.id);
+  // The whole point. These six are what a breastfeeding mother was offered.
+  for (const drug of ['lithium', 'clozapine', 'alprazolam', 'bupropion',
+                      'carbamazepine', 'fluoxetine']) {
+    result('9.2.4.1 no longer offers ' + drug,
+      !new RegExp(drug, 'i').test(built.drugs || ''),
+      (built.drugs || '').slice(0, 60));
+  }
+  result('but it still offers what the book DOES print under it',
+    /\w/.test(built.drugs || ''), (built.drugs || '(nothing)').slice(0, 80));
 
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     !/ServiceWorker|service worker/i.test(e));
