@@ -108,6 +108,18 @@
     /* A section that has been laid out is real HTML, so pre-line would add a
        blank line after every block it already spaces. */
     .g-text.g-outline{white-space:normal}
+    /* A section the import buried inside its neighbour. */
+    .g-buried-note{
+      font-size:12.5px;line-height:1.6;color:var(--warning-ink);
+      background:var(--cl-warn-bg, #FFF4E5);border:1px solid var(--warning)
+    }
+    .g-buried-open{
+      display:inline-block;margin-top:8px;font:inherit;font-size:12px;font-weight:800;
+      border:1.5px solid var(--warning);background:var(--surface);color:var(--warning-ink);
+      border-radius:9px;padding:7px 12px;cursor:pointer
+    }
+    :root{--cl-warn-bg:#FFF4E5}
+    html[data-theme="dark"]{--cl-warn-bg:rgba(255,184,112,.16)}
     /* ── The contents page ─────────────────────────────────────────────── */
     .g-browse{margin-top:14px}
     .g-browse-h{
@@ -116,6 +128,11 @@
     }
     .g-browse-h .material-icons-outlined{font-size:19px;color:var(--primary-ink)}
     .g-browse-n{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--text-lt)}
+    .g-browse-note{
+      font-size:11.5px;line-height:1.55;color:var(--warning-ink);
+      background:var(--cl-warn-bg, #FFF4E5);border:1px solid var(--warning);
+      border-radius:10px;padding:9px 12px;margin:0 2px 10px
+    }
     .g-ch{
       background:var(--surface);border:1px solid var(--border);border-radius:12px;
       margin-bottom:8px;overflow:hidden

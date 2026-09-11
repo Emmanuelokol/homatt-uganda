@@ -79,8 +79,12 @@ const result = (n, ok, x) => {
   });
   result('there is a contents page, not only a search box', browse.there === true);
   result('every chapter of the book is listed', browse.chapters === 24, 'chapters=' + browse.chapters);
-  result('and every section in it', browse.sections === 551, 'sections=' + browse.sections);
-  result('the count is stated plainly on screen', /551 sections · 24 chapters/.test(browse.header), browse.header);
+  // 551 rows in the book's own table, plus the 7 recovered from inside their
+  // neighbour — which are real sections of the book with no row of their own.
+  result('and every section in it, including the ones with no entry of their own',
+    browse.sections === 558, 'sections=' + browse.sections);
+  result('the count on screen matches the list under it',
+    new RegExp(browse.sections + ' sections · 24 chapters').test(browse.header), browse.header);
 
   // The chapters he said looked missing, because they are not diseases.
   for (const want of ['FAMILY PLANNING', 'IMMUNIZATION', 'NUTRITION', 'PALLIATIVE CARE', 'ORAL AND DENTAL']) {
@@ -145,6 +149,46 @@ const result = (n, ok, x) => {
   result('searching a non-disease topic returns something',
     hits.shown && hits.text.trim().length > 0 && !/Nothing in this book/.test(hits.text),
     hits.text.split('\n').slice(0, 2).join(' / '));
+
+  // ── 5. The seven sections the import buried inside their neighbour ──
+  // ~30,000 characters that searching could not reach, because they have no
+  // row and no full-text entry — only a heading part-way down someone else's
+  // section.
+  const buriedNames = ['Adenoid Disease', 'Oesophageal Varices', 'Alcohol Use Disorders',
+                       'Substance Abuse', 'Hepatorenal Syndrome'];
+  for (const name of buriedNames) {
+    const hit = await page.evaluate(async (n) => {
+      const s = document.getElementById('gSearch');
+      s.value = n.split(' ')[0];
+      s.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise(r => setTimeout(r, 800));
+      const box = document.getElementById('gResults');
+      return box ? box.innerText : '';
+    }, name);
+    result('searching now finds "' + name + '"',
+      hit.toLowerCase().includes(name.toLowerCase().split(' ')[0]),
+      hit.split('\n').slice(0, 2).join(' / '));
+  }
+
+  // Opening one shows its own text and says where the book prints it.
+  const buriedOpen = await page.evaluate(async () => {
+    const s = document.getElementById('gSearch');
+    s.value = 'adenoid';
+    s.dispatchEvent(new Event('input', { bubbles: true }));
+    await new Promise(r => setTimeout(r, 800));
+    const first = document.querySelector('#gResults .g-ac-item');
+    if (!first) return { opened: false };
+    first.click();
+    await new Promise(r => setTimeout(r, 800));
+    const card = document.getElementById('gCard');
+    return { opened: true, title: (card.querySelector('h2') || {}).textContent || '',
+             text: card.innerText, note: !!card.querySelector('.g-buried-note') };
+  });
+  result('and opening it shows that section, not its neighbour',
+    /Adenoid Disease/i.test(buriedOpen.title), buriedOpen.title);
+  result('with its own clinical text', /Eustachian|mouth breathing|snoring/i.test(buriedOpen.text || ''));
+  result('and it says where the book prints it',
+    buriedOpen.note === true && /Atrophic Rhinitis/i.test(buriedOpen.text || ''));
 
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
     !/ServiceWorker|service worker/i.test(e));

@@ -150,7 +150,15 @@
         'FROM conditions_fts f JOIN conditions c ON c.id = f.rowid ' +
         'WHERE conditions_fts MATCH ? ORDER BY rank LIMIT 12', [q]);
     } catch (e) { out = []; }
-    if (out.length) return out;
+    // A section the import buried inside its neighbour has no row and no FTS
+    // entry, so it can only be found by looking at the list we built.
+    var hidden = findBuried().filter(function (b) {
+      return b.title.toLowerCase().indexOf(String(term).toLowerCase()) >= 0;
+    }).map(function (b) {
+      return { id: b.key, number: b.number, title: b.title,
+               chapter_title: 'in ' + b.hostTitle, page: b.page };
+    });
+    if (out.length || hidden.length) return hidden.concat(out).slice(0, 12);
     return rows(
       'SELECT id, number, title, chapter_title, page FROM conditions ' +
       'WHERE title LIKE ? ORDER BY length(title) LIMIT 12', ['%' + term + '%']);
@@ -671,6 +679,109 @@
    * Every chapter, every section, nothing filtered and nothing capped. It is
    * built once and kept, because it is the same 551 rows every time.
    */
+  /* ── Sections the import buried inside their neighbour ───────────────────
+   *
+   * Seven headings in this book were swallowed by the section printed before
+   * them, so they exist in the text and in no index: searching "adenoid",
+   * "varices" or "alcohol" finds nothing, and the only way to reach roughly
+   * 30,000 characters of clinical text is to open the wrong condition and
+   * scroll past the end of it.
+   *
+   *   Oesophageal Varices            inside Hepatic Encephalopathy   p.437
+   *   Hepatorenal Syndrome           inside Hepatic Encephalopathy   p.437
+   *   Alcohol Use Disorders          inside Postnatal Psychosis      p.541
+   *   Substance Abuse                inside Postnatal Psychosis      p.541
+   *   Childhood Behavioural Disorders    "         "                 p.541
+   *   Childhood Developmental Disorders  "         "                 p.541
+   *   Adenoid Disease                inside Atrophic Rhinitis        p.962
+   *
+   * Adenoid Disease shows why: the book itself numbers it 21.2.6, the SAME
+   * number as the Atrophic Rhinitis printed above it. The importer keyed on
+   * the number, so the second one had nowhere to go.
+   *
+   * Nothing is moved or removed — the host keeps its text exactly as it is.
+   * These are ADDED as sections in their own right, findable by name and
+   * listed in their chapter, each showing its own slice and saying where in
+   * the book it is printed. Found by scanning the real text rather than by a
+   * hand-written list, so a rebuilt book with these fixed simply yields none.
+   */
+  var _buried = null;
+  var BURIED_HEAD = /(?:^|\n)[ \t]*(\d{1,2}(?:\.\d{1,2}){1,3})[ \t]+([A-Z][^\n]{2,80})/g;
+  var BURIED_UNIT = /^(MU|IU|mg|ml|g|kg|mcg|units?)\b/i;
+
+  function findBuried() {
+    if (_buried) return _buried;
+    _buried = [];
+    if (book !== 'ucg' || !cur().db) return _buried;
+    var all = rows('SELECT id, number, title, chapter_number, page, full_text FROM conditions');
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z]/g, ''); };
+    var known = {};
+    all.forEach(function (r) { known[norm(r.title)] = true; });
+
+    all.forEach(function (r) {
+      var txt = r.full_text;
+      if (!txt) return;
+      var hostNorm = norm(r.title), m;
+      BURIED_HEAD.lastIndex = 0;
+      while ((m = BURIED_HEAD.exec(txt)) !== null) {
+        var num = m[1];
+        var t = m[2].replace(/\s*ICD[- ]?10.*$/i, '').replace(/\s*CODE:.*$/i, '').trim();
+        if (t.length < 4 || BURIED_UNIT.test(t)) continue;
+        var tn = norm(t);
+        if (!tn || tn === hostNorm || known[tn]) continue;
+        // A real subsection carries its host's own chapter number; "2.4 MU IM"
+        // in a chapter-3 page is a dose, not a heading.
+        if (parseInt(num.split('.')[0], 10) !== Number(r.chapter_number)) continue;
+        _buried.push({
+          key: 'b' + r.id + '_' + _buried.length,
+          hostId: r.id, hostTitle: r.title, number: num, title: t,
+          chapter_number: r.chapter_number, page: r.page,
+          start: m.index + (m[0][0] === '\n' ? 1 : 0),
+        });
+      }
+    });
+    // Each slice runs to the next buried heading in the same host, or the end.
+    _buried.forEach(function (b) {
+      var host = all.filter(function (r) { return r.id === b.hostId; })[0];
+      var later = _buried.filter(function (o) {
+        return o.hostId === b.hostId && o.start > b.start;
+      }).map(function (o) { return o.start; });
+      b.end = later.length ? Math.min.apply(null, later) : host.full_text.length;
+      b.text = host.full_text.slice(b.start, b.end);
+    });
+    return _buried;
+  }
+
+  function buriedByKey(key) {
+    var list = findBuried();
+    for (var i = 0; i < list.length; i++) if (list[i].key === key) return list[i];
+    return null;
+  }
+
+  // One of these, rendered as its own section.
+  function renderBuried(key) {
+    var b = buriedByKey(key);
+    if (!b) return '';
+    // Drop the heading line itself; it becomes the title above.
+    var body = b.text.replace(/^[^\n]*\n?/, '');
+    return '<div class="g-head">' +
+      '<div class="g-head-num">' + esc(b.number) + '</div>' +
+      '<h2>' + esc(b.title) + '</h2>' +
+      '<div class="g-chips">' +
+        '<span class="g-chip">Ch ' + esc(String(b.chapter_number)) + '</span>' +
+        (b.page ? '<span class="g-chip">UCG 2023 p.' + esc(String(b.page)) + '</span>' : '') +
+      '</div></div>' +
+      '<div class="g-sec g-buried-note">' +
+        'In the printed book this section runs on from <b>' + esc(b.hostTitle) +
+        '</b> without a break of its own, so it had no entry to be found by. ' +
+        'The text below is exactly as printed. ' +
+        '<button type="button" class="g-buried-open" data-openhost="' + esc(String(b.hostId)) +
+        '">Open ' + esc(b.hostTitle) + '</button>' +
+      '</div>' +
+      section('The guideline text', asText(body)) +
+      sourcePanel(b.text, 'UCG 2023' + (b.page ? ', p.' + b.page : ''));
+  }
+
   var _browseBuilt = false;
   function buildBrowse() {
     var host = $('gBrowse');
@@ -685,13 +796,31 @@
     secs.forEach(function (s) {
       var k = String(s.chapter_number);
       (by[k] = by[k] || []).push(s);
+      // A section the import buried inside this one is listed right after it,
+      // where the book prints it — so the contents page matches the book.
+      findBuried().filter(function (b) { return b.hostId === s.id; })
+        .forEach(function (b) {
+          by[k].push({ id: null, buried: b.key, number: b.number,
+                       title: b.title, chapter_number: b.chapter_number, page: b.page });
+        });
     });
 
+    // Count what is actually listed, which is the book's sections PLUS the
+    // ones recovered from inside their neighbour. A number that does not match
+    // the list under it is worse than no number.
+    var listed = 0;
+    Object.keys(by).forEach(function (k) { listed += by[k].length; });
+    var extra = listed - secs.length;
     var html = '<div class="g-browse-h">' +
       '<span class="material-icons-outlined">list_alt</span>' +
       'Everything in the guideline' +
-      '<span class="g-browse-n">' + secs.length + ' sections · ' + chs.length + ' chapters</span>' +
-      '</div>';
+      '<span class="g-browse-n">' + listed + ' sections · ' + chs.length + ' chapters</span>' +
+      '</div>' +
+      (extra > 0
+        ? '<div class="g-browse-note">' + extra + ' of these run on from the section before ' +
+          'them in the printed book and had no entry of their own. They are listed here, ' +
+          'in their place, so they can be found.</div>'
+        : '');
 
     chs.forEach(function (ch) {
       var list = by[String(ch.number)] || [];
@@ -701,7 +830,8 @@
         '<span class="g-ch-c">' + list.length + '</span>' +
         '</summary><div class="g-ch-list">' +
         (list.length ? list.map(function (s) {
-          return '<button type="button" class="g-ch-item" data-open="' + esc(String(s.id)) + '">' +
+          return '<button type="button" class="g-ch-item"' +
+            (s.buried ? ' data-buried="' + esc(s.buried) + '"' : ' data-open="' + esc(String(s.id)) + '"') + '>' +
             '<span class="g-ci-t">' + esc(s.title) + '</span>' +
             (s.page ? '<span class="g-ci-p">p.' + esc(String(s.page)) + '</span>' : '') +
             '</button>';
@@ -712,9 +842,10 @@
     host.innerHTML = html;
     _browseBuilt = true;
     host.addEventListener('click', function (e) {
-      var b = e.target.closest && e.target.closest('[data-open]');
-      if (!b) return;
-      open(Number(b.getAttribute('data-open')));
+      var t = e.target.closest && e.target.closest('[data-open],[data-buried]');
+      if (!t) return;
+      if (t.hasAttribute('data-buried')) open(t.getAttribute('data-buried'));
+      else open(Number(t.getAttribute('data-open')));
     });
   }
 
@@ -727,7 +858,8 @@
     card.setAttribute('data-book', book);
     card.setAttribute('data-mode', mode);
     var html;
-    if (book === 'who' && mode === 'doses') html = renderDrug(id);
+    if (typeof id === 'string' && /^b\d+_/.test(id)) html = renderBuried(id);
+    else if (book === 'who' && mode === 'doses') html = renderDrug(id);
     else if (book === 'who') html = renderWho(id);
     else html = renderUcg(id);
     if (!html) return;
@@ -844,6 +976,11 @@
         if (typing) { var w = $('gWeight'); if (w) w.focus(); }
       }, 280);
     }
+  });
+  // "Open <host>" inside a buried section.
+  $('gCard').addEventListener('click', function (e) {
+    var oh = e.target.closest && e.target.closest('[data-openhost]');
+    if (oh) { open(Number(oh.getAttribute('data-openhost'))); return; }
   });
   $('gCard').addEventListener('click', function (e) {
     var clear = e.target.closest && e.target.closest('#gWeightClear');
