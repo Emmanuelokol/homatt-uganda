@@ -303,6 +303,32 @@ begin
   perform test_as('22222222-2222-4222-8222-222222222222'::uuid);   -- Gulu's owner
   select count(*) into n from public.clinician_activity where clinic_id = '11111111-1111-4111-8111-111111111111';
   perform ck('an owner cannot read what happened in another clinic', n = 0, 'rows=' || n);
+
+  /* And the positive side, which is the half that is easy to forget.
+   *
+   * Checking only that the walls hold would pass just as well if the walls
+   * were solid — an owner locked out of their own clinic's records looks
+   * exactly like good security until somebody opens the screen.
+   *
+   * This one is worth checking DIRECTLY rather than through the RPCs, because
+   * the policy on `clinicians` reads `clinic_clinicians` inside an EXISTS, and
+   * that table has RLS of its own. A policy whose subquery is itself filtered
+   * returns nothing, and every RPC would still work because they are security
+   * definer and never see any of it. */
+  perform test_as('22222222-2222-4222-8222-111111111111'::uuid);   -- Kampala's owner
+  select count(*) into n from public.clinic_clinicians
+   where clinic_id = '11111111-1111-4111-8111-111111111111';
+  perform ck('an owner CAN read the attachments to their own clinic', n >= 1, 'rows=' || n);
+
+  select count(*) into n from public.clinicians;
+  perform ck('an owner CAN read the record of a clinician attached to them', n >= 1, 'rows=' || n);
+
+  select count(*) into n from public.clinician_activity
+   where clinic_id = '11111111-1111-4111-8111-111111111111';
+  perform ck('an owner CAN read the work done in their own clinic', n >= 1, 'rows=' || n);
+
+  select count(*) into n from public.clinic_link_codes;
+  perform ck('and their own QR codes', n >= 1, 'rows=' || n);
 end $$;
 reset role;
 
