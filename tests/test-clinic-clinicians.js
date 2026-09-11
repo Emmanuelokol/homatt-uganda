@@ -60,6 +60,24 @@ function rpcReply(name, body) {
                case_code: 'CASE-1', diagnosis: 'Malaria', severity: 'moderate' }],
       by_day: [{ day: '2026-09-10', n: 3 }] };
   }
+  if (name === 'clinician_reference') {
+    return { ok: true,
+      profile: { full_name:'Dr Okello John', profession:'Medical Doctor' },
+      stints: [
+        { clinic_name:'Gulu Clinic', district:'Gulu', treatments:61,
+          started_at:new Date(Date.now()-86400000*300).toISOString(),
+          ended_at:new Date(Date.now()-86400000*90).toISOString(), status:'ended' },
+        { clinic_name:'Kampala Clinic', district:'Kampala', treatments:14,
+          started_at:new Date(Date.now()-86400000*10).toISOString(),
+          ended_at:null, status:'active' },
+      ],
+      totals: { treatments:75, clinics:2 },
+      conditions: [{ condition:'Malaria', n:31 }],
+      ratings: [{ clinic_name:'Gulu Clinic', rating:5, would_rehire:true,
+                  reference_note:'Careful with children.',
+                  created_at:new Date().toISOString() }],
+      average: 5 };
+  }
   if (name === 'end_clinician_stint') return { ok: true, ended_by: 'owner' };
   if (name === 'rate_clinician') return { ok: true };
   if (name === 'get_clinic_staff') return [];
@@ -189,6 +207,26 @@ function rpcReply(name, body) {
   result('the owner can see who the clinician treated, in their own clinic',
     /Achieng Mary/.test(work), work.slice(0, 60));
   result('with what was treated', /Malaria/.test(work));
+
+  // ── What they did at OTHER clinics ────────────────────────────────────
+  // The loop the whole feature exists to close: an owner deciding whether to
+  // let somebody treat patients can see where they have worked and what the
+  // last owners said, rather than a name and a hope.
+  await page.evaluate(() => {
+    const b = document.querySelector('.cc-act[data-act="record"]');
+    if (b) b.click();
+  });
+  await page.waitForTimeout(800);
+  const rec = await page.evaluate(() => (document.getElementById('ccWork_s1') || {}).innerText || '');
+  result('the owner can see what this clinician did at other clinics',
+    /Gulu Clinic/.test(rec), rec.slice(0, 70).replace(/\n/g, ' '));
+  result('with the totals across all of them', /75 treatments/.test(rec));
+  result('and what another owner wrote about them',
+    /Careful with children/.test(rec));
+  result('and their average rating', /rated 5\/5/.test(rec));
+  // The promise, checked on the one screen most likely to break it.
+  result('and NOT one patient from any clinic',
+    !/Achieng|Mukasa|Nakato|070011/.test(rec), rec.slice(0, 50).replace(/\n/g, ' '));
 
   // ── Ending, and the reference ─────────────────────────────────────────
   await page.evaluate(() => {

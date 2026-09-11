@@ -1143,6 +1143,7 @@ async function ccLoadList() {
          * put into markup as code. */
         + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
         +   '<button type="button" class="cc-act" data-act="work" data-stint="' + escHtml(c.stint_id) + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--brand-tint);color:var(--brand-ink);font-weight:700;cursor:pointer;font-family:inherit">Who they treated</button>'
+        +   '<button type="button" class="cc-act" data-act="record" data-clin="' + escHtml(c.clinician_id) + '" data-stint="' + escHtml(c.stint_id) + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface, #fff);color:var(--text, #1A1A1A);font-weight:700;cursor:pointer;font-family:inherit">Their record elsewhere</button>'
         +   (live ? '<button type="button" class="cc-act" data-act="end" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--danger);background:var(--cl-danger-bg, #FFF5F5);color:var(--danger-ink);font-weight:700;cursor:pointer;font-family:inherit">End their access</button>' : '')
         +   '<button type="button" class="cc-act" data-act="rate" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface, #fff);color:var(--text, #1A1A1A);font-weight:700;cursor:pointer;font-family:inherit">' + (c.rated ? 'Change the reference' : 'Leave a reference') + '</button>'
         + '</div>'
@@ -1155,6 +1156,9 @@ async function ccLoadList() {
         var id = btn.getAttribute('data-stint');
         var nm = btn.getAttribute('data-name');
         if (btn.getAttribute('data-act') === 'work') return ccSeeWork(id, btn);
+        if (btn.getAttribute('data-act') === 'record') {
+          return ccRecord(btn.getAttribute('data-clin'), id, btn);
+        }
         if (btn.getAttribute('data-act') === 'end')  return ccEnd(id, nm);
         return ccRate(id, nm);
       });
@@ -1189,6 +1193,84 @@ async function ccSeeWork(stintId, btn) {
         }).join('')
       + (work.length > 60 ? '<div style="font-size:11px;color:var(--brand-ink);opacity:.8;padding-top:8px">…and ' + (work.length - 60) + ' more</div>' : '')
       + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Could not load just now.</div>';
+  }
+}
+
+/* What this clinician did BEFORE they came here.
+ *
+ * The point of a record that belongs to the person rather than to a clinic:
+ * an owner deciding whether to let somebody treat patients can see where they
+ * have worked, how much, what of, and what the last three owners said — rather
+ * than a name, a phone number and a hope.
+ *
+ * Not one patient appears in it, from here or from anywhere else. This reads
+ * clinician_reference(), which is built from clinician_activity — a table with
+ * no column that could hold a patient identity. "Who they treated" above is a
+ * different question with a different answer: that one reads THIS clinic's own
+ * records, and it stops at this clinic's door.
+ */
+async function ccRecord(clinicianId, stintId, btn) {
+  var box = document.getElementById('ccWork_' + stintId);
+  if (!box) return;
+  if (box.style.display === 'block' && box.getAttribute('data-showing') === 'record') {
+    box.style.display = 'none'; btn.textContent = 'Their record elsewhere'; return;
+  }
+  box.style.display = 'block';
+  box.setAttribute('data-showing', 'record');
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Loading…</div>';
+  btn.textContent = 'Hide';
+  try {
+    var r = await _supa.rpc('clinician_reference', { p_clinician_id: clinicianId });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) {
+      box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">'
+        + escHtml((r.data && r.data.error) || 'Not available.') + '</div>';
+      return;
+    }
+    var d = r.data;
+    var t = d.totals || {}, stints = d.stints || [], ratings = d.ratings || [],
+        conds = d.conditions || [];
+
+    var html = '<div style="background:var(--brand-tint);border-radius:11px;padding:12px 13px">';
+    html += '<div style="font-size:13px;font-weight:800;color:var(--brand-ink);margin-bottom:8px">'
+      + (t.treatments || 0) + ' treatment' + (t.treatments === 1 ? '' : 's')
+      + ' across ' + (t.clinics || 0) + ' clinic' + (t.clinics === 1 ? '' : 's')
+      + (d.average ? ' · rated ' + d.average + '/5' : ' · not rated yet') + '</div>';
+
+    if (conds.length) {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">'
+        + conds.slice(0, 8).map(function (c) {
+            return '<span style="background:var(--surface, #fff);color:var(--text, #1A1A1A);border-radius:20px;padding:4px 10px;font-size:11.5px;font-weight:700">'
+              + escHtml(c.condition) + ' ' + (c.n || 0) + '</span>';
+          }).join('') + '</div>';
+    }
+
+    html += stints.map(function (s) {
+      return '<div style="padding:6px 0;border-top:1px solid rgba(0,0,0,.07);font-size:12.5px;color:var(--brand-ink);line-height:1.5">'
+        + '<b>' + escHtml(s.clinic_name || 'A clinic') + '</b>'
+        + (s.district ? ' · ' + escHtml(s.district) : '')
+        + ' · ' + (s.treatments || 0) + ' treated'
+        + ' · ' + (s.ended_at ? 'ended ' + ccAgo(s.ended_at) : 'still there')
+        + '</div>';
+    }).join('');
+
+    html += ratings.map(function (x) {
+      return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.07);font-size:12.5px;color:var(--brand-ink);line-height:1.55">'
+        + '<b>' + escHtml(x.clinic_name || 'A clinic') + '</b> — ' + (x.rating || '?') + '/5'
+        + (x.would_rehire === false ? ' · would not work with again' : '')
+        + (x.reference_note ? '<br>“' + escHtml(x.reference_note) + '”' : '')
+        + '</div>';
+    }).join('');
+
+    if (!stints.length && !ratings.length) {
+      html += '<div style="font-size:12.5px;color:var(--brand-ink)">This is their first clinic.</div>';
+    }
+    html += '<div style="margin-top:9px;font-size:11px;color:var(--brand-ink);opacity:.75;line-height:1.5">'
+      + 'No patient from any clinic appears here — a clinician’s record carries '
+      + 'what they treated, never who.</div>';
+    box.innerHTML = html + '</div>';
   } catch (e) {
     box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Could not load just now.</div>';
   }
