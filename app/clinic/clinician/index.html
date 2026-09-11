@@ -207,10 +207,28 @@
   }
   function clear() { msg.className = 'cl-msg'; msg.textContent = ''; }
 
-  // Already signed in? Straight to the home screen.
+  /* Already signed in? Then the same decision as signing in makes — opening
+   * the app must not land somewhere different from typing a password, or the
+   * fix only works on the one day of the month somebody signs in fresh.
+   *
+   * Their own screen is shown IMMEDIATELY from what the phone already knows,
+   * and only then replaced if the server says they belong in a clinic. Waiting
+   * for a round trip before showing anything is a blank screen on a bad
+   * connection, which is most of them. */
   (function () {
     var s = C.session();
-    if (s && s.userId) { window.location.replace('home.html'); }
+    if (!s || !s.userId) return;
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem('clinician_home_cache') || 'null'); } catch (e) {}
+    if (cached && C.liveLinks(cached.links).length === 1) {
+      window.location.replace(C.landingFor(cached.links));
+      return;
+    }
+    var supa = C.supa();
+    if (!supa || navigator.onLine === false) { window.location.replace('home.html'); return; }
+    C.goWhereTheyBelong(supa, 'home.html').then(function (where) {
+      window.location.replace(where);
+    });
   })();
 
   // If the app put somebody out, say why rather than showing a blank form.
@@ -247,15 +265,22 @@
   if (/[?&]new=1/.test(location.search)) show('up');
 
   // ── Fetch the clinician's own row and remember who they are ──
-  async function landAfterAuth(supa, user, fallbackName) {
+  // `route` is true when SIGNING IN and false when signing up. Somebody who has
+  // just made an account should see it once — it is new, it is theirs, and the
+  // way to join a clinic is on it. Somebody signing in for the ninth morning
+  // running wants the ward.
+  async function landAfterAuth(supa, user, fallbackName, route) {
     var name = fallbackName || (user.email || '').split('@')[0];
-    var clinicianId = null, profession = null;
+    var clinicianId = null, profession = null, links = null;
     try {
       var r = await supa.rpc('my_clinician_home');
-      if (r && r.data && r.data.ok && r.data.profile) {
-        name = r.data.profile.full_name || name;
-        clinicianId = r.data.profile.id;
-        profession = r.data.profile.profession;
+      if (r && r.data && r.data.ok) {
+        links = r.data.links;
+        if (r.data.profile) {
+          name = r.data.profile.full_name || name;
+          clinicianId = r.data.profile.id;
+          profession = r.data.profile.profession;
+        }
       }
     } catch (e) { /* offline — the home screen will fill it in later */ }
 
@@ -263,7 +288,12 @@
       userId: user.id, email: user.email, name: name,
       clinicianId: clinicianId, profession: profession,
     });
-    window.location.href = 'home.html';
+
+    /* Somebody who already works at one clinic signed in to treat patients,
+     * not to read their own CV. landingFor() sends them straight there and
+     * enters the clinic on the way; two clinics or none lands on their own
+     * screen, because that is a question only they can answer. */
+    window.location.href = route ? C.landingFor(links) : 'home.html';
   }
 
   // ── Sign in ──
@@ -279,7 +309,7 @@
     try {
       var res = await supa.auth.signInWithPassword({ email: email, password: pass });
       if (res.error) { say(C.saySorry(res.error)); return; }
-      await landAfterAuth(supa, res.data.user, null);
+      await landAfterAuth(supa, res.data.user, null, true);   // signing in → the ward
     } catch (err) {
       say(C.saySorry(err, 'Could not sign in just now.'));
     } finally {
@@ -347,7 +377,7 @@
         say(C.saySorry(saved.data.error, 'The account was made but the details did not save. Sign in and finish your profile.'), 'warn');
         return;
       }
-      await landAfterAuth(supa, res.data.user, profile.full_name);
+      await landAfterAuth(supa, res.data.user, profile.full_name, false);  // new account → show it
     } catch (err) {
       say(C.saySorry(err, 'Could not create the account just now.'));
     } finally {

@@ -237,13 +237,31 @@ function setupClinicMobileNav() {
   );
 }
 
+// Is the person using this clinic portal a clinician who scanned in, rather
+// than one of the clinic's own people? Written only by the clinician portal.
+function _isVisitingClinician() {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+    return !!(s && s.clinician === true);
+  } catch (e) { return false; }
+}
+
 async function clinicSignOut() {
   // Sign out of Supabase auth so the session token is invalidated
+  var wasClinician = _isVisitingClinician();
   try {
     const supa = _getClinicSupabase();
     if (supa) await supa.auth.signOut();
   } catch(e) {}
   localStorage.removeItem('clinic_session');
+  // A visiting clinician signed in through THEIR portal, so that is where
+  // signing out belongs. Dropping them on the clinic's staff sign-in page
+  // offers them a login they do not have and hides the one they do.
+  if (wasClinician) {
+    try { localStorage.removeItem('clinician_session'); } catch (e) {}
+    window.location.href = 'clinician/index.html';
+    return;
+  }
   window.location.href = 'index.html';
 }
 
@@ -295,6 +313,29 @@ function _injectClinicTopbarExit() {
     badge.className = 'clinic-demo-badge';
     badge.textContent = 'DEMO';
     right.insertBefore(badge, right.firstChild);
+  }
+
+  /* The way back to their own account.
+   *
+   * A clinician who works at one clinic is now taken straight into it when
+   * they sign in — which is right, and would be a trap without this. Their own
+   * record, their references, and joining a second clinic all live in the
+   * clinician portal, and there would otherwise be no route to any of it
+   * short of signing out.
+   *
+   * Only for somebody who scanned in. A clinic's own staff have no clinician
+   * account, and a link to one would be a door that opens onto nothing.
+   */
+  if (_isVisitingClinician() && !document.getElementById('clinicianHomeLink')) {
+    const mine = document.createElement('a');
+    mine.id = 'clinicianHomeLink';
+    mine.href = 'clinician/home.html';
+    mine.className = 'clinic-exit-btn';
+    mine.setAttribute('aria-label', 'My clinician account');
+    mine.innerHTML =
+      '<span class="material-icons-outlined" style="font-size:18px">badge</span>' +
+      '<span class="exit-label">My account</span>';
+    right.appendChild(mine);
   }
 
   const btn = document.createElement('button');

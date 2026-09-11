@@ -198,6 +198,57 @@
     return (c && c.clinician) ? c : null;
   }
 
+  /* Which of a clinician's attachments are LIVE right now.
+   *
+   * "status is active" is not enough on its own: a stint whose expires_at has
+   * passed is still marked active until something notices, and walking somebody
+   * into a clinic they no longer have access to would be worse than showing
+   * them their own screen.
+   */
+  function liveLinks(links) {
+    if (!links || !links.length) return [];
+    return links.filter(function (l) {
+      if (!l || l.status !== 'active') return false;
+      if (!l.expires_at) return true;
+      var t = new Date(l.expires_at).getTime();
+      return !isFinite(t) || t > Date.now();
+    });
+  }
+
+  /* Where should signing in actually put this person?
+   *
+   * They signed in to treat patients. If they already work at exactly one
+   * clinic, that is where they meant to go — sending them to their own profile
+   * and work record first is the right screen once a month and the wrong screen
+   * every other morning. "Just like a sub-account" was the ask, and a
+   * sub-account does not make you walk past your own CV to reach the ward.
+   *
+   * Two or more clinics is a real question only they can answer, so that lands
+   * on their own screen with both offered. None lands there too, to join one.
+   *
+   * Returns the page to go to, and enters the clinic as a side effect when
+   * there is exactly one.
+   */
+  function landingFor(links) {
+    var live = liveLinks(links);
+    if (live.length === 1) {
+      enterClinic(live[0]);
+      return '../dashboard.html';
+    }
+    return 'home.html';
+  }
+
+  // The same decision, for a page that is already inside the clinician portal
+  // and holds a session. Kept here so sign-in and re-opening the app can never
+  // disagree about where somebody belongs.
+  async function goWhereTheyBelong(supa, fallback) {
+    try {
+      var r = await supa.rpc('my_clinician_home');
+      if (r && r.data && r.data.ok) return landingFor(r.data.links);
+    } catch (e) { /* no server: their own screen still works offline */ }
+    return fallback || 'home.html';
+  }
+
   /* ── Small helpers the pages share ─────────────────────────────────── */
 
   function esc(s) {
@@ -295,6 +346,9 @@
     enterClinic: enterClinic,
     leaveClinic: leaveClinic,
     currentClinic: currentClinic,
+    liveLinks: liveLinks,
+    landingFor: landingFor,
+    goWhereTheyBelong: goWhereTheyBelong,
     esc: esc, when: when, dayMonth: dayMonth, saySorry: saySorry,
     isNotSetUp: isNotSetUp, NOT_SET_UP: NOT_SET_UP,
     /* What the clinician typed when they signed up, kept on the phone.
