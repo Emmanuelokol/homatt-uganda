@@ -54,6 +54,7 @@ const SHELL = [
   'clinician/js/qr.js?v=20260911',
   'js/guidelines.js?v=20261007',
   'js/vendor/sql-wasm.js',
+  'js/ucg-sections.js?v=20261007',
   'js/ucg-autofill.js?v=20261007',
   'js/clinic-impression.js?v=20261007',
   'js/clinic-dictate.js?v=20261007',

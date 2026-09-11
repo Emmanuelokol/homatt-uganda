@@ -669,6 +669,41 @@
     // drips and the treatment of complications were never on screen.
     var meds = rows('SELECT name,dose,unit,route,frequency,duration,source_line ' +
                     'FROM medicines WHERE condition_id=? ORDER BY id', [condId]);
+
+    /* ── A drug the book prints under a DIFFERENT heading ──────────────
+     *
+     * Measured over all 1,008 medicine rows (tests/measure-doses.js): every
+     * one is a real line of the book and every one is inside the full_text
+     * of the condition it is filed under — and 26 of them are still the
+     * wrong condition's drug, because one section's text ran past its own
+     * end and swallowed six more.
+     *
+     * That section is "Postnatal Psychosis". Typing it offered a woman who
+     * has just given birth, and is breastfeeding, a package built from
+     * lithium, carbamazepine, clozapine, alprazolam, fluoxetine and
+     * bupropion — gathered from Anxiety, Depression, Bipolar Disorder and
+     * Psychosis, none of them hers, all with a dose and a tick box.
+     *
+     * They are not dropped. Each is marked with the heading it is really
+     * printed under, taken out of what can be prescribed, and listed at the
+     * bottom of the panel saying where it belongs — because a drug that
+     * silently disappears is its own kind of wrong.
+     */
+    var elsewhere = [];
+    try {
+      if (window.HomattUcgSections) {
+        meds = window.HomattUcgSections.attribute(c, meds, function (num) {
+          return rows('SELECT id,title FROM conditions WHERE number=? LIMIT 1', [num])[0] || null;
+        });
+        elsewhere = meds.filter(function (m) { return m.printedUnder; });
+        meds = meds.filter(function (m) { return !m.printedUnder; });
+      }
+    } catch (e) { elsewhere = []; }
+    ctx.elsewhere = elsewhere.map(function (m) {
+      return { drug: (m.name || '') + (m.dose ? ' ' + m.dose + (m.unit || '') : ''),
+               under: m.printedUnder.title, id: m.printedUnder.id };
+    });
+
     var drugs = meds.map(function (m) {
       var tpd = freqPerDay(m.frequency), dd = durDays(m.duration);
       var reason = medReason(m.source_line);
@@ -945,6 +980,21 @@
       '.ucg-btn.ghost{background:var(--bg);color:var(--text-lt);flex:0 0 34%}',
       '.ucg-btn.go{background:linear-gradient(135deg,var(--grad-3),var(--grad-2));color:#fff;box-shadow:0 8px 18px rgba(14,124,90,.3)}',
       '.ucg-src{font-size:11px;color:var(--text-lt);padding:2px 2px 10px}',
+      // A fill colour and the words on it are defined as a PAIR, here, for
+      // both themes — --warning is a fill and reads at 3.7:1 as text, which is
+      // how four separate unreadable-text faults got past eyes before. This is
+      // the same pair the guideline screen already uses and that
+      // test-readable.js has measured.
+      ':root{--ucg-warn-bg:#FFF4E5}',
+      'html[data-theme="dark"]{--ucg-warn-bg:rgba(255,184,112,.16)}',
+      '.ucg-elsewhere{background:var(--ucg-warn-bg,#FFF4E5);border:1.5px solid var(--warning);' +
+        'border-radius:14px;padding:12px 13px;margin-bottom:10px}',
+      '.ucg-el-h{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;' +
+        'color:var(--warning-ink);margin-bottom:7px;line-height:1.35}',
+      '.ucg-el-h .material-icons-outlined{font-size:18px;flex:none}',
+      '.ucg-el-g{font-size:12.5px;line-height:1.55;color:var(--text);margin-bottom:3px}',
+      '.ucg-el-g b{color:var(--warning-ink)}',
+      '.ucg-el-n{font-size:11.5px;line-height:1.55;color:var(--text-lt);margin-top:7px}',
       '#ucgSearchWrap{padding:0 12px 12px}',
       '#ucgSearchWrap input{width:100%;border:1.5px solid var(--border);border-radius:12px;padding:11px 13px;font:inherit;font-size:15px;background:var(--surface);color:var(--text)}',
       '#ucgSearchRes,#ucgTestRes{background:var(--surface);border-radius:12px;box-shadow:var(--shadow);max-height:260px;overflow-y:auto;display:none;margin-top:8px;border:1.5px solid var(--brand-tint)}',
@@ -1503,7 +1553,7 @@
       // ④ Clinical guidance from the guideline — tap to open
       (ctx.info ? '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">4</span>' +
         '<h4>Guideline notes for this condition</h4><span class="ucg-count">tap to open</span></div>' +
-        '<div class="ucg-rows">' + guidanceHtml() + '</div></div>' : '') +
+        '<div class="ucg-rows">' + elsewhereHtml() + guidanceHtml() + '</div></div>' : '') +
 
       // ⑤ Follow-up + another condition
       '<div class="ucg-block"><div class="ucg-bh"><span class="ucg-step">' + (ctx.info ? '5' : '4') + '</span>' +
@@ -1666,6 +1716,35 @@
     });
     endList();
     return html;
+  }
+
+  /* Medicines the extraction attached to this condition that the book prints
+   * under a DIFFERENT heading. They are kept out of the prescribing list —
+   * they would otherwise arrive with a dose, a tick box and a price — but
+   * they are named here with the section they belong to, because a drug that
+   * silently disappears is its own kind of wrong, and a clinician who knows
+   * the book will go looking for it.
+   *
+   * 26 rows in the whole book, all of them from one section whose text ran
+   * past its own end (tests/measure-doses.js). */
+  function elsewhereHtml() {
+    var e = (ctx && ctx.elsewhere) || [];
+    if (!e.length) return '';
+    var by = {};
+    e.forEach(function (x) { (by[x.under] = by[x.under] || []).push(x.drug); });
+    return '<div class="ucg-elsewhere">' +
+      '<div class="ucg-el-h"><span class="material-icons-outlined">report_problem</span>' +
+      'Left out: ' + e.length + ' medicine' + (e.length === 1 ? '' : 's') +
+      ' the guideline prints under another heading</div>' +
+      Object.keys(by).map(function (k) {
+        return '<div class="ucg-el-g"><b>' + esc(k) + '</b> — ' +
+          esc(by[k].join(', ')) + '</div>';
+      }).join('') +
+      '<div class="ucg-el-n">The page these were lifted from runs on past the ' +
+      'end of this section in the printed book, so they were filed here by ' +
+      'mistake. They are not this condition\'s treatment and are not offered ' +
+      'for it. Open the section named above if one of them is what you want.' +
+      '</div></div>';
   }
 
   // Collapsible guideline detail: management, what else to check, what it could

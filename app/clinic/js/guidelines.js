@@ -655,8 +655,27 @@
       "WHEN 'HC3' THEN 2 WHEN 'HC4' THEN 3 WHEN 'H' THEN 4 WHEN 'GH' THEN 5 " +
       "WHEN 'RR' THEN 6 WHEN 'NR' THEN 7 ELSE 8 END, step_order", [id]);
     var meds = rows(
-      'SELECT name, dose, unit, route, frequency, duration FROM medicines ' +
+      'SELECT name, dose, unit, route, frequency, duration, source_line FROM medicines ' +
       'WHERE condition_id = ? ORDER BY id', [id]);
+
+    /* Some of those rows are printed under a DIFFERENT heading. One section
+     * in 551 ("9.2.4.1 Postnatal Psychosis") ran past its own end and
+     * swallowed six more, so 26 medicines — lithium, clozapine, alprazolam,
+     * bupropion among them — are filed against a woman who has just given
+     * birth. Every one of them is a real line of the real book, which is why
+     * nothing short of reading the section boundaries can see it.
+     *
+     * This is the reference screen, not the prescribing one, so nothing is
+     * hidden: the row is kept and labelled with the section that really
+     * prints it. The package screen takes them out of what it offers.
+     * (tests/measure-doses.js) */
+    try {
+      if (window.HomattUcgSections) {
+        meds = window.HomattUcgSections.attribute(c, meds, function (num) {
+          return one('SELECT id, title FROM conditions WHERE number = ? LIMIT 1', [num]);
+        });
+      }
+    } catch (e) {}
 
     var LOC_LABEL = {
       HC2: 'HC2 — Health Centre II', HC3: 'HC3 — Health Centre III',
@@ -743,12 +762,22 @@
         '<div class="g-tablewrap"><table class="g-table"><thead><tr>' +
         '<th>Medicine</th><th>Dose</th><th>Route</th><th>Frequency</th><th>Duration</th>' +
         '</tr></thead><tbody>' + meds.map(function (m) {
-          return '<tr><td class="g-md-name">' + esc(m.name) + '</td>' +
+          return '<tr' + (m.printedUnder ? ' class="g-md-else"' : '') + '>' +
+            '<td class="g-md-name">' + esc(m.name) +
+            (m.printedUnder
+              ? '<span class="g-md-under">printed under “' + esc(m.printedUnder.title) +
+                '”, not this heading</span>' : '') + '</td>' +
             '<td class="g-md-dose">' + esc([m.dose, m.unit].filter(Boolean).join(' ')) + '</td>' +
             '<td>' + esc(m.route || '—') + '</td>' +
             '<td>' + esc(m.frequency || '—') + '</td>' +
             '<td>' + esc(m.duration || '—') + '</td></tr>';
         }).join('') + '</tbody></table></div>' +
+        (meds.some(function (m) { return m.printedUnder; })
+          ? '<div class="g-verify g-verify-warn">The rows marked above are lines the ' +
+            'guideline prints further down the page, under a different heading — this ' +
+            'section\'s text runs on past its own end in the printed book. They are not ' +
+            'this condition\'s treatment. The treatment package does not offer them.</div>'
+          : '') +
         '<div class="g-verify">Verify every dose against the source text below before prescribing.</div>');
     }
 

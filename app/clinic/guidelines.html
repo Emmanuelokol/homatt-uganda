@@ -214,6 +214,14 @@
     .g-md-dose{font-weight:700;color:var(--primary-ink);white-space:nowrap}
     html[data-theme="dark"] .g-md-dose{color:#28D29B}
     .g-verify{font-size:11.5px;color:var(--warning-ink, #B23C00);margin-top:9px;font-weight:600}
+    /* A medicine the book prints further down the page, under a different
+       heading. Kept and labelled here — this is the reference screen — while
+       the treatment package leaves it out of what it offers. */
+    .g-verify-warn{background:var(--cl-warn-bg, #FFF4E5);border:1px solid var(--warning);
+      border-radius:11px;padding:10px 12px;line-height:1.55;font-weight:500}
+    .g-md-else{background:var(--cl-warn-bg, #FFF4E5)}
+    .g-md-under{display:block;font-size:10.5px;font-weight:700;line-height:1.4;
+      color:var(--warning-ink, #B23C00);margin-top:3px}
 
     /* Children's book */
     .g-head-who{background:linear-gradient(140deg,#123C6B 0%,#1565A8 60%,#1E86D0 100%);
@@ -409,6 +417,7 @@
   <script src="js/vendor/sql-wasm.js"></script>
   <script src="../js/config.js"></script>
   <script src="js/clinic.js?v=20261007"></script>
+  <script src="js/ucg-sections.js?v=20261007"></script>
   <script src="js/guidelines.js?v=20261007"></script>
 </body>
 </html>
