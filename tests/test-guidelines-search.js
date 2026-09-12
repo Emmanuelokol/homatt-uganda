@@ -211,6 +211,9 @@ const result = (n, ok, x) => {
   result('with the book\'s own rules in it, laid out',
     /legal document|dose size|duration of treatment|generic/i.test(ref.body || '') && ref.bullets > 0,
     'bullets=' + ref.bullets);
+  result('and it says why it is not broken into clinical parts',
+    /reference, not a condition/i.test(ref.body || ''),
+    (ref.body || '').slice(0, 90).replace(/\s+/g, ' '));
   result('filed under the reference chapter, not a clinical one',
     /REFERENCE/i.test(ref.chips || ''), ref.chips.slice(0, 70));
   result('and it cites no page, because the book numbers this part in roman',

@@ -937,9 +937,18 @@
      */
     if (!hasPrimary) {
       if (c.full_text && c.full_text.trim()) {
+        /* Two different reasons a section shows as printed, and saying the
+         * wrong one is a small lie on a screen that is asking to be trusted.
+         * Chapter 25 is the book's reference matter — prescribing rules, the
+         * abbreviations, the appendices — and it is deliberately NOT split
+         * into a condition's named parts, because it is not a condition.
+         * Everywhere else, the split genuinely found nothing. */
         html += '<div class="g-sec g-asprinted-note">' +
-          'The automatic split found no named parts in this section, so it is ' +
-          'shown here as the book sets it, in full.' +
+          (Number(c.chapter_number) === 25
+            ? 'This is reference, not a condition, so it is not broken into ' +
+              'clinical parts — it is shown here as the book sets it, in full.'
+            : 'The automatic split found no named parts in this section, so it ' +
+              'is shown here as the book sets it, in full.') +
           '</div>' +
           section('As printed in the guideline', asText(c.full_text));
       } else {
