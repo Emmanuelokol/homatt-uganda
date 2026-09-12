@@ -7,14 +7,32 @@ android {
         applicationId "ug.homatt.health"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 2
-        versionName "1.1.0"
+        // CI bumps the version code every build (APK_VERSION_CODE = run number)
+        // so each published APK installs as an UPDATE over the previous one —
+        // preserving the clinic's offline data instead of forcing an uninstall.
+        // Plain `=` assignments: `versionCode (x).toInteger()` is parsed by
+        // Groovy as `(versionCode(x)).toInteger()` and fails with "Value is null".
+        def ciVersionCode = System.getenv("APK_VERSION_CODE")
+        versionCode = (ciVersionCode != null && ciVersionCode.isInteger()) ? ciVersionCode.toInteger() : 2
+        versionName = System.getenv("APK_VERSION_NAME") ?: "1.1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
         // MultiDex support for large app
         multiDexEnabled true
+    }
+    // Stable signing so every build (from any machine/CI runner) is signed with
+    // the SAME key — the requirement for Android to accept one APK as an update
+    // of another. The keystore is committed for build reproducibility; it is a
+    // sideload distribution key, not a Play Store key.
+    signingConfigs {
+        release {
+            storeFile file('../homatt-upload.keystore')
+            storePassword System.getenv("HOMATT_KEYSTORE_PASSWORD") ?: "homattclinic2026"
+            keyAlias "homatt"
+            keyPassword System.getenv("HOMATT_KEYSTORE_PASSWORD") ?: "homattclinic2026"
+        }
     }
     buildTypes {
         debug {
@@ -25,9 +43,12 @@ android {
         }
         release {
             debuggable false
-            minifyEnabled true
-            shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Minification off: safety over size. Proguard stripping has broken
+            // Capacitor plugin bridges before, and we can't afford a build that
+            // installs but misbehaves in clinics.
+            minifyEnabled false
+            shrinkResources false
+            signingConfig signingConfigs.release
         }
     }
     compileOptions {

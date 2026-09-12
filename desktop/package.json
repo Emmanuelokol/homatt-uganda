@@ -1,0 +1,37 @@
+{
+  "name": "homatt-clinic-desktop",
+  "productName": "Homatt Clinic",
+  "version": "1.0.0",
+  "description": "Homatt Health clinic portal — works fully offline",
+  "main": "main.js",
+  "author": "Homatt Health",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis portable",
+    "dist:linux": "electron-builder --linux AppImage"
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "ug.homatt.clinic.desktop",
+    "productName": "Homatt Clinic",
+    "artifactName": "HomattClinic-${os}.${ext}",
+    "directories": { "output": "dist" },
+    "files": ["main.js", "app/**/*", "build/icon.png"],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [{ "target": "nsis" }, { "target": "portable" }]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "deleteAppDataOnUninstall": false,
+      "artifactName": "HomattClinic-Setup.${ext}"
+    },
+    "portable": { "artifactName": "HomattClinic-Portable.${ext}" },
+    "linux": { "icon": "build/icon.png", "category": "Office" }
+  }
+}

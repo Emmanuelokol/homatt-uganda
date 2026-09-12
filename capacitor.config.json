@@ -1,10 +1,9 @@
 {
   "appId": "ug.homatt.health",
-  "appName": "Homatt Health",
+  "appName": "Homatt Clinic",
   "webDir": "app",
   "bundledWebRuntime": false,
   "server": {
-    "url": "https://homatt-uganda-emmanuelokols-projects.vercel.app",
     "androidScheme": "https",
     "allowNavigation": [
       "*.supabase.co",
@@ -18,14 +17,13 @@
   },
   "android": {
     "allowMixedContent": false,
-    "captureInput": true,
     "webContentsDebuggingEnabled": false,
-    "backgroundColor": "#1B5E20",
+    "backgroundColor": "#0A1628",
     "minWebViewVersion": 60
   },
   "plugins": {
     "SplashScreen": {
-      "launchShowDuration": 0,
+      "launchShowDuration": 2000,
       "launchAutoHide": true,
       "backgroundColor": "#1B5E20",
       "androidSplashResourceName": "splash",
@@ -40,8 +38,9 @@
       "overlaysWebView": false
     },
     "Keyboard": {
-      "resize": "body",
-      "resizeOnFullScreen": true
+      "resize": "none",
+      "resizeOnFullScreen": false,
+      "scrollAssist": false
     },
     "Camera": {
       "permissions": ["camera", "photos"]

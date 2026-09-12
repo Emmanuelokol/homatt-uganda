@@ -8,9 +8,22 @@
 .env.local
 .env
 
+# Supabase CLI temp files
+supabase/.temp/
+
 # Node / Capacitor build artifacts
 node_modules/
 android/.gradle/
 android/build/
 android/app/build/
 .capacitor/
+desktop/app
+desktop/dist
+desktop/node_modules
+__pycache__/
+
+# Scratch space for tests that stand a whole app up and swap its files
+# underneath it (test-apkupdate.js). It is deleted when the test finishes, so
+# a `git add -A` while one is running would otherwise commit a few hundred
+# files and then show them all as deletions the moment it cleans up.
+tests/.apk-update-tmp/

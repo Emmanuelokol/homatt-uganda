@@ -107,7 +107,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const supa = initPharmacySupabase();
 
   if (supa && session.pharmacyId) {
-    await loadLive(supa, session.pharmacyId);
+    try {
+      await Promise.race([
+        loadLive(supa, session.pharmacyId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      loadDemo();
+    }
   } else {
     loadDemo();
   }

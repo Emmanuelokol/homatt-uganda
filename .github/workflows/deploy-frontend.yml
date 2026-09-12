@@ -27,6 +27,13 @@ jobs:
             echo "};"
           } > app/js/config.js
 
+      # What an installed Android app compares itself against. Generated from
+      # clinic-sw.js here rather than trusted from the commit, because a
+      # version.json that disagrees with the worker it ships beside would tell
+      # a phone to download files that are not there.
+      - name: Write version.json for self-updating installs
+        run: python3 tools/make_version_json.py
+
       - name: Deploy app/ to GitHub Pages (gh-pages branch)
         uses: peaceiris/actions-gh-pages@v4
         with:

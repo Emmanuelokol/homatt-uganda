@@ -242,11 +242,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   window._pharmSupa = supa;
 
   if (supa && session.pharmacyId) {
-    // Load OTC safety rules once
-    const { data: rules } = await supa.from('otc_safety_rules').select('*').eq('active', true);
-    otcSafetyRules = rules || [];
+    try {
+      // Load OTC safety rules once
+      const { data: rules } = await Promise.race([
+        supa.from('otc_safety_rules').select('*').eq('active', true),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))
+      ]).catch(() => ({ data: null }));
+      otcSafetyRules = rules || [];
 
-    await loadLive(supa, session.pharmacyId);
+      await Promise.race([
+        loadLive(supa, session.pharmacyId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      allOrders = [...MOCK_ORDERS];
+      render();
+    }
     setupRealtime(supa, session.pharmacyId);
   } else {
     allOrders = [...MOCK_ORDERS];
@@ -455,7 +466,7 @@ function render() {
       </div>` : ''}
       <div class="order-meta">
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">person</span> ${o.patient_name||'—'}</span>
-        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}</span>
+        <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">location_on</span> ${o.delivery_address||'—'}${(() => { const lat = o.delivery_lat || o.user_latitude; const lon = o.delivery_lon || o.user_longitude; return (lat && lon) ? ` <a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener" style="color:#1976D2;text-decoration:none;vertical-align:middle" title="Open in Google Maps"><span class="material-icons-outlined" style="font-size:14px">open_in_new</span></a>` : ''; })()}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">schedule</span> ${fmtDateTime(o.created_at)}</span>
         <span><span class="material-icons-outlined" style="font-size:13px;vertical-align:middle">payments</span> ${formatUGX(o.total_cost)}</span>
       </div>
@@ -862,6 +873,23 @@ window.rejectPrompt = async id => {
   render();
   showToast('Order rejected', 'warning');
 };
+</script>
+
+<!-- Realtime alerts -->
+<script src="../js/realtime-alerts.js"></script>
+<script>
+(function () {
+  const cfg = window.HOMATT_CONFIG || {};
+  if (!cfg.SUPABASE_URL || !window.supabase) return;
+  const s = (() => { try { return JSON.parse(localStorage.getItem('pharmacy_session') || 'null'); } catch(_) { return null; } })();
+  if (!s) return;
+  const client = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+    auth: { storageKey: 'sb-homatt-pharmacy-auth' }
+  });
+  if (typeof initRealtimeAlerts === 'function') {
+    initRealtimeAlerts({ client, portal: 'pharmacy', entityId: s.pharmacyId || null });
+  }
+})();
 </script>
 </body>
 </html>

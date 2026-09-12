@@ -1,0 +1,66 @@
+name: Build Desktop App (Windows)
+
+on:
+  push:
+    branches: [ main, 'claude/**' ]
+    paths:
+      - 'app/**'
+      - 'desktop/**'
+      - '.github/workflows/build-desktop-app.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write   # publish the installer to a GitHub release
+
+jobs:
+  build-desktop:
+    name: Build Windows installer
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Same public config the web deploy generates — keeps the bundle current
+      - name: Generate config.js
+        shell: bash
+        run: |
+          {
+            echo "window.HOMATT_CONFIG = {"
+            echo "  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',"
+            echo "  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',"
+            echo "  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',"
+            echo "};"
+          } > app/js/config.js
+
+      - name: Bundle web app into desktop package
+        shell: bash
+        run: |
+          rm -rf desktop/app
+          cp -r app desktop/app
+
+      - name: Install and build
+        shell: bash
+        working-directory: desktop
+        run: |
+          npm install --no-audit --no-fund
+          npx electron-builder --win nsis portable --publish never
+
+      - name: Publish installer to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: desktop-latest
+          name: "Homatt Clinic — Windows app (latest)"
+          body: |
+            Homatt Clinic desktop app. Works fully offline — everything ships inside the installer.
+            • **HomattClinic-Setup.exe** — one-click install (recommended)
+            • **HomattClinic-Portable.exe** — no install, runs from a folder or USB stick
+          files: |
+            desktop/dist/HomattClinic-Setup.exe
+            desktop/dist/HomattClinic-Portable.exe
+          prerelease: false

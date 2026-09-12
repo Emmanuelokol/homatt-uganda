@@ -7,6 +7,24 @@
 (function () {
   'use strict';
 
+  // ─── VIEWPORT HEIGHT FIX ─────────────────────────────────────────────────────
+  // Some Android WebViews (especially Samsung) cache the `100dvh` value at the
+  // keyboard-open height and never reset it when the keyboard closes. This leaves
+  // the body/phone-frame stuck at half-height with a black native-background gap
+  // below. We fix it by writing window.innerHeight to a CSS variable on every
+  // resize event — window.innerHeight ALWAYS reflects the correct current height.
+  // This IIFE runs immediately when the script loads, before Capacitor is ready,
+  // so the variable is set as early as possible on every page.
+  (function initViewportHeightVar() {
+    function _updateVh() {
+      document.documentElement.style.setProperty('--actual-vh', window.innerHeight + 'px');
+    }
+    window.addEventListener('resize', _updateVh, { passive: true });
+    _updateVh(); // set immediately
+    // Expose so keyboard hide handlers can call it explicitly
+    window._homattUpdateVh = _updateVh;
+  })();
+
   function isNative() {
     return !!(window.Capacitor && window.Capacitor.isNativePlatform());
   }
@@ -48,13 +66,17 @@
       // 1. Let the current page handle it if it registered a custom handler
       if (window.HomattBackHandler && window.HomattBackHandler()) return;
 
-      // 2. Close any open sheet / modal
+      // 2. Close any open sheet / modal — also clears any stuck JS-injected overlay.
       const openSheet = document.querySelector('.bottom-sheet.open, .modal.open, .overlay.active');
       if (openSheet) {
         openSheet.classList.remove('open', 'active');
         document.querySelectorAll('.sheet-overlay').forEach(o => o.classList.remove('visible'));
+        _clearStuckOverlays();
         return;
       }
+
+      // Safety: even if no open sheet, remove any orphaned overlays before navigating.
+      _clearStuckOverlays();
 
       // 3. Default page navigation
       const mainPages = ['dashboard.html', 'signin.html', 'index.html'];
@@ -64,6 +86,21 @@
       } else {
         window.history.back();
       }
+    });
+  }
+
+  // Remove any JS-injected fixed overlays that may have been orphaned by interrupted
+  // navigation or by a hardware gesture dismissing a panel without running its close handler.
+  function _clearStuckOverlays() {
+    ['notifOverlay', 'notifPanel', '_rtaPanel'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+    // Also remove any anonymous fixed divs that cover the full screen (z-index > 500).
+    document.querySelectorAll('body > div[style*="position:fixed"], body > div[style*="position: fixed"]').forEach(el => {
+      const style = el.style;
+      const z = parseInt(style.zIndex || '0', 10);
+      if (z > 500 && !el.id.startsWith('_network')) el.remove();
     });
   }
 
@@ -92,47 +129,165 @@
   }
 
   // ─── KEYBOARD ────────────────────────────────────────────────────────────────
-  function initKeyboard() {
-    // Scroll focused input above keyboard whenever any input gains focus inside a sheet
-    document.addEventListener('focusin', (e) => {
-      const el = e.target;
-      if (!el || !['INPUT', 'TEXTAREA', 'SELECT'].includes(el.tagName)) return;
-      // Delay to let keyboard animate in first
-      setTimeout(() => {
-        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      }, 300);
-    }, { passive: true });
+  // Public helper: dismiss keyboard from anywhere in the app.
+  window.HomattDismissKeyboard = function() {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) {
+      a.blur();
+    }
+    if (isNative() && window.Capacitor.Plugins.Keyboard) {
+      window.Capacitor.Plugins.Keyboard.hide().catch(() => {});
+    }
+  };
 
-    // Tap outside any input/textarea/select → blur immediately to dismiss keyboard fast
-    document.addEventListener('touchstart', (e) => {
-      const tag = e.target && e.target.tagName;
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
-        const active = document.activeElement;
-        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-          active.blur();
-        }
+  // Find the actual scrollable ancestor of the focused input.
+  // This walks up the DOM looking for any element that is an overflow:auto/scroll
+  // container whose content overflows. This single function handles:
+  //   - .bottom-sheet/.sheet-body (profile, symptom-checker, family, etc.)
+  //   - .cc-modal (chronic-disease)
+  //   - .mo-scroll, .cb-step (medicine-orders, clinic-booking inner scroll)
+  //   - .app-screen (default page scroll container)
+  // Returns null when no such container exists — which is the correct
+  // signal to fall back to scrollIntoView rather than trying to scroll
+  // an overflow:hidden element (like .app-screen in medicine-orders) or
+  // a position:fixed container that is too short to overflow yet.
+  function _findScroller(node) {
+    let cur = node.parentElement;
+    while (cur && cur !== document.body) {
+      const s = getComputedStyle(cur);
+      const oy = s.overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && cur.scrollHeight > cur.clientHeight) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  function _scrollFocusedInputIntoView() {
+    const el = document.activeElement;
+    if (!el || el === document.body) return;
+    if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'SELECT') return;
+
+    // Bottom-sheets: always scroll .sheet-body directly instead of falling through
+    // to scrollIntoView(), which scrolls the document and exposes the black native
+    // background below the phone-frame on Android.
+    const sheet = el.closest && el.closest('.bottom-sheet');
+    if (sheet) {
+      const sheetBody = sheet.querySelector('.sheet-body');
+      if (sheetBody) {
+        const elRect = el.getBoundingClientRect();
+        const sbRect = sheetBody.getBoundingClientRect();
+        const targetTop = sheetBody.scrollTop + elRect.top - sbRect.top
+          - sheetBody.clientHeight / 2 + el.offsetHeight / 2;
+        sheetBody.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+        return;
+      }
+    }
+
+    const scroller = _findScroller(el);
+    if (scroller) {
+      const elRect = el.getBoundingClientRect();
+      const scrollerRect = scroller.getBoundingClientRect();
+      // Center the input within the visible scroller area
+      const targetTop = scroller.scrollTop + elRect.top - scrollerRect.top
+        - (scroller.clientHeight / 2) + (elRect.height / 2);
+      scroller.scrollTo({ top: Math.max(0, targetTop), behavior: 'instant' });
+    } else {
+      // No scrollable container found (overflow:hidden screens, short modals,
+      // position:fixed sheets). Let the browser scroll to the element — this
+      // correctly handles crx-modal, #cbInner, and other modal scroll containers
+      // because scrollIntoView walks the stacking context, not just the DOM.
+      try { el.scrollIntoView({ block: 'center', behavior: 'instant' }); } catch(_) {}
+    }
+  }
+
+  // The app never scrolls the document itself — all scrolling happens inside
+  // .app-screen / .sheet-body etc. But while the keyboard is open the WebView
+  // is temporarily shorter, content overflows, and the document CAN get
+  // scrolled (by the browser revealing the focused input, or by a
+  // scrollIntoView fallback). Android WebView does not clamp that scroll back
+  // when the keyboard closes, which leaves the page shoved up with a big
+  // blank area at the bottom. Restore it explicitly on every keyboard hide.
+  function _resetDocumentScroll() {
+    // Clinic portal pages use the document as their scroll container (no fixed-height
+    // app-screen wrapper). Resetting scrollY there would snap the operator's scroll
+    // position back to the top every time the keyboard closes.
+    if (window.location.pathname.indexOf('/clinic/') !== -1) return;
+    try {
+      window.scrollTo(0, 0);
+      if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    } catch(_) {}
+  }
+
+  function initKeyboard() {
+    // Tap outside any input/textarea/select → blur to dismiss keyboard.
+    // Walk UP the DOM to detect interactive ancestors — without this, tapping
+    // an icon <span> inside a bottom-nav <a> looked non-interactive, blurred
+    // the focused input, and the resulting layout reflow ate the click —
+    // forcing the user to tap twice or thrice for nav/buttons to register.
+    document.addEventListener('touchend', (e) => {
+      const interactive = e.target && e.target.closest && e.target.closest(
+        'input, textarea, select, button, a, label, [onclick], [role="button"], .cbn-link, .nav-item, .sidebar-link'
+      );
+      if (interactive) return;
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
+        active.blur();
       }
     }, { passive: true });
 
-    // Capacitor Keyboard plugin listeners (native only)
-    if (!isNative()) return;
-    const { Keyboard } = window.Capacitor.Plugins;
-    if (!Keyboard) return;
+    if (isNative() && window.Capacitor.Plugins.Keyboard) {
+      // Native: Capacitor Keyboard plugin events
+      const { Keyboard } = window.Capacitor.Plugins;
 
-    Keyboard.addListener('keyboardWillShow', () => {
-      document.body.classList.add('keyboard-open');
-      // Re-scroll focused element into view after keyboard appears
-      setTimeout(() => {
-        const el = document.activeElement;
-        if (el && el !== document.body) {
-          el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      Keyboard.addListener('keyboardWillShow', () => {
+        document.body.classList.add('keyboard-open');
+        // 550ms: Android keyboard animation is ~300ms; the adjustResize WebView
+        // reflow takes another beat after the animation ends. We wait until both
+        // settle before scrolling so getBoundingClientRect reads the post-resize layout.
+        setTimeout(_scrollFocusedInputIntoView, 550);
+      });
+
+      Keyboard.addListener('keyboardWillHide', () => {
+        document.body.classList.remove('keyboard-open');
+        _resetDocumentScroll();
+        // Force --actual-vh back to full height immediately — some WebViews fire
+        // the resize event late, leaving the body stuck at keyboard height briefly.
+        if (window._homattUpdateVh) window._homattUpdateVh();
+      });
+
+      Keyboard.addListener('keyboardDidHide', () => {
+        document.body.classList.remove('keyboard-open');
+        _resetDocumentScroll();
+        if (window._homattUpdateVh) window._homattUpdateVh();
+        // Double-check after the WebView finishes growing back
+        setTimeout(() => {
+          _resetDocumentScroll();
+          if (window._homattUpdateVh) window._homattUpdateVh();
+        }, 250);
+      });
+    } else if (window.visualViewport) {
+      // Web/PWA fallback: detect the keyboard via visual viewport height changes.
+      let baseHeight = window.visualViewport.height;
+      window.visualViewport.addEventListener('resize', () => {
+        const h = window.visualViewport.height;
+        if (h > baseHeight) baseHeight = h; // rotation / chrome UI growth
+        const keyboardOpen = baseHeight - h > 150;
+        if (keyboardOpen) {
+          document.body.classList.add('keyboard-open');
+          setTimeout(_scrollFocusedInputIntoView, 300);
+        } else {
+          document.body.classList.remove('keyboard-open');
+          _resetDocumentScroll();
+          if (window._homattUpdateVh) window._homattUpdateVh();
+          setTimeout(() => {
+            _resetDocumentScroll();
+            if (window._homattUpdateVh) window._homattUpdateVh();
+          }, 250);
         }
-      }, 350);
-    });
-
-    Keyboard.addListener('keyboardWillHide', () => {
-      document.body.classList.remove('keyboard-open');
-    });
+      });
+    }
   }
 
   // ─── NETWORK STATUS ─────────────────────────────────────────────────────────
@@ -259,6 +414,82 @@
     }
   };
 
+  // ─── GEOLOCATION — Native wrapper ───────────────────────────────────────────
+  /**
+   * HomattGeolocation — wraps Capacitor Geolocation on native (which triggers
+   * the Android runtime permission dialog) and falls back to the browser API
+   * on web. Always use this instead of navigator.geolocation in the app.
+   */
+  window.HomattGeolocation = {
+    /**
+     * Returns [lat, lon] or null on failure.
+     * On native, requests permission first so Android shows the system dialog.
+     */
+    async getCurrentPosition(options) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const pos = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: (options && options.timeout) || 8000,
+          });
+          return [pos.coords.latitude, pos.coords.longitude];
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      return new Promise(resolve => {
+        if (!navigator.geolocation) { resolve(null); return; }
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve([pos.coords.latitude, pos.coords.longitude]),
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: (options && options.timeout) || 8000 }
+        );
+      });
+    },
+
+    /**
+     * Starts watching position. Calls callback(lat, lon) on each update.
+     * Returns a watchId that can be passed to clearWatch().
+     */
+    async watchPosition(options, callback) {
+      if (isNative() && window.Capacitor.Plugins.Geolocation) {
+        const { Geolocation } = window.Capacitor.Plugins;
+        try {
+          const perm = await Geolocation.requestPermissions();
+          if (perm.location !== 'granted' && perm.coarseLocation !== 'granted') return null;
+          const watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, maximumAge: options && options.maximumAge, timeout: options && options.timeout },
+            (pos, err) => { if (pos) callback(pos.coords.latitude, pos.coords.longitude); }
+          );
+          return { native: true, id: watchId };
+        } catch (e) {
+          return null;
+        }
+      }
+      // Web fallback
+      if (!navigator.geolocation) return null;
+      const id = navigator.geolocation.watchPosition(
+        pos => callback(pos.coords.latitude, pos.coords.longitude),
+        null,
+        { enableHighAccuracy: true, maximumAge: (options && options.maximumAge) || 15000, timeout: (options && options.timeout) || 10000 }
+      );
+      return { native: false, id };
+    },
+
+    async clearWatch(handle) {
+      if (!handle) return;
+      if (handle.native && window.Capacitor && window.Capacitor.Plugins.Geolocation) {
+        await window.Capacitor.Plugins.Geolocation.clearWatch({ id: handle.id }).catch(() => {});
+      } else {
+        navigator.geolocation.clearWatch(handle.id);
+      }
+    }
+  };
+
   // ─── HAPTICS ────────────────────────────────────────────────────────────────
   window.HomattHaptics = {
     light() {
@@ -279,11 +510,38 @@
   };
 
   // ─── INIT ────────────────────────────────────────────────────────────────────
+  // ─── EXTERNAL LINK INTERCEPTOR ──────────────────────────────────────────────
+  // Capacitor's WebView swallows clicks on external <a href="https://..."> links
+  // and either loads them inside the app or does nothing. Using window.open with
+  // the '_system' target tells Android to hand the URL to the device's default
+  // browser (Chrome) instead — so Google Maps, WhatsApp, websites, etc. all open
+  // correctly. Works for target="_blank" links too.
+  function initExternalLinks() {
+    const appHost = window.location.hostname; // e.g. homatt-uganda-emmanuelokols-projects.vercel.app or localhost
+    document.addEventListener('click', function(e) {
+      const anchor = e.target && e.target.closest && e.target.closest('a[href]');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      // Only intercept fully-qualified external URLs (http / https)
+      if (!/^https?:\/\//i.test(href)) return;
+      try {
+        const url = new URL(href);
+        // Let internal app links (same host) load normally
+        if (url.hostname === appHost || url.hostname === 'localhost') return;
+      } catch(_) { return; }
+      // Open in Chrome / system browser
+      e.preventDefault();
+      e.stopPropagation();
+      window.open(href, '_system');
+    }, true); // capturing so it fires before any onclick handlers
+  }
+
   function init() {
     initStatusBar();
     initBackButton();
     initNetwork();
     initKeyboard();
+    initExternalLinks();
     // Hide splash after a short delay to ensure content is visible
     if (document.readyState === 'complete') {
       hideSplash();
@@ -337,6 +595,22 @@
         .catch(() => {}); // silently fail on non-HTTPS or unsupported env
     });
   }
+
+  // ─── SMOOTH NAVIGATION ──────────────────────────────────────────────────────
+  // navTo(url) — fades the page out before navigating so there's no white
+  // flash between bottom-nav tabs.  Falls back to an instant redirect if the
+  // frame element isn't found or animation preference is reduced.
+  window.navTo = function(url) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      window.location.href = url;
+      return;
+    }
+    const frame = document.querySelector('.phone-frame');
+    if (!frame) { window.location.href = url; return; }
+    frame.style.transition = 'opacity 0.12s ease';
+    frame.style.opacity = '0';
+    setTimeout(() => { window.location.href = url; }, 120);
+  };
 
   // Wait for Capacitor bridge to be ready
   if (window.Capacitor) {

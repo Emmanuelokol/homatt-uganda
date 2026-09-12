@@ -14,7 +14,34 @@ function requireRider() {
   return s;
 }
 
+function setupRiderMobileNav() {
+  const sidebar = document.querySelector('.admin-sidebar');
+  const topbar  = document.querySelector('.admin-topbar');
+  if (!sidebar || !topbar) return;
+  if (!topbar.querySelector('.sidebar-hamburger')) {
+    const burger = document.createElement('button');
+    burger.className = 'sidebar-hamburger';
+    burger.innerHTML = '<span class="material-icons-outlined">menu</span>';
+    topbar.insertBefore(burger, topbar.firstChild);
+  }
+  if (!document.getElementById('_sidebarOverlay')) {
+    const ov = document.createElement('div');
+    ov.id = '_sidebarOverlay'; ov.className = 'sidebar-overlay';
+    document.body.appendChild(ov);
+  }
+  const toggle = (open) => {
+    sidebar.classList.toggle('open', open);
+    document.getElementById('_sidebarOverlay').classList.toggle('active', open);
+  };
+  topbar.querySelector('.sidebar-hamburger').onclick = () => toggle(!sidebar.classList.contains('open'));
+  document.getElementById('_sidebarOverlay').onclick = () => toggle(false);
+  sidebar.querySelectorAll('.sidebar-link, a').forEach(l =>
+    l.addEventListener('click', () => { if (window.innerWidth <= 768) toggle(false); })
+  );
+}
+
 function setupRiderLogout() {
+  setupRiderMobileNav();
   document.getElementById('riderLogoutBtn')?.addEventListener('click', () => {
     localStorage.removeItem('rider_session');
     window.location.href = 'index.html';

@@ -1,10 +1,19 @@
-name: Deploy AI Proxy to Supabase
+name: Deploy Edge Functions to Supabase
 
 on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/**'   # Only runs when the Edge Function changes
+      - 'supabase/functions/**'
+      # ...and when this file changes. The deploy list used to live in here, so
+      # a function could be added to the project and still never be deployed
+      # until somebody happened to edit its source again. Fixing the list has
+      # to be enough to make the fix take effect.
+      - '.github/workflows/deploy-edge-function.yml'
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
+
+env:
+  SUPABASE_PROJECT_REF: kgkdiykzmqjougwzzewi
 
 jobs:
   deploy:
@@ -19,20 +28,100 @@ jobs:
         with:
           version: latest
 
-      - name: Set API keys as Supabase secrets
+      # ── Secrets ───────────────────────────────────────────────────────────
+      # ONLY the ones that actually have a value.
+      #
+      # This step used to pass every name unconditionally, and `supabase
+      # secrets set X=""` does not skip an empty value — it WRITES an empty
+      # one. So a key somebody had set by hand in the dashboard was silently
+      # erased on the next deploy, and the symptom appeared somewhere else
+      # entirely, hours later. A secret that is not in GitHub is now left
+      # exactly as it is on the project.
+      #
+      # Values go through `env:` rather than into the command line, so a key
+      # containing a quote or a backtick cannot become shell.
+      - name: Set Supabase secrets
         run: |
-          supabase secrets set \
-            GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
-            --project-ref kgkdiykzmqjougwzzewi
+          set -uo pipefail
+          args=()
+          keep() {
+            if [ -n "${2:-}" ]; then
+              args+=("$1=$2")
+              echo "  will set $1"
+            else
+              echo "  skipping $1 — not set in GitHub Secrets, leaving the project's value alone"
+            fi
+          }
+          keep ANTHROPIC_API_KEY        "$ANTHROPIC_API_KEY"
+          keep GROQ_API_KEY             "$GROQ_API_KEY"
+          keep OPENAI_API_KEY           "$OPENAI_API_KEY"
+          keep GEMINI_API_KEY           "$GEMINI_API_KEY"
+          keep DEEPGRAM_API_KEY         "$DEEPGRAM_API_KEY"
+          keep ONESIGNAL_APP_ID         "$ONESIGNAL_APP_ID"
+          keep ONESIGNAL_REST_API_KEY   "$ONESIGNAL_REST_API_KEY"
+          keep SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "::warning::No secrets in GitHub — nothing set, nothing erased."
+            exit 0
+          fi
+          supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN:      ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          ANTHROPIC_API_KEY:          ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY:               ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY:             ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY:             ${{ secrets.GEMINI_API_KEY }}
+          DEEPGRAM_API_KEY:           ${{ secrets.DEEPGRAM_API_KEY }}
+          ONESIGNAL_APP_ID:           ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_API_KEY:     ${{ secrets.ONESIGNAL_REST_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # ── Deploy EVERY function in the repo ─────────────────────────────────
+      # Not a hand-written list. `transcribe` and `structure` were written,
+      # documented, keyed and tested — and never worked for a single clinic,
+      # because nobody added two lines to this file, and nothing anywhere said
+      # so. The dictate button just reported that it could not reach the
+      # service. A list that has to be remembered is a list that will be wrong
+      # again; the directory is the list.
+      #
+      # PUBLIC are the ones called by something that cannot hold a session: a
+      # webhook, pg_cron, the payment provider. Everything else must present a
+      # JWT — `transcribe` above all, because it spends money per minute and an
+      # open one can be drained by anyone who finds the URL.
+      - name: Deploy every Edge Function
+        run: |
+          set -uo pipefail
+          PUBLIC=" ai-proxy send-notification discharge-notify payment-notify relworx-payment "
+          failed=""
+          for dir in supabase/functions/*/; do
+            fn=$(basename "$dir")
+            [ -f "$dir/index.ts" ] || { echo "skipping $fn — no index.ts"; continue; }
+            case "$PUBLIC" in
+              *" $fn "*) flags="--no-verify-jwt"; note="(open)" ;;
+              *)         flags="";               note="(signed-in callers only)" ;;
+            esac
+            echo "── deploying $fn $note"
+            # shellcheck disable=SC2086
+            if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags; then
+              echo "✓ $fn"
+            else
+              echo "::error::$fn failed to deploy"
+              failed="$failed $fn"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::these did not deploy:$failed"
+            exit 1
+          fi
+          echo "All Edge Functions deployed."
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy Edge Function
-        run: |
-          supabase functions deploy ai-proxy \
-            --project-ref kgkdiykzmqjougwzzewi \
-            --no-verify-jwt
+      # ── Say what is actually live ─────────────────────────────────────────
+      # So the run log answers "is transcribe deployed?" without anyone having
+      # to open the dashboard. That question cost a week.
+      - name: List what is deployed
+        run: supabase functions list --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true

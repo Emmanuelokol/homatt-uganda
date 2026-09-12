@@ -1,0 +1,10 @@
+/* Inter (variable, Latin) — bundled locally so the UI text renders in the
+   correct font OFFLINE. Loaded from Google Fonts CDN before, which is
+   unreachable with no connection (text fell back to the system font). */
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("inter-latin.woff2?v=1") format("woff2");
+}

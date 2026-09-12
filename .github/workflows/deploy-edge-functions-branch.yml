@@ -1,0 +1,133 @@
+name: Deploy Edge Functions (branch)
+
+# Deploys edge functions on every push to claude/* branches.
+on:
+  push:
+    branches:
+      - 'claude/**'
+    paths:
+      - 'supabase/functions/**'
+      # ...and when this file changes — see the note in deploy-edge-function.yml.
+      - '.github/workflows/deploy-edge-functions-branch.yml'
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
+
+env:
+  SUPABASE_PROJECT_REF: kgkdiykzmqjougwzzewi
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check SUPABASE_ACCESS_TOKEN is set
+        run: |
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN secret is not set."
+            echo "::error::Go to: Supabase dashboard → Account → Access Tokens → create one"
+            echo "::error::Then: GitHub repo → Settings → Secrets → Actions → New secret"
+            exit 1
+          fi
+          echo "✓ SUPABASE_ACCESS_TOKEN is set"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Only the secrets that actually have a value: `supabase secrets set
+      # X=""` WRITES an empty value rather than skipping it, which silently
+      # erases a key somebody set by hand in the dashboard. Values are passed
+      # through `env:` so a key containing a quote cannot become shell.
+      - name: Set Supabase secrets
+        run: |
+          set -uo pipefail
+          args=()
+          keep() {
+            if [ -n "${2:-}" ]; then
+              args+=("$1=$2"); echo "  will set $1"
+            else
+              echo "  skipping $1 — not in GitHub Secrets, leaving the project's value alone"
+            fi
+          }
+          keep ONESIGNAL_APP_ID          "$ONESIGNAL_APP_ID"
+          keep ONESIGNAL_REST_API_KEY    "$ONESIGNAL_REST_API_KEY"
+          keep SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+          keep ANTHROPIC_API_KEY         "$ANTHROPIC_API_KEY"
+          keep OPENAI_API_KEY            "$OPENAI_API_KEY"
+          keep DEEPGRAM_API_KEY          "$DEEPGRAM_API_KEY"
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "::warning::No secrets in GitHub — nothing set, nothing erased."
+            exit 0
+          fi
+          supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN:      ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          ONESIGNAL_APP_ID:           ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_API_KEY:     ${{ secrets.ONESIGNAL_REST_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          ANTHROPIC_API_KEY:          ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY:             ${{ secrets.OPENAI_API_KEY }}
+          DEEPGRAM_API_KEY:           ${{ secrets.DEEPGRAM_API_KEY }}
+        continue-on-error: true   # Don't block deploy if secrets step has issues
+
+      # Allow GitHub Pages (and localhost for dev) to call edge functions.
+      # Without this the Supabase gateway returns 403 "Host not in allowlist"
+      # before CORS headers in the function code ever run.
+      - name: Configure Supabase Auth allowed origins
+        run: |
+          curl -s -X PATCH \
+            "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/config/auth" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "site_url": "https://emmanuelokol.github.io",
+              "additional_redirect_urls": "https://emmanuelokol.github.io/**\nhttp://localhost:3000/**\nhttp://localhost:5173/**"
+            }' | jq '{site_url: .site_url, status: "auth config updated"}' || echo "::warning::Auth config update failed (non-fatal)"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true
+
+      # ── Deploy EVERY function in the repo ─────────────────────────────────
+      # The directory is the list. A hand-written one is how `transcribe` came
+      # to be written, documented, keyed and tested without ever being
+      # deployed — for a clinic whose only symptom was a dictate button saying
+      # it could not reach the service.
+      - name: Deploy every Edge Function
+        run: |
+          set -uo pipefail
+          PUBLIC=" ai-proxy send-notification discharge-notify payment-notify relworx-payment "
+          failed=""
+          for dir in supabase/functions/*/; do
+            fn=$(basename "$dir")
+            [ -f "$dir/index.ts" ] || { echo "skipping $fn — no index.ts"; continue; }
+            case "$PUBLIC" in
+              *" $fn "*) flags="--no-verify-jwt"; note="(open)" ;;
+              *)         flags="";               note="(signed-in callers only)" ;;
+            esac
+            echo "── deploying $fn $note"
+            # shellcheck disable=SC2086
+            if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags; then
+              echo "✓ $fn"
+            else
+              echo "::error::$fn failed to deploy"
+              failed="$failed $fn"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::these did not deploy:$failed"
+            exit 1
+          fi
+          echo "All Edge Functions deployed."
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: List what is deployed
+        run: supabase functions list --project-ref "$SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true

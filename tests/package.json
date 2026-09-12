@@ -1,0 +1,11 @@
+{
+  "name": "homatt-tests",
+  "private": true,
+  "description": "Browser tests for the Homatt Health clinic portal",
+  "scripts": {
+    "test": "node run-all.js"
+  },
+  "dependencies": {
+    "playwright": "^1.62.1"
+  }
+}
