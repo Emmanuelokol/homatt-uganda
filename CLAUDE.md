@@ -1580,9 +1580,67 @@ tests/sql/test-owner-corrections.sql   105 checks, real Postgres
 tests/test-corrections.js               27 checks, real screens
 ```
 
+## One table that knows what a dose looks like
+
+`app/clinic/js/clinic-regimens.js` · `tests/test-followup-meds.js`
+
+The **follow-up visit** on the dashboard offered three empty boxes — drug
+name, strength, days — on the one screen where a clinician is adding a
+medicine to somebody already diagnosed. The treatment screen has known those
+regimens since it was written.
+
+The obvious fix is to copy the table onto the dashboard. **That is the mistake
+this project has already paid for once.** "Two separate implementations would
+drift, and the second one would be the one nobody measured" is written above
+about the microphone, and it is truer of a dose: the day somebody corrects
+amoxicillin in one file and not the other, two screens in the same app
+prescribe two different things and neither looks wrong. So the 39 regimens
+moved into `clinic-regimens.js` and **both screens read it**.
+
+If the module fails to load, `DRUG_REGIMENS` falls back to an **empty list**,
+not a second copy — auto-fill then does nothing and the clinician types the
+dose, which is what they did before any of this existed. A stale duplicate
+would be worse than none.
+
+### The band it used, not just the number
+`forBand(reg, band)` returns `usedBand` alongside the dose, and that is the
+point of it. Falling back to the adult figure for a child is often the only
+thing available and is safe **only if the screen says so**. Ciprofloxacin has
+an adult entry and nothing else, so a four-year-old's card reads *"This is the
+adult dose — the guide has none for this age. Check it before giving it."* in
+the warning colour, rather than quietly filling in 500mg.
+
+Everything filled stays editable, and the row says where the figure came from.
+It is a starting point, never a prescription.
+
+### The suggestion order is a clinical decision
+The clinic's **own shelf first**, with the quantity on it — a medicine in the
+building is one the patient can actually be given today, and it costs no
+request because Quick Sale has already loaded it. The common medicines follow.
+A shelf item still takes its dose from the shared table: the name on a box and
+the dose for it are two different questions.
+
+### `min-width:0`, or the select pushes itself off the card
+The frequency was **outside the medication card** on a real phone — "2×" cut
+off by the screen. The strength box and the select were `flex:1` with no
+`min-width:0`, and `.field-input` carries `font-size:16px !important`, so the
+select's own content set a floor wider than its share. A grid now, every cell
+`min-width:0` and `box-sizing:border-box`: a cell can never exceed its column.
+Two columns with the strength spanning both — three boxes across is not
+readable at 360px, which is the phone this is used on.
+
+**And a fixed-height flex sheet has no spare height**, which this round
+learned twice in one afternoon: a list of today's sales added to the quick
+sale sheet pushed the Sell button off the bottom (11px over at 412×420, 45px
+at 360×380), and a full-width correction button pushed the visit record to
+711px in the 661px it has. Both moved into a row that already existed — a
+header icon, and a 30px icon beside the severity chip. Put a new affordance in
+a row that already exists, or it comes out of the button at the bottom, on the
+phone of whoever has the smallest screen.
+
 ## The tests
 
-`tests/` — 64 files, ~905 checks (plus 13 `measure-*.js`, which print numbers
+`tests/` — 65 files, ~925 checks (plus 13 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -1658,6 +1716,12 @@ rules worth repeating here:
 - **`now()` is frozen for a transaction.** A test that writes several rows in
   one `do $$` block and then asserts on "the latest by created_at" is asking
   the planner to pick, not the clock. Assert on existence instead.
+- **An element with no size satisfies every layout assertion.** `#histModal`
+  starts at `display:none`, so measuring the follow-up row before showing it
+  returned zeros and "no field is outside the card" passed because nothing had
+  a size at all — reporting the fault fixed. Make it visible first, and put a
+  width assertion beside every overflow assertion: the width check is what
+  caught this.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by
