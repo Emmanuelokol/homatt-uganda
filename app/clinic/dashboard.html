@@ -294,6 +294,45 @@
     @media (max-width: 480px) {
       #qsDrugGrid { grid-template-columns: repeat(2,1fr) !important; }
     }
+
+    /* ── A medicine on the follow-up visit ─────────────────────────────
+       Laid out as a GRID with every cell min-width:0, because the previous
+       flex row let the frequency select set its own floor and push itself
+       outside the card — "2×" hanging off the edge of a real phone. A grid
+       cell can never exceed its column. */
+    .fu-dmed-row{border:1px solid var(--border);border-radius:12px;
+      padding:11px 12px;margin-bottom:9px;background:var(--surface)}
+    .fu-med-head{display:flex;justify-content:space-between;align-items:center;
+      margin-bottom:8px;gap:8px}
+    .fu-med-n{font-size:11px;font-weight:800;color:var(--primary-ink);
+      letter-spacing:.5px;text-transform:uppercase}
+    .fu-med-remove{background:transparent;border:none;color:var(--danger-ink);
+      font:inherit;font-size:12px;font-weight:700;cursor:pointer;padding:2px 4px}
+    .fu-med-namewrap{position:relative;margin-bottom:8px}
+    .fu-med-namewrap .fu-med-name{width:100%;box-sizing:border-box}
+    .fu-med-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .fu-med-grid > *{min-width:0;box-sizing:border-box;width:100%}
+    .fu-med-grid .fu-med-strength{grid-column:1 / -1}
+    .fu-med-days-wrap{display:flex;align-items:center;gap:6px}
+    .fu-med-days-wrap .fu-med-days{min-width:0;flex:1;box-sizing:border-box}
+    .fu-med-days-wrap span{font-size:13px;color:var(--text-lt);font-weight:600;flex:none}
+
+    /* The suggestion list. Anchored to the name box, above everything else in
+       the modal, and it must not be clipped by the card it sits in. */
+    .fu-ac{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;
+      z-index:40;background:var(--surface);border:1.5px solid var(--border);
+      border-radius:12px;box-shadow:var(--shadow-lg);max-height:220px;
+      overflow-y:auto}
+    .fu-ac-item{padding:10px 12px;cursor:pointer;border-bottom:1px solid var(--border)}
+    .fu-ac-item:last-child{border-bottom:none}
+    .fu-ac-item:hover,.fu-ac-item.on{background:var(--brand-tint)}
+    .fu-ac-nm{font-size:14px;font-weight:700;color:var(--text)}
+    .fu-ac-sub{font-size:11.5px;color:var(--text-lt);margin-top:1px}
+    .fu-ac-item:hover .fu-ac-nm,.fu-ac-item:hover .fu-ac-sub{color:var(--brand-ink)}
+    .fu-ac-head{padding:5px 12px;font-size:10px;font-weight:800;letter-spacing:.4px;
+      text-transform:uppercase;color:var(--text-lt);background:var(--bg)}
+    .fu-ac-pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;
+      background:var(--brand-tint);color:var(--brand-ink);margin-left:6px}
   </style>
 </head>
 <body>
@@ -2583,24 +2622,177 @@
   // ── Follow-up visit form ────────────────────────────────
   // Updates the existing clinic_diagnoses row in place — appends new meds,
   // adds to the bill, optionally records a payment. Does NOT create a new case.
+  /* One medicine on the follow-up.
+   *
+   * THE OLD LAYOUT PUT THE FREQUENCY OFF THE EDGE OF THE CARD. The strength
+   * box and the frequency select sat in a flex row as `flex:1` with no
+   * `min-width:0`, and `.field-input` carries `font-size:16px !important` — so
+   * the select's own content set a floor wider than its share and pushed
+   * itself out of the card. On the photograph that arrived, "2×" was hanging
+   * outside the border, cut off by the screen.
+   *
+   * A grid now, with every cell `min-width:0` and `box-sizing:border-box`, so
+   * a cell can never be wider than the column it is in whatever is inside it.
+   * Two columns, and the strength spans both: three boxes across is not
+   * readable at 360px, which is the phone this is used on.
+   */
+
+  /* ── Suggesting a medicine on the follow-up, and filling its dose ──────
+   *
+   * The same two sources the treatment screen uses, in the same order:
+   *
+   *   1. THE CLINIC'S OWN STOCK first, because a medicine on the shelf is one
+   *      the patient can actually be given today, and it is already loaded on
+   *      this page for Quick Sale (_qsDrugs) — no extra request.
+   *   2. The shared regimen table (js/clinic-regimens.js), which the treatment
+   *      screen reads too. One table, so the two screens cannot drift into
+   *      prescribing different doses for the same drug.
+   *
+   * Picking one fills the strength, how often and for how many days — as a
+   * STARTING POINT in editable boxes, never as a decision. Where the table has
+   * no figure for this patient's age band it says so on the row rather than
+   * quietly handing over the adult dose, which is the rule the rest of this
+   * app follows and the one that matters most here.
+   */
+  function _fuAgeBand(current) {
+    var a = Number(current && (current.patient_age || current.age));
+    if (!isFinite(a) || a <= 0) return 'adult';
+    if (a < 1) return 'infant';
+    if (a < 13) return 'child';
+    return 'adult';
+  }
+
+  function _fuStock(q) {
+    // _qsDrugs is a hoisted var in this same script — Quick Sale already
+    // loaded the shelf, so this costs no request. Guarded because the
+    // follow-up can be opened before Quick Sale ever has been.
+    var list = (typeof _qsDrugs !== 'undefined' && Array.isArray(_qsDrugs)) ? _qsDrugs : [];
+    return list.filter(function (d) {
+      return String(d.item_name || '').toLowerCase().indexOf(q) >= 0;
+    }).slice(0, 4);
+  }
+
+  function wireFollowupMedAutocomplete(current) {
+    var ctr = document.getElementById('fuMedsContainer');
+    if (!ctr) return;
+    var band = _fuAgeBand(current);
+
+    ctr.querySelectorAll('.fu-dmed-row').forEach(function (row) {
+      var inp = row.querySelector('.fu-med-name');
+      var menu = row.querySelector('.fu-ac');
+      if (!inp || !menu || inp._fuWired) return;
+      inp._fuWired = true;
+
+      function hide() { menu.style.display = 'none'; }
+
+      function fill(name, reg) {
+        inp.value = name;
+        hide();
+        if (!reg) return;
+        var d = window.HomattRegimens.forBand(reg, band);
+        if (!d) return;
+        var st = row.querySelector('.fu-med-strength');
+        var fq = row.querySelector('.fu-med-freq');
+        var dy = row.querySelector('.fu-med-days');
+        if (st) st.value = d.dose;
+        if (fq) fq.value = String(d.times);
+        if (dy) dy.value = String(d.days);
+        // Say where the figure came from, and say it loudest when the band
+        // does not match the patient in front of them.
+        var note = row.querySelector('.fu-med-note');
+        if (!note) {
+          note = document.createElement('div');
+          note.className = 'fu-med-note';
+          note.style.cssText = 'font-size:11.5px;line-height:1.45;margin-top:7px';
+          row.appendChild(note);
+        }
+        var wrong = d.usedBand !== band;
+        note.style.color = wrong ? 'var(--warning-ink)' : 'var(--text-lt)';
+        note.textContent = wrong
+          ? 'This is the ' + d.usedBand + ' dose — the guide has none for this age. Check it before giving it.'
+          : 'Filled from the ' + d.usedBand + ' dose in the guide' +
+            (d.byWeight ? ' — by weight, so check the child\'s weight' : '') +
+            (d.pregnancyCaution ? ' · caution in pregnancy' : '') + '. Edit if it differs.';
+      }
+
+      inp.addEventListener('input', function () {
+        var q = inp.value.trim().toLowerCase();
+        if (q.length < 2) { hide(); return; }
+        var stock = _fuStock(q);
+        var regs = (window.HomattRegimens ? window.HomattRegimens.names() : [])
+          .filter(function (r) {
+            return r.generic.indexOf(q) >= 0 ||
+                   r.also.some(function (a) { return a.indexOf(q) >= 0; });
+          }).slice(0, 6);
+        if (!stock.length && !regs.length) { hide(); return; }
+
+        var html = '';
+        if (stock.length) {
+          html += '<div class="fu-ac-head">On your shelf</div>' + stock.map(function (d) {
+            return '<div class="fu-ac-item" data-stock="' + esc(d.item_name) + '">' +
+              '<div class="fu-ac-nm">' + esc(d.item_name) +
+                '<span class="fu-ac-pill">' + esc(String(d.quantity)) + ' ' + esc(d.unit || '') + '</span></div>' +
+              '</div>';
+          }).join('');
+        }
+        if (regs.length) {
+          html += '<div class="fu-ac-head">Common medicines</div>' + regs.map(function (r) {
+            var also = r.also.length ? ' · also ' + r.also.slice(0, 2).join(', ') : '';
+            return '<div class="fu-ac-item" data-reg="' + esc(r.generic) + '">' +
+              '<div class="fu-ac-nm">' + esc(r.generic) + '</div>' +
+              '<div class="fu-ac-sub">' + esc(r.adult) + esc(also) + '</div></div>';
+          }).join('');
+        }
+        menu.innerHTML = html;
+        menu.style.display = 'block';
+
+        menu.querySelectorAll('[data-stock]').forEach(function (el) {
+          el.onclick = function () {
+            var nm = el.getAttribute('data-stock');
+            // A shelf item still gets its dose from the shared table when the
+            // table knows the drug — the name on a box and the dose for it are
+            // two different questions.
+            fill(nm, window.HomattRegimens ? window.HomattRegimens.find(nm) : null);
+          };
+        });
+        menu.querySelectorAll('[data-reg]').forEach(function (el) {
+          el.onclick = function () {
+            var nm = el.getAttribute('data-reg');
+            fill(nm.charAt(0).toUpperCase() + nm.slice(1),
+                 window.HomattRegimens ? window.HomattRegimens.find(nm) : null);
+          };
+        });
+      });
+
+      inp.addEventListener('blur', function () { setTimeout(hide, 180); });
+    });
+  }
+
   function followupMedRowHTML(i) {
     return ''
-    + '<div class="fu-dmed-row" data-idx="'+i+'" style="border:1px solid var(--border, #E0E0E0);border-radius:10px;padding:10px 12px;margin-bottom:8px">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'
-        + '<div style="font-size:11px;font-weight:700;color:#1565C0;letter-spacing:.5px;text-transform:uppercase">Medication '+(i+1)+'</div>'
-        + (i > 0 ? '<button type="button" class="fu-med-remove" style="background:transparent;border:none;color:#C62828;font-size:12px;cursor:pointer;font-family:inherit;padding:2px 6px">Remove</button>' : '')
+    + '<div class="fu-dmed-row" data-idx="'+i+'">'
+      + '<div class="fu-med-head">'
+        + '<span class="fu-med-n">Medicine '+(i+1)+'</span>'
+        + (i > 0 ? '<button type="button" class="fu-med-remove">Remove</button>' : '')
       + '</div>'
-      + '<input class="fu-med-name field-input" placeholder="Drug name e.g. Amoxicillin" style="width:100%;margin-bottom:6px">'
-      + '<div style="display:flex;gap:6px;margin-bottom:6px">'
-        + '<input class="fu-med-strength field-input" placeholder="Strength e.g. 500mg" style="flex:1">'
-        + '<select class="fu-med-freq field-input" style="flex:1">'
-          + '<option value="1">1× daily</option>'
-          + '<option value="2" selected>2× daily</option>'
-          + '<option value="3">3× daily</option>'
-          + '<option value="4">4× daily</option>'
+      + '<div class="fu-med-namewrap">'
+        + '<input class="fu-med-name field-input" autocomplete="off" '
+          + 'placeholder="Start typing a medicine…">'
+        + '<div class="fu-ac"></div>'
+      + '</div>'
+      + '<div class="fu-med-grid">'
+        + '<input class="fu-med-strength field-input" placeholder="Strength e.g. 500mg">'
+        + '<select class="fu-med-freq field-input" aria-label="How often">'
+          + '<option value="1">Once a day</option>'
+          + '<option value="2" selected>Twice a day</option>'
+          + '<option value="3">3 times a day</option>'
+          + '<option value="4">4 times a day</option>'
         + '</select>'
+        + '<div class="fu-med-days-wrap">'
+          + '<input class="fu-med-days field-input" type="number" min="1" value="5" aria-label="For how many days">'
+          + '<span>days</span>'
+        + '</div>'
       + '</div>'
-      + '<input class="fu-med-days field-input" type="number" min="1" value="5" placeholder="Duration (days)" style="width:100%">'
     + '</div>';
   }
 
@@ -2664,8 +2856,10 @@
       var idx = ctr.querySelectorAll('.fu-dmed-row').length;
       ctr.insertAdjacentHTML('beforeend', followupMedRowHTML(idx));
       wireFollowupRemoveButtons();
+      wireFollowupMedAutocomplete(current);
     };
     wireFollowupRemoveButtons();
+    wireFollowupMedAutocomplete(current);
 
     // Live preview of next return date
     function updateFuNextHint() {
@@ -6855,6 +7049,7 @@
 <script src="js/clinic-dictate.js?v=20261007" defer></script>
 <script src="js/clinic-speak.js?v=20261007" defer></script>
 <script src="js/pwa-install.js?v=20261007"></script>
+<script src="js/clinic-regimens.js?v=20261007"></script>
 <script src="js/clinic-corrections.js?v=20261007"></script>
 </body>
 </html>

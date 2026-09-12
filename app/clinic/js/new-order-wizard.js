@@ -1614,120 +1614,18 @@
   // flags drugs to avoid/verify in pregnancy (shown for female & unknown-sex
   // adults). `wt:true` marks weight-based paediatric dosing where an estimated
   // weight hint is most useful.
-  const DRUG_REGIMENS = [
-    { match:['paracetamol','panadol','acetaminophen'],
-      adult:{dose:'1g (2 tabs of 500mg)', times:3, days:3},
-      child:{dose:'15mg/kg per dose (syrup 120mg/5ml)', times:3, days:3, wt:true},
-      infant:{dose:'15mg/kg (syrup 120mg/5ml)', times:3, days:3, wt:true} },
-    { match:['coartem','artemether','lumefantrine','duo-cotecxin','artefan'],
-      adult:{dose:'4 tabs per dose',      times:2, days:3},
-      child:{dose:'1–3 tabs per dose by weight (5–14kg:1, 15–24kg:2, 25–34kg:3)', times:2, days:3, wt:true},
-      infant:{dose:'1 tab per dose (5–14kg)', times:2, days:3, wt:true} },
-    { match:['amoxicillin','amoxil','amoxyl'],
-      adult:{dose:'500mg',               times:3, days:5},
-      child:{dose:'25mg/kg per dose (syrup 250mg/5ml)', times:3, days:5, wt:true},
-      infant:{dose:'62.5–125mg (syrup 125mg/5ml)', times:3, days:5, wt:true} },
-    { match:['metronidazole','flagyl'],
-      adult:{dose:'400mg',               times:3, days:7},
-      child:{dose:'7.5mg/kg per dose',   times:3, days:7, wt:true} },
-    { match:['ciprofloxacin','cipro'],
-      adult:{dose:'500mg',               times:2, days:7, preg:true} },
-    { match:['doxycycline','doxy'],
-      adult:{dose:'100mg',               times:2, days:7, preg:true} },
-    { match:['cotrimoxazole','septrin','co-trimoxazole','bactrim'],
-      adult:{dose:'960mg (2 tabs of 480mg)', times:2, days:5},
-      child:{dose:'24mg/kg per dose (syrup 240mg/5ml)', times:2, days:5, wt:true},
-      infant:{dose:'120mg (syrup 2.5ml)', times:2, days:5} },
-    { match:['azithromycin','zithromax'],
-      adult:{dose:'500mg',               times:1, days:3},
-      child:{dose:'10mg/kg',             times:1, days:3, wt:true} },
-    { match:['erythromycin'],
-      adult:{dose:'500mg',               times:4, days:5},
-      child:{dose:'12.5mg/kg per dose',  times:4, days:5, wt:true} },
-    { match:['ibuprofen','brufen'],
-      adult:{dose:'400mg',               times:3, days:3},
-      child:{dose:'10mg/kg (syrup 100mg/5ml)', times:3, days:3, wt:true, preg:false} },
-    { match:['diclofenac'],
-      adult:{dose:'50mg',                times:2, days:5, preg:true} },
-    { match:['ors','oral rehydration'],
-      adult:{dose:'1 sachet in 1L water, after each loose stool', times:3, days:3},
-      child:{dose:'½–1 sachet, after each loose stool', times:3, days:3},
-      infant:{dose:'¼–½ sachet, 5ml/kg after each stool', times:3, days:3, wt:true} },
-    { match:['zinc'],
-      adult:{dose:'20mg',                times:1, days:10},
-      child:{dose:'20mg (10mg if under 6 months)', times:1, days:10},
-      infant:{dose:'10mg',               times:1, days:10} },
-    { match:['cetirizine','zyrtec'],
-      adult:{dose:'10mg',                times:1, days:5},
-      child:{dose:'5mg (syrup 5ml)',     times:1, days:5} },
-    { match:['chlorpheniramine','piriton'],
-      adult:{dose:'4mg',                 times:3, days:5},
-      child:{dose:'1–2mg (syrup 2.5–5ml)', times:2, days:5} },
-    { match:['omeprazole','losec'],
-      adult:{dose:'20mg',                times:1, days:14} },
-    { match:['metformin','glucophage'],
-      adult:{dose:'500mg',               times:2, days:30} },
-    { match:['amlodipine','norvasc'],
-      adult:{dose:'5mg',                 times:1, days:30} },
-    { match:['albendazole','zentel'],
-      adult:{dose:'400mg single dose',   times:1, days:1, preg:true},
-      child:{dose:'400mg single dose (200mg if 1–2 yrs)', times:1, days:1} },
-    { match:['mebendazole','vermox'],
-      adult:{dose:'100mg',               times:2, days:3, preg:true},
-      child:{dose:'100mg',               times:2, days:3} },
-    { match:['fluconazole','diflucan'],
-      adult:{dose:'150mg single dose',   times:1, days:1, preg:true} },
-    { match:['ferrous','iron'],
-      adult:{dose:'200mg',               times:1, days:30},
-      child:{dose:'3mg/kg elemental iron (syrup)', times:1, days:30, wt:true} },
-    { match:['folic'],
-      adult:{dose:'5mg',                 times:1, days:30} },
-    { match:['vitamin c','ascorbic'],
-      adult:{dose:'1 tab',               times:1, days:7},
-      child:{dose:'1 tab',               times:1, days:7} },
-    { match:['salbutamol','ventolin'],
-      adult:{dose:'4mg (or 2 puffs inhaler)', times:3, days:5},
-      child:{dose:'2mg (syrup 5ml) or 1–2 puffs', times:3, days:5} },
-    // ── Additional common Uganda OPD drugs ──
-    { match:['nystatin'],
-      adult:{dose:'1–2 tabs / 5ml suspension', times:4, days:7},
-      child:{dose:'1ml suspension to each side of mouth', times:4, days:7},
-      infant:{dose:'1ml suspension', times:4, days:7} },
-    { match:['nifedipine'],
-      adult:{dose:'20mg',                times:2, days:30} },
-    { match:['hydrochlorothiazide','hctz'],
-      adult:{dose:'25mg',                times:1, days:30} },
-    { match:['prednisolone','prednisone'],
-      adult:{dose:'30–40mg',             times:1, days:5},
-      child:{dose:'1mg/kg',              times:1, days:5, wt:true} },
-    { match:['dexamethasone'],
-      adult:{dose:'4mg',                 times:1, days:3},
-      child:{dose:'0.15mg/kg',           times:1, days:3, wt:true} },
-    { match:['hyoscine','buscopan'],
-      adult:{dose:'10mg',                times:3, days:3} },
-    { match:['loratadine','clarityne'],
-      adult:{dose:'10mg',                times:1, days:5},
-      child:{dose:'5mg (syrup 5ml)',     times:1, days:5} },
-    { match:['ranitidine','zantac'],
-      adult:{dose:'150mg',               times:2, days:14} },
-    { match:['ceftriaxone'],
-      adult:{dose:'1–2g IV/IM',          times:1, days:5},
-      child:{dose:'50–80mg/kg IV/IM',    times:1, days:5, wt:true} },
-    { match:['benzylpenicillin','crystalline penicillin'],
-      adult:{dose:'2–4 MU IV',           times:4, days:5},
-      child:{dose:'50,000 IU/kg IV',     times:4, days:5, wt:true} },
-    { match:['gentamicin'],
-      adult:{dose:'5–7mg/kg IV/IM',      times:1, days:5, wt:true},
-      child:{dose:'7.5mg/kg IV/IM',      times:1, days:5, wt:true} },
-    { match:['nevirapine','dolutegravir','tenofovir','efavirenz','tld'],
-      adult:{dose:'As per national ART guidelines — confirm regimen', times:1, days:30} },
-    { match:['quinine'],
-      adult:{dose:'600mg',               times:3, days:7},
-      child:{dose:'10mg/kg per dose',    times:3, days:7, wt:true} },
-    { match:['artesunate'],
-      adult:{dose:'2.4mg/kg IV at 0,12,24h then daily', times:1, days:3, wt:true},
-      child:{dose:'3mg/kg IV (under 20kg)', times:1, days:3, wt:true} },
-  ];
+  /* The regimen table moved to js/clinic-regimens.js so the follow-up visit
+   * on the dashboard reads the SAME doses this screen does. Copying it would
+   * have been quicker and is the mistake this project has already paid for
+   * once: the day somebody corrects amoxicillin in one file and not the other,
+   * two screens prescribe two different things and neither looks wrong.
+   *
+   * The fallback is an empty list rather than a second copy. If the module
+   * fails to load, auto-fill simply does nothing and the clinician types the
+   * dose — which is what they did before any of this existed. A stale
+   * duplicate would be worse than none. */
+  const DRUG_REGIMENS = (window.HomattRegimens && window.HomattRegimens.all) || [];
+;
 
   // Age the clinician typed in (years). Wins over the patient record so a
   // walk-in with no DOB can still be dosed by age.
@@ -1783,19 +1681,12 @@
   }
 
   function findRegimen(name) {
-    const n = (name || '').toLowerCase();
-    if (n.length < 3) return null;
-    return DRUG_REGIMENS.find(r => r.match.some(m => n.includes(m))) || null;
+    return window.HomattRegimens ? window.HomattRegimens.find(name) : null;
   }
 
   // "three times daily" / "bd" / "every 8 hours" → 1–4
   function parseTimesPerDay(text) {
-    const t = (text || '').toLowerCase();
-    if (/four times|4 times|\bqid\b|\bqds\b|every 6 ?h/.test(t)) return 4;
-    if (/three times|3 times|\btds\b|\btid\b|every 8 ?h/.test(t)) return 3;
-    if (/twice|two times|2 times|\bbd\b|\bbid\b|every 12 ?h/.test(t)) return 2;
-    if (/once|one time|1 time|\bod\b|single dose|\bstat\b/.test(t)) return 1;
-    return null;
+    return window.HomattRegimens ? window.HomattRegimens.timesPerDay(text) : null;
   }
 
   // Fill dosage, frequency, intake times and duration for medication idx
