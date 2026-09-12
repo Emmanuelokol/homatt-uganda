@@ -1281,6 +1281,104 @@ substance, not whether it found anything.** `hasPrimary` is clinical features,
 investigations, management, treatment steps or medicines — a differential and
 a note are not a section.
 
+## Everything in the book, including the parts that are not conditions
+
+`tools/ucg_reference.py` · `tools/build_ucg_db.py` ·
+`tests/measure-book-coverage.js`
+
+A clinician opened **24.1 Surgery**, got an empty card, and said: *"when I
+check in the book, the context is there."* Two different things were true.
+
+**24.1 itself was right.** The body prints `24.1 SURGERY` and then goes
+straight to `24.1.1 Intestinal Obstruction` — it is a heading with no text of
+its own, which is why it now lists what is under it.
+
+**But the question deserved a number**, so `measure-book-coverage.js` walks
+the source the database is cut from and asks, line by line, whether a
+clinician can reach it.
+
+| | letters |
+|---|---|
+| in the book | 994,324 |
+| reachable before | 887,140 · **89.22%** |
+| reachable now | 960,067 · **96.55%** |
+| the book's printed index (replaced by the app's own contents page) | 34,257 |
+| **in the book and nowhere in the app** | **0** |
+
+### A wrong number I nearly shipped
+My first alignment said 9.2% of SECTION text was missing, Hypertension losing
+23,892 letters. It was wrong: my matcher located headings by searching the
+whole document and found "Hypertension" in the abbreviations list. Measured
+with the project's own `ucg_spine`, section spans are contiguous —
+`a['end'] = b['line']` — so no clinical text falls between two sections, and
+the 20,928-letter difference is the 551 heading lines, which the card shows
+as its title. **The alarming number was mine, not the book's.** Worth keeping
+because it was confident and it was wrong.
+
+### What was really missing: everything outside the numbered spine
+`ucg_spine` cuts on numbered headings and `back_matter_start` deliberately
+stops before the appendices, so two blocks had no section, no search entry and
+no way to be read:
+
+| | letters | what is in it |
+|---|---|---|
+| front matter | 64,670 | **PRESCRIPTION WRITING RULES**, **INJECTIONS**, controlled-medicine prescriptions, prescribing in children and the elderly, medicine interactions, patient counselling, **Antimicrobial Resistance**, Appropriate Medicines Use, the Seven Steps in a Primary Care Consultation, the abbreviations list |
+| back matter | 27,087 | the four appendices — infection control, pharmacovigilance, **Appendix 3: the National Laboratory Test Menu**, which tests an HC II, HC III, HC IV, district hospital or national referral hospital can actually run |
+
+"Front matter" badly undersells the first one. A clinician looking up how to
+write a legal prescription, or whether their level of care can run a test,
+found nothing — and it was in the book in their hand.
+
+Both are now **chapter 25**, cut at the book's own headings. The headings are
+named as **anchors, not line numbers**, because a line number is a fact about
+one conversion and a heading is a fact about the book; an anchor that cannot
+be placed **fails the build loudly**, since a reference section that silently
+came out empty would look answered.
+
+### The one line that could do harm
+```python
+if is_ref: continue      # before medicines and treatments are parsed
+```
+The prescribing chapter is full of drug names used as **examples of how to
+write a prescription**, and Appendix 3 is a list of tests. Parsed as medicines
+they would become rows the one-tap package could offer a patient, with a dose
+lifted from a worked example. Two things prove it stayed skipped: the build's
+own counts are **unchanged** at 2,753 treatment steps and 1,008 medicine rows,
+and `test-doses.js` asserts 0 medicines and 0 steps from chapter 25 — because
+that failure would be silent and would look like content.
+
+Chapter 25 is also **out of the suggestion engine**: 91,666 characters thick
+with drug and test vocabulary and not one condition would score against any
+query, and a clinician typing a fever would be offered "Prescription Writing"
+as an impression. UCG documents stay at 488 and the WHO benchmark at 239/241.
+
+It cites **no page**, because this part of the book is paginated in roman
+numerals the index does not carry, and an arabic page would be a number from
+somewhere else entirely.
+
+### 2,691 rows of dashes were being read as findings
+The conversion drew the book's ruled tables as rows of `-----`, and the
+guideline screen laid every one out as a bullet — 320 in "Recommended Second
+Line Regimens", 204 in the TB preventive dosing chart, 177 in the antenatal
+care protocol, 72 in severe malaria. The package screen had dropped them since
+it was written; the guideline screen now does too. The **whole line** must be
+rule characters, so a single `-` survives (in a table cell it means nil).
+Dropped in the rendering, never in the data.
+
+**And the measurement had to be corrected before it could be believed.**
+`measure-guidelines.js` reported *3,530 words lost* for a change that lost no
+word at all — it was counting dash-runs, and lone `|` column dividers, as
+words. Same shape as the hyphen-repair correction in `measure-panel-text.js`:
+the thing being counted has to be the thing a clinician would miss. After the
+fix, 0 words lost across 565 sections and 2,005 fields.
+
+### What is still not done
+The seven buried sections still have no rows of their own. They are reachable
+— on the contents page and by search — and the 28 misfiled medicines are kept
+out of the package and labelled on the reference screen. Giving them real rows
+would be cleaner but would renumber the book's own spine, which this work has
+been careful not to touch. Its own change, with its own measurement.
+
 ## Which condition a dose belongs to
 
 `app/clinic/js/ucg-sections.js` · `tests/measure-doses.js` ·
@@ -1384,7 +1482,7 @@ input decides.** Recorded because the next reader will propose it again.
 
 ## The tests
 
-`tests/` — 63 files, ~870 checks (plus 13 `measure-*.js`, which print numbers
+`tests/` — 63 files, ~880 checks (plus 13 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -1424,6 +1522,12 @@ rules worth repeating here:
 - **`measure-*.js` files are not tests** — they print a number (30/30
   dictations placed correctly, 75% of doses read). Re-run them when changing
   what they measure and put the number in the commit message.
+- **A measurement can corrupt its own input, and it reads exactly like a bug
+  in the thing measured.** Three times now: an HTML tag-stripper run over the
+  book's own "<6 … >12" deleted the span between them (137 phantom lost
+  words); counting a repaired hyphen as a lost word; counting a table rule as
+  a word (3,530 phantom losses). Before believing a bad number, check that the
+  instrument is not the thing that is broken.
 - **A metric that the current code satisfies by construction proves nothing.**
   `measure-panel-text.js` counts "sentences cut in half" as exactly the pairs
   the shipped rule joins, so the shipped rule scores 0 whatever it does. The
