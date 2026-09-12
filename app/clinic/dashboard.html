@@ -798,6 +798,12 @@
       </div>
     </div>
 
+    <!-- Today's sales, so a mis-tap can be put right where it happened.
+         Owner only, and empty for everybody else — the module renders nothing
+         when clinicCan('corrections') is false. The permission itself lives in
+         the database, not here. -->
+    <div id="qsCorrect" data-cap="corrections"></div>
+
     <!-- Search, with "add it" alongside.
          Selling something not yet on the shelf is the commonest reason a sale
          stalls, and the only way in used to be the "+ New Item" button up in
@@ -1674,6 +1680,66 @@
   // A walk-in is recorded from the diagnosis alone, identified only by its case
   // number. This is where the details get filled in — reachable by tapping the
   // consultation itself, which is where a clinician looks for it.
+  /* The two things only the main account may do to a PATIENT.
+   *
+   * Fixing the name on one visit (the fields above) is everyday work, open to
+   * all staff and queued when offline. Correcting or removing the patient
+   * RECORD is not: it reaches every visit that person has, and a record
+   * removed to tidy a list takes a medical history with it. Those go through
+   * owner-only RPCs, and the database refuses them for anybody else whatever
+   * this screen draws.
+   *
+   * The clinic_patients row is looked up by phone, because that is what the
+   * visit carries and what the clinic's own unique constraint is on. No phone
+   * means no master record to correct, and the panel says so instead of
+   * offering a button that cannot work.
+   */
+  async function _pxOwnerControls(d) {
+    var host = document.getElementById('pxOwner');
+    if (!host) return;
+    host.innerHTML = '';
+    if (!(window.HomattCorrect && HomattCorrect.may())) return;
+    var phone = (d.phone || '').trim();
+    if (!phone) {
+      host.innerHTML = '<div style="font-size:11.5px;color:var(--text-lt);margin-top:10px;line-height:1.5">'
+        + 'Add a phone number and save, and this patient can then be corrected or '
+        + 'removed from the clinic\'s records here.</div>';
+      return;
+    }
+    var cid = await resolveClinicId();
+    if (!cid) return;
+    var pat = null;
+    try {
+      var r = await supabase.from('clinic_patients')
+        .select('id,full_name,phone').eq('clinic_id', cid).eq('phone', phone).limit(1);
+      pat = r && r.data && r.data[0];
+    } catch (e) {}
+    if (!pat) return;
+
+    host.innerHTML =
+      '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+      + '<div style="font-size:11px;font-weight:800;color:var(--text-lt);text-transform:uppercase;'
+      + 'letter-spacing:.04em;margin-bottom:7px">The patient record</div>'
+      + '<div style="display:flex;gap:8px">'
+      + '<button id="pxEditPat" style="flex:1;padding:10px;border-radius:11px;'
+      + 'border:1px solid var(--border);background:var(--surface);color:var(--text);'
+      + 'font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Correct name / phone</button>'
+      + '<button id="pxDelPat" style="flex:1;padding:10px;border-radius:11px;'
+      + 'border:1px solid var(--danger);background:var(--surface);color:var(--danger-ink);'
+      + 'font:inherit;font-size:12.5px;font-weight:700;cursor:pointer">Remove patient</button>'
+      + '</div></div>';
+
+    document.getElementById('pxEditPat').onclick = function () {
+      HomattCorrect.editPatient(pat, function () { _pxOwnerControls(d); });
+    };
+    document.getElementById('pxDelPat').onclick = function () {
+      HomattCorrect.deletePatient(pat, function () {
+        var ov = document.getElementById('pxEditOverlay');
+        if (ov) ov.style.display = 'none';
+      });
+    };
+  }
+
   window.openPatientEdit = function(d) {
     var id = d.dxid, ov = document.getElementById('pxEditOverlay');
     if (!ov) {
@@ -1697,6 +1763,10 @@
           + 'style="width:100%;padding:12px 14px;border:1.5px solid var(--border,#E0E0E0);border-radius:13px;'
           + 'font:inherit;font-size:15px;box-sizing:border-box;background:var(--surface,#fff);color:var(--text,#111)">'
         + '<div id="pxMsg" style="font-size:12.5px;margin-top:10px;min-height:16px"></div>'
+        /* The main account's extras: correcting or removing the PATIENT
+           record itself, which is a different thing from fixing the name on
+           this one visit. Empty for everybody else. */
+        + '<div id="pxOwner"></div>'
         + '<div style="display:flex;gap:9px;margin-top:12px">'
           + '<button id="pxCancel" style="flex:1;padding:13px;border-radius:13px;border:1.5px solid var(--border, #E0E0E0);'
             + 'background:var(--surface,#fff);font:inherit;font-size:14px;font-weight:700;color:var(--text,#111);cursor:pointer">Cancel</button>'
@@ -1712,6 +1782,7 @@
     document.getElementById('pxPhone').value = d.phone || '';
     document.getElementById('pxMsg').textContent = '';
     ov.style.display = 'flex';
+    _pxOwnerControls(d);
     setTimeout(function(){ try { document.getElementById('pxName').focus(); } catch(e){} }, 200);
 
     document.getElementById('pxSave').onclick = async function() {
@@ -2314,6 +2385,19 @@
       var balance = Math.max(0, total - paid);
       openPaymentModal(current.id, current.patient_name || 'Patient', total, paid, balance);
     };
+
+    var fixBtn = bodyEl.querySelector('[data-action="correct-visit"]');
+    if (fixBtn) fixBtn.onclick = function () {
+      if (!window.HomattCorrect) return;
+      HomattCorrect.editVisit(current, function (after) {
+        // Keep the open record in step with what was just saved, rather than
+        // leaving the clinician looking at the figures they have replaced.
+        current.total_charged_ugx = after.total_charged_ugx;
+        current.amount_paid       = after.amount_paid;
+        current.payment_status    = after.payment_status;
+        renderActiveDetailView();
+      });
+    };
   }
 
   function renderMedsList(items) {
@@ -2379,7 +2463,16 @@
             +(current.patient_type ? ' · ' + esc(current.patient_type) : '')+'</div>'
         +'</div>'
         +'<span class="pr-sev '+esc(sev)+'">'+esc(sev)+'</span>'
-      +'</div>';
+      +'</div>'
+      /* The lab test, the medicine or the money that was missed at the time.
+         Drawn only for the main account — and the database refuses the change
+         for anybody else whatever the screen shows. */
+      +((window.HomattCorrect && HomattCorrect.may())
+        ? '<button class="pr-tile-act" data-action="correct-visit" '
+          + 'style="margin:0 0 12px;width:100%;justify-content:center">'
+          + '<span class="material-icons-outlined">edit_note</span>'
+          + 'Correct this treatment — add what was missed</button>'
+        : '');
 
     // ── Money ──
     var money = '';
@@ -5453,6 +5546,10 @@
     if (flash) flash.style.display = 'none';
     setQsPm(_qsPm);
     loadQsDrugs();
+    // Today's sales, so a mis-tap can be put right where it happened. The
+    // module draws nothing unless this is the main account, and the database
+    // refuses the correction regardless of what the screen shows.
+    try { if (window.HomattCorrect) HomattCorrect.renderSaleList('qsCorrect'); } catch (e) {}
     // Pre-fetch clinicId + userId now so Sell tap is instant (no network call at sell time)
     resolveClinicId().then(function(cid) { _qsClinicId = cid; });
     if (supabase) {
@@ -6266,6 +6363,8 @@
   // (current item + everything that was in the cart), then fully resets the
   // sheet — selection AND cart — and refreshes stock + financials.
   function showQsSaleSuccess(count, grand, offlineNow) {
+    // The sale that was just made belongs in the list that corrects sales.
+    try { if (window.HomattCorrect) HomattCorrect.renderSaleList('qsCorrect'); } catch (e) {}
     var flash = document.getElementById('qsSuccessFlash');
     var ft    = document.getElementById('qsFlashText');
     var fs    = document.getElementById('qsFlashSub');
@@ -6737,5 +6836,6 @@
 <script src="js/clinic-dictate.js?v=20261007" defer></script>
 <script src="js/clinic-speak.js?v=20261007" defer></script>
 <script src="js/pwa-install.js?v=20261007"></script>
+<script src="js/clinic-corrections.js?v=20261007"></script>
 </body>
 </html>
