@@ -312,17 +312,19 @@
     var tests = (visit.lab_tests_ordered || []).join(', ');
 
     openDialog(
-      '<h4>Correct this treatment</h4>' +
+      '<h4>Fix a wrong figure on this treatment</h4>' +
       '<div class="why">' + esc(visit.confirmed_diagnosis || 'This visit') +
-        '. Add the lab test, the medicine or the money that was missed. ' +
-        'The diagnosis, who recorded it and the date are not changed here — ' +
+        '. This is for a number that was <b>recorded wrong</b> — a fee typed ' +
+        'with an extra nought, a payment entered twice, a lab test that was ' +
+        'run and never written down.<br><br>' +
+        '<b>To ADD a medicine, a charge or a payment, use Follow-up instead</b> ' +
+        '— that is for what has happened since, and it keeps the history. ' +
+        'This replaces the figures, so use it only when they are wrong.<br><br>' +
+        'The diagnosis, who recorded it and the date are never changed here: ' +
         'that would be a different record, not a correction.</div>' +
       '<div class="cx-msg" id="cxMsg"></div>' +
       '<div class="cx-f"><label>Lab tests (separate with a comma)</label>' +
         '<input id="cxTests" type="text" value="' + esc(tests) + '" placeholder="e.g. Malaria RDT, Blood slide"></div>' +
-      '<div class="cx-f"><label>Treatment / medicines given</label>' +
-        '<textarea id="cxPlan" rows="3" placeholder="what was actually given">' +
-        esc(visit.treatment_plan || '') + '</textarea></div>' +
       '<div class="cx-f"><label>Consultation fee (UGX)</label>' +
         '<input id="cxCons" type="number" inputmode="numeric" min="0" value="' + cons + '"></div>' +
       '<div class="cx-f"><label>Lab fee (UGX)</label>' +
@@ -368,13 +370,17 @@
         p_lab_fee: Number($('cxLab').value) || 0,
         p_meds_fee: Number($('cxMeds').value) || 0,
         p_amount_paid: Number($('cxPaid').value) || 0,
-        p_treatment_plan: ($('cxPlan').value || '').trim() || null,
+        // Deliberately not sent. The medicines live in prescription_items,
+        // which Follow-up maintains as a structured list; a free-text box
+        // beside it would give one visit two different answers to "what was
+        // given", and the free-text one would be the one nobody measured.
+        p_treatment_plan: null,
         p_reason: ($('cxWhy').value || '').trim() || null,
       });
       this.disabled = false; this.textContent = 'Save the correction';
       if (!r.ok) { say('bad', r.error); return; }
       closeDialog();
-      toast('Treatment corrected · ' + ugx(r.data.total_charged_ugx) + ' ' + r.data.payment_status);
+      toast('Figures corrected · ' + ugx(r.data.total_charged_ugx) + ' ' + r.data.payment_status);
       if (typeof onDone === 'function') onDone(r.data);
       refreshAfterMoneyChange();
     });

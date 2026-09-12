@@ -1547,10 +1547,23 @@ with no connection is refused with *"Nothing has been changed"* rather than
 accepted and lost.
 
 ### What was already there, and is left alone
-`openPatientEdit` lets **any** member of staff fix the name or phone **on one
-visit**, offline, queued. That is everyday work. Correcting the patient
-*record* is a different thing — it reaches every visit that person has — so it
-sits beneath it as the main account's own controls.
+Emmanuel caught this: *"I think for adding money or drug, it was already
+there."* He was right, and the first version of this duplicated it.
+
+| already there, all staff, offline | what a correction adds |
+|---|---|
+| **Follow-up** on a visit — adds medications to `prescription_items`, adds an extra charge, records a payment, notes, reschedules | fixes a figure that is **wrong**, in either direction — Follow-up can only ADD |
+| **Record payment** (`record_payment`) — adds to `amount_paid` | **sets** `amount_paid` to a figure, for a payment entered twice |
+| **`openPatientEdit`** — fixes the name or phone **on one visit** | corrects the patient **record**, which reaches every visit that person has |
+| — | **lab tests**, which nothing else could touch |
+
+So the correction dialog says, in as many words, *"To ADD a medicine, a charge
+or a payment, use Follow-up instead — that is for what has happened since."*
+And it carries **no free-text medicines box**: `prescription_items` is a
+structured list Follow-up maintains, and a free-text field beside it would
+give one visit two different answers to "what was given" — with the free-text
+one being the one nobody measured. `test-corrections.js` asserts both: that
+the box is absent and that the dialog points at Follow-up.
 
 ### Two faults that were in the TEST, not the code
 Both would have been easy to misread as the policy failing:

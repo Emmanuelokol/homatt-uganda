@@ -203,7 +203,7 @@ async function openDash(page, role) {
     window.HomattCorrect.editVisit({
       id: 'visit-1', confirmed_diagnosis: 'Malaria',
       consultation_fee_ugx: 10000, lab_fee_ugx: 0, meds_fee_ugx: 0, amount_paid: 0,
-      lab_tests_ordered: [], treatment_plan: '',
+      lab_tests_ordered: [],
     });
     await new Promise(r => setTimeout(r, 300));
     document.getElementById('cxLab').value = '5000';
@@ -226,6 +226,19 @@ async function openDash(page, role) {
     document.getElementById('cxSave').click();
     await new Promise(r => setTimeout(r, 900));
   });
+  // The boundary that was wrong on the first attempt: adding a medicine or a
+  // charge is what Follow-up already does, and this dialog must not offer a
+  // second, free-text answer to "what was given".
+  const boundary = await page.evaluate(() => {
+    const c = document.getElementById('cxCard');
+    return { text: (c ? c.innerText : '').replace(/\s+/g, ' '),
+             hasPlanBox: !!document.getElementById('cxPlan') };
+  });
+  result('the correction dialog does NOT offer a second way to write medicines',
+    boundary.hasPlanBox === false);
+  result('and it points at Follow-up for adding, which already existed',
+    /use Follow-up instead/i.test(boundary.text), boundary.text.slice(0, 120));
+
   const vCall = calls.find(c => /rpc\/edit_visit_record/.test(c.url));
   result('saving asks the server to correct the visit', !!vCall);
   if (vCall) {
