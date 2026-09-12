@@ -501,6 +501,26 @@
       var line = lines[i];
       if (!line.trim()) { close(); continue; }
 
+      /* A line that is nothing but dashes is a table RULE, not a finding.
+       *
+       * The conversion turned the book's ruled tables into rows of "-----",
+       * and there are 2,691 of them across 65 sections: 320 in "Recommended
+       * Second Line Regimens", 204 in the TB preventive dosing chart, 177 in
+       * the antenatal care protocol, 72 in severe malaria. On screen they
+       * read as empty bullets between the lines that matter, on exactly the
+       * pages a clinician is reading most carefully.
+       *
+       * The whole line must be rule characters — a single "-" is left alone,
+       * because in a table cell it means nil, and "~ Give quinine" is a
+       * bullet whose first character happens to be one of these.
+       *
+       * Dropped in the RENDERING, never in the data: full_text still holds
+       * the book exactly as it was converted, and the source panel at the
+       * bottom of every card still shows it. The package screen has done
+       * this since it was written (GL_DROP in ucg-autofill.js); this is the
+       * guideline screen catching up. */
+      if (/^[-—–_=|~.\s]{3,}$/.test(line)) { continue; }
+
       if (isHeading(line)) { close(); blocks.push({ kind: 'h', text: line.trim() }); continue; }
 
       var m = line.match(MARK_RE);

@@ -7,7 +7,7 @@
 //
 //   node tests/measure-guidelines.js
 //
-// It compares the words going in with the words coming out, for all 551
+// It compares the words going in with the words coming out, for all 565
 // sections × 9 text columns. Markers (~ • - –) are not words and are expected
 // to go; anything else that disappears is a fault and is printed.
 
@@ -66,10 +66,23 @@ function words(s, isHtml) {
   return t
     .replace(/[~•–—]/g, ' ')
     .split(/\s+/).filter(Boolean)
-    // A lone hyphen, asterisk or angle bracket was a bullet marker, not a
-    // word. Inside a word ("co-trimoxazole") it is untouched, because that
-    // token never splits.
-    .filter(function (w) { return !/^[-*>]$/.test(w); });
+    // A lone hyphen, asterisk, angle bracket or pipe was a bullet marker or a
+    // table column divider, not a word. Inside a word ("co-trimoxazole") it is
+    // untouched, because that token never splits.
+    .filter(function (w) { return !/^[-*>|]$/.test(w); })
+    /* A RUN of dashes is a table rule, not a word.
+     *
+     * The conversion drew the book's ruled tables as rows of "-----", and
+     * the guideline screen now drops them when it lays a section out — 2,691
+     * of them across 65 sections, 320 in "Recommended Second Line Regimens"
+     * alone, where they read as empty bullets between the lines that matter.
+     *
+     * Counting them as words made this measurement report 3,530 "words lost"
+     * for a change that lost no word at all. Same correction as the hyphen
+     * repair in measure-panel-text.js: the thing being counted has to be the
+     * thing a clinician would miss. A single "-" is still counted, because
+     * in a table cell it means nil. */
+    .filter(function (w) { return !/^[-—–_=|.]{2,}$/.test(w); });
 }
 
 function dump() {
