@@ -1480,9 +1480,96 @@ wrap. The panel is fed the already-split fields — short bullets and list
 items — where it is evidence of nothing. **Same job, different input, and the
 input decides.** Recorded because the next reader will propose it again.
 
+## Correcting what was already recorded
+
+`supabase/migrations/20260912_owner_corrections.sql` ·
+`app/clinic/js/clinic-corrections.js` · `tests/sql/test-owner-corrections.sql`
+· `tests/test-corrections.js`
+
+A clinic asked to be able to fix what they had already saved — a quick sale
+with the wrong quantity, a treatment where the lab test or the money was
+forgotten, a patient whose name was typed wrong — and to have all of it be
+"only done in the main account, not sub accounts".
+
+### The screen cannot enforce that, and nothing did
+Both tables were open to every member of staff:
+
+```
+qs_clinic_write               for all using (active portal_user, same clinic)
+clinic_patients_staff_manage  the same shape
+```
+
+`for all` is insert, update **and** delete, and the check is membership, not
+role. A receptionist or a visiting clinician could already delete a sale or a
+patient with one REST call. **Hiding a button changes nothing about that**, so
+the permission lives in the database: security-definer RPCs that check
+`is_clinic_main_account()`, and the direct UPDATE/DELETE closed behind
+owner-only policies. `clinicCan('corrections')` in the app is tidiness — not
+showing somebody a control they cannot use.
+
+### A hole found on the way
+`adjust_inventory`, `deduct_inventory` and `get_clinic_stock` are all
+`security definer` — they run as the function's owner and **RLS never applies
+to them** — and none checked that the *caller* belonged to `p_clinic_id`, only
+that the item did. Any authenticated Homatt user, including a patient account
+or a clinician attached to a different clinic, could read another clinic's
+shelves and adjust its quantities given the ids. Closed here, because the "put
+the stock back" path calls `adjust_inventory` and an owner-only feature built
+on a function anyone can call is not one.
+
+**The rule: RLS policies on a table say nothing about a `security definer`
+function that touches it.** Every such function needs its own caller check.
+
+### The rules a correction follows
+- **A sale deleted or reduced puts the stock back**, by the difference and in
+  the right direction. A sale removed without returning the stock makes the
+  shelf count drift silently — worse than the wrong sale, because nobody sees
+  it until a count.
+- **The amount decides the payment status, not a chip.** Same rule the
+  treatment screen already follows, so a correction cannot settle a debt by
+  mistyping.
+- **A patient with any history is archived, never destroyed**; one with none —
+  the duplicate a typo made, which is the common case — is deleted outright.
+  History is counted from `clinic_diagnoses`, **not `bookings`**: a walk-in
+  never gets a booking, so counting bookings would call most of a busy
+  clinic's patients history-free and delete them.
+- **Numbers and names only.** Not the diagnosis, not who recorded it, not the
+  date — changing what somebody was treated for, after the fact, is not a
+  correction, it is a different record.
+- **Every change writes an audit row** — who, when, from, to. There is
+  deliberately **no insert policy** on `clinic_record_edits`: an audit row a
+  client can forge is not an audit row.
+
+### No offline path, on purpose
+The outbox replays inserts. Replaying "set the quantity to 6" against a row
+somebody has since changed again would quietly undo their work. A correction
+with no connection is refused with *"Nothing has been changed"* rather than
+accepted and lost.
+
+### What was already there, and is left alone
+`openPatientEdit` lets **any** member of staff fix the name or phone **on one
+visit**, offline, queued. That is everyday work. Correcting the patient
+*record* is a different thing — it reaches every visit that person has — so it
+sits beneath it as the main account's own controls.
+
+### Two faults that were in the TEST, not the code
+Both would have been easy to misread as the policy failing:
+
+- **The SQL test connects as postgres, which is a superuser and bypasses RLS
+  completely.** Every direct-row attempt now runs `set role authenticated`
+  first. Without it the nurse's delete succeeded and the policy looked broken.
+- **It asserted "the last audit row is the deletion" by `created_at`.** Every
+  row is written inside one transaction and `now()` is frozen per transaction,
+  so they all share a timestamp and the ordering was the planner's choice.
+
+```
+tests/sql/test-owner-corrections.sql   105 checks, real Postgres
+tests/test-corrections.js               27 checks, real screens
+```
+
 ## The tests
 
-`tests/` — 63 files, ~880 checks (plus 13 `measure-*.js`, which print numbers
+`tests/` — 64 files, ~905 checks (plus 13 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -1552,3 +1639,14 @@ rules worth repeating here:
   network. `tests/run-sql.sh` applies the real migrations to a real Postgres and
   drives them; it is also the only thing that checks the "idempotent" every
   migration in this repo claims, by applying it twice.
+- **A SQL test connects as postgres, which is a SUPERUSER and bypasses RLS.**
+  Any check of the form "this role cannot touch that row" must run `set role
+  authenticated` first, or it proves nothing and reads as the policy failing.
+- **`now()` is frozen for a transaction.** A test that writes several rows in
+  one `do $$` block and then asserts on "the latest by created_at" is asking
+  the planner to pick, not the clock. Assert on existence instead.
+- **Test what a role CANNOT do, not only what the owner can.** Every
+  correction in `test-owner-corrections.sql` is driven as a nurse, a
+  receptionist, a visiting clinician and a stranger — and separately by
+  deleting the row directly, which is exactly what a hidden button leaves
+  open.
