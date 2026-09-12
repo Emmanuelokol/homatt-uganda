@@ -60,6 +60,23 @@ const calls = [];
         return r.fulfill({ status: 422, headers: H,
           body: JSON.stringify({ message: 'A user with this email address has already been registered' }) });
       }
+      /* The real reply a clinic hit, reproduced exactly.
+       *
+       * They typed a new address and got back: Email address
+       * "<their OLD address>" is invalid — naming the one they already had.
+       * Supabase's "Secure email change" confirms at BOTH addresses, so the
+       * CURRENT one is validated and mailed too, and when it is the one being
+       * refused the change can never complete from inside the app. */
+      if (asked && /refused@/.test(asked.email || '')) {
+        return r.fulfill({ status: 400, headers: H,
+          body: JSON.stringify({ code: 'email_address_invalid',
+            message: 'Email address "' + OLD_EMAIL + '" is invalid' }) });
+      }
+      if (asked && /badnew@/.test(asked.email || '')) {
+        return r.fulfill({ status: 400, headers: H,
+          body: JSON.stringify({ code: 'email_address_invalid',
+            message: 'Email address "' + asked.email + '" is invalid' }) });
+      }
       return r.fulfill({ status: 200, headers: H, body: JSON.stringify({
         id: UID, email: OLD_EMAIL, new_email: (asked || {}).email,
         email_change_sent_at: new Date().toISOString(),
@@ -169,6 +186,32 @@ const calls = [];
   msg = await page.evaluate(() => (document.getElementById('seMsg') || {}).textContent || '');
   result('and the clinic is told to open the link, and that the old email still works',
     /open the link/i.test(msg) && new RegExp(OLD_EMAIL).test(msg), msg.slice(0, 110));
+
+  // ── 6b. The refusal that named the WRONG address ─────────────────────
+  await page.evaluate(() => {
+    document.getElementById('seNew').value = 'refused@clinic.com';
+    changeSigninEmail();
+  });
+  await page.waitForTimeout(1500);
+  msg = await page.evaluate(() => (document.getElementById('seMsg') || {}).textContent || '');
+  result('when the server refuses the address you ALREADY have, the app says so',
+    /being refused is the one you sign in with now/i.test(msg), msg.slice(0, 110));
+  result('and says the old address still works, so nobody is locked out',
+    new RegExp('Keep signing in with ' + OLD_EMAIL).test(msg), msg.slice(-120));
+  result('and names what has to change, instead of the raw error',
+    /Secure email change/i.test(msg) && !/^Email address "/.test(msg.trim()), msg.slice(-130));
+
+  // A refusal of the NEW address reads differently, and must not blame the old one.
+  await page.evaluate(() => {
+    document.getElementById('seNew').value = 'badnew@clinic.com';
+    changeSigninEmail();
+  });
+  await page.waitForTimeout(1500);
+  msg = await page.evaluate(() => (document.getElementById('seMsg') || {}).textContent || '');
+  result('a refusal of the NEW address blames the new address',
+    /would not accept badnew@clinic\.com/i.test(msg), msg.slice(0, 100));
+  result('and still says which address is signing you in',
+    new RegExp(OLD_EMAIL).test(msg), msg.slice(-90));
 
   // ── 7. An address somebody else uses is named, not shrugged at ───────
   await page.evaluate(() => {

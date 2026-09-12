@@ -2297,15 +2297,53 @@ async function changeSigninEmail() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Sending…';
   try {
-    var res = await _supa.auth.updateUser({ email: next });
+    var res = await _supa.auth.updateUser({ email: next }, {
+      // Come back to the portal, not to a blank page. Without this the
+      // confirmation link lands on the site root and a clinic is left
+      // wondering whether it worked.
+      emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, 'index.html'),
+    });
     if (res.error) {
       var m = String(res.error.message || '');
+      /* WHICH ADDRESS did it refuse?
+       *
+       * A clinic changed their sign-in email and got back, word for word:
+       *   Email address "emmanuel@homatt-health.com" is invalid
+       * — the address they ALREADY had, not the one they typed. Shown raw,
+       * that is unusable: it names an address they did not enter and gives
+       * them nothing to do.
+       *
+       * It happens because Supabase's "Secure email change" confirms at BOTH
+       * addresses, so the CURRENT one is validated and mailed too. If the
+       * current address is the one being refused — its domain takes no mail,
+       * say — the change can never be completed from inside the app, and
+       * saying so plainly is the only honest answer.
+       *
+       * So the address is pulled out of the message and compared, rather
+       * than guessed at. */
+      var quoted = (m.match(/"([^"]+@[^"]+)"/) || m.match(/([\w.+-]+@[\w.-]+\.\w+)/) || [])[1] || '';
+      var badIsCurrent = quoted && now && quoted.toLowerCase() === now.toLowerCase();
       if (/already|registered|exists/i.test(m)) {
         showMsg('Another account already uses that email.', false);
       } else if (/rate|too many/i.test(m)) {
         showMsg('Too many attempts. Wait a few minutes and try again.', false);
+      } else if (/invalid/i.test(m) && badIsCurrent) {
+        showMsg('The address being refused is the one you sign in with now (' + now +
+                '), not the new one. Changing a sign-in email sends a confirmation to ' +
+                'BOTH addresses, and the server will not send to that one — so this ' +
+                'cannot be completed from here. Keep signing in with ' + now +
+                '; it still works. Whoever runs the Supabase project has to change ' +
+                'the address there, or turn off "Secure email change" so only the ' +
+                'new address is confirmed.', false);
+      } else if (/invalid/i.test(m)) {
+        showMsg('The server would not accept ' + (quoted || next) + '. Check the ' +
+                'spelling — and note that some addresses are refused because the ' +
+                'domain does not receive mail. You are still signed in with ' +
+                (now || 'your current email') + '.', false);
       } else {
-        showMsg(m || 'Could not change the sign-in email.', false);
+        showMsg((m || 'Could not change the sign-in email.') +
+                ' Nothing has changed — you still sign in with ' +
+                (now || 'your current email') + '.', false);
       }
       return;
     }
