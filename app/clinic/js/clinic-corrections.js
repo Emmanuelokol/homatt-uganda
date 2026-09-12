@@ -268,9 +268,10 @@
       });
       this.disabled = false; this.textContent = 'Save the correction';
       if (!r.ok) { say('bad', r.error); return; }
-      closeDialog();
       toast('Sale corrected' + (r.data.stock_returned ? ' · ' + r.data.stock_returned + ' back in stock' : ''));
-      renderSaleList(hostId);
+      // Straight back to the list, which is where the clinician was. Closing
+      // outright would make them re-open it to check the row now reads right.
+      openSaleList();
       refreshAfterMoneyChange();
     });
   }
@@ -296,9 +297,8 @@
         p_sale_id: sale.id, p_reason: ($('cxWhy').value || '').trim() || null });
       this.disabled = false; this.textContent = 'Remove the sale';
       if (!r.ok) { say('bad', r.error); return; }
-      closeDialog();
       toast((r.data.stock_returned || 0) + ' back in stock · sale removed');
-      renderSaleList(hostId);
+      openSaleList();
       refreshAfterMoneyChange();
     });
   }
@@ -458,9 +458,29 @@
     try { if (typeof loadQsDrugs === 'function') loadQsDrugs(); } catch (e) {}
   }
 
+  /* The list as a DIALOG, not as a block in the quick sale sheet.
+   *
+   * It began life in the sheet's flow and pushed the Sell button off the
+   * bottom of a small phone with the keyboard up — 11px over on 412x420, 45px
+   * on 360x380 (test-sell-liquids.js). The sheet is a fixed-height flex column
+   * and the file already carried a comment saying a row of its own was enough
+   * to do exactly that. An icon in the header costs no height. */
+  function openSaleList() {
+    openDialog(
+      '<h4>Correct a sale from today</h4>' +
+      '<div class="why">Only today\'s. A correction is something you make minutes ' +
+      'after a mis-tap; a list going back weeks would turn a repair into a way to ' +
+      'quietly rewrite last month\'s takings.</div>' +
+      '<div id="cxSaleHost"></div>' +
+      '<div class="cx-acts"><button class="off" id="cxCancel">Close</button></div>');
+    $('cxCancel').addEventListener('click', closeDialog);
+    renderSaleList('cxSaleHost');
+  }
+
   window.HomattCorrect = {
     may: mayCorrect,
     renderSaleList: renderSaleList,
+    openSaleList: openSaleList,
     editVisit: editVisitDialog,
     editPatient: editPatientDialog,
     deletePatient: deletePatientDialog,

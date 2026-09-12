@@ -792,17 +792,25 @@
           style="background:var(--tint-2);border:1.5px solid var(--tint-3);color:var(--deep-ink);border-radius:20px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;touch-action:manipulation;font-family:inherit;display:flex;align-items:center;gap:4px;white-space:nowrap">
           <span class="material-icons-outlined" style="font-size:16px">add</span> New Item
         </button>
+        <!-- Correcting a sale made earlier today.
+             In the HEADER, not in the sheet's flow, and this is not a style
+             choice. The sheet is a fixed-height flex column and the comment on
+             the search row below already records why: "with the keyboard up
+             this sheet has no spare height, and a row of its own was enough to
+             push the Sell button off the bottom." A list of today's sales in
+             the flow did exactly that — test-sell-liquids.js caught it at 11px
+             over on a 412x420 viewport and 45px on a 360x380. An icon costs
+             nothing, and the list opens as a dialog. -->
+        <button id="qsCorrectBtn" type="button" data-cap="corrections" aria-label="Correct a sale made today"
+          title="Correct a sale made today"
+          style="display:none;background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:36px;height:36px;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
+          <span class="material-icons-outlined" style="font-size:20px">history</span>
+        </button>
         <button id="qsCloseBtn" type="button" style="background:var(--bg, #F5F5F5);border:none;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;touch-action:manipulation">
           <span class="material-icons-outlined">close</span>
         </button>
       </div>
     </div>
-
-    <!-- Today's sales, so a mis-tap can be put right where it happened.
-         Owner only, and empty for everybody else — the module renders nothing
-         when clinicCan('corrections') is false. The permission itself lives in
-         the database, not here. -->
-    <div id="qsCorrect" data-cap="corrections"></div>
 
     <!-- Search, with "add it" alongside.
          Selling something not yet on the shelf is the commonest reason a sale
@@ -2462,17 +2470,22 @@
           +'<div class="pr-hero-when">'+esc(dateStr)+' at '+esc(timeStr)
             +(current.patient_type ? ' · ' + esc(current.patient_type) : '')+'</div>'
         +'</div>'
+        /* Fixing a wrong figure, for the main account only.
+           IN THE HERO ROW, beside the severity chip, and that is not a style
+           choice: as a full-width button of its own it pushed the record to
+           711px on a 412x915 phone against the 661px this modal has, and
+           test-patient-record.js asserts the whole record fits without
+           scrolling. An icon in a row that already exists costs nothing. */
+        +((window.HomattCorrect && HomattCorrect.may())
+          ? '<button data-action="correct-visit" aria-label="Fix a wrong figure or a missed lab test"'
+            + ' title="Fix a wrong figure or a missed lab test"'
+            + ' style="background:none;border:1px solid var(--border);border-radius:9px;'
+            + 'width:30px;height:30px;display:flex;align-items:center;justify-content:center;'
+            + 'cursor:pointer;flex-shrink:0;color:var(--text-lt);padding:0;margin-left:6px">'
+            + '<span class="material-icons-outlined" style="font-size:17px">edit_note</span></button>'
+          : '')
         +'<span class="pr-sev '+esc(sev)+'">'+esc(sev)+'</span>'
-      +'</div>'
-      /* The lab test, the medicine or the money that was missed at the time.
-         Drawn only for the main account — and the database refuses the change
-         for anybody else whatever the screen shows. */
-      +((window.HomattCorrect && HomattCorrect.may())
-        ? '<button class="pr-tile-act" data-action="correct-visit" '
-          + 'style="margin:0 0 12px;width:100%;justify-content:center">'
-          + '<span class="material-icons-outlined">edit_note</span>'
-          + 'Fix a wrong figure or a missed lab test</button>'
-        : '');
+      +'</div>';
 
     // ── Money ──
     var money = '';
@@ -5546,10 +5559,17 @@
     if (flash) flash.style.display = 'none';
     setQsPm(_qsPm);
     loadQsDrugs();
-    // Today's sales, so a mis-tap can be put right where it happened. The
-    // module draws nothing unless this is the main account, and the database
-    // refuses the correction regardless of what the screen shows.
-    try { if (window.HomattCorrect) HomattCorrect.renderSaleList('qsCorrect'); } catch (e) {}
+    // The header's "correct a sale" icon, for the main account only. The
+    // module answers may(); the database refuses the correction regardless of
+    // what this screen shows.
+    try {
+      var _cb = document.getElementById('qsCorrectBtn');
+      if (_cb) {
+        var _may = !!(window.HomattCorrect && HomattCorrect.may());
+        _cb.style.display = _may ? 'flex' : 'none';
+        if (_may) _cb.onclick = function () { HomattCorrect.openSaleList(); };
+      }
+    } catch (e) {}
     // Pre-fetch clinicId + userId now so Sell tap is instant (no network call at sell time)
     resolveClinicId().then(function(cid) { _qsClinicId = cid; });
     if (supabase) {
@@ -6363,8 +6383,7 @@
   // (current item + everything that was in the cart), then fully resets the
   // sheet — selection AND cart — and refreshes stock + financials.
   function showQsSaleSuccess(count, grand, offlineNow) {
-    // The sale that was just made belongs in the list that corrects sales.
-    try { if (window.HomattCorrect) HomattCorrect.renderSaleList('qsCorrect'); } catch (e) {}
+
     var flash = document.getElementById('qsSuccessFlash');
     var ft    = document.getElementById('qsFlashText');
     var fs    = document.getElementById('qsFlashSub');

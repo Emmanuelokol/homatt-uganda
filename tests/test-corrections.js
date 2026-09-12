@@ -113,17 +113,25 @@ async function openDash(page, role) {
   const asOwner = await page.evaluate(async () => {
     if (typeof openQuickSale === 'function') openQuickSale();
     await new Promise(r => setTimeout(r, 1200));
-    const host = document.getElementById('qsCorrect');
+    // The entry point is an icon in the sheet HEADER. It was a block in the
+    // sheet's flow and pushed the Sell button off the bottom of a small phone
+    // with the keyboard up (test-sell-liquids.js: 11px over at 412x420, 45px
+    // at 360x380). An icon costs no height.
+    const btn = document.getElementById('qsCorrectBtn');
+    const visible = btn ? getComputedStyle(btn).display !== 'none' : false;
+    if (btn && visible) btn.click();
+    await new Promise(r => setTimeout(r, 1000));
+    const host = document.getElementById('cxSaleHost');
     return {
-      there: !!host,
-      shown: host ? getComputedStyle(host).display !== 'none' : false,
+      btn: visible,
       rows: host ? host.querySelectorAll('[data-cxsale]').length : 0,
       text: host ? host.innerText.replace(/\s+/g, ' ') : '',
       may: !!(window.HomattCorrect && HomattCorrect.may()),
     };
   });
   result('the main account may correct', asOwner.may === true);
-  result('the quick sale sheet lists today\'s sales', asOwner.rows === 2, 'rows=' + asOwner.rows);
+  result('and the quick sale sheet offers it, from the header', asOwner.btn === true);
+  result('the dialog lists today\'s sales', asOwner.rows === 2, 'rows=' + asOwner.rows);
   result('each with what it was, so the right one can be picked',
     /Paracetamol/.test(asOwner.text) && /10 × UGX 200/.test(asOwner.text),
     asOwner.text.slice(0, 90));
@@ -275,18 +283,18 @@ async function openDash(page, role) {
       const may = !!(window.HomattCorrect && HomattCorrect.may());
       if (typeof openQuickSale === 'function') openQuickSale();
       await new Promise(r => setTimeout(r, 900));
-      const host = document.getElementById('qsCorrect');
+      const btn = document.getElementById('qsCorrectBtn');
       return {
         may,
-        rows: host ? host.querySelectorAll('[data-cxsale]').length : 0,
-        text: host ? host.innerText.trim() : '',
-        hidden: host ? getComputedStyle(host).display === 'none' : true,
+        rows: 0,
+        text: '',
+        hidden: btn ? getComputedStyle(btn).display === 'none' : true,
       };
     });
     result('a ' + role.replace('_', ' ') + ' is not offered corrections',
       sub.may === false && sub.rows === 0, 'may=' + sub.may + ' rows=' + sub.rows);
-    result('  …and the list is not merely empty, it is not drawn',
-      sub.hidden || sub.text === '', sub.text.slice(0, 40));
+    result('  …the button is not there at all, not merely disabled',
+      sub.hidden === true, sub.hidden ? '' : 'the button is showing');
   }
 
   const real = errors.filter(e => !/favicon|manifest|Failed to fetch/i.test(e) &&
