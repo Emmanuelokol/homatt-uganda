@@ -1,0 +1,2706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Clinic — Settings</title>
+  <script>
+    // Apply saved (or system) theme before first paint — no flash.
+    (function(){try{var t=localStorage.getItem('homatt_theme');
+    if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light';}
+    /* The colour family. Set here, before the first paint, so switching
+       look never shows a flash of the old one. */
+    var s=localStorage.getItem('homatt_skin');
+    if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
+    var d=document.documentElement;
+    d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
+    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+    document.addEventListener('DOMContentLoaded',function(){
+      var m=document.querySelector('meta[name="theme-color"]');
+      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
+  </script>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20261007">
+  <style>
+    .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
+    .settings-card { background:var(--surface, #FFFFFF); border-radius:14px; padding:22px 24px; box-shadow:0 2px 8px rgba(0,0,0,.06); margin-bottom:24px; }
+    /* ── Make it yours: the look picker and the clinician's photo ── */
+    .look-lbl{font-size:11px;font-weight:800;color:var(--text-lt);text-transform:uppercase;
+      letter-spacing:.5px;margin-bottom:10px}
+    .look-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .look-opt{position:relative;text-align:left;border:2px solid var(--border);background:var(--surface);
+      border-radius:14px;padding:12px 13px;font:inherit;cursor:pointer;touch-action:manipulation}
+    .look-opt.on{border-color:var(--primary);box-shadow:0 0 0 3px var(--brand-tint)}
+    .look-opt b{display:block;font-size:13.5px;font-weight:800;color:var(--text);margin-top:9px}
+    .look-opt > i{display:block;font-size:11px;font-style:normal;color:var(--text-lt);margin-top:1px}
+    .look-sw{display:flex;gap:4px}
+    .look-sw i{width:26px;height:16px;border-radius:5px;display:block;border:1px solid rgba(0,0,0,.08)}
+    .look-tick{position:absolute;top:9px;right:9px;font-size:19px;color:var(--primary-ink)}
+    .look-note{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:11px}
+
+    .portrait-row{display:flex;gap:16px;align-items:flex-start}
+    .portrait-slot{flex:none;width:86px;height:86px;border-radius:50%;cursor:pointer;
+      border:2px dashed var(--border);background:var(--bg);background-size:cover;
+      background-position:center;display:flex;align-items:center;justify-content:center;
+      padding:0;touch-action:manipulation}
+    .portrait-slot.has-photo{border-style:solid;border-color:var(--primary)}
+    .portrait-slot.has-photo .portrait-icon{display:none}
+    .portrait-icon{color:var(--text-lt);font-size:26px}
+    .portrait-txt{flex:1;min-width:0}
+    .portrait-txt p{font-size:12px;color:var(--text-lt);line-height:1.55;margin-top:9px}
+    .portrait-btn{border:none;background:var(--primary);color:var(--on-primary, #fff);font:inherit;font-size:13px;
+      font-weight:700;padding:9px 15px;border-radius:10px;cursor:pointer;margin-right:7px;
+      touch-action:manipulation}
+    .portrait-btn.ghost{background:transparent;color:var(--text-lt);border:1.5px solid var(--border)}
+    .portrait-status{font-size:12px;color:var(--text-lt);margin-top:8px;min-height:1em;line-height:1.5}
+    @media (max-width:520px){ .look-grid{grid-template-columns:1fr} }
+
+    .settings-card-title { font-size:14px; font-weight:700; color:var(--deep-ink); display:flex; align-items:center; gap:8px; margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border, #E0E0E0); }
+    .form-row { margin-bottom:14px; }
+    .form-row label { display:block; font-size:12px; font-weight:600; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; margin-bottom:5px; }
+    .form-input { width:100%; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; transition:border-color .2s; }
+    .form-input:focus { border-color:var(--deep-ink); }
+    .form-textarea { width:100%; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:9px 12px; font-family:inherit; font-size:13px; outline:none; resize:vertical; transition:border-color .2s; }
+    .form-textarea:focus { border-color:var(--deep-ink); }
+
+    /* Chip tags */
+    .chip-wrap { display:flex; flex-wrap:wrap; gap:6px; border:1px solid var(--border, #E0E0E0); border-radius:8px; padding:8px; min-height:44px; cursor:text; transition:border-color .2s; }
+    .chip-wrap:focus-within { border-color:var(--deep-ink); }
+    .chip { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:4px 11px; font-size:12px; font-weight:600; }
+    .chip-del { background:none; border:none; cursor:pointer; padding:0; color:var(--deep-ink); font-size:16px; line-height:1; }
+    .chip-input { border:none; outline:none; font-family:inherit; font-size:13px; min-width:150px; flex:1; background:transparent; }
+
+    /* Hours */
+    .hours-table { width:100%; }
+    .hours-row { display:grid; grid-template-columns:90px 1fr 1fr 70px; gap:8px; align-items:center; margin-bottom:8px; }
+    .hours-row .day { font-weight:600; font-size:13px; }
+    .hours-input { border:1px solid var(--border, #E0E0E0); border-radius:6px; padding:6px 8px; font-family:inherit; font-size:12px; width:100%; }
+    .closed-toggle { display:flex; align-items:center; gap:4px; font-size:12px; cursor:pointer; color:var(--danger-ink, #C62828); }
+
+    /* Facilities */
+    .facilities-grid { display:flex; flex-wrap:wrap; gap:8px; }
+    .facility-btn { border:1.5px solid var(--border, #E0E0E0); border-radius:10px; padding:6px 14px; font-size:12px; font-weight:500; cursor:pointer; background:var(--surface, #FFFFFF); font-family:inherit; color:#555; transition:all .15s; }
+    .facility-btn.active { border-color:var(--deep-ink); background:var(--tint-2); color:var(--deep-ink); font-weight:600; }
+
+    /* Fee table */
+    .fee-table { width:100%; border-collapse:collapse; }
+    .fee-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
+    .fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; }
+    .fee-input { border:1px solid var(--border, #E0E0E0); border-radius:6px; padding:5px 8px; font-family:inherit; font-size:12px; width:130px; text-align:right; }
+
+    /* Condition fee table */
+    .cond-fee-table { width:100%; border-collapse:collapse; }
+    .cond-fee-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
+    .cond-fee-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
+    .cond-fee-empty { text-align:center; padding:24px; color:var(--text-lt, #5F6368); font-size:13px; }
+    .cond-badge { display:inline-flex; align-items:center; gap:4px; background:var(--tint-2); color:var(--deep-ink); border-radius:14px; padding:3px 10px; font-size:11px; font-weight:600; }
+    .cond-fee-hint { background:#E3F2FD; border-radius:8px; padding:10px 14px; font-size:12px; color:#0D47A1; display:flex; align-items:center; gap:8px; margin-bottom:14px; }
+
+    .save-btn { background:var(--deep); color:var(--on-deep, #fff); border:none; border-radius:10px; padding:13px 28px; font-size:14px; font-weight:600; font-family:inherit; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+    .save-btn:active { background:#154d18; }
+    .save-btn:disabled { background:#9AA0A6; cursor:not-allowed; }
+
+    /* ── Mobile: stack fee-table rows vertically so service names fit ── */
+    @media(max-width:600px){
+      .fee-table, .fee-table tbody, .fee-table tr, .fee-table td { display:block; width:100%; }
+      .fee-table thead { display:none; }
+      .fee-table tr {
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .fee-table td {
+        padding:8px 0 0; border:none; font-size:13px;
+        display:flex; flex-direction:column; gap:5px;
+      }
+      .fee-table td:first-child { padding-top:0; }
+      .fee-table td::before {
+        content:attr(data-label); color:var(--text-lt, #5F6368); font-size:11px;
+        font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      }
+      .fee-table td:nth-child(1)::before { content:"Service Type"; }
+      .fee-table td:nth-child(2)::before { content:"Fee (UGX)"; }
+      .fee-table td:nth-child(3)::before { content:"Notes"; }
+      .fee-input { width:100% !important; max-width:100% !important; text-align:left !important; min-height:42px; font-size:15px; box-sizing:border-box; }
+
+      .cond-fee-table, .cond-fee-table tbody, .cond-fee-table tr, .cond-fee-table td { display:block; width:100%; }
+      .cond-fee-table thead { display:none; }
+      .cond-fee-table tr {
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .cond-fee-table td {
+        padding:8px 0 0; border:none; font-size:13px;
+        display:flex; flex-direction:column; gap:5px;
+      }
+      .cond-fee-table td:first-child { padding-top:0; }
+      .cond-fee-table td::before {
+        color:var(--text-lt, #5F6368); font-size:11px;
+        font-weight:700; text-transform:uppercase; letter-spacing:.4px;
+      }
+      .cond-fee-table td:nth-child(1)::before { content:"Condition"; }
+      .cond-fee-table td:nth-child(2)::before { content:"Fee (UGX)"; }
+      .cond-fee-table td:nth-child(3)::before { content:"Notes"; }
+      .cond-fee-table td:nth-child(4)::before { content:""; }
+
+      /* Diagnostic tests table */
+      .diag-table { width:100%; border-collapse:collapse; }
+      .diag-table th { font-size:11px; font-weight:700; color:var(--text-lt, #5F6368); text-transform:uppercase; letter-spacing:.4px; padding:6px 10px; border-bottom:2px solid var(--border, #E0E0E0); text-align:left; }
+      .diag-table td { padding:8px 10px; border-bottom:1px solid #F8F8F8; font-size:13px; vertical-align:middle; }
+      @media(max-width:600px){
+        .diag-table, .diag-table tbody, .diag-table tr, .diag-table td { display:block; width:100%; }
+        .diag-table thead { display:none; }
+        .diag-table tr { background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px; padding:12px; margin-bottom:10px; }
+        .diag-table td { padding:8px 0 0; border:none; font-size:13px; display:flex; flex-direction:column; gap:5px; }
+        .diag-table td:first-child { padding-top:0; }
+        .diag-table td::before { color:var(--text-lt, #5F6368); font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+        .diag-table td:nth-child(1)::before { content:"Test / Service"; }
+        .diag-table td:nth-child(2)::before { content:"Disease / Condition"; }
+        .diag-table td:nth-child(3)::before { content:"Price (UGX)"; }
+        .diag-table td:nth-child(4)::before { content:""; }
+      }
+
+      /* Hours row: stack day on its own row, then opens/closes side-by-side */
+      .hours-row {
+        grid-template-columns:1fr 1fr;
+        gap:8px;
+        background:var(--bg, #F5F5F5); border:1px solid var(--border, #E0E0E0); border-radius:10px;
+        padding:12px; margin-bottom:10px;
+      }
+      .hours-row > div:nth-child(1) { grid-column:1 / -1; font-weight:700; color:var(--deep-ink); font-size:14px; }
+      .hours-row > div:nth-child(4) { grid-column:1 / -1; }
+    }
+  </style>
+</head>
+<body>
+<div class="admin-layout">
+  <aside class="admin-sidebar">
+    <div class="sidebar-logo" style="display:flex;align-items:center;gap:11px">
+      <img src="icons/logo-mark.svg?v=1" alt="" style="width:34px;height:34px;flex-shrink:0" draggable="false">
+      <div style="min-width:0">
+        <div class="sidebar-logo-text" id="clinicUserName">Clinic Portal</div>
+        <div class="sidebar-logo-sub">Homatt Health — Uganda</div>
+      </div>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="dashboard.html" class="sidebar-link"><span class="material-icons-outlined">home</span> Home</a>
+      <a href="new-order.html" class="sidebar-link" data-nav-cap="consultations"><span class="material-icons-outlined">medical_services</span> New Treatment</a>
+      <a href="messages.html" class="sidebar-link"><span class="material-icons-outlined">forum</span> Messages</a>
+      <a href="guidelines.html" class="sidebar-link"><span class="material-icons-outlined">menu_book</span> Clinical Guidelines</a>
+      <a href="settings.html" class="sidebar-link active"><span class="material-icons-outlined">tune</span> Clinic Profile</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge"><span class="material-icons-outlined" style="font-size:14px">local_hospital</span> Clinic</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.62);margin:6px 0 10px" id="clinicUserDate"></div>
+      <button class="logout-sidebar-btn" id="clinicLogoutBtn">
+        <span class="material-icons-outlined" style="font-size:16px">logout</span> Sign Out
+      </button>
+    </div>
+  </aside>
+
+  <main class="admin-main">
+    <div class="admin-topbar">
+      <div class="admin-topbar-title">Clinic Profile & Settings</div>
+      <div class="admin-topbar-right">
+        <div class="admin-user-chip">
+          <div class="admin-user-avatar" id="clinicUserAvatar">C</div>
+          <span id="clinicUserNameTop">Clinic</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="admin-content">
+
+      <!-- Make it yours — the look and the clinician's photo -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">palette</span> Make it yours
+        </div>
+
+        <div class="look-lbl">Your photo</div>
+        <div class="portrait-row">
+          <button type="button" class="portrait-slot" data-portrait data-portrait-pick
+                  aria-label="Add or change your photo">
+            <span class="material-icons-outlined portrait-icon">add_a_photo</span>
+          </button>
+          <div class="portrait-txt">
+            <button type="button" class="portrait-btn" data-portrait-pick>Choose a photo</button>
+            <button type="button" class="portrait-btn ghost" id="portraitRemove" style="display:none">Remove</button>
+            <div id="portraitStatus" class="portrait-status"></div>
+            <p>Shown on your home screen. The photo is shrunk to 512&nbsp;px on this
+              phone before it is sent — that takes a 4&nbsp;MB photo down to about
+              40&nbsp;KB <strong>and removes the hidden location data</strong> that
+              phone cameras attach to every picture. It is kept in your clinic's own
+              folder and stays on this device, so it still shows with no internet.</p>
+          </div>
+        </div>
+        <input type="file" id="portraitInput" accept="image/*" style="display:none">
+
+        <div class="look-lbl" style="margin-top:22px">Colour</div>
+        <div id="lookPicker" class="look-grid"></div>
+        <p class="look-note">Changes as soon as you tap, on this device. The
+          sun / moon button in the top bar still switches between light and dark
+          inside whichever colour you pick.</p>
+      </div>
+
+      <!-- Basic Info -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_hospital</span> Clinic Basic Information
+        </div>
+        <div class="settings-grid">
+          <div class="form-row" style="grid-column:span 2">
+            <label>Clinic Name</label>
+            <input type="text" id="sClinicName" class="form-input" placeholder="e.g. Kampala Medical Centre">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>About This Clinic</label>
+            <textarea id="sClinicDesc" class="form-textarea" rows="3" placeholder="Brief description — specialties, history, what makes your clinic stand out..."></textarea>
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Phone Number</label>
+            <input type="text" id="sClinicPhone" class="form-input" placeholder="+256 7XX XXX XXX">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>WhatsApp Number</label>
+            <input type="text" id="sClinicWhatsapp" class="form-input" placeholder="+256 7XX XXX XXX">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <!-- Said plainly, because an owner changed this one and then could
+                 not sign in. It goes to the clinics table; the login lives in
+                 the authentication system and is changed further down. -->
+            <label>Clinic Contact Email
+              <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">
+                shown to patients — not your sign-in email</span>
+            </label>
+            <input type="email" id="sClinicEmail" class="form-input" placeholder="clinic@example.com">
+            <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;line-height:1.5">
+              To change the address you <b>sign in</b> with, use <b>Sign-in email</b> lower down this page.
+            </div>
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Contact Person / Manager</label>
+            <input type="text" id="sClinicContact" class="form-input" placeholder="Dr. Name or Manager Name">
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Clinicians ═════════════════════════════════════════════════
+           How somebody joins this clinic now. Show the code, they scan it,
+           they are in — with their own account, their own record and their
+           own name on every treatment they record here. -->
+      <div class="settings-card" id="cliniciansCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">qr_code_2</span> Clinicians
+        </div>
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 16px;line-height:1.5">
+          A clinician holds their own Homatt account. Show them this code and they
+          can work here — recording treatments under their own name — for as long
+          as you allow. They never see your money, your stock counts or your
+          reports, and you can stop their access at any moment.
+        </p>
+
+        <div id="ccCodeBox" style="display:none;text-align:center;margin-bottom:16px">
+          <!-- The QR keeps its own white ground in BOTH themes. A code
+               inverted by a dark theme does not scan on many Android
+               cameras, and the clinician holding the phone has no way to
+               know that is why. -->
+          <canvas id="ccQR" style="display:block;margin:0 auto;width:240px;max-width:100%;height:auto;background:#FFFFFF;padding:10px;border-radius:12px;border:1px solid var(--border, #E0E0E0)"></canvas>
+          <div id="ccCode" style="text-align:center;font-size:27px;font-weight:800;letter-spacing:4px;color:var(--text, #1A1A1A);margin:12px 0 2px;font-variant-numeric:tabular-nums"></div>
+          <div id="ccCodeHint" style="text-align:center;font-size:12px;color:var(--text-lt, #5F6368);line-height:1.5"></div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px">
+          <div style="flex:1;min-width:130px">
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--text, #1A1A1A);margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">They can work here for</label>
+            <select id="ccDays" class="form-input" style="width:100%">
+              <option value="1">1 day</option>
+              <option value="7">1 week</option>
+              <option value="30" selected>1 month</option>
+              <option value="90">3 months</option>
+              <option value="365">1 year</option>
+            </select>
+          </div>
+          <button type="button" id="ccMakeBtn"
+                  style="display:inline-flex;align-items:center;gap:6px;padding:11px 16px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:17px">qr_code_2</span>
+            Show a code
+          </button>
+        </div>
+        <div id="ccMsg" style="display:none;border-radius:10px;padding:10px 12px;font-size:12.5px;line-height:1.5;margin-bottom:12px"></div>
+
+        <div id="ccList">
+          <div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading clinicians…</div>
+        </div>
+      </div>
+
+      <!-- Who already has a login here.
+           The "Add staff account" button and its modal are gone on purpose:
+           joining is the QR code above, so that everybody who treats a patient
+           has their own account and their own record rather than a shared login
+           that belongs to the clinic. The list stays so existing logins keep
+           working and their roles can still be changed. -->
+      <div class="settings-card" id="staffAccessCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">badge</span> Existing logins
+        </div>
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 16px;line-height:1.5">
+          Logins already created for this clinic, and what each one can reach.
+          <strong>Owners</strong> access everything — finances, stock, settings.
+          <strong>Clinicians</strong> and <strong>nurses</strong> get treatments,
+          patient history, bookings, quick sale and stock — but not financial
+          reports. <strong>Receptionists</strong> handle the front desk.
+          <strong>Sales / Drug shop</strong> attendants get only quick sale and stock.
+          <br><br>
+          To bring somebody new in, use <strong>Clinicians</strong> above.
+        </p>
+        <div id="staffList">
+          <div style="text-align:center;padding:20px;color:var(--text-lt, #5F6368);font-size:13px">Loading staff…</div>
+        </div>
+        <div id="staffStatus" style="font-size:12px;color:var(--text-lt, #5F6368);min-height:16px;margin-top:8px"></div>
+      </div>
+
+      <!-- Ending a clinician's time here, and saying how they did -->
+      <div id="ccRateModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:600;align-items:center;justify-content:center;padding:20px">
+        <div style="background:var(--surface, #FFFFFF);border-radius:16px;max-width:440px;width:100%;padding:22px;max-height:90vh;overflow-y:auto">
+          <div style="font-size:17px;font-weight:800;color:var(--text, #1A1A1A);margin-bottom:4px" id="ccRateTitle">How did they do?</div>
+          <p style="font-size:12.5px;color:var(--text-lt, #5F6368);margin:0 0 14px;line-height:1.5">
+            This goes with them to their next clinic, so write what you would
+            want to read. You cannot change it afterwards.
+          </p>
+          <div id="ccStarPick" class="cl-starpick" style="display:flex;justify-content:center;gap:2px;margin-bottom:6px"></div>
+          <div id="ccStarWord" style="text-align:center;font-size:12.5px;font-weight:700;color:var(--text-lt, #5F6368);min-height:18px;margin-bottom:14px"></div>
+
+          <label style="font-size:11px;font-weight:700;color:var(--text, #1A1A1A);display:block;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">A few words — optional</label>
+          <textarea id="ccNote" class="form-input" rows="3" style="width:100%;margin-bottom:12px;resize:vertical" placeholder="e.g. Careful with children. Kept good records."></textarea>
+
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text, #1A1A1A);margin-bottom:14px;cursor:pointer">
+            <input type="checkbox" id="ccRehire" checked> I would work with them again
+          </label>
+
+          <div id="ccRateErr" style="display:none;background:var(--cl-danger-bg, #FFEBEE);color:var(--danger-ink);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:12px;line-height:1.45"></div>
+          <div style="display:flex;gap:8px">
+            <button type="button" id="ccRateCancel" style="flex:1;padding:12px;background:var(--bg, #F5F5F5);color:var(--text, #1A1A1A);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Not now</button>
+            <button type="button" id="ccRateSave" style="flex:2;padding:12px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Save</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">location_on</span> Location
+        </div>
+        <div style="background:var(--tint-2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--deep-ink);margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
+          <span>Enter your clinic's location using Uganda's place names — district, subcounty, parish. We will automatically find your GPS position from these names so patients near you can find you first.</span>
+        </div>
+        <div class="settings-grid">
+          <div class="form-row" style="grid-column:span 2">
+            <label>District <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Bugiri, Kampala, Jinja</span></label>
+            <input type="text" id="sClinicDistrict" class="form-input" placeholder="e.g. Bugiri" autocomplete="off">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>County <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Bukooli County</span></label>
+            <input type="text" id="sClinicCounty" class="form-input" placeholder="e.g. Bukooli County" autocomplete="off">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Subcounty / Town <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">e.g. Butto, Ntinda, Naguru</span></label>
+            <input type="text" id="sClinicCity" class="form-input" placeholder="e.g. Butto" autocomplete="off">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Parish / Village <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">most specific area</span></label>
+            <input type="text" id="sClinicParish" class="form-input" placeholder="e.g. Butto Parish" autocomplete="off">
+          </div>
+          <div class="form-row" style="grid-column:span 2">
+            <label>Full Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text-lt, #5F6368)">plot, street, landmarks</span></label>
+            <input type="text" id="sClinicAddress" class="form-input" placeholder="e.g. Plot 12, opposite Butto Trading Centre">
+          </div>
+        </div>
+
+        <!-- Auto-geocode + GPS buttons -->
+        <div style="margin-top:14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <button type="button" id="geocodeBtn" onclick="autoGeocodeLocation()"
+            style="display:flex;align-items:center;gap:6px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:16px">my_location</span>
+            Find GPS from address
+          </button>
+          <button type="button" id="useCurrentLocBtn" onclick="useCurrentLocation()"
+            style="display:flex;align-items:center;gap:6px;background:#1565C0;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:16px">gps_fixed</span>
+            Use my current location
+          </button>
+          <span id="geocodeStatus" style="font-size:12px;color:#555"></span>
+        </div>
+        <div style="margin-top:8px;font-size:11px;color:var(--text-lt, #5F6368);line-height:1.5">
+          <strong>Tip:</strong> Stand in front of your clinic, then tap <em>Use my current location</em> for the most accurate position. This is the location patients will see when navigating to your clinic.
+        </div>
+
+        <!-- Visible GPS readout so the clinician can verify -->
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div class="form-row" style="margin:0">
+            <label style="font-size:11px">Latitude</label>
+            <input type="text" id="sClinicLat" class="form-input" placeholder="e.g. 0.347596" inputmode="decimal" autocomplete="off">
+          </div>
+          <div class="form-row" style="margin:0">
+            <label style="font-size:11px">Longitude</label>
+            <input type="text" id="sClinicLng" class="form-input" placeholder="e.g. 32.582520" inputmode="decimal" autocomplete="off">
+          </div>
+        </div>
+        <div id="geocodeResult" style="display:none;margin-top:10px;background:#F1F8E9;border-radius:8px;padding:8px 12px;font-size:12px;color:#33691E;display:flex;align-items:center;gap:6px">
+          <span class="material-icons-outlined" style="font-size:14px">gps_fixed</span>
+          <span id="geocodeResultText"></span>
+        </div>
+      </div>
+
+      <!-- Front Photo -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">photo_camera</span> Clinic Front Photo
+        </div>
+        <div style="background:#E3F2FD;border-radius:8px;padding:10px 14px;font-size:12px;color:#0D47A1;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">
+          <span class="material-icons-outlined" style="font-size:16px;flex-shrink:0;margin-top:1px">info</span>
+          <span>Upload a clear photo of the front of your clinic. Patients will see this picture when they're choosing where to book — it helps them recognise the building and trust your clinic.</span>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:12px">
+          <div id="photoPreview" style="width:100%;max-width:320px;aspect-ratio:16/9;border:2px dashed #BDBDBD;border-radius:12px;background:var(--bg, #F5F5F5) url() center/cover no-repeat;display:flex;align-items:center;justify-content:center;color:#9E9E9E;font-size:13px;text-align:center;padding:8px;overflow:hidden">
+            <span id="photoPlaceholder" style="display:flex;flex-direction:column;align-items:center;gap:6px">
+              <span class="material-icons-outlined" style="font-size:36px;color:var(--text-lt, #5F6368)">add_photo_alternate</span>
+              No photo uploaded yet
+            </span>
+          </div>
+          <input type="file" id="frontPhotoInput" accept="image/*" style="display:none" onchange="handlePhotoUpload(event)">
+          <input type="hidden" id="sFrontPhotoUrl">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+            <button type="button" onclick="document.getElementById('frontPhotoInput').click()"
+              style="display:flex;align-items:center;gap:6px;background:var(--deep);color:var(--on-deep, #fff);border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              <span class="material-icons-outlined" style="font-size:16px">upload</span>
+              <span id="photoUploadLabel">Upload photo</span>
+            </button>
+            <button type="button" id="removePhotoBtn" onclick="removePhoto()" style="display:none;background:none;color:#D32F2F;border:1.5px solid #D32F2F;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">
+              Remove
+            </button>
+          </div>
+          <div id="photoStatus" style="font-size:12px;color:#555;text-align:center;min-height:16px"></div>
+        </div>
+      </div>
+
+      <!-- Conditions & Specialties -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">healing</span> Conditions Treated &amp; Specialties
+        </div>
+        <div class="form-row">
+          <label>Add conditions / diseases you treat (press Enter or comma after each)</label>
+          <div class="chip-wrap" id="specialtiesWrap" onclick="document.getElementById('specInput').focus()">
+            <input class="chip-input" id="specInput" placeholder="e.g. Malaria, Diabetes, Maternity, Hypertension…" onkeydown="addSpec(event)">
+          </div>
+          <div style="margin-top:6px;font-size:11px;color:var(--text-lt, #5F6368)">Suggested: Malaria, Typhoid, Diabetes, Hypertension, Maternity, Paediatrics, Skin, Eye, Dental, TB, HIV, Surgery</div>
+        </div>
+        <div style="margin-top:8px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-lt, #5F6368);margin-bottom:8px">Quick add:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px" id="suggestedSpecs"></div>
+        </div>
+      </div>
+
+      <!-- Diagnostic Tests are now managed FROM the consultation wizard:
+           when a test isn't in the list, the clinician adds it on the spot
+           (clinic_custom_lab_tests, offline-safe). The old management table
+           lived here; testsData still loads + saves so patient-facing lists
+           are untouched. -->
+      <!-- Condition-Based Fees -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_atm</span> Condition-Based Fees (UGX)
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Add the diseases / conditions you treat and what each costs. Patients will see this fee when their AI diagnosis matches a condition you offer — so they know exactly what to expect before arriving.</span>
+        </div>
+        <table class="cond-fee-table">
+          <thead><tr><th>Condition / Disease</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th><th></th></tr></thead>
+          <tbody id="condFeeTableBody">
+            <tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>
+          </tbody>
+        </table>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px;flex-wrap:wrap">
+          <button onclick="addCondFeeRow()" style="background:none;border:1px dashed var(--deep);color:var(--deep-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Condition</button>
+          <button onclick="populateFromSpecialties()" style="background:none;border:1px solid var(--info-ink);color:var(--info-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">
+            <span class="material-icons-outlined" style="font-size:14px;vertical-align:middle">auto_fix_high</span> Fill from Specialties
+          </button>
+        </div>
+      </div>
+
+      <!-- Appointment & Booking Settings -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">event_available</span> Appointment &amp; Booking Settings
+        </div>
+        <div class="cond-fee-hint">
+          <span class="material-icons-outlined" style="font-size:18px">info</span>
+          <span>Configure how patients schedule appointments. These settings control slot duration, capacity, and advance booking window shown to patients on the booking page.</span>
+        </div>
+        <div class="settings-grid">
+          <div class="form-row">
+            <label>Appointment Slot Duration</label>
+            <select id="sSlotDuration" class="form-input">
+              <option value="15">15 minutes</option>
+              <option value="20">20 minutes</option>
+              <option value="30" selected>30 minutes</option>
+              <option value="45">45 minutes</option>
+              <option value="60">60 minutes</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label>Max Patients Per Slot</label>
+            <input type="number" id="sMaxPerSlot" class="form-input" min="1" max="50" value="3" placeholder="e.g. 3">
+          </div>
+          <div class="form-row">
+            <label>Buffer Between Slots (minutes)</label>
+            <input type="number" id="sSlotBuffer" class="form-input" min="0" max="30" value="0" placeholder="e.g. 5">
+          </div>
+          <div class="form-row">
+            <label>Advance Booking Window (days)</label>
+            <input type="number" id="sBookingWindow" class="form-input" min="1" max="90" value="14" placeholder="e.g. 14">
+          </div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--deep-ink);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAcceptsOnlineSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)" checked>
+            Accept online appointment bookings from patients
+          </label>
+          <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;padding-left:28px">When enabled, patients can select a preferred date and time when booking. The clinic must confirm the slot.</div>
+        </div>
+        <div class="form-row" style="margin-top:4px">
+          <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--deep-ink);text-transform:none;letter-spacing:0">
+            <input type="checkbox" id="sAutoConfirmSlots" style="width:18px;height:18px;accent-color:var(--deep-ink)">
+            Auto-confirm bookings (no manual review needed)
+          </label>
+          <div style="font-size:11px;color:var(--text-lt, #5F6368);margin-top:4px;padding-left:28px">Automatically set bookings to "confirmed" on receipt, skipping manual clinic confirmation.</div>
+        </div>
+      </div>
+
+      <!-- Consultation Fees -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">payments</span> Treatment Fees &amp; Services (UGX)
+        </div>
+        <table class="fee-table">
+          <thead><tr><th>Service Type</th><th style="text-align:right">Fee (UGX)</th><th>Notes</th></tr></thead>
+          <tbody id="feesTableBody"></tbody>
+        </table>
+        <button onclick="addFeeRow()" style="margin-top:12px;background:none;border:1px dashed var(--deep);color:var(--deep-ink);border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Add Custom Service</button>
+      </div>
+
+      <!-- Facility level (drives the national essential medicines list) -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">local_hospital</span> Facility Level
+        </div>
+        <div style="font-size:12px;color:var(--text-lt, #5F6368);margin:-4px 0 12px">
+          Your level decides which medicines and supplies you may stock and prescribe,
+          under the national <b>Essential Medicines &amp; Health Supplies List (EMHSLU 2023)</b>.
+          The one-tap package warns you when a drug is above your level.
+        </div>
+        <div class="facilities-grid" id="levelGrid"></div>
+      </div>
+
+      <!-- Facilities -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">medical_services</span> Available Facilities &amp; Equipment
+        </div>
+        <div class="facilities-grid" id="facilitiesGrid"></div>
+      </div>
+
+      <!-- Opening Hours -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">schedule</span> Opening Hours
+        </div>
+        <div class="hours-row" style="margin-bottom:10px;font-size:11px;font-weight:700;color:var(--text-lt, #5F6368);text-transform:uppercase">
+          <div>Day</div><div>Opens</div><div>Closes</div><div>Closed?</div>
+        </div>
+        <div id="hoursContainer"></div>
+      </div>
+
+      <!-- The floating microphone -->
+      <div class="settings-card" id="speakCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">mic</span> The floating microphone
+        </div>
+        <p class="dict-note">
+          A microphone button that follows you around the app. Tap it anywhere,
+          say who the patient is and what they came with, and it opens the
+          treatment already filled in. It sits on top of the screen, so how
+          see-through it is matters — set it here, or turn it off.
+        </p>
+        <div class="form-row">
+          <label for="spOpacity">How see-through it is when you are not using it</label>
+          <input type="range" id="spOpacity" min="25" max="100" step="5" class="sp-range">
+          <div class="sp-range-note"><span id="spOpacityVal">55%</span> —
+            fainter on the left, solid on the right. It always goes solid while
+            it is listening.</div>
+        </div>
+        <div class="form-row">
+          <label>Which side of the screen</label>
+          <div class="sp-side">
+            <button type="button" class="sp-side-b" data-side="left">Left</button>
+            <button type="button" class="sp-side-b" data-side="right">Right</button>
+          </div>
+        </div>
+        <label class="sp-off">
+          <input type="checkbox" id="spOff"> Turn the floating microphone off
+        </label>
+      </div>
+
+      <!-- Dictation service -->
+      <div class="settings-card" id="dictationCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">mic</span> Dictation — speaking instead of typing
+        </div>
+        <p class="dict-note">
+          Clinicians can speak the complaint and the readings instead of typing
+          them. It is paid for by the minute, so it stops when the account runs
+          out. Check here before you are told by a dead button.
+        </p>
+
+        <!-- The master switch. One setting for ALL of it, because "optional"
+             has to mean the whole thing — a switch that quietened the floating
+             button and left two microphones on the intake screen would be a
+             worse answer than none. -->
+        <label class="sp-off" style="margin-bottom:12px">
+          <input type="checkbox" id="voiceOff"> Turn speaking off on this phone — type everything
+        </label>
+        <div style="font-size:11.5px;color:var(--text-lt, #5F6368);line-height:1.55;margin:-6px 0 14px;padding-left:28px">
+          Hides every microphone: the two on the treatment screen and the floating
+          one. Nothing else changes and nothing is lost — every box can be typed,
+          and the suggestions read what is typed exactly the same way.
+          This is per phone, not per clinic.
+        </div>
+        <div class="dict-state" id="dictState">
+          <span class="dict-dot" id="dictDot"></span>
+          <span class="dict-msg" id="dictMsg">Not checked yet.</span>
+        </div>
+        <div class="dict-detail" id="dictDetail"></div>
+        <button type="button" class="dict-btn" id="dictCheckBtn">
+          <span class="material-icons-outlined">refresh</span> Check now
+        </button>
+      </div>
+
+      <!-- App version -->
+      <div class="settings-card" id="appVersionCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">system_update</span> App version
+        </div>
+        <p class="dict-note">
+          The installed Android app has the whole portal baked into it, so on its
+          own it can never change — which is why it looked frozen while the web
+          version moved on. It now fetches new versions itself. Nothing is
+          swapped in until the whole thing has arrived, so a connection that
+          drops leaves the working app exactly as it was.
+        </p>
+        <div class="dict-state" id="verState">
+          <span class="dict-dot" id="verDot"></span>
+          <span class="dict-msg" id="verMsg">Checking…</span>
+        </div>
+        <div class="dict-detail" id="verDetail"></div>
+        <button type="button" class="dict-btn" id="verCheckBtn">
+          <span class="material-icons-outlined">refresh</span> Check for updates
+        </button>
+      </div>
+
+      <!-- ══ Sign-in email ══════════════════════════════════════════════
+           The EMAIL ADDRESS higher up this page is the CLINIC's — the one
+           patients are given. It is not the login, and changing it never was:
+           an owner changed it, tried to sign in with the new address and got
+           "Invalid login credentials", which is exactly what should happen and
+           tells them nothing about why.
+           The login lives in the authentication system, and this is the only
+           thing on this page that can move it. -->
+      <div class="settings-card" id="signinEmailCard">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">alternate_email</span> Sign-in email
+        </div>
+        <p style="font-size:13px;color:var(--text-lt, #5F6368);margin:-6px 0 14px;line-height:1.55">
+          The address you type to sign in. This is <strong>not</strong> the same as the
+          clinic's contact email higher up the page — that one is for patients and
+          changing it does not change how you sign in.
+        </p>
+        <div class="form-row">
+          <label>You sign in with</label>
+          <input type="email" class="form-input" id="seCurrent" readonly
+                 style="opacity:.75" value="—">
+        </div>
+        <div class="form-row">
+          <label>New sign-in email</label>
+          <input type="email" class="form-input" id="seNew" placeholder="you@example.com"
+                 autocomplete="username" autocapitalize="none" spellcheck="false">
+        </div>
+        <div style="font-size:12px;color:var(--text-lt, #5F6368);line-height:1.55;margin:-4px 0 12px">
+          We send a confirmation link to the new address. <strong>Your old email keeps
+          working until you open that link</strong> — so if the new address is wrong, or
+          you cannot reach it, nothing is lost and you are not locked out.
+        </div>
+        <div id="seMsg" style="font-size:13px;margin-bottom:12px;display:none;line-height:1.5"></div>
+        <button class="save-btn" id="seBtn" onclick="changeSigninEmail()" style="background:#0D47A1;color:#fff">
+          <span class="material-icons-outlined">mark_email_read</span> Change sign-in email
+        </button>
+      </div>
+
+      <!-- Change Password -->
+      <div class="settings-card">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">lock</span> Change Password
+        </div>
+        <div class="form-row">
+          <label>Current Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="currentPwd" placeholder="Enter your current password" autocomplete="current-password">
+            <button type="button" onclick="togglePwd('currentPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>New Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="newPwd" placeholder="Min 8 characters" autocomplete="new-password">
+            <button type="button" onclick="togglePwd('newPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div class="form-row">
+          <label>Confirm New Password</label>
+          <div style="position:relative">
+            <input type="password" class="form-input" id="confirmPwd" placeholder="Repeat new password" autocomplete="new-password">
+            <button type="button" onclick="togglePwd('confirmPwd',this)" tabindex="-1"
+              style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:0;color:var(--text-lt, #5F6368)">
+              <span class="material-icons-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+        </div>
+        <div id="pwdMsg" style="font-size:13px;margin-bottom:12px;display:none"></div>
+        <button class="save-btn" id="changePwdBtn" onclick="changePassword()" style="background:#0D47A1;color:#fff">
+          <span class="material-icons-outlined">lock_reset</span> Change Password
+        </button>
+      </div>
+
+      <!-- Save -->
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:32px">
+        <button class="save-btn" id="saveSettingsBtn" onclick="saveSettings()">
+          <span class="material-icons-outlined">save</span> Save Profile
+        </button>
+        <span id="saveMsg" style="font-size:13px;color:var(--text-lt, #5F6368)"></span>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+
+<div id="clinicToast" class="admin-toast"></div>
+
+<script src="js/vendor/supabase.min.js?v=2110" defer></script>
+<script src="../js/config.js" defer></script>
+<script src="js/clinic-offline.js?v=20261007a" defer></script>
+<script src="js/clinic.js?v=20261007" defer></script>
+<script src="js/msg-alerts.js?v=20261007" defer></script>
+<script>
+var _clinicId = null;
+var _supa = null;
+var _sessionIsDemo = false;
+var currentSpecs = [];
+var currentFacilities = [];
+var condFeeData = [];      // { id (existing uuid|null), condition_name, fee, notes, _delete }
+var condFeeDbRows = [];    // original rows fetched from DB
+var testsData = [];        // { test, condition, price }
+var _testSuggCache = [];   // flat list used by _addSuggByIdx
+
+var DEFAULT_FEES = [
+  { type:'General Treatment', fee:'', notes:'Standard OPD visit' },
+  { type:'Specialist Treatment', fee:'', notes:'With a specialist doctor' },
+  { type:'Ante-natal / Maternity', fee:'', notes:'Antenatal care visit' },
+  { type:'Child / Paediatric', fee:'', notes:'Under 12 years' },
+  { type:'Emergency', fee:'', notes:'After-hours or urgent care' },
+  { type:'Lab Tests (Basic)', fee:'', notes:'Blood count, urine, etc.' },
+  { type:'X-ray', fee:'', notes:'Standard chest / limb' },
+  { type:'Ultrasound / Scan', fee:'', notes:'Abdominal or obstetric' },
+];
+
+var SUGGESTED_SPECS = ['Malaria','Typhoid','Diabetes','Hypertension','Maternity','Paediatrics','HIV / AIDS','Tuberculosis (TB)','Skin Conditions','Eye Care','Dental','Surgery','Orthopaedics','Cardiology','Gynaecology','Mental Health'];
+
+var FACILITIES_LIST = ['Laboratory','X-ray Machine','Ultrasound / Scanner','ICU / High Dependency','Maternity / Delivery Ward','Operating Theatre','In-patient Wards','Pharmacy','Dental Chair','Physiotherapy','Eye Clinic','Immunisation Room','Ambulance','Oxygen / Ventilator','Mortuary'];
+
+var DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+
+/* ── Init ── */
+document.addEventListener('DOMContentLoaded', async function() {
+  var session = requireClinic();
+  if (!session) return;
+  setupClinicLogout();
+  // Clinic Profile / settings is owner-only.
+  if (!requireClinicCap('settings')) return;
+  document.getElementById('clinicUserDate').textContent = new Date().toLocaleDateString('en-UG',{weekday:'long',day:'numeric',month:'long'});
+
+  _clinicId = session.clinicId || null;
+  _sessionIsDemo = !!session.demo;
+
+  // Init Supabase
+  var cfg = window.HOMATT_CONFIG || {};
+  if (cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY && window.supabase) {
+    _supa = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, { auth: { storageKey: 'sb-homatt-clinic-auth' } });
+  }
+
+  applyRoleGating();   // hide nav links this staff role can't use
+  applyTierGating();   // lock premium sections on the basic plan
+  try { refreshClinicTier(_supa, session); } catch(e) {}
+
+  // If clinicId is missing but Supabase is available (non-demo), fetch it from portal_users
+  if (_supa && !_clinicId && !_sessionIsDemo) {
+    try {
+      var { data: authData } = await _supa.auth.getSession();
+      if (authData && authData.session && authData.session.user) {
+        var { data: pu } = await _supa
+          .from('portal_users')
+          .select('clinic_id, clinics(name)')
+          .eq('auth_user_id', authData.session.user.id)
+          .eq('role', 'clinic_staff')
+          .eq('is_active', true)
+          .single();
+        if (pu && pu.clinic_id) {
+          _clinicId = pu.clinic_id;
+          var updated = Object.assign({}, session, { clinicId: _clinicId, clinicName: (pu.clinics && pu.clinics.name) || session.clinicName });
+          localStorage.setItem('clinic_session', JSON.stringify(updated));
+        }
+      }
+    } catch(e) { /* silently ignore — will show proper message on save */ }
+  }
+
+  // Build UI sections
+  buildFeeTable(DEFAULT_FEES);
+  buildLevels();
+  buildFacilities([]);
+  buildHours({});
+  buildSuggestedSpecs();
+  buildTestSuggestions();
+
+  // Load existing data
+  if (_supa && _clinicId) {
+    await Promise.race([loadClinicProfile(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))]).catch(() => {});
+    await Promise.race([loadCondFees(), new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 10000))]).catch(() => {});
+  }
+
+  // Staff & access management (owner only)
+  loadStaffList();
+
+  // Clinicians who joined by scanning a code (owner only)
+  var _ccBtn = document.getElementById('ccMakeBtn');
+  if (_ccBtn) _ccBtn.addEventListener('click', ccMakeCode);
+  ccLoadList();
+
+  // Show which address actually signs this person in, so the difference
+  // between it and the clinic's contact email is visible rather than assumed.
+  paintSigninEmail();
+});
+
+/* ── Staff & Access ────────────────────────────────────────── */
+var STAFF_ROLE_OPTIONS = [
+  { value: 'owner',        label: 'Owner / Manager — everything incl. finances' },
+  { value: 'clinician',    label: 'Clinician — treatments, quick sale, stock' },
+  { value: 'nurse',        label: 'Nurse — treatments, quick sale, stock' },
+  { value: 'receptionist', label: 'Receptionist — front desk, payments, quick sale' },
+  { value: 'salesperson',  label: 'Sales / Drug shop — quick sale + stock only' },
+];
+
+async function loadStaffList() {
+  var card = document.getElementById('staffAccessCard');
+  var list = document.getElementById('staffList');
+  if (!list) return;
+
+  if (_sessionIsDemo || !_supa) {
+    if (card) card.style.display = 'none';   // nothing to manage in demo
+    return;
+  }
+
+  var CO = window.ClinicOffline;
+  var runStaff = function() { return _supa.rpc('get_clinic_staff'); };
+  var res = CO ? await CO.cachedQuery('clinic_staff_' + (_clinicId || 'me'), runStaff) : await runStaff();
+  if (res.error) {
+    // This page is owner-only (requireClinicCap above), so never hide the
+    // card silently — say WHY it can't load so the problem is fixable.
+    var m = (res.error.message || '') + '';
+    var why = /could not find the function|does not exist|schema cache/i.test(m)
+      ? 'Staff accounts need a database update — run <code>20260608_staff_roles.sql</code> in the Supabase SQL Editor (or re-run the Apply DB Migrations workflow).'
+      : (CO && CO.isNetworkErr && CO.isNetworkErr(res.error))
+      ? 'You\'re offline — staff accounts will appear when you reconnect.'
+      : 'Could not load staff: ' + m;
+    list.innerHTML = '<div style="background:#FFF8E1;border:1px solid #FFC107;border-radius:8px;padding:12px 14px;font-size:13px;color:#5D4037">' + why + '</div>';
+    return;
+  }
+  var staff = res.data || [];
+  if (!staff.length) {
+    // Empty set = the RPC says this login is not the clinic owner.
+    // `session` is local to the init handler, not in scope here — reading it
+    // directly threw and killed the rest of this render.
+    var _ses = {};
+    try { _ses = JSON.parse(localStorage.getItem('clinic_session') || '{}'); } catch (e) {}
+    list.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Only the clinic owner\'s account can manage staff logins. You\'re signed in as <strong>'
+      + ((_ses && (_ses.email || _ses.staffName)) || 'a staff member') + '</strong>.</div>';
+    return;
+  }
+
+  list.innerHTML = staff.map(function(s) {
+    var opts = STAFF_ROLE_OPTIONS.map(function(o) {
+      return '<option value="' + o.value + '"' + (o.value === s.staff_role ? ' selected' : '') + '>' + o.label + '</option>';
+    }).join('');
+    var name = (s.full_name || s.email || 'Staff member');
+    var active = s.is_active !== false;
+    var activeBadge = active
+      ? ''
+      : ' <span style="font-size:10px;color:#C62828;background:#FFEBEE;font-weight:700;padding:2px 8px;border-radius:10px;vertical-align:1px">DEACTIVATED</span>';
+    var toggleBtn = s.is_self ? '' :
+      '<button type="button" onclick="changeStaffActive(\'' + s.id + '\', ' + (active ? 'false' : 'true') + ', this)" '
+      + 'style="flex:0 0 auto;font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid ' + (active ? '#EF9A9A' : 'var(--tint-3)') + ';'
+      + 'background:' + (active ? '#FFF5F5' : '#F1F8E9') + ';color:' + (active ? '#C62828' : 'var(--deep)') + ';font-weight:700;cursor:pointer;font-family:inherit">'
+      + (active ? 'Deactivate' : 'Activate') + '</button>';
+    return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--border, #E0E0E0);' + (active ? '' : 'opacity:.65') + '">'
+      + '<div style="flex:1;min-width:150px">'
+      +   '<div style="font-weight:600;color:var(--text, #1A1A1A);font-size:14px">' + escHtml(name)
+      +     (s.is_self ? ' <span style="font-size:11px;color:var(--deep-ink);font-weight:700">(you)</span>' : '') + activeBadge + '</div>'
+      +   (s.email ? '<div style="font-size:12px;color:var(--text-lt, #5F6368)">' + escHtml(s.email) + '</div>' : '')
+      + '</div>'
+      + '<select onchange="changeStaffRole(\'' + s.id + '\', this.value, this)" '
+      +   (s.is_self ? 'disabled title="You cannot change your own role" ' : '')
+      +   'class="form-input" style="max-width:280px;flex:0 0 auto">' + opts + '</select>'
+      + toggleBtn
+      + '</div>';
+  }).join('');
+}
+
+async function changeStaffActive(targetId, active, btn) {
+  var status = document.getElementById('staffStatus');
+  if (active === false && !confirm('Deactivate this account? They will no longer be able to use the clinic portal until you reactivate them.')) return;
+  if (btn) btn.disabled = true;
+  if (status) { status.style.color = '#555'; status.textContent = 'Saving…'; }
+  var res = await _supa.rpc('set_staff_active', { p_target_id: targetId, p_active: active });
+  if (btn) btn.disabled = false;
+  if (res.error || (res.data && res.data.ok === false)) {
+    var msg = (res.data && res.data.error) || (res.error && res.error.message) || 'Could not update';
+    if (status) { status.style.color = '#C62828'; status.textContent = msg; }
+    return;
+  }
+  if (status) { status.style.color = 'var(--deep)'; status.textContent = active ? 'Account reactivated ✓' : 'Account deactivated ✓'; }
+  setTimeout(function() { if (status) status.textContent = ''; }, 2500);
+  loadStaffList();
+}
+
+/* Creating a login from inside the portal is GONE, on purpose.
+ *
+ * It made an account that belonged to the clinic: the clinic chose the
+ * email, the clinic set the password, and the record of who treated whom
+ * was a name typed into a box. Somebody who worked at three clinics had
+ * three logins and no history of their own, and a clinic that let one go
+ * still held their password.
+ *
+ * Joining is the QR code now (see the Clinicians card above). The person
+ * brings their own account, their own registration number and their own
+ * record; the clinic grants time-limited access and can end it. The
+ * create_staff_account RPC is left in the database so nothing that
+ * already exists breaks, but nothing calls it from here any more.
+ */
+
+
+async function changeStaffRole(targetId, role, selectEl) {
+  var status = document.getElementById('staffStatus');
+  if (selectEl) selectEl.disabled = true;
+  if (status) { status.style.color = '#555'; status.textContent = 'Saving…'; }
+  var res = await _supa.rpc('set_staff_role', { p_target_id: targetId, p_role: role });
+  if (selectEl) selectEl.disabled = false;
+  if (res.error || (res.data && res.data.ok === false)) {
+    var msg = (res.data && res.data.error) || (res.error && res.error.message) || 'Could not update role';
+    if (status) { status.style.color = '#C62828'; status.textContent = msg; }
+    loadStaffList();   // revert the dropdown to the true value
+    return;
+  }
+  if (status) { status.style.color = 'var(--deep)'; status.textContent = 'Role updated ✓'; }
+  setTimeout(function() { if (status) status.textContent = ''; }, 2500);
+}
+
+
+/* ══ Clinicians — the QR handshake, and how they did ═══════════════════
+ *
+ * The owner shows a code; a clinician scans it and can work here until it
+ * runs out. Everything below talks to the RPCs in
+ * 20260911_clinician_portal.sql, which do the checking — this screen is
+ * only the face of it, and is never the thing deciding who gets in.
+ */
+var _ccCurrent = null;          // the stint being rated
+var _ccStars = 5;
+
+function ccSay(text, kind) {
+  var el = document.getElementById('ccMsg');
+  if (!el) return;
+  if (!text) { el.style.display = 'none'; return; }
+  var bg = kind === 'bad' ? 'var(--cl-danger-bg, #FFEBEE)'
+         : kind === 'warn' ? 'var(--cl-warn-bg, #FFF8E1)' : 'var(--brand-tint)';
+  var fg = kind === 'bad' ? 'var(--danger-ink)'
+         : kind === 'warn' ? 'var(--warning-ink)' : 'var(--brand-ink)';
+  el.style.background = bg; el.style.color = fg;
+  el.textContent = text; el.style.display = 'block';
+}
+
+async function ccMakeCode() {
+  var btn = document.getElementById('ccMakeBtn');
+  if (_sessionIsDemo) { showToast('Demo mode — sign in as a clinic owner', 'info'); return; }
+  if (navigator.onLine === false) {
+    ccSay('Making a code needs a connection — it has to be written into the clinic’s own record so the clinician’s phone can check it.', 'warn');
+    return;
+  }
+  var days = parseInt(document.getElementById('ccDays').value, 10) || 30;
+  btn.disabled = true; btn.textContent = 'Making a code…';
+  try {
+    // The CODE is good for 24 hours — long enough to show somebody today,
+    // short enough that a photograph of this screen is worthless next week.
+    // The ACCESS it grants is the number of days chosen above; the two are
+    // deliberately different lengths.
+    var r = await _supa.rpc('create_clinic_link_code', {
+      p_hours: 24, p_max_uses: 1, p_access_days: days, p_role: 'visiting_clinician',
+    });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) { ccSay((r.data && r.data.error) || 'Could not make a code.', 'bad'); return; }
+
+    document.getElementById('ccCode').textContent = r.data.code;
+    document.getElementById('ccCodeHint').innerHTML =
+      'They can read this off the screen, or you can read it out.<br>' +
+      'This code stops working in 24 hours. Once used, it lets them work here for ' +
+      days + ' day' + (days === 1 ? '' : 's') + '.';
+    document.getElementById('ccCodeBox').style.display = 'block';
+
+    // The QR carries the tagged form, not a link. A URL in a QR opens a
+    // browser, and the clinician is holding the app — the app reads the tag
+    // directly and joins without leaving.
+    try {
+      if (window.HomattQR) {
+        window.HomattQR.toCanvas(document.getElementById('ccQR'),
+          'HOMATT-CLINIC:' + r.data.code, { size: 240, level: 'M' });
+      }
+    } catch (e) { /* the typed code still works, which is the point of it */ }
+
+    ccSay('', null);
+    ccLoadList();
+  } catch (e) {
+    ccSay((e && e.message) || 'Could not make a code just now.', 'bad');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined" style="font-size:17px">qr_code_2</span> Show a code';
+  }
+}
+
+function ccPill(c) {
+  var live = c.status === 'active' &&
+    (!c.expires_at || new Date(c.expires_at).getTime() > Date.now());
+  if (live) return '<span style="background:var(--brand-tint);color:var(--brand-ink);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Working here</span>';
+  if (c.status === 'revoked') return '<span style="background:var(--cl-danger-bg, #FFEBEE);color:var(--danger-ink);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Stopped</span>';
+  if (c.status === 'expired') return '<span style="background:var(--cl-quiet-bg, #ECEFF1);color:var(--text-lt, #5F6368);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Time ran out</span>';
+  return '<span style="background:var(--cl-quiet-bg, #ECEFF1);color:var(--text-lt, #5F6368);padding:3px 9px;border-radius:20px;font-size:11px;font-weight:800">Finished</span>';
+}
+
+function ccAgo(iso) {
+  if (!iso) return '';
+  var d = new Date(iso).getTime() - Date.now();
+  if (!isFinite(d)) return '';
+  var ahead = d > 0, s = Math.abs(d) / 1000, n, u;
+  if (s < 90) return ahead ? 'in a moment' : 'just now';
+  if (s < 5400) { n = Math.round(s / 60); u = 'minute'; }
+  else if (s < 129600) { n = Math.round(s / 3600); u = 'hour'; }
+  else if (s < 5184000) { n = Math.round(s / 86400); u = 'day'; }
+  else { n = Math.round(s / 2592000); u = 'month'; }
+  var t = n + ' ' + u + (n === 1 ? '' : 's');
+  return ahead ? 'in ' + t : t + ' ago';
+}
+
+async function ccLoadList() {
+  var box = document.getElementById('ccList');
+  if (!box) return;
+  if (_sessionIsDemo) {
+    box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Demo mode — no clinicians to show.</div>';
+    return;
+  }
+  try {
+    var r = await _supa.rpc('clinic_clinicians_list');
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) {
+      box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">'
+        + escHtml((r.data && r.data.error) || 'Only the clinic owner can see this.') + '</div>';
+      return;
+    }
+    var rows = r.data.clinicians || [];
+    if (!rows.length) {
+      box.innerHTML = '<div style="text-align:center;padding:20px 12px;color:var(--text-lt, #5F6368);font-size:13px;line-height:1.55">'
+        + 'No clinician has joined yet.<br>Show a code above and they can start today.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (c) {
+      var live = c.status === 'active' &&
+        (!c.expires_at || new Date(c.expires_at).getTime() > Date.now());
+      var meta = [];
+      if (c.profession) meta.push(escHtml(c.profession));
+      if (c.registration_no) meta.push(escHtml(c.registration_no));
+      if (c.phone) meta.push(escHtml(c.phone));
+      var work = [(c.treatments || 0) + ' treatment' + (c.treatments === 1 ? '' : 's')];
+      if (c.last_seen) work.push('last ' + ccAgo(c.last_seen));
+      if (live && c.expires_at) work.push('access ends ' + ccAgo(c.expires_at));
+      if (!live && c.ended_at) work.push('ended ' + ccAgo(c.ended_at));
+
+      return '<div style="padding:13px 0;border-bottom:1px solid var(--border, #E0E0E0)">'
+        + '<div style="display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap">'
+        +   '<div style="flex:1;min-width:150px">'
+        +     '<div style="font-weight:700;color:var(--text, #1A1A1A);font-size:14.5px">' + escHtml(c.full_name || 'Clinician') + '</div>'
+        +     '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px;line-height:1.5">' + meta.join(' · ') + '</div>'
+        +     '<div style="font-size:12px;color:var(--text-lt, #5F6368);margin-top:2px;line-height:1.5">' + work.join(' · ') + '</div>'
+        +     '<div style="margin-top:7px">' + ccPill(c)
+        +       (c.rated ? ' <span style="font-size:11px;color:var(--text-lt, #5F6368);font-weight:700">· you rated them ' + (c.rating || '?') + '/5</span>' : '')
+        +     '</div>'
+        +   '</div>'
+        + '</div>'
+        /* Data attributes and addEventListener, NOT inline onclick with the
+         * name interpolated into it.
+         *
+         * A name goes through escHtml on the way in, so an apostrophe becomes
+         * &#39; — and the HTML parser turns that back into a plain ' BEFORE the
+         * JavaScript in an onclick attribute is parsed. So O'Brien breaks a
+         * single-quoted argument, and JSON.stringify's double quotes end the
+         * attribute itself. Both produce "Unexpected end of input" on click,
+         * and the button silently does nothing.
+         *
+         * The name never has to survive two rounds of quoting if it is never
+         * put into markup as code. */
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'
+        +   '<button type="button" class="cc-act" data-act="work" data-stint="' + escHtml(c.stint_id) + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--brand-tint);color:var(--brand-ink);font-weight:700;cursor:pointer;font-family:inherit">Who they treated</button>'
+        +   '<button type="button" class="cc-act" data-act="record" data-clin="' + escHtml(c.clinician_id) + '" data-stint="' + escHtml(c.stint_id) + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface, #fff);color:var(--text, #1A1A1A);font-weight:700;cursor:pointer;font-family:inherit">Their record elsewhere</button>'
+        +   (live ? '<button type="button" class="cc-act" data-act="end" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--danger);background:var(--cl-danger-bg, #FFF5F5);color:var(--danger-ink);font-weight:700;cursor:pointer;font-family:inherit">End their access</button>' : '')
+        +   '<button type="button" class="cc-act" data-act="rate" data-stint="' + escHtml(c.stint_id) + '" data-name="' + escHtml(c.full_name || 'this clinician') + '" style="font-size:12px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--border, #E0E0E0);background:var(--surface, #fff);color:var(--text, #1A1A1A);font-weight:700;cursor:pointer;font-family:inherit">' + (c.rated ? 'Change the reference' : 'Leave a reference') + '</button>'
+        + '</div>'
+        + '<div id="ccWork_' + escHtml(c.stint_id) + '" style="display:none;margin-top:10px"></div>'
+        + '</div>';
+    }).join('');
+
+    box.querySelectorAll('.cc-act').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var id = btn.getAttribute('data-stint');
+        var nm = btn.getAttribute('data-name');
+        if (btn.getAttribute('data-act') === 'work') return ccSeeWork(id, btn);
+        if (btn.getAttribute('data-act') === 'record') {
+          return ccRecord(btn.getAttribute('data-clin'), id, btn);
+        }
+        if (btn.getAttribute('data-act') === 'end')  return ccEnd(id, nm);
+        return ccRate(id, nm);
+      });
+    });
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:13px;color:var(--text-lt, #5F6368);padding:8px 0">Could not load just now.</div>';
+  }
+}
+
+/* Who a clinician treated — inside THIS clinic only.
+ * These names come from the clinic's own records and stay here. They are not
+ * in the clinician's travelling record and they do not follow them out. */
+async function ccSeeWork(stintId, btn) {
+  var box = document.getElementById('ccWork_' + stintId);
+  if (!box) return;
+  if (box.style.display === 'block') { box.style.display = 'none'; btn.textContent = 'Who they treated'; return; }
+  box.style.display = 'block';
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Loading…</div>';
+  btn.textContent = 'Hide';
+  try {
+    var r = await _supa.rpc('clinic_clinician_detail', { p_stint_id: stintId });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) { box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">' + escHtml((r.data && r.data.error) || 'Not available.') + '</div>'; return; }
+    var work = r.data.work || [];
+    if (!work.length) { box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Nothing recorded yet.</div>'; return; }
+    box.innerHTML = '<div style="background:var(--brand-tint);border-radius:11px;padding:10px 12px;max-height:280px;overflow-y:auto">'
+      + work.slice(0, 60).map(function (w) {
+          return '<div style="padding:6px 0;border-bottom:1px solid rgba(0,0,0,.06);font-size:12.5px;color:var(--brand-ink);line-height:1.5">'
+            + '<strong>' + escHtml(w.patient_name || w.case_code || 'Walk-in') + '</strong> — '
+            + escHtml(w.diagnosis || '—')
+            + '<span style="opacity:.75"> · ' + ccAgo(w.created_at) + '</span></div>';
+        }).join('')
+      + (work.length > 60 ? '<div style="font-size:11px;color:var(--brand-ink);opacity:.8;padding-top:8px">…and ' + (work.length - 60) + ' more</div>' : '')
+      + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Could not load just now.</div>';
+  }
+}
+
+/* What this clinician did BEFORE they came here.
+ *
+ * The point of a record that belongs to the person rather than to a clinic:
+ * an owner deciding whether to let somebody treat patients can see where they
+ * have worked, how much, what of, and what the last three owners said — rather
+ * than a name, a phone number and a hope.
+ *
+ * Not one patient appears in it, from here or from anywhere else. This reads
+ * clinician_reference(), which is built from clinician_activity — a table with
+ * no column that could hold a patient identity. "Who they treated" above is a
+ * different question with a different answer: that one reads THIS clinic's own
+ * records, and it stops at this clinic's door.
+ */
+async function ccRecord(clinicianId, stintId, btn) {
+  var box = document.getElementById('ccWork_' + stintId);
+  if (!box) return;
+  if (box.style.display === 'block' && box.getAttribute('data-showing') === 'record') {
+    box.style.display = 'none'; btn.textContent = 'Their record elsewhere'; return;
+  }
+  box.style.display = 'block';
+  box.setAttribute('data-showing', 'record');
+  box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Loading…</div>';
+  btn.textContent = 'Hide';
+  try {
+    var r = await _supa.rpc('clinician_reference', { p_clinician_id: clinicianId });
+    if (r.error) throw r.error;
+    if (!r.data || !r.data.ok) {
+      box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">'
+        + escHtml((r.data && r.data.error) || 'Not available.') + '</div>';
+      return;
+    }
+    var d = r.data;
+    var t = d.totals || {}, stints = d.stints || [], ratings = d.ratings || [],
+        conds = d.conditions || [];
+
+    var html = '<div style="background:var(--brand-tint);border-radius:11px;padding:12px 13px">';
+    html += '<div style="font-size:13px;font-weight:800;color:var(--brand-ink);margin-bottom:8px">'
+      + (t.treatments || 0) + ' treatment' + (t.treatments === 1 ? '' : 's')
+      + ' across ' + (t.clinics || 0) + ' clinic' + (t.clinics === 1 ? '' : 's')
+      + (d.average ? ' · rated ' + d.average + '/5' : ' · not rated yet') + '</div>';
+
+    if (conds.length) {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">'
+        + conds.slice(0, 8).map(function (c) {
+            return '<span style="background:var(--surface, #fff);color:var(--text, #1A1A1A);border-radius:20px;padding:4px 10px;font-size:11.5px;font-weight:700">'
+              + escHtml(c.condition) + ' ' + (c.n || 0) + '</span>';
+          }).join('') + '</div>';
+    }
+
+    html += stints.map(function (s) {
+      return '<div style="padding:6px 0;border-top:1px solid rgba(0,0,0,.07);font-size:12.5px;color:var(--brand-ink);line-height:1.5">'
+        + '<b>' + escHtml(s.clinic_name || 'A clinic') + '</b>'
+        + (s.district ? ' · ' + escHtml(s.district) : '')
+        + ' · ' + (s.treatments || 0) + ' treated'
+        + ' · ' + (s.ended_at ? 'ended ' + ccAgo(s.ended_at) : 'still there')
+        + '</div>';
+    }).join('');
+
+    html += ratings.map(function (x) {
+      return '<div style="padding:8px 0;border-top:1px solid rgba(0,0,0,.07);font-size:12.5px;color:var(--brand-ink);line-height:1.55">'
+        + '<b>' + escHtml(x.clinic_name || 'A clinic') + '</b> — ' + (x.rating || '?') + '/5'
+        + (x.would_rehire === false ? ' · would not work with again' : '')
+        + (x.reference_note ? '<br>“' + escHtml(x.reference_note) + '”' : '')
+        + '</div>';
+    }).join('');
+
+    if (!stints.length && !ratings.length) {
+      html += '<div style="font-size:12.5px;color:var(--brand-ink)">This is their first clinic.</div>';
+    }
+    html += '<div style="margin-top:9px;font-size:11px;color:var(--brand-ink);opacity:.75;line-height:1.5">'
+      + 'No patient from any clinic appears here — a clinician’s record carries '
+      + 'what they treated, never who.</div>';
+    box.innerHTML = html + '</div>';
+  } catch (e) {
+    box.innerHTML = '<div style="font-size:12px;color:var(--text-lt, #5F6368)">Could not load just now.</div>';
+  }
+}
+
+async function ccEnd(stintId, name) {
+  if (!confirm('End ' + name + '’s access to this clinic?\n\nThey will not be able to record anything here until you give them a new code. Everything they already recorded stays on this clinic’s record.')) return;
+  try {
+    var r = await _supa.rpc('end_clinician_stint', { p_stint_id: stintId, p_reason: null });
+    if (r.error) throw r.error;
+    showToast('Access ended', 'success');
+    ccLoadList();
+    // Ask for the reference straight away. Asked a week later it is not
+    // written at all, and a clinician arriving at their next clinic has
+    // nothing to show for the months they worked here.
+    setTimeout(function () { ccRate(stintId, name); }, 400);
+  } catch (e) {
+    showToast((e && e.message) || 'Could not end access', 'error');
+  }
+}
+
+function ccPaintStars() {
+  var box = document.getElementById('ccStarPick');
+  var words = ['', 'Poor', 'Not good', 'Fine', 'Good', 'Very good'];
+  box.innerHTML = '';
+  for (var i = 1; i <= 5; i++) {
+    (function (n) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = n <= _ccStars ? 'on' : '';
+      b.setAttribute('aria-label', n + ' out of 5');
+      b.innerHTML = '<span class="material-icons-outlined" style="font-size:30px">star</span>';
+      b.style.cssText = 'background:none;border:none;cursor:pointer;padding:2px;font:inherit;color:'
+        + (n <= _ccStars ? 'var(--warning-ink)' : 'var(--border, #E0E0E0)');
+      b.onclick = function () { _ccStars = n; ccPaintStars(); };
+      box.appendChild(b);
+    })(i);
+  }
+  document.getElementById('ccStarWord').textContent = words[_ccStars] || '';
+}
+
+function ccRate(stintId, name) {
+  _ccCurrent = stintId; _ccStars = 5;
+  document.getElementById('ccRateTitle').textContent = 'How did ' + name + ' do?';
+  document.getElementById('ccNote').value = '';
+  document.getElementById('ccRehire').checked = true;
+  document.getElementById('ccRateErr').style.display = 'none';
+  ccPaintStars();
+  document.getElementById('ccRateModal').style.display = 'flex';
+}
+
+(function wireRate() {
+  var m = document.getElementById('ccRateModal');
+  if (!m) return;
+  m.addEventListener('click', function (e) { if (e.target === m) m.style.display = 'none'; });
+  var cancel = document.getElementById('ccRateCancel');
+  if (cancel) cancel.onclick = function () { m.style.display = 'none'; };
+  var save = document.getElementById('ccRateSave');
+  if (!save) return;
+  save.onclick = async function () {
+    var err = document.getElementById('ccRateErr');
+    err.style.display = 'none';
+    save.disabled = true; save.textContent = 'Saving…';
+    try {
+      var r = await _supa.rpc('rate_clinician', { p: {
+        stint_id: _ccCurrent,
+        rating: String(_ccStars),
+        would_rehire: String(document.getElementById('ccRehire').checked),
+        reference_note: (document.getElementById('ccNote').value || '').trim(),
+      } });
+      if (r.error) throw r.error;
+      if (r.data && r.data.ok === false) throw new Error(r.data.error);
+      m.style.display = 'none';
+      showToast('Reference saved — it goes with them', 'success');
+      ccLoadList();
+    } catch (e) {
+      err.textContent = (e && e.message) || 'Could not save just now.';
+      err.style.display = 'block';
+    } finally {
+      save.disabled = false; save.textContent = 'Save';
+    }
+  };
+})();
+
+function buildSuggestedSpecs() {
+  var el = document.getElementById('suggestedSpecs');
+  el.innerHTML = SUGGESTED_SPECS.map(function(s) {
+    return '<button onclick="addSpecVal(\'' + s + '\')" style="background:#F0F0F0;border:none;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit">' + s + '</button>';
+  }).join('');
+}
+
+function addSpecVal(val) {
+  if (val && !currentSpecs.includes(val)) {
+    currentSpecs.push(val);
+    renderSpecChips();
+  }
+}
+
+function addSpec(e) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    var val = e.target.value.trim().replace(/,$/,'');
+    addSpecVal(val);
+    e.target.value = '';
+  }
+}
+
+function renderSpecChips() {
+  var wrap = document.getElementById('specialtiesWrap');
+  var input = document.getElementById('specInput');
+  wrap.innerHTML = '';
+  currentSpecs.forEach(function(s, i) {
+    var chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = s + '<button class="chip-del" onclick="removeSpec(' + i + ')">×</button>';
+    wrap.appendChild(chip);
+  });
+  wrap.appendChild(input);
+  buildTestSuggestions();
+}
+
+window.removeSpec = function(i) { currentSpecs.splice(i,1); renderSpecChips(); };
+
+/* ── Fees table ── */
+var feesData = [];
+function buildFeeTable(fees) {
+  feesData = fees.map(function(f){ return Object.assign({}, f); });
+  renderFeeTable();
+}
+function renderFeeTable() {
+  var tbody = document.getElementById('feesTableBody');
+  tbody.innerHTML = feesData.map(function(f, i) {
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + (f.type||'') + '" oninput="feesData[' + i + '].type=this.value" placeholder="Service name"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (f.fee||'') + '" oninput="feesData[' + i + '].fee=Number(this.value)" placeholder="Amount" min="0"></td>' +
+      '<td style="display:flex;align-items:center;gap:6px"><input class="fee-input" style="flex:1;min-width:80px" value="' + (f.notes||'') + '" oninput="feesData[' + i + '].notes=this.value" placeholder="e.g. Includes basic exam">' +
+        '<button onclick="removeFeeRow(' + i + ')" style="background:none;border:none;cursor:pointer;color:var(--text-lt, #5F6368);padding:0;font-size:18px;line-height:1">×</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+window.addFeeRow = function() { feesData.push({type:'',fee:'',notes:''}); renderFeeTable(); };
+window.removeFeeRow = function(i) { feesData.splice(i,1); renderFeeTable(); };
+
+/* ── Facility level (EMHSLU) ──
+   Stored in the local session so it works offline and needs no migration. */
+var LEVELS_LIST = [
+  ['HC1', 'HC I — Village health team'],
+  ['HC2', 'HC II — Health Centre II'],
+  ['HC3', 'HC III — Health Centre III'],
+  ['HC4', 'HC IV — Health Centre IV'],
+  ['H',   'General Hospital'],
+  ['RR',  'Regional Referral Hospital'],
+  ['NR',  'National Referral Hospital']
+];
+function currentLevel() {
+  try { return (JSON.parse(localStorage.getItem('clinic_session') || '{}').level || '').toUpperCase(); }
+  catch (e) { return ''; }
+}
+function buildLevels() {
+  var cur = currentLevel();
+  var el = document.getElementById('levelGrid');
+  if (!el) return;
+  el.innerHTML = LEVELS_LIST.map(function(L) {
+    return '<button class="facility-btn' + (L[0] === cur ? ' active' : '') +
+           '" onclick="setLevel(this,\'' + L[0] + '\')" title="' + L[1] + '">' + L[1] + '</button>';
+  }).join('');
+}
+window.setLevel = function(btn, code) {
+  try {
+    var s = JSON.parse(localStorage.getItem('clinic_session') || '{}');
+    s.level = code;
+    localStorage.setItem('clinic_session', JSON.stringify(s));
+  } catch (e) {}
+  buildLevels();
+  if (typeof showToast === 'function') showToast('Facility level set to ' + code);
+  // Share it with this clinic's other devices. Best-effort: the level already
+  // works from the line above, so a missing column or no network changes nothing.
+  try {
+    if (_supa && _clinicId) {
+      _supa.from('clinics').update({ facility_level: code }).eq('id', _clinicId)
+        .then(function () {}, function () {});
+    }
+  } catch (e) {}
+};
+
+/* ── Facilities ── */
+function buildFacilities(existing) {
+  currentFacilities = existing || [];
+  var el = document.getElementById('facilitiesGrid');
+  el.innerHTML = FACILITIES_LIST.map(function(f) {
+    var active = currentFacilities.includes(f);
+    return '<button class="facility-btn' + (active?' active':'') + '" onclick="toggleFacility(this,\'' + f + '\')">' + f + '</button>';
+  }).join('');
+}
+window.toggleFacility = function(btn, name) {
+  var idx = currentFacilities.indexOf(name);
+  if (idx === -1) { currentFacilities.push(name); btn.classList.add('active'); }
+  else { currentFacilities.splice(idx,1); btn.classList.remove('active'); }
+};
+
+/* ── Use current GPS location ── */
+window.useCurrentLocation = function() {
+  var btn    = document.getElementById('useCurrentLocBtn');
+  var status = document.getElementById('geocodeStatus');
+  var result = document.getElementById('geocodeResult');
+  var resText= document.getElementById('geocodeResultText');
+
+  if (!navigator.geolocation) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'GPS not available on this device.';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.color = '#555';
+  status.textContent = 'Getting your GPS position…';
+  result.style.display = 'none';
+
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude.toFixed(6);
+    var lng = pos.coords.longitude.toFixed(6);
+    document.getElementById('sClinicLat').value = lat;
+    document.getElementById('sClinicLng').value = lng;
+    status.textContent = '';
+    resText.textContent = 'Captured your current location: ' + parseFloat(lat).toFixed(4) + ', ' + parseFloat(lng).toFixed(4) + ' (accuracy ±' + Math.round(pos.coords.accuracy) + 'm). Save the profile to apply.';
+    result.style.display = 'flex';
+    btn.disabled = false;
+  }, function(err) {
+    btn.disabled = false;
+    status.style.color = '#D32F2F';
+    if (err.code === 1) {
+      status.textContent = 'Location permission denied. Enable it in your browser/app settings to use this feature.';
+    } else if (err.code === 2) {
+      status.textContent = 'Position unavailable. Make sure GPS is on and you are outdoors or near a window.';
+    } else {
+      status.textContent = 'Could not get GPS — ' + (err.message || 'try again.');
+    }
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 });
+};
+
+/* ── Photo upload to Supabase storage ── */
+window.handlePhotoUpload = async function(ev) {
+  var file = ev.target.files && ev.target.files[0];
+  if (!file) return;
+  var status = document.getElementById('photoStatus');
+  var preview = document.getElementById('photoPreview');
+  var placeholder = document.getElementById('photoPlaceholder');
+  var label = document.getElementById('photoUploadLabel');
+  var hidden = document.getElementById('sFrontPhotoUrl');
+  var removeBtn = document.getElementById('removePhotoBtn');
+
+  if (!_supa || !_clinicId) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Sign in linked to a clinic before uploading.';
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Image too large — please pick one under 5 MB.';
+    return;
+  }
+
+  status.style.color = '#555';
+  status.textContent = 'Uploading photo…';
+  label.textContent = 'Uploading…';
+
+  try {
+    // Always upload to the same fixed path so it overwrites the previous photo
+    var ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    var path = _clinicId + '/front.' + ext;
+    var up = await _supa.storage.from('clinic-photos').upload(path, file, {
+      cacheControl: '3600',
+      upsert: true,
+      contentType: file.type || 'image/jpeg',
+    });
+    if (up.error) throw up.error;
+
+    // Bust the CDN cache with a version param so the browser fetches the new image
+    var publicUrl = _supa.storage.from('clinic-photos').getPublicUrl(path).data.publicUrl;
+    var versionedUrl = publicUrl + '?v=' + Date.now();
+
+    hidden.value = publicUrl;
+    preview.style.backgroundImage = "url('" + versionedUrl + "')";
+    if (placeholder) placeholder.style.display = 'none';
+    removeBtn.style.display = 'inline-flex';
+    label.textContent = 'Replace photo';
+    status.style.color = '#555';
+    status.textContent = 'Saving photo…';
+
+    // Auto-save the URL to the database immediately — no need to click "Save Profile"
+    var saveRes = await _supa
+      .from('clinics')
+      .update({ front_photo_url: publicUrl, updated_at: new Date().toISOString() })
+      .eq('id', _clinicId)
+      .select('id, front_photo_url');
+    if (saveRes.error) {
+      status.style.color = '#E65100';
+      status.textContent = 'Photo uploaded but could not save link (' + saveRes.error.message + '). Please click Save Profile.';
+    } else if (!saveRes.data || saveRes.data.length === 0) {
+      status.style.color = '#E65100';
+      status.textContent = 'Photo uploaded but permission denied. Run migration 20260518_fix_clinic_settings_rls.sql then click Save Profile.';
+    } else {
+      status.style.color = '#33691E';
+      status.textContent = '✓ Photo saved successfully.';
+    }
+  } catch (e) {
+    label.textContent = 'Upload photo';
+    status.style.color = '#D32F2F';
+    status.textContent = 'Upload failed: ' + (e.message || e);
+  }
+};
+
+window.removePhoto = function() {
+  document.getElementById('sFrontPhotoUrl').value = '';
+  document.getElementById('photoPreview').style.backgroundImage = '';
+  var ph = document.getElementById('photoPlaceholder'); if (ph) ph.style.display = 'flex';
+  document.getElementById('removePhotoBtn').style.display = 'none';
+  document.getElementById('photoUploadLabel').textContent = 'Upload photo';
+  document.getElementById('photoStatus').textContent = 'Photo removed — save the profile to apply.';
+  document.getElementById('photoStatus').style.color = '#555';
+};
+
+/* ── Auto-geocode: convert Uganda place names → GPS coordinates ── */
+window.autoGeocodeLocation = async function() {
+  var btn    = document.getElementById('geocodeBtn');
+  var status = document.getElementById('geocodeStatus');
+  var result = document.getElementById('geocodeResult');
+  var resText= document.getElementById('geocodeResultText');
+
+  var parish   = (document.getElementById('sClinicParish').value   || '').trim();
+  var subcounty= (document.getElementById('sClinicCity').value      || '').trim();
+  var county   = (document.getElementById('sClinicCounty').value    || '').trim();
+  var district = (document.getElementById('sClinicDistrict').value  || '').trim();
+
+  if (!district && !subcounty && !parish) {
+    status.textContent = 'Please enter at least a District or Subcounty first.';
+    status.style.color = '#D32F2F';
+    return;
+  }
+
+  btn.disabled = true;
+  status.style.color = '#555';
+  status.textContent = 'Searching for location…';
+  result.style.display = 'none';
+
+  // Build search query from most-specific to least-specific
+  var parts = [parish, subcounty, county, district, 'Uganda'].filter(Boolean);
+  var query  = parts.join(', ');
+
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(query);
+    var resp = await fetch(url, { headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' } });
+    var data = await resp.json();
+
+    if (!data || !data.length) {
+      // Try a broader query (district + Uganda)
+      var broaderQuery = [subcounty || county, district, 'Uganda'].filter(Boolean).join(', ');
+      resp = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=3&countrycodes=ug&q=' + encodeURIComponent(broaderQuery), {
+        headers: { 'Accept-Language': 'en', 'User-Agent': 'HomattHealth/1.0' }
+      });
+      data = await resp.json();
+    }
+
+    if (data && data.length) {
+      var best = data[0];
+      var lat = parseFloat(best.lat).toFixed(6);
+      var lng = parseFloat(best.lon).toFixed(6);
+      document.getElementById('sClinicLat').value = lat;
+      document.getElementById('sClinicLng').value = lng;
+
+      status.textContent = '';
+      resText.textContent = 'Found: ' + (best.display_name || query) + ' — GPS saved (' + parseFloat(lat).toFixed(4) + ', ' + parseFloat(lng).toFixed(4) + '). Patients near you will now find this clinic.';
+      result.style.display = 'flex';
+    } else {
+      status.style.color = '#E65100';
+      status.textContent = 'Could not find "' + query + '" on the map. Check spelling or try a broader area (district only).';
+    }
+  } catch(e) {
+    status.style.color = '#D32F2F';
+    status.textContent = 'Network error — check your internet connection and try again.';
+  }
+  btn.disabled = false;
+};
+
+// Auto-geocode whenever the district/subcounty/parish fields are filled and user leaves the field
+(function setupGeocodeTrigger() {
+  document.addEventListener('DOMContentLoaded', function() {
+    ['sClinicDistrict','sClinicCity','sClinicParish','sClinicCounty'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('blur', function() {
+          // Only auto-trigger if no coordinates yet
+          var lat = document.getElementById('sClinicLat').value;
+          if (!lat && document.getElementById('sClinicDistrict').value.trim()) {
+            window.autoGeocodeLocation();
+          }
+        });
+      }
+    });
+  });
+})();
+
+/* ── Hours ── */
+function buildHours(existing) {
+  var el = document.getElementById('hoursContainer');
+  el.innerHTML = DAYS.map(function(day) {
+    var h = (existing||{})[day] || {};
+    var closed = h.closed === true;
+    return '<div class="hours-row">' +
+      '<div class="day">' + day.slice(0,3) + '</div>' +
+      '<input class="hours-input" type="time" id="hs-open-'+day+'" value="' + (h.open||'08:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<input class="hours-input" type="time" id="hs-close-'+day+'" value="' + (h.close||'17:00') + '" ' + (closed?'disabled':'') + '>' +
+      '<label class="closed-toggle"><input type="checkbox" id="hs-closed-'+day+'" ' + (closed?'checked':'') + ' onchange="toggleDay(\'' + day + '\')" style="accent-color:#D32F2F"> Closed</label>' +
+    '</div>';
+  }).join('');
+}
+window.toggleDay = function(day) {
+  var cl = document.getElementById('hs-closed-'+day).checked;
+  document.getElementById('hs-open-'+day).disabled = cl;
+  document.getElementById('hs-close-'+day).disabled = cl;
+};
+function getHours() {
+  var r = {};
+  DAYS.forEach(function(d) {
+    r[d] = {
+      open: document.getElementById('hs-open-'+d)?.value || '08:00',
+      close: document.getElementById('hs-close-'+d)?.value || '17:00',
+      closed: document.getElementById('hs-closed-'+d)?.checked || false
+    };
+  });
+  return r;
+}
+
+/* ── Load clinic profile ── */
+async function loadClinicProfile() {
+  // Cached read: loads instantly offline, and any successful online load keeps
+  // the cache fresh (an offline save merges into the same cache — see below).
+  var CO = window.ClinicOffline;
+  var run = function() { return _supa.from('clinics').select('*').eq('id', _clinicId).single(); };
+  var res = CO ? await CO.cachedQuery('clinic_profile_' + _clinicId, run) : await run();
+  if (res.error) {
+    console.error('[settings] loadClinicProfile error:', res.error);
+    showToast('Could not load clinic data: ' + res.error.message, 'error');
+    return;
+  }
+  if (!res.data) {
+    showToast('Clinic record not found. Contact support.', 'error');
+    return;
+  }
+  var c = res.data;
+
+  document.getElementById('sClinicName').value = c.name || '';
+  document.getElementById('sClinicDesc').value = c.description || '';
+  document.getElementById('sClinicPhone').value = c.phone || '';
+  document.getElementById('sClinicWhatsapp').value = c.whatsapp || '';
+  document.getElementById('sClinicEmail').value = c.email || '';
+  document.getElementById('sClinicContact').value = c.contact_person || '';
+  document.getElementById('sClinicDistrict').value = c.district || '';
+  document.getElementById('sClinicCounty').value  = c.county   || '';
+  document.getElementById('sClinicCity').value    = c.city     || '';
+  document.getElementById('sClinicParish').value  = c.parish   || '';
+  document.getElementById('sClinicAddress').value = c.address  || '';
+  document.getElementById('sClinicLat').value     = c.latitude  || '';
+  document.getElementById('sClinicLng').value     = c.longitude || '';
+
+  // Front photo
+  if (c.front_photo_url) {
+    document.getElementById('sFrontPhotoUrl').value = c.front_photo_url;
+    // Add a cache-bust param so the browser always fetches the latest version
+    var displayUrl = c.front_photo_url + (c.front_photo_url.includes('?') ? '&' : '?') + 'v=' + (c.updated_at ? new Date(c.updated_at).getTime() : Date.now());
+    document.getElementById('photoPreview').style.backgroundImage = "url('" + displayUrl + "')";
+    var ph = document.getElementById('photoPlaceholder'); if (ph) ph.style.display = 'none';
+    document.getElementById('removePhotoBtn').style.display = 'inline-flex';
+    document.getElementById('photoUploadLabel').textContent = 'Replace photo';
+  }
+
+  // Show detected GPS badge if coordinates are already set
+  if (c.latitude && c.longitude) {
+    var res = document.getElementById('geocodeResult');
+    var txt = document.getElementById('geocodeResultText');
+    if (res && txt) {
+      txt.textContent = 'GPS position saved: ' + parseFloat(c.latitude).toFixed(4) + ', ' + parseFloat(c.longitude).toFixed(4) + ' — patients near you will find this clinic first.';
+      res.style.display = 'flex';
+    }
+  }
+
+  // Specialties
+  currentSpecs = c.specialties || [];
+  renderSpecChips();
+
+  // Fees — merge with defaults
+  var existingFees = [];
+  if (c.consultation_fee) {
+    existingFees.push({ type:'General Treatment', fee: c.consultation_fee, notes:'Standard OPD visit' });
+  }
+  if (Array.isArray(c.services) && c.services.length) {
+    c.services.forEach(function(s) {
+      var found = existingFees.find(function(f){ return f.type.toLowerCase().includes(s.type); });
+      if (!found) existingFees.push({ type: capitalise(s.type), fee: s.fee, notes:'' });
+    });
+  }
+  if (existingFees.length) {
+    // Fill in remaining defaults without values
+    DEFAULT_FEES.forEach(function(d) {
+      if (!existingFees.find(function(e){ return e.type === d.type; })) {
+        existingFees.push(Object.assign({}, d));
+      }
+    });
+    buildFeeTable(existingFees);
+  }
+
+  // Facility level — the server's value wins if this device has none yet.
+  if (c.facility_level) {
+    try {
+      var ses = JSON.parse(localStorage.getItem('clinic_session') || '{}');
+      if (!ses.level) {
+        ses.level = c.facility_level;
+        localStorage.setItem('clinic_session', JSON.stringify(ses));
+      }
+    } catch (e) {}
+    buildLevels();
+  }
+
+  // Facilities
+  buildFacilities(c.facilities || []);
+
+  // Hours
+  buildHours(c.opening_hours || {});
+
+  // Appointment settings
+  if (c.slot_duration_minutes) document.getElementById('sSlotDuration').value = String(c.slot_duration_minutes);
+  if (c.max_per_slot != null) document.getElementById('sMaxPerSlot').value = c.max_per_slot;
+  if (c.slot_buffer_minutes != null) document.getElementById('sSlotBuffer').value = c.slot_buffer_minutes;
+  if (c.booking_window_days != null) document.getElementById('sBookingWindow').value = c.booking_window_days;
+  if (c.accepts_online_slots != null) document.getElementById('sAcceptsOnlineSlots').checked = !!c.accepts_online_slots;
+  if (c.auto_confirm_slots != null) document.getElementById('sAutoConfirmSlots').checked = !!c.auto_confirm_slots;
+
+  // Diagnostic tests
+  testsData = Array.isArray(c.diagnostic_tests) ? c.diagnostic_tests : [];
+  renderTestsTable();
+  buildTestSuggestions();
+}
+
+function capitalise(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g,' ') : s; }
+
+/* ── Condition-Based Fees ── */
+async function loadCondFees() {
+  if (!_supa || !_clinicId) return;
+  var CO = window.ClinicOffline;
+  var run = function() {
+    return _supa.from('clinic_condition_fees')
+      .select('id,condition_name,fee,notes')
+      .eq('clinic_id', _clinicId)
+      .order('created_at', { ascending: true });
+  };
+  var res = CO ? await CO.cachedQuery('cond_fees_' + _clinicId, run) : await run();
+  condFeeDbRows = res.data || [];
+  condFeeData = condFeeDbRows.map(function(r) {
+    return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '', _delete: false };
+  });
+  renderCondFeeTable();
+}
+
+function renderCondFeeTable() {
+  var tbody = document.getElementById('condFeeTableBody');
+  var visible = condFeeData.filter(function(r){ return !r._delete; });
+  if (!visible.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No condition fees added yet. Use the button below to add.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = condFeeData.map(function(r, i) {
+    if (r._delete) return '';
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(r.condition_name) + '" oninput="condFeeData['+i+'].condition_name=this.value" placeholder="e.g. Malaria, Typhoid…"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (r.fee||'') + '" oninput="condFeeData['+i+'].fee=Number(this.value)" placeholder="Amount" min="0" style="width:130px"></td>' +
+      '<td><input class="fee-input" style="width:100%" value="' + escHtml(r.notes||'') + '" oninput="condFeeData['+i+'].notes=this.value" placeholder="e.g. Includes RDT test"></td>' +
+      '<td><button onclick="removeCondFee('+i+')" title="Remove" style="background:none;border:none;cursor:pointer;color:#D32F2F;font-size:18px;line-height:1;padding:0">×</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+function escHtml(str) {
+  return (str||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.addCondFeeRow = function() {
+  condFeeData.push({ id: null, condition_name: '', fee: '', notes: '', _delete: false });
+  renderCondFeeTable();
+  // Focus the new row's condition input
+  var rows = document.querySelectorAll('#condFeeTableBody tr');
+  var last = rows[rows.length - 1];
+  if (last) { var inp = last.querySelector('input'); if (inp) inp.focus(); }
+};
+
+window.removeCondFee = function(i) {
+  if (condFeeData[i].id) {
+    condFeeData[i]._delete = true; // mark for deletion from DB
+  } else {
+    condFeeData.splice(i, 1);
+  }
+  renderCondFeeTable();
+};
+
+window.populateFromSpecialties = function() {
+  var existing = condFeeData.filter(function(r){ return !r._delete; }).map(function(r){ return r.condition_name.toLowerCase(); });
+  var added = 0;
+  currentSpecs.forEach(function(spec) {
+    if (!existing.includes(spec.toLowerCase())) {
+      condFeeData.push({ id: null, condition_name: spec, fee: '', notes: '', _delete: false });
+      added++;
+    }
+  });
+  if (added) {
+    renderCondFeeTable();
+    showToast(added + ' condition(s) added from specialties', 'success');
+  } else {
+    showToast('All specialties already have fee entries', 'info');
+  }
+};
+
+async function saveCondFees() {
+  if (!_supa || !_clinicId) return;
+
+  // Delete marked rows
+  var toDelete = condFeeData.filter(function(r){ return r._delete && r.id; }).map(function(r){ return r.id; });
+  if (toDelete.length) {
+    await _supa.from('clinic_condition_fees').delete().in('id', toDelete);
+  }
+
+  // Upsert remaining rows that have a condition_name and fee
+  var toUpsert = condFeeData.filter(function(r){ return !r._delete && r.condition_name && (r.fee !== '' && r.fee !== null); }).map(function(r) {
+    var row = { clinic_id: _clinicId, condition_name: r.condition_name.trim(), fee: Number(r.fee), notes: r.notes || null, updated_at: new Date().toISOString() };
+    if (r.id) row.id = r.id;
+    return row;
+  });
+  if (toUpsert.length) {
+    await _supa.from('clinic_condition_fees').upsert(toUpsert, { onConflict: 'id' });
+  }
+}
+
+/* ── Diagnostic Tests ── */
+var TEST_SUGGESTIONS = {
+  'Malaria':           [{ test:'Malaria RDT (Rapid)', condition:'Malaria' }, { test:'Blood Smear / Microscopy', condition:'Malaria' }],
+  'Typhoid':           [{ test:'Widal Test', condition:'Typhoid' }, { test:'Blood Culture', condition:'Typhoid' }],
+  'Diabetes':          [{ test:'Fasting Blood Sugar (FBS)', condition:'Diabetes' }, { test:'HbA1c', condition:'Diabetes' }, { test:'Random Blood Sugar', condition:'Diabetes' }],
+  'Hypertension':      [{ test:'Blood Pressure Check', condition:'Hypertension' }, { test:'Renal Function Test (Creatinine)', condition:'Hypertension' }, { test:'ECG', condition:'Hypertension' }],
+  'HIV / AIDS':        [{ test:'HIV Rapid Test', condition:'HIV' }, { test:'CD4 Count', condition:'HIV' }, { test:'Viral Load', condition:'HIV' }],
+  'Tuberculosis (TB)': [{ test:'GeneXpert / TB PCR', condition:'TB' }, { test:'Sputum Microscopy (AAFB)', condition:'TB' }, { test:'Chest X-ray', condition:'TB' }],
+  'Maternity':         [{ test:'Pregnancy Test (HCG)', condition:'Pregnancy' }, { test:'Antenatal Blood Panel', condition:'Antenatal care' }, { test:'Obstetric Ultrasound', condition:'Pregnancy' }],
+  'Paediatrics':       [{ test:'Full Blood Count (FBC)', condition:'Paediatric illness' }, { test:'Malaria RDT', condition:'Malaria in children' }, { test:'Widal Test', condition:'Typhoid in children' }],
+  'Skin Conditions':   [{ test:'Skin Scraping / KOH Test', condition:'Fungal skin infection' }, { test:'VDRL / Syphilis Test', condition:'Syphilis' }],
+  'Eye Care':          [{ test:'Visual Acuity Test', condition:'Refractive error' }, { test:'Intraocular Pressure (IOP)', condition:'Glaucoma' }],
+  'Dental':            [{ test:'Dental X-ray (periapical)', condition:'Dental caries / abscess' }],
+  'Gynaecology':       [{ test:'Pap Smear', condition:'Cervical cancer screening' }, { test:'Pelvic Ultrasound', condition:'Fibroid / ovarian cyst' }, { test:'Vaginal Swab Culture', condition:'Vaginal infection' }],
+  'Cardiology':        [{ test:'ECG (Electrocardiogram)', condition:'Heart disease' }, { test:'Echocardiogram', condition:'Heart disease' }, { test:'Full Blood Count', condition:'Anaemia / cardiac workup' }],
+  'Orthopaedics':      [{ test:'X-ray (limb / spine)', condition:'Fracture / bone disease' }],
+  'Mental Health':     [{ test:'PHQ-9 Depression Screening', condition:'Depression' }, { test:'GAD-7 Anxiety Screening', condition:'Anxiety' }],
+  'Surgery':           [{ test:'Full Blood Count (pre-op)', condition:'Pre-operative workup' }, { test:'Clotting Profile (PT/APTT)', condition:'Pre-operative workup' }, { test:'Blood Group & Cross-match', condition:'Pre-operative workup' }],
+};
+
+function renderTestsTable() {
+  var tbody = document.getElementById('diagTestsBody');
+  if (!tbody) return;   // management UI removed — tests are added from the wizard
+  if (!testsData.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="cond-fee-empty">No tests added yet. Use the buttons below.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = testsData.map(function(t, i) {
+    return '<tr>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(t.test||'') + '" oninput="testsData[' + i + '].test=this.value" placeholder="e.g. Malaria RDT, Blood Sugar…"></td>' +
+      '<td><input class="fee-input" style="width:100%;text-align:left" value="' + escHtml(t.condition||'') + '" oninput="testsData[' + i + '].condition=this.value" placeholder="e.g. Malaria, Diabetes…"></td>' +
+      '<td><input class="fee-input" type="number" value="' + (t.price||'') + '" oninput="testsData[' + i + '].price=Number(this.value)||this.value" placeholder="Optional" min="0" style="width:120px"></td>' +
+      '<td><button onclick="removeTest(' + i + ')" title="Remove" style="background:none;border:none;cursor:pointer;color:#D32F2F;font-size:18px;line-height:1;padding:0">×</button></td>' +
+    '</tr>';
+  }).join('');
+}
+
+window.addTestRow = function() {
+  testsData.push({ test:'', condition:'', price:'' });
+  renderTestsTable();
+  var rows = document.querySelectorAll('#diagTestsBody tr');
+  var last = rows[rows.length - 1];
+  if (last) { var inp = last.querySelector('input'); if (inp) inp.focus(); }
+};
+
+window.removeTest = function(i) {
+  testsData.splice(i, 1);
+  renderTestsTable();
+};
+
+function buildTestSuggestions() {
+  var wrap = document.getElementById('testSuggestionsWrap');
+  if (!wrap) return;    // management UI removed
+  var container = document.getElementById('testSuggestions');
+  if (!wrap || !container) return;
+
+  var seen = {};
+  _testSuggCache = [];
+  currentSpecs.forEach(function(spec) {
+    var key = Object.keys(TEST_SUGGESTIONS).find(function(k) {
+      return k.toLowerCase() === spec.toLowerCase() || spec.toLowerCase().indexOf(k.toLowerCase()) !== -1;
+    });
+    if (key) {
+      TEST_SUGGESTIONS[key].forEach(function(s) {
+        if (!seen[s.test]) {
+          seen[s.test] = true;
+          _testSuggCache.push(s);
+        }
+      });
+    }
+  });
+
+  if (!_testSuggCache.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  container.innerHTML = _testSuggCache.map(function(s, idx) {
+    return '<button onclick="_addSuggByIdx(' + idx + ')" style="background:#F3E5F5;border:none;border-radius:12px;padding:4px 12px;font-size:11px;font-weight:500;cursor:pointer;font-family:inherit;color:#6A1B9A">' + escHtml(s.test) + '</button>';
+  }).join('');
+}
+
+window._addSuggByIdx = function(idx) {
+  var s = _testSuggCache[idx];
+  if (!s) return;
+  var existing = testsData.find(function(t){ return t.test.toLowerCase() === s.test.toLowerCase(); });
+  if (!existing) {
+    testsData.push({ test: s.test, condition: s.condition, price: '' });
+    renderTestsTable();
+    showToast('Added: ' + s.test, 'success');
+  } else {
+    showToast('Test already in list', 'info');
+  }
+};
+
+window.populateTestsFromConditions = function() {
+  var added = 0;
+  currentSpecs.forEach(function(spec) {
+    var key = Object.keys(TEST_SUGGESTIONS).find(function(k) {
+      return k.toLowerCase() === spec.toLowerCase() || spec.toLowerCase().indexOf(k.toLowerCase()) !== -1;
+    });
+    if (key) {
+      TEST_SUGGESTIONS[key].forEach(function(s) {
+        var existing = testsData.find(function(t){ return t.test.toLowerCase() === s.test.toLowerCase(); });
+        if (!existing) { testsData.push({ test: s.test, condition: s.condition, price: '' }); added++; }
+      });
+    }
+  });
+  if (added) {
+    renderTestsTable();
+    showToast(added + ' test(s) added from your specialties', 'success');
+  } else if (!currentSpecs.length) {
+    showToast('Add specialties first, then use this button', 'info');
+  } else {
+    showToast('All suggested tests are already in the list', 'info');
+  }
+};
+
+/* ── Save ── */
+async function saveSettings() {
+  var btn = document.getElementById('saveSettingsBtn');
+  var msg = document.getElementById('saveMsg');
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  msg.textContent = '';
+
+  // Build services from fee table
+  var services = feesData.filter(function(f){ return f.type && f.fee; }).map(function(f) {
+    return { type: f.type, fee: Number(f.fee), notes: f.notes || '' };
+  });
+
+  // Both names: clinics configured before this was renamed still have
+  // 'General Consultation' saved, and must keep their fee.
+  var generalFee = feesData.find(function(f){
+    return (f.type === 'General Treatment' || f.type === 'General Consultation') && f.fee; });
+
+  var payload = {
+    name: document.getElementById('sClinicName').value.trim() || undefined,
+    description: document.getElementById('sClinicDesc').value.trim() || null,
+    phone: document.getElementById('sClinicPhone').value.trim() || null,
+    whatsapp: document.getElementById('sClinicWhatsapp').value.trim() || null,
+    email: document.getElementById('sClinicEmail').value.trim() || null,
+    contact_person: document.getElementById('sClinicContact').value.trim() || null,
+    district: document.getElementById('sClinicDistrict').value.trim() || null,
+    county:   document.getElementById('sClinicCounty').value.trim()   || null,
+    city:     document.getElementById('sClinicCity').value.trim()     || null,
+    parish:   document.getElementById('sClinicParish').value.trim()   || null,
+    address:  document.getElementById('sClinicAddress').value.trim()  || null,
+    latitude:  parseFloat(document.getElementById('sClinicLat').value)  || null,
+    longitude: parseFloat(document.getElementById('sClinicLng').value) || null,
+    front_photo_url: document.getElementById('sFrontPhotoUrl').value.trim() || null,
+    specialties: currentSpecs.length ? currentSpecs : null,
+    facilities: currentFacilities.length ? currentFacilities : null,
+    services: services.length ? services : null,
+    consultation_fee: generalFee ? Number(generalFee.fee) : null,
+    opening_hours: getHours(),
+    slot_duration_minutes: parseInt(document.getElementById('sSlotDuration').value) || 30,
+    max_per_slot: parseInt(document.getElementById('sMaxPerSlot').value) || 3,
+    slot_buffer_minutes: parseInt(document.getElementById('sSlotBuffer').value) || 0,
+    booking_window_days: parseInt(document.getElementById('sBookingWindow').value) || 14,
+    accepts_online_slots: document.getElementById('sAcceptsOnlineSlots').checked,
+    auto_confirm_slots: document.getElementById('sAutoConfirmSlots').checked,
+    updated_at: new Date().toISOString()
+  };
+
+  if (!_supa || !_clinicId) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+    if (_sessionIsDemo) {
+      msg.textContent = 'Demo mode — changes are not saved to the database.';
+      showToast('Demo mode — not saved', 'info');
+    } else if (!_supa) {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Cannot reach server. Check your internet connection.';
+      showToast('Connection error', 'error');
+    } else {
+      msg.style.color = '#D32F2F';
+      msg.textContent = 'Your staff account is not linked to a clinic. Contact the admin.';
+      showToast('Account not linked to a clinic', 'error');
+    }
+    return;
+  }
+
+  var CO = window.ClinicOffline;
+
+  // Queue the whole settings save for background sync and fold it into the
+  // local caches, so everything reflects immediately (and after a reload)
+  // exactly as if it had saved online — then syncs automatically.
+  function queueSettingsOffline() {
+    CO.enqueue('table_update', {
+      table: 'clinics', match: { id: _clinicId },
+      patch: Object.assign({}, payload, { diagnostic_tests: testsData }),
+    });
+    var offDelete = condFeeData.filter(function(r){ return r._delete && r.id; }).map(function(r){ return r.id; });
+    if (offDelete.length) CO.enqueue('table_delete', { table: 'clinic_condition_fees', ids: offDelete });
+    var offUpsert = condFeeData.filter(function(r){ return !r._delete && r.condition_name && (r.fee !== '' && r.fee !== null); }).map(function(r) {
+      if (!r.id) r.id = CO.uuid();   // client id → shows correctly now, syncs idempotently
+      return { id: r.id, clinic_id: _clinicId, condition_name: r.condition_name.trim(), fee: Number(r.fee), notes: r.notes || null, updated_at: new Date().toISOString() };
+    });
+    if (offUpsert.length) CO.enqueue('table_upsert', { table: 'clinic_condition_fees', rows: offUpsert, onConflict: 'id' });
+
+    // Local caches: profile + fees now match what was queued.
+    var cachedProfile = CO.get('clinic_profile_' + _clinicId, null) || {};
+    CO.set('clinic_profile_' + _clinicId, Object.assign({}, cachedProfile, payload, { diagnostic_tests: testsData }));
+    condFeeData = condFeeData.filter(function(r){ return !r._delete; });
+    var feeCacheRows = condFeeData.map(function(r){ return { id: r.id, condition_name: r.condition_name, fee: r.fee, notes: r.notes || '' }; });
+    CO.set('cond_fees_' + _clinicId, feeCacheRows);
+    condFeeDbRows = feeCacheRows;
+    renderCondFeeTable();
+
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+    msg.style.color = '#33691E';
+    msg.textContent = 'Saved offline — will sync automatically when you reconnect.';
+    showToast('Settings saved offline — will sync automatically', 'success');
+  }
+
+  // Offline → queue + local cache, done. Works exactly like an online save.
+  if (CO && CO.isOffline()) { queueSettingsOffline(); return; }
+
+  // Use .select() so PostgREST returns the updated row — this is the ONLY reliable
+  // way to detect a "silent RLS rejection" (0 rows updated, no error returned).
+  var upd = _supa
+    .from('clinics')
+    .update(payload)
+    .eq('id', _clinicId)
+    .select('id, name, front_photo_url, latitude, longitude, address, updated_at');
+  var updRes = CO ? await CO.withTimeout(upd, 15000) : await upd;
+  var savedRows = updRes.data, error = updRes.error;
+
+  // Connection dropped / timed out mid-save → save offline instead of failing.
+  if (error && CO && CO.isNetworkErr(error)) { queueSettingsOffline(); return; }
+
+  if (!error) {
+    await saveCondFees();
+    // Reload condition fees to get fresh IDs from DB
+    await loadCondFees();
+    // Save diagnostic tests — separate call so it doesn't block main save if column absent
+    try {
+      await _supa.from('clinics').update({ diagnostic_tests: testsData }).eq('id', _clinicId);
+    } catch(e) {}
+    // Keep the offline cache in step with what just saved online.
+    if (CO) {
+      var cp = CO.get('clinic_profile_' + _clinicId, null) || {};
+      CO.set('clinic_profile_' + _clinicId, Object.assign({}, cp, payload, { diagnostic_tests: testsData }));
+    }
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<span class="material-icons-outlined">save</span> Save Profile';
+
+  if (error) {
+    msg.style.color = '#D32F2F';
+    msg.textContent = 'Error: ' + error.message;
+    showToast('Save failed: ' + error.message, 'error');
+    return;
+  }
+
+  // Detect silent RLS rejection: update returned success but no rows were affected
+  if (!savedRows || savedRows.length === 0) {
+    msg.style.color = '#D32F2F';
+    msg.textContent = 'Save blocked — your account may not have write permission. Run migration 20260518_fix_clinic_settings_rls.sql in Supabase SQL Editor.';
+    showToast('Permission denied — run the latest migration', 'error');
+    return;
+  }
+
+  // Confirm photo URL was persisted — update hidden field from DB response
+  var saved = savedRows[0];
+  if (saved.front_photo_url) {
+    document.getElementById('sFrontPhotoUrl').value = saved.front_photo_url;
+  }
+
+  msg.style.color = '#33691E';
+  msg.textContent = 'Saved ' + new Date().toLocaleTimeString('en-UG',{hour:'2-digit',minute:'2-digit'});
+  showToast('Clinic profile updated!', 'success');
+}
+
+/* ── Changing the address you SIGN IN with ────────────────────────────────
+ *
+ * The "Clinic Contact Email" field higher up this page writes to the clinics
+ * table — it is the address patients are given. It is not the login, and never
+ * was: an owner changed it, tried to sign in with the new address, and got
+ * "Invalid login credentials". The app was behaving correctly and explaining
+ * nothing, which is the worst combination.
+ *
+ * The login lives in Supabase auth, and only auth.updateUser can move it.
+ *
+ * THE OLD ADDRESS KEEPS WORKING until the link in the new inbox is opened.
+ * That is Supabase's behaviour and it is the right one: a typo in the new
+ * address, or an inbox nobody can reach, would otherwise lock a clinic out of
+ * its own records for good. The screen says so before they press the button,
+ * because somebody who does not know it will wonder why nothing changed.
+ */
+async function currentSigninEmail() {
+  try {
+    var s = await _supa.auth.getSession();
+    return (s && s.data && s.data.session && s.data.session.user && s.data.session.user.email) || '';
+  } catch (e) { return ''; }
+}
+
+async function paintSigninEmail() {
+  var el = document.getElementById('seCurrent');
+  if (!el || !_supa) return;
+  var email = await currentSigninEmail();
+  el.value = email || '(not signed in on this device)';
+}
+
+async function changeSigninEmail() {
+  var msg = document.getElementById('seMsg');
+  var btn = document.getElementById('seBtn');
+  var next = (document.getElementById('seNew').value || '').trim().toLowerCase();
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--deep-ink)' : 'var(--danger-ink)';
+    msg.style.background = ok ? 'var(--brand-tint)' : 'var(--cl-danger-bg, #FFEBEE)';
+    msg.style.padding = '10px 14px';
+    msg.style.borderRadius = '8px';
+    msg.style.display = 'block';
+  }
+
+  if (!_supa) { showMsg('Not connected. Try reloading.', false); return; }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) {
+    showMsg('Enter a valid email address.', false); return;
+  }
+  if (navigator.onLine === false) {
+    showMsg('Changing your sign-in email needs a connection — it has to send you a confirmation link.', false);
+    return;
+  }
+  var now = await currentSigninEmail();
+  if (now && now.toLowerCase() === next) {
+    showMsg('That is already your sign-in email.', false); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Sending…';
+  try {
+    var res = await _supa.auth.updateUser({ email: next }, {
+      // Come back to the portal, not to a blank page. Without this the
+      // confirmation link lands on the site root and a clinic is left
+      // wondering whether it worked.
+      emailRedirectTo: location.origin + location.pathname.replace(/[^/]*$/, 'index.html'),
+    });
+    if (res.error) {
+      var m = String(res.error.message || '');
+      /* WHICH ADDRESS did it refuse?
+       *
+       * A clinic changed their sign-in email and got back, word for word:
+       *   Email address "emmanuel@homatt-health.com" is invalid
+       * — the address they ALREADY had, not the one they typed. Shown raw,
+       * that is unusable: it names an address they did not enter and gives
+       * them nothing to do.
+       *
+       * It happens because Supabase's "Secure email change" confirms at BOTH
+       * addresses, so the CURRENT one is validated and mailed too. If the
+       * current address is the one being refused — its domain takes no mail,
+       * say — the change can never be completed from inside the app, and
+       * saying so plainly is the only honest answer.
+       *
+       * So the address is pulled out of the message and compared, rather
+       * than guessed at. */
+      var quoted = (m.match(/"([^"]+@[^"]+)"/) || m.match(/([\w.+-]+@[\w.-]+\.\w+)/) || [])[1] || '';
+      var badIsCurrent = quoted && now && quoted.toLowerCase() === now.toLowerCase();
+      if (/already|registered|exists/i.test(m)) {
+        showMsg('Another account already uses that email.', false);
+      } else if (/rate|too many/i.test(m)) {
+        showMsg('Too many attempts. Wait a few minutes and try again.', false);
+      } else if (/invalid/i.test(m) && badIsCurrent) {
+        showMsg('The address being refused is the one you sign in with now (' + now +
+                '), not the new one. Changing a sign-in email sends a confirmation to ' +
+                'BOTH addresses, and the server will not send to that one — so this ' +
+                'cannot be completed from here. Keep signing in with ' + now +
+                '; it still works. Whoever runs the Supabase project has to change ' +
+                'the address there, or turn off "Secure email change" so only the ' +
+                'new address is confirmed.', false);
+      } else if (/invalid/i.test(m)) {
+        showMsg('The server would not accept ' + (quoted || next) + '. Check the ' +
+                'spelling — and note that some addresses are refused because the ' +
+                'domain does not receive mail. You are still signed in with ' +
+                (now || 'your current email') + '.', false);
+      } else {
+        showMsg((m || 'Could not change the sign-in email.') +
+                ' Nothing has changed — you still sign in with ' +
+                (now || 'your current email') + '.', false);
+      }
+      return;
+    }
+    showMsg('Check ' + next + ' and open the link we just sent. Until you do, keep signing in with ' +
+            (now || 'your current email') + ' — it still works.', true);
+    showToast('Confirmation link sent to ' + next, 'success');
+    // portal_users carries a copy for the staff list; keep it in step so the
+    // app does not show two different addresses for one person. The login
+    // itself only moves when the link is opened.
+    try {
+      var sess = await _supa.auth.getSession();
+      var uid = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
+      if (uid) await _supa.from('portal_users').update({ email: next }).eq('auth_user_id', uid);
+    } catch (e) {}
+  } catch (e) {
+    showMsg('Unexpected error: ' + (e.message || e), false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">mark_email_read</span> Change sign-in email';
+  }
+}
+
+// ── Password change ──
+function togglePwd(id, btn) {
+  var inp = document.getElementById(id);
+  var ico = btn.querySelector('.material-icons-outlined');
+  if (inp.type === 'password') { inp.type = 'text'; ico.textContent = 'visibility_off'; }
+  else                         { inp.type = 'password'; ico.textContent = 'visibility'; }
+}
+
+async function changePassword() {
+  var currentPwd = (document.getElementById('currentPwd').value || '').trim();
+  var newPwd     = (document.getElementById('newPwd').value || '').trim();
+  var confirmPwd = (document.getElementById('confirmPwd').value || '').trim();
+  var msg        = document.getElementById('pwdMsg');
+  var btn        = document.getElementById('changePwdBtn');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--deep)' : '#D32F2F';
+    msg.style.background = ok ? 'var(--tint-2)' : '#FFEBEE';
+    msg.style.padding = '10px 14px';
+    msg.style.borderRadius = '8px';
+    msg.style.display = 'block';
+  }
+
+  if (!currentPwd)            { showMsg('Enter your current password.', false); return; }
+  if (newPwd.length < 8)      { showMsg('New password must be at least 8 characters.', false); return; }
+  if (newPwd !== confirmPwd)  { showMsg('Passwords don\'t match — check and try again.', false); return; }
+  if (!_supa)                 { showMsg('Not connected. Try reloading.', false); return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Verifying…';
+
+  try {
+    // Re-authenticate to verify the current password before changing it
+    var authData = await _supa.auth.getSession();
+    var email = authData && authData.data && authData.data.session && authData.data.session.user && authData.data.session.user.email;
+    if (!email) { showMsg('Could not read session email. Please sign out and back in.', false); return; }
+
+    var { error: signInErr } = await _supa.auth.signInWithPassword({ email: email, password: currentPwd });
+    if (signInErr) { showMsg('Current password is incorrect.', false); return; }
+
+    var { error: updateErr } = await _supa.auth.updateUser({ password: newPwd });
+    if (updateErr) { showMsg('Error: ' + updateErr.message, false); return; }
+
+    showMsg('Password changed successfully!', true);
+    document.getElementById('currentPwd').value = '';
+    document.getElementById('newPwd').value = '';
+    document.getElementById('confirmPwd').value = '';
+    showToast('Password updated!', 'success');
+  } catch(e) {
+    showMsg('Unexpected error: ' + (e.message || e), false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">lock_reset</span> Change Password';
+  }
+}
+
+/* ── Dictation: is it working, and how much is left? ──────────────────────────
+ * Two different questions, answered together:
+ *   1. What the SERVER says right now — the key, and what is left on the
+ *      account. This is the one an owner needs, because it is the same answer
+ *      for every phone in the clinic and it is the one they can act on.
+ *   2. What THIS device last ran into. A phone that hit "out of credit" an hour
+ *      ago is worth showing even if the account has since been topped up,
+ *      because the clinician who saw it is still avoiding the button.
+ */
+var DICT_FAULT_KEY = 'homatt_dictation_fault';
+
+function dictShow(state, msg, detail) {
+  var dot = document.getElementById('dictDot');
+  var m = document.getElementById('dictMsg');
+  var d = document.getElementById('dictDetail');
+  if (!dot || !m || !d) return;
+  dot.className = 'dict-dot ' + state;      // ok | low | bad | unknown | busy
+  m.textContent = msg;
+  d.innerHTML = detail || '';
+  d.style.display = detail ? 'block' : 'none';
+}
+
+function dictLastFaultHtml() {
+  var raw;
+  try { raw = JSON.parse(localStorage.getItem(DICT_FAULT_KEY) || 'null'); }
+  catch (e) { raw = null; }
+  if (!raw || !raw.kind) return '';
+  var when = '';
+  try {
+    var t = new Date(raw.at);
+    if (!isNaN(t)) when = t.toLocaleString('en-UG',
+      { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  } catch (e) {}
+  return '<div class="dict-last"><span class="material-icons-outlined">history</span>' +
+         '<span>On this device' + (when ? ', ' + escHtml(when) : '') + ': ' +
+         escHtml(raw.message || raw.kind) + '</span></div>';
+}
+
+async function dictCheck() {
+  var btn = document.getElementById('dictCheckBtn');
+  if (btn) btn.disabled = true;
+  dictShow('unknown', 'Checking…', '');
+  try {
+    if (!navigator.onLine) {
+      dictShow('unknown', 'You are offline, so this cannot be checked. ' +
+        'Dictation needs a connection too.', dictLastFaultHtml());
+      return;
+    }
+    if (!_supa || !_supa.functions) {
+      dictShow('unknown', 'This device is not connected to the server, so the ' +
+        'dictation account cannot be checked.', dictLastFaultHtml());
+      return;
+    }
+    var r = await _supa.functions.invoke('transcribe', { body: { probe: true } });
+    var body = r.data;
+    if (r.error) {
+      // A non-2xx carries the function's own JSON in the context — without
+      // reading it, "no key set" looks exactly like "the server is down".
+      try {
+        if (r.error.context && typeof r.error.context.json === 'function') {
+          body = await r.error.context.json();
+        }
+      } catch (e) {}
+    }
+    if (!body) {
+      // Nothing to read means one of two very different things, and the
+      // browser will not tell us which: the server is not answering, or it IS
+      // answering with a 404 that carries no CORS headers because the
+      // dictation function was never deployed. The second is far more likely,
+      // and it is the one nobody can guess from "could not reach". So ask a
+      // question the browser will answer — is Supabase reachable at all?
+      var reachable = null;
+      try {
+        var cfg = window.HOMATT_CONFIG || {};
+        if (cfg.SUPABASE_URL) {
+          await fetch(String(cfg.SUPABASE_URL).replace(/\/+$/, '') + '/auth/v1/health',
+                      { method: 'GET', mode: 'no-cors', cache: 'no-store' });
+          reachable = true;
+        }
+      } catch (e) { reachable = false; }
+      if (reachable === true) {
+        dictShow('bad', 'The dictation function is not installed on this ' +
+          'project. The server is answering, but there is no "transcribe" ' +
+          'function on it — deploy it, then check again.',
+          '<div class="dict-row">Run <b>supabase functions deploy transcribe</b>, ' +
+          'or push to <b>main</b> and let the Deploy Edge Functions action do it.</div>' +
+          dictLastFaultHtml());
+      } else {
+        dictShow('bad', 'Could not reach the server to check dictation.',
+          dictLastFaultHtml());
+      }
+      return;
+    }
+    var kind = body.kind || (body.ok ? '' : 'bad');
+    var state = body.ok ? (kind === 'low' ? 'low' : 'ok')
+                        : (kind === 'busy' ? 'busy' : 'bad');
+    var lines = (body.providers || []).map(function (p) {
+      var bal = (p.balance === null || p.balance === undefined)
+        ? '' : ' — $' + Number(p.balance).toFixed(2) + ' left';
+      // The last four characters of the key that is actually live. After
+      // rotating a key, "dictation works" reads exactly the same for the old
+      // one and the new one — this is the only way to see WHICH is in use.
+      var tag = p.key ? ' <span class="dict-key">key ' + escHtml(p.key) + '</span>' : '';
+      return '<div class="dict-row"><b>' + escHtml(p.name) + '</b>: ' +
+             escHtml(p.message || (p.ok ? 'working' : 'not working')) +
+             escHtml(bal) + tag + '</div>';
+    }).join('');
+    dictShow(state, body.message || (body.ok ? 'Dictation is working.'
+                                             : 'Dictation is not working.'),
+      lines + dictLastFaultHtml());
+  } catch (e) {
+    dictShow('bad', 'Could not check dictation: ' + (e.message || e),
+      dictLastFaultHtml());
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+/* ── Speaking: on or off, for everything ────────────────────────────────── */
+function voiceSwitch() {
+  var box = document.getElementById('voiceOff');
+  if (!box) return;
+  var KEY = (window.HomattDictate && window.HomattDictate.VOICE_OFF_KEY) || 'homatt_voice_off';
+  try { box.checked = localStorage.getItem(KEY) === '1'; } catch (e) {}
+  box.addEventListener('change', function () {
+    try { localStorage.setItem(KEY, box.checked ? '1' : ''); } catch (e) {}
+    // The floating microphone is on THIS page, so it can be put away at once.
+    // The dictate buttons live on the treatment screen and are read when that
+    // screen is built, so they follow on its next open — which is why the note
+    // under the switch says "on this phone" rather than promising "now".
+    try {
+      if (window.HomattSpeak) {
+        if (box.checked) window.HomattSpeak.applyLook();
+        else { window.HomattSpeak.mount(); window.HomattSpeak.applyLook(); }
+      }
+    } catch (e) {}
+    showToast(box.checked ? 'Speaking is off on this phone' : 'Speaking is back on', 'success');
+  });
+}
+
+/* ── The floating microphone: how faint, which side, or off ─────────────── */
+function spSettings() {
+  var range = document.getElementById('spOpacity');
+  var val = document.getElementById('spOpacityVal');
+  var off = document.getElementById('spOff');
+  var S = window.HomattSpeak;
+  if (!range || !S) return;
+
+  function read(k, d) { try { var v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }
+  function write(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+
+  var o = Math.round(parseFloat(read(S.KEY_OPACITY, '0.55')) * 100);
+  if (!isFinite(o) || o < 25 || o > 100) o = 55;
+  range.value = o;
+  val.textContent = o + '%';
+  off.checked = read(S.KEY_OFF, '') === '1';
+  var side = read(S.KEY_SIDE, 'right') === 'left' ? 'left' : 'right';
+  document.querySelectorAll('.sp-side-b').forEach(function (b) {
+    b.classList.toggle('on', b.dataset.side === side);
+  });
+
+  range.addEventListener('input', function () {
+    val.textContent = range.value + '%';
+    write(S.KEY_OPACITY, String(range.value / 100));
+    S.applyLook();
+  });
+  off.addEventListener('change', function () {
+    write(S.KEY_OFF, off.checked ? '1' : '');
+    if (off.checked) S.applyLook(); else S.mount();
+    S.applyLook();
+  });
+  document.querySelectorAll('.sp-side-b').forEach(function (b) {
+    b.addEventListener('click', function () {
+      write(S.KEY_SIDE, b.dataset.side);
+      document.querySelectorAll('.sp-side-b').forEach(function (x) {
+        x.classList.toggle('on', x === b);
+      });
+      S.applyLook();
+    });
+  });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  setTimeout(voiceSwitch, 0);
+  setTimeout(spSettings, 0);
+  var btn = document.getElementById('dictCheckBtn');
+  if (btn) btn.addEventListener('click', dictCheck);
+  var vbtn = document.getElementById('verCheckBtn');
+  if (vbtn) vbtn.addEventListener('click', function () { verCheck(true); });
+  verCheck(false);
+  // Show what this device already knows without waiting to be asked; the live
+  // check costs a request, so it stays on the button.
+  var last = dictLastFaultHtml();
+  if (last) dictShow('bad', 'Dictation failed the last time it was used here.', last);
+});
+</script>
+<script src="../js/native-bridge.js"></script>
+<script src="js/clinic-look.js?v=20261007"></script>
+<script src="js/vendor/sql-wasm.js" defer></script>
+<script src="js/clinic-impression.js?v=20261007" defer></script>
+<script src="js/clinic-dictate.js?v=20261007" defer></script>
+<script src="js/clinic-speak.js?v=20261007" defer></script>
+<script src="js/pwa-install.js?v=20261007"></script>
+<!-- Draws the clinician handshake QR. No CDN: the code is shown to somebody
+     standing in the room, which is exactly when the connection is worst. -->
+<script src="clinician/js/qr.js?v=20260911"></script>
+
+<script>
+// ── App version, and fetching a newer one ───────────────────────────────────
+// The Android build cannot update itself: the worker's own update call
+// re-fetches from its origin, which inside the APK is the installed file. The
+// worker knows how to go and get a newer build instead; this asks it to, and
+// says what happened rather than leaving somebody to guess.
+function verShow(state, msg, detail) {
+  var dot = document.getElementById('verDot');
+  var m   = document.getElementById('verMsg');
+  var d   = document.getElementById('verDetail');
+  if (dot) dot.className = 'dict-dot ' + (state || '');
+  if (m)   m.textContent = msg || '';
+  if (d)   d.innerHTML = detail || '';
+}
+async function verCheck(force) {
+  var here = 'unknown';
+  try {
+    var ks = await caches.keys();
+    var mine = ks.filter(function (k) { return k.indexOf('homatt-clinic-v') === 0 &&
+                                               k.indexOf('-incoming') < 0; });
+    if (mine.length) here = mine.sort().pop();
+  } catch (e) {}
+  var line = '<div class="dict-row">This app is <b>' + escHtml(here) + '</b></div>';
+
+  if (!navigator.serviceWorker || !navigator.serviceWorker.controller) {
+    verShow('', 'Running from the browser — it updates itself every time you open it.', line);
+    return;
+  }
+  if (force) verShow('busy', 'Looking for a newer version…', line);
+
+  var reply = await new Promise(function (resolve) {
+    var ch = new MessageChannel();
+    var done = false;
+    ch.port1.onmessage = function (ev) { done = true; resolve(ev.data || {}); };
+    try {
+      navigator.serviceWorker.controller.postMessage(
+        { type: 'checkForUpdate' }, [ch.port2]);
+    } catch (e) { resolve({ reason: 'could not ask the worker' }); return; }
+    setTimeout(function () { if (!done) resolve({ reason: 'timed out' }); }, 90000);
+  });
+
+  if (reply && reply.updated) {
+    verShow('ok', 'Updated to ' + (reply.latest || 'the newest version') +
+      '. Close the app and open it again to use it.',
+      line + '<div class="dict-row">Everything was downloaded before anything ' +
+      'was replaced, so nothing was left half-changed.</div>');
+    return;
+  }
+  if (reply && reply.reason === 'this copy updates itself') {
+    verShow('', 'This copy updates itself every time you open it.', line);
+    return;
+  }
+  if (reply && reply.latest && reply.latest === reply.current) {
+    verShow('ok', 'This is the newest version.', line);
+    return;
+  }
+  verShow(force ? 'bad' : '', force
+    ? 'Could not update: ' + escHtml((reply && reply.reason) || 'no answer')
+    : 'Not checked yet.', line);
+}
+// The worker announces an update it took on its own, so somebody who never
+// opens this screen still learns the app has changed underneath them.
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', function (ev) {
+    if (ev.data && ev.data.type === 'homatt-updated') {
+      try { showToast('The app has been updated. Close it and open it again.', 'success'); }
+      catch (e) {}
+      try { verCheck(false); } catch (e) {}
+    }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Homatt — Clinician</title>
+  <link href="../fonts/inter.css?v=1" rel="stylesheet">
+  <link href="../fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="stylesheet" href="../css/clinic.css?v=20261007">
+  <link rel="stylesheet" href="css/clinician.css?v=20260911">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1B5E20">
+  <link rel="apple-touch-icon" href="../icons/clinic-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="../icons/clinic-512.png?v=3">
+  <script>
+    /* Theme and skin before the first paint, so there is no flash. Same keys as
+       the clinic portal — one person, one look, whichever door they came in. */
+    (function () {
+      try {
+        var t = localStorage.getItem('homatt_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    body { background: var(--bg, #F5F7F6); margin: 0; }
+    .cl-hero {
+      text-align: center; padding: 30px 16px 6px;
+    }
+    .cl-hero img { width: 48px; height: 48px; }
+    .cl-hero h1 {
+      margin: 10px 0 2px; font-size: 21px; font-weight: 800; color: var(--text, #1A1A1A);
+    }
+    .cl-hero p { margin: 0; font-size: 13px; color: var(--text-lt, #5F6368); }
+    .cl-switch {
+      text-align: center; margin-top: 16px; font-size: 13px; color: var(--text-lt, #5F6368);
+    }
+    .cl-switch a { color: var(--primary-ink); font-weight: 700; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<div class="cl-wrap">
+  <div class="cl-hero">
+    <img src="../icons/logo-mark.svg?v=1" alt="Homatt Health" draggable="false">
+    <h1>Clinician</h1>
+    <p>Your own account — it goes with you</p>
+  </div>
+
+  <!-- Why the app asked again. "It logs me out sometimes" is not something
+       anybody can chase; a reason and a time are. -->
+  <div id="clWhyOut" class="cl-msg warn"></div>
+
+  <div class="cl-card">
+    <div class="cl-tabs" role="tablist">
+      <button type="button" id="tabIn" class="on" role="tab" aria-selected="true">Sign in</button>
+      <button type="button" id="tabUp" role="tab" aria-selected="false">Create an account</button>
+    </div>
+
+    <!-- ── Sign in ──────────────────────────────────────────────────── -->
+    <form id="formIn" style="margin-top:14px">
+      <div class="cl-field">
+        <label for="inEmail">Email</label>
+        <input type="text" id="inEmail" inputmode="email" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               placeholder="you@example.com" required>
+      </div>
+      <div class="cl-field">
+        <label for="inPass">Password</label>
+        <input type="password" id="inPass" autocomplete="current-password"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               placeholder="Your password" required>
+      </div>
+      <button type="submit" class="cl-btn" id="inBtn">
+        <span class="material-icons-outlined">login</span> Sign in
+      </button>
+    </form>
+
+    <!-- ── Create an account ────────────────────────────────────────── -->
+    <form id="formUp" style="display:none;margin-top:14px">
+      <p class="cl-hint">
+        This account is yours, not a clinic's. It keeps your work record and your
+        references, and you take it with you when you move.
+      </p>
+
+      <div class="cl-field">
+        <label for="upName">Your full name</label>
+        <input type="text" id="upName" autocomplete="name" placeholder="e.g. Okello John" required>
+      </div>
+
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="upProfession">Profession</label>
+          <select id="upProfession" required>
+            <option value="">Choose…</option>
+            <option>Medical Doctor</option>
+            <option>Clinical Officer</option>
+            <option>Nurse</option>
+            <option>Midwife</option>
+            <option>Laboratory Technologist</option>
+            <option>Pharmacist / Dispenser</option>
+            <option>Nutritionist</option>
+            <option>Other health worker</option>
+          </select>
+        </div>
+        <div class="cl-field">
+          <label for="upCadre">Cadre <span class="cl-note">— optional</span></label>
+          <input type="text" id="upCadre" placeholder="e.g. Medical Officer">
+        </div>
+      </div>
+
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="upRegBody">Registered with <span class="cl-note">— optional</span></label>
+          <select id="upRegBody">
+            <option value="">Choose…</option>
+            <option>UMDPC</option>
+            <option>UNMC</option>
+            <option>AHPC</option>
+            <option>Pharmacy Council</option>
+            <option>Not registered yet</option>
+          </select>
+        </div>
+        <div class="cl-field">
+          <label for="upRegNo">Registration number <span class="cl-note">— optional</span></label>
+          <input type="text" id="upRegNo" placeholder="e.g. UMDPC/12345"
+                 autocapitalize="characters" spellcheck="false">
+        </div>
+      </div>
+
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="upQual">Qualification <span class="cl-note">— optional</span></label>
+          <input type="text" id="upQual" placeholder="e.g. MBChB, Dip CM">
+        </div>
+        <div class="cl-field">
+          <label for="upYears">Years working <span class="cl-note">— optional</span></label>
+          <input type="number" id="upYears" min="0" max="60" inputmode="numeric" placeholder="e.g. 6">
+        </div>
+      </div>
+
+      <div class="cl-two">
+        <div class="cl-field">
+          <label for="upDistrict">District where you stay</label>
+          <input type="text" id="upDistrict" placeholder="e.g. Lira" required>
+        </div>
+        <div class="cl-field">
+          <label for="upVillage">Village / area <span class="cl-note">— optional</span></label>
+          <input type="text" id="upVillage" placeholder="e.g. Adyel">
+        </div>
+      </div>
+
+      <div class="cl-field">
+        <label for="upPhone">Phone</label>
+        <input type="tel" id="upPhone" inputmode="tel" autocomplete="tel"
+               placeholder="e.g. 0772 000 111" required>
+      </div>
+
+      <div class="cl-field">
+        <label for="upLangs">Languages you speak <span class="cl-note">— optional, helps a clinic place you</span></label>
+        <input type="text" id="upLangs" placeholder="e.g. English, Luo, Kiswahili">
+      </div>
+
+      <div class="cl-field">
+        <label for="upEmail">Email</label>
+        <input type="text" id="upEmail" inputmode="email" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               placeholder="you@example.com" required>
+      </div>
+      <div class="cl-field">
+        <label for="upPass">Choose a password <span class="cl-note">— at least 8 characters</span></label>
+        <input type="password" id="upPass" autocomplete="new-password"
+               autocapitalize="none" autocorrect="off" spellcheck="false"
+               placeholder="At least 8 characters" required minlength="8">
+      </div>
+
+      <button type="submit" class="cl-btn" id="upBtn">
+        <span class="material-icons-outlined">person_add</span> Create my account
+      </button>
+    </form>
+
+    <div id="clMsg" class="cl-msg"></div>
+
+    <div class="cl-switch">
+      Work at one clinic only? <a href="../index.html">Use the clinic portal</a>
+    </div>
+  </div>
+</div>
+
+<script src="../js/vendor/supabase.min.js?v=2110"></script>
+<script src="../../js/config.js"></script>
+<script src="js/clinician.js?v=20260911"></script>
+<script>
+(function () {
+  var C = window.HomattClinician;
+  var msg = document.getElementById('clMsg');
+
+  function say(text, kind) {
+    msg.className = 'cl-msg show ' + (kind || 'bad');
+    msg.textContent = text;
+  }
+  function clear() { msg.className = 'cl-msg'; msg.textContent = ''; }
+
+  /* Already signed in? Then the same decision as signing in makes — opening
+   * the app must not land somewhere different from typing a password, or the
+   * fix only works on the one day of the month somebody signs in fresh.
+   *
+   * Their own screen is shown IMMEDIATELY from what the phone already knows,
+   * and only then replaced if the server says they belong in a clinic. Waiting
+   * for a round trip before showing anything is a blank screen on a bad
+   * connection, which is most of them. */
+  (function () {
+    var s = C.session();
+    if (!s || !s.userId) return;
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem('clinician_home_cache') || 'null'); } catch (e) {}
+    if (cached && C.liveLinks(cached.links).length === 1) {
+      window.location.replace(C.landingFor(cached.links));
+      return;
+    }
+    var supa = C.supa();
+    if (!supa || navigator.onLine === false) { window.location.replace('home.html'); return; }
+    C.goWhereTheyBelong(supa, 'home.html').then(function (where) {
+      window.location.replace(where);
+    });
+  })();
+
+  // If the app put somebody out, say why rather than showing a blank form.
+  (function () {
+    try {
+      var raw = localStorage.getItem('homatt_last_signout');
+      if (!raw) return;
+      var r = JSON.parse(raw);
+      if (!r || !r.at) return;
+      var mins = Math.max(0, Math.round((Date.now() - new Date(r.at).getTime()) / 60000));
+      if (mins > 60 * 24) { localStorage.removeItem('homatt_last_signout'); return; }
+      var el = document.getElementById('clWhyOut');
+      el.textContent = 'You were asked to sign in again ' +
+        (mins < 1 ? 'just now' : mins + ' minute' + (mins === 1 ? '' : 's') + ' ago') +
+        ' because ' + r.why + '.' + (r.online ? '' : ' The phone had no connection at the time.');
+      el.classList.add('show');
+    } catch (e) {}
+  })();
+
+  // ── Tabs ──
+  var tabIn = document.getElementById('tabIn'), tabUp = document.getElementById('tabUp');
+  var formIn = document.getElementById('formIn'), formUp = document.getElementById('formUp');
+  function show(which) {
+    var up = which === 'up';
+    tabUp.classList.toggle('on', up); tabIn.classList.toggle('on', !up);
+    tabUp.setAttribute('aria-selected', String(up));
+    tabIn.setAttribute('aria-selected', String(!up));
+    formUp.style.display = up ? '' : 'none';
+    formIn.style.display = up ? 'none' : '';
+    clear();
+  }
+  tabIn.addEventListener('click', function () { show('in'); });
+  tabUp.addEventListener('click', function () { show('up'); });
+  if (/[?&]new=1/.test(location.search)) show('up');
+
+  // ── Fetch the clinician's own row and remember who they are ──
+  // `route` is true when SIGNING IN and false when signing up. Somebody who has
+  // just made an account should see it once — it is new, it is theirs, and the
+  // way to join a clinic is on it. Somebody signing in for the ninth morning
+  // running wants the ward.
+  async function landAfterAuth(supa, user, fallbackName, route) {
+    var name = fallbackName || (user.email || '').split('@')[0];
+    var clinicianId = null, profession = null, links = null;
+    try {
+      var r = await supa.rpc('my_clinician_home');
+      if (r && r.data && r.data.ok) {
+        links = r.data.links;
+        if (r.data.profile) {
+          name = r.data.profile.full_name || name;
+          clinicianId = r.data.profile.id;
+          profession = r.data.profile.profession;
+        }
+      }
+    } catch (e) { /* offline — the home screen will fill it in later */ }
+
+    C.setSession({
+      userId: user.id, email: user.email, name: name,
+      clinicianId: clinicianId, profession: profession,
+    });
+
+    /* Somebody who already works at one clinic signed in to treat patients,
+     * not to read their own CV. landingFor() sends them straight there and
+     * enters the clinic on the way; two clinics or none lands on their own
+     * screen, because that is a question only they can answer. */
+    window.location.href = route ? C.landingFor(links) : 'home.html';
+  }
+
+  // ── Sign in ──
+  formIn.addEventListener('submit', async function (e) {
+    e.preventDefault(); clear();
+    var btn = document.getElementById('inBtn');
+    var email = document.getElementById('inEmail').value.trim().toLowerCase();
+    var pass  = document.getElementById('inPass').value;
+    var supa = C.supa();
+    if (!supa) { say('This device cannot reach the server yet. Check the connection.'); return; }
+
+    btn.disabled = true; btn.textContent = 'Signing in…';
+    try {
+      var res = await supa.auth.signInWithPassword({ email: email, password: pass });
+      if (res.error) { say(C.saySorry(res.error)); return; }
+      await landAfterAuth(supa, res.data.user, null, true);   // signing in → the ward
+    } catch (err) {
+      say(C.saySorry(err, 'Could not sign in just now.'));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">login</span> Sign in';
+    }
+  });
+
+  // ── Create an account ──
+  formUp.addEventListener('submit', async function (e) {
+    e.preventDefault(); clear();
+    var btn = document.getElementById('upBtn');
+    var v = function (id) { return (document.getElementById(id).value || '').trim(); };
+    var email = v('upEmail').toLowerCase();
+    var pass  = document.getElementById('upPass').value;
+
+    if (pass.length < 8) { say('Choose a password of at least 8 characters.'); return; }
+
+    var profile = {
+      full_name: v('upName'), profession: v('upProfession'), cadre: v('upCadre'),
+      registration_no: v('upRegNo'), registration_body: v('upRegBody'),
+      qualification: v('upQual'), years_experience: v('upYears'),
+      phone: v('upPhone'), email: email,
+      district: v('upDistrict'), village: v('upVillage'), languages: v('upLangs'),
+    };
+
+    var supa = C.supa();
+    if (!supa) { say('This device cannot reach the server yet. Check the connection.'); return; }
+
+    // Kept on the phone BEFORE anything is sent, and kept whatever happens
+    // next. Ten fields somebody carefully filled in must not vanish because a
+    // server was unreachable, or had never had its database update applied —
+    // which is exactly what happened: a clinician signed up, landed on his own
+    // screen, and found every box empty with nothing saying why.
+    C.keepProfile(profile);
+
+    btn.disabled = true; btn.textContent = 'Creating your account…';
+    try {
+      var res = await supa.auth.signUp({
+        email: email, password: pass,
+        options: { data: { full_name: profile.full_name, homatt_role: 'clinician' } },
+      });
+      if (res.error) { say(C.saySorry(res.error)); return; }
+
+      // signUp returns a session only when email confirmation is switched off.
+      // With it on there is nobody to save the profile AS yet, so it is kept on
+      // the device and written on the first sign-in — otherwise a clinician
+      // fills in ten fields, confirms an email, and finds an empty account.
+      if (!res.data.session) {
+        try { localStorage.setItem('clinician_pending_profile', JSON.stringify(profile)); } catch (e) {}
+        say('Account created. Open the email we sent and confirm the address, then sign in here — your details are saved on this phone and will go in automatically.', 'good');
+        return;
+      }
+
+      var saved = await supa.rpc('save_my_clinician_profile', { p: profile });
+      // A server with no clinician tables is not a reason to strand somebody on
+      // the sign-up screen: the account exists, the details are on the phone,
+      // and the home screen will show them and say what is missing. Stopping
+      // here would leave them with a working login and no way to reach it.
+      if (saved && saved.error && !C.isNotSetUp(saved.error)) {
+        say(C.saySorry(saved.error, 'The account was made but the details did not save. Sign in and finish your profile.'), 'warn');
+        return;
+      }
+      if (saved && saved.data && saved.data.ok === false) {
+        say(C.saySorry(saved.data.error, 'The account was made but the details did not save. Sign in and finish your profile.'), 'warn');
+        return;
+      }
+      await landAfterAuth(supa, res.data.user, profile.full_name, false);  // new account → show it
+    } catch (err) {
+      say(C.saySorry(err, 'Could not create the account just now.'));
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '<span class="material-icons-outlined">person_add</span> Create my account';
+    }
+  });
+
+  // A profile that was filled in before the email was confirmed gets written
+  // the moment there is somebody to write it as.
+  window.addEventListener('load', async function () {
+    var raw = null;
+    try { raw = localStorage.getItem('clinician_pending_profile'); } catch (e) {}
+    if (!raw) return;
+    var supa = C.supa(); if (!supa) return;
+    try {
+      var g = await supa.auth.getSession();
+      if (!(g && g.data && g.data.session)) return;
+      var r = await supa.rpc('save_my_clinician_profile', { p: JSON.parse(raw) });
+      if (r && r.data && r.data.ok) localStorage.removeItem('clinician_pending_profile');
+    } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>
