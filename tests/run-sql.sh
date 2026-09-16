@@ -136,7 +136,7 @@ $PSQL -d $DB -c "alter table clinic_diagnoses
   add column if not exists treatment_plan text;" >/dev/null 2>&1 || true
 
 # ── the migrations under test ──
-for m in 20260911_clinician_portal.sql 20260912_owner_corrections.sql; do
+for m in 20260911_clinician_portal.sql 20260912_owner_corrections.sql 20260916_vital_flowsheet.sql; do
   $PSQL -d $DB -f "supabase/migrations/$m" >/dev/null
   # applied twice on purpose: every migration in this project claims to be
   # idempotent and a second run is the only thing that checks it
@@ -154,7 +154,7 @@ $PSQL -d $DB -c "
 
 set +e
 : > /tmp/homatt-sql-out.txt
-for t in tests/sql/test-clinician-portal.sql tests/sql/test-owner-corrections.sql; do
+for t in tests/sql/test-clinician-portal.sql tests/sql/test-owner-corrections.sql tests/sql/test-vital-flowsheet.sql; do
   psql -h "$PGSOCK" -p "$PGPORT" -U postgres -d $DB -q -f "$t" 2>&1 \
     | sed -e 's/^psql:[^ ]*[0-9]: //' -e 's/^NOTICE:  //' \
     | grep -E '^(PASS|FAIL|ERROR|---)' \
