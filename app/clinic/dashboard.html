@@ -2445,6 +2445,34 @@
         renderActiveDetailView();
       });
     };
+
+    /* The clinical camera. The count is painted AFTER the record is laid out
+       and lives inside the 30px button, so knowing there are photographs on a
+       file costs the record no height — which it does not have: it already
+       measures 661px against a 661px modal on a 412x915 phone. */
+    var camBtn = bodyEl.querySelector('[data-action="clinic-photo"]');
+    if (camBtn && window.HomattPhoto) {
+      camBtn.onclick = function () { HomattPhoto.open(current, function () { _photoCount(bodyEl, current); }); };
+      _photoCount(bodyEl, current);
+    }
+  }
+
+  // How many photographs this visit has, shown as a dot on the camera button.
+  function _photoCount(bodyEl, current) {
+    if (!window.HomattPhoto || !bodyEl || !current) return;
+    HomattPhoto.countFor(current.id).then(function (n) {
+      var badge = bodyEl.querySelector('[data-role="photo-count"]');
+      var btn = bodyEl.querySelector('[data-action="clinic-photo"]');
+      if (!badge) return;
+      badge.textContent = n > 9 ? '9+' : String(n);
+      badge.style.display = n > 0 ? 'block' : 'none';
+      if (btn) {
+        var lab = n > 0
+          ? n + ' photograph' + (n === 1 ? '' : 's') + ' on this file · tap to take another'
+          : 'Take a photograph for this file';
+        btn.title = lab; btn.setAttribute('aria-label', lab);
+      }
+    }).catch(function () {});
   }
 
   function renderMedsList(items) {
@@ -2522,6 +2550,20 @@
             + 'width:30px;height:30px;display:flex;align-items:center;justify-content:center;'
             + 'cursor:pointer;flex-shrink:0;color:var(--text-lt);padding:0;margin-left:6px">'
             + '<span class="material-icons-outlined" style="font-size:17px">edit_note</span></button>'
+          : '')
+        /* The clinical camera, in the same row and for the same reason. A
+           photograph of the wound belongs on the record, and the shortest way
+           to one is from the record you are already looking at. */
+        +((window.HomattPhoto && HomattPhoto.may())
+          ? '<button data-action="clinic-photo" aria-label="Take a photograph for this file"'
+            + ' title="Take a photograph for this file"'
+            + ' style="background:none;border:1px solid var(--border);border-radius:9px;'
+            + 'width:30px;height:30px;display:flex;align-items:center;justify-content:center;'
+            + 'cursor:pointer;flex-shrink:0;color:var(--text-lt);padding:0;margin-left:6px;position:relative">'
+            + '<span class="material-icons-outlined" style="font-size:17px">photo_camera</span>'
+            + '<span data-role="photo-count" style="display:none;position:absolute;top:-5px;right:-5px;'
+            + 'min-width:15px;height:15px;border-radius:8px;background:var(--deep);color:var(--on-deep);'
+            + 'font-size:9.5px;font-weight:800;line-height:15px;text-align:center;padding:0 3px"></span></button>'
           : '')
         +'<span class="pr-sev '+esc(sev)+'">'+esc(sev)+'</span>'
       +'</div>';
@@ -7051,5 +7093,6 @@
 <script src="js/pwa-install.js?v=20261007"></script>
 <script src="js/clinic-regimens.js?v=20261007"></script>
 <script src="js/clinic-corrections.js?v=20261007"></script>
+<script src="js/clinic-photo.js?v=20261007"></script>
 </body>
 </html>
