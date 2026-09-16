@@ -68,6 +68,11 @@
      for the one line on the screen that says something went wrong. The fill
      colour is left alone, because white on it is what the delete buttons use. */
   --danger-ink:#C62828;
+  /* --success as a WORD. #2E7D32 is a fill; on a dark card it is 2.6:1, which
+     is the same mistake --info-ink and --warning-ink were added to undo. The
+     flowsheet needs "this reading is fine" in green text, so the pair is
+     defined here rather than at the point of use. */
+  --success-ink:#2E7D32;
   --warning-ink:#B23C00;   /* warning as TEXT — #E65100 is 3.8:1 on a card */
   --accent-v:      #6C5CE7;   /* violet — interactive highlights */
   --accent-v-tint: #ECE9FF;
@@ -365,7 +370,7 @@ html[data-theme="dark"]{
   --sidebar:#080D0A; --sidebar-hv:#152119;
   --text:#E8F0EA; --text-lt:#9FB4A4; --border:#293630;
   --on-primary:#000000; --danger-ink:#FF8A80; --warning-ink:#FFB870;
-  --info-ink:#8FC4F8;
+  --info-ink:#8FC4F8; --success-ink:#7FD98C;
   /* The brand colour as a WORD. Every skin already says what that is in dark
      mode; without this, skins whose --primary is a near-black chrome fill
      printed their labels at 1.5:1 on their own surface. */

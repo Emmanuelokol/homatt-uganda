@@ -820,6 +820,17 @@
           aria-label="Print this patient's full record" title="Print this patient's full record">
           <span class="material-icons-outlined" style="font-size:19px">print</span>
         </button>
+        <!-- The vital flowsheet. Here for the same measured reason as the other
+             two, and it matters more here than it did for them: the record body
+             has to fit a 412x915 phone WITHOUT scrolling (test-patient-record.js
+             asserts it), so anything added to it takes height from something
+             else. The header's height is set by the close button and the name
+             beside it ellipsizes rather than wraps, so a fourth 34px control
+             costs the record nothing. Measured after adding it, not assumed. -->
+        <button id="pxVitalsBtn" data-action="flowsheet" style="display:none"
+          aria-label="Vitals, and how they are changing" title="Vitals, and how they are changing">
+          <span class="material-icons-outlined" style="font-size:19px">monitor_heart</span>
+        </button>
         <button onclick="document.getElementById('histModal').style.display='none'"
           aria-label="Close"
           style="background:var(--tint-2);color:var(--text);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
@@ -2514,7 +2525,205 @@
         };
       }
     }
+
+    /* The vital flowsheet. Same row, same reason. */
+    var vtBtn = document.getElementById('pxVitalsBtn');
+    if (vtBtn) {
+      var canVitals = !!(window.HomattFlowsheet && HomattFlowsheet.may());
+      vtBtn.style.cssText = canVitals
+        ? 'background:var(--tint-2);color:var(--text);border:1px solid var(--border);' +
+          'border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;' +
+          'align-items:center;justify-content:center;cursor:pointer;padding:0'
+        : 'display:none';
+      if (canVitals) vtBtn.onclick = function () { openFlowsheet(current); };
+    }
   }
+
+  /* ── The flowsheet's connection to the world ──────────────────────────────
+   *
+   * The module is handed an `io` and never learns what a Supabase is, the same
+   * separation that keeps the print sheet printable with no connection. Here
+   * is where the client and the clinic id live, so here is where the queries
+   * go — and here is where "no signal" is handled, because a ward round with
+   * no signal is the normal case and the observations still have to be taken.
+   *
+   * A reading made offline gets a client-side id BEFORE it is queued, so the
+   * note written at the same moment has something to hang off. Without that
+   * the note would either be lost or reappear against the wrong reading when
+   * the outbox replayed — and on this screen "which reading was the drug given
+   * at" is the entire question.
+   */
+  async function openFlowsheet(current) {
+    if (!window.HomattFlowsheet) return;
+    var clinicId = await resolveClinicId();
+    var CO = window.ClinicOffline;
+    var patientId = current.clinic_patient_id || null;
+    var sess = session || {};
+
+    function pendingKey() { return 'fs_pending_' + (patientId || current.id); }
+    function pending() { return (CO && CO.get(pendingKey(), [])) || []; }
+    function rememberPending(row) {
+      if (!CO) return;
+      var list = pending(); list.unshift(row); CO.set(pendingKey(), list.slice(0, 200));
+    }
+    function forgetPending(ids) {
+      if (!CO) return;
+      var keep = pending().filter(function (r) { return ids.indexOf(r.id) < 0; });
+      CO.set(pendingKey(), keep);
+    }
+
+    var io = {
+      load: async function () {
+        var rows = [];
+        if (supabase && CO && !CO.isOffline()) {
+          var q = supabase.from('vital_logs').select('*').eq('clinic_id', clinicId);
+          q = patientId ? q.eq('clinic_patient_id', patientId) : q.eq('diagnosis_id', current.id);
+          var r = await q.order('logged_at', { ascending: false }).limit(500);
+          if (r && !r.error) {
+            rows = r.data || [];
+            if (rows.length) {
+              var ids = rows.map(function (x) { return x.id; });
+              var nr = await supabase.from('vital_notes').select('*')
+                .in('vital_log_id', ids).order('created_at', { ascending: true });
+              var by = {};
+              (((nr || {}).data) || []).forEach(function (n) {
+                (by[n.vital_log_id] = by[n.vital_log_id] || []).push(n);
+              });
+              rows.forEach(function (x) { x._notes = by[x.id] || []; });
+            }
+            // Anything the server now has is no longer waiting locally.
+            forgetPending(rows.map(function (x) { return x.id; }));
+            if (CO) CO.set('fs_rows_' + (patientId || current.id), rows);
+          } else if (CO) {
+            rows = CO.get('fs_rows_' + (patientId || current.id), []) || [];
+          }
+        } else if (CO) {
+          rows = CO.get('fs_rows_' + (patientId || current.id), []) || [];
+        }
+        // Readings taken while offline sit on top until the outbox drains.
+        var seen = {};
+        rows.forEach(function (x) { seen[x.id] = 1; });
+        return pending().filter(function (x) { return !seen[x.id]; }).concat(rows);
+      },
+
+      save: async function (row, note, noteKind) {
+        var full = {
+          id: (CO ? CO.uuid() : String(Math.random()).slice(2)),
+          clinic_id: clinicId,
+          clinic_patient_id: patientId,
+          diagnosis_id: current.id || null,
+          systolic: row.systolic, diastolic: row.diastolic,
+          pulse: row.pulse, temp_c: row.temp_c, spo2: row.spo2, resp_rate: row.resp_rate,
+          logged_at: row.logged_at, back_entered: row.back_entered,
+          source: row.source || 'manual',
+          recorded_by: sess.userId || null,
+          recorded_by_name: sess.staffName || null
+        };
+        var noteRow = note ? {
+          id: (CO ? CO.uuid() : null), vital_log_id: full.id, clinic_id: clinicId,
+          note_text: note, action_type: noteKind || 'OBSERVATION',
+          author_id: sess.userId || null, author_name: sess.staffName || null
+        } : null;
+
+        if (!supabase || (CO && CO.isOffline())) {
+          if (CO) {
+            CO.enqueue('table_insert', { table: 'vital_logs', row: full, stripUnknownColumns: true });
+            if (noteRow) CO.enqueue('table_insert', { table: 'vital_notes', row: noteRow, stripUnknownColumns: true });
+            var local = Object.assign({}, full);
+            local.map_mmhg = (window.HomattVitals)
+              ? HomattVitals.map(full.systolic, full.diastolic) : null;
+            rememberPending(local);
+            return local;
+          }
+          throw new Error('No connection, and nothing to queue it with.');
+        }
+        var r = await supabase.from('vital_logs').insert(full).select('*').single();
+        if (r && r.error) {
+          if (CO && CO.isNetworkErr(r.error)) {
+            CO.enqueue('table_insert', { table: 'vital_logs', row: full, stripUnknownColumns: true });
+            if (noteRow) CO.enqueue('table_insert', { table: 'vital_notes', row: noteRow, stripUnknownColumns: true });
+            rememberPending(full);
+            return full;
+          }
+          throw new Error(r.error.message || 'It could not be saved.');
+        }
+        if (noteRow) {
+          try { await supabase.from('vital_notes').insert(noteRow); } catch (e) {}
+        }
+        return (r && r.data) || full;
+      },
+
+      addNote: async function (logId, text, kind) {
+        var n = {
+          id: (CO ? CO.uuid() : null), vital_log_id: logId, clinic_id: clinicId,
+          note_text: text, action_type: kind || 'OBSERVATION',
+          author_id: sess.userId || null, author_name: sess.staffName || null
+        };
+        if (!supabase || (CO && CO.isOffline())) {
+          if (CO) { CO.enqueue('table_insert', { table: 'vital_notes', row: n, stripUnknownColumns: true }); return n; }
+          throw new Error('No connection.');
+        }
+        var r = await supabase.from('vital_notes').insert(n);
+        if (r && r.error) {
+          if (CO && CO.isNetworkErr(r.error)) {
+            CO.enqueue('table_insert', { table: 'vital_notes', row: n, stripUnknownColumns: true });
+            return n;
+          }
+          throw new Error(r.error.message || 'The note could not be saved.');
+        }
+        return n;
+      },
+
+      /* Striking one out is NOT queued offline, on purpose — the same rule the
+         corrections feature follows. Replaying "strike this out" against a
+         record somebody has since worked from would quietly change what a
+         chart meant, hours later, with nobody watching. */
+      voidLog: async function (id, why) {
+        if (!supabase || (CO && CO.isOffline())) {
+          return { ok: false, error: 'Striking out a reading needs a connection — it is not something that can wait in the queue.' };
+        }
+        var r = await supabase.rpc('void_vital_log', { p_log_id: id, p_reason: why });
+        if (r && r.error) return { ok: false, error: r.error.message || 'It could not be struck out.' };
+        return (r && r.data) || { ok: true };
+      },
+
+      watchGet: async function () {
+        if (!supabase || (CO && CO.isOffline())) return CO ? CO.get('fs_watch_' + (patientId || current.id), null) : null;
+        var q = supabase.from('vital_watch').select('*').eq('clinic_id', clinicId).is('stopped_at', null);
+        q = patientId ? q.eq('clinic_patient_id', patientId) : q.eq('diagnosis_id', current.id);
+        var r = await q.order('started_at', { ascending: false }).limit(1);
+        var w = (r && !r.error && r.data && r.data[0]) || null;
+        if (CO) CO.set('fs_watch_' + (patientId || current.id), w);
+        return w;
+      },
+      watchStart: async function (mins) {
+        if (!supabase || (CO && CO.isOffline())) {
+          return { ok: false, error: 'Setting a check interval needs a connection — it is an instruction to whoever is on the ward next, so it has to reach them.' };
+        }
+        var r = await supabase.rpc('start_vital_watch', {
+          p_clinic_id: clinicId, p_patient_id: patientId,
+          p_diagnosis_id: current.id || null, p_interval_minutes: mins, p_reason: null
+        });
+        if (r && r.error) return { ok: false, error: r.error.message };
+        return (r && r.data) || { ok: true };
+      },
+      watchStop: async function (id) {
+        if (!supabase || (CO && CO.isOffline())) return { ok: false };
+        var r = await supabase.rpc('stop_vital_watch', { p_watch_id: id });
+        return (r && r.data) || { ok: !(r && r.error) };
+      }
+    };
+
+    HomattFlowsheet.open({
+      clinicId: clinicId,
+      patientId: patientId,
+      diagnosisId: current.id,
+      name: (current.patient_name || '').trim() || (current.case_code || 'Patient'),
+      meta: [current.patient_phone, current.confirmed_diagnosis].filter(Boolean).join(' · '),
+      record: current
+    }, io);
+  }
+  window.openFlowsheet = openFlowsheet;
 
   /* The register, for a period. The query lives HERE rather than in the print
      module because this is where the client and the clinic id are; the module
@@ -7174,5 +7383,7 @@
 <script src="js/clinic-corrections.js?v=20261007"></script>
 <script src="js/clinic-photo.js?v=20261007"></script>
 <script src="js/clinic-print.js?v=20261007"></script>
+<script src="js/clinic-vitals.js?v=20261007"></script>
+<script src="js/clinic-flowsheet.js?v=20261007"></script>
 </body>
 </html>
