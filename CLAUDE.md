@@ -1873,6 +1873,57 @@ somebody guessing cannot learn which addresses exist — **and the app must not
 undo that by saying "no such account"**. But it can tell the third apart,
 because the third happened on this phone and was written down.
 
+### 4. …and then the explanation itself became the dead end
+`supabase/functions/change-email/index.ts` · `tests/test-email-direct.js`
+
+The message above is accurate and it was still a failure. A clinic on
+`emmanuel@homatt-health.com` — a domain that takes no mail — was told, in as
+many words, that the change *"cannot be completed from here"* and that
+*"whoever runs the Supabase project"* would have to fix it. For a clinic in
+Uganda that means it never happens. The account is stuck on that address for
+ever, and the app's contribution is a paragraph naming a dashboard setting
+nobody there can reach.
+
+**Explaining a wall is not the same as getting over it.** So there is a second
+route, through an Edge Function with the admin API, which sends **no mail at
+all** — the old address never has to be reachable.
+
+What replaces the confirmation link matters, because something has to. The link
+proves two things: control of the new mailbox, and identity. **Only the second
+is a security property**; the first is a convenience and it is precisely what
+is broken here. So the second is proved directly — a valid session **and the
+current password, verified on the server** — and the first is dropped. That is
+the same bar as changing a password, and an attacker who can clear it already
+owns the account.
+
+The residual risk is a typo in the new address, and it is recoverable: the
+password is unchanged and the address is whatever they typed. The change is
+written into `homatt_email_change` with `direct: true`, so the **sign-in
+screen** reads it back — and typing the OLD address afterwards is answered with
+*"That is the OLD address… use \<new\> — your password did not change."*
+Being stuck on an address that takes no mail is not recoverable. That is the
+trade, and it is the right way round.
+
+It is offered **only after the ordinary route has actually failed** in that one
+unrecoverable way. Offering it up front would train clinics to skip a
+confirmation link that works perfectly well for everybody else.
+
+#### `error.status` does not exist on a FunctionsHttpError
+The client read `r.error.status` to decide what went wrong. supabase-js puts
+the Response on **`error.context`**, not `error.status` — so that lookup found
+`undefined` for *every* refusal, and a **wrong password came out as "the helper
+is not installed on your server yet"**. A clinic would have gone to their
+developer over a mistyped password. Nothing about the code looked wrong; the
+test caught it.
+
+The body is now read off `error.context.json()`, and the genuinely-missing case
+is told apart by there being nothing readable at all. **A 404 and "no reply"
+are the same fault wearing two faces** — the gateway answers 404 for a function
+that was never deployed and puts no CORS headers on it, so depending on where
+the request came from it arrives either as a readable 404 or as nothing. Both
+say the same sentence now; leaning on the CORS block alone left the readable
+case reporting a bare "error 404" to a clinic.
+
 ### Still open
 There is **no password reset** on the clinic sign-in page at all — no "forgot
 password", no route of any kind. A clinic that mistypes its way out has nothing
@@ -2169,6 +2220,14 @@ rules worth repeating here:
   one that says the problem is fixed. `measure-browser-support.js` found 12 of
   36 real sites with clever regexes and four imaginary ones (CSS hex colours
   read as JS private fields). Prefer complete recall and let a reader judge.
+- **Explaining a wall is not getting over it.** The sign-in-email message was
+  accurate, well-worded, and left a clinic permanently stuck on an address that
+  takes no mail, pointing at a dashboard setting nobody there can reach. If the
+  honest message ends "ask somebody else", the work is not finished.
+- **`error.status` is not where supabase-js puts it.** A `FunctionsHttpError`
+  carries the Response on `error.context`; reading `.status` finds `undefined`
+  for every refusal. That turned a wrong password into "the helper is not
+  installed on your server" — a clinic sent to their developer over a typo.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by

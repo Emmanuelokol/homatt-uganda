@@ -197,9 +197,25 @@ const calls = [];
   result('when the server refuses the address you ALREADY have, the app says so',
     /being refused is the one you sign in with now/i.test(msg), msg.slice(0, 110));
   result('and says the old address still works, so nobody is locked out',
-    new RegExp('Keep signing in with ' + OLD_EMAIL).test(msg), msg.slice(-120));
-  result('and names what has to change, instead of the raw error',
-    /Secure email change/i.test(msg) && !/^Email address "/.test(msg.trim()), msg.slice(-130));
+    new RegExp('keep signing in with ' + OLD_EMAIL, 'i').test(msg), msg.slice(-120));
+  /* This used to assert the message named "Secure email change" — the Supabase
+   * dashboard setting whoever ran the project would have to turn off. It was
+   * accurate and it was a dead end: a clinic in Uganda cannot act on it, so the
+   * account stayed on an address it could not move off, for ever.
+   *
+   * The message now offers the way out instead, and the way out is what is
+   * asserted. Naming the vendor's setting is no longer the point. */
+  result('and offers a way out rather than naming a setting nobody here can change',
+    !/^Email address "/.test(msg.trim()) && /change it directly/i.test(msg), msg.slice(-130));
+  const escape_ = await page.evaluate(() => {
+    const box = document.getElementById('seDirect');
+    return { shown: box ? getComputedStyle(box).display !== 'none' : false,
+             pwd: !!document.getElementById('seDirectPwd'),
+             to: (document.getElementById('seDirectTo') || {}).textContent || '' };
+  });
+  result('the direct route appears, with a password box and the address it will move to',
+    escape_.shown && escape_.pwd && /refused@clinic\.com/.test(escape_.to),
+    escape_.to.slice(0, 90));
 
   // A refusal of the NEW address reads differently, and must not blame the old one.
   await page.evaluate(() => {

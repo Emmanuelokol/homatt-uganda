@@ -764,6 +764,32 @@
              background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
              border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
         <div id="seMsg" style="font-size:13px;margin-bottom:12px;display:none;line-height:1.5"></div>
+        <!-- The way out, shown only when the ordinary route has hit the one
+             wall it cannot get over: the CURRENT address being refused. The
+             confirmation link proves two things — that you hold the new
+             mailbox, and that you are the account holder. Only the second is a
+             security property, and it is proved here with the password
+             instead. See supabase/functions/change-email/index.ts. -->
+        <div id="seDirect" style="display:none;margin-bottom:12px;padding:12px 13px;border-radius:10px;
+             background:var(--tint-2);border:1px solid var(--border, #E0E0E0)">
+          <div style="font-size:13px;font-weight:700;color:var(--text, #1A1A1A);margin-bottom:5px">
+            Change it directly instead
+          </div>
+          <div style="font-size:12.5px;color:var(--text-lt, #5F6368);line-height:1.5;margin-bottom:10px">
+            No confirmation email is sent — so it works even when the old address cannot
+            receive mail. Type your current password to prove it is you.
+          </div>
+          <div class="form-row" style="margin-bottom:10px">
+            <label>Your current password</label>
+            <input type="password" class="form-input" id="seDirectPwd"
+                   placeholder="The password you sign in with" autocomplete="current-password">
+          </div>
+          <div id="seDirectTo" style="font-size:12.5px;color:var(--text-lt, #5F6368);margin-bottom:10px"></div>
+          <button class="save-btn" id="seDirectBtn" onclick="changeSigninEmailDirect()"
+                  style="background:var(--deep);color:var(--on-deep)">
+            <span class="material-icons-outlined">lock_reset</span> Change it now
+          </button>
+        </div>
         <button class="save-btn" id="seBtn" onclick="changeSigninEmail()" style="background:#0D47A1;color:#fff">
           <span class="material-icons-outlined">mark_email_read</span> Change sign-in email
         </button>
@@ -2309,13 +2335,159 @@ async function paintSigninEmail() {
 
   var when = '';
   try { when = new Date(pend.at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }); } catch (e) {}
-  box.textContent =
-    'A change to ' + pend.to + ' was started' + (when ? ' on ' + when : '') +
-    ' and has not been confirmed yet. Until the link sent to ' + pend.to +
-    ' is opened, that address will NOT sign you in — keep using ' +
-    (email || 'your current email') + '. If the link never arrived, check the ' +
-    'spelling of ' + pend.to + ' and start again.';
+  // A direct change is finished, not pending. It is still worth saying once,
+  // because the address people remember is the old one.
+  box.textContent = pend.direct
+    ? 'The sign-in email was changed to ' + pend.to + (when ? ' on ' + when : '') +
+      ' using your password. That is what you sign in with now.'
+    : 'A change to ' + pend.to + ' was started' + (when ? ' on ' + when : '') +
+      ' and has not been confirmed yet. Until the link sent to ' + pend.to +
+      ' is opened, that address will NOT sign you in — keep using ' +
+      (email || 'your current email') + '. If the link never arrived, check the ' +
+      'spelling of ' + pend.to + ' and start again.';
   box.style.display = 'block';
+}
+
+/* The escape hatch, and the button that opens it.
+ *
+ * Hidden until the ordinary route has actually failed in the one way it cannot
+ * recover from. Offering it up front would train clinics to skip the
+ * confirmation link, which is the safer default whenever it can work — and it
+ * works for everybody except the account whose own address is refused.
+ */
+function showDirect(next, now) {
+  var box = document.getElementById('seDirect');
+  var to = document.getElementById('seDirectTo');
+  if (!box) return;
+  if (to) {
+    to.innerHTML = 'This will change your sign-in from <b>' + _esc(now || '—') +
+      '</b> to <b>' + _esc(next) + '</b>. Check that address letter by letter — ' +
+      'it is what you will type from now on.';
+  }
+  box.style.display = 'block';
+}
+function hideDirect() {
+  var box = document.getElementById('seDirect');
+  if (box) box.style.display = 'none';
+  var p = document.getElementById('seDirectPwd');
+  if (p) p.value = '';
+}
+function _esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
+}
+
+/* Change it with the admin API, through the change-email Edge Function.
+ *
+ * No mail is sent to anybody, which is the whole point: the old address does
+ * not have to be reachable. The password is what proves this is the account
+ * holder, and it is verified on the server — never here, where a check could
+ * simply be skipped.
+ */
+async function changeSigninEmailDirect() {
+  var msg = document.getElementById('seMsg');
+  var btn = document.getElementById('seDirectBtn');
+  var next = (document.getElementById('seNew').value || '').trim().toLowerCase();
+  var pwd = (document.getElementById('seDirectPwd').value || '');
+
+  function showMsg(text, ok) {
+    msg.textContent = text;
+    msg.style.color = ok ? 'var(--deep-ink)' : 'var(--danger-ink)';
+    msg.style.background = ok ? 'var(--brand-tint)' : 'var(--cl-danger-bg, #FFEBEE)';
+    msg.style.padding = '10px 14px';
+    msg.style.borderRadius = '8px';
+    msg.style.display = 'block';
+  }
+
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(next)) { showMsg('Enter a valid email address.', false); return; }
+  if (!pwd) { showMsg('Type the password you sign in with, to prove it is you.', false); return; }
+  if (navigator.onLine === false) {
+    showMsg('This needs a connection. Try again when you are back online.', false); return;
+  }
+
+  var now = await currentSigninEmail();
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-icons-outlined">hourglass_empty</span> Changing…';
+  try {
+    var r = await _supa.functions.invoke('change-email', { body: { newEmail: next, password: pwd } });
+    var data = r && r.data;
+
+    /* READ THE BODY OFF error.context, not error.status.
+     *
+     * supabase-js treats any non-2xx as an error, and a FunctionsHttpError
+     * does NOT carry `.status` — the Response is on `.context`, and the
+     * server's own sentence is in its body. Looking for `.status` finds
+     * undefined for EVERY refusal, so a wrong password came out as "the
+     * helper is not installed on your server" and would have sent a clinic to
+     * their developer over a typed password. The test caught it; nothing
+     * about the code looked wrong.
+     *
+     * The genuinely-not-deployed case is the one with NO readable reply at
+     * all: a function that was never deployed answers 404 from the gateway
+     * with no CORS headers, so the browser refuses to hand the reply to
+     * JavaScript and there is no context to read. That is the same trap
+     * `transcribe` fell into, and it is told apart here by whether anything
+     * came back at all. */
+    if (r && r.error && !data) {
+      var ctx = r.error.context;
+      var st = Number((ctx && ctx.status) || 0);
+      var said = '';
+      if (ctx && typeof ctx.json === 'function') {
+        try { var j = await ctx.json(); said = (j && j.error) || ''; } catch (e) {}
+      }
+      if (said) { showMsg(said, false); return; }
+      /* 404 and "nothing readable" are the SAME fault wearing two faces.
+       *
+       * The Supabase gateway answers 404 for a function that was never
+       * deployed, and it puts no CORS headers on that answer — so depending on
+       * where the request is made from, this arrives either as a readable 404
+       * or as nothing at all. Both mean the same thing and must say the same
+       * thing; leaning on the CORS block alone left the readable case
+       * reporting a bare "error 404" to a clinic. */
+      if (!st || st === 404) {
+        showMsg('The helper that does this is not installed on your server yet. ' +
+                'Whoever set up Homatt needs to deploy the Edge Functions — ' +
+                'until then, keep signing in with ' + (now || 'your current email') + '.', false);
+      } else if (st === 503) {
+        showMsg('This server is not set up to change sign-in emails yet.', false);
+      } else if (st === 401) {
+        showMsg('That password does not match this account.', false);
+      } else {
+        showMsg('Could not change the sign-in email (error ' + st + '). Nothing has changed.', false);
+      }
+      return;
+    }
+    if (!data || data.ok !== true) {
+      showMsg((data && data.error) || 'Could not change the sign-in email. Nothing has changed.', false);
+      return;
+    }
+
+    /* Write down what it moved TO, on this device.
+     *
+     * A typo here is the one risk this route carries, and this is what makes
+     * it recoverable: the sign-in screen reads this back, so nobody has to
+     * remember what they typed an hour ago. */
+    try {
+      localStorage.setItem('homatt_email_change', JSON.stringify({
+        from: data.from || now || '', to: data.to || next,
+        at: new Date().toISOString(), direct: true,
+      }));
+    } catch (e) {}
+
+    hideDirect();
+    document.getElementById('seNew').value = '';
+    showMsg('Done — you now sign in with ' + (data.to || next) + '. ' +
+            'Your password has not changed. Write the new address down somewhere ' +
+            'before you sign out.', true);
+    showToast('Sign-in email changed', 'success');
+    paintSigninEmail();
+  } catch (e) {
+    showMsg('Unexpected error: ' + (e.message || e) + '. Nothing has changed.', false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-icons-outlined">lock_reset</span> Change it now';
+  }
 }
 
 async function changeSigninEmail() {
@@ -2379,13 +2551,21 @@ async function changeSigninEmail() {
       } else if (/rate|too many/i.test(m)) {
         showMsg('Too many attempts. Wait a few minutes and try again.', false);
       } else if (/invalid/i.test(m) && badIsCurrent) {
+        /* The dead end, and the way out of it.
+         *
+         * The address being refused is the one they ALREADY sign in with.
+         * Changing an email sends a confirmation to both addresses, and the
+         * server will not send to that one — so the ordinary route can never
+         * finish, however many times it is tried. This used to end with "ask
+         * whoever runs the database", which for a clinic in Uganda means it
+         * never happens: they are simply stuck on an address forever.
+         *
+         * So the password route is offered right here instead. */
         showMsg('The address being refused is the one you sign in with now (' + now +
-                '), not the new one. Changing a sign-in email sends a confirmation to ' +
-                'BOTH addresses, and the server will not send to that one — so this ' +
-                'cannot be completed from here. Keep signing in with ' + now +
-                '; it still works. Whoever runs the Supabase project has to change ' +
-                'the address there, or turn off "Secure email change" so only the ' +
-                'new address is confirmed.', false);
+                '), not the new one — so the confirmation email can never arrive and ' +
+                'this route cannot finish. You are not stuck: change it directly below ' +
+                'with your password. Until you do, keep signing in with ' + now + '.', false);
+        showDirect(next, now);
       } else if (/invalid/i.test(m)) {
         showMsg('The server would not accept ' + (quoted || next) + '. Check the ' +
                 'spelling — and note that some addresses are refused because the ' +

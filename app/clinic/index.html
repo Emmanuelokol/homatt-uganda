@@ -523,9 +523,16 @@
     var p = _pendingEmailChange();
     var el = document.getElementById('pendingEmail');
     if (!p || !el) return;
-    el.textContent = 'A change of sign-in email to ' + p.to + ' was started on this ' +
-      'phone and has not been confirmed. Until the link sent to ' + p.to + ' is opened, ' +
-      'sign in with ' + (p.from || 'your old address') + ' — it still works.';
+    /* A change made DIRECTLY has already moved the login — there is no link to
+     * open and the old address is finished. Saying "it has not been confirmed,
+     * keep using the old one" would be exactly backwards, and would send
+     * somebody to an address that no longer works. */
+    el.textContent = p.direct
+      ? 'The sign-in email for this account was changed to ' + p.to + ' on this phone. ' +
+        'Use that from now on — ' + (p.from ? p.from + ' no longer works.' : 'the old one no longer works.')
+      : 'A change of sign-in email to ' + p.to + ' was started on this ' +
+        'phone and has not been confirmed. Until the link sent to ' + p.to + ' is opened, ' +
+        'sign in with ' + (p.from || 'your old address') + ' — it still works.';
     el.style.display = '';
   })();
 
@@ -612,11 +619,18 @@
     }
     if (/invalid login credentials|invalid.*credential/i.test(m)) {
       var p = _pendingEmailChange();
-      if (p && String(p.to).toLowerCase() === String(typed).toLowerCase()) {
+      // Only an UNCONFIRMED change explains this. A direct change already
+      // moved the login, so the address is right and the password is not —
+      // blaming the change there would send them to an address that is gone.
+      if (p && !p.direct && String(p.to).toLowerCase() === String(typed).toLowerCase()) {
         return 'That address is not your sign-in yet. The change to ' + p.to +
                ' was never confirmed, so the account is still ' +
                (p.from || 'your old address') + ' — sign in with that one. ' +
                'The link sent to ' + p.to + ' has to be opened first.';
+      }
+      if (p && p.direct && String(p.from || '').toLowerCase() === String(typed).toLowerCase()) {
+        return 'That is the OLD address. The sign-in for this account was changed to ' +
+               p.to + ' — use that one. Your password did not change.';
       }
       return 'That email and password did not sign in. Check the address letter ' +
              'by letter — ' + typed + ' is what was sent. If you recently changed ' +
