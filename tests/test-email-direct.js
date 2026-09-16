@@ -194,6 +194,18 @@ const seen = [];
   result('a function that was never deployed is named, not reported as a bad connection',
     /not installed|deploy/i.test(missing) && !/could not reach the server/i.test(missing),
     missing.slice(0, 110));
+  /* AND IT NAMES SOMETHING THAT CAN BE DONE TODAY.
+   *
+   * An earlier version of this card named the manual route — somebody with the
+   * Supabase dashboard changes the address under Authentication → Users, in
+   * about a minute — and that sentence was dropped when the password route
+   * replaced it. So on a server where the password route is not installed, the
+   * screen went from naming a slow remedy to naming none at all: worse than
+   * what it replaced. "Ask somebody to deploy something" is not a remedy a
+   * clinic can act on this morning. */
+  result('and it also names the fix that needs nobody to deploy anything',
+    /Authentication\s*→\s*Users/i.test(missing) && /dashboard/i.test(missing),
+    missing.slice(110, 300));
 
   // ── 6. It works, and says what to use from now on ────────────────────
   fnMode = 'ok';

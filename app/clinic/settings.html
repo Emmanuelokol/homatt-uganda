@@ -2397,6 +2397,10 @@ async function changeSigninEmailDirect() {
     msg.style.background = ok ? 'var(--brand-tint)' : 'var(--cl-danger-bg, #FFEBEE)';
     msg.style.padding = '10px 14px';
     msg.style.borderRadius = '8px';
+    // The longer messages are written in paragraphs. textContent keeps the
+    // newlines in the node but the default white-space collapses them, so a
+    // three-part instruction rendered as one unbroken wall.
+    msg.style.whiteSpace = 'pre-line';
     msg.style.display = 'block';
   }
 
@@ -2446,11 +2450,30 @@ async function changeSigninEmailDirect() {
        * thing; leaning on the CORS block alone left the readable case
        * reporting a bare "error 404" to a clinic. */
       if (!st || st === 404) {
-        showMsg('The helper that does this is not installed on your server yet. ' +
-                'Whoever set up Homatt needs to deploy the Edge Functions — ' +
-                'until then, keep signing in with ' + (now || 'your current email') + '.', false);
+        /* Say the thing that can be done TODAY, not only the thing that needs
+         * a deploy.
+         *
+         * An earlier version of this card named the manual route — somebody
+         * with the Supabase dashboard can change the address under
+         * Authentication → Users in about thirty seconds — and I dropped that
+         * sentence when I replaced it with the password route, which is not
+         * installed on this server. So the screen went from naming a slow
+         * remedy to naming none at all, which is worse than what it replaced.
+         *
+         * Both are here now: the thing that fixes it in a minute, and the
+         * thing that stops it happening again. */
+        showMsg('The helper that does this is not installed on your server yet, so ' +
+                'this button cannot work until somebody deploys the Edge Functions.\n\n' +
+                'It can still be changed by hand right now: whoever has the Supabase ' +
+                'dashboard opens Authentication → Users, finds ' +
+                (now || 'this account') + ', and edits the email there. It takes a ' +
+                'minute and needs nothing from this app.\n\n' +
+                'Until one of those happens, keep signing in with ' +
+                (now || 'your current email') + ' — it still works.', false);
       } else if (st === 503) {
-        showMsg('This server is not set up to change sign-in emails yet.', false);
+        showMsg('This server has the helper but not the key it needs. Whoever set up ' +
+                'Homatt has to set SUPABASE_SERVICE_ROLE_KEY. In the meantime it can be ' +
+                'changed by hand in the Supabase dashboard, under Authentication → Users.', false);
       } else if (st === 401) {
         showMsg('That password does not match this account.', false);
       } else {
@@ -2501,6 +2524,10 @@ async function changeSigninEmail() {
     msg.style.background = ok ? 'var(--brand-tint)' : 'var(--cl-danger-bg, #FFEBEE)';
     msg.style.padding = '10px 14px';
     msg.style.borderRadius = '8px';
+    // The longer messages are written in paragraphs. textContent keeps the
+    // newlines in the node but the default white-space collapses them, so a
+    // three-part instruction rendered as one unbroken wall.
+    msg.style.whiteSpace = 'pre-line';
     msg.style.display = 'block';
   }
 
@@ -2636,6 +2663,10 @@ async function changePassword() {
     msg.style.background = ok ? 'var(--tint-2)' : '#FFEBEE';
     msg.style.padding = '10px 14px';
     msg.style.borderRadius = '8px';
+    // The longer messages are written in paragraphs. textContent keeps the
+    // newlines in the node but the default white-space collapses them, so a
+    // three-part instruction rendered as one unbroken wall.
+    msg.style.whiteSpace = 'pre-line';
     msg.style.display = 'block';
   }
 
