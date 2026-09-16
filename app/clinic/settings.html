@@ -755,6 +755,14 @@
           working until you open that link</strong> — so if the new address is wrong, or
           you cannot reach it, nothing is lost and you are not locked out.
         </div>
+        <!-- A change that was started and never finished. Until this was here,
+             the only trace of a half-done change was an email in somebody's
+             inbox, and the app cheerfully showed the new address everywhere
+             while refusing it at sign-in. -->
+        <div id="sePending" style="display:none;font-size:12.5px;line-height:1.5;margin:-4px 0 12px;
+             padding:10px 12px;border-radius:9px;
+             background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
+             border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
         <div id="seMsg" style="font-size:13px;margin-bottom:12px;display:none;line-height:1.5"></div>
         <button class="save-btn" id="seBtn" onclick="changeSigninEmail()" style="background:#0D47A1;color:#fff">
           <span class="material-icons-outlined">mark_email_read</span> Change sign-in email
@@ -2260,11 +2268,54 @@ async function currentSigninEmail() {
   } catch (e) { return ''; }
 }
 
+// A change that was asked for and not yet confirmed, or null.
+function pendingEmailChange() {
+  try {
+    var p = JSON.parse(localStorage.getItem('homatt_email_change') || 'null');
+    return (p && p.to) ? p : null;
+  } catch (e) { return null; }
+}
+
 async function paintSigninEmail() {
   var el = document.getElementById('seCurrent');
   if (!el || !_supa) return;
   var email = await currentSigninEmail();
   el.value = email || '(not signed in on this device)';
+
+  /* Reconcile a half-finished change, every time this screen opens.
+   *
+   * The login moves only when the link is opened, and that happens in a mail
+   * app — somewhere this code is not running. So the only way to know it
+   * landed is to compare: if the address we are now signed in with IS the one
+   * that was asked for, the change went through. That is also the right moment
+   * to bring portal_users into step, which is what used to be done the instant
+   * the link was SENT — so the staff list showed an address that would not
+   * sign in, for as long as the link went unopened. */
+  var box = document.getElementById('sePending');
+  var pend = pendingEmailChange();
+  if (!box) return;
+  if (!pend) { box.style.display = 'none'; return; }
+
+  if (email && String(pend.to).toLowerCase() === email.toLowerCase()) {
+    try {
+      var sess = await _supa.auth.getSession();
+      var uid = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
+      if (uid) await _supa.from('portal_users').update({ email: email }).eq('auth_user_id', uid);
+    } catch (e) {}
+    try { localStorage.removeItem('homatt_email_change'); } catch (e) {}
+    box.style.display = 'none';
+    return;
+  }
+
+  var when = '';
+  try { when = new Date(pend.at).toLocaleDateString('en-UG', { day: 'numeric', month: 'short' }); } catch (e) {}
+  box.textContent =
+    'A change to ' + pend.to + ' was started' + (when ? ' on ' + when : '') +
+    ' and has not been confirmed yet. Until the link sent to ' + pend.to +
+    ' is opened, that address will NOT sign you in — keep using ' +
+    (email || 'your current email') + '. If the link never arrived, check the ' +
+    'spelling of ' + pend.to + ' and start again.';
+  box.style.display = 'block';
 }
 
 async function changeSigninEmail() {
@@ -2350,14 +2401,32 @@ async function changeSigninEmail() {
     showMsg('Check ' + next + ' and open the link we just sent. Until you do, keep signing in with ' +
             (now || 'your current email') + ' — it still works.', true);
     showToast('Confirmation link sent to ' + next, 'success');
-    // portal_users carries a copy for the staff list; keep it in step so the
-    // app does not show two different addresses for one person. The login
-    // itself only moves when the link is opened.
+
+    /* Write the half-finished change down, on the device.
+     *
+     * This is the whole fix for what a clinic actually ran into. They changed
+     * the address, were told here that the old one still works, and by the
+     * time they next signed in — hours later, on the sign-in screen, with none
+     * of this text in front of them — the only address they could remember
+     * asking for was the new one. It was refused, in Supabase's words, with
+     * "Invalid login credentials", which says nothing about why.
+     *
+     * Recorded here, the sign-in page can say it: an unconfirmed change is not
+     * a wrong password, and the app is the only thing that knows the
+     * difference.
+     *
+     * portal_users is deliberately NOT updated here any more. It used to be,
+     * "so the app does not show two different addresses for one person" — but
+     * there genuinely ARE two until the link is opened, and writing the new
+     * one immediately made every other screen advertise an address that could
+     * not sign in. It is brought into step in paintSigninEmail(), once the
+     * login has actually moved. */
     try {
-      var sess = await _supa.auth.getSession();
-      var uid = sess && sess.data && sess.data.session && sess.data.session.user && sess.data.session.user.id;
-      if (uid) await _supa.from('portal_users').update({ email: next }).eq('auth_user_id', uid);
+      localStorage.setItem('homatt_email_change', JSON.stringify({
+        from: now || '', to: next, at: new Date().toISOString(),
+      }));
     } catch (e) {}
+    paintSigninEmail();
   } catch (e) {
     showMsg('Unexpected error: ' + (e.message || e), false);
   } finally {

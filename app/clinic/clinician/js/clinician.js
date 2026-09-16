@@ -77,21 +77,32 @@
     } catch (e) { return false; }
   }
 
-  function signOutBecause(why) {
+  function signOutBecause(why, opts) {
     try {
       localStorage.setItem('homatt_last_signout', JSON.stringify({
         why: String(why || 'unknown'), at: new Date().toISOString(),
         online: navigator.onLine !== false,
+        deliberate: !!(opts && opts.deliberate),
       }));
     } catch (e) {}
     try { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(CLINIC_KEY); } catch (e) {}
     global.location.href = 'index.html';
   }
 
+  function lastSignout() {
+    try {
+      var r = JSON.parse(localStorage.getItem('homatt_last_signout') || 'null');
+      return (r && r.at) ? r : null;
+    } catch (e) { return null; }
+  }
+
+  // Signing out is not a fault and must be recorded as such — see the note in
+  // clinic.js. Without the record the next guarded page finds nothing and
+  // reports damaged storage for something the clinician asked for.
   async function signOut() {
     try { var s = supa(); if (s) await s.auth.signOut(); } catch (e) {}
-    try { localStorage.removeItem(SESSION_KEY); localStorage.removeItem(CLINIC_KEY); } catch (e) {}
-    global.location.href = 'index.html';
+    try { localStorage.removeItem(CLINIC_KEY); } catch (e) {}
+    signOutBecause('you signed out', { deliberate: true });
   }
 
   /* The guard on every clinician page.
@@ -104,9 +115,21 @@
    * same return value and must not have the same consequence. */
   function requireClinician() {
     document.body.style.visibility = 'hidden';
+    // Absent is not the same as damaged. See requireClinic() in clinic.js:
+    // treating the two the same told clinics their phone was broken when they
+    // had simply signed out.
+    var rawSess = null;
+    try { rawSess = localStorage.getItem(SESSION_KEY); } catch (e) {}
     var s = session();
     if (!s || typeof s !== 'object' || Array.isArray(s)) {
-      signOutBecause('the saved sign-in on this device could not be read');
+      if (rawSess == null) {
+        var last = lastSignout();
+        if (last && last.deliberate) { global.location.href = 'index.html'; return null; }
+        signOutBecause('there was no sign-in saved on this device — either it ' +
+          'was signed out, or the phone cleared this app’s storage');
+      } else {
+        signOutBecause('the saved sign-in on this device could not be read');
+      }
       return null;
     }
     document.body.style.visibility = 'visible';
@@ -337,7 +360,13 @@
   global.HomattClinician = {
     supa: supa,
     session: session,
-    setSession: function (v) { setJSON(SESSION_KEY, v); },
+    // Writing a session IS signing in, so it is the one place that can be sure
+    // the last sign-out is over. Leaving the reason behind printed it above
+    // whatever went wrong next, for a whole day afterwards.
+    setSession: function (v) {
+      setJSON(SESSION_KEY, v);
+      try { localStorage.removeItem('homatt_last_signout'); } catch (e) {}
+    },
     requireClinician: requireClinician,
     keepSignedIn: keepSignedIn,
     hasStoredLogin: hasStoredLogin,

@@ -24,6 +24,22 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
   await page.evaluate(([cid,uid])=>{localStorage.clear();
     localStorage.setItem('clinic_session',JSON.stringify({staffName:'D',clinicName:'K',clinicId:cid,staffRole:'owner',userId:uid}));
     localStorage.setItem('sb-homatt-clinic-auth',JSON.stringify({access_token:'t',refresh_token:'r',token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid}}));},[CID,UID]);
+  /* Tied to the WORKER, never to a literal typed in here.
+   *
+   * This assertion used to read /^Version v151 ·/ — and that is exactly how
+   * the bug it was supposed to guard survived for two months. clinic.js said
+   * v151, this test said v151, both agreed, and clinic-sw.js beside them went
+   * to v184 while every clinic in the country read "Version v151" off their
+   * side menu and reported it to us. A test that repeats the constant cannot
+   * see the constant going stale; it can only see somebody changing it.
+   *
+   * So the number on screen is now compared against the one in the service
+   * worker, which is the thing that actually defines a build. Neither can
+   * drift without this failing. */
+  const SW = fs.readFileSync(path.join(APP,'clinic','clinic-sw.js'),'utf8');
+  const WANT = (SW.match(/const CACHE\s*=\s*'homatt-clinic-(v\d+)'/)||[])[1];
+  result('the service worker names a build this test can check against', !!WANT, WANT||'NOT FOUND');
+
   const pages=['dashboard.html','new-order.html','settings.html','messages.html'];
   const seen={};
   for (const p of pages){
@@ -35,7 +51,12 @@ const SB='https://kgkdiykzmqjougwzzewi.supabase.co';
   }
   console.log('   '+JSON.stringify(seen,null,0).replace(/,"/g,',\n    "'));
   result('the version is visible on every main screen',
-    pages.every(p=>/^Version v151 ·/.test(seen[p])), Object.values(seen)[0]);
+    pages.every(p=>/^Version v\d+\+? · /.test(seen[p])), Object.values(seen)[0]);
+  result('and it is the build the service worker actually is',
+    pages.every(p=>seen[p].indexOf('Version '+WANT+' ')===0||seen[p].indexOf('Version '+WANT+'+ ')===0),
+    WANT+' vs '+Object.values(seen)[0]);
+  result('never a hard-coded number that outlived the build',
+    WANT!=='v151'&&pages.every(p=>!/^Version v151 /.test(seen[p])), Object.values(seen)[0]);
   result('no page errors', errs.length===0, errs.slice(0,3).join(' | '));
   await b.close(); server.close();
 })().catch(e=>{console.error('CRASH',e.message);process.exit(1);});

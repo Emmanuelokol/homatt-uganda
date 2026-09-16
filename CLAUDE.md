@@ -1638,9 +1638,179 @@ header icon, and a 30px icon beside the severity chip. Put a new affordance in
 a row that already exists, or it comes out of the button at the bottom, on the
 phone of whoever has the smallest screen.
 
+## A photograph of a patient, which must not reach the gallery
+
+`app/clinic/js/clinic-photo.js` · `tests/test-clinical-photo.js` ·
+`tests/measure-photo.js`
+
+A wound, a rash, a swelling, a lab slip — these belong on the record. Taking
+one with the phone's own camera app does not put them there: it writes a
+full-resolution file into shared storage, registers it with MediaStore, and
+from that moment a patient's ulcer is in the gallery, in the photo backup, and
+in whatever gallery app the clinic's phone shipped with. Nothing in this app
+can reach in and take it back.
+
+So the picture is never handed to the operating system at all.
+
+| | how |
+|---|---|
+| the viewport | `getUserMedia` into a `<video>` **in the page**. No Intent, no file picker, no `ACTION_IMAGE_CAPTURE` — so no MediaStore row, because no other process ever sees the frame |
+| the metadata | the frame goes through a `<canvas>` and comes out a fresh JPEG |
+| the size | a size-then-quality ladder, hard ceiling 50 KB |
+| the storage | `Directory.Data` — the app's private internal files directory — with a `.nomedia` beside it; IndexedDB where the Filesystem plugin is absent |
+| leaving the phone | it doesn't. Nothing here uploads |
+
+### There is no "strip EXIF" step, and that is the point
+A canvas holds raster data and nothing else, so the encoder has no GPS tag, no
+timestamp, no device name and no orientation flag to write. Metadata is not
+filtered out — **it has no route in**. A filter can miss a tag it has never
+heard of; this cannot.
+
+Measured rather than assumed, by walking the JPEG's marker chain and naming
+each APPn block by the identifier written inside it. The file holds exactly
+two: `JFIF`, and a 472-byte generic sRGB `ICC_PROFILE`. No Exif, no XMP, no
+IPTC, no comment.
+
+**The colour profile is deliberately kept.** Judging how red a cellulitis is,
+or how yellow a sclera, is exactly what goes wrong when one phone's colours are
+read as another's, and it costs half a kilobyte of the fifty.
+
+The first version of that assertion read "APP0 and nothing else" and failed on
+the profile. Worth remembering: **a metadata check written as "no unexpected
+segments" will fail on something harmless**, and tempt whoever inherits it into
+loosening it to "no segment I have seen before" — which is how a real one gets
+through.
+
+### What 50 KB actually buys
+The camera Chromium fakes is a smooth synthetic pattern that compresses to
+nothing and flatters the ladder badly, so `measure-photo.js` spans the range
+instead. Sensor grain is the part that costs — a drawn image is far cleaner
+than anything a phone produces:
+
+| 1280×960 source | at q0.60 | kept as | size |
+|---|---|---|---|
+| flat lesion on even skin | 11.2 KB | 1280×960 q0.60 | 11.2 KB |
+| ordinary skin texture | 9.2 KB | 1280×960 q0.60 | 9.2 KB |
+| coarse wound / dressing | 16.4 KB | 1280×960 q0.60 | 16.4 KB |
+| **skin + daylight sensor grain** | 83.1 KB | 1024×768 q0.55 | 38.3 KB |
+| **skin + dim-room sensor grain** | 210.5 KB | 800×600 q0.45 | 39.6 KB |
+| pure noise — worse than any camera | 532.8 KB | 640×480 q0.35 | 45.8 KB |
+
+Size is stepped **before** quality is pushed low, because a 1024px picture at
+q0.45 is easier to read a wound margin off than a 1280px one at q0.25 — JPEG
+spends its worst artefacts on exactly the edges that matter here.
+
+### Small things that are not small
+- **`audio: false`, explicitly.** A clinical photograph must not also record
+  what was being said in the room.
+- **`ideal`, never `exact`**, on `facingMode` — a hard constraint a phone
+  cannot meet fails the whole call with `OverconstrainedError`, the same trap
+  the microphone fell into.
+- **The camera is released the moment the frame is taken.** A lit camera
+  behind a still picture is a battery drain and a privacy light nobody can
+  explain.
+- **`.nomedia` goes in BEFORE the first photograph**, not after. A marker that
+  arrives second leaves a window in which a scanner can index the folder, and
+  once indexed, adding the marker does not remove what it took.
+- **One copy, one place.** Where the bytes go to the filesystem they are *not*
+  also left in the database; the record keeps a path.
+- **Deleting a saved photograph is main-account only**, the same rule as a sale
+  or a patient. A blurry one can be retaken and both kept; letting any member
+  of staff erase what was recorded is a different thing.
+- A receptionist and a drug-shop salesperson are not offered a camera. A
+  photograph of a patient is clinical work.
+
+### The proof that the upload check works
+"No image was uploaded" is also what a detector that inspects nothing reports.
+So the test posts the very bytes just taken and **requires the instrument to
+catch them**. Three URL-shaped versions of that check were wrong first: "any
+POST" counted the dashboard's own RPC polling (PostgREST calls a function with
+POST), "any storage call" counted a GET of the clinic's logo, and "any non-GET
+storage call" counted `/object/sign/…/portrait.jpg` — a POST that asks for a
+link to READ something. **The body knows; the URL guesses.**
+
+## Three things a sign-in screen said that were not true
+
+`app/clinic/index.html` · `app/clinic/js/clinic.js` ·
+`app/clinic/settings.html` · `tests/test-signin-clarity.js`
+
+A clinic sent one photograph of the sign-in page while trying to change their
+login email. It carried three wrong things, and all three were ours.
+
+### 1. A 228-minute-old explanation, printed over a fresh failure
+> *"You were asked to sign in again 228 minutes ago because the saved sign-in
+> on this device could not be read."* — above an unrelated *"Invalid login
+> credentials"* from a moment earlier.
+
+Two faults in one sentence:
+
+- **`clinicSignOut()` cleared the session and recorded no reason.** The next
+  guarded page found nothing and `requireClinic()` announced *"could not be
+  read"* — the same branch handled "there is nothing saved" and "what is saved
+  is damaged", and it chose the frightening wording. An ordinary sign-out was
+  reported to a clinic as a broken phone.
+- **A successful sign-in never cleared the reason.** It was dropped only after
+  24 hours, so it kept being printed on top of whatever went wrong next.
+
+Now: signing out records `deliberate: true` and is never announced back at
+anybody; absent and damaged say different things; signing in clears the reason;
+and anything older than 30 minutes is history rather than a description of the
+screen. **An explanation that outlives the thing it explains is worse than
+none** — this one cost the first hour of the investigation.
+
+### 2. "v151", in TWO places, neither of them true
+`app/clinic/index.html` and `app/clinic/js/clinic.js` each carried
+`= 'v151'` — written on 2026-07-05, never touched again, while
+`clinic-sw.js` beside them reached v184. The second one is printed in the side
+menu of **every screen**. Every clinic in the country, on every build, read
+"Version v151" and reported it to us.
+
+**A version nobody remembers to bump is worse than no version at all**: it does
+not merely fail to inform, it misinforms, with the confidence of a printed
+number. Both are now asked for, in one place (`homattRunningBuild()`), in order
+of authority: `__meta__appliedBuild` from IndexedDB (marked **`+`** — this
+phone has taken a build over the air, the most useful thing a screenshot can
+say), else the highest `homatt-clinic-vNNN` cache, else `v?` said plainly.
+
+**And `test-version.js` asserted the literal**, which is how it survived:
+clinic.js said v151, the test said v151, they agreed, and the worker drifted
+two months away. The test now compares the number on screen against the CACHE
+constant in the service worker, so neither can move without it failing. *A test
+that repeats the constant cannot see the constant going stale.*
+
+### 3. Supabase's words, for a situation only the app could explain
+Changing a sign-in email does **not** move the login. `auth.updateUser({email})`
+starts a confirmation; with "Secure email change" a link goes to the **old**
+address as well and **both** must be opened. Until then the old address is the
+account. The app said so — in Settings, behind the sign-in, hours before it
+mattered.
+
+Worse, it wrote the new address into `portal_users` the instant the link was
+**sent**, so every other screen advertised an address that could not sign in.
+That is how a clinic ends up typing it.
+
+So: the half-finished change is written down on the device
+(`homatt_email_change`), Settings shows it and names which address still works,
+the **sign-in page** warns before a word is typed, and `portal_users` is
+brought into step only once the login has actually moved — detected by
+comparing the session's email to the pending one, because the link is opened in
+a mail app where none of this code is running.
+
+`err.textContent = authError.message` is gone. "Invalid login credentials"
+covers a wrong password, an address with no account, and an unconfirmed
+change. Supabase deliberately gives the same answer to the first two so that
+somebody guessing cannot learn which addresses exist — **and the app must not
+undo that by saying "no such account"**. But it can tell the third apart,
+because the third happened on this phone and was written down.
+
+### Still open
+There is **no password reset** on the clinic sign-in page at all — no "forgot
+password", no route of any kind. A clinic that mistypes its way out has nothing
+to tap. That is a real hole and it is not fixed here.
+
 ## The tests
 
-`tests/` — 65 files, ~925 checks (plus 13 `measure-*.js`, which print numbers
+`tests/` — 67 files, ~970 checks (plus 14 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -1722,6 +1892,17 @@ rules worth repeating here:
   a size at all — reporting the fault fixed. Make it visible first, and put a
   width assertion beside every overflow assertion: the width check is what
   caught this.
+- **A test that repeats a constant cannot see that constant going stale.**
+  `test-version.js` asserted `/^Version v151 ·/` while clinic.js said `v151` —
+  they agreed with each other for two months while the service worker drifted
+  to v184 and every clinic read the wrong number off their screen. Assert
+  against the thing that DEFINES the value (here, the worker's `CACHE`), never
+  against a copy of it.
+- **A check that reports "nothing happened" needs proof it could have seen
+  something happen.** "No image was uploaded" is also what a detector that
+  inspects nothing returns. `test-clinical-photo.js` posts the bytes it just
+  took and requires the check to catch them, immediately after asserting it
+  caught nothing.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by

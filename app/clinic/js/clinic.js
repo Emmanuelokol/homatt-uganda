@@ -69,16 +69,43 @@ function _isAuthRejection(err) {
 // a sign-in screen has no idea why, and neither did anybody they could ask —
 // "it logs me out sometimes" is not something that can be chased. Now the
 // reason and the time are kept, and the sign-in page says which it was.
-function _signOutBecause(why) {
+function _signOutBecause(why, opts) {
   try {
     localStorage.setItem('homatt_last_signout', JSON.stringify({
       why: String(why || 'unknown'),
       at: new Date().toISOString(),
       online: navigator.onLine !== false,
+      // A sign-out somebody ASKED for needs no explanation on the next screen.
+      // It is recorded all the same, because the record is what stops the next
+      // page mistaking an empty storage for a broken one.
+      deliberate: !!(opts && opts.deliberate),
     }));
   } catch (e) {}
   try { localStorage.removeItem('clinic_session'); } catch (e) {}
+  if (opts && opts.to) { window.location.href = opts.to; return; }
   window.location.href = 'index.html';
+}
+
+// What the device last recorded about being signed out, or null.
+function _lastSignout() {
+  try {
+    var r = JSON.parse(localStorage.getItem('homatt_last_signout') || 'null');
+    return (r && r.at) ? r : null;
+  } catch (e) { return null; }
+}
+
+/* Signing in again is the end of the story, so the explanation goes with it.
+ *
+ * Without this the reason survives for a full day (index.html only drops it
+ * after 24 hours) and is printed over the top of whatever goes wrong next. A
+ * clinic sent a screenshot showing "you were asked to sign in again 228
+ * minutes ago because the saved sign-in could not be read" above a completely
+ * unrelated "Invalid login credentials" from a moment earlier — two faults
+ * nearly four hours apart, read as one, and it sent the first hour of this
+ * investigation down the wrong path. An explanation that outlives the thing it
+ * explains is worse than none. */
+function _clearSignoutReason() {
+  try { localStorage.removeItem('homatt_last_signout'); } catch (e) {}
 }
 
 // An access token lasts an hour and the library renews it on a timer. A timer
@@ -117,10 +144,32 @@ function _keepSignedIn() {
 function requireClinic() {
   // Hide content immediately so there's no flash of protected content before redirect
   document.body.style.visibility = 'hidden';
-  let s;
-  try { s = JSON.parse(localStorage.getItem('clinic_session') || 'null'); } catch(e) {}
+  /* "There is nothing saved" and "what is saved is damaged" are DIFFERENT, and
+   * for a long time this branch handled both and announced the alarming one.
+   *
+   * Ordinary signing out clears the key. The next protected page then found
+   * nothing, and told the clinic their storage could not be read — which reads
+   * like a broken phone and sends everybody looking in the wrong place. So the
+   * absent case is separated from the corrupt one, and a sign-out the clinic
+   * asked for is named as exactly that. */
+  let raw = null, s;
+  try { raw = localStorage.getItem('clinic_session'); } catch (e) {}
+  try { s = JSON.parse(raw || 'null'); } catch (e) {}
   if (!s || typeof s !== 'object' || Array.isArray(s)) {
-    _signOutBecause('the saved sign-in on this device could not be read');
+    if (raw == null) {
+      var last = _lastSignout();
+      if (last && last.deliberate) {
+        // Already explained, by the sign-out itself. Do not overwrite a true
+        // record with a guess.
+        try { localStorage.removeItem('clinic_session'); } catch (e) {}
+        window.location.href = 'index.html';
+        return null;
+      }
+      _signOutBecause('there was no sign-in saved on this device — either it ' +
+        'was signed out, or the phone cleared this app’s storage');
+    } else {
+      _signOutBecause('the saved sign-in on this device could not be read');
+    }
     return null;
   }
   // Auth passed — show the page
@@ -274,16 +323,22 @@ async function clinicSignOut() {
     const supa = _getClinicSupabase();
     if (supa) await supa.auth.signOut();
   } catch(e) {}
-  localStorage.removeItem('clinic_session');
+  /* Write down that this was ASKED FOR, before clearing anything.
+   *
+   * It used to just remove the key and go. The next protected page opened,
+   * found no session, and announced "the saved sign-in on this device could
+   * not be read" — so an ordinary sign-out was reported to the clinic as
+   * damaged storage, and there was nothing in the record to tell the two
+   * apart afterwards. */
   // A visiting clinician signed in through THEIR portal, so that is where
   // signing out belongs. Dropping them on the clinic's staff sign-in page
   // offers them a login they do not have and hides the one they do.
   if (wasClinician) {
     try { localStorage.removeItem('clinician_session'); } catch (e) {}
-    window.location.href = 'clinician/index.html';
+    _signOutBecause('you signed out', { deliberate: true, to: 'clinician/index.html' });
     return;
   }
-  window.location.href = 'index.html';
+  _signOutBecause('you signed out', { deliberate: true });
 }
 
 function setupClinicLogout() {
@@ -770,8 +825,78 @@ window.HomattPace = (function () {
 // Android app the web files are packaged INSIDE the APK, so a new APK has to be
 // installed before any change appears — and until now that was invisible.
 // This line is added to the side menu on every page.
-var HOMATT_BUILD = 'v151';
+/* The build is asked for, never typed.
+ *
+ * This was `var HOMATT_BUILD = 'v151'` — written once on 2026-07-05 and never
+ * touched again, while clinic-sw.js beside it reached v184. It is printed in
+ * the side menu of EVERY screen, so every clinic in the country, on every
+ * build, read "Version v151" and reported it to us when something went wrong.
+ * A clinic sent a screenshot to ask about a sign-in failure and that number
+ * sent the first hour of the investigation looking for a two-month-old app
+ * that did not exist.
+ *
+ * A version nobody remembers to bump is worse than no version at all: it does
+ * not merely fail to inform, it actively misinforms, and it does so with the
+ * confidence of a printed number. So there is nothing to remember now.
+ *
+ * In order of authority:
+ *   1. __meta__appliedBuild in IndexedDB — what the self-update actually put
+ *      in place. Marked '+', because "this phone has taken a newer build over
+ *      the air" is the single most useful thing a support screenshot can say.
+ *   2. the highest homatt-clinic-vNNN cache present, which is the name the
+ *      running worker gave its own cache.
+ *   3. 'v?' — said plainly rather than guessed at.
+ */
+var HOMATT_BUILD = 'v…';
 window.HOMATT_BUILD = HOMATT_BUILD;
+
+function homattRunningBuild() {
+  return new Promise(function (done) {
+    var applied = '', cacheName = '';
+    function finish() {
+      var b = applied ? applied.replace(/^homatt-clinic-/, '') + '+'
+            : cacheName ? cacheName.replace(/^homatt-clinic-/, '')
+            : 'v?';
+      HOMATT_BUILD = b; window.HOMATT_BUILD = b;
+      done(b);
+    }
+    var left = 2;
+    function step() { if (--left <= 0) finish(); }
+
+    try {
+      var q = indexedDB.open('homatt-shell', 1);
+      q.onupgradeneeded = function () { try { q.result.createObjectStore('files'); } catch (e) {} };
+      q.onsuccess = function () {
+        try {
+          var rq = q.result.transaction('files', 'readonly').objectStore('files')
+            .get('__meta__appliedBuild');
+          rq.onsuccess = function () {
+            applied = (rq.result && rq.result.body) ? String(rq.result.body) : ''; step();
+          };
+          rq.onerror = step;
+        } catch (e) { step(); }
+      };
+      q.onerror = step;
+    } catch (e) { step(); }
+
+    try {
+      if (!window.caches) { step(); }
+      else {
+        caches.keys().then(function (keys) {
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
+            // An old cache can still be sitting beside the one in use.
+            var a = parseInt((keys[i].match(/v(\d+)/) || [])[1] || '0', 10);
+            var b = parseInt((cacheName.match(/v(\d+)/) || [])[1] || '-1', 10);
+            if (a > b) cacheName = keys[i];
+          }
+          step();
+        }).catch(step);
+      }
+    } catch (e) { step(); }
+  });
+}
+window.homattRunningBuild = homattRunningBuild;
 
 function homattBuildLine() {
   var foot = document.querySelector('.sidebar-footer');
@@ -788,20 +913,33 @@ function homattBuildLine() {
                   window.Capacitor.isNativePlatform());
   var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
   var mode = native ? 'android app' : (standalone ? 'installed' : 'browser');
-  el.textContent = 'Version ' + HOMATT_BUILD + ' · ' + mode;
 
-  // Add the service-worker state once it is known — that is what tells us
-  // whether an old copy of the app is still being served from the cache.
-  if (!('serviceWorker' in navigator)) return;
-  navigator.serviceWorker.getRegistration().then(function (reg) {
-    var sw = !reg ? 'no offline cache'
-      : reg.waiting ? 'UPDATE READY — fully close and reopen the app'
-      : reg.active ? 'offline cache on' : 'starting';
-    el.textContent = 'Version ' + HOMATT_BUILD + ' · ' + mode + ' · ' + sw;
-    // A waiting worker means a newer version is sitting there unused. Take it.
-    try { if (reg && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
-    try { if (reg && reg.update) reg.update(); } catch (e) {}
-  }).catch(function () {});
+  /* ONE painter, and everything it needs is gathered before it runs.
+   *
+   * The build now has to be read out of storage, and so does the worker state.
+   * Two independent .then() handlers each writing the whole line means the
+   * slower one wins, and which is slower varies — so the menu would sometimes
+   * show a resolved build and sometimes the placeholder, at random. Gather
+   * first, paint once, repaint only when there is genuinely more to say. */
+  function paint(build, sw) {
+    el.textContent = 'Version ' + build + ' · ' + mode + (sw ? ' · ' + sw : '');
+  }
+  paint(HOMATT_BUILD, '');           // never leave the menu empty while we ask
+
+  homattRunningBuild().catch(function () { return 'v?'; }).then(function (build) {
+    paint(build, '');
+    // The service-worker state is what tells us whether an old copy of the app
+    // is still being served out of the cache.
+    if (!('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      paint(build, !reg ? 'no offline cache'
+        : reg.waiting ? 'UPDATE READY — fully close and reopen the app'
+        : reg.active ? 'offline cache on' : 'starting');
+      // A waiting worker means a newer version is sitting there unused. Take it.
+      try { if (reg && reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' }); } catch (e) {}
+      try { if (reg && reg.update) reg.update(); } catch (e) {}
+    }).catch(function () {});
+  });
 }
 
 if (document.readyState === 'loading') {

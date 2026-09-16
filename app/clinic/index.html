@@ -170,6 +170,14 @@
          background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
          border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
 
+    <!-- A sign-in email that was changed and never confirmed. This is the
+         screen where that matters and the only screen where nobody could see
+         it: the explanation lived in Settings, behind the sign-in. -->
+    <div id="pendingEmail" style="display:none;margin-bottom:14px;padding:10px 12px;
+         border-radius:11px;font-size:12.5px;line-height:1.45;
+         background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
+         border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
+
     <form id="loginForm">
       <div class="login-field">
         <label for="email">Staff Email</label>
@@ -239,7 +247,23 @@
   // files it has actually cached. "SW:active cache:20" = offline will work;
   // "SW:none" or "cache:0" pinpoints the real failure.
   (function () {
-    var BUILD = 'v151';
+    /* The build is ASKED FOR, never typed here.
+     *
+     * This line existed to be photographed and sent to us, and for two months
+     * its most important field was the string 'v151' — written once on
+     * 2026-07-05 and never touched again, while the worker beside it went to
+     * v184. Every clinic on every build reported v151, and a screenshot that
+     * was meant to answer "what are they running?" answered it wrongly, with
+     * total confidence, for every phone in the country.
+     *
+     * The honest answers, in order of authority:
+     *   1. __meta__appliedBuild in IndexedDB — what the self-update actually
+     *      put in place. This is the only field that knows a phone has taken a
+     *      newer build over the air, and it is marked with a '+'.
+     *   2. otherwise the newest homatt-clinic-vNNN cache, which is the name
+     *      the running worker gave its own cache.
+     *   3. otherwise 'v?' — said plainly, rather than guessed at. */
+    var BUILD = 'v…';
     var el = document.getElementById('buildMarker');
     function set(t) { if (el) el.textContent = t; }
     var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
@@ -254,6 +278,7 @@
           sw = !reg ? 'none' : (reg.active ? 'active' : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'reg')));
         }
       } catch (e) { sw = 'err'; }
+      var cacheBuild = '';
       try {
         if (window.caches) {
           var keys = await caches.keys();
@@ -261,26 +286,62 @@
             if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
             var c = await caches.open(keys[i]);
             pages += (await c.keys()).length;
+            // Highest version number wins: an old cache can still be lying
+            // around next to the one in use.
+            var nThis = parseInt((keys[i].match(/v(\d+)/) || [])[1] || '0', 10);
+            var nBest = parseInt((cacheBuild.match(/v(\d+)/) || [])[1] || '-1', 10);
+            if (nThis > nBest) cacheBuild = keys[i];
           }
         }
       } catch (e) {}
       // The IndexedDB SECOND copy of the shell (survives cache wipes) and
       // whether the OS granted persistent storage (protects against cleaners).
-      var idbN = 0, keep = '?';
+      var idbN = 0, keep = '?', applied = '';
       try {
-        idbN = await new Promise(function (res) {
+        var shelf = await new Promise(function (res) {
           var q = indexedDB.open('homatt-shell', 1);
           q.onupgradeneeded = function () { try { q.result.createObjectStore('files'); } catch (e) {} };
           q.onsuccess = function () {
             try {
-              var rq = q.result.transaction('files', 'readonly').objectStore('files').getAllKeys();
-              rq.onsuccess = function () { res((rq.result || []).length); };
-              rq.onerror = function () { res(0); };
-            } catch (e) { res(0); }
+              var st = q.result.transaction('files', 'readonly').objectStore('files');
+              var out = { n: 0, build: '' }, left = 2;
+              function done() { if (--left <= 0) res(out); }
+              var rq = st.getAllKeys();
+              rq.onsuccess = function () { out.n = (rq.result || []).length; done(); };
+              rq.onerror = done;
+              // What the self-update actually put in place, written by
+              // clinic-sw.js as __meta__appliedBuild. Absent on a phone that
+              // has never taken an over-the-air build.
+              var rb = st.get('__meta__appliedBuild');
+              rb.onsuccess = function () {
+                out.build = (rb.result && rb.result.body) ? String(rb.result.body) : ''; done();
+              };
+              rb.onerror = done;
+            } catch (e) { res({ n: 0, build: '' }); }
           };
-          q.onerror = function () { res(0); };
+          q.onerror = function () { res({ n: 0, build: '' }); };
         });
+        idbN = shelf.n; applied = shelf.build;
       } catch (e) {}
+      /* The answer comes from clinic.js, which is the one place that works it
+       * out — the same number the side menu shows on every other screen, so
+       * the two can never disagree about what this phone is running.
+       *
+       * It is loaded further down this page, but every `await` above has
+       * yielded to the parser by now, so it is there. If it somehow is not —
+       * and this is the one screen that has to keep working when things are
+       * broken — fall back to the cache name, which was already read for the
+       * "cache:" counter beside it.
+       *
+       * '+' means this phone has taken a newer build over the air, which is
+       * the single most useful thing a support screenshot can tell us. */
+      if (typeof window.homattRunningBuild === 'function') {
+        try { BUILD = await window.homattRunningBuild(); } catch (e) { BUILD = 'v?'; }
+      } else {
+        BUILD = applied ? (applied.replace(/^homatt-clinic-/, '') + '+')
+              : cacheBuild ? cacheBuild.replace(/^homatt-clinic-/, '')
+              : 'v?';
+      }
       try {
         if (navigator.storage && navigator.storage.persisted) {
           keep = (await navigator.storage.persisted()) ? 'yes' : 'no';
@@ -341,8 +402,21 @@
       if (!raw) return;
       var r = JSON.parse(raw);
       if (!r || !r.at) return;
+      // Nobody needs telling they signed out. It is recorded so the next page
+      // does not mistake the empty storage for a damaged one, not so it can be
+      // announced back at them.
+      if (r.deliberate) return;
       var mins = Math.max(0, Math.round((Date.now() - new Date(r.at).getTime()) / 60000));
-      if (mins > 60 * 24) { localStorage.removeItem('homatt_last_signout'); return; }
+      /* An explanation must not outlive the thing it explains.
+       *
+       * This used to keep for a full DAY, and a successful sign-in never
+       * cleared it — so one clinic's screenshot carried a 228-minute-old
+       * "could not be read" printed directly above a fresh and completely
+       * unrelated "Invalid login credentials", as though they were one fault.
+       * Signing in now clears it (see the submit handler), and anything older
+       * than half an hour is history rather than an explanation of what is on
+       * the screen right now. */
+      if (mins > 30) { localStorage.removeItem('homatt_last_signout'); return; }
       var el = document.getElementById('whySignedOut');
       if (!el) return;
       el.textContent = 'You were asked to sign in again ' +
@@ -351,6 +425,34 @@
         (r.online ? '' : ' The phone had no connection at the time.');
       el.style.display = '';
     } catch (e) {}
+  })();
+
+  /* An email change that was started and never finished.
+   *
+   * Changing a sign-in email in Supabase does not move the login — it sends a
+   * confirmation link, and with "Secure email change" it sends one to the OLD
+   * address as well, and BOTH have to be opened. Until then the old address is
+   * still the account.
+   *
+   * A clinic changed theirs, came back later, typed the NEW address here
+   * because that is the one they had decided on, and was told "Invalid login
+   * credentials" — which is true, unhelpful, and identical to what a wrong
+   * password says. Settings knew the change was pending; this screen, the one
+   * they were actually looking at, did not. Now it does. */
+  function _pendingEmailChange() {
+    try {
+      var p = JSON.parse(localStorage.getItem('homatt_email_change') || 'null');
+      return (p && p.to) ? p : null;
+    } catch (e) { return null; }
+  }
+  (function () {
+    var p = _pendingEmailChange();
+    var el = document.getElementById('pendingEmail');
+    if (!p || !el) return;
+    el.textContent = 'A change of sign-in email to ' + p.to + ' was started on this ' +
+      'phone and has not been confirmed. Until the link sent to ' + p.to + ' is opened, ' +
+      'sign in with ' + (p.from || 'your old address') + ' — it still works.';
+    el.style.display = '';
   })();
 
   // Offer the native Android app (best offline) on Android web browsers only —
@@ -404,6 +506,52 @@
   emailInput.addEventListener('compositionend',   () => { _composing = false; sanitizeEmail(); });
   emailInput.addEventListener('blur', sanitizeEmail);
 
+  /* What the sign-in error actually means, in words a clinic can act on.
+   *
+   * It used to print Supabase's own sentence, unedited. "Invalid login
+   * credentials" is that sentence, and it covers three different situations
+   * that need three different actions:
+   *
+   *   - the password is wrong
+   *   - there is no account with this address
+   *   - the address is a NEW one whose change was never confirmed
+   *
+   * Supabase deliberately gives the same answer to the first two, so that
+   * somebody guessing cannot learn which addresses exist, and that is right —
+   * the app must not undo it by saying "no such account". But it CAN tell the
+   * third apart, because the third happened on this phone and was written
+   * down, and that is the one a clinic cannot possibly work out alone. */
+  function _signinFault(e, typed) {
+    var m = String((e && e.message) || '');
+    var status = Number((e && e.status) || 0);
+
+    if (/failed to fetch|networkerror|network request failed|load failed|timeout/i.test(m)) {
+      return 'Could not reach the server. Check the connection and try again — ' +
+             'everything already on this phone still works offline once you are in.';
+    }
+    if (/rate|too many|429/i.test(m) || status === 429) {
+      return 'Too many attempts. Wait a few minutes, then try again.';
+    }
+    if (/email not confirmed|not confirmed/i.test(m)) {
+      return 'This account’s address has not been confirmed yet. Open the link ' +
+             'that was sent to ' + typed + ', then sign in.';
+    }
+    if (/invalid login credentials|invalid.*credential/i.test(m)) {
+      var p = _pendingEmailChange();
+      if (p && String(p.to).toLowerCase() === String(typed).toLowerCase()) {
+        return 'That address is not your sign-in yet. The change to ' + p.to +
+               ' was never confirmed, so the account is still ' +
+               (p.from || 'your old address') + ' — sign in with that one. ' +
+               'The link sent to ' + p.to + ' has to be opened first.';
+      }
+      return 'That email and password did not sign in. Check the address letter ' +
+             'by letter — ' + typed + ' is what was sent. If you recently changed ' +
+             'your sign-in email, the OLD one still works until the confirmation ' +
+             'link is opened.';
+    }
+    return m || 'Could not sign in. Try again.';
+  }
+
   document.getElementById('loginForm').addEventListener('submit', async e => {
     e.preventDefault();
     _composing = false;
@@ -425,7 +573,7 @@
 
     const { data: authData, error: authError } = await _supa.auth.signInWithPassword({ email, password });
     if (authError) {
-      err.textContent = authError.message;
+      err.textContent = _signinFault(authError, email);
       err.style.display = 'block';
       btn.disabled = false;
       btn.textContent = 'Sign In to Clinic Portal';
@@ -457,6 +605,18 @@
       staffRole: pu.staff_role || 'owner',
       email
     }));
+    // Signed in: whatever put them out is over, and must not be printed over
+    // the top of the next thing that goes wrong.
+    try { localStorage.removeItem('homatt_last_signout'); } catch (e) {}
+    // This address IS the login — it just worked. So a pending change to some
+    // other address is either finished or was never confirmed; either way the
+    // warning has served its purpose once the right one is in use.
+    try {
+      var pend = JSON.parse(localStorage.getItem('homatt_email_change') || 'null');
+      if (pend && String(pend.to || '').toLowerCase() === email) {
+        localStorage.removeItem('homatt_email_change');
+      }
+    } catch (e) {}
     window.location.href = 'dashboard.html';
   });
 

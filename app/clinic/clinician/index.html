@@ -238,8 +238,14 @@
       if (!raw) return;
       var r = JSON.parse(raw);
       if (!r || !r.at) return;
+      // A sign-out somebody asked for needs no announcement, and an
+      // explanation older than half an hour is history rather than a
+      // description of the screen in front of them. See the long note in
+      // ../index.html: a 228-minute-old reason printed above a fresh error
+      // read as one fault and cost an afternoon.
+      if (r.deliberate) return;
       var mins = Math.max(0, Math.round((Date.now() - new Date(r.at).getTime()) / 60000));
-      if (mins > 60 * 24) { localStorage.removeItem('homatt_last_signout'); return; }
+      if (mins > 30) { localStorage.removeItem('homatt_last_signout'); return; }
       var el = document.getElementById('clWhyOut');
       el.textContent = 'You were asked to sign in again ' +
         (mins < 1 ? 'just now' : mins + ' minute' + (mins === 1 ? '' : 's') + ' ago') +
