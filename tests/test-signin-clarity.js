@@ -244,8 +244,32 @@ function seed(page, extra) {
     afterIn.reason === null, afterIn.here + ' · ' + afterIn.reason);
 
   // ── 4. The build in the footer is asked for, not typed ────────────────
+  /* Start from a KNOWN storage state, not from whatever is lying around.
+   *
+   * This read "the highest homatt-clinic cache wins" and simply opened two —
+   * which is true only if nothing else has already written an applied-build
+   * record, and inside the suite something had: it reported v999+ (the build
+   * test-selfupdate.js uses) where v903 was expected. The assertion was
+   * describing ambient state rather than the thing it meant to test, and it
+   * passed alone and failed in company, which is the worst way for a test to
+   * be wrong. Wipe both stores first. */
   await gotoSignIn(page);
   await page.evaluate(async () => {
+    for (const k of await caches.keys()) {
+      if (k.indexOf('homatt-clinic-') === 0) await caches.delete(k);
+    }
+    await new Promise((res) => {
+      const q = indexedDB.open('homatt-shell', 1);
+      q.onupgradeneeded = () => { try { q.result.createObjectStore('files'); } catch (e) {} };
+      q.onsuccess = () => {
+        try {
+          const t = q.result.transaction('files', 'readwrite');
+          t.objectStore('files').delete('__meta__appliedBuild');
+          t.oncomplete = res; t.onerror = res;
+        } catch (e) { res(); }
+      };
+      q.onerror = res;
+    });
     await caches.open('homatt-clinic-v903');
     await caches.open('homatt-clinic-v410');       // an old one left lying about
   });
