@@ -119,6 +119,61 @@ Deno.serve(async (req) => {
   }
   try { await check.auth.signOut(); } catch (_) { /* best effort */ }
 
+  /* ── 2b. CAN THE NEW ADDRESS ACTUALLY RECEIVE MAIL? ──────────────────────
+   *
+   * This route exists precisely because it sends no confirmation, which means
+   * it is also the one route that can strand somebody on an address nobody can
+   * reach. That is not hypothetical: the clinic this was written for was on
+   * `homatt-health.com`, which does not resolve at all, and was moving to
+   * `clinic.com`, whose MX record is 0.0.0.0 — a blackhole. Out of the frying
+   * pan.
+   *
+   * It matters more than it sounds because the portal has NO password reset.
+   * An account whose address takes no mail has no way back if the password is
+   * ever lost — not a nuisance, a locked door.
+   *
+   * The rules are RFC 5321/7505: a domain with no MX may still take mail at
+   * its A record (implicit MX), and an MX of "." — or the 0.0.0.0 that badly
+   * configured domains use to mean the same — is an explicit "this domain
+   * accepts no mail".
+   *
+   * It refuses ONLY what it can positively show is undeliverable. A resolver
+   * having a bad minute, or an edge runtime that does not expose
+   * Deno.resolveDns at all, both land in "unknown" and are allowed through —
+   * because a check that blocks a real address when DNS hiccups is worse than
+   * the fault it guards against, and this one is advisory, not a security
+   * boundary.
+   */
+  const domain = newEmail.split("@")[1] || "";
+  let mailable: "yes" | "no" | "unknown" = "unknown";
+  try {
+    let mx: { exchange: string }[] = [];
+    try { mx = await Deno.resolveDns(domain, "MX") as { exchange: string }[]; } catch (_) { mx = []; }
+    const usable = mx.filter((r) => {
+      const h = String(r.exchange || "").trim().replace(/\.$/, "");
+      return h !== "" && h !== "." && h !== "0.0.0.0" && h !== "localhost";
+    });
+    if (usable.length) {
+      mailable = "yes";
+    } else if (mx.length) {
+      mailable = "no";                       // MX exists and explicitly refuses
+    } else {
+      // No MX at all — an A record would still accept mail (implicit MX).
+      try {
+        const a = await Deno.resolveDns(domain, "A");
+        mailable = (a && a.length) ? "yes" : "no";
+      } catch (_) { mailable = "no"; }       // NXDOMAIN: the domain is not real
+    }
+  } catch (_) { mailable = "unknown"; }
+
+  if (mailable === "no") {
+    return json({ ok: false, error:
+      "Nothing can send email to " + domain + " — it has no working mail server. " +
+      "If you use that address you will never receive a password reset or any " +
+      "notice from us, and there is no way back into the account if the password " +
+      "is lost. Use an address you can actually open, such as a Gmail one." }, 400);
+  }
+
   // ── 3. Move it, with no mail to anybody ──────────────────────────────────
   const admin = createClient(URL_, SERVICE);
   const { error: upErr } = await admin.auth.admin.updateUserById(uid, {

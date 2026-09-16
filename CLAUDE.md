@@ -1966,6 +1966,40 @@ fortnight, and each is worth keeping:
 Account → Access Tokens → generate, then GitHub → Settings → Secrets and
 variables → Actions → `SUPABASE_ACCESS_TOKEN`. Nothing deploys until then.
 
+### 6. Both addresses were dead ends, and that is the real fault
+Asked "can't the client just change it in the portal?", I checked the
+assumption I had been repeating instead of repeating it again:
+
+```
+homatt-health.com  ->  ENOTFOUND       the domain does not exist at all
+clinic.com         ->  MX: 0.0.0.0     a blackhole; accepts no mail
+gmail.com          ->  real MX         (so the resolver works — those answers are real)
+```
+
+The clinic was on an address that **does not exist**, moving to one whose mail
+goes to **0.0.0.0**. Out of the frying pan. It also explains, and now *proves*
+rather than assumes, why the ordinary route refused: Supabase validates the
+domain, and there is no domain.
+
+**This matters far more than the deploy.** The portal has no password reset, so
+an account on an unreachable address has no way back if the password is ever
+lost — not a nuisance, a locked door. And the direct route is the one that can
+create that situation, because it deliberately sends no mail.
+
+So `change-email` now checks the new domain before committing, by RFC
+5321/7505: usable MX → fine; MX present but `.` or `0.0.0.0` → explicitly
+refuses mail; no MX at all → an A record still takes mail (implicit MX), no A
+either → the domain is not real. It refuses only what it can **positively
+show** is undeliverable — a resolver having a bad minute, or an edge runtime
+without `Deno.resolveDns`, lands in "unknown" and is allowed through, because a
+check that blocks a real address when DNS hiccups is worse than the fault it
+guards against.
+
+**The lesson is older than this bug: I had asserted "the domain takes no mail"
+four times before measuring it.** It happened to be right, and the measurement
+turned up the second dead domain that nobody had noticed — which no amount of
+being right about the first one would have found.
+
 ### Still open
 There is **no password reset** on the clinic sign-in page at all — no "forgot
 password", no route of any kind. A clinic that mistypes its way out has nothing
