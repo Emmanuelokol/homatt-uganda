@@ -692,6 +692,57 @@ put the old version straight back:
 own origin is the stale one.** Anything that "refreshes from the network" has
 to know that, or it will helpfully restore the old app.
 
+### And a fifth, which was undoing the update about half the time
+`test-selfupdate.js` failed roughly one run in two, and had done since long
+before anybody noticed — a flaky test nobody had chased. It was not the test.
+**It was the mechanism, and it was the fourth fault above coming back through a
+door the fix had left open.**
+
+`_appliedBuild` is what `localIsStale()` reads, and it was assigned at the END
+of the swap — after the copy loop, after the STAGE delete, after `idbPutAll`
+had written every shell file into IndexedDB:
+
+```js
+for (…) await live.put(keys[i], hit.clone());   // the NEW build is live from here
+await caches.delete(STAGE);
+await idbPutAll(keys, live);                    // hundreds of ms
+_appliedBuild = manifest.cache;                 // …and the flag flips only here
+```
+
+For that whole window the live cache already held the new build while
+`localIsStale()` still answered **false**. A background revalidate completing
+inside it passed its guard — the guard that exists precisely to stop this — and
+wrote the local origin's old `dashboard.html` straight back over the new one.
+Caught by logging every `cache.put` with the staleness flag beside it:
+
+```
+PUT homatt-clinic-v186-incoming  …/dashboard.html  stale=false   ← new build staged
+PUT homatt-clinic-v186           …/dashboard.html  stale=false   ← old one written back
+```
+
+**The guard was never wrong; the flag it consults was set too late.** One
+worker, one event loop, so there is no lock to take — the fix is ordering:
+`_appliedBuild` is now set *before* anything becomes live. Nothing may go live
+while the worker still believes its own origin is current.
+
+Setting it early is safe in the only direction that matters: the flag **only
+ever suppresses** writing the local origin's copy into the cache. Believing
+"this install is ahead of its origin" a few hundred milliseconds early costs
+one skipped revalidation. Believing it late costs the update.
+
+Measured both ways, because ten green runs after a change is not evidence on a
+50% flake — the old ordering has to be shown to bring the failure back:
+
+| | failures |
+|---|---|
+| assignment after the swap (as shipped) | **4 of 6 runs** |
+| assignment before the swap | **0 of 10 runs** |
+
+**A flaky test guarding a delivery mechanism is not a flaky test until it is
+proven to be one.** This one had been dismissed as noise; what it was actually
+reporting is that a real clinic taking a real update could have it silently
+walked back, on the very next page they opened.
+
 ### The header nobody had checked, and the test that hid it
 The mechanism rests on one thing that cannot be verified from a development
 machine: whether the host sends **`Access-Control-Allow-Origin`**. A worker on
@@ -1922,6 +1973,16 @@ rules worth repeating here:
   inspects nothing returns. `test-clinical-photo.js` posts the bytes it just
   took and requires the check to catch them, immediately after asserting it
   caught nothing.
+- **A flaky test guarding a delivery mechanism is not flaky until proven so.**
+  `test-selfupdate.js` failed about half the time for weeks and was read as
+  noise. It was reporting a real race in the service worker that silently
+  walked back a completed update — the thing that decides whether any fix ever
+  reaches a clinic. Chase the flake in the mechanism before blaming the test.
+- **On an intermittent failure, a green run after the change proves nothing —
+  put the bug BACK.** Ten clean runs on a 50% flake is ~0.1% likely by chance,
+  which is suggestive and not proof. Restoring the old ordering brought the
+  failure straight back (4 of 6), and that is the half of the experiment that
+  turns correlation into cause.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by

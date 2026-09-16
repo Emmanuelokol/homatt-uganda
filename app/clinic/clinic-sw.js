@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v186';
+const CACHE = 'homatt-clinic-v187';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -231,6 +231,33 @@ async function fetchNewBuild(force) {
       }
     }
 
+    /* THE FLAG FLIPS BEFORE ANYTHING GOES LIVE, NOT AFTER.
+     *
+     * `_appliedBuild` is what `localIsStale()` reads, and `localIsStale()` is
+     * the one thing standing between a finished update and the background
+     * revalidate that would put the old page straight back over it.
+     *
+     * It used to be assigned AFTER the copy loop, the STAGE delete and
+     * idbPutAll — hundreds of milliseconds in which the live cache already
+     * held the NEW build while localIsStale() still answered false. A
+     * navigation revalidate completing inside that window passed its guard,
+     * wrote the local origin's answer over the new page, and the update was
+     * silently walked back. Measured: it happened in roughly HALF of all runs,
+     * and it is exactly the "helpfully restore the old app" failure this whole
+     * mechanism exists to prevent.
+     *
+     * The guard was never wrong; the flag it consults was set too late. There
+     * is no lock to take here — one worker, one event loop — so the fix is
+     * ordering: nothing may become live while the worker still believes its
+     * own origin is current.
+     *
+     * Setting it early is safe in the only direction that matters. The flag
+     * ONLY ever suppresses writing the local origin's copy into the cache.
+     * Believing "this install is ahead of its origin" a few hundred
+     * milliseconds too early costs one skipped revalidation; believing it too
+     * late costs the whole update. */
+    _appliedBuild = manifest.cache;
+
     // Complete. Now, and only now, move it across.
     const live = await caches.open(CACHE);
     const keys = await stage.keys();
@@ -240,7 +267,6 @@ async function fetchNewBuild(force) {
     }
     await caches.delete(STAGE);
     await idbPutAll(keys, live);
-    _appliedBuild = manifest.cache;
     try { await idbPut('__meta__appliedBuild', { body: manifest.cache, ct: 'text/plain' }); }
     catch (e) {}
     await tellPages({ type: 'homatt-updated', version: manifest.cache });
