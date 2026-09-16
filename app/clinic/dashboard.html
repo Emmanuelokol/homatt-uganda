@@ -790,6 +790,17 @@
           <div style="font-size:15px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="histModalName">Patient Name</div>
           <div style="font-size:12px;color:var(--text-lt);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="histModalMeta"></div>
         </div>
+        <!-- The clinical camera. Here rather than in the record's hero row:
+             the close button already makes this row 34px tall, so a second
+             34px control costs no height at all, and the name and meta beside
+             it are nowrap/ellipsis so they cannot wrap the way the diagnosis
+             did. Hidden for roles that have no business photographing a
+             patient — a receptionist, a drug-shop salesperson. -->
+        <button id="pxPhotoBtn" data-action="clinic-photo" style="display:none"
+          aria-label="Take a photograph for this file" title="Take a photograph for this file">
+          <span class="material-icons-outlined" style="font-size:19px">photo_camera</span>
+          <span data-role="photo-count"></span>
+        </button>
         <button onclick="document.getElementById('histModal').style.display='none'"
           aria-label="Close"
           style="background:var(--tint-2);color:var(--text);border:1px solid var(--border);border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;align-items:center;justify-content:center;cursor:pointer">
@@ -2446,32 +2457,45 @@
       });
     };
 
-    /* The clinical camera. The count is painted AFTER the record is laid out
-       and lives inside the 30px button, so knowing there are photographs on a
-       file costs the record no height — which it does not have: it already
-       measures 661px against a 661px modal on a 412x915 phone. */
-    var camBtn = bodyEl.querySelector('[data-action="clinic-photo"]');
-    if (camBtn && window.HomattPhoto) {
-      camBtn.onclick = function () { HomattPhoto.open(current, function () { _photoCount(bodyEl, current); }); };
-      _photoCount(bodyEl, current);
+    /* The clinical camera, in the modal HEADER rather than in the record.
+       It is outside the part that gets re-rendered, so it is styled and wired
+       here instead of being built into the body's HTML — and the record keeps
+       every pixel of the 661px it has. */
+    var camBtn = document.getElementById('pxPhotoBtn');
+    if (camBtn) {
+      var allowed = !!(window.HomattPhoto && HomattPhoto.may());
+      camBtn.style.cssText = allowed
+        ? 'background:var(--tint-2);color:var(--text);border:1px solid var(--border);' +
+          'border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;' +
+          'align-items:center;justify-content:center;cursor:pointer;padding:0;position:relative'
+        : 'display:none';
+      if (allowed) {
+        camBtn.onclick = function () {
+          HomattPhoto.open(current, function () { _photoCount(current); });
+        };
+        _photoCount(current);
+      }
     }
   }
 
-  // How many photographs this visit has, shown as a dot on the camera button.
-  function _photoCount(bodyEl, current) {
-    if (!window.HomattPhoto || !bodyEl || !current) return;
+  // How many photographs this visit has, as a dot on the camera button.
+  function _photoCount(current) {
+    var btn = document.getElementById('pxPhotoBtn');
+    if (!window.HomattPhoto || !btn || !current) return;
     HomattPhoto.countFor(current.id).then(function (n) {
-      var badge = bodyEl.querySelector('[data-role="photo-count"]');
-      var btn = bodyEl.querySelector('[data-action="clinic-photo"]');
-      if (!badge) return;
-      badge.textContent = n > 9 ? '9+' : String(n);
-      badge.style.display = n > 0 ? 'block' : 'none';
-      if (btn) {
-        var lab = n > 0
-          ? n + ' photograph' + (n === 1 ? '' : 's') + ' on this file · tap to take another'
-          : 'Take a photograph for this file';
-        btn.title = lab; btn.setAttribute('aria-label', lab);
+      var badge = btn.querySelector('[data-role="photo-count"]');
+      if (badge) {
+        badge.style.cssText = n > 0
+          ? 'position:absolute;top:-4px;right:-4px;min-width:15px;height:15px;border-radius:8px;' +
+            'background:var(--deep);color:var(--on-deep);font-size:9.5px;font-weight:800;' +
+            'line-height:15px;text-align:center;padding:0 3px'
+          : 'display:none';
+        badge.textContent = n > 9 ? '9+' : String(n);
       }
+      var lab = n > 0
+        ? n + ' photograph' + (n === 1 ? '' : 's') + ' on this file · tap to take another'
+        : 'Take a photograph for this file';
+      btn.title = lab; btn.setAttribute('aria-label', lab);
     }).catch(function () {});
   }
 
@@ -2551,20 +2575,13 @@
             + 'cursor:pointer;flex-shrink:0;color:var(--text-lt);padding:0;margin-left:6px">'
             + '<span class="material-icons-outlined" style="font-size:17px">edit_note</span></button>'
           : '')
-        /* The clinical camera, in the same row and for the same reason. A
-           photograph of the wound belongs on the record, and the shortest way
-           to one is from the record you are already looking at. */
-        +((window.HomattPhoto && HomattPhoto.may())
-          ? '<button data-action="clinic-photo" aria-label="Take a photograph for this file"'
-            + ' title="Take a photograph for this file"'
-            + ' style="background:none;border:1px solid var(--border);border-radius:9px;'
-            + 'width:30px;height:30px;display:flex;align-items:center;justify-content:center;'
-            + 'cursor:pointer;flex-shrink:0;color:var(--text-lt);padding:0;margin-left:6px;position:relative">'
-            + '<span class="material-icons-outlined" style="font-size:17px">photo_camera</span>'
-            + '<span data-role="photo-count" style="display:none;position:absolute;top:-5px;right:-5px;'
-            + 'min-width:15px;height:15px;border-radius:8px;background:var(--deep);color:var(--on-deep);'
-            + 'font-size:9.5px;font-weight:800;line-height:15px;text-align:center;padding:0 3px"></span></button>'
-          : '')
+        /* The clinical camera is NOT here, and that is measured rather than
+           chosen. A second 30px icon beside the first left the diagnosis 154px
+           instead of 200px, so "Diagnosis pending" wrapped onto a second line
+           and took the hero from 57px to 81px — 683px of record in the 661px
+           this modal has. This row had 30px of slack and the button needed 36.
+           It lives in the modal's header instead, where the close button
+           already sets the height and the text ellipsizes rather than wraps. */
         +'<span class="pr-sev '+esc(sev)+'">'+esc(sev)+'</span>'
       +'</div>';
 

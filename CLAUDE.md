@@ -1720,6 +1720,25 @@ spends its worst artefacts on exactly the edges that matter here.
 - A receptionist and a drug-shop salesperson are not offered a camera. A
   photograph of a patient is clinical work.
 
+### "A row that already exists" is not enough — it needs the SLACK
+The camera button first went in the patient record's hero row, beside the "fix
+a wrong figure" icon, on the rule written further down this file: *put a new
+affordance in a row that already exists, or it comes out of the button at the
+bottom.* That rule is right and it was not sufficient.
+
+That row had **30px of slack and the button needed 36**. The diagnosis dropped
+from 200px to 154px, "Diagnosis pending" wrapped onto a second line, the hero
+went 57px → 81px, and the whole record went to **683px in the 661px** the modal
+has. `test-patient-record.js` caught it.
+
+It lives in the modal's **header** now, beside the close button — which already
+makes that row 34px tall, so a second 34px control costs nothing, and the name
+and meta beside it are `nowrap`/`ellipsis` so they cannot wrap the way the
+diagnosis did. **Adding to a full row can cost height without adding a row**:
+the squeeze lands on whatever text was sharing it. The test now asserts the
+hero stays one line and the record still fits, so the next person to reach for
+that row finds out immediately.
+
 ### The proof that the upload check works
 "No image was uploaded" is also what a detector that inspects nothing reports.
 So the test posts the very bytes just taken and **requires the instrument to

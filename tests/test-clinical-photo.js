@@ -217,24 +217,46 @@ const MEASURE_IN = (sel) => {
     if (modal) modal.style.display = 'flex';
     renderActiveDetailView();
     await new Promise(r => setTimeout(r, 400));
-    const btn = document.querySelector('[data-action="clinic-photo"]');
+    const btn = document.getElementById('pxPhotoBtn');
+    const head = btn && btn.parentElement;
     const hero = document.querySelector('.pr-hero');
     const body = document.querySelector('#histModalBody');
     return {
-      there: !!btn,
-      inHero: !!(btn && hero && hero.contains(btn)),
-      // The record already measures to the millimetre against the modal it
-      // sits in; a new full-width button here pushed it 50px over once before.
+      there: !!(btn && getComputedStyle(btn).display !== 'none'),
+      // Beside the close button, which already sets this row's height.
+      withClose: !!(head && head.querySelector('[aria-label="Close"]')),
+      headH: head ? Math.round(head.getBoundingClientRect().height) : 0,
+      closeH: head && head.querySelector('[aria-label="Close"]')
+        ? Math.round(head.querySelector('[aria-label="Close"]').getBoundingClientRect().height) : 0,
+      heroH: hero ? Math.round(hero.getBoundingClientRect().height) : 0,
+      // The record measures to the millimetre against the modal it sits in.
       recordH: body ? Math.round(body.scrollHeight) : 0,
       roomH: body ? Math.round(body.clientHeight) : 0,
     };
   }, VISIT);
   result('the patient file offers a camera', entry.there === true);
-  result('and it is an icon in a row that already existed, not a new block',
-    entry.inHero === true);
+  /* Placed by MEASUREMENT, not by taste.
+   *
+   * It was first put in the record's hero row, beside the "fix a figure" icon,
+   * on the principle that a new affordance belongs in a row that already
+   * exists. That row had 30px of slack and the button needed 36: the diagnosis
+   * dropped from 200px to 154px, "Diagnosis pending" wrapped onto a second
+   * line, the hero went 57px -> 81px and the whole record went to 683px in the
+   * 661px it has. test-patient-record.js caught it.
+   *
+   * The header is the right row because the close button ALREADY makes it
+   * 34px tall, so a second 34px control costs nothing, and the name and meta
+   * beside it ellipsize rather than wrap. */
+  result('it sits beside the close button, in a row already that tall',
+    entry.withClose === true && entry.headH <= entry.closeH + 26,
+    'row ' + entry.headH + 'px, close button ' + entry.closeH + 'px');
+  result('and the record still fits the modal it lives in',
+    entry.recordH <= entry.roomH, entry.recordH + 'px in ' + entry.roomH + 'px');
+  result('the diagnosis did not get squeezed into wrapping',
+    entry.heroH <= 60, 'hero ' + entry.heroH + 'px');
 
   // ── 2. Opening it gives OUR viewport, not the phone's camera app ─────
-  await page.evaluate(() => document.querySelector('[data-action="clinic-photo"]').click());
+  await page.evaluate(() => document.getElementById('pxPhotoBtn').click());
   await page.waitForTimeout(1400);
 
   const sheet = await page.evaluate(() => {
@@ -473,8 +495,11 @@ const MEASURE_IN = (sel) => {
       window._activeDetailContext = { current: v, history: [] };
       renderActiveDetailView();
       await new Promise(r => setTimeout(r, 120));
+      // The button is in the static header markup, so "is it there?" is the
+      // wrong question — "can this role see it?" is the one that matters.
+      var el = document.getElementById('pxPhotoBtn');
       out[role] = { may: window.HomattPhoto.may(),
-                    btn: !!document.querySelector('[data-action="clinic-photo"]') };
+                    btn: !!(el && getComputedStyle(el).display !== 'none') };
     }
     return out;
   }, VISIT);
