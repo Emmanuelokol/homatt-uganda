@@ -22,15 +22,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check SUPABASE_ACCESS_TOKEN is set
+      # CHECK THE TOKEN WORKS, NOT THAT IT IS NON-EMPTY.
+      #
+      # This step used to test only that the secret had some characters in it,
+      # and then said "✓ SUPABASE_ACCESS_TOKEN is set" — which it was, and it
+      # was also revoked. The job then ran on for three more steps and failed
+      # at the ninth function with "unexpected list functions status 401", nine
+      # times over, naming nothing anybody could act on.
+      #
+      # A revoked token and a missing one need the same remedy and must
+      # therefore produce the same sentence, at the first step, not the last.
+      - name: Check SUPABASE_ACCESS_TOKEN works
         run: |
+          set -uo pipefail
           if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
-            echo "::error::SUPABASE_ACCESS_TOKEN secret is not set."
-            echo "::error::Go to: Supabase dashboard → Account → Access Tokens → create one"
-            echo "::error::Then: GitHub repo → Settings → Secrets → Actions → New secret"
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Supabase dashboard → Account → Access Tokens → generate one, then GitHub → Settings → Secrets and variables → Actions → SUPABASE_ACCESS_TOKEN."
             exit 1
           fi
-          echo "✓ SUPABASE_ACCESS_TOKEN is set"
+          code=$(curl -sS -o /tmp/sb_projects.json -w '%{http_code}' \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            https://api.supabase.com/v1/projects || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is set but Supabase REJECTED it (HTTP $code). It has expired or been revoked. Generate a new one at Supabase dashboard → Account → Access Tokens, then replace the SUPABASE_ACCESS_TOKEN secret at GitHub → Settings → Secrets and variables → Actions. Nothing deploys until that is done."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Could not reach the Supabase Management API (HTTP $code). Nothing has been deployed; try again shortly."
+            exit 1
+          fi
+          if ! grep -q "$SUPABASE_PROJECT_REF" /tmp/sb_projects.json; then
+            echo "::error::The token is valid but project $SUPABASE_PROJECT_REF is not one it can see. It probably belongs to a different Supabase account or organisation."
+            exit 1
+          fi
+          echo "✓ token accepted, and it can see $SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
@@ -64,7 +88,16 @@ jobs:
             echo "::warning::No secrets in GitHub — nothing set, nothing erased."
             exit 0
           fi
-          supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF"
+          # continue-on-error on this step means GitHub marks it green whatever
+          # happens — which is how a revoked token produced a run with one red
+          # step and three green ones that had all failed. If it fails, SAY so.
+          if out=$(supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF" 2>&1); then
+            echo "$out"
+          else
+            echo "$out"
+            why=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 | tr '\n' ' ' | cut -c1-400)
+            echo "::warning::secrets were NOT set — $why"
+          fi
         env:
           SUPABASE_ACCESS_TOKEN:      ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           ONESIGNAL_APP_ID:           ${{ secrets.ONESIGNAL_APP_ID }}

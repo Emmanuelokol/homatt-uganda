@@ -1924,6 +1924,48 @@ the request came from it arrives either as a readable 404 or as nothing. Both
 say the same sentence now; leaning on the CORS block alone left the readable
 case reporting a bare "error 404" to a clinic.
 
+### 5. And none of it deployed, for eleven days, in silence
+`.github/workflows/deploy-edge-functions-branch.yml`
+
+The clinic tapped the new button and got *"the helper is not installed on your
+server yet"*. That was true, and it was not about `change-email`. **Every Edge
+Function had failed to deploy on every run since 5 September** — `ai-proxy`,
+`create-staff`, `discharge-notify`, `payment-notify`, `relworx-payment`,
+`send-notification`, `structure`, `transcribe` and `change-email`. Dictation
+and push notifications were running whatever last deployed in **March**.
+
+The cause, once it could be read:
+
+```
+unexpected list functions status 401: {"message":"Unauthorized"}
+```
+
+The access token had been revoked. Three things conspired to hide that for a
+fortnight, and each is worth keeping:
+
+- **A check that only tests non-empty is not a check.** The first step said
+  `✓ SUPABASE_ACCESS_TOKEN is set`, which was true of a revoked token. It now
+  calls `GET /v1/projects` and fails at step one with the remedy in the
+  sentence — and confirms the token can actually see *this* project, since a
+  valid token for the wrong account fails differently and needs a different
+  answer.
+- **`continue-on-error: true` makes a green tick that cannot go red.** "Set
+  Supabase secrets" and "Configure Auth origins" both use the same token and
+  both *appeared to succeed* while failing. I read those ticks as proof the
+  token worked and told Emmanuel so — twice, and wrongly. A step allowed to
+  fail must still SAY that it failed.
+- **The error was written only to the log.** The step ran the CLI and reported
+  `::error::<fn> failed to deploy`, nine identical lines with no reason, while
+  the CLI's own message went to a log that a corporate egress proxy refuses to
+  serve (the download is Azure blob storage; 403). A run's **annotations** come
+  from the GitHub API and are always readable. Putting the CLI's last lines
+  into the annotation is what turned eleven days of "failed" into one
+  diagnosable sentence, in a single run.
+
+**The token is the fix and it is not a code change**: Supabase dashboard →
+Account → Access Tokens → generate, then GitHub → Settings → Secrets and
+variables → Actions → `SUPABASE_ACCESS_TOKEN`. Nothing deploys until then.
+
 ### Still open
 There is **no password reset** on the clinic sign-in page at all — no "forgot
 password", no route of any kind. A clinic that mistypes its way out has nothing
@@ -2308,6 +2350,17 @@ rules worth repeating here:
   wrong two elements away inside a sheet that is always `#fff` — where it was
   1.11:1 on dark themes. If a surface does not follow the theme, nothing on it
   may.
+- **`continue-on-error: true` is a green tick that cannot go red.** Two deploy
+  steps using a revoked token both "succeeded" for eleven days, and I read
+  those ticks as proof the token was fine — twice, out loud, wrongly. A step
+  allowed to fail must still emit a `::warning::` saying it did.
+- **Write the failure where it can be READ.** A GitHub log download is served
+  from Azure blob storage and a corporate proxy will refuse it (403);
+  annotations come from the GitHub API and always arrive. `::error::<fn>
+  failed` carried no reason for a fortnight; putting the tool's own last lines
+  into the annotation diagnosed it in one run.
+- **A check that tests non-empty is not a check.** `✓ SUPABASE_ACCESS_TOKEN is
+  set` was true of a revoked token. Call the API with it.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by
