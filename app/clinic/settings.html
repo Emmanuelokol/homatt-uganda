@@ -1756,9 +1756,9 @@ function getHours() {
   var r = {};
   DAYS.forEach(function(d) {
     r[d] = {
-      open: document.getElementById('hs-open-'+d)?.value || '08:00',
-      close: document.getElementById('hs-close-'+d)?.value || '17:00',
-      closed: document.getElementById('hs-closed-'+d)?.checked || false
+      open: (document.getElementById('hs-open-'+d) || {}).value || '08:00',
+      close: (document.getElementById('hs-close-'+d) || {}).value || '17:00',
+      closed: (document.getElementById('hs-closed-'+d) || {}).checked || false
     };
   });
   return r;

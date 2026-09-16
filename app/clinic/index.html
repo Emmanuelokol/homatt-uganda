@@ -7,6 +7,80 @@
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
   <title>Homatt Clinic</title>
+  <script>
+  /* A blank page is the worst thing a browser can show a clinic, because it
+   * looks identical to a broken connection, a wrong address and a dead phone.
+   * Clinics reported "the site does not load" and there was nothing on screen
+   * for anybody to act on.
+   *
+   * This runs FIRST and is written in the oldest JavaScript there is — no
+   * arrow functions, no const, no template strings, no optional chaining —
+   * because a browser too old for the app is by definition too old for
+   * anything clever in the message that explains it. It must parse in the
+   * engine it is warning about, or it is another blank page.
+   *
+   * It checks the things the portal genuinely cannot work without, and names
+   * the missing one. It does NOT check for a service worker: the app runs
+   * perfectly well without offline caching, and refusing to load over that
+   * would lock out the browsers this is meant to help. */
+  (function () {
+    var missing = [];
+    try {
+      if (typeof JSON === 'undefined' || !JSON.parse) missing.push('reading saved data (JSON)');
+      if (typeof Promise === 'undefined') missing.push('Promises');
+      if (typeof fetch === 'undefined') missing.push('fetch');
+      if (!document.querySelector) missing.push('querySelector');
+      if (!window.addEventListener) missing.push('addEventListener');
+      if (!Array.prototype.forEach || !Array.prototype.indexOf) missing.push('modern arrays');
+      try {
+        // Not just "is there a localStorage" — a browser in a locked-down
+        // private mode HAS the object and THROWS on write, which is a
+        // different fault and needs a different sentence.
+        window.localStorage.setItem('__homatt_probe__', '1');
+        window.localStorage.removeItem('__homatt_probe__');
+      } catch (e) { missing.push('STORAGE_BLOCKED'); }
+    } catch (e) { missing.push('something basic'); }
+    if (!missing.length) return;
+
+    var blocked = false, i;
+    for (i = 0; i < missing.length; i++) if (missing[i] === 'STORAGE_BLOCKED') blocked = true;
+
+    var msg = blocked
+      ? '<b>This browser is blocking storage.</b><p>Homatt Clinic keeps your sign-in and '
+        + 'any work you record without a connection on this device, so it cannot run with '
+        + 'storage switched off.</p><p>If you are in a private or incognito window, open the '
+        + 'site in a normal window. Otherwise allow cookies and site data for this site, '
+        + 'then reload.</p>'
+      : '<b>This browser is too old for Homatt Clinic.</b><p>It is missing: '
+        + missing.join(', ') + '.</p><p>Please open the site in an up-to-date Chrome, Edge, '
+        + 'Firefox or Safari, or install the Android app. Nothing you have recorded is '
+        + 'lost — it is on the server, and it will be there when you sign in.</p>';
+
+    var show = function () {
+      var d = document.createElement('div');
+      d.setAttribute('style',
+        'position:fixed;inset:0;left:0;top:0;right:0;bottom:0;z-index:99999;background:#F3FAF4;'
+        + 'color:#17251A;font-family:Arial,Helvetica,sans-serif;padding:26px;overflow:auto;'
+        + 'font-size:15px;line-height:1.55');
+      d.innerHTML = '<div style="max-width:430px;margin:8vh auto;background:#fff;border:1px solid #D7E4D9;'
+        + 'border-radius:16px;padding:22px 20px">'
+        + '<div style="font-size:19px;font-weight:700;margin-bottom:10px">Homatt Clinic</div>'
+        + msg
+        + '<p style="color:#5B6B5E;font-size:13px">If you are not sure what to do, show this '
+        + 'screen to whoever set up the clinic’s phones.</p></div>';
+      if (document.body) document.body.appendChild(d);
+    };
+    if (document.body) show();
+    else if (window.addEventListener) window.addEventListener('DOMContentLoaded', show);
+    else if (window.attachEvent) window.attachEvent('onload', show);
+  })();
+  </script>
+  <noscript>
+    <div style="font-family:Arial,Helvetica,sans-serif;padding:26px;font-size:15px;line-height:1.6">
+      <b>Homatt Clinic needs JavaScript.</b>
+      <p>Turn it on in your browser settings and reload this page.</p>
+    </div>
+  </noscript>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
   <link href="fonts/material-icons.css?v=1" rel="stylesheet">
@@ -601,7 +675,7 @@
       userId: authData.user.id,
       staffName: pu.full_name || email,
       clinicId: pu.clinic_id,
-      clinicName: pu.clinics?.name || 'Clinic',
+      clinicName: (pu.clinics || {}).name || 'Clinic',
       staffRole: pu.staff_role || 'owner',
       email
     }));

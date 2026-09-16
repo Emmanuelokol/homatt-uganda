@@ -1878,9 +1878,180 @@ There is **no password reset** on the clinic sign-in page at all — no "forgot
 password", no route of any kind. A clinic that mistypes its way out has nothing
 to tap. That is a real hole and it is not fixed here.
 
+## "It does not load on some browsers"
+
+`tests/measure-browser-support.js` · `app/clinic/index.html` (the boot check)
+
+Desktop clinics reported the site simply not loading. That is the hardest
+report to act on, because a blank page looks identical to a bad connection, a
+wrong address and a dead laptop.
+
+**A missing METHOD and a missing SYNTAX FEATURE are not the same kind of
+fault, and only one of them does this.** `[].flatMap()` on an old engine
+throws where it is called and the rest of the page carries on. A `?.` is a
+**parse error**, and it takes the WHOLE FILE — every function in it, including
+the ones that never touch the new syntax. No `try/catch` can reach it, because
+nothing in the file ever runs.
+
+Measured across the 32 shipped files:
+
+| | |
+|---|---|
+| optional chaining `?.` in shipped code | **36 occurrences in 4 files** |
+| one of those files | `js/clinic.js` — which defines `requireClinic()` |
+
+So on any browser older than Chrome 80 / Firefox 74 / Safari 13.1, `clinic.js`
+did not parse, `requireClinic` did not exist, and **every guarded page in the
+portal was a blank screen**. The other three were `index.html` (the sign-in
+handler itself), `new-order-wizard.js` and `settings.html`.
+
+All 36 are gone, rewritten as `(EXPR || {}).prop` — which evaluates EXPR
+exactly once, yields `undefined` instead of throwing, and is understood by
+every engine ever shipped. No build step was added: this project deliberately
+ships plain files, and a bundler is a bigger change than the bug.
+
+| | before | after |
+|---|---|---|
+| hard syntax dependencies | 36 | **0** |
+| files that would not parse | 4 | **0** |
+
+`Promise.allSettled` in the service worker is shimmed (it was called during
+`install`, so an older browser got **no offline app at all**, silently), and
+the two `.flatMap()` calls are `reduce`. Everything that remains — four
+`globalThis` and three `navigator.clipboard` — is feature-detected or inside a
+`try/catch`, listed by name in the measurement with the guard quoted beside it.
+
+### And when it genuinely cannot run, it says so
+A first-in-the-page check, written in the oldest JavaScript there is — no
+arrow functions, no `const`, no template strings — because **a browser too old
+for the app is too old for anything clever in the message explaining that.**
+It names the missing capability, and tells a locked-down private window that
+it is blocking storage, which is a different fault needing a different
+sentence. Plus a `<noscript>`.
+
+### The instrument was wrong first, in both directions
+The first version of `measure-browser-support.js` blanked strings and comments
+with a hand-rolled scanner and matched with clever regexes. It reported **12**
+optional-chaining sites where there are **36** (its blanker lost track of
+quoting and silently blanked real code), and it reported "class private field
+`#x`" four times in dashboard.html — every one a **CSS hex colour** inside an
+inline style.
+
+**A rule that cannot tell `#private` from `#FFF8E1` is worse than no rule, and
+a scanner that under-reports is worse still — it is the one that says the
+problem is fixed.** It now uses a literal search, which has complete recall by
+construction, and prints every line so a reader can judge. It can over-report;
+it cannot under-report. That is the safe direction for a check whose job is to
+find something before a clinic does.
+
+## Switching tabs must never lose what was typed
+
+`app/clinic/js/new-order-wizard.js` · `tests/test-wizard-draft.js`
+
+> *"If you open a new tab, by the time you go back to the site it needs you to
+> re-enter the details."*
+
+It was not the browser. The wizard had:
+
+```js
+const untouched = state.step === 1 && !state.patient && !state.bookingId &&
+  !state.confirmedDx && !state.medications.length && … ;
+if (untouched && hidden > 2500ms) window.location.replace('dashboard.html');
+```
+
+Every one of those is something **picked**. On the intake screen almost all
+the work is something **typed** — name, phone, age, complaint, story,
+background, four vitals — and it lives in the DOM. `state.patient` is only set
+when an *existing* patient is chosen, so a brand-new patient, which is the
+common case, left `untouched` true with the screen full of their details.
+Three seconds in another tab and the page navigated away and threw the lot.
+
+On a phone that seldom fires. On a desktop it fires all day — which is exactly
+who reported it.
+
+**Ask the SCREEN whether anybody has done anything, not the model.** A model
+written only on "confirm" cannot answer a question about unconfirmed work.
+
+### Two ways to get "has anybody typed?" wrong, both found by probing
+- **`defaultValue` is not the default.** `followUpDays` is a number box the
+  wizard fills with **7** on load while its markup default is empty, so a
+  `defaultValue` comparison called every fresh form "already being typed in" —
+  which would have silently disabled the return-to-dashboard *and* suppressed
+  the draft offer, on a form where nothing looked wrong. A **baseline**
+  snapshot taken once the form settles cannot fall behind the form the way a
+  list of field names would.
+- **The app fires its own input events.** Counting them marked the form
+  touched the instant it opened. Before the baseline only `isTrusted` events
+  count — the browser sets that on a real key and never on `dispatchEvent`.
+  After it, both count, because by then a synthetic fill **is** work: that is
+  dictation and the one-tap handoff putting a patient on screen.
+
+### And a draft, because not navigating away is not the whole answer
+It does not cover the tab being discarded to reclaim memory, a stray Back, a
+crash, or the wrong window closed — and on each of those a clinician retypes a
+patient from memory, which is worse than a nuisance because the second telling
+is never quite the first.
+
+**Offered, never applied.** A shared clinic laptop can hold somebody else's
+half-typed patient, and writing that into a form unasked is how one record
+ends up describing two people — a fault this project has already had once.
+Kept 12 hours, per clinic, and cleared the moment a treatment is saved.
+
+### What is NOT claimed
+The wizard also returns home when a genuinely untouched New Treatment is
+resumed. That does not fire in the test harness — and **it does not fire on
+the original code either**, checked directly. So it is not a regression, and
+asserting it would be asserting something that was never true under those
+conditions. The test asserts the judgement the navigation depends on instead,
+which is the part that changed.
+
+## Printing a record, and printing a period
+
+`app/clinic/js/clinic-print.js` · `tests/test-print.js`
+
+One patient in full — the sheet that goes in a paper file or travels with a
+referral — and a register for a day, week, month or year with the money on it.
+
+**Not `window.open()`.** Pop-ups are blocked by default in several desktop
+browsers and behave badly inside the Android WebView, which is precisely the
+split of devices this clinic uses. The sheet is built into a div in the
+current page and a `@media print` rule hides everything else: no pop-up, no
+second document, no network. It prints offline, which matters because the
+power and the internet in a Ugandan clinic do not fail at the same times.
+
+It shows the sheet on screen first. Paper costs money, and nobody should find
+out the date range was wrong after forty pages.
+
+- **Black on white, always.** This is the one surface where the app's colour
+  tokens are wrong: a clinic on the dark skin would otherwise print white on
+  white and get blank paper, or lay down a full dark background. Asserted at
+  21:1 on two skins.
+- **Local midnight, not UTC.** Kampala is UTC+3, so a UTC "today" silently
+  drops the first three hours of the clinic's day.
+- **The "N/A" placeholder is dropped**, the same way the record screen drops
+  it — a medicine called "N/A" is not a prescription and must not print like
+  one.
+- The query lives in `dashboard.html`, not in the module: the module is handed
+  a loader and never learns what a Supabase is, which is what keeps the
+  single-patient sheet printable with no connection at all.
+
+### "It costs no height" is a delta, not a threshold
+The print button went in the patient record's modal header. The first version
+of the test asserted `headH <= 62` and `heroH <= 60` — two numbers picked out
+of the air — and both failed for reasons that had nothing to do with the
+button: the header is 65px because the name and meta are two lines, and the
+hero is 81px because *"Uncomplicated Malaria"* is a long diagnosis that wraps.
+Measured with the button, without it, and without the camera too, **every
+figure was identical**.
+
+**A threshold tests the fixture.** The claim was "this control costs the
+record no height", and the only honest way to check it is to take the control
+away and measure again — the same discipline as putting a bug back to prove a
+fix.
+
 ## The tests
 
-`tests/` — 67 files, ~970 checks (plus 14 `measure-*.js`, which print numbers
+`tests/` — 69 files, ~1010 checks (plus 15 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -1983,6 +2154,21 @@ rules worth repeating here:
   which is suggestive and not proof. Restoring the old ordering brought the
   failure straight back (4 of 6), and that is the half of the experiment that
   turns correlation into cause.
+- **Assert a DELTA, not a threshold, for "this costs nothing".** `headH <= 62`
+  tests the fixture; removing the control and measuring again tests the claim.
+  Two such thresholds failed in `test-print.js` for reasons that had nothing
+  to do with the thing being added — a two-line name, and a long diagnosis
+  that wraps.
+- **Before asserting you PRESERVED a behaviour, check it happens at all.**
+  `test-wizard-draft.js` was going to assert that an untouched wizard still
+  returns to the dashboard. It does not fire in the harness — and it does not
+  fire on the original code either. Asserting it would have been asserting
+  something that was never true, and the "regression" would have been chased
+  for an afternoon.
+- **A scanner that under-reports is worse than no scanner**, because it is the
+  one that says the problem is fixed. `measure-browser-support.js` found 12 of
+  36 real sites with clever regexes and four imaginary ones (CSS hex colours
+  read as JS private fields). Prefer complete recall and let a reader judge.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by

@@ -488,7 +488,19 @@
             <span class="material-icons-outlined" style="font-size:18px;vertical-align:-3px;color:#1565C0">monitor_heart</span>
             Active Treatments
           </div>
-          <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
+          <span style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+            <span id="activeCount" style="font-size:13px;color:#1565C0;font-weight:600"></span>
+            <!-- Print the register: today, this week, this month, this year.
+                 In the header row that already exists, beside the count. -->
+            <button id="printPeriodBtn" onclick="openPrintPeriod()"
+              aria-label="Print patients for a day, week, month or year"
+              title="Print patients for a day, week, month or year"
+              style="background:none;border:1px solid var(--border, #E0E0E0);border-radius:8px;
+                     width:30px;height:30px;display:flex;align-items:center;justify-content:center;
+                     cursor:pointer;color:var(--text-lt, #5F6368);padding:0">
+              <span class="material-icons-outlined" style="font-size:17px">print</span>
+            </button>
+          </span>
         </div>
         <div style="padding:8px 16px 4px;position:relative">
           <span class="material-icons-outlined" style="position:absolute;left:26px;top:50%;transform:translateY(-50%);color:var(--text-lt, #5F6368);font-size:18px;pointer-events:none">search</span>
@@ -800,6 +812,13 @@
           aria-label="Take a photograph for this file" title="Take a photograph for this file">
           <span class="material-icons-outlined" style="font-size:19px">photo_camera</span>
           <span data-role="photo-count"></span>
+        </button>
+        <!-- Print this one patient, in full. In the header for the same reason
+             the camera is: the close button already makes this row 34px tall,
+             and the record below it has no spare height at all. -->
+        <button id="pxPrintBtn" data-action="print-patient" style="display:none"
+          aria-label="Print this patient's full record" title="Print this patient's full record">
+          <span class="material-icons-outlined" style="font-size:19px">print</span>
         </button>
         <button onclick="document.getElementById('histModal').style.display='none'"
           aria-label="Close"
@@ -2476,7 +2495,50 @@
         _photoCount(current);
       }
     }
+
+    /* Print this one patient, in full. The sheet is built from the record
+       already on screen plus the history beside it, so it needs no request and
+       works with no connection — which is the state a clinic is in whenever
+       the power has just come back and the router has not. */
+    var prBtn = document.getElementById('pxPrintBtn');
+    if (prBtn) {
+      var canPrint = !!window.HomattPrint;
+      prBtn.style.cssText = canPrint
+        ? 'background:var(--tint-2);color:var(--text);border:1px solid var(--border);' +
+          'border-radius:50%;width:34px;height:34px;flex-shrink:0;display:flex;' +
+          'align-items:center;justify-content:center;cursor:pointer;padding:0'
+        : 'display:none';
+      if (canPrint) {
+        prBtn.onclick = function () {
+          HomattPrint.patient(current, (_activeDetailContext || {}).history || []);
+        };
+      }
+    }
   }
+
+  /* The register, for a period. The query lives HERE rather than in the print
+     module because this is where the client and the clinic id are; the module
+     is handed a loader and never learns how this clinic talks to its server —
+     the same separation that keeps the sheet printable offline. */
+  async function openPrintPeriod() {
+    if (!window.HomattPrint) return;
+    HomattPrint.askPeriod(async function (sinceISO) {
+      if (!supabase) return null;
+      var clinicId = await resolveClinicId();
+      if (!clinicId) return null;
+      var r = await supabase
+        .from('clinic_diagnoses')
+        .select('id,patient_name,patient_phone,confirmed_diagnosis,severity,clinician_name,' +
+                'prescription_items,total_charged_ugx,amount_paid,payment_status,created_at')
+        .eq('clinic_id', clinicId)
+        .gte('created_at', sinceISO)
+        .order('created_at', { ascending: true })
+        .limit(2000);
+      if (r && r.error) return null;
+      return (r && r.data) || [];
+    });
+  }
+  window.openPrintPeriod = openPrintPeriod;
 
   // How many photographs this visit has, as a dot on the camera button.
   function _photoCount(current) {
@@ -7111,5 +7173,6 @@
 <script src="js/clinic-regimens.js?v=20261007"></script>
 <script src="js/clinic-corrections.js?v=20261007"></script>
 <script src="js/clinic-photo.js?v=20261007"></script>
+<script src="js/clinic-print.js?v=20261007"></script>
 </body>
 </html>

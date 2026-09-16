@@ -345,7 +345,8 @@ function setupClinicLogout() {
   // Setup mobile nav (called from every portal page after DOMContentLoaded)
   setupClinicMobileNav();
 
-  document.getElementById('clinicLogoutBtn')?.addEventListener('click', clinicSignOut);
+  var _logoutBtn = document.getElementById('clinicLogoutBtn');
+  if (_logoutBtn) _logoutBtn.addEventListener('click', clinicSignOut);
 
   // Inject an always-visible exit control into the top bar. Without this the only
   // way out is the Sign Out button at the bottom of the sidebar, which is hidden
@@ -438,7 +439,7 @@ async function resolveClinicId(supabase, session) {
 
   try {
     const { data: authData } = await supabase.auth.getSession();
-    if (!authData?.session?.user) return null;
+    if (!(authData && authData.session && authData.session.user)) return null;
 
     const { data: pu } = await supabase
       .from('portal_users')
@@ -448,10 +449,10 @@ async function resolveClinicId(supabase, session) {
       .eq('is_active', true)
       .single();
 
-    if (pu?.clinic_id) {
+    if (pu && pu.clinic_id) {
       _mergeClinicSession({
         clinicId: pu.clinic_id,
-        clinicName: pu.clinics?.name || session.clinicName || 'Clinic',
+        clinicName: (pu.clinics || {}).name || session.clinicName || 'Clinic',
         staffRole: pu.staff_role || session.staffRole || 'owner',
       });
       return pu.clinic_id;

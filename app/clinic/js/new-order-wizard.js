@@ -19,8 +19,8 @@
     new Date().toLocaleDateString('en-UG', { day:'numeric', month:'short', year:'numeric' });
 
   // Resolve clinic_id
-  let _clinicId = session?.clinicId || null;
-  if (!_clinicId && supabase && !session?.demo) {
+  let _clinicId = (session || {}).clinicId || null;
+  if (!_clinicId && supabase && !(session || {}).demo) {
     resolveClinicId(supabase, session).then(id => { _clinicId = id; });
   }
 
@@ -96,9 +96,9 @@
 
   // ── Fee helpers ──────────────────────────────────────────────────
   function recalcFees() {
-    const c = parseFloat(document.getElementById('feeConsult')?.value) || 0;
-    const l = parseFloat(document.getElementById('feeLab')?.value)    || 0;
-    const m = parseFloat(document.getElementById('feeMeds')?.value)   || 0;
+    const c = parseFloat((document.getElementById('feeConsult') || {}).value) || 0;
+    const l = parseFloat((document.getElementById('feeLab') || {}).value)    || 0;
+    const m = parseFloat((document.getElementById('feeMeds') || {}).value)   || 0;
     state.feeConsult = c; state.feeLab = l; state.feeMeds = m;
     const total = c + l + m;
     const el = document.getElementById('feeTotal');
@@ -205,7 +205,7 @@
     if (supabase && _clinicId) {
       supabase.from('clinics').select('consultation_fee').eq('id', _clinicId).maybeSingle()
         .then(({ data }) => {
-          if (data?.consultation_fee) {
+          if (data && data.consultation_fee) {
             const el = document.getElementById('feeConsult');
             if (el && !parseFloat(el.value)) { el.value = data.consultation_fee; recalcFees(); }
           }
@@ -474,7 +474,7 @@
   }
 
   document.getElementById('lookupCodeBtn').onclick = async () => {
-    const code = (bookingCodeInput?.value || '').trim().toUpperCase();
+    const code = ((bookingCodeInput || {}).value || '').trim().toUpperCase();
     const errEl = document.getElementById('codeError');
     errEl.style.display = 'none';
     if (!code || !code.startsWith('HO')) {
@@ -896,8 +896,8 @@
     // (we almost always do). Only look it up online, never while offline —
     // resolveClinicId awaits getSession(), which hangs for the full timeout in
     // airplane mode and was a big part of the ~1-minute wait.
-    if (!_clinicId && session?.clinicId) _clinicId = session.clinicId;
-    if (!_clinicId && !offline && supabase && !session?.demo) {
+    if (!_clinicId && (session || {}).clinicId) _clinicId = session.clinicId;
+    if (!_clinicId && !offline && supabase && !(session || {}).demo) {
       _clinicId = await resolveClinicId(supabase, session);
     }
 
@@ -908,7 +908,7 @@
       const id = CO.uuid();
       CO.enqueue('table_upsert', {
         table: 'clinic_patients',
-        rows: [{ id, clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null }],
+        rows: [{ id, clinic_id: _clinicId, full_name: name, phone, registered_by: (session || {}).userId || null }],
         onConflict: 'clinic_id,phone'
       });
       CO.flush();
@@ -925,7 +925,7 @@
       if (supabase && !offline) {
         try {
           supabase.functions.invoke('send-sms-invite', {
-            body: { phone, name, clinicName: session?.clinicName || 'Clinic' }
+            body: { phone, name, clinicName: (session || {}).clinicName || 'Clinic' }
           }).catch(() => {});
         } catch (e) {}
       }
@@ -942,7 +942,7 @@
     let clinicPatientId = null;
     try {
       const up = supabase.from('clinic_patients')
-        .upsert({ clinic_id: _clinicId, full_name: name, phone, registered_by: session?.userId || null },
+        .upsert({ clinic_id: _clinicId, full_name: name, phone, registered_by: (session || {}).userId || null },
                 { onConflict: 'clinic_id,phone' })
         .select('id').single();
       const res = CO ? await CO.withTimeout(up, 6000) : await up;
@@ -1228,9 +1228,9 @@
   const labNoMatchEl  = document.getElementById('labNoMatch');
 
   function applyLabFilter() {
-    const q = (labSearchEl?.value || '').trim().toLowerCase();
+    const q = ((labSearchEl || {}).value || '').trim().toLowerCase();
     const qEl = document.getElementById('labNoMatchQ');
-    if (qEl) qEl.textContent = (labSearchEl?.value || '').trim();
+    if (qEl) qEl.textContent = ((labSearchEl || {}).value || '').trim();
     if (labSearchClr) labSearchClr.style.display = q ? 'block' : 'none';
     let anyVisible = false;
     document.querySelectorAll('.lab-chip').forEach(chip => {
@@ -1579,13 +1579,259 @@
   // OS resumed. If the app is brought back and this wizard is completely
   // untouched, go to the dashboard. ANY entered work (patient, diagnosis, meds,
   // labs, or a booking) keeps the user here so nothing is ever lost.
+  /* WHAT COUNTS AS "UNTOUCHED" MUST INCLUDE WHAT WAS TYPED.
+   *
+   * This read `state` and nothing else — state.patient, bookingId,
+   * confirmedDx, medications, labTests, materialsUsed. Every one of those is
+   * something PICKED. On step 1 almost all the work is something TYPED: the
+   * name, the phone, the age, the complaint, the story, the background and
+   * four vitals boxes, and they live in the DOM. `state.patient` is only set
+   * when an EXISTING patient is chosen, so a brand-new patient — the common
+   * case — left `untouched` true with the screen full of their details.
+   *
+   * So: type a new patient in, switch to another tab for three seconds, come
+   * back, and the wizard navigated to the dashboard and threw all of it away.
+   * On a phone that seldom fires. On a desktop, where switching tabs is
+   * constant, it fires all day — which is exactly who reported it.
+   *
+   * The rule this should always have followed: ask the SCREEN whether anybody
+   * has done anything, not the model. A model that is only written on
+   * "confirm" cannot answer a question about unconfirmed work. */
+  /* Every field of the wizard, asked directly rather than from a hand-written
+   * list of ids. A list falls behind the form the first time somebody adds a
+   * box to it, and the failure is silent and costs a clinician their typing. */
+  function _wizFields() {
+    try {
+      return document.querySelectorAll(
+        '.wiz-section input, .wiz-section textarea, .wiz-section select');
+    } catch (e) { return []; }
+  }
+
+  /* Has this field been CHANGED, or is it simply showing what the page put
+   * there? Compared against a BASELINE taken once the form has settled, not
+   * against the HTML `defaultValue`.
+   *
+   * The difference is not academic. `followUpDays` is a number box the wizard
+   * fills with 7 on load — a sensible default nobody typed — and its HTML
+   * default is empty, so a defaultValue comparison called it changed and the
+   * form was NEVER untouched. That would have quietly disabled the
+   * return-to-dashboard and suppressed the draft offer for ever, on a form
+   * where nothing looked wrong. A probe found it in one pass; reading would
+   * not have, because the 7 is set from another file.
+   *
+   * A baseline also cannot fall behind the form the way a list of field names
+   * would: whatever the page sets, now or next year, is the baseline. */
+  var _wizBaseline = null;
+
+  function _wizSnapshot() {
+    var f = _wizFields(), snap = {};
+    for (var i = 0; i < f.length; i++) {
+      var el = f[i];
+      if (!el.id) continue;
+      var t = (el.type || '').toLowerCase();
+      snap[el.id] = (t === 'checkbox' || t === 'radio') ? ('c:' + !!el.checked)
+                                                        : ('v:' + String(el.value == null ? '' : el.value));
+    }
+    return snap;
+  }
+
+  function _wizChanged(el) {
+    if (!el || el.disabled) return false;
+    var t = (el.type || '').toLowerCase();
+    if (t === 'button' || t === 'submit' || t === 'reset' || t === 'hidden' || t === 'file') return false;
+    var now = (t === 'checkbox' || t === 'radio') ? ('c:' + !!el.checked)
+                                                  : ('v:' + String(el.value == null ? '' : el.value));
+    if (_wizBaseline && el.id && Object.prototype.hasOwnProperty.call(_wizBaseline, el.id)) {
+      return now !== _wizBaseline[el.id];
+    }
+    // No baseline yet (or no id): fall back to the markup's own default.
+    if (t === 'checkbox' || t === 'radio') return !!el.checked !== !!el.defaultChecked;
+    if (el.tagName === 'SELECT') return false;   // a bare select is the page's choice, not the user's
+    return String(el.value == null ? '' : el.value) !== String(el.defaultValue == null ? '' : el.defaultValue);
+  }
+
+  /* And a flag set by the EVENTS, because a baseline has one blind spot: it is
+   * taken a moment after load, and somebody typing inside that moment would be
+   * captured AS the baseline — their work would read as untouched, which is
+   * the dangerous direction. An input event cannot be mistaken that way.
+   *
+   * Synthetic events count on purpose: dictation and the one-tap handoff fill
+   * these boxes programmatically, and that is work worth keeping too. */
+  var _wizTouched = false;
+  function _wizNoteEvent(e) {
+    if (!e.target || !e.target.closest || !e.target.closest('.wiz-section')) return;
+    /* BEFORE the baseline, only a real keystroke counts.
+     *
+     * The wizard fills its own boxes while it is starting up — the default
+     * follow-up, the fee defaults, whatever the formulary loads — and each of
+     * those dispatches an input event. Counting them made the form "touched"
+     * the instant it opened, which silently disabled the return-to-dashboard
+     * on a form nobody had typed a character into.
+     *
+     * isTrusted is exactly the distinction: the browser sets it on events it
+     * generated from a real key or tap, and never on dispatchEvent. AFTER the
+     * baseline both count, because by then a synthetic fill IS work — that is
+     * dictation and the one-tap handoff putting a patient on the screen. */
+    if (_wizBaseline || e.isTrusted) _wizTouched = true;
+  }
+  document.addEventListener('input', _wizNoteEvent, true);
+  document.addEventListener('change', _wizNoteEvent, true);
+
+  function _wizAnyTypedInput() {
+    if (_wizTouched) return true;
+    var f = _wizFields();
+    for (var i = 0; i < f.length; i++) if (_wizChanged(f[i])) return true;
+    return false;
+  }
+
+  /* A DRAFT, because fixing the navigation is not the whole answer.
+   *
+   * Not navigating away covers the tab switch that was reported. It does not
+   * cover the browser reloading the tab to reclaim memory, a stray Back, a
+   * crash, or somebody closing the wrong window — and on every one of those a
+   * clinician retypes a patient from memory, which is worse than a nuisance
+   * because the second telling is never quite the first.
+   *
+   * Kept per clinic and per device. It is offered, never applied silently:
+   * a shared clinic laptop can hold somebody else's half-typed patient, and
+   * writing that into a form without asking is how one record ends up
+   * describing two people — a fault this project has already had once. */
+  var WIZ_DRAFT_KEY = 'homatt_wiz_draft';
+  var WIZ_DRAFT_MAX_AGE = 12 * 60 * 60 * 1000;
+
+  function _wizSaveDraft() {
+    try {
+      var f = _wizFields(), out = {}, n = 0;
+      for (var i = 0; i < f.length; i++) {
+        var el = f[i];
+        if (!el.id || !_wizChanged(el)) continue;
+        var t = (el.type || '').toLowerCase();
+        out[el.id] = (t === 'checkbox' || t === 'radio') ? { c: !!el.checked } : { v: el.value };
+        n++;
+      }
+      if (!n) { localStorage.removeItem(WIZ_DRAFT_KEY); return; }
+      localStorage.setItem(WIZ_DRAFT_KEY, JSON.stringify({
+        at: Date.now(), clinicId: _clinicId || null, step: state.step || 1, fields: out,
+      }));
+    } catch (e) {}
+  }
+
+  function _wizReadDraft() {
+    try {
+      var d = JSON.parse(localStorage.getItem(WIZ_DRAFT_KEY) || 'null');
+      if (!d || !d.fields || !d.at) return null;
+      if (Date.now() - d.at > WIZ_DRAFT_MAX_AGE) { localStorage.removeItem(WIZ_DRAFT_KEY); return null; }
+      if (d.clinicId && _clinicId && d.clinicId !== _clinicId) return null;
+      return d;
+    } catch (e) { return null; }
+  }
+
+  function _wizApplyDraft(d) {
+    var put = 0;
+    for (var id in d.fields) {
+      if (!Object.prototype.hasOwnProperty.call(d.fields, id)) continue;
+      var el = document.getElementById(id);
+      if (!el) continue;
+      try {
+        if ('c' in d.fields[id]) el.checked = !!d.fields[id].c;
+        else el.value = d.fields[id].v;
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+        put++;
+      } catch (e) {}
+    }
+    return put;
+  }
+
+  function _wizOfferDraft() {
+    var d = _wizReadDraft();
+    if (!d || _wizAnyTypedInput()) return;      // never over the top of live work
+    var host = document.querySelector('.wiz-section[data-step="1"]');
+    if (!host) return;
+    var when = '';
+    try {
+      var mins = Math.round((Date.now() - d.at) / 60000);
+      when = mins < 1 ? 'a moment ago'
+           : mins < 60 ? mins + ' minute' + (mins === 1 ? '' : 's') + ' ago'
+           : Math.round(mins / 60) + ' hour' + (Math.round(mins / 60) === 1 ? '' : 's') + ' ago';
+    } catch (e) {}
+    var bar = document.createElement('div');
+    bar.id = 'wizDraftBar';
+    bar.style.cssText = 'margin:0 0 12px;padding:11px 13px;border-radius:11px;font-size:13px;' +
+      'line-height:1.5;background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);' +
+      'border:1px solid var(--pr-owe-bd, #F5D9A8);display:flex;flex-wrap:wrap;gap:8px;align-items:center';
+    bar.innerHTML =
+      '<span style="flex:1 1 180px;min-width:0">You were entering a patient ' + when +
+      ' and did not finish. Bring it back?</span>' +
+      '<button type="button" id="wizDraftYes" style="flex:0 0 auto;padding:7px 13px;border:none;' +
+      'border-radius:8px;background:var(--deep);color:var(--on-deep);font-weight:700;font-size:13px;' +
+      'cursor:pointer;font-family:inherit">Bring it back</button>' +
+      '<button type="button" id="wizDraftNo" style="flex:0 0 auto;padding:7px 13px;' +
+      'border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;' +
+      'font-weight:700;font-size:13px;cursor:pointer;font-family:inherit">Start fresh</button>';
+    host.insertBefore(bar, host.firstChild);
+    document.getElementById('wizDraftYes').onclick = function () {
+      _wizApplyDraft(d);
+      bar.parentNode && bar.parentNode.removeChild(bar);
+    };
+    document.getElementById('wizDraftNo').onclick = function () {
+      try { localStorage.removeItem(WIZ_DRAFT_KEY); } catch (e) {}
+      bar.parentNode && bar.parentNode.removeChild(bar);
+    };
+  }
+
+  // Save on the way out, by every route the page can leave by. pagehide is the
+  // one that fires when a tab is discarded to reclaim memory, which is the
+  // case a desktop hits and a phone does not.
+  (function () {
+    var t = null;
+    document.addEventListener('input', function () {
+      if (t) clearTimeout(t);
+      t = setTimeout(_wizSaveDraft, 900);
+    }, true);
+    window.addEventListener('pagehide', _wizSaveDraft);
+    window.addEventListener('beforeunload', _wizSaveDraft);
+    /* Order matters here. The baseline has to exist BEFORE the draft is
+       offered: without it `_wizChanged` falls back to the markup's default,
+       sees the 7 the page put in followUpDays, decides somebody is already
+       typing, and silently refuses to offer the draft — the fault would look
+       like "the draft feature does nothing". */
+    function settle() {
+      setTimeout(function () {
+        _wizBaseline = _wizSnapshot();
+        setTimeout(_wizOfferDraft, 300);
+      }, 600);
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', settle);
+    else settle();
+  })();
+  window._wizSaveDraft = _wizSaveDraft;
+  window._wizClearDraft = function () {
+    try { localStorage.removeItem(WIZ_DRAFT_KEY); } catch (e) {}
+  };
+  // Exported so the test can ask for the offer at the moment that matters —
+  // with a patient already half typed — rather than only at page load.
+  window.HomattWizOfferDraft = _wizOfferDraft;
+  /* And WHY the form thinks it has been touched, which is the question that
+   * actually gets asked when this misbehaves. Exported for the same reason
+   * `_denials()` is: a rule that decides whether work is thrown away should be
+   * answerable directly, not only through its consequences. */
+  window._wizWhyTouched = function () {
+    var f = _wizFields(), changed = [];
+    for (var i = 0; i < f.length; i++) {
+      if (_wizChanged(f[i])) changed.push(f[i].id || ('(' + f[i].tagName + ')'));
+    }
+    return { touched: _wizTouched, baseline: !!_wizBaseline, changed: changed };
+  };
+
   (function () {
     let _hiddenAt = 0;
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { _hiddenAt = Date.now(); return; }
+      if (document.hidden) { _hiddenAt = Date.now(); _wizSaveDraft(); return; }
       const untouched = state.step === 1 && !state.patient && !state.bookingId &&
         !state.confirmedDx && !(state.medications && state.medications.length) &&
-        !(state.labTests && state.labTests.length) && !(state.materialsUsed && state.materialsUsed.length);
+        !(state.labTests && state.labTests.length) && !(state.materialsUsed && state.materialsUsed.length) &&
+        !_wizAnyTypedInput();
       if (untouched && _hiddenAt && (Date.now() - _hiddenAt > 2500)) {
         window.location.replace('dashboard.html');
       }
@@ -1853,8 +2099,8 @@
         </div>
         ${m.inventoryItemId ? (() => {
           const inv = state.clinicInventory.find(x => x.id === m.inventoryItemId);
-          const stockBg = inv?.is_critical ? '#FFEBEE' : inv?.is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
-          const stockClr = inv?.is_critical ? '#C62828' : inv?.is_low_stock ? '#E65100' : 'var(--deep)';
+          const stockBg = (inv || {}).is_critical ? '#FFEBEE' : (inv || {}).is_low_stock ? '#FFF3E0' : 'var(--tint-2)';
+          const stockClr = (inv || {}).is_critical ? '#C62828' : (inv || {}).is_low_stock ? '#E65100' : 'var(--deep)';
           const stockTxt = inv ? `${inv.quantity} ${inv.unit} in stock` : 'In clinic stock';
           return `<div style="font-size:11px;color:${stockClr};background:${stockBg};padding:3px 9px;border-radius:6px;display:inline-flex;align-items:center;gap:4px;margin-bottom:6px">
             <span class="material-icons-outlined" style="font-size:12px">inventory_2</span>${esc(stockTxt)}</div>`;
@@ -1877,7 +2123,7 @@
               type="number" min="1" max="180" value="${m.durationDays}">
           </div>
           ${m.inventoryItemId ? `<div>
-            <label class="field-label">Units used (${esc(state.clinicInventory.find(x=>x.id===m.inventoryItemId)?.unit||'units')})</label>
+            <label class="field-label">Units used (${esc((state.clinicInventory.find(x=>x.id===m.inventoryItemId) || {}).unit||'units')})</label>
             <input class="field-input qty-deduct-input" data-idx="${i}"
               type="number" min="0" step="1" value="${m.qtyToDeduct||''}" placeholder="0"
               style="border-color:var(--accent)">
@@ -2208,7 +2454,7 @@
       return d.toISOString();
     }
 
-    const firstTime = (state.medications[0]?.intakeTimes?.[0]) || '08:00';
+    const firstTime = (((state.medications[0] || {}).intakeTimes || [])[0]) || '08:00';
     rows.push({
       diagnosis_id: diagnosisId,
       scheduled_at: whenAt(1, firstTime),
@@ -2381,7 +2627,7 @@
 
     try {
 
-    if (!_clinicId && supabase && !session?.demo) {
+    if (!_clinicId && supabase && !(session || {}).demo) {
       _clinicId = await resolveClinicId(supabase, session);
     }
 
@@ -2462,8 +2708,8 @@
     const dxPayload = {
       case_code: state.caseCode || null,
       clinic_id: _clinicId,
-      clinician_id: session?.userId || null,
-      clinician_name: session?.staffName || null,
+      clinician_id: (session || {}).userId || null,
+      clinician_name: (session || {}).staffName || null,
       booking_id: state.bookingId || null,
       // A walk-in may have no name and no phone yet. The case number is the
       // identity until someone fills those in — the record is still complete
@@ -2546,7 +2792,7 @@
         patient_id: (state.patient && state.patient.id) || null,
         clinic_patient_id: (state.patient && state.patient.clinicPatientId) || null,
         clinic_id: _clinicId,
-        issued_by: session?.userId || null,
+        issued_by: (session || {}).userId || null,
         items,
         status: 'active',
         start_date: new Date().toISOString().slice(0,10),
@@ -2580,7 +2826,8 @@
       if (successMsgEl) successMsgEl.textContent =
         'Saved on this phone \u2014 it syncs by itself the moment you are back online.';
       // The same record of the visit, whether it went to the server or not.
-      const offTimes = [...new Set(meds.flatMap(m => m.intakeTimes).sort())];
+      const offTimes = [...new Set(meds.reduce(function (a, m) {
+        return a.concat(m.intakeTimes || []); }, []).sort())];
       renderConsultationSummary({ meds: meds, times: offTimes });
       _invalidateDashboardCaches();
     }
@@ -2697,7 +2944,7 @@
           p_booking_id:   state.bookingId || null,
           p_items:        invItems,
         }).then(({ data: dResult }) => {
-          const low = dResult?.low_stock;
+          const low = (dResult || {}).low_stock;
           if (Array.isArray(low) && low.length) {
             low.forEach(item => showToast(`⚠ Low stock: ${item.item_name} — ${item.quantity} left`, 'error'));
           }
@@ -2712,7 +2959,7 @@
         patient_id: (state.patient && state.patient.id) || null,
         clinic_patient_id: (state.patient && state.patient.clinicPatientId) || null,
         clinic_id: _clinicId,
-        issued_by: session?.userId || null,
+        issued_by: (session || {}).userId || null,
         items,
         status: 'active',
         start_date: new Date().toISOString().slice(0,10),
@@ -2779,12 +3026,17 @@
     // number they will say out loud, what was diagnosed, what was ordered,
     // what was given and in what quantity, what it came to, what was paid and
     // what is still owed, and what happens next.
-    const allTimes  = meds.flatMap(m => m.intakeTimes).sort();
+    const allTimes  = meds.reduce(function (a, m) {
+      return a.concat(m.intakeTimes || []); }, []).sort();
     const uniqTimes = [...new Set(allTimes)];
     renderConsultationSummary({ meds: meds, times: uniqTimes });
 
     const successSheet = document.getElementById('successSheet');
     if (successSheet) successSheet.style.display = 'flex';
+    // The treatment is recorded, so the half-typed copy of it is not a draft
+    // any more — it is a stale offer to re-enter a patient who is already on
+    // the books. Clear it here, at the one point that means "finished".
+    try { window._wizClearDraft && window._wizClearDraft(); } catch (e) {}
     _invalidateDashboardCaches();
 
     } catch (fatalErr) {

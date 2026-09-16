@@ -11,13 +11,36 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v187';
+const CACHE = 'homatt-clinic-v188';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
 // install that the book underneath it has changed. It must match the DATA_V
 // used to build the .db URLs in the pages that load them.
 const DATA_VERSION = '145';
+
+/* Promise.allSettled, for engines that do not have it (before Chrome 76).
+ *
+ * The worker's install path used it in three places. A missing method is a
+ * runtime error where it is CALLED — and where it is called here is install,
+ * so on an older browser the worker threw, never activated, and the clinic got
+ * no offline app at all with nothing on screen to say why.
+ *
+ * Every callback below already catches for itself, so Promise.all would behave
+ * identically today — but that is a fact about today's callbacks, not about
+ * this function, and the day somebody removes one of those catches
+ * Promise.all would start rejecting the whole install on one bad file. Keep
+ * the semantics that were asked for.
+ */
+const allSettled = (Promise.allSettled
+  ? Promise.allSettled.bind(Promise)
+  : function (ps) {
+      return Promise.all(Array.prototype.map.call(ps, function (p) {
+        return Promise.resolve(p).then(
+          function (value) { return { status: 'fulfilled', value: value }; },
+          function (reason) { return { status: 'rejected', reason: reason }; });
+      }));
+    });
 
 // The core pages that must be openable offline. Kept as an explicit list so the
 // worker can guarantee they're cached (and repair them if a precache ever fails).
@@ -57,6 +80,7 @@ const SHELL = [
   'js/clinic-regimens.js?v=20261007',
   'js/clinic-corrections.js?v=20261007',
   'js/clinic-photo.js?v=20261007',
+  'js/clinic-print.js?v=20261007',
   'js/ucg-sections.js?v=20261007',
   'js/ucg-autofill.js?v=20261007',
   'js/clinic-impression.js?v=20261007',
@@ -642,7 +666,7 @@ self.addEventListener('install', (event) => {
       // own offline handling in control instead of the browser's.
       // The pages themselves are not versioned, so they are always fetched —
       // that is how new code reaches the phone.
-      await Promise.allSettled(CORE_PAGES.map(async (u) => {
+      await allSettled(CORE_PAGES.map(async (u) => {
         try {
           const r = await fetch(u, { cache: 'no-cache', credentials: 'same-origin' });
           if (r && r.ok && !r.redirected) await c.put(u, r);
@@ -650,11 +674,11 @@ self.addEventListener('install', (event) => {
       }));
       // Everything else: take it from the previous cache when the URL is
       // unchanged, and only download what is genuinely new.
-      Promise.allSettled(VENDOR.map(async (u) => {
+      allSettled(VENDOR.map(async (u) => {
         if (await carryOver(c, u)) return;
         return c.add(u).catch(() => {});
       }));
-      Promise.allSettled(
+      allSettled(
         SHELL.filter((u) => CORE_PAGES.indexOf(u) < 0).map(async (u) => {
           if (await carryOver(c, u)) return;
           return c.add(u).catch(() => {});

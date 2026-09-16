@@ -1,5 +1,5 @@
 {
-  "cache": "homatt-clinic-v187",
+  "cache": "homatt-clinic-v188",
   "dataVersion": "145",
   "files": [
     "./",
@@ -21,6 +21,7 @@
     "js/clinic-regimens.js?v=20261007",
     "js/clinic-corrections.js?v=20261007",
     "js/clinic-photo.js?v=20261007",
+    "js/clinic-print.js?v=20261007",
     "js/ucg-sections.js?v=20261007",
     "js/ucg-autofill.js?v=20261007",
     "js/clinic-impression.js?v=20261007",
