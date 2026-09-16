@@ -195,6 +195,8 @@ const HISTORY = [
     ['what was charged', 'UGX 30,000'], ['what was paid', 'UGX 20,000'],
     ['what is owed', 'UGX 10,000'],
     ['the earlier visit', 'Peptic Ulcer Disease'],
+    ['when they have been seen', 'When this patient has been seen'],
+    ['and which entry is today’s', '(this visit)'],
   ];
   const missing = must.filter(([, s]) => sheet.text.indexOf(s) < 0).map(([w]) => w);
   result('the sheet carries every detail of the visit', missing.length === 0,
@@ -263,6 +265,51 @@ const HISTORY = [
     ['day', 'week', 'month', 'year'].every(k => picker.chips.indexOf(k) >= 0),
     picker.chips.join(', '));
 
+  /* THE WORDS ON THOSE BUTTONS MUST BE VISIBLE, IN EVERY SKIN.
+   *
+   * They shipped as `color: var(--text)` on the white sheet. That pair is
+   * right in the toolbar, where the background is var(--surface) and the two
+   * move together — inside the paper the background is #fff and does not move,
+   * so on every dark theme the four words were near-white on white. Measured
+   * at 1.11:1, 1.16:1 and 1.19:1, and a clinic photographed four empty
+   * outlines. The paper is white in every skin, so its ink is stated in the
+   * sheet's own stylesheet and never borrowed. */
+  for (const [skin, theme] of [['forest', 'dark'], ['dark', 'dark'], ['midnight', 'dark'], ['clay', 'light']]) {
+    const chip = await page.evaluate(async ([s, t]) => {
+      document.documentElement.setAttribute('data-skin', s);
+      document.documentElement.setAttribute('data-theme', t);
+      await new Promise(r => setTimeout(r, 140));
+      const el = document.querySelector('#hmPrintPaper [data-period]');
+      if (!el) return null;
+      const cs = getComputedStyle(el);
+      function lum(c) {
+        const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null;
+        const p = m[1].split(',').map(parseFloat);
+        function ch(v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }
+        return 0.2126 * ch(p[0]) + 0.7152 * ch(p[1]) + 0.0722 * ch(p[2]);
+      }
+      // Walk up for the first opaque background — the button's own is white.
+      let node = el, bg = null;
+      while (node && !bg) {
+        const c = getComputedStyle(node).backgroundColor;
+        const m = String(c).match(/rgba?\(([^)]+)\)/);
+        const a = m ? (m[1].split(',')[3] === undefined ? 1 : parseFloat(m[1].split(',')[3])) : 0;
+        if (a >= 0.999) bg = c;
+        node = node.parentElement;
+      }
+      const f = lum(cs.color), b = lum(bg || 'rgb(255,255,255)');
+      return { ratio: (Math.max(f, b) + 0.05) / (Math.min(f, b) + 0.05), fg: cs.color, bg: bg,
+               text: el.textContent };
+    }, [skin, theme]);
+    result('"' + (chip ? chip.text : '?') + '" is readable on ' + skin + '/' + theme,
+      !!chip && chip.ratio >= 4.5,
+      chip ? Math.round(chip.ratio * 100) / 100 + ':1  ' + chip.fg + ' on ' + chip.bg : 'no chip');
+  }
+  await page.evaluate(() => {
+    document.documentElement.setAttribute('data-skin', 'forest');
+    document.documentElement.setAttribute('data-theme', 'light');
+  });
+
   const reg = await page.evaluate(async () => {
     document.querySelector('#hmPrintPaper [data-period="month"]').click();
     await new Promise(r => setTimeout(r, 900));
@@ -281,6 +328,62 @@ const HISTORY = [
     'expected 65,000 charged · 45,000 paid · 20,000 owing');
   result('the medicine count ignores the "N/A" placeholder',
     /2 patients/.test(reg.text), reg.text.match(/\d+ patients?/) ? reg.text.match(/\d+ patients?/)[0] : '?');
+
+  /* ── 5b. The preview is the PAPER, scaled — not a different page ──────
+   *
+   * It used to be "820px or whatever the phone gives it", which on a 412px
+   * device is 384px. A ten-column register laid out in 384px needed 718px and
+   * ran 320px off the side — the photograph that arrived — and, worse, what a
+   * clinic saw was never what came out of the printer, because the preview and
+   * the paper were different widths.
+   *
+   * Now the sheet is a fixed 752px (A4 content plus its padding) and the whole
+   * page is scaled down to the room available. */
+  const fit = await page.evaluate(() => {
+    const paper = document.getElementById('hmPrintPaper');
+    const scroll = document.getElementById('hmPrintScroll');
+    const fitBox = document.getElementById('hmPrintFit');
+    return {
+      layout: Math.round(paper.scrollWidth),               // unscaled
+      shown: Math.round(paper.getBoundingClientRect().width),  // scaled
+      sideways: Math.round(scroll.scrollWidth - scroll.clientWidth),
+      wrapW: fitBox ? Math.round(fitBox.getBoundingClientRect().width) : 0,
+      wrapH: fitBox ? Math.round(fitBox.getBoundingClientRect().height) : 0,
+      paperH: Math.round(paper.getBoundingClientRect().height),
+    };
+  });
+  result('the preview is the real A4 page, not a phone-width one',
+    fit.layout >= 740 && fit.layout <= 760, fit.layout + 'px laid out');
+  result('and it is scaled to fit, so nothing runs off the side',
+    fit.sideways <= 1 && fit.shown < fit.layout,
+    'shown at ' + Math.round(fit.shown / fit.layout * 100) + '% (' + fit.shown + 'px), ' +
+    (fit.sideways > 1 ? 'scrolls ' + fit.sideways + 'px' : 'no sideways scroll'));
+  /* A transform does not change layout, so the wrapper has to be given the
+   * scaled size by hand. Without that the scroll area keeps the full 752px and
+   * the page floats in grey with scrollbars for space that is not there —
+   * which is the other half of what was photographed. */
+  result('the scroll area matches the scaled page, not the unscaled one',
+    Math.abs(fit.wrapW - fit.shown) <= 2 && Math.abs(fit.wrapH - fit.paperH) <= 2,
+    'wrapper ' + fit.wrapW + '×' + fit.wrapH + ', page ' + fit.shown + '×' + fit.paperH);
+
+  const zoomed = await page.evaluate(async () => {
+    const btn = document.getElementById('hmPrintZoom');
+    const before = document.getElementById('hmPrintPaper').getBoundingClientRect().width;
+    btn.click();
+    await new Promise(r => setTimeout(r, 200));
+    const after = document.getElementById('hmPrintPaper').getBoundingClientRect().width;
+    const label = btn.textContent;
+    btn.click();                                  // back to fitting
+    await new Promise(r => setTimeout(r, 200));
+    return { before: Math.round(before), after: Math.round(after), label };
+  });
+  /* Fitting an A4 onto a phone is about 50%, which turns 11px table text into
+   * 6px — fine for "is this the right patient?", useless for reading a dose.
+   * The app sets user-scalable=no, so pinching is unavailable and this button
+   * is the only way in. */
+  result('and there is a way to zoom in and actually read it',
+    zoomed.after > zoomed.before && /whole page/i.test(zoomed.label),
+    zoomed.before + 'px → ' + zoomed.after + 'px, button then says "' + zoomed.label + '"');
 
   // ── 6. The period starts at LOCAL midnight ───────────────────────────
   const bounds = await page.evaluate(() => {

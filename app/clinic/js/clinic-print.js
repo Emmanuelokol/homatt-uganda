@@ -93,8 +93,42 @@
     '.hm-pbtn{flex:0 0 auto;padding:9px 14px;border-radius:9px;border:none;font-family:inherit;font-size:13.5px;' +
       'font-weight:700;cursor:pointer;background:var(--deep,#1B5E20);color:var(--on-deep,#fff)}' +
     '.hm-pbtn.ghost{background:transparent;color:var(--text,#1A1A1A);border:1px solid var(--border,#E0E0E0)}' +
+    /* ANYTHING INSIDE THE PAPER TAKES THE PAPER'S COLOURS, NOT THE APP'S.
+     *
+     * The period buttons — Today, This week, This month, This year — were
+     * `.hm-pbtn.ghost`, which is `color: var(--text)` on a transparent
+     * background. That pair is correct in the toolbar, where the background is
+     * `var(--surface)` and the two move together. Inside the sheet the
+     * background is #fff and does NOT move, so on every dark theme those four
+     * words were near-white on white: measured at 1.11:1, 1.16:1 and 1.19:1 —
+     * invisible, and photographed that way by a clinic.
+     *
+     * This is the rule already written down in this project — a fill colour
+     * and the text on it must be defined as a PAIR, in the same place — and I
+     * broke it by borrowing a word colour from a palette that changes
+     * underneath the surface it sits on. The sheet is white in every skin, so
+     * its ink is black in every skin, stated here and nowhere else. */
+    '.hm-sheet .hm-period{display:inline-block;margin:0 8px 8px 0;padding:10px 16px;border-radius:9px;' +
+      'font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;' +
+      'background:#fff;color:#000;border:1.5px solid #000}' +
+    '.hm-sheet .hm-period:hover{background:#000;color:#fff}' +
     '#hmPrintScroll{flex:1 1 auto;min-height:0;overflow:auto;padding:14px;background:#5A5A5A}' +
-    '#hmPrintPaper{background:#fff;max-width:820px;margin:0 auto;padding:22px 24px;box-shadow:0 6px 28px rgba(0,0,0,.4)}' +
+    /* THE PREVIEW IS THE PAPER, AT THE PAPER'S WIDTH.
+     *
+     * It used to be `max-width:820px` and whatever the phone gave it — 384px
+     * on the device this is used on. That is not a preview of anything: a
+     * ten-column register laid out in 384px needed 718px and ran 320px off the
+     * side, which is the photograph that arrived. And because the preview was
+     * a different width from the paper, what a clinic saw was never what came
+     * out of the printer.
+     *
+     * A4 at 96dpi is 794px; 12mm margins leave 704px of content, and 24px of
+     * padding either side makes the sheet 752px. Fixed. The whole page is then
+     * SCALED to whatever room the screen has (see fitPaper), so a phone shows
+     * the real page shrunk rather than a different page at full size. */
+    '#hmPrintFit{margin:0 auto;position:relative}' +
+    '#hmPrintPaper{background:#fff;width:752px;box-sizing:border-box;padding:24px;' +
+      'box-shadow:0 6px 28px rgba(0,0,0,.4);transform-origin:top left}' +
     '@media print{' +
       'html,body{background:#fff !important;margin:0 !important;padding:0 !important}' +
       /* Hide the app, show the sheet. Every direct child of body goes, which
@@ -103,9 +137,21 @@
       'body.hm-printing > #' + ROOT_ID + '{display:block !important}' +
       '#' + ROOT_ID + '{display:block;position:static}' +
       '.hm-noprint{display:none !important}' +
+      /* The preview is scaled to fit a screen; the paper is not. Undo it, or
+         the print comes out half-size in the top-left corner of the sheet. */
+      '#hmPrintPaper{transform:none !important;width:auto !important;box-shadow:none !important;padding:0 !important}' +
+      '#hmPrintFit{width:auto !important;height:auto !important}' +
       '.hm-sheet{font-size:11px}' +
-      '.hm-sheet tr,.hm-sheet .hm-block{page-break-inside:avoid}' +
+      /* One page or six — but never a row sawn in half, and never a heading
+         stranded at the foot of a page with its table overleaf. `break-after`
+         on the heading is the one that is usually forgotten, and it is the one
+         that produces "MEDICINES GIVEN" alone at the bottom of page 1. */
+      '.hm-sheet tr,.hm-sheet .hm-block{page-break-inside:avoid;break-inside:avoid}' +
+      '.hm-sheet h2{page-break-after:avoid;break-after:avoid}' +
+      '.hm-sheet .hm-kv{page-break-inside:avoid;break-inside:avoid}' +
       '.hm-sheet thead{display:table-header-group}' +   /* repeat headings per page */
+      '.hm-sheet tfoot{display:table-footer-group}' +
+      '.hm-sheet .hm-foot{page-break-before:avoid;break-before:avoid}' +
       '@page{margin:12mm}' +
     '}';
 
@@ -129,15 +175,57 @@
       wrap.innerHTML =
         '<div id="hmPrintBar">' +
           '<div class="t" id="hmPrintTitle">Print</div>' +
+          '<button class="hm-pbtn ghost" id="hmPrintZoom">Read it</button>' +
           '<button class="hm-pbtn" id="hmPrintGo">Print</button>' +
           '<button class="hm-pbtn ghost" id="hmPrintClose">Close</button>' +
         '</div>' +
-        '<div id="hmPrintScroll"><div id="hmPrintPaper"></div></div>';
+        '<div id="hmPrintScroll"><div id="hmPrintFit"><div id="hmPrintPaper"></div></div></div>';
       document.body.appendChild(wrap);
       document.getElementById('hmPrintClose').onclick = close;
       document.getElementById('hmPrintGo').onclick = doPrint;
+      document.getElementById('hmPrintZoom').onclick = function () {
+        _actualSize = !_actualSize;
+        this.textContent = _actualSize ? 'Whole page' : 'Read it';
+        fitPaper();
+      };
+      window.addEventListener('resize', fitPaper);
     }
     return root;
+  }
+
+  /* Fit the whole page on the screen, or show it at full size to read.
+   *
+   * A transform does not change layout, so the wrapper is given the SCALED
+   * dimensions by hand — otherwise the scroll area keeps the unscaled size and
+   * the page floats in a sea of grey with scrollbars for space that is not
+   * there. That grey, and those scrollbars, are half of what the clinic
+   * photographed.
+   *
+   * "Read it" is not a nicety. Fitting an A4 onto a 384px phone is a scale of
+   * about 0.5, which turns 11px table text into 6px — fine for "is this the
+   * right patient?", useless for reading a dose. One tap goes to full size and
+   * scrolls; the app's own viewport meta sets user-scalable=no, so pinching is
+   * not available and this is the only way in.
+   */
+  var _actualSize = false;
+  var PAPER_W = 752;
+
+  function fitPaper() {
+    var paper = document.getElementById('hmPrintPaper');
+    var fit = document.getElementById('hmPrintFit');
+    var scroll = document.getElementById('hmPrintScroll');
+    if (!paper || !fit || !scroll) return;
+    var room = scroll.clientWidth - 28;               // the 14px padding, both sides
+    var k = _actualSize ? 1 : Math.min(1, room / PAPER_W);
+    if (!isFinite(k) || k <= 0) k = 1;
+    paper.style.transform = k === 1 ? 'none' : 'scale(' + k + ')';
+    // The wrapper carries the scaled footprint so the scroll area is honest.
+    var h = paper.offsetHeight || 0;
+    fit.style.width = Math.ceil(PAPER_W * k) + 'px';
+    fit.style.height = Math.ceil(h * k) + 'px';
+    var zoom = document.getElementById('hmPrintZoom');
+    // Nothing to zoom into when it already fits.
+    if (zoom) zoom.style.display = (k === 1 && !_actualSize) ? 'none' : '';
   }
 
   function clinicHead() {
@@ -231,18 +319,33 @@
         '<div><b>Severity</b>' + esc(String(v.severity || '—')) + '</div>' +
       '</div>';
 
-    var hist = '';
-    if (history.length) {
-      hist = '<table><thead><tr><th>Date</th><th>Diagnosis</th><th>Seen by</th>' +
-        '<th class="num">Charged</th><th class="num">Paid</th></tr></thead><tbody>' +
-        history.map(function (h) {
-          return '<tr><td>' + esc(dmy(h.created_at)) + '</td>' +
-            '<td>' + esc(h.confirmed_diagnosis || '—') + '</td>' +
-            '<td>' + esc(h.clinician_name || '—') + '</td>' +
-            '<td class="num">' + ugx(h.total_charged_ugx) + '</td>' +
-            '<td class="num">' + ugx(h.amount_paid) + '</td></tr>';
-        }).join('') + '</tbody></table>';
-    }
+    /* EVERY visit, this one included, in date order.
+     *
+     * It used to be "Previous visits" and left the current one out — so the
+     * sheet listed four dates while the patient had been seen five times, and
+     * the one occasion the sheet was actually about was missing from its own
+     * list of occasions. A clinician reading the paper, or somebody at the
+     * hospital it was sent to, has to be able to answer "when has this person
+     * been seen?" from the page in their hand, without adding the heading to
+     * the table themselves. */
+    var all = history.slice();
+    all.push({ _this: true, created_at: v.created_at,
+               confirmed_diagnosis: v.confirmed_diagnosis,
+               clinician_name: v.clinician_name,
+               total_charged_ugx: v.total_charged_ugx, amount_paid: v.amount_paid });
+    all.sort(function (a, b) { return String(a.created_at) < String(b.created_at) ? 1 : -1; });
+    var hist = '<table><thead><tr><th>Date</th><th>Diagnosis</th><th>Seen by</th>' +
+      '<th class="num">Charged</th><th class="num">Paid</th></tr></thead><tbody>' +
+      all.map(function (h) {
+        return '<tr' + (h._this ? ' style="background:#F4F4F4"' : '') + '>' +
+          '<td>' + esc(dmy(h.created_at)) + (h._this ? ' <b>(this visit)</b>' : '') + '</td>' +
+          '<td>' + esc(h.confirmed_diagnosis || '—') + '</td>' +
+          '<td>' + esc(h.clinician_name || '—') + '</td>' +
+          '<td class="num">' + ugx(h.total_charged_ugx) + '</td>' +
+          '<td class="num">' + ugx(h.amount_paid) + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="hm-sub" style="margin-top:3px">' + all.length + ' visit' +
+      (all.length === 1 ? '' : 's') + ' on record at this clinic.</div>';
 
     var fup = '';
     if (v.follow_up_days || v.follow_up_reason || v.expected_recovery) {
@@ -265,7 +368,7 @@
       (prose(v.patient_instructions) ? sect('Instructions for the patient', prose(v.patient_instructions)) : '') +
       (fup ? sect('Follow-up', fup) : '') +
       sect('Charges', moneyTable(v)) +
-      (hist ? sect('Previous visits', hist) : '') +
+      sect('When this patient has been seen', hist) +
       '<div class="hm-foot"><span>' + esc(v.patient_name || '') + ' · ' + esc(dmy(v.created_at)) + '</span>' +
       '<span>Homatt Health</span></div>' +
     '</div>';
@@ -347,6 +450,13 @@
     document.getElementById('hmPrintPaper').innerHTML = html;
     document.getElementById('hmPrintTitle').textContent = title;
     document.getElementById('hmPrintWrap').className = 'hm-noprint on';
+    // Scale after the content is in, not before — the height is not knowable
+    // until it has been laid out, and the wrapper needs the height.
+    _actualSize = false;
+    var z = document.getElementById('hmPrintZoom');
+    if (z) z.textContent = 'Read it';
+    fitPaper();
+    setTimeout(fitPaper, 60);      // again once fonts have settled
   }
 
   function doPrint() {
@@ -379,7 +489,9 @@
   function askPeriod(load) {
     var root = ensureDom();
     var chips = PERIODS.map(function (p) {
-      return '<button class="hm-pbtn ghost" data-period="' + p.key + '" style="margin:0 6px 6px 0">' +
+      // .hm-period, not .hm-pbtn.ghost — see the note in CSS. These sit on the
+      // white sheet and must carry the sheet's own ink.
+      return '<button type="button" class="hm-period" data-period="' + p.key + '">' +
         esc(p.label) + '</button>';
     }).join('');
     show('Print patients', '<div class="hm-sheet"><h2>Which period?</h2>' +

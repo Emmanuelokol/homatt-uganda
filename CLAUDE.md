@@ -2086,6 +2086,76 @@ out the date range was wrong after forty pages.
   a loader and never learns what a Supabase is, which is what keeps the
   single-patient sheet printable with no connection at all.
 
+### The preview was not a preview, and four words were invisible
+`tests/measure-print-fit.js` prints the sheet through Chromium's own print
+pipeline to a **real PDF**, counts the pages, and measures every element
+against the printable edge. A clinic sent three photographs and it answered all
+of them:
+
+| | before | after |
+|---|---|---|
+| "Today / This week / This month / This year" | **1.11:1, 1.16:1, 1.19:1** — invisible on all three dark themes | 21:1, every skin |
+| register preview on a 412px phone | needs 718px, **runs 320px off the side** | the real page at 51%, no sideways scroll |
+| on A4 | fits, 3 pages | fits, 3 pages (was never the problem) |
+
+**The paper was fine all along.** What was broken was the preview and the
+buttons, and the measurement is what separated the two — the first version of
+that measurement got it wrong too, and is worth keeping as a warning.
+
+#### I broke my own colour rule
+The period buttons were `.hm-pbtn.ghost` — `color: var(--text)` on a
+transparent background. That pair is **correct in the toolbar**, where the
+background is `var(--surface)` and the two move together. Inside the sheet the
+background is `#fff` and does **not** move, so on every dark theme those four
+words were near-white on white.
+
+This is exactly the rule written above — *a fill colour and the text on it must
+be defined as a PAIR, in the same place* — and I broke it by borrowing a word
+colour from a palette that changes underneath the surface it sits on. **The
+paper is white in every skin, so its ink is black in every skin**, stated in
+the sheet's own stylesheet and never inherited.
+
+#### The measurement measured the wrong width first
+The first version reported print overflow from the DOM at the **412px phone
+viewport** with print media switched on. Chromium lays a print out at 96dpi:
+A4 is 794px and 12mm margins leave **704px**. So it "found" a table overflowing
+the paper by 282px when that table fits an A4 perfectly well — and would have
+sent the fix off narrowing columns that were never too wide. Measured at 704px,
+nothing hangs off either sheet. *Print layout happens at the paper's width, not
+the screen's.*
+
+#### What you see must be what prints
+The preview was `max-width:820px` and otherwise whatever the phone gave it —
+384px. So a ten-column register was laid out at a width the printer will never
+use, and a clinic's preview was of a page that did not exist. The sheet is now
+a fixed **752px** (704 of content plus its padding) and the whole page is
+**scaled** to the room available.
+
+A transform does not change layout, so the wrapper is given the scaled size by
+hand. Without that the scroll area keeps the full 752px and the page floats in
+grey with scrollbars for space that is not there — the other half of what was
+photographed.
+
+Fitting A4 onto a phone is about **51%**, which turns 11px table text into 6px:
+fine for *"is this the right patient?"*, useless for reading a dose. **"Read
+it"** switches to full size and scrolls. It is not a nicety — the app's own
+viewport meta sets `user-scalable=no`, so pinching is unavailable and that
+button is the only way in.
+
+#### One page or six, but never a heading alone at the foot of one
+`page-break-inside: avoid` on rows was already there. The one usually forgotten
+is **`break-after: avoid` on the heading**, and it is the one that produces
+"MEDICINES GIVEN" stranded at the bottom of page 1 with its table overleaf.
+`thead`/`tfoot` repeat per page.
+
+#### "When this patient has been seen"
+The visits table was *"Previous visits"* and left the current one out — so the
+sheet listed four dates while the patient had been seen five times, and the one
+occasion the sheet was **about** was missing from its own list of occasions.
+Every visit is now in it, newest first, with today's marked *(this visit)* and
+a count underneath. Somebody at the hospital it was sent to has to be able to
+answer "when has this person been seen?" from the page in their hand.
+
 ### "It costs no height" is a delta, not a threshold
 The print button went in the patient record's modal header. The first version
 of the test asserted `headH <= 62` and `heroH <= 60` — two numbers picked out
@@ -2102,7 +2172,7 @@ fix.
 
 ## The tests
 
-`tests/` — 69 files, ~1010 checks (plus 15 `measure-*.js`, which print numbers
+`tests/` — 70 files, ~1030 checks (plus 16 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -2228,6 +2298,16 @@ rules worth repeating here:
   carries the Response on `error.context`; reading `.status` finds `undefined`
   for every refusal. That turned a wrong password into "the helper is not
   installed on your server" — a clinic sent to their developer over a typo.
+- **Print layout happens at the PAPER's width, not the screen's.** Chromium
+  lays a print out at 96dpi — A4 is 794px, less margins. `measure-print-fit.js`
+  first measured overflow at a 412px phone viewport with print media on, and
+  "found" a table 282px over the edge that fits an A4 perfectly. Resize the
+  viewport to the paper before believing any print measurement.
+- **A colour token is only safe on the surface it was paired with.**
+  `color: var(--text)` is right in the toolbar (`var(--surface)` behind it) and
+  wrong two elements away inside a sheet that is always `#fff` — where it was
+  1.11:1 on dark themes. If a surface does not follow the theme, nothing on it
+  may.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by
