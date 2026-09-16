@@ -88,9 +88,16 @@ jobs:
       # webhook, pg_cron, the payment provider. Everything else must present a
       # JWT — `transcribe` above all, because it spends money per minute and an
       # open one can be drained by anyone who finds the URL.
+      # The CLI's own words go in the ANNOTATION, not just "failed to deploy" —
+      # see the long note in deploy-edge-functions-branch.yml. The short of it:
+      # this step failed on every run for eleven days and never said why,
+      # because the reason was printed to a log that a corporate proxy will not
+      # serve, while annotations come from the GitHub API and always can be.
       - name: Deploy every Edge Function
         run: |
           set -uo pipefail
+          echo "Supabase CLI: $(supabase --version 2>&1 | tr '\n' ' ')"
+          echo "::notice::Supabase CLI $(supabase --version 2>&1 | head -1)"
           PUBLIC=" ai-proxy send-notification discharge-notify payment-notify relworx-payment "
           failed=""
           for dir in supabase/functions/*/; do
@@ -102,10 +109,12 @@ jobs:
             esac
             echo "── deploying $fn $note"
             # shellcheck disable=SC2086
-            if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags; then
-              echo "✓ $fn"
+            if out=$(supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags 2>&1); then
+              echo "$out"; echo "✓ $fn"
             else
-              echo "::error::$fn failed to deploy"
+              echo "$out"
+              why=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -4 | tr '\n' ' ' | cut -c1-500)
+              echo "::error::$fn failed to deploy — $why"
               failed="$failed $fn"
             fi
           done

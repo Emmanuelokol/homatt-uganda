@@ -97,9 +97,24 @@ jobs:
       # to be written, documented, keyed and tested without ever being
       # deployed — for a clinic whose only symptom was a dictate button saying
       # it could not reach the service.
+      # THE CLI'S OWN WORDS GO IN THE ANNOTATION, NOT JUST "failed to deploy".
+      #
+      # This step failed on EVERY run for eleven days — all nine functions,
+      # every time — and said only "<fn> failed to deploy" nine times over. The
+      # reason was in the CLI's output, which was printed to the log and then
+      # discarded, and a log is exactly what somebody diagnosing this from
+      # outside GitHub often cannot reach: the download is served from Azure
+      # blob storage, which a corporate proxy will refuse, while the run's
+      # ANNOTATIONS come straight from the GitHub API and are always readable.
+      #
+      # So the failure now carries its own cause. An error that does not say
+      # why is how a deploy stays broken for a fortnight without anybody
+      # knowing which question to ask.
       - name: Deploy every Edge Function
         run: |
           set -uo pipefail
+          echo "Supabase CLI: $(supabase --version 2>&1 | tr '\n' ' ')"
+          echo "::notice::Supabase CLI $(supabase --version 2>&1 | head -1)"
           PUBLIC=" ai-proxy send-notification discharge-notify payment-notify relworx-payment "
           failed=""
           for dir in supabase/functions/*/; do
@@ -111,10 +126,14 @@ jobs:
             esac
             echo "── deploying $fn $note"
             # shellcheck disable=SC2086
-            if supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags; then
+            if out=$(supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags 2>&1); then
+              echo "$out"
               echo "✓ $fn"
             else
-              echo "::error::$fn failed to deploy"
+              echo "$out"
+              # The last few non-empty lines are where the CLI puts the reason.
+              why=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -4 | tr '\n' ' ' | cut -c1-500)
+              echo "::error::$fn failed to deploy — $why"
               failed="$failed $fn"
             fi
           done
