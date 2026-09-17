@@ -338,12 +338,76 @@ const HISTORY = [
     document.querySelector('#hmPrintPaper [data-period="month"]').click();
     await new Promise(r => setTimeout(r, 900));
     const root = document.getElementById('hmPrintRoot');
+    const all = [...root.querySelectorAll('tbody tr')];
     return { text: root.innerText.replace(/\s+/g, ' '),
-             rows: root.querySelectorAll('tbody tr').length,
+             rows: all.length,
+             // A register is grouped by day now, so tbody carries heading rows
+             // and subtotal rows as well as patients. Count the patients.
+             patientRows: all.filter(t => !t.className).length,
+             groupRows: root.querySelectorAll('tr.hm-grp').length,
+             subRows: root.querySelectorAll('tr.hm-sub-row').length,
+             sumCells: root.querySelectorAll('.hm-sum-c').length,
+             whoCol: !!root.querySelector('th.w-who'),
+             dateCol: !!root.querySelector('th.w-time') ||
+                      /^\s*Date\s*$/.test((root.querySelector('thead th') || {}).textContent || ''),
              title: document.getElementById('hmPrintTitle').textContent };
   });
   result('picking a period prints the register for it', /This month/i.test(reg.title), reg.title);
-  result('with one row per patient', reg.rows === 2, reg.rows + ' rows');
+  result('with one row per patient', reg.patientRows === 2, reg.patientRows + ' patient rows');
+
+  /* ── THE REGISTER IS ORGANISED, not a flat wall ────────────────────────
+   * A clinic photographed the old one: ten columns, the full date wrapped
+   * onto three lines on every row, "DANIEL MUSINGUZI" repeated down the
+   * whole page, and no figure readable without reading all of it. */
+  result('it opens with the figures an owner came for',
+    reg.sumCells === 4 && /patients seen/i.test(reg.text) &&
+    /charged/i.test(reg.text) && /received/i.test(reg.text) && /still owing/i.test(reg.text),
+    reg.sumCells + ' summary cells');
+  result('it is grouped by day, with the date in the heading',
+    reg.groupRows >= 1, reg.groupRows + ' day headings');
+  result('...so the date is no longer a column wrapping on every row',
+    reg.dateCol === false);
+  /* WHO SAW THEM: stated once when it is always the same person, kept as a
+   * column when it is not. The fixture above has two clinicians, so the
+   * column is right there; the single-clinician case — which is what the
+   * clinic photographed, "DANIEL MUSINGUZI" on all thirty-four rows — is
+   * driven separately below. Testing only one of the two would have let the
+   * rule be wrong in whichever half was not exercised. */
+  result('with TWO clinicians the column stays, and the names are shortened',
+    reg.whoCol === true && /D\. B|D\. C/.test(reg.text), reg.text.slice(0, 200));
+
+  const oneDoc = await page.evaluate(() => {
+    const rows = [0, 1, 2, 3].map((i) => ({
+      id: 'x' + i, patient_name: ['Okello John', 'Achieng Mary'][i % 2],
+      patient_phone: '070011122' + i, confirmed_diagnosis: 'Malaria', severity: 'moderate',
+      clinician_name: 'DANIEL MUSINGUZI',
+      prescription_items: [{ drug_name: 'Coartem' }],
+      total_charged_ugx: 20000, amount_paid: 5000, payment_status: 'partial',
+      created_at: new Date(Date.now() - 86400000 * i).toISOString(),
+    }));
+    const html = window.HomattPrint._periodSheet(rows, 'month');
+    const d = document.createElement('div');
+    d.style.width = '704px'; d.innerHTML = html; document.body.appendChild(d);
+    const out = { text: d.innerText.replace(/\s+/g, ' '),
+                  // The ELEMENT, not the words. /Seen by/i also matches the
+                  // "all seen by DANIEL MUSINGUZI" line under the heading —
+                  // which is the thing that REPLACED the column — so the
+                  // string test reported the column present precisely when it
+                  // had been removed correctly.
+                  whoCol: !!d.querySelector('th.w-who'),
+                  headings: d.querySelectorAll('tr.hm-grp').length,
+                  subs: d.querySelectorAll('tr.hm-sub-row').length };
+    d.remove();
+    return out;
+  });
+  result('ONE clinician is named once, under the heading',
+    /all seen by DANIEL MUSINGUZI/i.test(oneDoc.text), oneDoc.text.slice(0, 150));
+  result('...and the column that repeated it on every row is gone',
+    oneDoc.whoCol === false);
+  result('four visits across four days make four day headings',
+    oneDoc.headings === 4, oneDoc.headings + ' headings');
+  result('...each with its own subtotal to check the cash box against',
+    oneDoc.subs === 4, oneDoc.subs + ' subtotals');
   result('naming each patient and what they were treated for',
     /Okello John/.test(reg.text) && /Pneumonia/.test(reg.text) &&
     /Achieng Mary/.test(reg.text) && /Malaria/.test(reg.text));

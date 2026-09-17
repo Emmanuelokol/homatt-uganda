@@ -83,6 +83,39 @@
     '.hm-sheet .hm-foot{margin-top:16px;padding-top:6px;border-top:1px solid #000;font-size:10px;color:#333;' +
       'display:flex;justify-content:space-between;gap:10px}' +
     '.hm-sheet .hm-none{color:#555;font-style:italic}' +
+
+    /* ── THE REGISTER ────────────────────────────────────────────────────
+     * Black ink on white paper, like everything else on this sheet, and
+     * column widths that are stated rather than left to the browser. The
+     * date column used to wrap "6 Apr 2026" onto three lines because it was
+     * given whatever was left over; the date is now a group heading and the
+     * remaining widths are fixed so nothing has to guess. */
+    '.hm-sheet .hm-sum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;' +
+      'border:1px solid #000;margin:8px 0 0}' +
+    '.hm-sheet .hm-sum-c{padding:7px 9px;border-right:1px solid #999;min-width:0}' +
+    '.hm-sheet .hm-sum-c:last-child{border-right:0}' +
+    '.hm-sheet .hm-sum-c b{display:block;font-size:14px;font-weight:700;line-height:1.2;' +
+      'white-space:nowrap;overflow:hidden;text-overflow:ellipsis}' +
+    '.hm-sheet .hm-sum-c span{display:block;font-size:9.5px;color:#333;margin-top:1px;' +
+      'text-transform:uppercase;letter-spacing:.4px}' +
+    '.hm-sheet .hm-flag{margin-top:7px;padding:6px 9px;border:1px solid #000;' +
+      'border-left:4px solid #000;font-size:10.5px;line-height:1.5}' +
+    '.hm-sheet table.hm-reg{table-layout:fixed;margin-top:9px}' +
+    '.hm-sheet table.hm-reg td{word-wrap:break-word;overflow-wrap:break-word}' +
+    '.hm-sheet .w-time{width:44px}' +
+    '.hm-sheet .w-pt{width:134px}' +
+    '.hm-sheet .w-ph{width:86px}' +
+    '.hm-sheet .w-who{width:88px}' +
+    '.hm-sheet .w-n{width:38px}' +
+    '.hm-sheet .w-m{width:82px}' +
+    '.hm-sheet .hm-sev{display:block;font-size:9px;color:#444;text-transform:uppercase;' +
+      'letter-spacing:.3px;margin-top:1px}' +
+    /* The group heading is a row of the table on purpose: it has to repeat
+       the table's column widths and it has to break with the rows it heads. */
+    '.hm-sheet tr.hm-grp td{background:#DDD;font-weight:700;font-size:11px;' +
+      'border-top:2px solid #000;letter-spacing:.3px}' +
+    '.hm-sheet .hm-grp-n{float:right;font-weight:400;font-size:10px;color:#333}' +
+    '.hm-sheet tr.hm-sub-row td{background:#F4F4F4;font-weight:700;font-size:10.5px}' +
     /* The screen preview: the paper, on a grey desk. */
     '#hmPrintWrap{position:fixed;inset:0;left:0;top:0;right:0;bottom:0;z-index:2000;background:rgba(0,0,0,.6);' +
       'display:none;flex-direction:column}' +
@@ -148,6 +181,14 @@
          that produces "MEDICINES GIVEN" alone at the bottom of page 1. */
       '.hm-sheet tr,.hm-sheet .hm-block{page-break-inside:avoid;break-inside:avoid}' +
       '.hm-sheet h2{page-break-after:avoid;break-after:avoid}' +
+      /* A DAY'S HEADING MUST NOT BE THE LAST THING ON A PAGE. The same trap
+         `h2` is guarded against, one level down: "Mon 14 Sept 2026" alone at
+         the foot of page 2 with its patients overleaf reads as a day with
+         nobody in it. And a day's subtotal must stay with the rows it totals,
+         or it becomes a figure at the top of a page belonging to nothing. */
+      '.hm-sheet tr.hm-grp{page-break-after:avoid;break-after:avoid}' +
+      '.hm-sheet tr.hm-sub-row{page-break-before:avoid;break-before:avoid}' +
+      '.hm-sheet .hm-sum,.hm-sheet .hm-flag{page-break-inside:avoid;break-inside:avoid}' +
       '.hm-sheet .hm-kv{page-break-inside:avoid;break-inside:avoid}' +
       '.hm-sheet thead{display:table-header-group}' +   /* repeat headings per page */
       '.hm-sheet tfoot{display:table-footer-group}' +
@@ -394,54 +435,227 @@
     return d;
   }
 
+  /* ── The register, as a register ──────────────────────────────────────────
+   *
+   * It was one flat table of ten columns, every row carrying the full date and
+   * the clinician's name. A clinic photographed it: "the prints for the period
+   * are not organised". They were right, and three things made it that way.
+   *
+   *  • THE DATE WAS ON EVERY ROW, and at 11px in its share of 704px it wrapped
+   *    to three lines — "6 / Apr / 2026" — so every row was three rows tall
+   *    for a fact that changes once a day. It now lives in the group heading,
+   *    and the column is gone.
+   *
+   *  • THE CLINICIAN'S NAME WAS ON EVERY ROW. In a clinic where one person
+   *    sees everybody, that is "DANIEL MUSINGUZI" wrapped over two lines,
+   *    thirty-four times, saying nothing. When one name covers the whole
+   *    period it is stated once, under the heading, and the column goes.
+   *
+   *  • THERE WAS NOTHING TO READ WITHOUT READING ALL OF IT. A register is
+   *    reconciled against and taken to a meeting; both want the totals first.
+   *
+   * A register is read BY DAY, so it is grouped by day — by month over a year,
+   * where a day-by-day list of 300 headings would be its own kind of unusable.
+   * Each group carries its own subtotal, which is the figure a clinic actually
+   * checks the cash box against.
+   */
   function periodSheet(rows, period) {
     rows = (Array.isArray(rows) ? rows : []).slice();
     rows.sort(function (a, b) { return String(a.created_at) < String(b.created_at) ? -1 : 1; });
     var label = (PERIODS.filter(function (p) { return p.key === period; })[0] || {}).label || period;
     var from = since(period);
 
-    var tCharged = 0, tPaid = 0;
-    var body = rows.map(function (v) {
+    if (!rows.length) {
+      return '<div class="hm-sheet">' + clinicHead() +
+        '<h2>Patients — ' + esc(label) + '</h2>' +
+        '<div class="hm-sub" style="margin-bottom:4px">' + esc(dmy(from)) + ' to ' +
+          esc(dmy(new Date())) + '</div>' +
+        '<p class="hm-none">No patients were recorded in this period.</p>' +
+        '<div class="hm-foot"><span>Patients ' + esc(label.toLowerCase()) +
+          '</span><span>Homatt Health</span></div></div>';
+    }
+
+    // ── what the period adds up to ─────────────────────────────────────────
+    var tCharged = 0, tPaid = 0, owingCount = 0, medsTotal = 0;
+    var dx = {}, clinicians = {}, overpaid = [];
+    rows.forEach(function (v) {
       var total = Number(v.total_charged_ugx) || 0, paid = Number(v.amount_paid) || 0;
       tCharged += total; tPaid += paid;
-      var meds = (Array.isArray(v.prescription_items) ? v.prescription_items : []).filter(function (m) {
-        var n = String((m && (m.drug_name || m.name)) || '').trim();
-        return n && !/^(n\/?a|none|nil|-{1,2})$/i.test(n);
-      }).length;
-      return '<tr>' +
-        '<td>' + esc(dmy(v.created_at)) + '</td>' +
-        '<td>' + esc(v.patient_name || '—') + '</td>' +
-        '<td>' + esc(v.patient_phone || '') + '</td>' +
-        '<td>' + esc(v.confirmed_diagnosis || '—') + '</td>' +
-        '<td>' + esc(v.severity || '') + '</td>' +
-        '<td>' + esc(v.clinician_name || '') + '</td>' +
-        '<td class="num">' + meds + '</td>' +
-        '<td class="num">' + ugx(total) + '</td>' +
-        '<td class="num">' + ugx(paid) + '</td>' +
-        '<td class="num">' + ugx(Math.max(0, total - paid)) + '</td>' +
-      '</tr>';
+      if (total - paid > 0) owingCount++;
+      if (paid > total && total > 0) overpaid.push(v);
+      medsTotal += medCount(v);
+      var d = String(v.confirmed_diagnosis || '').trim();
+      if (d) dx[d] = (dx[d] || 0) + 1;
+      var c = String(v.clinician_name || '').trim();
+      if (c) clinicians[c] = (clinicians[c] || 0) + 1;
+    });
+    var names = Object.keys(clinicians);
+    var oneClinician = names.length === 1 ? names[0] : '';
+    var top = Object.keys(dx).sort(function (a, b) { return dx[b] - dx[a]; }).slice(0, 4);
+
+    var summary =
+      '<div class="hm-sum">' +
+        sumCell(String(rows.length), 'patient' + (rows.length === 1 ? '' : 's') + ' seen') +
+        sumCell(ugx(tCharged), 'charged') +
+        sumCell(ugx(tPaid), 'received') +
+        sumCell(ugx(Math.max(0, tCharged - tPaid)),
+                owingCount ? 'still owing, from ' + owingCount : 'still owing') +
+      '</div>' +
+      (top.length
+        ? '<div class="hm-sub" style="margin:5px 0 0">Commonest: ' +
+          top.map(function (d) { return esc(d) + ' (' + dx[d] + ')'; }).join(' · ') +
+          (medsTotal ? ' · ' + medsTotal + ' medicine' + (medsTotal === 1 ? '' : 's') + ' given' : '') +
+          '</div>'
+        : '');
+
+    /* MORE RECEIVED THAN CHARGED IS SHOWN, NOT HIDDEN. It is in this clinic's
+     * real figures — 10,000 charged against 20,000 received — and it means
+     * either change is owed or a number was mis-keyed. A register that quietly
+     * totals past it is how that stays true for months. */
+    var flag = overpaid.length
+      ? '<div class="hm-flag"><b>Check these ' + overpaid.length + ':</b> more was received than ' +
+        'was charged — ' +
+        overpaid.slice(0, 6).map(function (v) {
+          return esc(v.patient_name || 'unnamed') + ' (' + ugx(Number(v.total_charged_ugx) || 0) +
+                 ' charged, ' + ugx(Number(v.amount_paid) || 0) + ' received)';
+        }).join('; ') + (overpaid.length > 6 ? ' …' : '') +
+        '. Either change is owed, or a figure was typed wrongly.</div>'
+      : '';
+
+    // ── grouped, and by what ───────────────────────────────────────────────
+    // A day register needs the time; a year needs months, because three
+    // hundred day-headings is a different kind of unreadable.
+    var by = period === 'today' ? 'none' : (period === 'year' ? 'month' : 'day');
+    var showWho = !oneClinician && names.length > 1;
+    /* SEVEN base columns — Patient, Phone, Diagnosis, Meds, Charged, Paid,
+     * Owing — plus Time on a single-day register and Seen by when more than
+     * one person saw patients. This said 6, so every group heading spanned one
+     * column too few and each subtotal's three money cells landed one column
+     * to the left: the "Charged" figure was rendered in the 38px Meds column
+     * and quietly overflowed it. Invisible to a bounding-rect check, because a
+     * fixed-layout cell clips; only the per-element scrollWidth reading in
+     * measure-print-fit.js could see it, and only after that instrument was
+     * taught to name the element rather than print a total. */
+    var cols = 7 + (by === 'none' ? 1 : 0) + (showWho ? 1 : 0);
+
+    var head = '<thead><tr>' +
+      (by === 'none' ? '<th class="w-time">Time</th>' : '') +
+      '<th class="w-pt">Patient</th><th class="w-ph">Phone</th><th>Diagnosis</th>' +
+      (showWho ? '<th class="w-who">Seen by</th>' : '') +
+      '<th class="num w-n">Meds</th><th class="num w-m">Charged</th>' +
+      '<th class="num w-m">Paid</th><th class="num w-m">Owing</th></tr></thead>';
+
+    var groups = groupRows(rows, by);
+    var bodyHTML = groups.map(function (g) {
+      var gC = 0, gP = 0;
+      var trs = g.rows.map(function (v) {
+        var total = Number(v.total_charged_ugx) || 0, paid = Number(v.amount_paid) || 0;
+        gC += total; gP += paid;
+        var owe = total - paid;
+        return '<tr>' +
+          (by === 'none' ? '<td>' + esc(hm(v.created_at)) + '</td>' : '') +
+          '<td>' + esc(v.patient_name || '—') + '</td>' +
+          '<td>' + esc(v.patient_phone || '') + '</td>' +
+          '<td>' + esc(v.confirmed_diagnosis || '—') +
+            (v.severity ? '<span class="hm-sev">' + esc(v.severity) + '</span>' : '') + '</td>' +
+          (showWho ? '<td>' + esc(shortName(v.clinician_name)) + '</td>' : '') +
+          '<td class="num">' + medCount(v) + '</td>' +
+          '<td class="num">' + ugx(total) + '</td>' +
+          '<td class="num">' + ugx(paid) + '</td>' +
+          /* "(UGX 15,000 over)" is 98px in a 78px column, and `.num` is
+             nowrap, so it overflowed silently — the cell clipped, the rect
+             stayed inside the page, and only scrollWidth could see it. Said
+             compactly instead; the flag above the table explains it, and the
+             figure itself is already in the Paid column. */
+          '<td class="num">' + (owe > 0 ? ugx(owe)
+            : (owe < 0 ? 'over ' + ugx(-owe).replace('UGX ', '') : '—')) + '</td>' +
+        '</tr>';
+      }).join('');
+
+      var header = by === 'none' ? '' :
+        '<tr class="hm-grp"><td colspan="' + cols + '">' + esc(g.label) +
+          '<span class="hm-grp-n">' + g.rows.length + ' patient' +
+          (g.rows.length === 1 ? '' : 's') + '</span></td></tr>';
+
+      // A subtotal only earns its row when there is more than one group.
+      var sub = (groups.length > 1)
+        ? '<tr class="hm-sub-row"><td colspan="' + (cols - 3) + '">' + esc(g.label) + ' total</td>' +
+          '<td class="num">' + ugx(gC) + '</td><td class="num">' + ugx(gP) + '</td>' +
+          '<td class="num">' + ugx(Math.max(0, gC - gP)) + '</td></tr>'
+        : '';
+      return header + trs + sub;
     }).join('');
 
-    var table = rows.length
-      ? '<table><thead><tr><th>Date</th><th>Patient</th><th>Phone</th><th>Diagnosis</th>' +
-        '<th>Severity</th><th>Seen by</th><th class="num">Meds</th><th class="num">Charged</th>' +
-        '<th class="num">Paid</th><th class="num">Owing</th></tr></thead>' +
-        '<tbody>' + body + '</tbody><tfoot><tr>' +
-        '<td colspan="6">' + rows.length + ' patient' + (rows.length === 1 ? '' : 's') + '</td>' +
-        '<td class="num"></td>' +
-        '<td class="num">' + ugx(tCharged) + '</td>' +
-        '<td class="num">' + ugx(tPaid) + '</td>' +
-        '<td class="num">' + ugx(Math.max(0, tCharged - tPaid)) + '</td>' +
-        '</tr></tfoot></table>'
-      : '<p class="hm-none">No patients were recorded in this period.</p>';
+    var table = '<table class="hm-reg">' + head + '<tbody>' + bodyHTML + '</tbody>' +
+      '<tfoot><tr><td colspan="' + (cols - 3) + '">' + rows.length + ' patient' +
+        (rows.length === 1 ? '' : 's') + ' · whole period</td>' +
+      '<td class="num">' + ugx(tCharged) + '</td>' +
+      '<td class="num">' + ugx(tPaid) + '</td>' +
+      '<td class="num">' + ugx(Math.max(0, tCharged - tPaid)) + '</td></tr></tfoot></table>';
 
     return '<div class="hm-sheet">' + clinicHead() +
       '<h2>Patients — ' + esc(label) + '</h2>' +
-      '<div class="hm-sub" style="margin-bottom:4px">' + esc(dmy(from)) + ' to ' + esc(dmy(new Date())) + '</div>' +
-      table +
-      '<div class="hm-foot"><span>Patients ' + esc(label.toLowerCase()) + '</span><span>Homatt Health</span></div>' +
+      '<div class="hm-sub" style="margin-bottom:6px">' + esc(dmy(from)) + ' to ' +
+        esc(dmy(new Date())) +
+        (oneClinician ? ' · all seen by ' + esc(oneClinician) : '') + '</div>' +
+      summary + flag + table +
+      '<div class="hm-foot"><span>Patients ' + esc(label.toLowerCase()) +
+        '</span><span>Homatt Health</span></div>' +
     '</div>';
   }
+
+  function sumCell(big, small) {
+    return '<div class="hm-sum-c"><b>' + esc(big) + '</b><span>' + esc(small) + '</span></div>';
+  }
+
+  function medCount(v) {
+    return (Array.isArray(v.prescription_items) ? v.prescription_items : []).filter(function (m) {
+      var n = String((m && (m.drug_name || m.name)) || '').trim();
+      return n && !/^(n\/?a|none|nil|-{1,2})$/i.test(n);
+    }).length;
+  }
+
+  /* "DANIEL MUSINGUZI" is two lines in its column and one line as
+   * "D. MUSINGUZI". Only ever shortened when there is more than one clinician
+   * to tell apart — where there is only one, the name is printed in full under
+   * the heading instead. */
+  function shortName(s) {
+    var t = String(s || '').trim();
+    if (!t) return '';
+    var parts = t.split(/\s+/);
+    if (parts.length < 2) return t;
+    return parts[0].charAt(0).toUpperCase() + '. ' + parts.slice(1).join(' ');
+  }
+
+  function hm(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    var h = d.getHours(), m = d.getMinutes();
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  function groupRows(rows, by) {
+    if (by === 'none') return [{ label: '', rows: rows }];
+    var order = [], map = {};
+    rows.forEach(function (v) {
+      var d = new Date(v.created_at);
+      var key, lab;
+      if (isNaN(d.getTime())) { key = 'unknown'; lab = 'Date not recorded'; }
+      else if (by === 'month') {
+        key = d.getFullYear() + '-' + d.getMonth();
+        lab = MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+      } else {
+        key = d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate();
+        lab = DAYS[d.getDay()] + ' ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+      }
+      if (!map[key]) { map[key] = { label: lab, rows: [] }; order.push(key); }
+      map[key].rows.push(v);
+    });
+    return order.map(function (k) { return map[k]; });
+  }
+
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // ── showing and printing ──────────────────────────────────────────────
   function show(title, html) {

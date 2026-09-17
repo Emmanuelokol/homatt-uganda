@@ -131,7 +131,25 @@ const OVERFLOW = () => {
     const over = Math.round(r.right - (root.getBoundingClientRect().left + rw));
     if (over > 1) out.push((el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : '')) + ' +' + over + 'px');
   });
-  return { w: Math.round(rw), scrollW: Math.round(root.scrollWidth), out: out.slice(0, 8) };
+  /* NAME WHAT NEEDS THE WIDTH, do not just report the number.
+   *
+   * This returned `scrollWidth` and nothing else, so "content needs 724px of
+   * 704" named no element and sent me guessing at column arithmetic twice.
+   * A cell in a `table-layout:fixed` table can overflow its own content box
+   * while its bounding rect stays inside the page — so the per-element check
+   * above, which reads getBoundingClientRect, sees nothing at all. Only
+   * scrollWidth does, and only per element does it point anywhere. */
+  const needs = [];
+  root.querySelectorAll('*').forEach((el) => {
+    const sw = el.scrollWidth, cw = el.clientWidth;
+    if (cw > 0 && sw > cw + 1) {
+      needs.push((el.tagName + (el.className ? '.' + String(el.className).split(' ')[0] : '')) +
+        ' needs ' + Math.round(sw) + ' in ' + Math.round(cw) +
+        (el.textContent ? '  "' + el.textContent.trim().slice(0, 24) + '"' : ''));
+    }
+  });
+  return { w: Math.round(rw), scrollW: Math.round(root.scrollWidth),
+           out: out.slice(0, 8), needs: needs.slice(0, 6) };
 };
 
 function pdfPages(buf) {
@@ -213,6 +231,7 @@ function pdfPages(buf) {
     console.log('  ' + s.name);
     console.log('    A4 pages                 ' + pages);
     console.log('    A4 width used            ' + over.w + 'px of 704  (content needs ' + over.scrollW + 'px)');
+    (over.needs || []).forEach((n) => console.log('      ↳ ' + n));
     console.log('    hangs off the edge       ' + (over.out.length ? over.out.length + ' element(s)' : 'nothing') +
       (over.out.length ? '  — ' + over.out.join(', ') : ''));
 
