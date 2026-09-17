@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The Homatt Clinic home-screen widget.
+
+  THREE THINGS A CLINIC DOES ALL DAY, one tap from the home screen: start a
+  treatment, look at who is still being treated, sell something over the
+  counter. Each of those is four taps away otherwise — unlock, open the app,
+  wait for the dashboard, find the button — and four taps while somebody is
+  standing in front of you is four taps of not listening to them.
+
+  ── WHAT A WIDGET LAYOUT MAY CONTAIN ──────────────────────────────────────
+
+  This is inflated into a RemoteViews, which runs in the LAUNCHER's process,
+  not ours. It supports a fixed list of view classes and nothing else: Frame,
+  Linear, Relative and Grid layouts, TextView, ImageView, Button, ImageButton,
+  ProgressBar, and a few list types. ConstraintLayout is NOT on that list — a
+  widget built with one inflates to nothing, on every phone, silently. Hence
+  plain LinearLayouts.
+
+  For the same reason there is no `selectableItemBackground`: the ripple is
+  ours to draw, in widget_btn.xml, or a button on a home screen gives no
+  feedback at all and reads as broken.
+
+  ── WHY THE TEXT IS WHERE IT IS ───────────────────────────────────────────
+
+  A widget is resized by whoever places it, down to whatever their launcher
+  allows. Every label is `singleLine` with `ellipsize="end"`, and the row of
+  three shares the width with `layout_weight`, so a narrow placement clips a
+  word rather than reflowing into a shape nobody designed.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_bg"
+    android:padding="12dp">
+
+    <!-- Who this is, so a home screen with a dozen widgets on it is readable.
+         Tapping the strip opens the app normally, without choosing anything —
+         the ordinary way in, kept available. -->
+    <LinearLayout
+        android:id="@+id/widget_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="9dp">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/widget_title"
+            android:textColor="@color/widgetInk"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/widget_subtitle"
+            android:textColor="@color/widgetInkSoft"
+            android:textSize="10sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+    <!-- The three actions. The first is the one a clinic reaches for most, so
+         it carries the weight; the other two are equals beside it. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal"
+        android:baselineAligned="false">
+
+        <TextView
+            android:id="@+id/widget_new"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1.15"
+            android:layout_marginEnd="7dp"
+            android:background="@drawable/widget_btn_primary"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/widget_new"
+            android:textColor="@color/widgetOnPrimary"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:contentDescription="@string/widget_new_desc" />
+
+        <TextView
+            android:id="@+id/widget_active"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_marginEnd="7dp"
+            android:background="@drawable/widget_btn"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/widget_active"
+            android:textColor="@color/widgetInk"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:contentDescription="@string/widget_active_desc" />
+
+        <TextView
+            android:id="@+id/widget_sale"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/widget_btn"
+            android:gravity="center"
+            android:padding="8dp"
+            android:text="@string/widget_sale"
+            android:textColor="@color/widgetInk"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:contentDescription="@string/widget_sale_desc" />
+    </LinearLayout>
+</LinearLayout>

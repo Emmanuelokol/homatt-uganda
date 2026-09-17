@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The long-press menu on the app icon — the same three targets as the widget.
+
+  Worth having even with the widget built, and for two reasons. A clinic that
+  never adds a widget still gets one-tap access, and a launcher that has no
+  widgets at all (several Android skins in this market hide them) still shows
+  these. They cost one file.
+
+  Each one carries the SAME homatt://app/… link the widget uses, so there is
+  one list of targets and one thing to keep correct. `android:enabled="true"`
+  and a targetPackage/targetClass on the intent are both required — a shortcut
+  with an implicit intent is silently dropped at install time.
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <shortcut
+        android:shortcutId="new-treatment"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_new_short"
+        android:shortcutLongLabel="@string/shortcut_new_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="homatt://app/new-treatment"
+            android:targetPackage="ug.homatt.health"
+            android:targetClass="ug.homatt.health.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="active"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_active_short"
+        android:shortcutLongLabel="@string/shortcut_active_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="homatt://app/active"
+            android:targetPackage="ug.homatt.health"
+            android:targetClass="ug.homatt.health.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+
+    <shortcut
+        android:shortcutId="quick-sale"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_sale_short"
+        android:shortcutLongLabel="@string/shortcut_sale_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="homatt://app/quick-sale"
+            android:targetPackage="ug.homatt.health"
+            android:targetClass="ug.homatt.health.MainActivity" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>

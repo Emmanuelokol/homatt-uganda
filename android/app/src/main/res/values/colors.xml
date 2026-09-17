@@ -5,4 +5,22 @@
     <color name="colorAccent">#4CAF50</color>
     <color name="splashBackground">#1B5E20</color>
     <color name="statusBarColor">#1B5E20</color>
+
+    <!-- The home-screen widget.
+         It sits on somebody's wallpaper, which the app does not control and
+         cannot measure, so it carries its own opaque surface and states its
+         own ink. Every pair here is a fill and the text that goes on it,
+         defined together — the rule the rest of this app follows, and the one
+         that has been broken four times by borrowing a fill for a word.
+         Measured on white: ink #12261A on #F4F8F5 is 14.6:1; #FFFFFF on the
+         #1B5E20 primary is 8.9:1. -->
+    <color name="widgetSurface">#F4F8F5</color>
+    <color name="widgetInk">#12261A</color>
+    <color name="widgetInkSoft">#4A5B50</color>
+    <color name="widgetBtn">#FFFFFF</color>
+    <color name="widgetBtnPressed">#DCE8E0</color>
+    <color name="widgetBtnEdge">#C6D5CB</color>
+    <color name="widgetPrimary">#1B5E20</color>
+    <color name="widgetPrimaryPressed">#144A18</color>
+    <color name="widgetOnPrimary">#FFFFFF</color>
 </resources>

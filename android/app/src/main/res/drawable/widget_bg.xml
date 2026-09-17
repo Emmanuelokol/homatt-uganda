@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The card the three buttons sit on.
+
+     A widget sits on somebody's wallpaper, which we do not control and cannot
+     measure, so it carries its own opaque background rather than trusting
+     whatever is behind it. That is the same rule as the printed sheet: where a
+     surface does not follow the theme, nothing on it may. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/widgetSurface" />
+    <corners android:radius="18dp" />
+</shape>
