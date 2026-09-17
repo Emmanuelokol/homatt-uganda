@@ -29,15 +29,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Check SUPABASE_ACCESS_TOKEN is set
+      # A CHECK THAT TESTS NON-EMPTY IS NOT A CHECK.
+      #
+      # This said "✓ SUPABASE_ACCESS_TOKEN is set", which was true of a token
+      # Supabase had revoked. The job then walked all 83 migrations, got 401 on
+      # every one, and only worked out at the very end that the token was the
+      # problem — by grepping the LAST response body for the word
+      # "unauthorized". Half an hour of run time to reach a conclusion that was
+      # available in one call at the start.
+      #
+      # The same fault was found and fixed in both Edge Function workflows and
+      # missed here, which is how the CLINICIAN PORTAL, the OWNER CORRECTIONS
+      # and the VITAL FLOWSHEET migrations came to sit unapplied while the
+      # repository said they had shipped.
+      #
+      # A revoked token and a missing one need the same remedy, so they produce
+      # the same sentence — at the first step, not the last.
+      - name: Check SUPABASE_ACCESS_TOKEN works
         run: |
-          if [ -z "${{ secrets.SUPABASE_ACCESS_TOKEN }}" ]; then
-            echo "::error::SUPABASE_ACCESS_TOKEN secret is not set."
-            echo "::error::Go to: Supabase dashboard → Account → Access Tokens → create one"
-            echo "::error::Then: GitHub repo → Settings → Secrets → Actions → New secret"
+          set -uo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Supabase dashboard → Account → Access Tokens → generate one, then GitHub → Settings → Secrets and variables → Actions → SUPABASE_ACCESS_TOKEN. NO MIGRATION IS APPLIED until that is done."
             exit 1
           fi
-          echo "✓ SUPABASE_ACCESS_TOKEN is set"
+          code=$(curl -sS -o /tmp/sb_projects.json -w '%{http_code}' \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            https://api.supabase.com/v1/projects || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is set but Supabase REJECTED it (HTTP $code) — expired or revoked. Generate a new one at Supabase dashboard → Account → Access Tokens, then replace the SUPABASE_ACCESS_TOKEN secret at GitHub → Settings → Secrets and variables → Actions. NO MIGRATION IS APPLIED until that is done, so the database stays behind the code."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Could not reach the Supabase Management API (HTTP $code). Nothing has been applied; try again shortly."
+            exit 1
+          fi
+          if ! grep -q "$SUPABASE_PROJECT_REF" /tmp/sb_projects.json; then
+            echo "::error::The token is valid but project $SUPABASE_PROJECT_REF is not one it can see. It probably belongs to a different Supabase account or organisation."
+            exit 1
+          fi
+          echo "✓ token accepted, and it can see $SUPABASE_PROJECT_REF"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       # This step said, in a comment, that it must not fail the whole job —
       # every migration here is idempotent and re-applying one that is already
