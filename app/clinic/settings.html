@@ -2942,6 +2942,28 @@ document.addEventListener('DOMContentLoaded', function () {
     return (C && C.Plugins && C.Plugins.HomattWidget) || null;
   }
 
+  /* IS THIS THE INSTALLED ANDROID APP AT ALL?
+   *
+   * This is a DIFFERENT question from "is the widget plugin there", and
+   * conflating the two is the bug a clinic photographed. The portal updates
+   * its own web files over the air — that is the whole point of the self-update
+   * — so this card arrived inside an app whose APK was built before the widget
+   * existed. window.Capacitor was there; Plugins.HomattWidget was not; and the
+   * screen announced "This is the web version" to somebody holding the
+   * installed Android app.
+   *
+   * Capacitor's bridge injects window.Capacitor into every page it serves, in
+   * every version, so its presence answers "installed app?" on its own and
+   * does not depend on any plugin being present. */
+  function isInstalledApp() {
+    var C = window.Capacitor;
+    if (!C) return false;
+    try {
+      if (typeof C.isNativePlatform === 'function') return !!C.isNativePlatform();
+    } catch (e) {}
+    return !!(C.isNative || C.platform === 'android' || C.platform === 'ios');
+  }
+
   var MANUAL = 'To add it by hand: press and hold an empty part of your home ' +
     'screen, tap <b>Widgets</b>, find <b>Homatt Clinic</b> and drag it out. ' +
     'Or press and hold the Homatt Clinic icon — the same three are in that menu, ' +
@@ -2952,18 +2974,36 @@ document.addEventListener('DOMContentLoaded', function () {
     var btn = document.getElementById('pinBtn');
     if (!card) return;
     var P = pinPlugin();
-    /* Not the installed app at all — a browser or the web version. Nothing
-     * here can place an Android widget, and saying so is more use than an
-     * empty card. The PWA's own long-press shortcuts still work. */
+    card.style.display = '';
+
+    /* THREE STATES, NOT TWO, and the middle one is the whole reason this was
+     * reported as broken. */
     if (!P) {
-      card.style.display = '';
-      pinShow('unknown', 'This is the web version.',
-        'A home-screen widget belongs to the installed Android app. If you ' +
-        'added this page to your home screen, press and hold its icon — ' +
-        'New treatment, Active and Quick sale are in that menu.');
+      if (isInstalledApp()) {
+        /* The installed app, updating itself perfectly — this very card
+         * arrived that way — but running an APK built before the widget
+         * existed. The widget is Java and XML compiled into the app, so no
+         * web update can add it; it is also why it is not in the launcher's
+         * widget list either, which is what "I am not seeing the widget"
+         * actually meant. */
+        pinShow('low', 'The app itself needs updating, just this once.',
+          'Everything you see on these screens updates by itself, and it has \u2014 ' +
+          'that is how this card reached you. The home-screen widget cannot: it ' +
+          'is part of the Android app, not of the pages, so it only arrives with ' +
+          'a new install of <b>Homatt Clinic</b>. Install the latest one over ' +
+          'this one; nothing you have recorded is lost, and after that the ' +
+          'screens go on updating on their own.');
+        return;
+      }
+      /* A browser, or the page added to a home screen as a web app. Nothing
+       * here can place an Android widget, and the long-press menu is the real
+       * answer rather than a consolation. */
+      pinShow('unknown', 'This is the web version, not the installed app.',
+        'A home-screen widget belongs to the Android app. If you added this ' +
+        'page to your home screen, press and hold its icon \u2014 New treatment, ' +
+        'Active and Quick sale are in that menu.');
       return;
     }
-    card.style.display = '';
     var r = null;
     try { r = await P.canPin(); } catch (e) { r = null; }
     if (r && r.supported) {

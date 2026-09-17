@@ -248,11 +248,18 @@ async function signIn(page) {
     });
     if (plugin !== null) {
       await pinPage.addInitScript((p) => {
-        window.Capacitor = { isNativePlatform: () => true, platform: 'android', Plugins: {
-          HomattWidget: {
-            canPin: async () => p.canPin,
-            pin: async () => { if (p.pinThrows) { const e = new Error('no'); e.code = p.pinThrows; throw e; } return { asked: true }; },
-          } } };
+        /* `noPlugin` is the state a clinic actually photographed: the installed
+         * Android app, whose web files updated themselves over the air, running
+         * an APK built before the widget existed. Capacitor is there; the
+         * plugin is not. It had no coverage at all, which is why the screen
+         * shipped saying "This is the web version" to somebody holding the
+         * installed app. */
+        window.Capacitor = { isNativePlatform: () => true, platform: 'android',
+          Plugins: p.noPlugin ? {} : {
+            HomattWidget: {
+              canPin: async () => p.canPin,
+              pin: async () => { if (p.pinThrows) { const e = new Error('no'); e.code = p.pinThrows; throw e; } return { asked: true }; },
+            } } };
       }, plugin);
     }
     /* SEEDED ON THE UNGUARDED PAGE. settings.html calls requireClinic(), which
@@ -296,11 +303,37 @@ async function signIn(page) {
     /launcher/i.test(refused.detail), refused.detail.slice(0, 90));
   ok('...and no dead button here either', refused.btnShown === false);
 
+  /* THE STATE A CLINIC PHOTOGRAPHED, and the one that had no test.
+   *
+   * The installed Android app, updating its own web files perfectly — that is
+   * how the card reached them — but on an APK built before the widget existed.
+   * Capacitor present, plugin absent. The screen used to announce "This is the
+   * web version" to somebody holding the installed app, which is not true, does
+   * not explain why the widget is missing from the launcher either, and gives
+   * them nothing to do. */
+  const oldApk = await settingsWith({ noPlugin: true });
+  ok('an installed app with an older APK is NOT called the web version',
+    oldApk.cardShown && !/web version/i.test(oldApk.msg), oldApk.msg);
+  ok('...it is told the APP needs updating, once',
+    /app itself needs updating/i.test(oldApk.msg), oldApk.msg);
+  ok('...and that the screens already update themselves',
+    /updates by itself|update by themselves|go on updating/i.test(oldApk.detail),
+    oldApk.detail.slice(0, 110));
+  ok('...and why a web update cannot bring a widget',
+    /part of the Android app/i.test(oldApk.detail), oldApk.detail.slice(0, 140));
+  ok('...and that nothing recorded is lost by installing over it',
+    /nothing you have recorded is lost/i.test(oldApk.detail), oldApk.detail.slice(0, 200));
+  ok('...and it is not offered a button that cannot work', oldApk.btnShown === false);
+
   const web = await settingsWith(null);
-  ok('the web version says a widget belongs to the installed app',
+  ok('a real browser IS told it is the web version',
     web.cardShown && /web version/i.test(web.msg), web.msg);
   ok('...and points at the long-press menu it DOES have',
     /press and hold its icon/i.test(web.detail), web.detail.slice(0, 90));
+  /* The two must not say the same thing: one needs an install, the other
+   * cannot have a widget at all. A single message for both is what shipped. */
+  ok('the installed-app and browser messages are DIFFERENT',
+    oldApk.msg !== web.msg, oldApk.msg + ' / ' + web.msg);
 
   // Tapping it must never claim the widget was added: Android's dialog decides,
   // and requestPinAppWidget returns when that dialog OPENS.
