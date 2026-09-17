@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v193';
+const CACHE = 'homatt-clinic-v194';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -89,6 +89,7 @@ const SHELL = [
   'js/clinic-impression.js?v=20261007',
   'js/clinic-dictate.js?v=20261007',
   'js/clinic-speak.js?v=20261007',
+  'js/clinic-whois.js?v=20261007',
   'js/clinic-intake.js?v=20261007',
   'js/clinic-look.js?v=20261007',
   'manifest.json',

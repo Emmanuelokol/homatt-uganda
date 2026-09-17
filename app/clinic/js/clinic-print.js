@@ -126,6 +126,13 @@
     '.hm-pbtn{flex:0 0 auto;padding:9px 14px;border-radius:9px;border:none;font-family:inherit;font-size:13.5px;' +
       'font-weight:700;cursor:pointer;background:var(--deep,#1B5E20);color:var(--on-deep,#fff)}' +
     '.hm-pbtn.ghost{background:transparent;color:var(--text,#1A1A1A);border:1px solid var(--border,#E0E0E0)}' +
+    /* Full width so it wraps under the buttons rather than squeezing them; the
+       bar is already `flex-wrap`. Toolbar colours, because it is on the
+       toolbar's surface and not on the paper — the distinction this file has
+       been caught by twice. */
+    '#hmPrintBar .hm-tip{flex:1 0 100%;font-size:11px;line-height:1.5;margin-top:2px;' +
+      'color:var(--text-lt,#5F6368)}' +
+    '#hmPrintBar .hm-tip b{color:var(--text,#1A1A1A);font-weight:700}' +
     /* ANYTHING INSIDE THE PAPER TAKES THE PAPER'S COLOURS, NOT THE APP'S.
      *
      * The period buttons — Today, This week, This month, This year — were
@@ -219,6 +226,15 @@
           '<button class="hm-pbtn ghost" id="hmPrintZoom">Read it</button>' +
           '<button class="hm-pbtn" id="hmPrintGo">Print</button>' +
           '<button class="hm-pbtn ghost" id="hmPrintClose">Close</button>' +
+          /* THE ONE THING ABOUT PRINTING THE APP CANNOT CONTROL, said where it
+             is read rather than left to be discovered on paper. The browser
+             prints its own header and footer outside our sheet — the title and
+             the web address — which is why a clinic found a GitHub address on a
+             referral letter. The title is ours and is set properly now; the
+             address is the browser's and only its own dialog can turn it off. */
+          '<div class="hm-tip" id="hmPrintTip">Your browser adds the web address ' +
+            'at the edge of the paper. To leave it off: in the print window open ' +
+            '<b>More settings</b> and untick <b>Headers and footers</b>.</div>' +
         '</div>' +
         '<div id="hmPrintScroll"><div id="hmPrintFit"><div id="hmPrintPaper"></div></div></div>';
       document.body.appendChild(wrap);
@@ -673,14 +689,54 @@
     setTimeout(fitPaper, 60);      // again once fonts have settled
   }
 
+  /* ── WHAT THE BROWSER PRINTS AROUND OUR SHEET ────────────────────────────
+   *
+   * A clinic asked why somebody reading a printed sheet sees a GitHub address.
+   * They are not seeing ours — they are seeing the BROWSER's own header and
+   * footer, which it adds outside the page: the document title on one side and
+   * the address of the page on the other. So a referral letter carried to a
+   * hospital was headed `emmanuelokol.github.io`.
+   *
+   * Half of that is ours and is fixed here. `document.title` was "Homatt
+   * Clinic" — the app's title, not this sheet's — so the printed header named
+   * neither the clinic nor the patient. For the duration of the print it
+   * becomes "Homatt Health · <what this sheet is> · <the clinic>", and is put
+   * back afterwards so the browser tab does not keep it.
+   *
+   * THE OTHER HALF CANNOT BE FIXED IN CODE. No stylesheet can suppress that
+   * address; it is the browser's, deliberately, so that a printed page can
+   * always be traced back to where it came from. Two things do change it:
+   * turning "Headers and footers" off in the print dialog, and serving the app
+   * from a Homatt domain instead of a GitHub one. The preview says the first
+   * of those, in the toolbar, rather than leaving a clinic to wonder. */
+  var _titleWas = null;
+
+  function printTitle(what) {
+    var s = {};
+    try { s = JSON.parse(localStorage.getItem('clinic_session') || '{}') || {}; } catch (e) {}
+    var bits = ['Homatt Health'];
+    if (what) bits.push(String(what).replace(/\s+/g, ' ').trim());
+    if (s.clinicName) bits.push(s.clinicName);
+    return bits.join(' · ');
+  }
+
   function doPrint() {
+    var t = document.getElementById('hmPrintTitle');
+    _titleWas = document.title;
+    try { document.title = printTitle(t ? t.textContent : ''); } catch (e) {}
+
     document.body.classList.add('hm-printing');
     try { window.print(); }
     catch (e) { /* a browser with no print: nothing to do but leave the sheet up */ }
     // Some browsers return from print() synchronously and some do not; the
     // class has to come off either way or the app stays hidden on the NEXT
     // print. afterprint where it exists, a timer where it does not.
-    var off = function () { document.body.classList.remove('hm-printing'); };
+    var off = function () {
+      document.body.classList.remove('hm-printing');
+      // Put the tab's own title back. Leaving the sheet's title on the tab
+      // would make the NEXT print's header say what the LAST one was about.
+      if (_titleWas !== null) { try { document.title = _titleWas; } catch (e) {} _titleWas = null; }
+    };
     if (window.onafterprint !== undefined) window.addEventListener('afterprint', off, { once: true });
     setTimeout(off, 1500);
   }

@@ -1019,6 +1019,79 @@
   }
   if (_qpName)  _qpName.addEventListener('input', _syncQuickPatient);
   if (_qpPhone) _qpPhone.addEventListener('input', _syncQuickPatient);
+
+  /* ── WHO IS THIS, WHILE THE NAME IS STILL BEING TYPED ──────────────────
+   *
+   * Until now this box did nothing but copy its text into `state`. The only
+   * patient search in the wizard is bound to the PHONE box, returns a name and
+   * a phone and nothing else, and the money and the history are only fetched
+   * once somebody has been picked from it. So a clinic could treat the same
+   * person a fourth time, with two unpaid visits behind them, and nothing said
+   * so until the bill was already being written.
+   *
+   * It reads `clinic_diagnoses` directly rather than asking for a new RPC —
+   * `search_clinic_patients` would be the tidier home, but the deploy token is
+   * revoked, nothing new reaches the database, and a feature that needs a
+   * migration nobody can apply is a feature that does not exist.
+   *
+   * ONE fetch per screen, not one per keystroke. A few hundred recent visits
+   * filter instantly on the phone; a query per keystroke on a Ugandan mobile
+   * connection is slow and paid for by the clinic. */
+  if (window.HomattWhoIs) {
+    HomattWhoIs.attach({
+      inputId: 'quickPatientName',
+      io: {
+        recentVisits: async function (limit) {
+          var CO = window.ClinicOffline;
+          var key = 'whois_recent_' + (_clinicId || 'x');
+          /* THE INTAKE SCREEN ALREADY FETCHES THIS. `loadOwing()` in
+             clinic-intake.js pulls the same 400 recent visits for the unpaid
+             check and for matching a misheard name, and caches them. Asking
+             for them again is a clinic paying twice on a metered connection,
+             and a second copy of "who has this clinic seen" that can disagree
+             with the first. Found by counting requests in the test, which saw
+             two where it expected one. */
+          if (typeof window._intakeRecentVisits === 'function') {
+            try {
+              var shared = await window._intakeRecentVisits();
+              if (shared && shared.length) return shared;
+            } catch (e) { /* fall through to our own query */ }
+          }
+          if (!supabase || !_clinicId || (CO && CO.isOffline())) {
+            return (CO && CO.get(key, [])) || [];
+          }
+          var q = supabase.from('clinic_diagnoses')
+            .select('patient_name,patient_phone,clinic_patient_id,confirmed_diagnosis,' +
+                    'total_charged_ugx,amount_paid,created_at')
+            .eq('clinic_id', _clinicId)
+            .order('created_at', { ascending: false })
+            .limit(limit || 400);
+          var r = CO ? await CO.withTimeout(q, 6000) : await q;
+          if (!r || r._timeout || r.error || !Array.isArray(r.data)) {
+            return (CO && CO.get(key, [])) || [];
+          }
+          if (CO) CO.set(key, r.data);
+          return r.data;
+        }
+      },
+      /* IT OFFERS; IT NEVER FILLS. Nothing reaches a box until this runs, and
+       * this only runs on a tap. Two people in a village share a name, and a
+       * clinic's own records are full of near-duplicates — auto-selecting on a
+       * name match is how one visit gets filed against somebody else's debt. */
+      onPick: function (g) {
+        if (_qpName)  _qpName.value  = g.name || '';
+        if (_qpPhone) _qpPhone.value = g.phone || '';
+        _syncQuickPatient();
+        if (state.patient) {
+          state.patient.clinicPatientId = g.clinicPatientId || state.patient.clinicPatientId || null;
+          state.patient._owed = g.owed || 0;
+        }
+        try {
+          if (typeof window._intakeMarks === 'function') window._intakeMarks();
+        } catch (e) {}
+      }
+    });
+  }
   // Picking someone from the booking-code or phone lookup fills these in, so
   // the screen always shows who the treatment is actually for.
   window._wizShowPatientInBoxes = function (p) {

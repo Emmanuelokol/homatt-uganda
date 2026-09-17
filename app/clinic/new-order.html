@@ -1532,6 +1532,12 @@
 <script src="js/vendor/sql-wasm.js"></script>
 <script src="js/stock-blueprints.js?v=20261007"></script>
 <script src="js/clinic-regimens.js?v=20261007"></script>
+<!-- BEFORE the wizard, not after. The wizard wires this box in its module
+     body, which runs the moment the file is parsed — so a module loaded
+     after it is `undefined` at exactly the instant it is looked for, and
+     the name box silently goes back to doing nothing. Caught by driving
+     the real screen; no amount of unit testing the module could see it. -->
+<script src="js/clinic-whois.js?v=20261007"></script>
 <script src="js/new-order-wizard.js?v=20261007"></script>
 <script src="js/ucg-sections.js?v=20261007"></script>
 <script src="js/ucg-autofill.js?v=20261007"></script>

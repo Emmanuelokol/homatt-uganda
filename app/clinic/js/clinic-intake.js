@@ -283,7 +283,7 @@
   // The clinic's own word for it is "Demanded". If a name or number matches an
   // unpaid visit, that has to be visible right where the name is typed —
   // before the treatment, not after it, when the money conversation is over.
-  var _debtT = null, _debtCache = null;
+  var _debtT = null, _debtCache = null, _allVisits = null;
   function clinicId() {
     try { return JSON.parse(localStorage.getItem('clinic_session') || '{}').clinicId || null; }
     catch (e) { return null; }
@@ -296,7 +296,13 @@
     try {
       var r = await window.ClinicOffline.cachedQuery('owing_' + cid, function () {
         return supa.from('clinic_diagnoses')
-          .select('patient_name,patient_phone,total_charged_ugx,amount_paid,created_at,case_code')
+          /* `confirmed_diagnosis` and `clinic_patient_id` are here so that the
+             "who is this?" lookup on the name box can read THIS fetch rather
+             than making a second one. Two queries for nearly the same 400 rows
+             is a clinic paying twice on a metered connection — and two copies
+             of "who has this clinic seen" that can disagree. */
+          .select('patient_name,patient_phone,total_charged_ugx,amount_paid,created_at,case_code,' +
+                  'confirmed_diagnosis,clinic_patient_id')
           .eq('clinic_id', cid)
           .order('created_at', { ascending: false })
           .limit(400);
@@ -312,12 +318,24 @@
         var k = n.toLowerCase();
         if (n.length >= 3 && !already[k]) { already[k] = 1; _seenNames.push(n); }
       });
+      // Every visit, kept whole for the name lookup; the debt list is the
+      // subset that still owes something.
+      _allVisits = rows;
       _debtCache = rows.filter(function (x) {
         return (Number(x.total_charged_ugx) || 0) - (Number(x.amount_paid) || 0) > 0;
       });
-    } catch (e) { _debtCache = []; }
+    } catch (e) { _debtCache = []; _allVisits = _allVisits || []; }
     return _debtCache;
   }
+
+  /* The same 400 rows, for anything else on this screen that needs to know who
+   * this clinic has seen. One fetch, one answer — the rule this project has
+   * already paid for twice over the microphone and the dose table. */
+  window._intakeRecentVisits = async function () {
+    if (_allVisits) return _allVisits;
+    await loadOwing();
+    return _allVisits || [];
+  };
 
   /* ── Matching a heard name to a person this clinic already knows ──────────
    *

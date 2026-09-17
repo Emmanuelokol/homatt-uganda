@@ -1,5 +1,5 @@
 {
-  "cache": "homatt-clinic-v193",
+  "cache": "homatt-clinic-v194",
   "dataVersion": "145",
   "files": [
     "./",
@@ -30,6 +30,7 @@
     "js/clinic-impression.js?v=20261007",
     "js/clinic-dictate.js?v=20261007",
     "js/clinic-speak.js?v=20261007",
+    "js/clinic-whois.js?v=20261007",
     "js/clinic-intake.js?v=20261007",
     "js/clinic-look.js?v=20261007",
     "manifest.json",
