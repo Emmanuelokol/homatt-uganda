@@ -350,6 +350,42 @@ async function signIn(page) {
   ok('...and says what happens if you decline',
     /nothing was added/i.test(asked.detail), asked.detail.slice(0, 90));
 
+  /* ── 8. GETTING THE APP, from inside the app ──────────────────────────
+   *
+   * "The link for the app is not clicking." The link was correct — the repo
+   * is public, the APK is refreshed by every build, and it downloads with no
+   * sign-in. It was a bare URL in a chat, which is not tappable everywhere.
+   * A clinic told to install something, holding an address they cannot tap,
+   * has been handed a dead end — so the way to the new app belongs inside the
+   * app they already have. */
+  const getApk = await pinPage.evaluate(() => {
+    let opened = null;
+    window.open = (u) => { opened = u; return { closed: false }; };
+    const btn = document.getElementById('getApkBtn');
+    const shown = !!btn && getComputedStyle(btn).display !== 'none';
+    if (btn) btn.click();
+    return { shown, opened,
+             printed: (document.getElementById('apkUrlText') || {}).textContent || '' };
+  });
+  ok('Settings offers the app itself, not just an address', getApk.shown === true);
+  ok('...and tapping it opens the APK', /HomattHealth\.apk$/.test(getApk.opened || ''),
+    String(getApk.opened));
+  ok('...in a NEW window, because a WebView asked to navigate to an APK does nothing',
+    true);
+  /* The address is printed too, and selectable. A button that fails silently
+   * — a blocked pop-up, a WebView that refuses — needs something a person can
+   * copy, or they are back where they started. */
+  ok('...and the address is printed as well, to be copied if the button fails',
+    getApk.printed === getApk.opened && /^https:\/\//.test(getApk.printed),
+    getApk.printed);
+
+  // The old-APK message must point AT that button rather than leaving a clinic
+  // to find it, since that is the state where it is needed.
+  const settingsSrc = fs.readFileSync(path.join(APP, 'clinic', 'settings.html'), 'utf8');
+  ok('the "your app needs updating" message names the button that does it',
+    /Get the newest app/.test(settingsSrc) &&
+    /there is no.{0,20}address to type/s.test(settingsSrc));
+
   if (pinCtx) await pinCtx.close();
 
   ok('no page error anywhere in that journey', errors.length === 0, errors.slice(0, 2).join(' | '));

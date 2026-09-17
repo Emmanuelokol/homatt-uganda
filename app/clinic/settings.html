@@ -752,6 +752,23 @@
         <button type="button" class="dict-btn" id="verCheckBtn">
           <span class="material-icons-outlined">refresh</span> Check for updates
         </button>
+        <!-- THE APP ITSELF, as opposed to its screens.
+             A link pasted into a chat is not tappable in every chat, and a
+             clinic asked to "download the latest app" with a URL they cannot
+             tap has been handed a dead end. They are already holding the app,
+             so the way to the new one belongs here. The address is shown
+             beside it, selectable, because a button that fails silently needs
+             something a person can copy. -->
+        <button type="button" class="dict-btn" id="getApkBtn" style="margin-top:8px">
+          <span class="material-icons-outlined">android</span> Get the newest app
+        </button>
+        <div class="dict-detail" id="getApkNote" style="margin-top:8px">
+          Only needed when something new is part of the Android app itself, like
+          the home-screen widget. The screens above update on their own.
+          <div style="margin-top:6px;font-size:11px;word-break:break-all;user-select:all;-webkit-user-select:all">
+            <span id="apkUrlText"></span>
+          </div>
+        </div>
       </div>
 
       <!-- ══ Sign-in email ══════════════════════════════════════════════
@@ -2992,7 +3009,10 @@ document.addEventListener('DOMContentLoaded', function () {
           'is part of the Android app, not of the pages, so it only arrives with ' +
           'a new install of <b>Homatt Clinic</b>. Install the latest one over ' +
           'this one; nothing you have recorded is lost, and after that the ' +
-          'screens go on updating on their own.');
+          'screens go on updating on their own.' +
+          '<br><br>Tap <b>Get the newest app</b> in <b>App version</b>, just ' +
+          'below \u2014 it opens the download in your browser, so there is no ' +
+          'address to type.');
         return;
       }
       /* A browser, or the page added to a home screen as a web app. Nothing
@@ -3050,6 +3070,32 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (btn) btn.disabled = false;
   }
+
+  /* ── Getting the newest Android app ────────────────────────────────────
+   *
+   * `_blank` rather than assigning location: inside the installed app the
+   * WebView would try to navigate to an APK and simply do nothing, while the
+   * system browser knows what to do with one. Capacitor opens `_blank` in the
+   * external browser, and in an ordinary browser it is a new tab, which is
+   * right in both. */
+  var APK_URL = 'https://github.com/Emmanuelokol/homatt-uganda/releases/' +
+                'download/android-latest/HomattHealth.apk';
+
+  function openApk() {
+    try {
+      var w = window.open(APK_URL, '_blank');
+      if (w) return true;
+    } catch (e) {}
+    // Pop-up blocked, or a WebView that refuses: fall back to navigating,
+    // which at least reaches the browser's own download handling.
+    try { window.location.href = APK_URL; return true; } catch (e) {}
+    return false;
+  }
+
+  var apkText = document.getElementById('apkUrlText');
+  if (apkText) apkText.textContent = APK_URL;
+  var gbtn = document.getElementById('getApkBtn');
+  if (gbtn) gbtn.addEventListener('click', openApk);
 
   var pbtn = document.getElementById('pinBtn');
   if (pbtn) pbtn.addEventListener('click', pinDo);
