@@ -2246,9 +2246,179 @@ record no height", and the only honest way to check it is to take the control
 away and measure again — the same discipline as putting a bug back to prove a
 fix.
 
+## The flowsheet, and which book decides what a number means
+
+`app/clinic/js/clinic-vitals.js` (the arithmetic) ·
+`app/clinic/js/clinic-flowsheet.js` (the screen) ·
+`supabase/migrations/20260916_vital_flowsheet.sql` ·
+`tests/test-vitals-engine.js`, `tests/test-flowsheet.js`,
+`tests/sql/test-vital-flowsheet.sql` · `tests/measure-vitals.js`
+
+"Monitor her BP every fifteen minutes" and "bring her back next month and we
+will check it again" are the same question over two timescales: is this person
+getting worse, holding, or responding? One reading cannot answer it. Until now
+the app only ever took one, at intake, and wrote it into `clinical_findings`
+as a sentence — which cannot be plotted, compared or counted.
+
+### One sheet, not two
+It reads its own readings and changes how it presents them: several inside six
+hours is a ward observation chart, one a day is somebody whose pressure is
+being followed. The clinician can override it, because a rule about time
+cannot know what is happening in the room. Two screens would be two things to
+keep correct and the second would be the one nobody measured — written in this
+file already about the microphone and about the follow-up dose table, and true
+a third time.
+
+### The bands are the UGANDA guideline's, and this is not a detail
+Every worked example on the internet uses the AHA's 2017 table. The app ships
+the UCG and a clinician can open it, one tap away, on the same phone. Measured
+over 8,130 plausible adult readings (`measure-vitals.js`) the two disagree
+about **what to do** in 2,890 of them — **35.5%**:
+
+| AHA says | the book says | readings |
+|---|---|---|
+| stage 2 | Hypertension, stage 1 | 1,445 |
+| stage 1 | Pre-hypertension | 800 |
+| stage 2 | Hypertensive emergency | 645 |
+
+135/85 is "stage 1 hypertension" under the AHA and **pre-hypertension** in UCG
+4.1.6, whose step 1 for that is three months of lifestyle measures before any
+medicine. Using the familiar table would have printed one answer on the
+flowsheet and the opposite one on the guideline screen beside it, with nothing
+to tell a clinician which the app meant.
+
+### A child is never given an adult stage
+Under 13 uses the book's own paediatric table (UCG 1.1.2.1, *Normal ranges for
+vital signs in children*) and reads *in range / below / above* for that age.
+Over 555 paediatric readings the adult table is wrong **245 times (44.1%)**:
+
+| | |
+|---|---|
+| a child **above** their range, called normal | **205** |
+| a child inside their range, called hypotensive | 40 |
+| a child **below** their range, called normal | **0** |
+
+That last row is stated rather than assumed: the paediatric floors (70, 80, 90)
+all sit at or under the adult 90, so the adult table cannot miss a low child —
+it over-warns instead. **I had written the opposite in two file headers; the
+measurement disproved it and both were corrected.** The harm is the 205, which
+is the direction that gets ignored.
+
+The book's table gives **systolic only**, so a child's diastolic is recorded
+and not judged, and the card says so. Inventing a paediatric diastolic
+threshold to make the display symmetrical is exactly the class of mistake this
+engine exists to avoid.
+
+Where no age is recorded the adult table is used and the result carries
+`assumedAdult`, which the card prints out loud. The age itself is read from
+what intake already wrote — `Patient: Female, 46 years` is the first line of
+`clinical_findings` — so it costs no column and no migration.
+
+### A fall in blood pressure is not always improvement
+This is the only real judgement in the engine. 200/120 → 170/100 is the
+hydralazine working. 95/60 → 80/50 is the same arithmetic and the opposite
+event. **A flowsheet that colours every fall green paints a haemorrhage as a
+cure.** So a reading is judged by whether it moved *toward* the window it
+belongs in, not by the sign of the change, and both directions read correctly
+with one rule. Anything under 5 mmHg is called stable — a cuff read by ear is
+routinely that far off between two honest readings, and labelling that noise
+"worsening" every few minutes trains people to ignore the sheet.
+
+A reading in the emergency band is `CRITICAL` whichever way it moved. 220/130
+down to 200/125 is improvement and is still an emergency; the direction is
+kept separately so the arrow can still say the medicine is working.
+
+MAP is `DBP + (SBP − DBP)/3`, written out because the fraction is what gets
+mangled in transit — `DBP + 31 × (SBP − DBP)` is a real thing people have
+typed. In the database it is a **generated column**: a derived number written
+by a client can disagree with the numbers it came from after a bad sync or an
+older build, and nothing on the far side notices.
+
+### A reading is never edited and never deleted
+The rest of this app can correct a sale, a fee or a patient's name, because
+those are facts about an agreement and an agreement can be wrong. A vital sign
+is not that — it is an observation of a person at an instant, and the instant
+is gone.
+
+Rewriting one in place would also destroy what the sheet is for: every delta,
+arrow and trend line is computed from the row **before**, so changing a reading
+changes the meaning of its neighbours, and a chart somebody has already acted
+on becomes a different chart with no trace.
+
+So there is **no update policy and no delete policy** on the readings — not for
+a nurse, not for a visiting clinician, not for the owner. A mistake is
+**voided**: struck through, with a reason and a name against it, kept visible
+and kept out of the arithmetic, and the corrected reading entered as its own
+row. That is how a paper observation chart has always worked. Who may strike
+one out: the person who recorded it, or the main account — striking out
+somebody else's observation is a statement about what they saw.
+
+`logged_at` is separate from `created_at`. A nurse writes four observations up
+at the end of a ward round and a phone with no signal writes them whenever it
+next has one; the clinical fact is when the reading was **taken**, and a
+back-dated row is marked as such rather than lying about the clock.
+
+The plausibility constraints are **deliberately loose** — they reject what
+cannot be a living human, not what is unlikely. A constraint tight enough to
+catch a typo is tight enough to reject a real reading from a patient in
+extremis, and a rejected insert loses the observation entirely. 60/30 with a
+pulse of 150 is accepted; a temperature of 385 is not.
+
+### Three seconds to enter one
+A split numpad that advances from systolic to diastolic **on its own** after
+three digits, so a blood pressure is six taps and nothing in between. Anything
+that makes a nurse choose a box between the two numbers is what makes the
+fourth observation of the morning the one that does not get written down.
+
+It says what the reading **means** while it is still being typed — the band,
+the MAP and the change on the last one — so the comparison arrives while the
+patient is still in the room rather than after the record is filed.
+
+### The chart is drawn, not fetched
+About a hundred lines of SVG. A charting library from a CDN works perfectly on
+the laptop it was chosen on and is an empty box in Gulu — the same reasoning
+that had the QR encoder written out. Notes appear as **pins** on the trend
+line, because a fall of 30 mmHg means one thing alone and another with a dose
+of hydralazine sitting under it, and nobody reading the chart later can tell
+the two apart unless the chart says so.
+
+Colours are tokens, never the `#0D0D0D` the design called for: four skins × two
+themes is eight combinations and a hex literal is readable in one of them.
+**`--success-ink` is added as the pair for `--success`**, which was a fill being
+asked to be a word — the same mistake `--info-ink` and `--warning-ink` were
+added to undo.
+
+### With no signal
+A reading gets its client-side id **before** it is queued, so the note written
+at the same moment has something to hang off; without that the note is lost, or
+reappears against the wrong reading when the outbox replays — and on this
+screen "which reading was the drug given at" is the whole question.
+
+Striking one out is deliberately **not** queued. Replaying "strike this out"
+against a chart somebody has since worked from would change what it meant hours
+later, with nobody watching. Same rule as the corrections feature.
+
+### Two faults the test found that reading would not have
+- **The note's KIND was dropped on the round trip.** The module works out that
+  "Gave hydralazine 10mg IV" is a medication; the page then posted it as a
+  plain observation, so it read "Noted" on every device except the one that
+  typed it. On a chart whose question is whether the drug or the disease moved
+  the pressure, that is the label that matters.
+- **The patient record has two doors, and only one of them cleaned up.**
+  `openHistModal` (the history search) shares `#histModal` with the
+  active-treatment list but does not wire its header controls. It already hid
+  the footer, with a comment saying it "would be stale here" — and left the
+  camera, the print button and the flowsheet on screen, **still pointing at the
+  patient looked at before**. A photograph of the person in front of you filed
+  against somebody else's record is a record about the wrong patient: the same
+  fault the handoff check was written to stop, arriving by another door. It
+  predates this work — the camera and print buttons have shipped with it — and
+  was found by driving the two entry points in sequence. Put back to prove it:
+  all three buttons reappear, and the test fails.
+
 ## The tests
 
-`tests/` — 70 files, ~1030 checks (plus 16 `measure-*.js`, which print numbers
+`tests/` — 72 files, ~1160 checks (plus 16 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -2336,6 +2506,19 @@ rules worth repeating here:
   to v184 and every clinic read the wrong number off their screen. Assert
   against the thing that DEFINES the value (here, the worker's `CACHE`), never
   against a copy of it.
+- **A metric can be right about the conclusion and wrong about the reason.**
+  The paediatric table IS needed — but not for the reason written in two file
+  headers, which said the adult table would read a shocked child as fine.
+  `measure-vitals.js` says that never happens (0 of 555): the paediatric floors
+  all sit at or under the adult 90. The real harm is the 205 readings where a
+  child ABOVE their range is called normal. The measurement was run to justify
+  a decision already taken, and it corrected the justification.
+- **A modal with two entry points needs both of them driven.** `#histModal` is
+  opened by the active-treatment list, which wires its header controls, and by
+  the history search, which does not — so the camera, print and flowsheet
+  buttons stayed on screen pointing at the previous patient. The footer had
+  already been dealt with, years earlier, with a comment explaining exactly
+  this. Reading either door alone shows nothing.
 - **A check that reports "nothing happened" needs proof it could have seen
   something happen.** "No image was uploaded" is also what a detector that
   inspects nothing returns. `test-clinical-photo.js` posts the bytes it just

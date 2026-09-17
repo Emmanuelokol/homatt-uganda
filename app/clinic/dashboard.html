@@ -2196,6 +2196,21 @@
     // (it's wired to a different patient context and would be stale here).
     var histFooter = document.getElementById('histModalFooter');
     if (histFooter) histFooter.style.display = 'none';
+
+    /* AND THE HEADER CONTROLS, FOR EXACTLY THE SAME REASON — which was missed
+       when the footer was dealt with, and matters more than the footer does.
+       The camera, the print button and the flowsheet are wired in
+       renderActiveDetailView() and are never touched here, so after looking at
+       one active patient and then searching the history for a DIFFERENT one,
+       all three stayed on screen still pointing at the first.
+       A photograph of the person in front of you filed against somebody else's
+       record is a record about the wrong patient — the same fault the handoff
+       check was written to stop, arriving by another door. Found by driving
+       the two entry points in sequence rather than by reading either one. */
+    ['pxPhotoBtn', 'pxPrintBtn', 'pxVitalsBtn'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) { b.style.display = 'none'; b.onclick = null; }
+    });
     modal.style.display = 'flex';
 
     // Searching inside one person's record. Six visits is enough that finding

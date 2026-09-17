@@ -510,7 +510,112 @@ const VISIT = {
   result('a temperature of 385 is refused with the decimal point named',
     /decimal point/.test(refused.temp), refused.temp);
 
-  // ── 14. Nothing threw ────────────────────────────────────────────────────
+  /* ── 14. A READING TAKEN WITH NO SIGNAL ──────────────────────────────────
+   *
+   * A ward round with no signal is the normal case, and the observations still
+   * have to be taken. The reading has to appear on the sheet immediately — a
+   * nurse who sees nothing happen writes it on her hand — and it has to still
+   * be there after the sheet is closed and reopened, because the outbox may
+   * not drain for hours. */
+  await page.evaluate(() => { document.getElementById('fsEntry').classList.remove('on'); });
+  await ctx.setOffline(true);
+  const off = await page.evaluate(async () => {
+    const before = (window.ClinicOffline.get('outbox', []) || []).length;
+    document.getElementById('fsAdd').click();
+    await new Promise(r => setTimeout(r, 150));
+    const keys = [...document.querySelectorAll('#fsKeys .fs-key')];
+    const by = (t) => keys.find(k => k.textContent.trim() === t);
+    ['1', '4', '2'].forEach(d => by(d).click());
+    ['0', '8', '8'].forEach(d => by(d).click());
+    document.getElementById('fsNote').value = 'Gave amlodipine 5mg';
+    document.getElementById('fsSave').click();
+    await new Promise(r => setTimeout(r, 700));
+    const box = window.ClinicOffline.get('outbox', []) || [];
+    return {
+      queuedBefore: before, queuedAfter: box.length,
+      tables: box.map(o => (o.payload || {}).table).filter(Boolean),
+      onSheet: document.getElementById('fsBody').innerText.replace(/\s+/g, ' '),
+      entryOpen: document.getElementById('fsEntry').classList.contains('on'),
+      msg: document.getElementById('fsMsg').textContent,
+    };
+  });
+  result('a reading taken with no signal is accepted, not refused',
+    off.entryOpen === false && !off.msg, off.msg || 'saved');
+  result('...and shows on the sheet straight away', /142\/88/.test(off.onSheet), off.onSheet.slice(0, 80));
+  result('...with its MAP worked out on the phone', /MAP 106/.test(off.onSheet), off.onSheet.slice(0, 120));
+  result('...and it is queued to be sent — the reading AND its note',
+    off.queuedAfter === off.queuedBefore + 2 &&
+    off.tables.indexOf('vital_logs') >= 0 && off.tables.indexOf('vital_notes') >= 0,
+    off.tables.join(','));
+
+  // It must survive the sheet being closed — the outbox may not drain for hours.
+  const survived = await page.evaluate(async () => {
+    window.HomattFlowsheet.close();
+    await new Promise(r => setTimeout(r, 250));
+    document.getElementById('pxVitalsBtn').click();
+    await new Promise(r => setTimeout(r, 900));
+    return document.getElementById('fsBody').innerText.replace(/\s+/g, ' ');
+  });
+  result('...and it is still there when the sheet is closed and reopened',
+    /142\/88/.test(survived), survived.slice(0, 90));
+
+  // Striking one out, however, is refused rather than queued.
+  const offVoid = await page.evaluate(async () => {
+    let said = '';
+    window.prompt = () => 'wrong arm';
+    window.alert = (m) => { said = m; };
+    document.querySelector('#fsBody [data-void]').click();
+    await new Promise(r => setTimeout(r, 500));
+    return said;
+  });
+  result('striking a reading out with no signal is refused, not queued',
+    /needs a connection/.test(offVoid), offVoid);
+  await ctx.setOffline(false);
+  await page.evaluate(() => window.HomattFlowsheet.close());
+
+  /* ── 15. THE OTHER WAY INTO THE SAME MODAL ───────────────────────────────
+   *
+   * The patient record has two entry points: the active-treatment list, which
+   * wires these header controls, and the history search, which shares the same
+   * modal and does not. The footer was already hidden there, with a comment
+   * saying it "would be stale here" — and the camera, the print button and the
+   * flowsheet were left on screen, still pointing at the patient looked at
+   * before. A photograph of the person in front of you filed against somebody
+   * else's record is a record about the wrong patient.
+   *
+   * The control below proves the check can see a button that IS showing:
+   * without it, "all three are hidden" is also what a broken selector returns. */
+  const twoDoors = await page.evaluate(async (v) => {
+    function shown() {
+      return ['pxPhotoBtn', 'pxPrintBtn', 'pxVitalsBtn'].filter(function (id) {
+        var b = document.getElementById(id);
+        return b && getComputedStyle(b).display !== 'none';
+      });
+    }
+    // 1. an active patient: the controls are wired to them
+    window._activeDetailContext = { current: v, history: [] };
+    document.getElementById('histModal').style.display = 'flex';
+    renderActiveDetailView();
+    await new Promise(r => setTimeout(r, 300));
+    const afterActive = shown();
+
+    // 2. now a DIFFERENT patient, through the history search
+    window._histGroups = { g1: {
+      name: 'Okello John', phone: '0700999888',
+      records: [{ id: 'other-1', confirmed_diagnosis: 'Peptic Ulcer Disease',
+                  created_at: new Date().toISOString(), prescription_items: [] }] } };
+    openHistModal('g1');
+    await new Promise(r => setTimeout(r, 300));
+    return { afterActive: afterActive, afterHistory: shown(),
+             name: document.getElementById('histModalName').textContent };
+  }, VISIT);
+  result('CONTROL: on the active patient the header controls ARE showing',
+    twoDoors.afterActive.length === 3, twoDoors.afterActive.join(','));
+  result('the history search opens a different patient', /Okello John/.test(twoDoors.name), twoDoors.name);
+  result('and NO control stays behind still wired to the previous patient',
+    twoDoors.afterHistory.length === 0, twoDoors.afterHistory.join(',') || 'none');
+
+  // ── 16. Nothing threw ────────────────────────────────────────────────────
   result('no page error anywhere in that journey',
     errors.length === 0, errors.slice(0, 2).join(' | '));
 
