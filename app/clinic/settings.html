@@ -769,6 +769,28 @@
             <span id="apkUrlText"></span>
           </div>
         </div>
+
+        <!-- THE LINK TO SEND SOMEBODY ELSE.
+             Different from the one above, and the difference is the whole
+             point. The address above downloads an APK — right for a phone,
+             useless on a laptop and alarming to somebody who has never been
+             sent one. This one is a page that offers both and says which is
+             which, so it is the only address that should ever be pasted into
+             a message. It is what a clinic was being sent instead of /clinic/,
+             which is how a country's worth of clinics ended up holding the web
+             version without knowing there was another. -->
+        <div class="dict-note" id="shareNote" style="margin-top:14px;padding-top:12px;
+             border-top:1px solid var(--border)">
+          <b>Sending Homatt to a clinic?</b> Send this address, not the one you
+          are signed in on. It offers the Android app and the browser version
+          on one page, and says what the difference is.
+          <div style="margin-top:6px;font-size:11px;word-break:break-all;user-select:all;-webkit-user-select:all">
+            <span id="shareUrlText"></span>
+          </div>
+          <button type="button" class="dict-btn" id="copyShareBtn" style="margin-top:8px">
+            <span class="material-icons-outlined">content_copy</span> Copy the link
+          </button>
+        </div>
       </div>
 
       <!-- ══ Sign-in email ══════════════════════════════════════════════
@@ -2981,6 +3003,27 @@ document.addEventListener('DOMContentLoaded', function () {
     return !!(C.isNative || C.platform === 'android' || C.platform === 'ios');
   }
 
+  /* THE ONE ADDRESS TO SEND A CLINIC.
+   *
+   * The link being shared was /clinic/ — the portal itself — so every clinic
+   * that "installed" Homatt had added a web page to their home screen, and
+   * none of them was ever offered the Android app. get.html offers both, with
+   * the difference in plain words.
+   *
+   * Derived from where this page is actually served wherever that can be
+   * known, so a branch preview names itself rather than sending somebody to
+   * the live site. Inside the installed app the origin is https://localhost —
+   * this phone and nobody else's — and there the published home is the only
+   * truthful answer. */
+  function shareUrl() {
+    try {
+      var u = new URL('../get.html', location.href);
+      if ((u.protocol === 'https:' || u.protocol === 'http:') &&
+          u.hostname !== 'localhost' && u.hostname !== '127.0.0.1') return u.href;
+    } catch (e) {}
+    return 'https://emmanuelokol.github.io/homatt-uganda/get.html';
+  }
+
   var MANUAL = 'To add it by hand: press and hold an empty part of your home ' +
     'screen, tap <b>Widgets</b>, find <b>Homatt Clinic</b> and drag it out. ' +
     'Or press and hold the Homatt Clinic icon — the same three are in that menu, ' +
@@ -3015,13 +3058,22 @@ document.addEventListener('DOMContentLoaded', function () {
           'address to type.');
         return;
       }
-      /* A browser, or the page added to a home screen as a web app. Nothing
-       * here can place an Android widget, and the long-press menu is the real
-       * answer rather than a consolation. */
+      /* A browser, or the page added to a home screen as a web app.
+       *
+       * An icon on a home screen is not an installed app, and this is the
+       * sentence that has to say so \u2014 a clinic that tapped "Add to Home
+       * screen" believes it installed Homatt, because from the outside it
+       * looks exactly like it did. Nothing here can place an Android widget;
+       * the long-press menu is a real answer for today, and the Android app
+       * is the answer to the thing they actually asked for. */
       pinShow('unknown', 'This is the web version, not the installed app.',
         'A home-screen widget belongs to the Android app. If you added this ' +
         'page to your home screen, press and hold its icon \u2014 New treatment, ' +
-        'Active and Quick sale are in that menu.');
+        'Active and Quick sale are in that menu, which is the nearest this ' +
+        'version gets.' +
+        '<br><br>To get the widget itself, install the Android app: ' +
+        '<a id="pinGetLink" href="' + shareUrl() + '" target="_blank" rel="noopener">' +
+        shareUrl() + '</a>. It keeps everything already recorded.');
       return;
     }
     var r = null;
@@ -3096,6 +3148,31 @@ document.addEventListener('DOMContentLoaded', function () {
   if (apkText) apkText.textContent = APK_URL;
   var gbtn = document.getElementById('getApkBtn');
   if (gbtn) gbtn.addEventListener('click', openApk);
+
+  /* The shareable address, shown as text FIRST and copyable second.
+   * navigator.clipboard is absent over plain http and in several WebViews, and
+   * a copy button that silently does nothing is worse than none — so the
+   * address is on the screen either way, selectable, and the button reports
+   * what actually happened rather than claiming success. */
+  var shareText = document.getElementById('shareUrlText');
+  if (shareText) shareText.textContent = shareUrl();
+  var cbtn = document.getElementById('copyShareBtn');
+  if (cbtn) cbtn.addEventListener('click', function () {
+    function say(msg) {
+      // The label is the text node after the icon span, so the icon survives.
+      cbtn.lastChild.nodeValue = ' ' + msg;
+      setTimeout(function () { cbtn.lastChild.nodeValue = ' Copy the link'; }, 2600);
+    }
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl()).then(
+          function () { say('Copied'); },
+          function () { say('Copy it from above'); });
+        return;
+      }
+    } catch (e) {}
+    say('Copy it from above');
+  });
 
   var pbtn = document.getElementById('pinBtn');
   if (pbtn) pbtn.addEventListener('click', pinDo);

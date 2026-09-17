@@ -536,18 +536,50 @@
     el.style.display = '';
   })();
 
-  // Offer the native Android app (best offline) on Android web browsers only —
-  // not inside an already-installed app, and not on desktop.
+  /* Offer the native Android app — and the whole point of this block is WHO it
+   * is offered to.
+   *
+   * IT USED TO BE HIDDEN FROM THE ONE PERSON WHO NEEDED IT. The old test was
+   *
+   *     standalone || Capacitor  ->  "already installed, say nothing"
+   *
+   * and `display-mode: standalone` is true of ANY page added to a home screen.
+   * So a clinic that tapped "Add to Home screen" on this very page — which is
+   * what everybody given the /clinic/ link does, and what the owner himself
+   * had done — was thereafter treated as though they were holding the Android
+   * app. They were holding a browser tab with no address bar. It offered them
+   * nothing, told them nothing, and they reasonably concluded there was
+   * nothing else to get.
+   *
+   * That is the same conflation the widget card was caught by: an icon on a
+   * home screen is not an installed app. Only the Capacitor bridge answers
+   * that question, because only the real app has one.
+   *
+   * Standalone is still worth knowing — somebody who has already "installed"
+   * something needs to be told plainly that this is not it, rather than
+   * offered an install they think they already did. */
   (function() {
     try {
       var isAndroid = /Android/i.test(navigator.userAgent || '');
-      var inApp = window.matchMedia('(display-mode: standalone)').matches ||
-                  !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
-      if (isAndroid && !inApp) {
+      var native = !!(window.Capacitor && (window.Capacitor.isNative ||
+                   (typeof window.Capacitor.isNativePlatform === 'function' &&
+                    window.Capacitor.isNativePlatform())));
+      var standalone = false;
+      try { standalone = window.matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+      var inApp = standalone || native;   // desktop's rule, unchanged
+      if (isAndroid && !native) {
         var a = document.getElementById('apkDownload');
         var h = document.getElementById('apkHint');
         if (a) a.style.display = 'flex';
-        if (h) h.style.display = 'block';
+        if (h) {
+          if (standalone) {
+            h.innerHTML = 'What you have on your home screen is this web page, ' +
+              'not the Android app. The app works with no internet at all and ' +
+              'can put New treatment, Active and Quick sale on your home screen. ' +
+              'Installing it keeps everything already recorded.';
+          }
+          h.style.display = 'block';
+        }
       }
       // Desktop browser (not a phone, not already installed/native, not the
       // desktop app itself which runs from file:) → offer the Windows app.

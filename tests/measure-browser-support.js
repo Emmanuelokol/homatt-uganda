@@ -99,6 +99,12 @@ const GUARDED = {
   'clinic/js/pwa-install.js': {
     'navigator.clipboard': 'guarded by `if (navigator.clipboard && navigator.clipboard.writeText)`',
   },
+  'clinic/settings.html': {
+    // Read by hand: inside try/catch AND behind the feature test, and when it
+    // is missing the button says so rather than pretending — the address is on
+    // the screen above it, selectable, which is the answer that needs no API.
+    'navigator.clipboard': 'guarded by `if (navigator.clipboard && navigator.clipboard.writeText)`, inside try/catch',
+  },
 };
 function guardReason(f) {
   const g = GUARDED[f.file];

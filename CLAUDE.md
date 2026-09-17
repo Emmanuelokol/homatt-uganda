@@ -772,6 +772,69 @@ takes **one more APK install** to get it. After that one, the portal updates
 itself, and Settings → *App version* says which build it is running and lets
 somebody check on demand.
 
+## Nobody had the app, including the person who wrote it
+
+`app/get.html` · `app/clinic/index.html` (who is offered the APK) ·
+`app/clinic/settings.html` (the address to send) · `tests/test-get-page.js`
+
+> *"the app on my phone that I downloaded from the link
+> .../homatt-uganda/clinic/ it show that is a web app, and yet it is on my
+> android phone, and that is the link I send to client."*
+
+That sentence explains four rounds of confusion at once. There was no APK. The
+link being shared was **the portal itself**, so every clinic that "installed"
+Homatt had added a web page to a home screen — which from the outside is
+indistinguishable from installing an app: an icon, a splash screen, no address
+bar. The widget was missing because a web page cannot have one. The card saying
+*"This is the web version"* was correct and read as an insult.
+
+### The offer was hidden from exactly the people who needed it
+The sign-in page has offered the Android app since long before any of this. Its
+test for "they already have it" was:
+
+```js
+var inApp = matchMedia('(display-mode: standalone)').matches || Capacitor…
+```
+
+**`display-mode: standalone` is true of any icon on a home screen.** So the one
+state in which somebody most needs to be told there is a real app — they think
+they installed it, they did not, and nothing on screen disagrees — was the one
+state that was told nothing at all. Only the Capacitor bridge answers "is this
+the installed app", because only the installed app has one.
+
+A home-screen web app is now offered the APK like any other browser, with the
+wording changed to say what they are actually holding. Put back to prove it:
+the old condition returns and three assertions fail.
+
+### One address, which is not either of the two that existed
+Neither existing link could be the one to send:
+
+| | why not |
+|---|---|
+| `…/clinic/` | it IS the web version — sending it is what caused this |
+| the `.apk` release URL | right for a phone, useless on a laptop, and alarming to somebody who has never been sent a file to install |
+
+`get.html` offers both, says which is which in plain words, and is
+**self-contained** — no stylesheet, no script, no font from anywhere. It is the
+page somebody opens on a bad connection in order to get the thing that works
+without one, so the test refuses every off-origin request rather than mocking
+it; a mock would let a font creep back in unnoticed.
+
+Settings names that address, beside the APK one and labelled as the different
+thing it is, because the person who sends it is the person signed in.
+
+### The APK address never needs replacing, and the test proves it is real
+Every push builds and replaces the file behind
+`releases/download/android-latest/HomattHealth.apk`, so the address is
+permanent and always the newest build. No — a refresh cannot *generate* an APK;
+the web screens update themselves over the air and the APK is built by CI, and
+those are two different mechanisms with two different lags.
+
+The expected URL in `test-get-page.js` is **read out of the build workflow** —
+its `tag_name` and the filename it renames the APK to — and the three places
+that carry it are compared against that. A test that repeats the constant
+cannot see the constant go stale, which is how `v151` survived two months.
+
 ## Every word, in every colour
 
 `tests/measure-contrast.js` (the survey) · `tests/test-readable.js` (the guard)
@@ -2482,7 +2545,7 @@ later, with nobody watching. Same rule as the corrections feature.
 
 ## The tests
 
-`tests/` — 73 files, ~1380 checks (plus 16 `measure-*.js`, which print numbers
+`tests/` — 77 files, ~1500 checks (plus 16 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -2660,6 +2723,16 @@ rules worth repeating here:
   into the annotation diagnosed it in one run.
 - **A check that tests non-empty is not a check.** `✓ SUPABASE_ACCESS_TOKEN is
   set` was true of a revoked token. Call the API with it.
+- **A page that claims to need nothing must be tested with nothing allowed.**
+  `test-get-page.js` ABORTS every off-origin request rather than mocking it,
+  and asserts the count is zero. Mock them and a stylesheet, a font or an
+  analytics tag creeps back into the one page whose whole job is to open on a
+  bad connection — and the test goes on passing.
+- **`display-mode: standalone` does not mean "installed app".** It is true of
+  any icon added to a home screen. Testing it as "they already have the app"
+  hid the Android app offer from every clinic that had added the portal to
+  their home screen, which was all of them. Only the Capacitor bridge answers
+  that question.
 - **Test what a role CANNOT do, not only what the owner can.** Every
   correction in `test-owner-corrections.sql` is driven as a nurse, a
   receptionist, a visiting clinician and a stranger — and separately by
