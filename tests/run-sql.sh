@@ -107,6 +107,14 @@ create table if not exists public.clinic_inventory (
   quantity numeric default 0, min_threshold numeric default 0,
   reorder_level numeric default 0, unit_cost_ugx numeric,
   selling_price_ugx numeric, is_active boolean default true,
+  -- Added by 20260710_inventory_expiry.sql, which every real clinic has run.
+  -- It was missing from this stand-in, and that is why the SQL tests could not
+  -- see that 20260912 re-declared get_clinic_stock WITHOUT the three expiry
+  -- columns — a change that cannot even be applied to a database that has
+  -- 20260710, and that would have blanked every expiry warning if it could.
+  -- A fixture that is behind production hides exactly the faults production
+  -- will hit.
+  expiry_date date,
   updated_at timestamptz default now());
 alter table public.clinic_inventory enable row level security;
 
@@ -134,6 +142,15 @@ $PSQL -d $DB -c "alter table clinic_diagnoses
   add column if not exists lab_fee_ugx numeric default 0,
   add column if not exists meds_fee_ugx numeric default 0,
   add column if not exists treatment_plan text;" >/dev/null 2>&1 || true
+
+# 20260710 redefines get_clinic_stock with THIRTEEN columns (it adds
+# expiry_date / is_expired / is_expiring_soon) and drops the old signature
+# first because the return type changes. Every real clinic has it. Applying it
+# HERE, before the migrations under test, is what makes this fixture reproduce
+# production's ordering — without it, 20260912's own re-declaration of that
+# function looked fine, and on a real database it was fatal:
+#   ERROR: cannot change return type of existing function
+$PSQL -d $DB -f supabase/migrations/20260710_inventory_expiry.sql >/dev/null 2>&1 || true
 
 # ── the migrations under test ──
 for m in 20260911_clinician_portal.sql 20260912_owner_corrections.sql 20260916_vital_flowsheet.sql; do

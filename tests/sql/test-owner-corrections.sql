@@ -33,6 +33,7 @@ declare
   r          jsonb;
   n          numeric;
   t          text;
+  i          integer;
 begin
   -- ── the cast ──────────────────────────────────────────────────────
   insert into auth.users(id, email) values
@@ -196,10 +197,29 @@ begin
   select array_length(lab_tests_ordered, 1) into n from public.clinic_diagnoses where id = v_visit;
   perform ck('the lab tests are on the visit', n = 2, 'tests=' || n);
 
-  -- paying the whole bill reads as paid, and overpaying cannot happen
+  /* OVERPAYING IS REFUSED IN WORDS, not silently clamped to the bill.
+   *
+   * This used to assert that 99999 against an 18,000 bill came back recorded
+   * as 18,000 — the function clamped it. That clamp destroyed real receipts:
+   * a patient who had handed over 45,000 against a total later corrected down
+   * to 30,000 lost 15,000 of recorded payments. Removing the clamp alone was
+   * the opposite mistake, letting a slipped finger inflate the clinic's books.
+   *
+   * A payment larger than the bill is either a typo or a sign the BILL is
+   * wrong, and those need opposite corrections — so a person decides. */
   r := public.edit_visit_record(v_visit, null, null, null, null, null, 99999, null, 'paid up');
+  perform ck('paying MORE than the bill is refused, not quietly reduced',
+             (r->>'ok') = 'false', r->>'error');
+  perform ck('...and the refusal names both figures',
+             (r->>'error') like '%99999%' and (r->>'error') like '%18,000%'
+               or (r->>'error') like '%18000%', r->>'error');
+  select amount_paid into n from public.clinic_diagnoses where id = v_visit;
+  perform ck('...and nothing was changed', n = 12000, 'amount_paid=' || n);
+
+  -- Paying exactly the bill is what "paid" means.
+  r := public.edit_visit_record(v_visit, null, null, null, null, null, 18000, null, 'paid up');
   perform ck('paying the whole bill reads as paid', r->>'payment_status' = 'paid', r->>'payment_status');
-  perform ck('and nobody can be recorded as having paid more than the bill',
+  perform ck('and the recorded figure is the bill, not more',
              (r->>'amount_paid')::numeric = 18000, r->>'amount_paid');
 
   -- ── patients ──────────────────────────────────────────────────────
@@ -289,4 +309,106 @@ begin
     execute 'reset role';
     perform ck('an audit row cannot be written by hand', true);
   end;
+
+  /* ══ THE THREE FAULTS THAT MADE THIS MIGRATION UNSAFE ═══════════════
+   * Each was found by asking what happens on a database that already has
+   * real clinic data, and each has its guard here. */
+
+  -- 1. get_clinic_stock must keep the EXPIRY columns 20260710 added.
+  --    This migration re-declared it with ten columns and no DROP, which on
+  --    any real clinic is fatal — "cannot change return type of existing
+  --    function" — and would have rolled back the entire paste. Adding a bare
+  --    DROP would have been worse: it applies, and every expiry warning on the
+  --    stock screen goes dark, because the screen reads expiry_date,
+  --    is_expired and is_expiring_soon and they would all be gone.
+  select count(*) into i
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'get_clinic_stock'
+    and column_name in ('expiry_date', 'is_expired', 'is_expiring_soon');
+  if i = 0 then
+    -- information_schema does not describe a set-returning function's columns
+    -- on every version, so ask the function itself.
+    perform test_as(v_owner);
+    select count(*) into i
+    from pg_proc p2 join pg_namespace n on n.oid = p2.pronamespace
+    where n.nspname = 'public' and p2.proname = 'get_clinic_stock'
+      and array_to_string(p2.proargnames, ',') like '%is_expiring_soon%';
+  end if;
+  perform ck('get_clinic_stock still returns the expiry columns', i >= 1,
+             'found ' || i);
+
+  perform test_as(v_owner);
+  select count(*) into i from public.get_clinic_stock(v_clinic)
+   where is_expiring_soon is not null or is_expired is not null or true;
+  perform ck('...and it can actually be called with them', true, 'rows=' || i);
+
+  -- 2. Correcting a LAB TEST must not touch the money.
+  --    Follow-up adds its extra charge straight onto total_charged_ugx and
+  --    never touches the three fee columns, so on any visit that has had one
+  --    the total is legitimately larger than their sum. This function used to
+  --    rebuild the total from those three unconditionally, deleting the
+  --    difference in silence.
+  update public.clinic_diagnoses
+     set consultation_fee_ugx = 10000, lab_fee_ugx = 5000, meds_fee_ugx = 3000,
+         total_charged_ugx = 48000,       -- 18,000 + a 30,000 follow-up charge
+         amount_paid = 18000, payment_status = 'partial'
+   where id = v_visit;
+
+  perform test_as(v_owner);
+  r := public.edit_visit_record(v_visit, null, array['Malaria RDT','FBC','LFTs'],
+                                null, null, null, null, null, 'fix a lab test name');
+  perform ck('a lab-test correction is accepted', (r->>'ok')::boolean, r::text);
+  select total_charged_ugx into n from public.clinic_diagnoses where id = v_visit;
+  perform ck('THE FOLLOW-UP CHARGE SURVIVES a correction that touched no fee',
+             n = 48000, 'total=' || n);
+  select amount_paid into n from public.clinic_diagnoses where id = v_visit;
+  perform ck('...and the payment was not clamped down with it', n = 18000, 'paid=' || n);
+  select payment_status into t from public.clinic_diagnoses where id = v_visit;
+  perform ck('...and the debt is still a debt', t = 'partial', t);
+
+  -- ...but naming a fee DOES rebuild the total, which is the other half.
+  perform test_as(v_owner);
+  -- (visit, prescription_items, lab_tests, consultation_fee, lab_fee,
+  --  meds_fee, amount_paid, treatment_plan, reason) — meds_fee left null so it
+  --  keeps the existing 3,000, which is what makes the sum 28,000.
+  r := public.edit_visit_record(v_visit, null, null, 20000, 5000, null, null, null, 'the consult fee was wrong');
+  select total_charged_ugx into n from public.clinic_diagnoses where id = v_visit;
+  perform ck('naming a fee DOES rebuild the total', n = 28000, 'total=' || n);
+
+  -- 3. A patient's history must be found however their phone is written.
+  --    This counted with raw string equality, while the rest of the codebase
+  --    normalises. Correcting a mistyped phone and then deleting the duplicate
+  --    it created is exactly the sequence that made both sides of the match
+  --    miss — and hard-deleted somebody with years of treatments.
+  /* The NAME must not be able to rescue this check, or it proves nothing about
+   * the phone. The first version of this guard used the same name on both
+   * rows, so the raw-string match found it anyway and the test passed with the
+   * bug still in place. Here the recorded name is genuinely a different
+   * person's, so the phone is the ONLY thing that can link them — which is
+   * exactly the real case: the visit was recorded against a walk-in's number
+   * before anybody typed a name. */
+  insert into public.clinic_patients(clinic_id, full_name, phone)
+  values (v_clinic, 'Namubiru Esther', '+256772004455') returning id into v_pat_old;
+  insert into public.clinic_diagnoses(clinic_id, patient_name, patient_phone, confirmed_diagnosis)
+  values (v_clinic, 'not the same name at all', '0772004455', 'Malaria');
+
+  perform test_as(v_owner);
+  r := public.delete_clinic_patient(v_pat_old, 'duplicate');
+  perform ck('A DIFFERENTLY-FORMATTED PHONE STILL FINDS THE HISTORY',
+             (r->>'archived')::boolean = true, r::text);
+  select count(*) into i from public.clinic_patients where id = v_pat_old;
+  perform ck('...so the patient is ARCHIVED, not destroyed', i = 1, 'rows=' || i);
+
+  -- And the name side, where only the case and the spacing differ.
+  insert into public.clinic_patients(clinic_id, full_name, phone)
+  values (v_clinic, 'Okello  John', '0700777666') returning id into v_pat_old;
+  insert into public.clinic_diagnoses(clinic_id, patient_name, patient_phone, confirmed_diagnosis)
+  values (v_clinic, 'OKELLO JOHN', '0999000111', 'Pneumonia');
+
+  perform test_as(v_owner);
+  r := public.delete_clinic_patient(v_pat_old, 'duplicate');
+  perform ck('a name differing only in case and spacing finds it too',
+             (r->>'archived')::boolean = true, r::text);
+
 end $$;

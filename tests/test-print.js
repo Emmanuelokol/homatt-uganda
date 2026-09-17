@@ -130,16 +130,40 @@ const HISTORY = [
       heroH: hero ? Math.round(hero.getBoundingClientRect().height) : 0,
       recordH: body ? Math.round(body.scrollHeight) : 0,
       roomH: body ? Math.round(body.clientHeight) : 0,
-      // Three 34px controls now share this row. It must still not clip.
+      // Four 34px controls now share this row. It must still not clip.
       overflow: head ? Math.round(head.scrollWidth - head.clientWidth) : 0,
+      scrollable: body ? (getComputedStyle(body).overflowY === 'auto' ||
+                          getComputedStyle(body).overflowY === 'scroll') : false,
+      // The things a clinician must see before scrolling.
+      dxY: hero ? Math.round(hero.getBoundingClientRect().top -
+                             body.getBoundingClientRect().top) : -1,
+      moneyY: (function () {
+        var t = document.querySelector('.pr-strip');
+        return t ? Math.round(t.getBoundingClientRect().top -
+                              body.getBoundingClientRect().top) : -1;
+      })(),
     };
   }, VISIT);
   result('the patient file offers a print button', entry.shown === true);
   result('it is in the header row beside Close', entry.withClose === true);
-  result('three controls fit that row without clipping',
+  result('four controls fit that row without clipping',
     entry.overflow <= 1, 'overflow ' + entry.overflow + 'px, row ' + entry.headH + 'px');
-  result('and the record fits the modal it lives in',
-    entry.recordH <= entry.roomH, entry.recordH + 'px in ' + entry.roomH + 'px');
+  /* THIS SAID "and the record fits the modal it lives in", and it was the same
+   * fixture artefact as in test-patient-record.js. The record used to omit the
+   * complaint, the story, the background and every reading, so of course it
+   * fitted. Now that it shows them it is 689px in 661px and it SCROLLS, which
+   * is correct — expecting a full record to fit a phone would mean never
+   * showing it, which is the bug a clinic reported.
+   *
+   * What this assertion was written to protect is chrome, not content: a
+   * full-width button once pushed the record to 711px. That claim is tested
+   * properly by the delta immediately below, and by these two. */
+  result('the record scrolls rather than clipping what will not fit',
+    entry.scrollable === true && entry.recordH > 0,
+    entry.recordH + 'px of record in ' + entry.roomH + 'px of room');
+  result('and the diagnosis and the money are still above the fold',
+    entry.dxY >= 0 && entry.dxY < entry.roomH && entry.moneyY < entry.roomH,
+    'dx ' + entry.dxY + ', money ' + entry.moneyY + ' in ' + entry.roomH + 'px');
 
   /* THE DELTA, not a threshold.
    *

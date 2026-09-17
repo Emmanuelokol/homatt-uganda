@@ -438,12 +438,39 @@ begin
   select pu.full_name into v_name from public.portal_users pu
    where pu.auth_user_id = auth.uid() and pu.clinic_id = p_clinic_id limit 1;
 
-  -- One order at a time, per patient. Two running intervals is an argument.
+  /* A watch has to belong to SOMEBODY. Without this the row below is a watch
+   * on the clinic rather than on a person, and the statement after it has
+   * nothing to scope by. */
+  if p_patient_id is null and p_diagnosis_id is null then
+    return jsonb_build_object('ok', false, 'error',
+      'A check interval has to be set on a patient or on a visit.');
+  end if;
+
+  /* One order at a time, per PATIENT — and a walk-in is identified by their
+   * visit, not by a patient row they do not have.
+   *
+   * This read `clinic_patient_id is not distinct from p_patient_id`, and
+   * `is not distinct from` treats null as equal to null. A walk-in has no
+   * patient row — the table's own comment says so — so p_patient_id is null in
+   * the ordinary case, and that condition matched EVERY walk-in's watch in the
+   * clinic. Reproduced: three watches, two of them walk-ins, one
+   * start_vital_watch call with a null patient id, and both walk-ins' watches
+   * were stopped.
+   *
+   * On a ward that means a "monitor her every fifteen minutes" order on a
+   * deteriorating patient silently ends because somebody set an interval on a
+   * different walk-in — and a countdown that has stopped looks exactly like a
+   * countdown that was never set. */
   update public.vital_watch
      set stopped_at = now(), stopped_by = auth.uid()
    where clinic_id = p_clinic_id
      and stopped_at is null
-     and clinic_patient_id is not distinct from p_patient_id;
+     and (
+       (p_patient_id is not null and clinic_patient_id = p_patient_id)
+       or
+       (p_patient_id is null and clinic_patient_id is null
+          and diagnosis_id = p_diagnosis_id)
+     );
 
   insert into public.vital_watch
     (clinic_id, clinic_patient_id, diagnosis_id, interval_minutes, reason,

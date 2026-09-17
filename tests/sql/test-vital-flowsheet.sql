@@ -345,6 +345,62 @@ begin
   perform ck('CONTROL: the delete statement CAN remove a row when nothing stops it',
              i = 0, 'rows left: ' || i::text);
 
+  /* ── 8c. A WALK-IN'S WATCH MUST NOT STOP ANOTHER WALK-IN'S ───────────
+   *
+   * start_vital_watch ended the running watch with
+   * `clinic_patient_id is not distinct from p_patient_id`, and that operator
+   * treats null as equal to null. A walk-in has no clinic_patients row — the
+   * table's own comment says so — so p_patient_id is null in the ordinary
+   * case, and that condition matched EVERY walk-in's watch in the clinic.
+   *
+   * On a ward it means "monitor her every fifteen minutes" on a deteriorating
+   * patient silently ends because somebody set an interval on a different
+   * walk-in. A countdown that has stopped looks exactly like one that was
+   * never set. */
+  perform test_as(v_nurse);
+  set local role authenticated;
+  insert into public.clinic_diagnoses(id, clinic_id, patient_name, confirmed_diagnosis)
+  values (gen_random_uuid(), v_clinic, 'Walk-in A', 'Hypertensive urgency')
+  returning id into v_log2;
+  reset role;
+  declare v_visit_b uuid;
+  begin
+    perform test_as(v_nurse);
+    set local role authenticated;
+    insert into public.clinic_diagnoses(id, clinic_id, patient_name, confirmed_diagnosis)
+    values (gen_random_uuid(), v_clinic, 'Walk-in B', 'Fever')
+    returning id into v_visit_b;
+    reset role;
+
+    perform test_as(v_nurse);
+    r := public.start_vital_watch(v_clinic, null, v_log2, 15, 'deteriorating');
+    perform ck('a walk-in with no patient row can be put on a watch',
+               (r->>'ok') = 'true', r::text);
+
+    -- Now a DIFFERENT walk-in, also with no patient row.
+    r := public.start_vital_watch(v_clinic, null, v_visit_b, 60, 'routine');
+    perform ck('...and so can a second one', (r->>'ok') = 'true', r::text);
+
+    select count(*) into i from public.vital_watch
+     where clinic_id = v_clinic and stopped_at is null and diagnosis_id = v_log2;
+    perform ck('THE FIRST WALK-IN''S WATCH IS STILL RUNNING', i = 1, 'running=' || i);
+
+    select count(*) into i from public.vital_watch
+     where clinic_id = v_clinic and stopped_at is null and diagnosis_id = v_visit_b;
+    perform ck('...and so is the second one''s', i = 1, 'running=' || i);
+
+    -- But a second order on the SAME walk-in still replaces the first.
+    r := public.start_vital_watch(v_clinic, null, v_log2, 5, 'worse');
+    select count(*) into i from public.vital_watch
+     where clinic_id = v_clinic and stopped_at is null and diagnosis_id = v_log2;
+    perform ck('one order at a time on the same walk-in, still', i = 1, 'running=' || i);
+
+    -- And a watch belonging to nobody is refused, since nothing could scope it.
+    r := public.start_vital_watch(v_clinic, null, null, 15, 'nobody');
+    perform ck('a watch on neither a patient nor a visit is refused',
+               (r->>'ok') = 'false', r->>'error');
+  end;
+
   -- ── 9. Nothing here follows a clinician between clinics ───────────
   -- The clinician portal's one rule: patient identity never travels. These
   -- tables are the clinic's own record and must not have leaked into the

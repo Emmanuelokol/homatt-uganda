@@ -89,6 +89,24 @@ $$;
 
 grant execute on function public.is_clinic_staff(uuid) to authenticated;
 
+-- `homatt_norm_phone` comes from 20260615_unified_patient_identity.sql and is
+-- what delete_clinic_patient below counts a patient's history with. Restated
+-- here, identically, because a missing function inside a plpgsql body is
+-- resolved at RUN time — so a database that skipped that migration would
+-- accept this one and then fail on the first patient somebody tried to
+-- remove. `create or replace` with the same body is a no-op where it exists.
+create or replace function public.homatt_norm_phone(p text)
+returns text
+language sql
+immutable
+as $$
+  select case
+    when p is null then null
+    when length(regexp_replace(p, '\D', '', 'g')) < 9 then null
+    else right(regexp_replace(p, '\D', '', 'g'), 9)
+  end;
+$$;
+
 -- ── 1. The audit trail ──────────────────────────────────────────────
 create table if not exists public.clinic_record_edits (
   id           uuid primary key default gen_random_uuid(),
@@ -116,33 +134,88 @@ create policy "record_edits_read" on public.clinic_record_edits
   for select using (public.is_clinic_staff(clinic_id));
 
 -- ── 2. Close the inventory hole ─────────────────────────────────────
+--
+-- TWO FAULTS WERE FOUND HERE, and the first one stopped this whole migration
+-- applying to any real clinic. Both are recorded because the second is the
+-- trap waiting for whoever fixes the first.
+--
+-- 1. IT COULD NOT BE APPLIED AT ALL. This was written as a bare
+--    `create or replace` returning TEN columns. `20260710_inventory_expiry.sql`
+--    had already redefined get_clinic_stock with THIRTEEN — it added
+--    expiry_date, is_expired and is_expiring_soon, and dropped the old
+--    signature first precisely because the return type was changing. Postgres
+--    refuses to change a function's OUT parameters in place:
+--
+--      ERROR:  cannot change return type of existing function
+--      DETAIL: Row type defined by OUT parameters is different.
+--      HINT:   Use DROP FUNCTION get_clinic_stock(uuid) first.
+--
+--    And that error is fatal to everything around it. The Supabase SQL Editor
+--    and the Management API send a whole script as ONE query string, which
+--    Postgres runs in one implicit transaction — verified: two tables created
+--    before a deliberate error in the same string, and neither survived. So
+--    one red line about a function nobody has heard of would silently discard
+--    the entire paste: the clinician portal, these corrections and the
+--    flowsheet, all rolled back together.
+--
+-- 2. AND THE OBVIOUS FIX IS WORSE THAN THE BUG. Adding a bare
+--    `drop function` would let it run — and would permanently remove
+--    expiry_date, is_expired and is_expiring_soon from what the stock screen
+--    receives. dashboard.html reads all three: it filters expiring stock,
+--    sorts by expiry urgency and draws the EXPIRED and EXP SOON badges, and
+--    its own client-side recompute derives the flags from expiry_date, which
+--    would be gone too — so it would return false for everything. A clinic
+--    would watch every expiry warning go dark on a shelf of real medicines,
+--    with nothing on screen to say the warnings had stopped rather than that
+--    nothing was expiring.
+--
+-- So: drop it explicitly, and put back all THIRTEEN columns with the caller
+-- check added. The only thing this migration was ever meant to change here is
+-- who may call it.
+drop function if exists public.get_clinic_stock(uuid);
+
 create or replace function public.get_clinic_stock(p_clinic_id uuid)
 returns table (
-  id            uuid,
-  item_name     text,
-  item_type     text,
-  unit          text,
-  quantity      numeric,
-  min_threshold numeric,
-  reorder_level numeric,
-  unit_cost_ugx numeric,
-  is_low_stock  boolean,
-  is_critical   boolean
+  id               uuid,
+  item_name        text,
+  item_type        text,
+  unit             text,
+  quantity         numeric,
+  min_threshold    numeric,
+  reorder_level    numeric,
+  unit_cost_ugx    numeric,
+  is_low_stock     boolean,
+  is_critical      boolean,
+  expiry_date      date,
+  is_expired       boolean,
+  is_expiring_soon boolean
 )
 language sql
 security definer
 set search_path = public
 as $$
   select
-    id, item_name, item_type, unit, quantity, min_threshold, reorder_level,
+    id,
+    item_name,
+    item_type,
+    unit,
+    quantity,
+    min_threshold,
+    reorder_level,
     unit_cost_ugx,
-    quantity <= min_threshold as is_low_stock,
-    quantity = 0              as is_critical
+    quantity <= min_threshold   as is_low_stock,
+    quantity = 0                as is_critical,
+    expiry_date,
+    (expiry_date is not null and expiry_date < current_date)                as is_expired,
+    (expiry_date is not null and expiry_date >= current_date
+       and expiry_date < current_date + interval '60 days')                 as is_expiring_soon
   from public.clinic_inventory
   where clinic_id = p_clinic_id
     and is_active = true
     -- The caller must be staff of THIS clinic. Without this the function
-    -- handed any authenticated user any clinic's shelves.
+    -- handed any authenticated user any clinic's shelves. This line is the
+    -- entire point of touching the function; everything above it is the
+    -- 20260710 definition, unchanged.
     and public.is_clinic_staff(p_clinic_id)
   order by (quantity <= min_threshold) desc, item_type, item_name;
 $$;
@@ -371,9 +444,67 @@ begin
   v_cons := greatest(0, coalesce(p_consultation_fee, v_row.consultation_fee_ugx, 0));
   v_lab  := greatest(0, coalesce(p_lab_fee,          v_row.lab_fee_ugx,          0));
   v_meds := greatest(0, coalesce(p_meds_fee,         v_row.meds_fee_ugx,         0));
-  v_total := v_cons + v_lab + v_meds;
+
+  /* THE TOTAL IS ONLY REBUILT FROM THE THREE FEES WHEN A FEE WAS ACTUALLY
+   * GIVEN, and that condition is the whole of this fix.
+   *
+   * This line used to read `v_total := v_cons + v_lab + v_meds;`
+   * unconditionally — including when the owner had touched nothing but a
+   * misspelt lab test name. The three fee columns are not the only source of
+   * a charge: FOLLOW-UP adds its extra charge straight onto
+   * total_charged_ugx and never touches them —
+   *
+   *     update.total_charged_ugx = (Number(current.total_charged_ugx) || 0)
+   *                              + extraCharge;        (dashboard.html)
+   *
+   * so on any visit that has had a follow-up, total_charged_ugx is
+   * legitimately LARGER than the sum of the three, and rebuilding it deleted
+   * the difference in silence.
+   *
+   * Concretely: a 30,000 visit plus a 30,000 follow-up charge is 60,000
+   * billed and 30,000 paid — partial. The owner opens the dialog to fix a
+   * typo in a lab test. The total is rewritten to 30,000, the clamp below
+   * pulls amount_paid down to match, the status flips to 'paid', and the
+   * clinic's 30,000 debt disappears from the owing list and from the month's
+   * figures. Nothing on screen says a number changed.
+   *
+   * Correcting a lab test must not touch the money. */
+  if p_consultation_fee is null and p_lab_fee is null and p_meds_fee is null then
+    v_total := coalesce(v_row.total_charged_ugx, v_cons + v_lab + v_meds);
+  else
+    v_total := v_cons + v_lab + v_meds;
+  end if;
+
   v_paid := greatest(0, coalesce(p_amount_paid, v_row.amount_paid, 0));
-  if v_paid > v_total then v_paid := v_total; end if;
+
+  /* MORE PAID THAN BILLED IS REFUSED — NOT CLAMPED, AND NOT ACCEPTED.
+   *
+   * This read `if v_paid > v_total then v_paid := v_total`, and that quietly
+   * destroyed recorded receipts: a patient who had handed over 45,000 against
+   * a total later corrected down to 30,000 lost 15,000 of payments, with no
+   * trace outside the audit row.
+   *
+   * Simply removing the clamp is the other mistake. A slipped finger —
+   * "99999" on an 18,000 bill — would then inflate the clinic's money-in
+   * figure, and a wrong number in the books is what this whole feature exists
+   * to fix.
+   *
+   * Both of those are the function deciding something only a person can. A
+   * payment larger than the bill is either a typo or a genuine overpayment
+   * that means the BILL is wrong, and those need opposite corrections. So it
+   * is refused, in words, with both figures named.
+   *
+   * Only when the owner actually SUPPLIED an amount. A visit that already
+   * carries more paid than billed — which a follow-up charge recorded in the
+   * wrong order can produce — must still be correctable in every other
+   * respect, or fixing its lab test becomes impossible. */
+  if p_amount_paid is not null and v_paid > v_total then
+    return jsonb_build_object('ok', false, 'error',
+      'That records UGX ' || trim(to_char(v_paid, '999999999')) ||
+      ' paid against a bill of UGX ' || trim(to_char(v_total, '999999999')) ||
+      '. If the patient really paid that much, correct the bill first; if it ' ||
+      'is a typo, correct the amount. Nothing has been changed.');
+  end if;
 
   -- THE AMOUNT DECIDES THE STATUS, NOT A CHIP. Same rule the treatment screen
   -- already follows: nothing paid is pending, part of it is partial, the whole
@@ -515,11 +646,49 @@ begin
   -- onto a diagnosis and never gets a booking at all, so counting bookings
   -- would report "no history" for most of a busy clinic's patients and delete
   -- them outright. `bookings` has no patient_phone column either.
+  /* MATCHED THE WAY THE REST OF THIS CODEBASE MATCHES A PERSON, which this
+   * did not, and it is the only thing standing between "archive" and a hard
+   * DELETE.
+   *
+   * It compared raw strings. This project has a whole migration
+   * (20260615_unified_patient_identity.sql) saying why that is unsafe —
+   * "+256772123456, 0772123456 and 772123456 all resolve to the same person" —
+   * it ships `homatt_norm_phone` for exactly this, and it indexes
+   * clinic_patients on that function. clinic-intake.js normalises before
+   * comparing too. Only this count did not.
+   *
+   * And the two functions in THIS file combine into the failure.
+   * `edit_clinic_patient` above updates clinic_patients.full_name and phone
+   * and deliberately leaves the historical clinic_diagnoses rows alone. So the
+   * natural sequence — correct the patient's mistyped phone, then delete the
+   * duplicate that the typo created — is precisely the sequence that makes
+   * BOTH sides of the OR miss, counts zero visits, and hard-deletes somebody
+   * with years of treatments behind them. Their clinic_diagnoses rows survive
+   * but are orphaned, and the registration row goes.
+   *
+   * It fails safe now in the only direction that matters: a phone too short to
+   * normalise falls back to the raw comparison rather than matching nothing,
+   * and a name is compared case- and space-insensitively. Counting one visit
+   * too many archives a duplicate that could have been deleted, which is
+   * untidy. Counting one too few destroys a medical record. */
   select count(*) into v_visits
   from public.clinic_diagnoses d
   where d.clinic_id = v_row.clinic_id
-    and (d.patient_phone = v_row.phone
-         or (d.patient_name is not null and d.patient_name = v_row.full_name));
+    and (
+      (public.homatt_norm_phone(v_row.phone) is not null
+        and public.homatt_norm_phone(d.patient_phone) = public.homatt_norm_phone(v_row.phone))
+      or
+      (public.homatt_norm_phone(v_row.phone) is null
+        and d.patient_phone is not null and d.patient_phone = v_row.phone)
+      or
+      /* Internal whitespace is collapsed too, not just trimmed. `btrim` alone
+       * left "Okello  John" and "OKELLO JOHN" as different people — and a
+       * double space in a typed name is one of the commonest ways the
+       * duplicate this feature deletes gets created in the first place. */
+      (d.patient_name is not null and v_row.full_name is not null
+        and regexp_replace(lower(btrim(d.patient_name)), '\s+', ' ', 'g')
+          = regexp_replace(lower(btrim(v_row.full_name)), '\s+', ' ', 'g'))
+    );
 
   if v_visits > 0 then
     update public.clinic_patients
