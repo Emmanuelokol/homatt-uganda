@@ -68,11 +68,14 @@
      for the one line on the screen that says something went wrong. The fill
      colour is left alone, because white on it is what the delete buttons use. */
   --danger-ink:#C62828;
-  /* --success as a WORD. #2E7D32 is a fill; on a dark card it is 2.6:1, which
-     is the same mistake --info-ink and --warning-ink were added to undo. The
-     flowsheet needs "this reading is fine" in green text, so the pair is
-     defined here rather than at the point of use. */
-  --success-ink:#2E7D32;
+  /* --success as a WORD, and it is NOT the same green.
+     #2E7D32 is a FILL. Measured as text on its own 12% tint it is 4.37:1 —
+     under the 4.5 a 13px word needs — which is the identical mistake
+     --info-ink and --warning-ink were added to undo, made once more by
+     borrowing the fill for the ink. An ink has to be darker than the fill it
+     sits on. #276B2A measures 5.56:1 on that tint and 5.63:1 on clay's
+     off-white surface. */
+  --success-ink:#276B2A;
   --warning-ink:#B23C00;   /* warning as TEXT — #E65100 is 3.8:1 on a card */
   --accent-v:      #6C5CE7;   /* violet — interactive highlights */
   --accent-v-tint: #ECE9FF;
@@ -901,6 +904,47 @@ html[data-theme="dark"]{
 .pr-sec b{ color:var(--text-lt); font-weight:800 }
 
 .pr-note{ font-size:12px; color:var(--text-lt); font-style:italic }
+
+/* ── What they came with ────────────────────────────────────────────────────
+   The complaint, the readings, the story and the background, on the ACTIVE
+   treatment record — where none of it was drawn at all until a clinic sent a
+   photograph of the record asking where it had gone. It sits directly under
+   the diagnosis because it is the context for everything below it: a
+   follow-up that cannot see what the patient first came with is being decided
+   from a number and a drug name.
+
+   Every colour here is a token. The chips are a fill and an ink defined as a
+   PAIR — an ink token the theme flips, over a wash that is the same
+   percentage of whatever surface is behind it — so they hold in all eight
+   skin/theme combinations without being restated eight times. */
+.pr-came{ display:flex; flex-direction:column; gap:7px }
+.pr-came-chief{
+  font-size:14.5px; font-weight:700; color:var(--text); line-height:1.4;
+}
+.pr-came-t{
+  font-size:10.5px; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+  color:var(--text-lt); margin-top:2px;
+}
+.pr-came-p{ font-size:12.5px; color:var(--text); line-height:1.5 }
+.pr-came-fu{
+  font-size:12px; color:var(--text); line-height:1.5; padding:6px 9px;
+  border-left:3px solid var(--brand-ink); background:var(--brand-tint);
+  color:var(--brand-ink); border-radius:0 8px 8px 0;
+}
+.pr-vitals{ display:flex; flex-wrap:wrap; gap:6px; margin-top:1px }
+.pr-vital{
+  display:inline-flex; align-items:baseline; gap:3px; white-space:nowrap;
+  padding:4px 9px; border-radius:20px; border:1px solid var(--border);
+  background:transparent;
+}
+.pr-vital b{ font-size:13.5px; font-weight:800; color:var(--text); line-height:1.2 }
+.pr-vital i{ font-size:10.5px; font-style:normal; color:var(--text-lt); font-weight:700 }
+.pr-vital.ok  { border-color:rgba(46,125,50,.34);  background:rgba(46,125,50,.12) }
+.pr-vital.warn{ border-color:rgba(230,81,0,.34);   background:rgba(230,81,0,.12) }
+.pr-vital.bad { border-color:rgba(211,47,47,.34);  background:rgba(211,47,47,.12) }
+.pr-vital.ok   b, .pr-vital.ok   i{ color:var(--success-ink) }
+.pr-vital.warn b, .pr-vital.warn i{ color:var(--warning-ink) }
+.pr-vital.bad  b, .pr-vital.bad  i{ color:var(--danger-ink) }
 
 /* Medications: one line each where it fits, so six drugs are a list and not a
    scroll. The quantity is the thing the clinician counts out, so it keeps its

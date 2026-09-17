@@ -433,14 +433,22 @@ const VISIT = {
           const fgc = fg.a === 1 ? fg.c : fg.c.map((v, k) => v * fg.a + bg[k] * (1 - fg.a));
           const l1 = lum(fgc), l2 = lum(bg);
           const ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
-          if (ratio < 3.0) worst.push({ t: txt.slice(0, 28), r: Math.round(ratio * 100) / 100 });
+          /* The WCAG rule, size-aware, exactly as test-readable.js applies it:
+             3:1 for large text (>=24px, or >=18.66px bold), 4.5:1 otherwise.
+             A flat 3.0 was too lax for 11px chips and let --success-ink
+             through at 4.37:1 on its own tint — caught by the patient record
+             test, which has always used the right bar. */
+          const size = parseFloat(cs.fontSize) || 13;
+          const weight = parseInt(cs.fontWeight, 10) || 400;
+          const need = (size >= 24 || (size >= 18.66 && weight >= 700)) ? 3 : 4.5;
+          if (ratio < need) worst.push({ t: txt.slice(0, 28), r: Math.round(ratio * 100) / 100 });
         });
         return worst;
       }, [skin, theme]);
       worst.forEach(w => bad.push(skin + '/' + theme + ' "' + w.t + '" ' + w.r + ':1'));
     }
   }
-  result('every word on the flowsheet is readable in all 8 skin/theme combinations',
+  result('every word on the flowsheet clears the WCAG bar for its size, in all 8 skin/theme combinations',
     bad.length === 0, bad.length ? bad.slice(0, 4).join(' | ') : 'none');
 
   await page.evaluate(() => {

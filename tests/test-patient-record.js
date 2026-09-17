@@ -27,6 +27,21 @@ const BASE = {
   severity:'mild', patient_type:'outpatient',
   total_charged_ugx:60000, amount_paid:0, payment_status:'pending',
   follow_up_days:7, follow_up_reason:'',
+  /* THE FIXTURE HAD NO clinical_findings AT ALL, and that is why "the whole
+     record fits without scrolling" passed for months while the record was
+     missing the complaint, the story, the background and every reading. A
+     fixture that omits the thing under test cannot fail on it. This is what
+     the intake screen actually writes. */
+  clinical_findings:
+    'Patient: Female, 34 years\n' +
+    'Chief complaint: fever and headache for three days\n' +
+    'History: started Friday, worse at night, vomited twice, no diarrhoea\n' +
+    'Vitals: BP 142/92 mmHg · Temp 38.9 °C · Weight 58 kg · Pulse 104/min\n' +
+    'Background: no known illness, not on any medicine',
+  lab_tests_ordered:'Malaria RDT, Full Blood Count',
+  lab_results:'RDT positive for P. falciparum',
+  patient_instructions:'Take with food. Plenty of fluids.',
+  clinician_name:'DR OKELLO JOHN',
   prescription_items:[
     {drug_name:'artemether/lumefantrine 20/120mg',strength:'20/120mg',frequency:'2x/day',duration:5,quantity:20},
     {drug_name:'artesunate 50mg',strength:'50mg',frequency:'1x/day',duration:5,quantity:5},
@@ -175,7 +190,7 @@ const SEARCH_ROWS = [
     const tiles = [...body.querySelectorAll('.pr-tile')];
     return {
       dx: (body.querySelector('.pr-hero-dx')||{}).textContent || '',
-      dxY: y('.pr-hero-dx'), stripY: y('.pr-strip'), medsY: y('.pr-sec'), pastY: y('.pr-past'),
+      dxY: y('.pr-hero-dx'), stripY: y('.pr-strip'), medsY: y('.pr-sec-meds'), pastY: y('.pr-past'),
       tiles: tiles.map(t => (t.querySelector('.pr-tile-k')||{}).textContent || ''),
       owedValue: (body.querySelector('.pr-tile.owe .pr-tile-v')||{}).textContent || '',
       // the figure must never wrap — it used to break across two lines
@@ -185,6 +200,9 @@ const SEARCH_ROWS = [
       pastOpen: !!(body.querySelector('.pr-past') || {}).open,
       payBtn: !!body.querySelector('[data-action="record-payment"]'),
       scrollH: body.scrollHeight, clientH: body.clientHeight,
+      cameY: y('.pr-came'),
+      scrollable: getComputedStyle(body).overflowY === 'auto' ||
+                  getComputedStyle(body).overflowY === 'scroll',
     };
   });
   result('the diagnosis is the headline, above everything else',
@@ -201,8 +219,89 @@ const SEARCH_ROWS = [
     shape.meds === 6, shape.meds + ' rows');
   result('previous visits are folded away, below the current one',
     shape.pastY > shape.medsY && shape.pastOpen === false);
-  result('the whole record fits without scrolling on a 412x915 phone',
-    shape.scrollH <= shape.clientH + 2, shape.scrollH + 'px in ' + shape.clientH + 'px');
+  /* THIS ASSERTION USED TO READ `scrollH <= clientH` — the whole record fits
+   * without scrolling — and it passed only because the fixture above had no
+   * findings in it. A real record has a complaint, a history, a background and
+   * four readings, and it does not fit a phone; expecting it to would mean
+   * never showing them, which is the bug a clinic reported.
+   *
+   * What the assertion was written to protect is still real, and is narrower
+   * than it was stated: CHROME must not eat the record. A full-width button
+   * once pushed it to 711px in the 661px this modal has. So the test is now
+   * that the things a clinician must see before scrolling — the diagnosis,
+   * what the patient came with, and what is owed — are all inside the first
+   * screenful, and that the record scrolls rather than clips. */
+  result('the diagnosis, the complaint and the money are all above the fold',
+    shape.dxY >= 0 && shape.cameY < shape.clientH && shape.stripY < shape.clientH,
+    'dx ' + shape.dxY + ', came ' + shape.cameY + ', money ' + shape.stripY +
+    ' in ' + shape.clientH + 'px');
+  result('the record scrolls rather than clipping what will not fit',
+    shape.scrollable === true && shape.scrollH > 0,
+    shape.scrollH + 'px of record in ' + shape.clientH + 'px of room');
+
+  // ── 3b. WHAT THEY CAME WITH ─────────────────────────────────────────────
+  //
+  // The reported fault: "am not seeing the data that was initially taken, the
+  // complaints reported by patient, vital taken, background". Every one of
+  // those was fetched on the row and never drawn.
+  const came = await page.evaluate(() => {
+    const body = document.getElementById('histModalBody');
+    const card = body.querySelector('.pr-came');
+    const vitals = [...body.querySelectorAll('.pr-vital')].map(v => v.textContent.trim());
+    return {
+      there: !!card,
+      text: body.innerText.replace(/\s+/g, ' '),
+      vitals,
+      toned: [...body.querySelectorAll('.pr-vital')]
+        .map(v => v.className.replace('pr-vital', '').trim()).filter(Boolean),
+      aboveMoney: card ? card.getBoundingClientRect().top <
+        body.querySelector('.pr-strip').getBoundingClientRect().top : false,
+      belowDx: card ? card.getBoundingClientRect().top >
+        body.querySelector('.pr-hero-dx').getBoundingClientRect().top : false,
+    };
+  });
+  result('the complaint the patient reported is on the record',
+    /fever and headache for three days/.test(came.text), came.text.slice(0, 120));
+  result('so is the story they told',
+    /vomited twice, no diarrhoea/.test(came.text));
+  result('so is the background',
+    /not on any medicine/.test(came.text));
+  result('the readings are shown as readings, not buried in a sentence',
+    came.vitals.length === 4, came.vitals.join(' | '));
+  result('...the blood pressure among them',
+    came.vitals.some(v => /142\/92/.test(v)), came.vitals.join(' | '));
+  result('...and coloured against the guideline band rather than left plain',
+    came.toned.length >= 2, came.toned.join(','));
+  result('the lab tests and their results are there too',
+    /Malaria RDT/.test(came.text) && /P\. falciparum/.test(came.text));
+  result('it sits under the diagnosis and above the money',
+    came.belowDx && came.aboveMoney,
+    'belowDx ' + came.belowDx + ', aboveMoney ' + came.aboveMoney);
+
+  /* THE CONTROL. "The complaint is on the record" is also what this test
+   * would report if it were reading the wrong element, or if the fixture text
+   * appeared somewhere incidental. Take the findings away and every one of
+   * the assertions above must stop being true. */
+  const withoutIt = await page.evaluate((base) => {
+    const stripped = Object.assign({}, base);
+    delete stripped.clinical_findings;
+    window._activeDetailContext = { current: stripped, history: [] };
+    renderActiveDetailView();
+    const body = document.getElementById('histModalBody');
+    return { text: body.innerText.replace(/\s+/g, ' '),
+             vitals: body.querySelectorAll('.pr-vital').length };
+  }, BASE);
+  result('CONTROL: with the findings removed, none of it is on the record',
+    !/fever and headache/.test(withoutIt.text) && withoutIt.vitals === 0,
+    withoutIt.vitals + ' readings, ' + withoutIt.text.slice(0, 60));
+  result('...and the record says so plainly instead of drawing an empty card',
+    /Nothing was recorded for this visit/.test(withoutIt.text),
+    withoutIt.text.slice(0, 120));
+  // Put the record back exactly as it was — WITH its history. Restoring it
+  // with an empty history removed the "Previous visits" fold, and the next
+  // test crashed looking for it. A control that changes the page has to undo
+  // everything it changed, not just the part it was testing.
+  await open(page, BASE, PAST);
 
   // ── 4. The fold opens ───────────────────────────────────────────────────
   const opened = await page.evaluate(() => {
