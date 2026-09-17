@@ -2246,6 +2246,70 @@ record no height", and the only honest way to check it is to take the control
 away and measure again — the same discipline as putting a bug back to prove a
 fix.
 
+### A register, not a flat wall of ten columns
+
+Three photographs arrived together: the period buttons invisible, the table
+running off the side, and *"the prints for the period are not organised"*.
+
+**Two of the three were already fixed, and the clinic was on an old build.**
+Measured before touching anything: the period buttons are **21:1 black on
+white** in both themes, and the register **fits 704px of A4** with nothing
+hanging off, previewed at 51%. Saying so is worth more than fixing it twice —
+this is the stale-build problem the self-update mechanism exists for, and it
+still needs one more APK install to land.
+
+*(The first probe of that reported the buttons as white-on-green. An unscoped
+`querySelector('[data-period]')` had found one of the dashboard's own finance
+chips. **The instrument was reading the wrong element** — check what a probe
+selected before believing what it says.)*
+
+**The third was real, and it was the design rather than a bug.** Three things
+made it a wall:
+
+- **the date was on every row**, and at 11px in its share of the width it
+  wrapped to three lines — "6 / Apr / 2026" — so every row was three rows tall
+  for a fact that changes once a day;
+- **the clinician's name was on every row**, "DANIEL MUSINGUZI" over two lines,
+  thirty-four times, saying nothing;
+- **nothing could be read without reading all of it.**
+
+So it is grouped **by day** — by month over a year, where three hundred
+day-headings is its own kind of unusable — with the date in the group heading
+and that column gone. One clinician is named once under the title and that
+column goes too; two or more and it stays, shortened to "D. MUSINGUZI". Every
+group carries its own subtotal, which is the figure a clinic checks the cash
+box against. A summary band opens it: patients seen, charged, received, still
+owing and from how many, then the commonest diagnoses.
+
+**And it shows what the old one totalled past.** This clinic's real figures
+include 10,000 charged against 20,000 received, twice. Those rows are named at
+the top — either change is owed or a number was mis-keyed, and a register that
+quietly sums over it is how that stays true for months.
+
+#### The instrument reported a number that named nothing
+`measure-print-fit.js` said *"content needs 724px of 704"* and pointed at no
+element, and two rounds went into guessing at column arithmetic. The reason it
+could not point: **a cell in a `table-layout:fixed` table overflows its content
+box while its bounding rect stays inside the page**, so the per-element check —
+which reads `getBoundingClientRect` — sees nothing at all. Only `scrollWidth`
+does, and only per element does it point anywhere.
+
+Taught to name the culprit, it named two in one run:
+
+```
+TD.num needs 98 in 77   "(UGX 15,000 over)"   the over-payment wording
+TD.num needs 64 in 37   "UGX 25,000"          a money cell in the 38px Meds column
+```
+
+The second is the one that mattered: `cols` counted **7 base columns as 6**, so
+every group heading spanned one column too few and each subtotal's money cells
+landed one column to the left. Invisible on screen, invisible to a
+bounding-rect check, and it would have printed that way.
+
+**A measurement that reports a total without naming what produced it sends the
+next person guessing.** The number was right every time; it was useless until it
+could say which element.
+
 ## The flowsheet, and which book decides what a number means
 
 `app/clinic/js/clinic-vitals.js` (the arithmetic) ·
@@ -2418,7 +2482,7 @@ later, with nobody watching. Same rule as the corrections feature.
 
 ## The tests
 
-`tests/` — 72 files, ~1160 checks (plus 16 `measure-*.js`, which print numbers
+`tests/` — 73 files, ~1380 checks (plus 16 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -2562,6 +2626,24 @@ rules worth repeating here:
   first measured overflow at a 412px phone viewport with print media on, and
   "found" a table 282px over the edge that fits an A4 perfectly. Resize the
   viewport to the paper before believing any print measurement.
+- **A measurement that names no element is half a measurement.**
+  `measure-print-fit.js` reported "content needs 724px of 704" and pointed
+  nowhere, and two rounds went into guessing column arithmetic. A cell in a
+  `table-layout:fixed` table overflows while its bounding rect stays inside the
+  page, so the per-element rect check sees nothing — only per-element
+  `scrollWidth` does. Taught to name the culprit it found two faults in one
+  run, one of which was an off-by-one column count that would have printed
+  every subtotal's money in the wrong column.
+- **Check what the probe actually selected.** An unscoped
+  `querySelector('[data-period]')` found the dashboard's own finance chip
+  instead of the print dialog's button, and reported a green button that was
+  never on the screen in the photograph. The measurement was of the wrong
+  element, not of the wrong thing.
+- **A string test can match the thing that REPLACED what it was checking for.**
+  `/Seen by/i` was meant to detect the "Seen by" column; it also matched the
+  "all seen by DANIEL MUSINGUZI" line printed under the heading *because* the
+  column had been removed — so it reported the column present exactly when the
+  fix had worked. Assert on the element, not on words that appear elsewhere.
 - **A colour token is only safe on the surface it was paired with.**
   `color: var(--text)` is right in the toolbar (`var(--surface)` behind it) and
   wrong two elements away inside a sheet that is always `#fff` — where it was
