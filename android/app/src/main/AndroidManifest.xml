@@ -103,6 +103,15 @@
                 android:resource="@xml/widget_homatt_info" />
         </receiver>
 
+        <!-- Android's answer to "did they actually add the widget?".
+             requestPinAppWidget returns when the DIALOG opens, not when the
+             person agrees, so without this the app cannot tell adding from
+             declining. exported="false": only the system's own PendingIntent
+             fires it. -->
+        <receiver
+            android:name=".WidgetPinnedReceiver"
+            android:exported="false" />
+
         <!-- Local Notifications receivers -->
         <receiver
             android:name="com.capacitorjs.plugins.localnotifications.TimedNotificationPublisher"

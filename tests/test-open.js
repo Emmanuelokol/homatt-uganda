@@ -209,6 +209,116 @@ async function signIn(page) {
     (pwa.shortcuts || []).every((s) => /new-order\.html|go=(active|quick-sale)/.test(s.url)),
     JSON.stringify((pwa.shortcuts || []).map((s) => s.url)));
 
+  /* ── 7. THE SETTINGS CARD THAT PLACES THE WIDGET ──────────────────────
+   *
+   * "Is there a way to add that widget in the app itself instead of searching
+   * for it in the widgets." The card only appears once the phone has been
+   * ASKED whether it can, and what it says when the answer is no matters more
+   * than what it says when the answer is yes — a clinic on a launcher that
+   * refuses needs to be told where to look, not shown a button that does
+   * nothing. All three answers are driven here with a stub plugin. */
+  /* A FRESH CONTEXT PER CASE, with the stub installed by `addInitScript`.
+   *
+   * The first version set window.Capacitor with `page.evaluate` and then
+   * reloaded — and a reload throws away everything evaluate put there, so
+   * every case ran against a page with no plugin and all four reported "this
+   * is the web version". The stub has to be installed BEFORE the page's own
+   * scripts run, on every navigation, which is exactly what addInitScript is
+   * for. */
+  let pinPage = null, pinCtx = null;
+  async function settingsWith(plugin) {
+    if (pinCtx) await pinCtx.close();
+    /* Service workers BLOCKED in these throwaway contexts. Not to hide
+     * anything: settings.html registers the clinic worker on load, and closing
+     * a context while that registration is in flight makes Chromium report
+     * "Failed to update a ServiceWorker … the object is in an invalid state".
+     * That error is produced by this test tearing contexts down, not by the
+     * app, and leaving it in would train whoever reads this run to ignore a
+     * genuine page error. The worker has its own tests. */
+    pinCtx = await b.newContext({ viewport: { width: 412, height: 915 },
+                                  serviceWorkers: 'block' });
+    pinPage = await pinCtx.newPage();
+    pinPage.on('pageerror', e => errors.push(String(e.message)));
+    await pinPage.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith(ORIGIN)) return r.continue();
+      if (u.startsWith(SB)) return r.fulfill({ status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+      return r.abort();
+    });
+    if (plugin !== null) {
+      await pinPage.addInitScript((p) => {
+        window.Capacitor = { isNativePlatform: () => true, platform: 'android', Plugins: {
+          HomattWidget: {
+            canPin: async () => p.canPin,
+            pin: async () => { if (p.pinThrows) { const e = new Error('no'); e.code = p.pinThrows; throw e; } return { asked: true }; },
+          } } };
+      }, plugin);
+    }
+    /* SEEDED ON THE UNGUARDED PAGE. settings.html calls requireClinic(), which
+     * redirects to the sign-in page when there is no session — and the
+     * redirect destroys the execution context mid-evaluate, so seeding there
+     * throws rather than working. This is written down in CLAUDE.md already,
+     * from test-email-direct.js, and it caught me again. */
+    await pinPage.goto(ORIGIN + '/clinic/index.html', { waitUntil: 'domcontentloaded' });
+    await signIn(pinPage);
+    await pinPage.goto(ORIGIN + '/clinic/settings.html', { waitUntil: 'load' });
+    await pinPage.waitForTimeout(1800);
+    return pinPage.evaluate(() => {
+      const card = document.getElementById('pinWidgetCard');
+      const btn = document.getElementById('pinBtn');
+      return {
+        cardShown: !!card && getComputedStyle(card).display !== 'none',
+        btnShown: !!btn && getComputedStyle(btn).display !== 'none',
+        msg: (document.getElementById('pinMsg') || {}).textContent || '',
+        detail: (document.getElementById('pinDetail') || {}).textContent || '',
+        dot: (document.getElementById('pinDot') || {}).className || '',
+      };
+    });
+  }
+
+  const yes = await settingsWith({ canPin: { supported: true, reason: '' } });
+  ok('a phone that CAN add it is offered the button',
+    yes.cardShown && yes.btnShown, JSON.stringify(yes));
+  ok('...and told so', /can add it/i.test(yes.msg), yes.msg);
+
+  const old7 = await settingsWith({ canPin: { supported: false, reason: 'android-too-old' } });
+  ok('an Android older than 8 is told THAT, specifically',
+    old7.cardShown && /older than 8/i.test(old7.msg), old7.msg);
+  ok('...and is not offered a button that would do nothing', old7.btnShown === false);
+  ok('...and is told where to look instead',
+    /press and hold/i.test(old7.detail), old7.detail.slice(0, 80));
+
+  const refused = await settingsWith({ canPin: { supported: false, reason: 'launcher-refuses' } });
+  ok('a launcher that refuses is told THAT, which is a different thing',
+    refused.cardShown && /home screen does not let/i.test(refused.msg), refused.msg);
+  ok('...and that it is the launcher\u2019s choice, not Android\u2019s',
+    /launcher/i.test(refused.detail), refused.detail.slice(0, 90));
+  ok('...and no dead button here either', refused.btnShown === false);
+
+  const web = await settingsWith(null);
+  ok('the web version says a widget belongs to the installed app',
+    web.cardShown && /web version/i.test(web.msg), web.msg);
+  ok('...and points at the long-press menu it DOES have',
+    /press and hold its icon/i.test(web.detail), web.detail.slice(0, 90));
+
+  // Tapping it must never claim the widget was added: Android's dialog decides,
+  // and requestPinAppWidget returns when that dialog OPENS.
+  await settingsWith({ canPin: { supported: true, reason: '' } });
+  const asked = await pinPage.evaluate(async () => {
+    document.getElementById('pinBtn').click();
+    await new Promise(r => setTimeout(r, 400));
+    return { msg: document.getElementById('pinMsg').textContent,
+             detail: document.getElementById('pinDetail').textContent };
+  });
+  ok('tapping it says Android has ASKED', /asked you to confirm/i.test(asked.msg), asked.msg);
+  ok('...and never claims the widget was added',
+    !/added|done|success/i.test(asked.msg), asked.msg);
+  ok('...and says what happens if you decline',
+    /nothing was added/i.test(asked.detail), asked.detail.slice(0, 90));
+
+  if (pinCtx) await pinCtx.close();
+
   ok('no page error anywhere in that journey', errors.length === 0, errors.slice(0, 2).join(' | '));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

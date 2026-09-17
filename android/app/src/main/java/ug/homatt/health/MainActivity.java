@@ -9,6 +9,12 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        /* BEFORE super.onCreate, which is where Capacitor 6 builds its bridge
+         * and reads the plugin list. Registered after it, the plugin exists in
+         * Java and is simply not there for JavaScript — which fails as a
+         * missing method rather than as an error anybody could act on. */
+        registerPlugin(HomattWidgetPlugin.class);
+
         // Install splash screen BEFORE super.onCreate
         SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
         super.onCreate(savedInstanceState);

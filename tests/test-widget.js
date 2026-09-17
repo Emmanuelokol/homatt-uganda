@@ -267,5 +267,76 @@ function colourOf(body, name) {
   });
 });
 
+// ── 9. Adding it from inside the app ─────────────────────────────────────
+//
+// "Is there a way to add that widget in the app itself instead of searching
+// for it in the widgets" — requestPinAppWidget is the platform's answer, and
+// there are three ways to get it wrong that a build will not catch.
+const plugin = path.join(ROOT, 'java', 'ug', 'homatt', 'health', 'HomattWidgetPlugin.java');
+const receiver = path.join(ROOT, 'java', 'ug', 'homatt', 'health', 'WidgetPinnedReceiver.java');
+const mainAct = path.join(ROOT, 'java', 'ug', 'homatt', 'health', 'MainActivity.java');
+ok('the pin plugin exists', exists(plugin));
+ok('the "did they actually add it" receiver exists', exists(receiver));
+
+if (exists(plugin) && exists(mainAct)) {
+  const pl = read(plugin);
+  const ma = read(mainAct);
+
+  /* REGISTERED BEFORE super.onCreate. Capacitor 6 builds its bridge and reads
+   * the plugin list there; registered after it, the plugin exists in Java and
+   * is simply not there for JavaScript — which fails as a missing method
+   * rather than as anything anybody could act on. */
+  /* COMMENTS STRIPPED FIRST. The first version of this compared raw indices
+   * and failed because the comment ABOVE registerPlugin says the words
+   * "super.onCreate" — so it found the explanation of the rule before the code
+   * that follows it. That is the third time this session a check has matched
+   * an explanation of a thing rather than the thing. Strip, then compare. */
+  const code = ma.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+  const reg = code.indexOf('registerPlugin(HomattWidgetPlugin.class)');
+  const sup = code.indexOf('super.onCreate');
+  ok('the plugin is registered', reg >= 0);
+  ok('...BEFORE super.onCreate, or Capacitor never sees it',
+    reg >= 0 && sup >= 0 && reg < sup, 'registerPlugin at ' + reg + ', super at ' + sup);
+  ok('CONTROL: stripping really removed the comments',
+    code.indexOf('Capacitor 6 builds its bridge') < 0 && code.length < ma.length,
+    ma.length + ' → ' + code.length + ' chars');
+
+  /* isRequestPinAppWidgetSupported asks about the LAUNCHER, not about Android,
+   * and several skins sold in this market answer no. Calling requestPin
+   * without asking first is a button that silently does nothing. */
+  ok('it asks the launcher whether it will take a widget at all',
+    /isRequestPinAppWidgetSupported/.test(pl));
+  ok('...and API 26 is checked too, because the API did not exist before it',
+    /VERSION_CODES\.O/.test(pl), 'no API 26 guard');
+  ok('...and minSdk really is below 26, so that guard is not theatre',
+    Number(minSdk) < 26, 'minSdk ' + minSdk);
+
+  // The two refusals need different answers, so they carry different codes.
+  ok('the two reasons it can refuse are told apart',
+    /android-too-old/.test(pl) && /launcher-refuses/.test(pl));
+
+  ok('a success callback is passed, so adding and declining are told apart',
+    /WidgetPinnedReceiver/.test(pl) && /getBroadcast/.test(pl));
+  ok('...and that callback is immutable on Android 12+',
+    /FLAG_IMMUTABLE/.test(pl));
+  ok('the callback receiver is declared in the manifest',
+    /<receiver[\s\S]*?WidgetPinnedReceiver/.test(manifest));
+}
+
+// ── 10. And the screen that offers it ────────────────────────────────────
+const settings = read(path.join(__dirname, '..', 'app', 'clinic', 'settings.html'));
+ok('Settings has a card for it', /id="pinWidgetCard"/.test(settings));
+ok('...hidden until the phone is asked whether it can',
+  /id="pinWidgetCard"[^>]*style="display:none"/.test(settings));
+ok('...and it calls canPin before offering the button',
+  /canPin\(\)/.test(settings));
+/* It must never claim the widget was added. requestPinAppWidget returns when
+ * Android's dialog OPENS, not when somebody agrees — so a screen that says
+ * "added" congratulates the person who just declined. */
+ok('it says Android has ASKED, never that the widget was added',
+  /has asked you to confirm/i.test(settings) && !/widget was added/i.test(settings));
+ok('and where it cannot, it says where to look instead',
+  /press and hold an empty part of your home/i.test(settings));
+
 console.log('\n' + pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

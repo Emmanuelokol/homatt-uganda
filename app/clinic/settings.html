@@ -701,6 +701,37 @@
         </button>
       </div>
 
+      <!-- ══ Put it on the home screen ═════════════════════════════════
+           A clinic asked for this in as many words: "is there a way to add
+           that widget in the app itself instead of searching for it in the
+           widgets". The launcher's widget drawer is several gestures deep and
+           in a different place on every Android skin sold here, and a clinic
+           that cannot find it concludes the feature does not exist.
+
+           The card is HIDDEN unless the phone can actually do it, and when it
+           cannot it says which of the two reasons applies — the Android is too
+           old, or this launcher refuses — because those need different
+           answers and generic advice is no answer at all. -->
+      <div class="settings-card" id="pinWidgetCard" style="display:none">
+        <div class="settings-card-title">
+          <span class="material-icons-outlined">widgets</span> On the home screen
+        </div>
+        <p class="dict-note">
+          A small card with <b>New treatment</b>, <b>Active</b> and
+          <b>Quick sale</b> on it, so each is one tap from the home screen
+          instead of four. Android will ask you to confirm.
+        </p>
+        <div class="dict-state" id="pinState">
+          <span class="dict-dot" id="pinDot"></span>
+          <span class="dict-msg" id="pinMsg">Checking…</span>
+        </div>
+        <div class="dict-detail" id="pinDetail"></div>
+        <button type="button" class="dict-btn" id="pinBtn" style="display:none">
+          <span class="material-icons-outlined">add_to_home_screen</span>
+          Put it on my home screen
+        </button>
+      </div>
+
       <!-- App version -->
       <div class="settings-card" id="appVersionCard">
         <div class="settings-card-title">
@@ -2888,11 +2919,107 @@ function spSettings() {
 document.addEventListener('DOMContentLoaded', function () {
   setTimeout(voiceSwitch, 0);
   setTimeout(spSettings, 0);
+  /* ── Putting the widget on the home screen from here ───────────────────
+   *
+   * The whole point is to not send a clinic hunting through a launcher's
+   * widget drawer. So the card only appears when the phone can actually do
+   * it, and when it cannot it says WHICH of the two reasons applies — the
+   * Android is too old (before 8, no app can place a widget at all) or this
+   * launcher refuses (a question about the launcher, not about Android).
+   * Those need different answers, and a button that does nothing when tapped
+   * is worse than a sentence saying where to look instead. */
+  function pinShow(kind, msg, detail) {
+    var d = document.getElementById('pinDot');
+    var m = document.getElementById('pinMsg');
+    var x = document.getElementById('pinDetail');
+    if (d) d.className = 'dict-dot ' + kind;
+    if (m) m.textContent = msg;
+    if (x) x.innerHTML = detail || '';
+  }
+
+  function pinPlugin() {
+    var C = window.Capacitor;
+    return (C && C.Plugins && C.Plugins.HomattWidget) || null;
+  }
+
+  var MANUAL = 'To add it by hand: press and hold an empty part of your home ' +
+    'screen, tap <b>Widgets</b>, find <b>Homatt Clinic</b> and drag it out. ' +
+    'Or press and hold the Homatt Clinic icon — the same three are in that menu, ' +
+    'with nothing to set up.';
+
+  async function pinInit() {
+    var card = document.getElementById('pinWidgetCard');
+    var btn = document.getElementById('pinBtn');
+    if (!card) return;
+    var P = pinPlugin();
+    /* Not the installed app at all — a browser or the web version. Nothing
+     * here can place an Android widget, and saying so is more use than an
+     * empty card. The PWA's own long-press shortcuts still work. */
+    if (!P) {
+      card.style.display = '';
+      pinShow('unknown', 'This is the web version.',
+        'A home-screen widget belongs to the installed Android app. If you ' +
+        'added this page to your home screen, press and hold its icon — ' +
+        'New treatment, Active and Quick sale are in that menu.');
+      return;
+    }
+    card.style.display = '';
+    var r = null;
+    try { r = await P.canPin(); } catch (e) { r = null; }
+    if (r && r.supported) {
+      pinShow('ok', 'This phone can add it for you.', '');
+      if (btn) btn.style.display = '';
+      return;
+    }
+    var why = (r && r.reason) || '';
+    if (why === 'android-too-old') {
+      pinShow('low', 'This phone\u2019s Android is older than 8.',
+        'On these phones no app is allowed to place a widget itself. ' + MANUAL);
+    } else {
+      pinShow('low', 'This home screen does not let an app add a widget.',
+        'That is the launcher\u2019s choice, not Android\u2019s, and several of ' +
+        'the ones sold here refuse. ' + MANUAL);
+    }
+  }
+
+  async function pinDo() {
+    var P = pinPlugin();
+    if (!P) return;
+    var btn = document.getElementById('pinBtn');
+    if (btn) btn.disabled = true;
+    pinShow('busy', 'Asking Android\u2026', '');
+    try {
+      await P.pin();
+      /* Android's dialog decides, not us, and `requestPinAppWidget` returns
+       * when that dialog OPENS rather than when somebody agrees. So this says
+       * what was asked, never that it was done — congratulating a clinician
+       * who just declined is a small lie and the kind that makes them stop
+       * believing the rest of the screen. */
+      pinShow('ok', 'Android has asked you to confirm.',
+        'Tap <b>Add</b> on the box that appeared. If you did not see one, or ' +
+        'you changed your mind, nothing was added. ' + MANUAL);
+    } catch (e) {
+      var code = (e && e.code) || '';
+      if (code === 'android-too-old') {
+        pinShow('low', 'This phone\u2019s Android is older than 8.', MANUAL);
+      } else if (code === 'launcher-refuses') {
+        pinShow('low', 'This home screen refused.', MANUAL);
+      } else {
+        pinShow('bad', 'It could not be added from here.', MANUAL);
+      }
+    }
+    if (btn) btn.disabled = false;
+  }
+
+  var pbtn = document.getElementById('pinBtn');
+  if (pbtn) pbtn.addEventListener('click', pinDo);
+
   var btn = document.getElementById('dictCheckBtn');
   if (btn) btn.addEventListener('click', dictCheck);
   var vbtn = document.getElementById('verCheckBtn');
   if (vbtn) vbtn.addEventListener('click', function () { verCheck(true); });
   verCheck(false);
+  pinInit();
   // Show what this device already knows without waiting to be asked; the live
   // check costs a request, so it stays on the button.
   var last = dictLastFaultHtml();
