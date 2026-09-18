@@ -1,0 +1,79 @@
+// Malaria AND typhoid in one visit — the commonest co-infection in Uganda.
+// Reported: only typhoid comes out.
+const APP = require('path').join(__dirname, '..', 'app');
+const CHROME = process.env.HOMATT_CHROME ||
+  require('./chrome').find();
+const { chromium } = require('playwright');
+const http=require('http'),fs=require('fs'),path=require('path');
+const ROOT=APP;
+const MIME={'.html':'text/html','.js':'application/javascript','.css':'text/css','.wasm':'application/wasm','.db':'application/octet-stream','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.json':'application/json'};
+const server=http.createServer((rq,rs)=>{let p=decodeURIComponent(rq.url.split('?')[0]);if(p.endsWith('/'))p+='index.html';fs.readFile(path.join(ROOT,p),(e,d)=>{if(e){rs.writeHead(404);rs.end('nf');return;}rs.writeHead(200,{'Content-Type':MIME[path.extname(p)]||'application/octet-stream'});rs.end(d);});});
+const CID='11111111-1111-4111-8111-111111111111',UID='22222222-2222-4222-8222-222222222222';
+const SB='https://kgkdiykzmqjougwzzewi.supabase.co',PORT=9090,ORIGIN='http://localhost:'+PORT;
+
+(async()=>{
+  await new Promise(r=>server.listen(PORT,r));
+  const b=await chromium.launch({executablePath:CHROME,args:['--no-sandbox']});
+  const page=await (await b.newContext({viewport:{width:430,height:1300},serviceWorkers:'block'})).newPage();
+  page.on('pageerror',e=>console.log('ERR',e.message.split('\n')[0]));
+  await page.route('**/*',r=>{const u=r.request().url();
+    if(u.startsWith(ORIGIN))return r.continue();
+    if(u.startsWith(SB))return r.fulfill({status:200,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'},body:'[]'});
+    return r.abort();});
+  await page.goto(ORIGIN+'/clinic/index.html');
+  await page.evaluate(([cid,uid])=>{localStorage.clear();
+    localStorage.setItem('clinic_session',JSON.stringify({staffName:'D',clinicName:'K',clinicId:cid,staffRole:'owner',userId:uid,level:'HC3'}));
+    localStorage.setItem('sb-homatt-clinic-auth',JSON.stringify({access_token:'t',refresh_token:'r',token_type:'bearer',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,user:{id:uid}}));},[CID,UID]);
+  await page.goto(ORIGIN+'/clinic/new-order.html');
+  await page.waitForFunction(()=>!!window._wizState,{timeout:30000});
+  await page.waitForTimeout(2500);
+
+  async function applyDx(name){
+    return page.evaluate(async (dx)=>{
+      const st=window._wizState;
+      st.patient={name:'X',phone:''}; st.severity='moderate'; st.materialsUsed=st.materialsUsed||[];
+      const el=document.getElementById('confirmedDx');
+      el.focus(); el.select && el.select();
+      el.value=dx; el.dispatchEvent(new Event('input',{bubbles:true}));
+      await new Promise(r=>setTimeout(r,600));
+      document.getElementById('ucgOneTap').click();
+      await new Promise(r=>setTimeout(r,5000));
+      const ask=document.getElementById('ucgAsk');
+      if(ask&&getComputedStyle(ask).display!=='none'){
+        const c=ask.querySelector('[data-h]'); if(c) c.click();
+        await new Promise(r=>setTimeout(r,4000));
+      }
+      const drugs=document.querySelectorAll('.ucg-drug').length;
+      const ap=document.getElementById('ucgApply');
+      if(!ap) return {applied:false, drugs};
+      ap.click();
+      await new Promise(r=>setTimeout(r,1200));
+      // the "learn this?" prompt can sit on top — dismiss it
+      const no=document.getElementById('ucgLearnNo')||document.querySelector('[data-learn="no"]');
+      if(no){ no.click(); await new Promise(r=>setTimeout(r,600)); }
+      return {applied:true, drugs};
+    }, name);
+  }
+
+  const a = await applyDx('Malaria');
+  const after1 = await page.evaluate(()=>{const s=window._wizState;return{
+    dx:s.confirmedDx, input:document.getElementById('confirmedDx').value,
+    meds:(s.medications||[]).map(m=>m.drug), labs:(s.labTests||[]).slice(),
+    fees:{c:s.feeConsult,l:s.feeLab,m:s.feeMeds}};});
+  console.log('AFTER MALARIA ', JSON.stringify(after1));
+
+  const c = await applyDx('Typhoid');
+  const after2 = await page.evaluate(()=>{const s=window._wizState;return{
+    dx:s.confirmedDx, input:document.getElementById('confirmedDx').value,
+    meds:(s.medications||[]).map(m=>m.drug), labs:(s.labTests||[]).slice(),
+    fees:{c:s.feeConsult,l:s.feeLab,m:s.feeMeds}};});
+  console.log('AFTER TYPHOID ', JSON.stringify(after2));
+
+  console.log('');
+  console.log('DIAGNOSIS KEEPS BOTH? ', /malaria/i.test(after2.dx) && /typhoid/i.test(after2.dx), '→', JSON.stringify(after2.dx));
+  console.log('MEDICINES KEPT BOTH?  ', after2.meds.length > after1.meds.length);
+  console.log('LAB TESTS KEPT BOTH?  ', after2.labs.length >= after1.labs.length, JSON.stringify(after2.labs));
+  console.log('FEES ADDED UP?        ', after2.fees.l >= after1.fees.l && after2.fees.m >= after1.fees.m,
+              'was', JSON.stringify(after1.fees), 'now', JSON.stringify(after2.fees));
+  await b.close(); server.close();
+})().catch(e=>{console.error('CRASH',e.message);process.exit(1);});

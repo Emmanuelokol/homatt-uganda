@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One action. `selectableItemBackground` is not available to RemoteViews, so
+     the pressed state is drawn here or there is no feedback at all — and a
+     button on a home screen that does not visibly respond reads as broken. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widgetBtnPressed" />
+            <corners android:radius="13dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/widgetBtn" />
+            <corners android:radius="13dp" />
+            <stroke android:width="1dp" android:color="@color/widgetBtnEdge" />
+        </shape>
+    </item>
+</selector>

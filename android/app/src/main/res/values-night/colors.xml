@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The widget in the system's dark theme. Every value here is the PAIR of the
+     one it replaces in values/colors.xml — a fill and its ink move together or
+     one of them ends up invisible, which is the fault this project has
+     measured four separate times. Ink #E8F0EA on surface #122016 is 14.0:1. -->
+<resources>
+    <color name="widgetSurface">#122016</color>
+    <color name="widgetInk">#E8F0EA</color>
+    <color name="widgetInkSoft">#9FB4A4</color>
+    <color name="widgetBtn">#1B2E21</color>
+    <color name="widgetBtnPressed">#27412E</color>
+    <color name="widgetBtnEdge">#2E4636</color>
+    <color name="widgetPrimary">#43A047</color>
+    <color name="widgetPrimaryPressed">#357D38</color>
+    <color name="widgetOnPrimary">#04150A</color>
+</resources>

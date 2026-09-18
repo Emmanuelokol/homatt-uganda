@@ -1,7 +1,30 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Homatt Health</string>
-    <string name="title_activity_main">Homatt Health</string>
+    <string name="app_name">Homatt Clinic</string>
+    <string name="title_activity_main">Homatt Clinic</string>
     <string name="package_name">ug.homatt.health</string>
     <string name="custom_url_scheme">ug.homatt.health</string>
+    <!-- OneSignal Push Notifications -->
+    <string name="onesignal_app_id">eb88a928-4a93-4713-9bab-027fd1fbf181</string>
+
+    <!-- The home-screen widget and the long-press shortcuts.
+         Short labels, because both are read at a glance on a home screen and
+         both clip rather than wrap. "New treatment" is the app's own word —
+         never "consultation", which no user-visible screen in this app says. -->
+    <string name="widget_title">Homatt Clinic</string>
+    <string name="widget_subtitle">one tap</string>
+    <string name="widget_new">New\ntreatment</string>
+    <string name="widget_active">Active</string>
+    <string name="widget_sale">Quick\nsale</string>
+    <string name="widget_new_desc">Start a new treatment</string>
+    <string name="widget_active_desc">Patients still being treated</string>
+    <string name="widget_sale_desc">Sell a medicine over the counter</string>
+    <string name="widget_description">Start a treatment, see who is still being treated, or make a quick sale — without opening the app first.</string>
+
+    <string name="shortcut_new_short">New treatment</string>
+    <string name="shortcut_new_long">Start a new treatment</string>
+    <string name="shortcut_active_short">Active</string>
+    <string name="shortcut_active_long">Patients still being treated</string>
+    <string name="shortcut_sale_short">Quick sale</string>
+    <string name="shortcut_sale_long">Sell a medicine over the counter</string>
 </resources>

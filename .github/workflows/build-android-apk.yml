@@ -11,6 +11,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
+    # Required so the "Publish APK to release" step can create/update the
+    # public android-latest release. Without this the release step fails with
+    # "Resource not accessible by integration" and no public download link is
+    # produced (the APK still builds as an artifact, but can't be published).
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -27,15 +34,46 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Create app config.js with Supabase credentials
+      - name: Create app config.js with Supabase + OneSignal credentials
         run: |
           {
             echo "window.HOMATT_CONFIG = {"
             echo "  SUPABASE_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co',"
             echo "  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtna2RpeWt6bXFqb3Vnd3p6ZXdpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEyMzI1MTEsImV4cCI6MjA4NjgwODUxMX0.BhrLUC57jA-xsoFiTKqk_qKVsHsb71YGSEnvjzyQ0e8',"
             echo "  API_PROXY_URL: 'https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/ai-proxy',"
+            echo "  ONESIGNAL_APP_ID: '${{ secrets.ONESIGNAL_APP_ID }}',"
             echo "};"
           } > app/js/config.js
+
+      - name: Write google-services.json (required for FCM / push notifications)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "$GOOGLE_SERVICES_JSON" | base64 --decode > android/app/google-services.json
+            echo "✓ google-services.json written"
+          else
+            echo "::warning::GOOGLE_SERVICES_JSON secret is not set — push notifications will NOT work in this build."
+            echo "::warning::Get google-services.json from Firebase Console → Project Settings → Your Android app"
+            echo "::warning::Then base64-encode it and add as GOOGLE_SERVICES_JSON secret in GitHub."
+          fi
+
+      # The APK bakes app/ in whole, including app/clinic/version.json — which
+      # is what a freshly installed app compares itself against. The web deploy
+      # regenerates it from clinic-sw.js; this build did not, so it shipped
+      # whatever happened to be committed.
+      #
+      # That is the exact failure make_version_json.py exists to prevent, as
+      # its own header says: a version.json that disagrees with the worker
+      # beside it is worse than none, because it tells a phone to fetch files
+      # that are not there. Bump CACHE, forget to regenerate, and every new
+      # install is born unable to update.
+      #
+      # It also refuses to write when a listed file does not exist, so this
+      # step fails the build rather than shipping a manifest that breaks
+      # updates silently.
+      - name: Write version.json (same generator the web deploy uses)
+        run: python3 tools/make_version_json.py
 
       - name: Install npm dependencies
         run: npm install
@@ -59,19 +97,159 @@ jobs:
           key: gradle-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-
 
-      - name: Build Debug APK
+      # Signed RELEASE build (stable committed key + CI-bumped versionCode) so
+      # every published APK installs as an UPDATE over the previous one —
+      # clinics keep their offline data instead of uninstall/reinstall wiping it.
+      - name: Build Signed Release APK
         working-directory: android
-        run: ./gradlew assembleDebug --no-daemon --stacktrace
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
         env:
           GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.jvmargs=-Xmx4g"
+          APK_VERSION_CODE: ${{ github.run_number }}
+          APK_VERSION_NAME: "1.1.${{ github.run_number }}"
 
       - name: Locate built APK
         run: find android/app/build/outputs -name "*.apk" -type f
 
-      - name: Upload APK — Homatt Health Android
+      - name: Upload APK — Homatt Clinic Android
         uses: actions/upload-artifact@v4
         with:
           name: Homatt-Health-Android-APK
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 90
+
+      - name: Rename APK for release
+        run: cp android/app/build/outputs/apk/release/app-release.apk HomattHealth.apk
+
+      # ── THE PUBLISHED APK MUST NEVER GO BACKWARDS ────────────────────────
+      #
+      # This workflow runs on `main` AND on every `claude/**` branch, and every
+      # one of them writes the SAME `android-latest` release. `main` is
+      # hundreds of commits behind and its capacitor.config.json points the app
+      # at a different server entirely — so one push to it would replace, at a
+      # permanent public download link that clinics have already been sent, the
+      # app they are running with one from months ago. Nothing would say so.
+      # The download would work. The APK would install. It would simply be the
+      # wrong app.
+      #
+      # The rule is the same one the service worker now enforces for the web
+      # build, deliberately: a number that goes down is not an update. The
+      # number is the one in clinic-sw.js, which is the build a clinic sees on
+      # its own Settings screen, so refusing here and refusing there mean the
+      # same thing to the same person.
+      #
+      # Equal is allowed — a Java-only change (the widget, the bar colours)
+      # ships without touching the web build, and blocking that would be
+      # blocking exactly the kind of fix this guard exists to deliver.
+      - name: Check this build is not older than the published one
+        id: forward
+        run: |
+          set -u
+          mine=$(grep -o "homatt-clinic-v[0-9]\+" app/clinic/clinic-sw.js | head -1 | grep -o "[0-9]\+")
+          if [ -z "$mine" ]; then
+            echo "::error::Could not read the build number out of app/clinic/clinic-sw.js."
+            exit 1
+          fi
+          echo "this build: v$mine (branch ${GITHUB_REF_NAME}, commit ${GITHUB_SHA})"
+
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-latest/build-info.json"
+          theirs=""
+          if curl -fsSL --retry 3 --max-time 30 -o published.json "$url" 2>/dev/null; then
+            theirs=$(python3 -c "import json;print(json.load(open('published.json')).get('build',''))" 2>/dev/null || true)
+            echo "published:  v${theirs:-unknown}  $(python3 -c "import json;d=json.load(open('published.json'));print(d.get('branch',''), d.get('sha','')[:8])" 2>/dev/null || true)"
+          else
+            # No stamp yet: either the first run of this guard, or a release
+            # published before it existed. Publishing is right in both cases —
+            # this is the run that starts recording, and refusing would leave
+            # the link stuck on an APK nobody can identify.
+            echo "published:  nothing recorded yet"
+          fi
+
+          publish=yes
+          if [ -n "$theirs" ] && [ "$mine" -lt "$theirs" ] 2>/dev/null; then
+            publish=no
+            echo "::warning::NOT publishing. This build is v$mine and the published APK is v$theirs — publishing would hand clinics an older app at a link they have already been sent. Branch ${GITHUB_REF_NAME} is behind; merge the newer work into it first. The APK is still attached to this run as an artifact."
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+          # The stamp itself. "Build 578" on a clinic's Settings screen is the
+          # versionCode, which is this run number — so this file is what turns
+          # a photograph of a phone into a commit anybody can look up.
+          # The SIZE and the CHECKSUM, because "did my download finish?" is a
+          # real question with a real answer and nobody could reach it.
+          #
+          # A clinic photographed a download sitting at 12.75 MB of 12.75 MB
+          # with the browser still showing it as in progress. Every byte was
+          # there; Chrome simply never flipped it to done. With nothing
+          # published to compare against, "is this file complete?" could only
+          # be guessed at — so the file sat in Downloads, untapped, while the
+          # app it contained was the thing being waited for.
+          export MINE="$mine"
+          export APK_BYTES="$(wc -c < HomattHealth.apk)"
+          export APK_SHA256="$(sha256sum HomattHealth.apk | cut -d' ' -f1)"
+          python3 - <<'PY' > build-info.json
+          import json, os
+          b = int(os.environ['APK_BYTES'])
+          print(json.dumps({
+            'build': int(os.environ['MINE']),
+            'versionCode': os.environ['GITHUB_RUN_NUMBER'],
+            'versionName': '1.1.' + os.environ['GITHUB_RUN_NUMBER'],
+            'branch': os.environ['GITHUB_REF_NAME'],
+            'sha': os.environ['GITHUB_SHA'],
+            'run': os.environ['GITHUB_RUN_ID'],
+            'built': os.environ.get('BUILT', ''),
+            'apkBytes': b,
+            'apkSize': '%.2f MB' % (b / 1000000.0),   # what a phone shows
+            'apkSha256': os.environ['APK_SHA256'],
+          }, indent=2))
+          PY
+          cat build-info.json
+        env:
+          BUILT: ${{ github.event.head_commit.timestamp }}
+
+      # Publish the APK at a PERMANENT public link so the portal can offer a
+      # one-tap "Download Android app" — no GitHub account or Actions digging:
+      #   https://github.com/<owner>/<repo>/releases/download/android-latest/HomattHealth.apk
+      - name: Publish APK to the android-latest release
+        if: steps.forward.outputs.publish == 'yes'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: Homatt Clinic — Android app (latest)
+          # Named, not just "the latest". A clinic reads "build 578" off its own
+          # Settings screen; this is where that number is looked up.
+          body: |
+            Latest Homatt Clinic Android app.
+
+            | | |
+            |---|---|
+            | Build (shown in Settings → App version) | `${{ github.run_number }}` |
+            | Version | `1.1.${{ github.run_number }}` |
+            | Built from | `${{ github.ref_name }}` |
+            | Commit | `${{ github.sha }}` |
+
+            Download **HomattHealth.apk** below and open it on your phone to
+            install or update. It installs over the previous version and keeps
+            everything already recorded. `build-info.json` beside it carries the
+            same information plus the APK's exact byte count and SHA-256, so
+            "did my download finish, and is it intact?" can be answered instead
+            of guessed at.
+
+            **If the download appears to stop at 100%** — the same number on
+            both sides of the slash, still showing as busy — it has finished.
+            Open the file from My Files → Downloads and install it.
+
+            The screens inside the app update themselves over the internet
+            afterwards. The app itself — the home-screen widget, the colour of
+            the phone's own top and bottom bars, the camera — only changes when
+            a new file like this one is installed.
+          files: |
+            HomattHealth.apk
+            build-info.json
+          make_latest: true
+
+      - name: Say plainly that nothing was published
+        if: steps.forward.outputs.publish != 'yes'
+        run: |
+          echo "::warning::The APK built successfully and was NOT published, because it is older than the one clinics can already download. It is attached to this run as an artifact if you need it."

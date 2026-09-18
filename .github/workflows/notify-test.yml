@@ -1,0 +1,64 @@
+name: Test Push Notification
+
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: "Supabase user UUID to send test notification to"
+        required: true
+        type: string
+      title:
+        description: "Notification title"
+        required: false
+        default: "Homatt Health Test"
+        type: string
+      message:
+        description: "Notification message"
+        required: false
+        default: "Push notifications are working correctly!"
+        type: string
+
+jobs:
+  send-test-notification:
+    name: Send Test Push Notification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send notification via Supabase Edge Function
+        id: send
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://kgkdiykzmqjougwzzewi.supabase.co/functions/v1/send-notification" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{
+              "userId": "${{ github.event.inputs.user_id }}",
+              "title": "${{ github.event.inputs.title }}",
+              "message": "${{ github.event.inputs.message }}",
+              "data": { "screen": "dashboard" }
+            }')
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          echo "body=$BODY" >> $GITHUB_OUTPUT
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Notification failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "✅ Notification sent successfully"
+          echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(f'Notification ID: {d.get(\"notification_id\",\"unknown\")}, Recipients: {d.get(\"recipients\",0)}')"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Push Notification Test Result" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **User ID:** ${{ github.event.inputs.user_id }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Title:** ${{ github.event.inputs.title }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Message:** ${{ github.event.inputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Response:** ${{ steps.send.outputs.body }}" >> $GITHUB_STEP_SUMMARY

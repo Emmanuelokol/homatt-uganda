@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Homatt — Join a clinic</title>
+  <link href="../fonts/inter.css?v=1" rel="stylesheet">
+  <link href="../fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="stylesheet" href="../css/clinic.css?v=20261007">
+  <link rel="stylesheet" href="css/clinician.css?v=20260911">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#1B5E20">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('homatt_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    body { background: var(--bg, #F5F7F6); margin: 0; }
+    #clCodeIn {
+      text-align: center; font-size: 24px; font-weight: 800;
+      letter-spacing: 5px; text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<div class="cl-top">
+  <button type="button" id="clBack" aria-label="Back">
+    <span class="material-icons-outlined">arrow_back</span>
+  </button>
+  <div class="cl-title">Join a clinic<span class="cl-sub">Scan the code they show you</span></div>
+</div>
+
+<div class="cl-wrap">
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">qr_code_scanner</span> Scan their code</h2>
+    <p class="cl-hint">
+      Ask the clinic owner to open <b>Settings → Clinicians</b> and show you the code.
+      Point your camera at it.
+    </p>
+
+    <button type="button" class="cl-btn" id="clScanBtn">
+      <span class="material-icons-outlined">photo_camera</span> Open the camera
+    </button>
+
+    <div id="clScanWrap">
+      <video id="clScanVideo" playsinline muted></video>
+      <div id="clScanFrame"></div>
+      <button type="button" class="cl-btn ghost" id="clStopBtn" style="margin-top:10px">
+        Stop the camera
+      </button>
+    </div>
+
+    <div id="clScanMsg" class="cl-msg"></div>
+  </div>
+
+  <div class="cl-card">
+    <h2><span class="material-icons-outlined">keyboard</span> Or type the code</h2>
+    <p class="cl-hint">
+      Eight characters. This always works — a camera that will not focus, a
+      cracked screen, or a code read out over the phone.
+    </p>
+    <form id="clCodeForm">
+      <div class="cl-field">
+        <label for="clCodeIn">The clinic's code</label>
+        <input type="text" id="clCodeIn" maxlength="9" autocomplete="off"
+               autocapitalize="characters" autocorrect="off" spellcheck="false"
+               inputmode="latin" placeholder="ABCD2345" required>
+      </div>
+      <button type="submit" class="cl-btn" id="clCodeBtn">
+        <span class="material-icons-outlined">login</span> Join this clinic
+      </button>
+    </form>
+    <div id="clCodeMsg" class="cl-msg"></div>
+  </div>
+</div>
+
+<script src="../js/vendor/supabase.min.js?v=2110"></script>
+<script src="../../js/config.js"></script>
+<script src="js/clinician.js?v=20260911"></script>
+<script>
+(function () {
+  var C = window.HomattClinician;
+  var session = C.requireClinician();
+  if (!session) return;
+
+  document.getElementById('clBack').addEventListener('click', function () {
+    window.location.href = 'home.html';
+  });
+
+  function show(el, text, kind) {
+    el.className = 'cl-msg show ' + (kind || 'bad');
+    el.textContent = text;
+  }
+
+  var codeMsg = document.getElementById('clCodeMsg');
+  var scanMsg = document.getElementById('clScanMsg');
+
+  /* What a scanned QR actually contains.
+   *
+   * Either the bare code, or "HOMATT-CLINIC:ABCD2345", or a full URL with ?c=.
+   * All three are accepted because all three will exist: the QR this app draws,
+   * a code somebody typed into a message, and a link shared in WhatsApp. */
+  function codeFrom(text) {
+    var s = String(text || '').trim();
+    var m = s.match(/[?&]c=([A-Za-z0-9]{4,12})/);
+    if (m) return m[1].toUpperCase();
+    m = s.match(/^HOMATT-CLINIC:([A-Za-z0-9]{4,12})$/i);
+    if (m) return m[1].toUpperCase();
+    m = s.match(/^[A-Za-z0-9]{6,12}$/);
+    if (m) return s.toUpperCase();
+    return null;
+  }
+
+  async function redeem(code, msgEl, btn) {
+    var supa = C.supa();
+    if (!supa) { show(msgEl, 'This device cannot reach the server yet.'); return; }
+    if (navigator.onLine === false) {
+      show(msgEl, 'Joining a clinic needs a connection — it has to ask the clinic\'s own record. Try again when you have signal.', 'warn');
+      return;
+    }
+    if (btn) { btn.disabled = true; btn.textContent = 'Joining…'; }
+    try {
+      var r = await supa.rpc('redeem_clinic_link_code', { p_code: code });
+      if (r.error) throw r.error;
+      if (!r.data || !r.data.ok) {
+        show(msgEl, (r.data && r.data.error) || 'That code is not valid.');
+        return;
+      }
+      show(msgEl, 'You are in — ' + r.data.clinic_name + '. Opening the clinic…', 'good');
+      C.enterClinic(r.data);
+      setTimeout(function () { window.location.href = '../dashboard.html'; }, 700);
+    } catch (e) {
+      show(msgEl, C.saySorry(e, 'Could not join just now.'));
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-icons-outlined">login</span> Join this clinic';
+      }
+    }
+  }
+
+  // ── Typed code ────────────────────────────────────────────────────────
+  var input = document.getElementById('clCodeIn');
+  input.addEventListener('input', function () {
+    var at = input.selectionStart;
+    var cleaned = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (cleaned !== input.value) {
+      input.value = cleaned;
+      // Putting the caret back matters: without it, correcting a character in
+      // the middle of the code throws the cursor to the end on every keypress.
+      try { input.setSelectionRange(at, at); } catch (e) {}
+    }
+  });
+  document.getElementById('clCodeForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    codeMsg.className = 'cl-msg';
+    var code = codeFrom(input.value);
+    if (!code) { show(codeMsg, 'That does not look like a clinic code. It is 8 characters.'); return; }
+    redeem(code, codeMsg, document.getElementById('clCodeBtn'));
+  });
+
+  // A link opened from a message: /clinician/join.html?c=ABCD2345
+  (function () {
+    var m = location.search.match(/[?&]c=([A-Za-z0-9]{4,12})/);
+    if (m) { input.value = m[1].toUpperCase(); }
+  })();
+
+  // ── The camera ────────────────────────────────────────────────────────
+  /* Reading a QR needs a decoder, and the one already on the phone is
+   * BarcodeDetector — part of the Android WebView this app runs inside. No
+   * library, no download, and it uses the platform's own scanner.
+   *
+   * Where it is missing (an older WebView, iOS Safari, Firefox) the camera
+   * button says so plainly and points at the box below it. That is why the
+   * typed code is not a fallback bolted on at the end: on a fair number of
+   * phones it is the only route, so it gets its own heading and its own card. */
+  var stream = null, scanning = false, detector = null;
+  var wrap = document.getElementById('clScanWrap');
+  var video = document.getElementById('clScanVideo');
+
+  function stopCamera() {
+    scanning = false;
+    try { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    stream = null;
+    wrap.style.display = 'none';
+  }
+  document.getElementById('clStopBtn').addEventListener('click', stopCamera);
+  window.addEventListener('pagehide', stopCamera);
+
+  document.getElementById('clScanBtn').addEventListener('click', async function () {
+    scanMsg.className = 'cl-msg';
+
+    if (typeof window.BarcodeDetector === 'undefined') {
+      show(scanMsg, 'This phone\'s browser cannot read a QR code by itself. Type the eight characters below instead — it works exactly the same.', 'warn');
+      input.focus();
+      return;
+    }
+    try {
+      var formats = await window.BarcodeDetector.getSupportedFormats();
+      if (formats.indexOf('qr_code') < 0) {
+        show(scanMsg, 'This phone cannot read QR codes. Type the eight characters below instead.', 'warn');
+        input.focus();
+        return;
+      }
+      detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    } catch (e) {
+      show(scanMsg, 'This phone cannot read QR codes. Type the eight characters below instead.', 'warn');
+      return;
+    }
+
+    try {
+      // The back camera, asked for as a preference rather than a requirement —
+      // a hard constraint a phone cannot meet fails the whole call.
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } }, audio: false,
+      });
+    } catch (e) {
+      var name = String(e && e.name || '');
+      if (/NotAllowed|Security/i.test(name)) {
+        show(scanMsg, 'The camera is blocked. Allow it in the phone\'s settings, or type the code below.', 'warn');
+      } else if (/NotFound|Overconstrained/i.test(name)) {
+        show(scanMsg, 'No camera found on this phone. Type the code below instead.', 'warn');
+      } else if (/NotReadable|TrackStart/i.test(name)) {
+        show(scanMsg, 'Another app is using the camera. Close it and try again, or type the code below.', 'warn');
+      } else {
+        show(scanMsg, 'Could not open the camera. Type the code below instead.', 'warn');
+      }
+      return;
+    }
+
+    video.srcObject = stream;
+    wrap.style.display = 'block';
+    try { await video.play(); } catch (e) {}
+    scanning = true;
+    show(scanMsg, 'Looking for a code…', 'good');
+    tick();
+  });
+
+  async function tick() {
+    if (!scanning) return;
+    try {
+      var found = await detector.detect(video);
+      if (found && found.length) {
+        for (var i = 0; i < found.length; i++) {
+          var code = codeFrom(found[i].rawValue);
+          if (code) {
+            stopCamera();
+            input.value = code;
+            redeem(code, codeMsg, document.getElementById('clCodeBtn'));
+            return;
+          }
+        }
+        // A QR that is not one of ours. Say so — otherwise the camera sits
+        // there apparently doing nothing while somebody points it at the
+        // wrong poster.
+        show(scanMsg, 'That is a QR code, but not a Homatt clinic code. Keep looking…', 'warn');
+      }
+    } catch (e) { /* a frame that could not be read; the next one will do */ }
+    setTimeout(function () { requestAnimationFrame(tick); }, 220);
+  }
+})();
+</script>
+</body>
+</html>

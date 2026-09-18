@@ -1,10 +1,19 @@
-name: Deploy AI Proxy to Supabase
+name: Deploy Edge Functions to Supabase
 
 on:
   push:
     branches: [main]
     paths:
-      - 'supabase/functions/**'   # Only runs when the Edge Function changes
+      - 'supabase/functions/**'
+      # ...and when this file changes. The deploy list used to live in here, so
+      # a function could be added to the project and still never be deployed
+      # until somebody happened to edit its source again. Fixing the list has
+      # to be enough to make the fix take effect.
+      - '.github/workflows/deploy-edge-function.yml'
+  workflow_dispatch:              # Allow manual trigger from GitHub Actions UI
+
+env:
+  SUPABASE_PROJECT_REF: kgkdiykzmqjougwzzewi
 
 jobs:
   deploy:
@@ -14,25 +23,149 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      # See the long note in deploy-edge-functions-branch.yml: check the token
+      # WORKS, not that it is non-empty. A revoked token looks identical to a
+      # good one until something actually calls the API with it, and this job
+      # used to discover that nine steps later in nine unreadable errors.
+      - name: Check SUPABASE_ACCESS_TOKEN works
+        run: |
+          set -uo pipefail
+          if [ -z "${SUPABASE_ACCESS_TOKEN:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Supabase dashboard → Account → Access Tokens → generate one, then GitHub → Settings → Secrets and variables → Actions → SUPABASE_ACCESS_TOKEN."
+            exit 1
+          fi
+          code=$(curl -sS -o /tmp/sb_projects.json -w '%{http_code}' \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            https://api.supabase.com/v1/projects || echo 000)
+          if [ "$code" = "401" ] || [ "$code" = "403" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is set but Supabase REJECTED it (HTTP $code). It has expired or been revoked. Generate a new one at Supabase dashboard → Account → Access Tokens, then replace the SUPABASE_ACCESS_TOKEN secret at GitHub → Settings → Secrets and variables → Actions. Nothing deploys until that is done."
+            exit 1
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::Could not reach the Supabase Management API (HTTP $code). Nothing has been deployed; try again shortly."
+            exit 1
+          fi
+          echo "✓ token accepted"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Setup Supabase CLI
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Set API keys as Supabase secrets
+      # ── Secrets ───────────────────────────────────────────────────────────
+      # ONLY the ones that actually have a value.
+      #
+      # This step used to pass every name unconditionally, and `supabase
+      # secrets set X=""` does not skip an empty value — it WRITES an empty
+      # one. So a key somebody had set by hand in the dashboard was silently
+      # erased on the next deploy, and the symptom appeared somewhere else
+      # entirely, hours later. A secret that is not in GitHub is now left
+      # exactly as it is on the project.
+      #
+      # Values go through `env:` rather than into the command line, so a key
+      # containing a quote or a backtick cannot become shell.
+      - name: Set Supabase secrets
         run: |
-          supabase secrets set \
-            GROQ_API_KEY="${{ secrets.GROQ_API_KEY }}" \
-            OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
-            GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
-            --project-ref kgkdiykzmqjougwzzewi
+          set -uo pipefail
+          args=()
+          keep() {
+            if [ -n "${2:-}" ]; then
+              args+=("$1=$2")
+              echo "  will set $1"
+            else
+              echo "  skipping $1 — not set in GitHub Secrets, leaving the project's value alone"
+            fi
+          }
+          keep ANTHROPIC_API_KEY        "$ANTHROPIC_API_KEY"
+          keep GROQ_API_KEY             "$GROQ_API_KEY"
+          keep OPENAI_API_KEY           "$OPENAI_API_KEY"
+          keep GEMINI_API_KEY           "$GEMINI_API_KEY"
+          keep DEEPGRAM_API_KEY         "$DEEPGRAM_API_KEY"
+          keep ONESIGNAL_APP_ID         "$ONESIGNAL_APP_ID"
+          keep ONESIGNAL_REST_API_KEY   "$ONESIGNAL_REST_API_KEY"
+          keep SUPABASE_SERVICE_ROLE_KEY "$SUPABASE_SERVICE_ROLE_KEY"
+          if [ ${#args[@]} -eq 0 ]; then
+            echo "::warning::No secrets in GitHub — nothing set, nothing erased."
+            exit 0
+          fi
+          # continue-on-error on this step means GitHub marks it green whatever
+          # happens — which is how a revoked token produced a run with one red
+          # step and three green ones that had all failed. If it fails, SAY so.
+          if out=$(supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF" 2>&1); then
+            echo "$out"
+          else
+            echo "$out"
+            why=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -3 | tr '\n' ' ' | cut -c1-400)
+            echo "::warning::secrets were NOT set — $why"
+          fi
+        env:
+          SUPABASE_ACCESS_TOKEN:      ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          ANTHROPIC_API_KEY:          ${{ secrets.ANTHROPIC_API_KEY }}
+          GROQ_API_KEY:               ${{ secrets.GROQ_API_KEY }}
+          OPENAI_API_KEY:             ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY:             ${{ secrets.GEMINI_API_KEY }}
+          DEEPGRAM_API_KEY:           ${{ secrets.DEEPGRAM_API_KEY }}
+          ONESIGNAL_APP_ID:           ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_REST_API_KEY:     ${{ secrets.ONESIGNAL_REST_API_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY:  ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+
+      # ── Deploy EVERY function in the repo ─────────────────────────────────
+      # Not a hand-written list. `transcribe` and `structure` were written,
+      # documented, keyed and tested — and never worked for a single clinic,
+      # because nobody added two lines to this file, and nothing anywhere said
+      # so. The dictate button just reported that it could not reach the
+      # service. A list that has to be remembered is a list that will be wrong
+      # again; the directory is the list.
+      #
+      # PUBLIC are the ones called by something that cannot hold a session: a
+      # webhook, pg_cron, the payment provider. Everything else must present a
+      # JWT — `transcribe` above all, because it spends money per minute and an
+      # open one can be drained by anyone who finds the URL.
+      # The CLI's own words go in the ANNOTATION, not just "failed to deploy" —
+      # see the long note in deploy-edge-functions-branch.yml. The short of it:
+      # this step failed on every run for eleven days and never said why,
+      # because the reason was printed to a log that a corporate proxy will not
+      # serve, while annotations come from the GitHub API and always can be.
+      - name: Deploy every Edge Function
+        run: |
+          set -uo pipefail
+          echo "Supabase CLI: $(supabase --version 2>&1 | tr '\n' ' ')"
+          echo "::notice::Supabase CLI $(supabase --version 2>&1 | head -1)"
+          PUBLIC=" ai-proxy send-notification discharge-notify payment-notify relworx-payment "
+          failed=""
+          for dir in supabase/functions/*/; do
+            fn=$(basename "$dir")
+            [ -f "$dir/index.ts" ] || { echo "skipping $fn — no index.ts"; continue; }
+            case "$PUBLIC" in
+              *" $fn "*) flags="--no-verify-jwt"; note="(open)" ;;
+              *)         flags="";               note="(signed-in callers only)" ;;
+            esac
+            echo "── deploying $fn $note"
+            # shellcheck disable=SC2086
+            if out=$(supabase functions deploy "$fn" --project-ref "$SUPABASE_PROJECT_REF" $flags 2>&1); then
+              echo "$out"; echo "✓ $fn"
+            else
+              echo "$out"
+              why=$(printf '%s\n' "$out" | grep -v '^[[:space:]]*$' | tail -4 | tr '\n' ' ' | cut -c1-500)
+              echo "::error::$fn failed to deploy — $why"
+              failed="$failed $fn"
+            fi
+          done
+          if [ -n "$failed" ]; then
+            echo "::error::these did not deploy:$failed"
+            exit 1
+          fi
+          echo "All Edge Functions deployed."
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy Edge Function
-        run: |
-          supabase functions deploy ai-proxy \
-            --project-ref kgkdiykzmqjougwzzewi \
-            --no-verify-jwt
+      # ── Say what is actually live ─────────────────────────────────────────
+      # So the run log answers "is transcribe deployed?" without anyone having
+      # to open the dashboard. That question cost a week.
+      - name: List what is deployed
+        run: supabase functions list --project-ref "$SUPABASE_PROJECT_REF"
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        continue-on-error: true

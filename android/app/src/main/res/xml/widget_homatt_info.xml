@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  What the launcher needs to know before it will offer this widget.
+
+  SIZES. `minWidth`/`minHeight` are the OLD contract and are still the only
+  thing pre-31 launchers read, so they cannot be dropped. The formula is
+  70 * n - 30: four cells across is 250dp, two down is 110dp. `targetCellWidth`
+  and `targetCellHeight` are the API 31+ way of saying the same thing in cells,
+  and both have to be present or a modern launcher places it at a size nobody
+  chose.
+
+  `minResizeWidth`/`minResizeHeight` are the floor a person may drag it down
+  to. Below three cells wide the three labels have nowhere to go, so that is
+  where it stops.
+
+  updatePeriodMillis="0" — deliberately. These are three fixed buttons; there
+  is nothing to refresh, and a periodic update on a widget that never changes
+  is battery a clinic pays for and gets nothing back.
+
+  previewLayout shows the real thing in the picker on API 31+; previewImage is
+  the older fallback and has to be a drawable that exists, so it is the
+  launcher icon rather than a screenshot nobody will remember to regenerate.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="70dp"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:maxResizeWidth="360dp"
+    android:maxResizeHeight="180dp"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_homatt"
+    android:previewLayout="@layout/widget_homatt"
+    android:previewImage="@mipmap/ic_launcher"
+    android:description="@string/widget_description"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen" />

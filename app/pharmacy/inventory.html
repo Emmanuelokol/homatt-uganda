@@ -263,7 +263,21 @@ document.addEventListener('DOMContentLoaded', async () => {
   window._pharmSupa = supa;
 
   if (supa && _session.pharmacyId) {
-    await loadLive(supa, _session.pharmacyId);
+    try {
+      await Promise.race([
+        loadLive(supa, _session.pharmacyId),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 12000))
+      ]);
+    } catch(e) {
+      allInventory = MOCK_INVENTORY.map(i => ({
+        ...i,
+        drug_type: i.drug_type || 'otc',
+        category:  i.category  || '',
+        notes:     i.notes     || '',
+        is_available: i.is_available !== undefined ? i.is_available : true,
+      }));
+      renderInventory();
+    }
   } else {
     allInventory = MOCK_INVENTORY.map(i => ({
       ...i,

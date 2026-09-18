@@ -15,3 +15,3207 @@ If you intend to call multiple tools and there are no dependencies between the t
 ## Reduce Hallucinations
 
 Never speculate about code you have not opened. If the user references a specific file, you MUST read the file before answering. Make sure to investigate and read relevant files BEFORE answering questions about the codebase. Never make any claims about code before investigating unless you are certain of the correct answer - give grounded and hallucination-free answers.
+
+## Push Notifications
+
+**Provider:** OneSignal
+**Plugin:** `onesignal-cordova-plugin` v5 (Capacitor-compatible Cordova plugin)
+**Platform:** Android-first (FCM via OneSignal)
+
+### Credentials Storage
+| Secret | Location |
+|--------|----------|
+| OneSignal App ID | `android/app/src/main/res/values/strings.xml` (string `onesignal_app_id`) AND Supabase secret `ONESIGNAL_APP_ID` |
+| OneSignal REST API Key | Supabase secret `ONESIGNAL_REST_API_KEY` only — never in code |
+
+### GitHub Secrets Required
+Add at: **GitHub → Settings → Secrets and variables → Actions**
+- `ONESIGNAL_APP_ID` — OneSignal App ID
+- `ONESIGNAL_REST_API_KEY` — OneSignal REST API Key v2
+- `SUPABASE_ANON_KEY` — Supabase anon key (for calling Edge Functions from CI)
+
+### How to Trigger Notifications
+Always send via the Supabase Edge Function `send-notification` — never call OneSignal REST API directly from client code.
+
+```javascript
+const { data } = await supabase.functions.invoke('send-notification', {
+  body: {
+    userId: 'supabase-user-uuid',
+    title: 'Appointment Confirmed',
+    message: 'Your booking at Kampala Clinic is confirmed.',
+    data: { screen: 'appointment', id: 'booking-uuid' }
+  }
+});
+```
+
+### Navigation Payload Schema
+```json
+{ "screen": "appointment",    "id": "<booking_id>" }
+{ "screen": "prescription",   "id": "<prescription_id>" }
+{ "screen": "lab_result",     "id": "<booking_id>" }
+{ "screen": "shop_order",     "id": "<order_id>" }
+{ "screen": "medicine_order", "id": "<order_id>" }
+{ "screen": "dashboard" }
+```
+Screen → URL mapping lives in `app/js/onesignal.js` (`SCREEN_URLS`).
+
+### User Identity Linking
+- **On login:** `oneSignalLogin(supabase_user_id)` — called in `app/js/signin.js` after auth succeeds
+- **On logout:** `oneSignalLogout()` — called in `app/js/profile.js` before `supabase.auth.signOut()`
+
+### Key Files
+| File | Purpose |
+|------|---------|
+| `app/js/onesignal.js` | OneSignal init, login/logout helpers, notification tap handler |
+| `supabase/functions/send-notification/index.ts` | Edge Function — sends notifications via OneSignal REST API |
+| `.github/workflows/notify-test.yml` | Manual workflow to test end-to-end notification delivery |
+
+### Android Requirements
+- `google-services.json` from Firebase Console → place at `android/app/google-services.json`
+- Min SDK: 22 (set in `android/variables.gradle`)
+- `POST_NOTIFICATIONS` permission already declared in `AndroidManifest.xml`
+
+## Dictating the History and the Vitals
+
+**Provider:** Deepgram (`nova-2-medical`) first, OpenAI Whisper as the fallback,
+both called from a Supabase Edge Function
+**Scope:** who the patient is, the complaint, the story, the background and the
+four vitals boxes — never a diagnosis, never a medicine
+
+### Setup required
+| What | Where |
+|------|-------|
+| `DEEPGRAM_API_KEY` | Supabase secret — **never** in code or a message |
+| `OPENAI_API_KEY` | Supabase secret (already expected by `ai-proxy`); the fallback |
+| `RECORD_AUDIO` **and** `MODIFY_AUDIO_SETTINGS` | both declared in `android/app/src/main/AndroidManifest.xml` |
+| Edge Functions | deploy `supabase/functions/transcribe` and `supabase/functions/structure` |
+
+**Setting the key is not enough — the function has to exist.** The two are
+separate, and only one of them is visible in the Supabase dashboard's Secrets
+page. `DEEPGRAM_API_KEY` sat correctly in Secrets for days while `transcribe`
+had never been deployed at all, and the app could not say so: the gateway's 404
+for a missing function carries no CORS headers, so the browser refuses to show
+the reply to JavaScript and `fetch()` just rejects — identical, from inside the
+page, to having no signal.
+
+Both are now checked from **Settings → Dictation → Check now**, which says which
+of the two is missing. And the deploy workflow no longer has a hand-written list
+of functions: it deploys every directory under `supabase/functions/`, so a new
+one cannot be forgotten again.
+
+**Both** Android permissions are required, not just the obvious one. Capacitor's
+`BridgeWebChromeClient.onPermissionRequest` asks Android for `RECORD_AUDIO` and
+`MODIFY_AUDIO_SETTINGS` together when a page calls `getUserMedia`, and only lets
+recording start when both come back granted. A permission that is not declared
+can never be granted, so omitting `MODIFY_AUDIO_SETTINGS` makes the microphone
+work perfectly in a browser and fail silently in the APK. Nothing in the web
+code can detect or work around that.
+
+With neither key the button reports "Dictation is not set up on this server"
+rather than failing silently.
+
+### How it works
+The phone records a short clip and posts it to the `transcribe` Edge Function,
+which returns plain text. The key never reaches the phone — the same
+arrangement as `send-notification` and `ai-proxy`.
+
+`clinic-dictate.js` then does two things with that text, in this order:
+
+1. **Rules, on the phone, instantly.** They read the vitals, the name, the sex,
+   the age, and split the prose into complaint / story / background. Measured
+   over 30 realistic dictations: 30/30 with every word in the right box, 0 lost
+   (`measure-story.js`). This runs with no second round trip, so it is what the
+   clinician sees first.
+2. **`structure`, if a model key exists.** It may improve the split and name the
+   patient. It may not set a number, a diagnosis, a medicine or a fee — the
+   reply is filtered against a whitelist on the server *and* on the phone, and
+   a split that loses words is thrown away in favour of the rules.
+
+Everything captured is then listed in one panel at the top of the intake screen
+(`#itCheck`) for the clinician to confirm before proceeding. A field nobody
+filled is marked; tapping a tile opens the box it belongs to.
+
+### Where the button is, and why
+`#itSpeak` sits at the very top of the intake screen — **before** the patient's
+name — because that is the order it happens in. The clinician is holding a phone
+in one hand and a cuff in the other; asking them to type a name before they can
+say anything puts the slowest thing first. One sentence fills the name, the sex,
+the age, the complaint, the story and the background.
+
+### What is actually recorded
+The clip is labelled with what the phone **really** produced, not with a
+constant. `MediaRecorder.mimeType` decides it, because that label is what the
+Edge Function forwards to Deepgram as the `Content-Type` — a WebView that
+records MP4 and is announced as WebM asks the recogniser to decode a container
+that is not there. Opus-in-WebM is asked for first (best fit, smallest upload
+on mobile data) and the list falls back through ogg, mp4 and aac; a WebView with
+no `isTypeSupported` at all still records with whatever the phone picks.
+
+`getUserMedia` asks for mono, echo cancellation, noise suppression and gain
+control as **ideal**, never as required — a hard constraint a phone cannot meet
+fails the whole call with `OverconstrainedError`, and a noisier recording is
+enormously better than none. If the shape of the request is rejected outright,
+it asks again the plain way before giving up.
+
+`start(1000)` rather than `start()`: if the WebView is pushed out of the
+foreground mid-sentence, what was already said has been handed over instead of
+being lost with the recorder. `onerror` puts the button back and says so —
+without it the button stayed lit over a recorder that had already died.
+
+### Getting the words right, which is the whole point
+Accuracy is decided long before the recogniser sees anything. Five things in
+the capture chain were losing words, and four of them hurt a quiet speaker
+worst:
+
+- **The browser's noise suppressor was ON.** It is built for telephone calls,
+  not machine transcription, and it is a **gate**: it decides what is speech
+  and what is room, and removes the rest *before* the recogniser ever sees it.
+  A tired clinician half a metre from the phone at the end of a clinic is
+  exactly what it throws away. `noiseSuppression: false` and
+  `echoCancellation: false` now. A recogniser is trained on noisy audio; it
+  copes with a fan far better than with a sentence deleted before it arrived.
+  **Turning these back on "to clean the audio up" is the well-meant change that
+  would break dictation** — `test-speak-first.js` asserts they stay off.
+- **Automatic gain stays ON.** It lifts a quiet speaker, which is what we want.
+- **The sample rate was forced to 16 kHz**, making the phone resample from its
+  native 48 kHz with whatever resampler it had. Opus works at 48 kHz internally
+  regardless, so it cost quality and bought nothing. No longer constrained.
+- **The bitrate had no floor.** Some Android WebViews default mono Opus to a
+  call bitrate, and a heavily compressed quiet consonant is one the recogniser
+  has to guess at. `makeRecorder()` asks the recorder what it chose and rebuilds
+  it only if that is under 64 kbps — a floor, never a ceiling, so a phone that
+  already chose better is never dragged down.
+- **The recording stopped at 30 seconds, silently.** That limit was set when
+  the button only took a blood pressure; it now takes the name, sex, age,
+  complaint, story, denials, background and readings, and a clinician saying
+  all that at a natural pace runs past 30 seconds easily. Everything after the
+  cut was never recorded. Now 120 s for the story, 45 s for vitals — and when
+  it does fire, **it says so**, because a missing tail is otherwise invisible.
+
+### Making a quiet voice loud enough to hear
+Turning the gate off gives the recogniser the real signal. It does nothing
+about the real signal being too quiet, so the microphone is routed through
+`enhance()` before encoding — high-pass 85 Hz, compressor, makeup gain, and a
+limiter — and it is the conditioned audio that is sent.
+
+Measured through the real graph (`tests/measure-audio.js`):
+
+| speaker | raw RMS | conditioned | lift |
+|---|---|---|---|
+| very quiet | 0.0038 | 0.0483 | 12.6× |
+| quiet | 0.0115 | 0.1376 | 12.0× |
+| normal | 0.0383 | 0.2354 | 6.1× |
+| loud | 0.0958 | 0.2524 | 2.6× |
+
+A 25× spread of input arrives as a 5× spread; both quiet levels are rescued
+from under the 0.012 the app calls silence; nothing clips.
+
+**The limiter is not optional.** The first attempt used a makeup gain with no
+ceiling and drove *two of the four levels into clipping* — which is far worse
+for a recogniser than quietness, because it shatters exactly the consonants
+that tell "no" from "so". The measurement caught it; the settings were swept
+against it rather than guessed.
+
+The level meter still reads the **raw** microphone, not the conditioned signal,
+so "is it hearing anything" keeps answering for the microphone rather than for
+the gain, and the 0.012 silence threshold keeps its meaning.
+
+If the WebView has no `AudioContext`, or anything in the graph throws, the raw
+microphone is recorded exactly as before. A quiet dictation beats none.
+
+### Which model does the transcribing
+`DEEPGRAM_MODEL` (Supabase secret, default `nova-2-medical`). nova-2-medical is
+tuned for dictated American medical notes; what this app actually hears is
+Ugandan-accented conversational English in a noisy room, and which model wins on
+that is a question about real audio, not one to settle by argument. Set the
+secret to `nova-3` or `nova-2-general` and compare — no code change, no deploy.
+The keyword parameter follows the model (`keyterm` for nova-3, `keywords` for
+nova-2), so switching does not silently drop the Ugandan name boosting.
+
+### Showing that it is listening
+While the microphone is open, `#itDictateLive` shows a blinking dot, a row of
+bars, the elapsed time, and — in words — whether anything is being heard. A
+label alone looks identical on a working microphone and a dead one, and a
+clinician who cannot tell will talk into nothing and lose the whole
+consultation.
+
+Three things had to be right before the meter told the truth:
+
+- **`ctx.resume()`.** A new `AudioContext` starts *suspended* under the
+  autoplay policy, and a suspended analyser returns silence for ever. Every bar
+  sat flat on microphones that were working perfectly. This was the whole "it is
+  not hearing me" complaint, and it is one line.
+- **Only the speech band.** Averaging the whole spectrum across seven bars put
+  most of them in frequencies a human voice never reaches, so the right-hand
+  bars stayed dead however loudly anyone spoke. Bars now cover ~0–4 kHz.
+- **A logarithmic scale.** Loudness is logarithmic and a phone at arm's length
+  in a clinic is quiet; a linear `/140` left ordinary speech barely moving.
+
+The **decision** ("is it hearing anything?") comes from RMS on the time-domain
+data, not the bars — `_live.peak`, 0…1. Ordinary speech at arm's length measures
+0.05–0.3; below 0.012 is under a quiet room. After two and a half seconds of
+that the hint turns red and says so, while there is still time to do something
+about it, and a recording that never rose above it is refused with the likeliest
+cause named rather than sent off to be transcribed for money.
+
+That refusal is trusted **only when the meter actually ran** (`meterRan()`). On
+a WebView with no `AudioContext` the peak is zero because nothing measured it,
+and refusing every recording there would be a worse fault than the one it
+guards against.
+
+### The words, before they are filed
+After a consultation dictation, `#itHeardBox` shows the transcript **word for
+word in an editable box**, with *Use these words* and *Say it again*. Correcting
+a word clears the three prose boxes and re-runs the placement from the start, so
+a fix reaches every field it belongs in rather than one of them.
+
+This is the only defence against the fault nothing in the code can see: a
+recogniser that turns "no chest pain" into "chest pain" produces a sentence that
+reads perfectly well and means the opposite. A clinician reading it back can
+catch that; no amount of parsing can.
+
+### Two buttons, two vocabularies
+`transcribe` takes a `mode` of `vitals` or `story`, which chooses the vocabulary
+the recogniser is told to expect. Biasing a history toward vitals makes it hear
+numbers nobody said.
+
+| button (id) | `attach` mode | `transcribe` mode | fills |
+|-------------|---------------|-------------------|-------|
+| "Say who it is and what they came with" (`itDictateStory`, tab 1) | `consult` | `story` | name, sex, age, `itChief`, `itSubjective`, `itBackground` |
+| "Say the readings" (`itDictate`, tab 2) | `vitals` | `vitals` | `itSbp`, `itDbp`, `itTemp`, `itWeight`, `itPulse` |
+
+`attach(btnId, sayId, mode)` also accepts `story` — prose only, no name or sex —
+which is what tab 1 used before the two were joined into one dictation.
+
+### Knowing when the service is cut off
+An empty Deepgram account is not a glitch — it will not fix itself, and a
+clinician who reads it as a bad signal will keep trying all morning. So the
+faults are told apart and named:
+
+| kind | what it means | who can fix it |
+|------|---------------|----------------|
+| `unconfigured` | the Edge Function is not deployed, or is deployed with no key (503) | whoever set the project up |
+| `credit` | the account is out of money (402) | whoever pays the bill |
+| `auth` | the key is wrong, revoked or never set (401/403 from Deepgram) | whoever holds the key |
+| `signedout` | the caller's session expired (401/403 from Supabase) | the clinician, by signing in |
+| `busy` | rate limited (429) | wait a moment |
+| `server` | the function itself failed (5xx) | try later |
+| `unreachable` | no reply at all | the connection |
+| `mic-denied` / `mic-busy` / `mic-missing` | the phone's microphone | the clinician, in phone settings |
+
+The first row is the one that used to be invisible, and it is worth
+understanding why, because the same trap is waiting for the next Edge Function.
+
+A function that has never been deployed answers **404 from the Supabase gateway
+with no CORS headers on it**. The browser therefore refuses to hand the reply to
+JavaScript at all: `functions.invoke` comes back with a `FunctionsFetchError`
+that has no status, no body, nothing. From inside the page that is *identical*
+to having no signal — so the app said "could not reach the dictation service",
+and a clinic went looking at their internet while dictation had simply never
+been installed.
+
+`faultFrom()` now asks a second question when there is nothing to read: it
+fetches `${SUPABASE_URL}/auth/v1/health` with `mode: 'no-cors'`. The reply is
+opaque and unreadable, but whether the *promise* resolves still answers "can
+this phone reach Supabase at all?" — and that is the whole question. Server
+answering + function silent = not deployed. Nothing answering = the connection.
+
+Where a status IS readable it decides the message, and the gateway's own words
+("Requested function was not found") are never shown to a nurse.
+
+Two places show it:
+- **On the phone**, the message appears under the button, and the last fault is
+  kept in `localStorage` under `homatt_dictation_fault`.
+- **In the admin**, Settings → *Dictation* has a **Check now** button. It posts
+  `{ "probe": true }` to `transcribe`, which asks Deepgram whether the key is
+  live and what is left on the account **without sending any audio**, so it
+  costs nothing. Under $5 it warns while dictation still works; at zero it says
+  the account is empty. It also shows what this device last ran into.
+
+### Reading how people actually talk
+Clinicians do not dictate textbook sentences. Measured over 27 real phrasings —
+Ugandan English, half-finished clauses, "yeah" mid-sentence, the recogniser's
+own commas (`measure-speech.js`): **name 27/27, sex 27/27, age 27/27,
+complaint 27/27, 0 words lost, 0 diagnoses leaked into a field.**
+
+What made the difference:
+
+- **The name cue is a slot, not a phrase.** "Name of the person is Emmanuel
+  Opal" — the commonest opening of all — did not match `name is`, because of
+  the three words in the middle. Also handled: "Patient name Okello John" (no
+  verb), "We have Mukasa Peter here", "Am seeing Achieng Mary". Cue words that
+  get glued to the front of a capture ("this patient is **called** Grace") are
+  peeled off rather than making the name unusable, and trailing filler
+  ("Mukasa Peter **here**") is trimmed.
+- **Weak cues, anchored to the symptom vocabulary.** "with", "has", "having",
+  "feeling" are far too common to mark a complaint on their own — but "with a
+  rash" and "has fever" are exactly how one is said aloud. They are trusted
+  only when a **known symptom** follows immediately, so nothing that is not
+  already a symptom can be promoted into a complaint. That alone took the
+  complaint from 18/27 to 25/27.
+- **An optional article must be a whole word.** `(?:a|an|the)?` inside the cue
+  ate the "a" of "**a**bdominal", leaving "bdominal pain" — which is not a
+  symptom, so the complaint was silently dropped. `(?:(?:a|an|the)\s+)*` fixes
+  it. Worth remembering: an optional group with no boundary will eat the start
+  of the next word.
+- **Ages as they are said**: "he is 52", "she's 27", "the age is 45", "a young
+  man of 22", "a baby of six months". A bare number is still never an age —
+  it has to be a number a *person* is said to be, or it is how a temperature
+  becomes an age.
+
+### Ugandan names, which are the hardest part
+An English-trained recogniser faced with "Okello" or "Nakato" returns the
+nearest English word it knows — "Emmanuel **Opio**" came back as "Emmanuel
+**Opal**". Nothing in the audio can fix that, so there are three defences,
+in the order they apply:
+
+1. **Boosted at the recogniser.** `BOOST_NAMES` in `transcribe` feeds Deepgram
+   ~75 common Ugandan name stems (Luganda, Acholi/Lango, Iteso, Basoga,
+   Runyankole) as `keywords`, at a modest weight. Boosting raises the odds of a
+   word the model would otherwise rank below a common English one. Names that
+   are *also* English words — Grace, Mercy, Innocent, Gift, Patience — are
+   deliberately left out: they are already recognised, and boosting them would
+   make every "grace period" a patient. Story mode only; a vitals reading has
+   no names in it.
+2. **Spelt out, when it matters.** "The name is spelt O-K-E-L-L-O" — hyphenated
+   runs are joined on sight; space-separated letters are joined only after a
+   spelling cue, or "I am a" would become "Iama".
+3. **Matched against the clinic's own records, on the phone.** `closeNames()`
+   compares the heard name to the ~400 recent patient names already in memory
+   for the unpaid-visit check — no extra request, and nothing leaves the
+   device. A shared word plus one near-miss word (edit distance ≤ 2) is the
+   shape of a misheard surname, so "Emmanuel Opal" offers "Emmanuel Opio".
+   It **offers**; it never renames. A wrong auto-correct on a name is a record
+   about the wrong person, which is worse than a misspelling.
+
+`.it-how` on the intake screen tells the clinician the rest — say the word
+"name", say "male"/"female" rather than relying on he/she, give the age its
+unit, label every reading, keep the denials, and never say the disease.
+
+### The summary reads as a record, not a transcript
+Once the name, sex and age are in their own boxes, repeating them in the story
+is noise. `dropPersonBits()` removes a clause only when it is **nothing but**
+scaffolding, and keeps it the moment it contains a symptom or a denial — so the
+way it fails is by keeping too much, which is untidy and safe. The words are
+not lost: the transcript is shown verbatim in the correction box and again
+under "What was heard, word for word".
+
+*Say it again* is a **re-take**: it clears the three prose boxes first. Without
+that, a second attempt appended, and the story read "Name of the person is
+Emmanuel Paul.. Name of the person is Emmanuel Opal."
+
+### The rules it follows, and why
+- **Nothing spoken is ever lost.** In the story, every word ends up in the
+  complaint, the history or the background; anything ambiguous goes to the
+  history, where the clinician reads it back. A lost sentence is the fault that
+  matters in prose, because it looks exactly like a sentence that was never
+  said.
+- **The chief complaint is one thing.** It is only set when the box is empty;
+  "also complains of joint pain" on a second dictation joins the history.
+- **Vitals replace, prose appends.** A re-taken temperature overwrites the old
+  one; a second sentence adds to the story rather than wiping it.
+- **A value is taken only when the clinician said what it was** — a label
+  ("temp", "pulse") or an unambiguous unit ("kg", "mmHg"). A bare "38.5" fills
+  nothing. Guessing which box a number belongs to is how a temperature ends up
+  in the weight field.
+- **Every reading is range-checked** against what a human body can do, and one
+  outside it is reported rather than stored: "Ignored temp 385 — outside
+  30–45 °C".
+- **A model may only report a name it actually heard.** Asked to fill a form, a
+  model will oblige; a plausible Ugandan name on a consultation nobody named is
+  worse than an empty box, because it reads like a record. `saidAloud()` checks
+  every word of a suggested name against the transcript, on the phone and on
+  the server.
+- **A model never touches a number.** The vitals come from rules that cannot
+  hallucinate a temperature. `age` is the only number `structure` may return,
+  and it is bounded.
+- **Never a diagnosis, never a drug.** A misheard drug name becomes a
+  prescription, and no recogniser is good enough at "artemether/lumefantrine"
+  to be trusted with that.
+- **A dropped negation cannot be detected.** "no chest pain" heard as "chest
+  pain" reads perfectly well, means the opposite, and would feed the suggestion
+  engine. Nothing in the code can see it. The defence is that the transcript is
+  shown back word for word and the denials it *did* hear are listed to draw the
+  eye — read it before moving on.
+
+### Known limits
+- **It needs a connection.** The recogniser runs on Deepgram's servers, so
+  dictation is the one part of this app that does not work offline. The button
+  says so.
+- **Patient audio leaves the clinic.** That is inherent to the cloud provider
+  and was a deliberate choice; the on-device alternative (whisper.cpp) needs a
+  31–57 MB model, which is 3–6x the whole bundled clinical library, and runs at
+  1–3x realtime on a mid-range phone.
+- Cost is a fraction of a US cent per consultation on Deepgram's per-minute
+  rate; the Edge Function caps a clip at ~1 minute so a stuck microphone cannot
+  run up a bill.
+- **A key pasted into a chat is a burnt key.** Rotate it — and read the next
+  section first, because rotating it in the wrong place undoes itself.
+
+### Rotating the Deepgram key, and the trap in it
+**Supabase is not the only place the key lives.** Both deploy workflows carry
+it from GitHub:
+
+```
+keep DEEPGRAM_API_KEY "$DEEPGRAM_API_KEY"     # deploy-edge-function.yml:59
+supabase secrets set "${args[@]}" --project-ref "$SUPABASE_PROJECT_REF"
+```
+
+`keep` sets a secret only when the GitHub value is **non-empty**, and leaves
+the project's own value alone when it is empty. So:
+
+- If `DEEPGRAM_API_KEY` **is** in GitHub → Actions → Secrets, then setting a
+  new key in the Supabase dashboard works until the next push, and the next
+  push **silently puts the old, burnt key back**. Rotate it in **GitHub**.
+- If it is **not** in GitHub Secrets, Supabase is the only home and setting it
+  there is enough.
+
+Safe either way: set the new key in **both**, in this order.
+
+1. Deepgram dashboard → new API key. Do not delete the old one yet.
+2. GitHub → Settings → Secrets and variables → Actions → `DEEPGRAM_API_KEY`.
+3. `supabase secrets set DEEPGRAM_API_KEY=<new> --project-ref <ref>`, or push
+   anything so the deploy action carries it across.
+4. **Settings → Dictation → Check now**, and read the key tag (below).
+5. Only once the tag shows the NEW key: delete the old one in Deepgram.
+
+**How to see WHICH key is live.** "Dictation is working" reads identically for
+the burnt key and its replacement, which is what makes a half-finished rotation
+so easy to believe in. The probe now returns `keyTag()` — the last four
+characters and nothing else — and Settings shows it beside the provider. Four
+characters of a 40-character key name it without being usable; the key itself
+never leaves the Edge Function.
+
+### Key files
+| File | Purpose |
+|------|---------|
+| `app/clinic/js/clinic-dictate.js` | recording, the level meter, the parsers, filling the boxes, naming a fault |
+| `app/clinic/new-order.html` | `#itSpeak` at the top of the intake screen, and its styles |
+| `app/clinic/js/clinic-intake.js` | the "Check this" panel at the top of the intake screen |
+| `app/clinic/settings.html` | Settings → Dictation: the live "is it working?" check |
+| `supabase/functions/transcribe/index.ts` | holds the keys, calls Deepgram/Whisper, caps the clip, answers the probe |
+| `supabase/functions/structure/index.ts` | splits a transcript into fields; whitelisted server-side |
+
+## The floating microphone
+
+**File:** `app/clinic/js/clinic-speak.js` · **on:** dashboard, messages,
+settings, new-order · **settings:** Settings → *The floating microphone*
+
+A microphone button that follows the clinician around the app. Tap it anywhere,
+say who the patient is and what they came with, check the summary, tap a
+condition — and the treatment opens already filled in, at the one-tap package.
+
+### Why it floats
+The dictate button on the intake screen is the right place when you are already
+there. You usually are not: you are on the dashboard or in a patient's history
+when someone walks in. Four taps to reach a microphone are four taps during
+which you are not listening to them.
+
+### Why it is see-through
+It sits on top of screens people are reading. At rest it is faint enough to
+read a table through and solid enough to find; `--sp-rest` comes from the
+clinic's own setting (25–100%), and it goes **fully solid the moment it is
+recording** — that is the one instant a clinician must be able to see it is on.
+It can be moved to the other side or turned off entirely: a floating thing that
+cannot be got out of the way is a nuisance, not a feature.
+
+### One microphone path, not two
+It calls `HomattDictate.listen()` — the same recorder, the same format
+negotiation, the same level meter, the same fault messages as the intake
+screen. `useLiveElements()` points the meter at whichever screen is asking.
+Two separate implementations would drift, and the second one would be the one
+nobody measured.
+
+### What it costs
+The suggestion engine needs `impression_index.db` (786 KB) and the SQLite WASM
+— **not** the 4 MB guidelines book, which is only needed for the one-tap
+package on the treatment screen. Both are cached by the service worker
+cache-first, so a clinic pays for them the first time the widget is used and
+never again. Nothing is loaded on page open.
+
+### The handoff
+Everything crosses in `localStorage` under `homatt_speak_handoff`, never in the
+URL — a query string carrying a patient's name and complaint ends up in
+history, in a shared phone's address bar, and in any log in between. The intake
+screen consumes it exactly once, ignores anything older than ten minutes, and
+**fills empty boxes only**: a screen with a patient half entered is a different
+patient, and their words are not ours to overwrite.
+
+### What it is not allowed to do
+Exactly what the intake screen is not allowed to do. The conditions it lists
+are suggestions from the books, each with a match strength, the findings that
+point to it and the page it came from; the panel says *not a diagnosis, you
+decide*; none is preselected; and nothing is written anywhere until a person
+taps one.
+
+## Walking the journey, which is how these four were found
+
+`tests/test-journey.js` · by hand: `tests/probe-journey.js`
+
+Reading the code found none of these. Driving the real screens end to end —
+type a treatment, tap a suggestion, hand off from the widget, open the package
+— found all four in one pass, and they were all in the part of the journey no
+single file owns.
+
+### A lab test was ordered, and charged, with nothing on screen to show it
+Confirming a suggestion pushes the tests the book names into `state.labTests`,
+which is what gets **priced** and saved as `lab_tests_ordered`. It never called
+`window._wizRefreshAfterAutofill()`, so the tray stayed hidden, no chip lit and
+the lab fee did not move. The test was on the visit and on the bill, and the
+clinician had seen nothing happen. One line, and it is the kind of line that is
+invisible in review and obvious the moment you tap the button.
+
+### Changing your mind still charged for the diagnosis you discarded
+Tapping a second condition added its tests and left the first one's behind. A
+clinician comparing two suggestions silently accumulated billable tests.
+`_dxTests` now remembers what a *confirmed suggestion* put there — and only
+that, so a test the clinician ticked themselves, or one the package brought, is
+never taken away again.
+
+### A handoff could put two patients in one record
+"Fills empty boxes only" was written to protect a half-entered patient, and it
+does protect the boxes that are full. What it did not do is notice that the
+words belong to somebody else: with **Okello John** and **headache** already
+typed, a handoff for **Nakato Sarah** wrote her story, her temperature of 39.5
+and her diagnosis of malaria into the empty boxes. One record, two people, and
+nothing on screen to say so.
+
+The two are now told apart before anything is written — a name that disagrees,
+or a complaint that disagrees — and where they disagree a person decides:
+*clear this and use what was said*, or *keep what is on the screen*. The same
+patient half entered is not a disagreement, so the ordinary case still just
+fills the empty boxes.
+
+### A child's package printed the same warning three times, mid-sentence
+The "This is a child — nothing is ticked" block had been pasted into the
+unpriced-medicines sentence twice more, so a child whose clinician ticked an
+unpriced medicine read: *"2 ticked medicine"*, then a block saying nothing was
+ticked, then *"s are not priced in your stock, so"*, then the same block again.
+Three copies, a sentence cut in half mid-word, and the two halves contradicting
+each other — on the one screen where a dose is being decided for a child.
+
+### And one thing that was not a bug, but was still wrong
+"Pneumonia" is five sections in the book, three split by age: an infant up to
+2 months, a child of 2 months to 5 years, and children over 5 with adults. The
+app asks which — correctly, because only a person can choose — but it offered
+all five **unmarked**, while the age was already on the screen above. That is
+how the adult page gets opened for a three-year-old.
+
+The sections that fit the recorded age are now marked *for this age* and sorted
+first; ones that cannot apply are marked *not this age group*. Nothing is
+removed and nothing is chosen. The matcher is deliberately narrow — it reads a
+range only from titles that are talking about a **person's** age, so
+"Postpartum Examination of the Mother Up to 6 Weeks" (which counts weeks since
+delivery) is left alone rather than marked wrong for an adult woman.
+
+## Part payment, and the screen it actually belongs on
+
+`app/clinic/js/ucg-autofill.js` (`PAY_OPTS`, `#ucgPartWrap`) ·
+`app/clinic/new-order.html` (the fees card) · `tests/test-journey.js`
+
+**There are TWO payment rows in a treatment**, and this is worth knowing before
+changing either: the fees card on the wizard screen (`.pay-chips`), and the one
+inside the one-tap package panel (`#ucgPay`, built from `PAY_OPTS` in
+`ucg-autofill.js`). A clinician saving straight from the package never sees the
+first one. Changing only the wizard's row looks like nothing happened.
+
+"Pending" could only ever say the whole bill was unpaid, so a patient who hands
+over part of it left two untrue choices: **Paid**, and the clinic loses the
+debt; or **Pending**, and the clinic loses the money it is holding. Either way
+the whole amount went to the owing list.
+
+Both rows now offer **Part payment**. Tapping it opens a box for the figure and
+says, as it is typed:
+
+> Paid UGX 20,000 out of UGX 60,000 — UGX 40,000 still owing.
+
+**The amount decides the status, not the chip.** Nothing entered is still
+`pending`, part of it is `partial`, and entering the whole bill is simply
+`paid` — so a slip of the finger cannot record a bill as settled, and a clinic
+cannot lose a debt by mistapping. `'partial'` was already a valid
+`payment_status`; the migration that added `record_payment` added it too.
+
+## Why the installed app never changed
+
+`app/clinic/clinic-sw.js` · `tools/make_version_json.py` ·
+`tests/test-selfupdate.js` · Settings → *App version*
+
+A clinic reported seeing none of the work: "I have not seen any updates in
+clinic portal, do you want me to download the app every time I update?"
+
+They were right, and it was not a bug in any of it. `capacitor.config.json`
+has `"webDir": "app"` and **no `server.url`**, so the Android build bakes this
+entire folder into the APK. Inside it `self.registration.update()` re-fetches
+the worker from its OWN origin — the installed file — so it always finds
+itself. The web version at GitHub Pages updated on every push; the installed
+app could not change until somebody downloaded a new APK.
+
+### Why not simply point the app at the website
+Because `localStorage`, IndexedDB and the offline outbox of unsynced
+consultations are **per-origin**. Setting `server.url` moves the app from
+`https://localhost` to the Pages origin, and every consultation a clinic had
+recorded but not yet synced becomes invisible on the first launch. An update
+that silently strands a day of work is worse than no update.
+
+### What it does instead
+The worker fetches the newer build from where the web version lives and writes
+it into **this** origin's cache. The origin never changes, so nothing local
+moves. `version.json` (generated from clinic-sw.js, so it can never disagree
+with the worker beside it) names the build and lists its files; the 4 MB books
+are only sent when `dataVersion` says the book itself was rebuilt.
+
+It is staged: nothing is swapped in until every file has arrived, so a
+connection that dies half-way leaves the working app exactly as it was. The
+worst case is the one we already had — no update.
+
+### The four things that quietly undid it
+Every one of these was found by driving it, and each on its own was enough to
+put the old version straight back:
+
+- **`CACHE` cannot answer "what am I running?"** It is a constant inside the
+  worker, and the worker is part of the APK, so it reads v168 for ever no
+  matter what has been fetched over the top. The applied build is kept in
+  IndexedDB instead.
+- **The background revalidate.** Navigations refresh from the network — and
+  for an installed app "the network" is the old file inside the APK. It has to
+  be checked again when the fetch *completes*, not when it starts, because an
+  update can finish while the request is still in flight.
+- **The shell repair.** `ensureShellCached(cache, force)` re-fetches every
+  shell file to repair a damaged cache. Forced, it skips the cache check
+  entirely — and the page asks for it on load, so the update was being walked
+  back file by file on the very next page open.
+- **A worker woken for one request.** It has not run `activate`, so it does
+  not yet know the local origin is behind. Every path that can overwrite now
+  waits on the same promise before deciding.
+
+**The rule underneath all four: once an install has taken a newer build, its
+own origin is the stale one.** Anything that "refreshes from the network" has
+to know that, or it will helpfully restore the old app.
+
+### And a fifth, which was undoing the update about half the time
+`test-selfupdate.js` failed roughly one run in two, and had done since long
+before anybody noticed — a flaky test nobody had chased. It was not the test.
+**It was the mechanism, and it was the fourth fault above coming back through a
+door the fix had left open.**
+
+`_appliedBuild` is what `localIsStale()` reads, and it was assigned at the END
+of the swap — after the copy loop, after the STAGE delete, after `idbPutAll`
+had written every shell file into IndexedDB:
+
+```js
+for (…) await live.put(keys[i], hit.clone());   // the NEW build is live from here
+await caches.delete(STAGE);
+await idbPutAll(keys, live);                    // hundreds of ms
+_appliedBuild = manifest.cache;                 // …and the flag flips only here
+```
+
+For that whole window the live cache already held the new build while
+`localIsStale()` still answered **false**. A background revalidate completing
+inside it passed its guard — the guard that exists precisely to stop this — and
+wrote the local origin's old `dashboard.html` straight back over the new one.
+Caught by logging every `cache.put` with the staleness flag beside it:
+
+```
+PUT homatt-clinic-v186-incoming  …/dashboard.html  stale=false   ← new build staged
+PUT homatt-clinic-v186           …/dashboard.html  stale=false   ← old one written back
+```
+
+**The guard was never wrong; the flag it consults was set too late.** One
+worker, one event loop, so there is no lock to take — the fix is ordering:
+`_appliedBuild` is now set *before* anything becomes live. Nothing may go live
+while the worker still believes its own origin is current.
+
+Setting it early is safe in the only direction that matters: the flag **only
+ever suppresses** writing the local origin's copy into the cache. Believing
+"this install is ahead of its origin" a few hundred milliseconds early costs
+one skipped revalidation. Believing it late costs the update.
+
+Measured both ways, because ten green runs after a change is not evidence on a
+50% flake — the old ordering has to be shown to bring the failure back:
+
+| | failures |
+|---|---|
+| assignment after the swap (as shipped) | **4 of 6 runs** |
+| assignment before the swap | **0 of 10 runs** |
+
+**A flaky test guarding a delivery mechanism is not a flaky test until it is
+proven to be one.** This one had been dismissed as noise; what it was actually
+reporting is that a real clinic taking a real update could have it silently
+walked back, on the very next page they opened.
+
+### The header nobody had checked, and the test that hid it
+The mechanism rests on one thing that cannot be verified from a development
+machine: whether the host sends **`Access-Control-Allow-Origin`**. A worker on
+`https://localhost` reading another origin is a cross-origin fetch, and without
+that header the browser refuses to hand over the response — which arrives here
+as an ordinary network failure, **indistinguishable from having no signal**.
+
+`test-selfupdate.js` served its stand-in web host **with CORS switched on**, so
+it passed while proving nothing about the real one. Run the same test with the
+header off and both assertions fail:
+
+```
+FAIL  it finds the newer build and takes it   — reason: "no connection"
+FAIL  the app now serves the NEW build        — (old)
+```
+
+A test that only passes against a permissive mock proves less than it looks
+like it proves. The first stand-in is now served **deliberately unreadable**,
+and the update has to arrive anyway — from `UPDATE_SOURCES[1]`,
+`raw.githubusercontent.com`, which exists to be read by programs and says so in
+its headers. Each source is tried in turn for `version.json`, and every file of
+the build then comes from whichever one answered.
+
+### What this still costs, once
+The mechanism is in the worker, and the worker ships inside the APK — so it
+takes **one more APK install** to get it. After that one, the portal updates
+itself, and Settings → *App version* says which build it is running and lets
+somebody check on demand.
+
+### And the worker was never registered in the app at all
+`app/clinic/js/pwa-install.js` · `app/js/native-bridge.js` ·
+`tests/test-app-updates.js` · by hand: `tests/probe-selfupdate-reaches.js`
+
+> *"do I have to download the app for every update … it doesn't show me any
+> version"*
+
+Everything above is true of `clinic-sw.js` and every word of it was tested.
+None of it had ever run on a phone. `pwa-install.js` opened with:
+
+```js
+if (isNativeApp()) { …unregister every worker…; return; }
+```
+
+So inside the APK the clinic worker was never registered, and any worker found
+was actively removed — while `native-bridge.js` registered the **patient**
+app's root-scoped `../sw.js` from clinic pages, which then controlled them.
+A worker that knows nothing about clinic builds, has no `homatt-clinic` cache
+and cannot fetch a newer one.
+
+**A perfect test of a mechanism proves nothing about whether the mechanism is
+switched on.** `test-selfupdate.js` drives the worker directly — it constructs
+it, so it never asked who registers it.
+
+Measured, on the same commit, changing one thing:
+
+| | worker | `homatt-clinic` cache | the version line |
+|---|---|---|---|
+| the web version | registered (×2) | `homatt-clinic-v202` | **Version v202** |
+| the installed app | **none** | **none** | **Version v?** |
+
+That last cell is the report word for word, and it is why it survived: the web
+version answers correctly, and whoever checks a version complaint is on the web
+version. Put the early return back and the failure returns immediately — 0
+registrations, no cache, *"no offline cache"*.
+
+So **every assurance that one more install would make the screens update
+themselves was wrong**. As shipped, an installed clinic could only ever change
+by installing an APK. That is the honest answer to the question he actually
+asked, and it had been answered confidently in the other direction for rounds.
+
+**The old comment's objection was real and is answered rather than ignored:**
+*"a worker whose cache is empty can serve the placeholder INSTEAD of the
+bundled page."* The navigation path already falls through cache → IndexedDB →
+network before the placeholder, and inside the APK the network **is** the
+bundle, which cannot fail. But `netUpdate` was `Promise.resolve(null)` unless a
+revalidation happened to be due — so nothing cached *plus* a recent stamp went
+straight to "Setting up…" with the real page one fetch away. The network is now
+always tried when there is no cached copy. Answering the objection is what
+makes registering the worker safe, and the test asserts the placeholder never
+appears.
+
+**One worker per area.** A clinic page registered both `clinic-sw.js` and the
+patient `../sw.js`; the measurement showed **2 registrations** on the web
+version. `native-bridge.js` now leaves `/clinic/` to the worker that owns it.
+
+**And `v?` is the last answer, not the second.** Both of its sources came from
+the worker. `homattRunningBuild()` now falls back to `version.json` — which is
+generated *from* `clinic-sw.js` and ships beside it — so on a first launch,
+after a cleaner, or anywhere the worker has not started, the files can still
+say which build they are. A screen that cannot name its own version is a
+support conversation nobody can win.
+
+### Chrome refuses the file, and that is not a fault in the file
+> *"in the chrome, it wasn't downloading, think it was about the security
+> issue"* — and the same APK then downloaded perfectly in Firefox.
+
+Chrome blocks **every** `.apk`, however safe, because it did not come from the
+Play Store. *Download anyway* is deliberately small and often behind a `⋮`.
+Unexplained it reads as "the app is broken" or "this file is a virus", and a
+clinic stops there. `get.html` now names the exact words Chrome uses, says
+where the button hides, and names three browsers that simply do not ask.
+
+This is a **different fault from the one above it** on that page — a download
+that finished and looked busy — and they need different answers. Both are
+`<details>`, so they work on a page with no script at all.
+
+## Nobody had the app, including the person who wrote it
+
+`app/get.html` · `app/clinic/index.html` (who is offered the APK) ·
+`app/clinic/settings.html` (the address to send) · `tests/test-get-page.js`
+
+> *"the app on my phone that I downloaded from the link
+> .../homatt-uganda/clinic/ it show that is a web app, and yet it is on my
+> android phone, and that is the link I send to client."*
+
+That sentence explains four rounds of confusion at once. There was no APK. The
+link being shared was **the portal itself**, so every clinic that "installed"
+Homatt had added a web page to a home screen — which from the outside is
+indistinguishable from installing an app: an icon, a splash screen, no address
+bar. The widget was missing because a web page cannot have one. The card saying
+*"This is the web version"* was correct and read as an insult.
+
+### The offer was hidden from exactly the people who needed it
+The sign-in page has offered the Android app since long before any of this. Its
+test for "they already have it" was:
+
+```js
+var inApp = matchMedia('(display-mode: standalone)').matches || Capacitor…
+```
+
+**`display-mode: standalone` is true of any icon on a home screen.** So the one
+state in which somebody most needs to be told there is a real app — they think
+they installed it, they did not, and nothing on screen disagrees — was the one
+state that was told nothing at all. Only the Capacitor bridge answers "is this
+the installed app", because only the installed app has one.
+
+A home-screen web app is now offered the APK like any other browser, with the
+wording changed to say what they are actually holding. Put back to prove it:
+the old condition returns and three assertions fail.
+
+### One address, which is not either of the two that existed
+Neither existing link could be the one to send:
+
+| | why not |
+|---|---|
+| `…/clinic/` | it IS the web version — sending it is what caused this |
+| the `.apk` release URL | right for a phone, useless on a laptop, and alarming to somebody who has never been sent a file to install |
+
+`get.html` offers both, says which is which in plain words, and is
+**self-contained** — no stylesheet, no script, no font from anywhere. It is the
+page somebody opens on a bad connection in order to get the thing that works
+without one, so the test refuses every off-origin request rather than mocking
+it; a mock would let a font creep back in unnoticed.
+
+Settings names that address, beside the APK one and labelled as the different
+thing it is, because the person who sends it is the person signed in.
+
+### The APK address never needs replacing, and the test proves it is real
+Every push builds and replaces the file behind
+`releases/download/android-latest/HomattHealth.apk`, so the address is
+permanent and always the newest build. No — a refresh cannot *generate* an APK;
+the web screens update themselves over the air and the APK is built by CI, and
+those are two different mechanisms with two different lags.
+
+The expected URL in `test-get-page.js` is **read out of the build workflow** —
+its `tag_name` and the filename it renames the APK to — and the three places
+that carry it are compared against that. A test that repeats the constant
+cannot see the constant go stale, which is how `v151` survived two months.
+
+### "The download doesn't finish" — over a download that had finished
+
+A clinic photographed the Downloads screen: **12.75 MB / 12.75 MB**, with the
+browser still showing it as busy, and the file untapped. Measured against the
+published asset, that is **12,750,356 bytes — every byte of it**. Chrome does
+this with APKs: the transfer completes and the entry never flips to done.
+
+So the finished app sat in Downloads while the thing inside it was what they
+were waiting for. **Nothing was broken and nothing could have told them that.**
+
+What the measurement did and did not establish, because the difference matters:
+
+| established | not established |
+|---|---|
+| the asset is 12,750,356 bytes, and the phone had all of them | *why* Chrome did not finalise |
+| the link is a signed URL, valid ~1 hour | that the expiry had anything to do with it |
+| `Accept-Ranges: bytes` — a real stop resumes rather than restarting | — |
+
+I tried to reproduce an expired-signature failure by corrupting the signature
+and still got a `206`, so that theory is **unproven and not claimed**.
+
+The fix is therefore guidance, not code: `get.html` carries a folded panel
+saying that **the same number on both sides means finished**, where to go and
+tap it, and how that differs from a download that really did stop. The test is
+a fact anybody can read off their own screen — no published constant to go
+stale. It is `<details>`, so it opens on a page that has no script at all.
+
+`build-info.json` beside the APK now also carries `apkBytes` and `apkSha256`,
+so "is this file intact?" has an answer for whoever wants one.
+
+## The widget tap that landed on the last screen you were reading
+
+`app/clinic/js/clinic-open.js` · `tests/test-open.js` ·
+by hand: `tests/probe-widget-open.js`
+
+> *"when I tap on the icon on the widget, instead of taking me to the exact
+> feature, they just take me to the app itself, where I left off"*
+
+Reading the code offered four candidate causes and no way to choose between
+them. Driving the real dashboard picked two, and they are **different faults
+that produce the identical symptom** — either one alone reproduces the report:
+
+### 1. Five pages of seven could not answer at all
+`clinic-open.js` was loaded by `dashboard.html` and `new-order.html`. It is the
+file that registers the `appUrlOpen` listener — so on `settings.html`,
+`messages.html`, `guidelines.html` or the sign-in page, the intent arrived and
+there was nothing listening. The app came to the front showing what it was
+showing.
+
+Which is exactly where this clinic had been: checking *App version* and
+*Dictation* in Settings, going to the home screen, tapping the widget.
+
+`patients.html` still has no router, and the test asserts **why**: it is a
+21-line redirect stub, so it is never the page anybody is left on. An exemption
+nobody checks is how the next page quietly opts itself out.
+
+### 2. "Active" returned true and did nothing — on the dashboard too
+```
+go("active")  returned  {"returned":true}
+scrollY       0 -> 0
+listVisible   false
+```
+The dashboard lays its cards out on four **slides** — home, patients, money,
+stock — and opens on *home*. `#activeTreatmentsList` is on *patients*, so on
+arrival it is in the document and off the screen.
+
+The check was `if (!list) return false` — **does the element exist**. It does.
+So the retry loop succeeded on its first attempt, never ran again, and called
+`scrollIntoView` on a hidden element, which is a no-op that reports nothing.
+
+**Existence is not the question; being lookable-at is.** The predicate now
+requires `offsetParent !== null`, so it keeps waiting instead of declaring
+success at something invisible.
+
+### And giving up quietly was the third fault
+`whenReady` retried for eight seconds and then `return`ed. Silence is
+indistinguishable from a widget that was never wired up — a clinician stops
+using it and never says why. It now names what it could not open.
+
+### The feature shows itself
+> *"make at least the accessibility insanely simple, by when they tap on the
+> treatment that feature can just show itself, and they work on that without
+> leaving to the app"*
+
+The dashboard already had the answer: a full-screen section view
+(`svOverlay` + `_svRenderers`, used by Stock, Pending Payments and Conditions)
+with its own title, count and search. Active Treatments was simply never
+registered in it.
+
+`renderActiveTreatments()` gained three optional arguments — where to render,
+where to write the count, what to search for — so **one function** now serves
+the card and the overlay. Called with no arguments it behaves exactly as it
+always did, so every existing caller is untouched. Copying it is the mistake
+this project has paid for three times (the microphone, the dose table, the
+treatment screen), and the test proves there is one implementation by rendering
+the overlay's markup and comparing it to the card's, character for character.
+
+Measured: the overlay fills **412×915 of 412×915** — the feature, not a scroll
+position on a dashboard.
+
+### The condition every earlier test missed, and what it settled
+`tests/probe-widget-resume.js`
+
+The next report was **"quick sale is the only one that does right… active and
+new treatment take me to the home page"** — after the fix above had shipped.
+
+Quick sale working is the clue, because all three go through the same router:
+the link IS arriving and IS being parsed. So the difference is later, and the
+condition nothing had tested is the one that is always true of a widget tap —
+**the page was backgrounded**. A clinician on the home screen has, by
+definition, left the app; the WebView was hidden and it wakes in the same
+instant the intent is delivered. Every assertion up to here called `go()` on a
+page that was wide awake.
+
+Driven properly — hidden, wait past the wizard's 2,500 ms, fire `appUrlOpen`,
+wake — over three targets × three starting pages, **plus a cold start** through
+the real `app/index.html → clinic/index.html → dashboard.html` chain where only
+`getLaunchUrl` can recover the tap:
+
+| against | result |
+|---|---|
+| the build **inside his APK** | **14 failures**, matching the report line by line: Active lands on the dashboard and does not open, Settings loses all three, quick sale works everywhere else |
+| the build **on this branch** | **12 of 12 pass** |
+
+So the code was already right and the phone was on the older build. That is
+worth more than another fix: it is the difference between "this is broken" and
+"this has not arrived yet", and only driving the real condition could tell them
+apart.
+
+**The probe broke it itself first.** Its seed ran on every page load and called
+`sessionStorage.clear()` — which is exactly where the router parks the target
+across a navigation. The first run reported the cross-page cases failing on
+*both* builds. The instrument was wiping the thing it was measuring, on the
+very page that was supposed to act on it.
+
+### And then he said it again, so "you are on an old build" stopped being an answer
+
+> *"Active button only takes me to the home page, it should take me straight to
+> the active treatment section"*
+
+The same symptom, reported a second time, after the section above had concluded
+the code was already right. **A second report of a symptom you have explained
+away is evidence against the explanation**, so this time I went looking for a
+cause the harness could not see — and found two, both mine, both in the branch
+written in the round above.
+
+**1. Calling a function is not the same as it working.** I had written:
+
+```js
+root.openSectionView('active');
+return true;                      // ← success, reported without looking
+```
+
+`openSectionView` returns **silently** on three separate refusals — the role
+gate (`SV_CAPS`), a renderer it does not recognise, and a missing `#svOverlay`.
+On any of them the router announced success, the retry loop stopped, and the
+clinician was left on whatever screen they were already on with nothing said.
+
+That is the **identical** mistake to the one described twenty lines above —
+*"does the element exist"* instead of *"can it be seen"* — reintroduced one
+branch higher, in the same file, in the same round, by the person who had just
+fixed it. It now calls, then asks `sectionViewOpen()`, and falls through to the
+slide rather than claiming anything.
+
+**2. `show()` reroutes an empty slide to HOME, which is the report word for
+word.** The fallback path for a build whose dashboard has no full view is
+`showSlide('patients')`. A slide is marked `dataset.empty` when every card on
+it was hidden *at the moment the tabs were built*, and `show()` quietly sends a
+request for an empty slide to `visibleKeys()[0] || 'home'`. Ask for patients
+before the active list has loaded and you are not refused — **you are taken to
+the home slide**. `_refreshSlideTabs()` is now called first, so emptiness is
+re-judged against the DOM as it stands rather than as it was on page load.
+
+The test forces the first fault by moving the card out of the way and stubbing
+`openSectionView` to do nothing. Put the bug back and it reports exactly what
+the clinic did:
+
+```
+FAIL  a refused full view is not reported as success   {"called":1,"overlayOpen":false}
+FAIL  ...it keeps trying rather than stopping at the first call
+FAIL  ...and it finally says which thing it could not open   — null
+```
+
+### Tapped while signed out
+`go()` no longer navigates away from the sign-in page. Sending a signed-out
+clinician to `dashboard.html` only has the guard send them back, **consuming
+the target on the way** — the tap is lost and the round trip is invisible. It
+is remembered instead, so signing in lands on the thing they asked for.
+
+## The green at the top and the green at the bottom
+
+`app/clinic/js/clinic-chrome.js` · `--chrome` in `app/clinic/css/clinic.css` ·
+`android/…/HomattChromePlugin.java` · `app/js/native-bridge.js` ·
+`tests/test-chrome.js`
+
+> *"the green at the top and down even when I change the colour"*
+
+A clinic chose **Midnight blue** and photographed a green strip above the app
+and a green strip below it. Three separate things were putting it there and
+only one of them was in the page:
+
+| | where | reaches a phone |
+|---|---|---|
+| `StatusBar.setBackgroundColor({color:'#1B5E20'})` | `native-bridge.js`, every load of dashboard and settings | over the air |
+| `android:statusBarColor` / `android:navigationBarColor` = `colorPrimaryDark` | `res/values/styles.xml`, **compiled** | only a new APK |
+| `StatusBar.backgroundColor` | `capacitor.config.json`, a third copy | only a new APK |
+
+**The first one is why this survived being reported.** It runs in the
+*installed app only*. The page worked out the right colour, wrote it into
+`theme-color`, and a moment later that line put the green back — so the browser
+looked correct and the app did not, and whoever checks is usually on the wrong
+one of the two.
+
+And the colour the page *did* work out was a four-entry map copied into **five
+HTML files**:
+
+```js
+var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
+```
+
+Five copies of one fact is five chances for the next skin to reach four of
+them — the dose-table mistake and the microphone mistake for the third time.
+It is now `--chrome`, in `clinic.css`, beside the skin that owns it, read by
+one module.
+
+**`--chrome` is its own token and not `--grad-1`**, which happens to hold the
+same value today. `--grad-1` is "the dark end of the hero gradient"; the day
+somebody lightens that gradient the status bar would follow it without anybody
+asking. A fill handed to the operating system gets its own name.
+
+**The icon colour is computed, not stored.** Android takes a boolean, not a
+colour, so it is derived from `--chrome`'s own luminance — a pair that computes
+itself cannot drift. (The old code asked for `Style.LIGHT`, which in Capacitor
+means *dark* icons, on a near-black bar. It was wrong in the direction nobody
+notices, because Android drew white anyway.)
+
+### Half of it lands now and half needs an install, and saying so is the point
+- **the top bar** moves through `@capacitor/status-bar`, which every shipped
+  APK already carries — so it is fixed for phones in the field the moment the
+  pages update;
+- **the bottom bar** has no web API at all. `HomattChromePlugin` does it, and
+  Java only arrives with an install.
+
+`test-chrome.js` drives both: a fake bridge *with* the new plugin, and a fake
+bridge *without* it, because the second is what almost every phone is running.
+
+`MainActivity` applies the last colour from `SharedPreferences` before the
+WebView starts — otherwise every launch shows the compiled green for a second
+while the page boots, which is the reported bug in miniature.
+
+## Two ways the app could have gone backwards
+
+### An OLDER build was a valid update
+`app/clinic/clinic-sw.js` · `tests/test-selfupdate.js`
+
+The worker asked `if (manifest.cache === running)` — **different**, not
+**newer**. gh-pages is published with `force_orphan` from whichever branch
+pushed last, and this repository has a `main` hundreds of commits behind whose
+`capacitor.config.json` points the app at another server entirely. One push to
+it republishes that folder, and every installed app would read the lower
+`version.json`, find it different, and swap a working clinic for a build from
+months ago — no flowsheet, no widget, no corrections.
+
+Reported as a **successful update**. Nothing on any screen, and it would repeat
+every six hours.
+
+Demonstrated rather than argued: run `test-selfupdate.js` against the old
+worker and the last assertion reads *"still serving ANCIENT"*. A number that
+goes down is never an update; it is refused, by name, and the app keeps
+working. Both CI publishers now refuse the same way, so the guard exists on the
+phone **and** before the file is put there — the first one only protects phones
+that already took the build containing it.
+
+### An apostrophe in a comment stopped every update in the country
+`tools/make_version_json.py`
+
+`version.json` is generated by scanning the `SHELL` array for quoted strings —
+over the comments as well. One comment reading *"the phone's own bars"* was
+read as the start of a string, and the generator listed
+
+```
+"s own status and navigation bars. In SHELL because a page that"
+```
+
+as a file of the build, while silently swallowing the real entry beside it.
+An installed app fetches every entry and throws the **whole** staged build away
+on the first failure, reporting *"the connection dropped part-way"* — for ever,
+on every phone, while the connection was fine.
+
+Comments are stripped now. **The guard that matters more is the other one:**
+every listed file must exist on disk or the generator refuses to write and
+names them. That catches all the ways of producing a bad list, not just this
+one. (It also turned up a pre-existing harmless duplicate: `scope './'` in
+another comment had been adding a second `"./"` for months.)
+
+*A generator that writes a broken manifest and exits 0 has done the most
+damaging thing available to it.*
+
+## Which build is this, exactly
+
+`homattAppInfo()` in `app/clinic/js/clinic.js` · Settings → *App version*
+
+> *"You have given me an old apk, it doesn't have the updates."*
+
+Nothing on any screen could settle that in either direction. The version line
+said `homatt-clinic-v199` — the **web** build, which updates itself over the
+air and therefore says almost nothing about which APK somebody is holding. And
+the APK is what carries the widget, the bar colours and the camera.
+
+Three questions, three answers, printed separately:
+
+| | from | why it matters |
+|---|---|---|
+| is this the Android app at all? | the Capacitor bridge | an icon on a home screen is **not** an install |
+| which APK? | `App.getInfo()` → versionCode, which CI sets to the **GitHub run number** | names one run, one commit, one moment — "build 578" is checkable, "the latest one" is not |
+| which screens? | the existing build lookup, plus whether it arrived over the air | the two move separately, and that is the fact nobody had |
+
+The release body carries the same run number, branch and commit, and
+`build-info.json` is published beside the APK — so a photograph of a phone can
+be turned into a commit by anybody.
+
+The side-menu line now says **"home screen"** rather than "installed" for a
+web app added to a home screen. It exists to be photographed and sent; it has
+to tell the two apart.
+
+## Every word, in every colour
+
+`tests/measure-contrast.js` (the survey) · `tests/test-readable.js` (the guard)
+· `tools/tokenise_colours.py` (the sweep)
+
+Four skins × two themes is **eight** combinations. A colour written as a
+literal instead of a token is readable in the one the author was looking at and
+invisible in the other seven, and no amount of looking finds that. A number
+does:
+
+| | unreadable text |
+|---|---|
+| the treatment screen, before | **49** |
+| all six screens, after | **0** of 4,632 measured |
+
+Worst offenders: *"Total charged"* at **1.06:1**, *"Clinic stock"* at
+**1.01:1**, *"Drug 1"* and the dictate icon at **1.46:1**.
+
+### The sweep, and why it is safe
+`tools/tokenise_colours.py` made **388** replacements. It is safe by
+construction: every literal it replaces is EXACTLY the light-mode value of the
+token replacing it (`--text` is #1A1A1A, `--text-lt` is #5F6368, `--border` is
+#E0E0E0, `--surface` is #FFFFFF), so light mode renders identically and only
+dark mode changes. It skips rules already scoped to `[data-theme="dark"]`,
+skips `--token:` definitions, skips the service worker's self-contained offline
+page (which never loads clinic.css, so a token there would resolve to nothing),
+and writes fallbacks — `var(--text-lt, #5F6368)` — so a missing token can never
+blank a colour.
+
+### The screen the sweep could not see, which was the one being complained about
+"0 unreadable" was true of the **pages** and said nothing about the screen a
+clinician actually photographed. The one-tap package panel's stylesheet is
+**injected by `ucg-autofill.js` at runtime**, and the panel only exists while
+it is open — so a page sweep walks straight past it. Measured properly
+(`tests/measure-panel-contrast.js`, six skin/theme combinations, 1,542
+elements): **36 unreadable, three of them at 1:1** — literally invisible:
+
+| what | ratio | which is |
+|---|---|---|
+| `.ucg-chip` "Malaria RDT" | **1:1** | the empty dark pills in the photograph |
+| `.ucg-paychip.on` "⏳ Pending" | **1:1** | the chip showing only its emoji |
+
+`--brand-tint` is a background and `--brand-ink` is the text that goes on it —
+defined as a pair, per skin. Both chips used **`--primary-d`**, a darker *fill*
+variant, which in the "dark" skin is the same value as `--brand-tint`. Dark
+grey on dark grey.
+
+**And a specificity bug hiding behind it.** `.ucg-drug .nm span` is (0,2,1) and
+beats `.ucg-rank.r-first` (0,2,0), so a generic grey won over *every* rank and
+stock colour — FIRST LINE, ALTERNATIVE and "not in your stock" all came out the
+same faint grey whatever they were meant to be, and no amount of correcting the
+colours would have shown until the selector was fixed. Now `span.ucg-rank.…`,
+which ties the specificity and wins on order.
+
+`test-readable.js` opens the panel and measures inside it, so this screen can
+never drift back out of view again.
+
+### Four faults a sweep cannot see, found by measuring
+- **`--primary` used as a WORD.** In the "dark" skin `--primary` is `#2C3035`,
+  a near-black chrome fill, and 53 places used it as a text colour — 1.46:1 on
+  that skin's own near-black surface. **`--primary-ink`** now carries "the brand
+  colour as text" and follows `--deep-ink` in dark mode, which every skin
+  already defines.
+- **White on a `--primary` fill.** `--on-primary` exists for exactly this and
+  flips to black in dark mode; 32 places hardcoded `#fff` and sat at 3.3:1.
+- **`--deep` is not `--primary`.** It stays dark in midnight, dark and clay,
+  but the forest dark theme redefines it to a *light* green — so neither white
+  nor black clears the bar on all four. **`--on-deep`** is defined beside it,
+  per skin.
+- **`--info` and `--danger` as words.** Fill colours again: `#1565C0` is 2.97:1
+  and `#D32F2F` 3.81:1 on a dark card. `--info-ink` joins the `--danger-ink` /
+  `--warning-ink` that were already there.
+
+**The rule worth keeping: a fill colour and the text that sits on it must be
+defined as a PAIR, in the same place, for every skin.** Every failure above is
+the same mistake — a fill token borrowed for words, or a word colour written
+next to a fill that changes underneath it.
+
+## Staying signed in
+
+`app/clinic/js/clinic.js` · `tests/test-signin-sticks.js`
+
+Clinics were being put back on the sign-in page in the middle of a working day,
+on phones that had never signed out.
+
+**What I could and could not prove.** I have NOT reproduced the exact symptom
+from here — `test-signin-sticks.js` drives the real Supabase library with only
+the network mocked, and the old code passes every case in it. So what follows
+is a set of faults that are real in the code and would each produce that
+symptom, not a demonstrated cure. If it happens again, the app now says why
+(below), and that answer is worth more than another guess.
+
+### getSession() gives the same answer to two different questions
+`supabase.auth.getSession()` returns `{ session: null }` **without throwing**
+both when there is no sign-in at all and when there is a perfectly good refresh
+token it could not reach the server to exchange. The guard read that null as
+"this localStorage was faked", deleted the session and redirected — so the
+`catch()` branch commented "Network error — allow offline access" could never
+run, because nothing had been thrown.
+
+"You are not signed in" and "I could not check right now" must not have the
+same consequence: one is a security measure, the other is a clinician losing
+the patient in front of them. The guard now asks, in order — is there a session
+(yes: only a *different user* is grounds to leave); is there a stored sign-in at
+all (no: genuinely out); is the phone offline (yes: stay, the whole app is
+built to work without a connection); and only then asks the server, where only
+an explicit refusal counts.
+
+### A refresh token is used ONCE, and this app opens several pages
+Each page makes its own Supabase client. Two renewing in the same moment means
+the slower one is told **"Invalid Refresh Token: Already Used"** for a token
+that was good a second earlier. That is indistinguishable, at the call site,
+from a real expiry. So a refusal is now re-checked once after a short pause: if
+another page has since written a fresh session to the same storage, it was a
+race and nobody is disturbed.
+
+### A timer does not run in a suspended WebView
+The library renews on a timer. Android suspends the WebView, so a phone that
+spent the morning in a pocket wakes holding an expired token and the first
+thing the clinician taps is what discovers it. `_keepSignedIn()` renews when
+the app returns to the front, when focus comes back, and when the connection
+returns — five minutes before expiry rather than after, and never as grounds
+for signing anybody out.
+
+### And when it does happen, the app says why
+"It logs me out sometimes" is not something anybody can chase. Every exit now
+goes through `_signOutBecause()`, which records the reason, the time and
+whether the phone had a connection; the sign-in page reads it back — *"You were
+asked to sign in again 3 minutes ago because the server refused the saved
+sign-in. The phone had no connection at the time."* The next report will name
+the cause instead of describing the symptom.
+
+## How a suggestion is worked out
+
+`app/clinic/js/clinic-impression.js` · benchmark: `tests/measure-impression.js`
+· rules and the negation scoper: `tests/test-guards.js` · before/after by hand:
+`tests/probe-guards.js`
+
+**Everything the clinician recorded feeds it** — the complaint, the readings,
+the story and the background — and the readings are turned into the words the
+books actually use (`temp 40.2` → `hyperpyrexia`, `fever`; `pulse 130` →
+`tachycardia`). Scoring is BM25 over 729 documents, so a rare word counts for
+far more than a common one, and no field is privileged once its words are in.
+
+### The term budget, which is where the order matters
+Only **22 search terms** are used. More is both slower and noisier: every extra
+common word dilutes the ones that discriminate. So which 22 is a real decision.
+
+The complaint and the vitals go in whole — together rarely more than eight
+words, and the two things the clinician is surest of. What is left used to go
+to the story until it ran out, and only then to the background. Measured on
+four realistic dictations (`tests/measure-terms.js`), that meant:
+
+| dictation | background terms reaching the engine |
+|---|---|
+| short | 1/1 |
+| ordinary | 2/2 |
+| **wordy** | **0/11** ← "known peptic ulcer disease" never arrived |
+| **very wordy** | **3/10** |
+
+A wordy story ate the whole budget. The remainder is now **shared**: the
+background is offered a third of what is left, and whatever either does not use
+goes to the other. Same four dictations: 1/1, 2/2, **7/11**, **7/10** — and the
+wordy abdominal-pain case now returns **Peptic Ulcer Disease** first instead of
+"Worms".
+
+The WHO differential benchmark is unchanged by the sharing at **239/241 in the
+top 3 (99.2%)**, which is the point of having it: it proves the change did not
+cost anything elsewhere.
+
+### A denial used to count as evidence FOR the thing denied
+This was the worst fault in the engine and nothing in the interface could show
+it. `toks()` drops "no" (the regex is `[a-z]{3,}`) and "not"/"without" (STOP),
+so **"no rigidity, no guarding, no rebound" reached the scorer as the terms
+`rigidity`, `guard`, `rebound`** — three rare, high-IDF words. Measured:
+
+| what the clinician wrote | Peritonitis |
+|---|---|
+| "no rigidity, no guarding, no rebound tenderness" | **79%, first** |
+| "rigidity, guarding and rebound tenderness" | 57%, fifth |
+
+Writing down a careful **negative** examination made the emergency look *more*
+likely than writing down a positive one. Every denial in the record did this,
+not only these three.
+
+`denials()` is a small NegEx over the query: find a cue (no, not, denies,
+denied, without, never, nil, none, nothing, negative for, free of), read
+forward a bounded window, stop at the first thing that closes it. What closes
+it is where the accuracy lives:
+
+- **Punctuation, and the next cue.** "No rigidity, no guarding" is two denials,
+  not one running one.
+- **A new clause** — but/however/except, and any verb that starts one
+  (has, is, complains, says, noted, present). "No vomiting **but has**
+  diarrhoea" keeps the diarrhoea.
+- **…except an auxiliary sitting directly on the cue**, because "never **had**
+  convulsions" is one denial and "no vomiting **and has** diarrhoea" is not.
+- **A determiner after a conjunction**: "no fever **and the** mother says…"
+  ends the list of denied things. Without this the window ate "mother".
+- **A word said plainly somewhere else is not denied.** "Pain in the lower
+  abdomen, no pain on passing urine" must not lose the word "pain". So the
+  tokens dropped are the denied ones *minus everything affirmed anywhere*.
+
+It fails by **under-negating** — a comma ends the scope, so "no fever, cough or
+vomiting" only drops the fever. That is the safe direction: leaving a word in
+is the noise we already had, while over-negating deletes findings that were
+never denied.
+
+It runs on the **query only**. The books are indexed exactly as they were
+written, because "in the absence of peritonitis there is no rigidity/rebound
+tenderness" is Acute Pancreatitis describing *itself*, and rewriting the book
+to suit a phone would be a far larger and worse change.
+
+`_denials()` is exported so `test-guards.js` can test it directly, including
+hostile input: a cue with nothing after it ("abdominal pain, no") used to be
+able to reset the scan to zero and **loop for ever**, which on a phone is a
+frozen screen. It is now word-indexed and the index only moves forward.
+
+### The rigidity guard
+When rigidity or guarding is recorded **absent**, peritonitis and appendicitis
+are put below 10% and out of the three the clinician reads. The screen names
+them, quotes the words that did it, and says a soft belly does not rule a
+surgical abdomen out.
+
+**Which conditions.** An explicit list of `title_normalized` values, never a
+text match — searching the documents for "peritonitis" or "rebound" catches
+Typhoid Fever, Ectopic Pregnancy, PID, Acute Pancreatitis and Peptic Ulcer
+Disease, because each describes peritonitis as a complication of *itself*. A
+text-matching rule would suppress the ruptured ectopic in the same breath as
+the peritonitis.
+
+The list started at six and was cut to **three** — peritonitis, appendicitis,
+acute appendicitis. What came off matters more than what stayed, and each has
+a test:
+
+| taken off | because |
+|---|---|
+| ectopic pregnancy | an **unruptured** one has a soft abdomen, and that is the only window in which she can still be saved cheaply |
+| intestinal obstruction | distended, tympanitic and soft until it strangulates; the book names no peritoneal sign |
+| intussusception | in a screaming infant guarding cannot be assessed at all, so "no guarding" is usually an artefact |
+| acute pancreatitis | the book says, in as many words, "in the absence of peritonitis there is no rigidity/rebound tenderness" |
+| spontaneous bacterial peritonitis | carries the word, is not a surgical abdomen, has a soft belly by rule |
+
+**When the guard must NOT fire.** A soft belly is not a safe belly, and this is
+the part that keeps the rule from killing someone. Peritonitis is present
+without rigidity in advanced HIV, in the elderly, in the malnourished, on
+steroids — and, the lethal one, in **late decompensated disease, where the
+abdomen goes from rigid to flaccid as the patient deteriorates**. At the point
+of maximum danger the guarding is gone. Late presentation is the Ugandan norm.
+
+Nor can any parser tell "examined, and it was soft" from "not examined" from
+"could not assess". The string is identical.
+
+So the demotion is suspended, with a red note saying why, on any of:
+under five · systolic < 100 · **shock index** (pulse ÷ systolic ≥ 0.9, which
+catches the compensating 22-year-old at 110/115 that neither "pulse over 120"
+nor "systolic under 90" can see) · pulse ≥ 120 · pulse pressure ≤ 25 ·
+temperature < 36 (hypothermia in a belly is late sepsis, and must read as
+*more* dangerous than fever) · or the record itself saying board-like abdomen,
+rebound, distension, bilious vomiting, HIV, a previous laparotomy, a missed
+period, collapse — or **"not passing stool or flatus"**, **"absent bowel
+sounds"**, which are checked against the text **as written** rather than the
+denial-stripped text, because those danger signs are *phrased* as negatives and
+stripping them would delete the finding along with the reassurance.
+
+### Reproductive priority
+A woman with lower-quadrant pain plus vaginal discharge or pain on passing
+urine is grouped toward the gynaecological and urinary causes, and the bowel
+parasites are left out unless the bowel is part of the story.
+
+**Ectopic pregnancy is deliberately in the RAISED list.** It shares the trigger
+exactly — sexually active woman, lower abdominal pain, spotting, urinary
+frequency — and treating a discharge as evidence *for* PID and therefore
+*against* ectopic is the classic fatal error. The screen asks, every time the
+rule fires: has she missed a period, is the pain worse on the right, is the
+temperature over 38 — ectopic, appendicitis, malaria.
+
+**Schistosomiasis is in the raised list, not the parasite list**, and this is
+the single most important entry on either. Its own UCG text (p.161) reads *"In
+females: low abdominal pain and abnormal vaginal discharge"* and *"Frequent and
+painful micturition"* — this rule's trigger, word for word, produced by a worm,
+endemic around Victoria, Albert and the Nile. Filed as a parasite it would have
+been hidden by the very presentation that should raise it, PID antibiotics
+would do nothing, and untreated female genital schistosomiasis raises HIV risk.
+
+**Getting the parasites back** takes more than diarrhoea. Amoebiasis has five
+presentations in the book and only one is dysentery: a liver abscess is right
+sub-costal pain, fever, chills and weight loss with **no diarrhoea at all**,
+and an amoeboma is a mass with constipation. So the suppression is lifted by
+diarrhoea or dysentery *or* by tenesmus, worms seen, right sub-costal or liver
+pain, weight loss, night sweats, a mass, or constipation. Suppression keyed on
+the absence of a symptom must never be applied to a condition whose worst form
+does not have that symptom.
+
+Pinworm is **not** on the parasite list either — in a girl it causes
+vulvovaginitis and dysuria, so it is a real answer to this presentation.
+
+**What must not trigger it**, each with a test: a man; upper or epigastric
+pain; an ear, eye, nose or wound discharge; "discharged from hospital"; a
+*denied* discharge; and — the trap — a child with **chest in-drawing**, because
+`SAY_AS` rewrites that to "lower chest **wall** indrawing" and a rule that
+tested for "lower" plus "pain" would fire on a paediatric pneumonia. The site
+word is always required to be an abdominal one.
+
+`SAY_AS` also rewrites "passing urine" → "urination" **before** "pain(ful)
+urin\*" → "dysuria", so "pain when passing urine" arrives as "pain when
+urination" and never becomes dysuria on its own. The dysuria predicate has to
+catch that itself, and it is the commonest way a patient says it.
+
+### When there is almost nothing to go on
+The percentage is worked out against the rest of the list, not against the
+disease, so **the top suggestion always carries a big-looking number**. That
+was survivable while a denial padded the query out; now that denials are
+removed, a careful negative examination can leave two words standing —
+"abdominal pain" — and two generic words return a confident-looking list of
+nonsense. Under four search terms the screen now says so and prints the words
+it actually used.
+
+Two words were also added to `STOP` on the same measurement: **`present`**
+("bowel sounds present" is not a finding to search on) and the **number words
+one…ten** (the engine has no sense of time, so "for two days" is pure noise).
+Both are neutral on the WHO benchmark at 239/241 and both improve the thin
+queries the negation scoper now produces.
+
+### What it does NOT do
+It has no sense of **time**. "Fever for two days" and "fever for two months"
+score the same, though they are different diseases. Duration is in the story
+the clinician reads, but it is not weighed. The same goes for the order events
+happened in — "vomiting then headache" and "headache then vomiting" are the
+same bag of words to it. Worth knowing before trusting the ordering of the
+list, and worth doing one day.
+
+## The clinician portal
+
+`app/clinic/clinician/` · `supabase/migrations/20260911_clinician_portal.sql` ·
+`tests/test-clinician.js`, `tests/test-clinic-clinicians.js`,
+`tests/test-clinician-gating.js` · SQL: `tests/run-sql.sh`
+
+A clinician is a person, not a seat at one clinic. They sign up once, hold
+their own profile and their own work record, and attach **temporarily** to a
+clinic by scanning its QR code.
+
+### The one rule the whole design exists to keep
+**Patient identity never travels with the clinician.** `clinician_activity` —
+the table that follows somebody from clinic to clinic — has no patient name, no
+phone, no patient id, and *no column that could hold one*. It records that
+Malaria was treated, at which clinic, on which day. That is a professional
+record. A list of the people somebody treated is a medical record, and it
+belongs to the clinic that made it.
+
+This is structural, not a policy: there is nothing to leak, and the change to
+stop in review is the one that adds a column. The owner *can* see who a
+clinician treated — through `clinic_clinician_detail()`, reading the clinic's
+own `clinic_diagnoses`, inside their own clinic only.
+
+### Where the clinical work happens — not here
+Once attached, the clinician is sent into the **ordinary clinic portal**: the
+same intake screen, the same suggestion engine, the same treatment wizard, the
+same offline outbox, carrying `staffRole: 'visiting_clinician'`. A second copy
+of the treatment screen would be a second thing to keep correct, and the second
+one is always the one nobody measured. The clinician portal is three screens —
+sign up, your own record, and joining a clinic.
+
+### Why it lives inside `/clinic/`
+`clinic-sw.js` registers with scope `'./'`, so it can only intercept, serve,
+cache and self-update files under `/clinic/`. At `/clinician/` these pages
+would have loaded from whatever shipped in the APK and could **never change** —
+the exact fault the self-update mechanism exists to fix. They are in `SHELL`.
+
+### The handshake
+| | the CODE | the ACCESS it grants |
+|---|---|---|
+| how long | 24 hours | whatever the owner chose (1 day – 1 year) |
+| why | a photograph of the screen is worthless next week | a month's work should not need a new code every morning |
+
+Eight characters, no `0 O 1 I L` because it gets read off a screen and typed by
+somebody whose camera would not focus. Single-use by default. A wrong code and
+a spent code return the **identical sentence**, so guessing tells an attacker
+nothing about which clinics exist.
+
+Scanning uses `BarcodeDetector`, which is already in the Android WebView — no
+library, no download. Where it is missing the typed code is the route, which is
+why typing has its own heading and its own card rather than being a fallback
+bolted on the end.
+
+### What a visiting clinician cannot reach
+Cut: the money, the payments ledger, quick sale, restock and adding stock, the
+monthly reports, settings. Kept: treatments, patient history, bookings,
+medicines — and the stock **list**, read-only (`stockview`). Whether the
+amoxicillin is on the shelf is a clinical question; what it cost is not.
+
+**The money leaves the record, not only the screen.** The fees card is hidden,
+so every fee would be whatever the form defaulted to — and a default is not a
+price anybody agreed to. Left alone it goes on the clinic's books as a real
+charge against a real patient, set by somebody who never saw the number. The
+wizard zeroes every money field when `!clinicCan('payments')`. Hiding the card
+alone would have been the bug.
+
+`clinicRole()`'s fail-safe hands out FULL access when the role is missing, which
+is right for a clinic's own staff and exactly wrong for a guest — so it is
+inverted when the session says `clinician: true`.
+
+### Sub-account creation is gone, from both portals
+It made an account that belonged to the clinic: the clinic chose the email, set
+the password, and who treated whom was a name typed into a box. Somebody who
+worked at three clinics had three logins and no history of their own, and a
+clinic that let one go still held their password. Joining is the QR code now.
+The list of existing logins stays, and `create_staff_account` is left in the
+database, so nothing already working breaks — but nothing calls it.
+
+### The SQL is tested against a real Postgres
+`./tests/run-sql.sh` starts one, applies the migrations, applies this one twice
+to check the idempotency every migration here claims, and drives it: sign up
+with no clinic, be refused a code as a clinician, mint one as the owner, scan
+it, treat two people, read the log back, end the job, carry the rating to the
+next clinic. **51 checks.** The browser tests mock the network and never reach
+a database, so nothing they do could check an RLS policy, a security-definer
+RPC or a trigger — and this feature's whole security model is those three
+things.
+
+The walls are checked by reading the tables **directly**, not through the RPCs:
+those are `security definer` and so never see RLS at all.
+
+### Logging is a trigger, not a client call
+`trg_log_clinician_activity` on `clinic_diagnoses`. A log the phone is asked to
+write is missing exactly when it matters — the consultation replayed from the
+offline outbox, the one the app crashed after, the screen somebody adds next
+year and forgets to wire up. The row goes in beside the treatment or not at
+all, and a failure to log can never cost a clinic the consultation it was
+logging.
+
+### The QR encoder, and why it is written out
+`app/clinic/clinician/js/qr.js` · `tests/measure-qr.js`
+
+The code is shown to somebody standing in the room, which is the moment nothing
+is set up and the connection is worst. A CDN library works perfectly on the
+laptop it was written on and shows an empty box in Gulu. Byte mode, versions
+1–10, all four correction levels, ~9 KB.
+
+Verified against python-qrcode: **51 payloads × 8 masks = 408 symbols, every
+module compared, 408/408 identical**, and the mask-penalty scorer agrees on 96
+of 96 scores. A wrong encoder does not look wrong — it draws a tidy square that
+will not scan — and the measurement found three bugs that reading never would:
+
+- the 15 format bits laid down least-significant first (13 modules of 441);
+- format bit 7 written at `(size-8, 8)` and then overwritten by the always-dark
+  module, so one bit of the format simply did not exist (1 module);
+- alignment patterns skipped wherever the centre was already occupied, which is
+  right up to version 6 and from version 7 drops the six patterns crossing the
+  timing line, shifting every data module after them (hundreds).
+
+The third only appeared because the comparison covered all ten versions rather
+than the one this feature actually uses.
+
+## Speaking is optional
+
+`homatt_voice_off` · Settings → *Dictation* · `tests/test-voice-optional.js`
+
+One switch turns off **all three** microphones: the big one at the top of
+intake, the one beside the vitals, and the floating one. A switch that
+quietened one and left two would be worse than none — somebody who asked not to
+have voice recognition would still be looking at microphones and would
+reasonably conclude the setting does nothing.
+
+Per device, not per clinic: the phone with the broken microphone, the one in
+the noisy room, and the clinician who would rather type are one phone's
+business. Default is on. Hidden rather than greyed out — a disabled microphone
+still asks to be pressed and still takes up the top of the screen.
+
+The test's most important assertion is not that the buttons go: it is that
+every box they used to fill can still be typed into by hand, and that hiding
+the readings button did not take the readings with it.
+
+## Looking a word up in the book
+
+`app/clinic/js/guidelines.js` · `tests/measure-search.js` ·
+`tests/test-guidelines-search.js`
+
+A clinician typed **Family** into the guideline search and was told "Nothing
+in this book matches". Chapter 15 of the Uganda Clinical Guidelines **is**
+"FAMILY PLANNING (FP)". The book was not missing it; the search could not see
+it.
+
+### Every index in every book is FTS5, and the engine has no FTS5
+`conditions_fts`, `drugs_fts`, `differentials_fts`, `emhslu_fts` are all
+`CREATE VIRTUAL TABLE … USING fts5`. The SQLite compiled into
+`js/vendor/sql-wasm.wasm` has FTS3 and FTS4 and **not FTS5** — `grep fts5` on
+the file returns nothing. So `MATCH` threw `no such module: fts5` on every
+search ever run in this app, a `catch` swallowed it, and what actually ran was
+the fallback: `title LIKE '%term%'`.
+
+A section could therefore only be found if the typed word was in its **own
+heading**. Nothing in the body of the book was reachable, and neither was the
+chapter a section sits in — which is the whole reason "family planning",
+"immunisation" and "nutrition" read as missing. **This is the trap to
+remember: a `try/catch` around a query turns a missing engine feature into a
+silently worse product, and the app cannot tell you.**
+
+The fix is not a bigger binary. 551 rows are already in memory; scoring them
+in one pass needs no module, takes a few milliseconds, and can weigh a heading
+against a chapter against a passing mention, which `rank` cannot. One search
+path now, for every book, and it is the one the tests measure.
+
+| | words a clinician types, of 45 |
+|---|---|
+| title-only fallback (what shipped) | **27** |
+| scanning the book (now) | **45** |
+| things that worked and stopped working | **0** |
+
+Recovered: family · family planning · immunisation · oncology · radiology ·
+bed nets · mosquito · rehydration · referral · weight band · chest indrawing ·
+coartem · artemether · ceftriaxone · metformin · 19.2 · 15.2
+
+**It is fast enough to type into.** Timed in the real WASM against the real
+book: 1.8 ms for a single letter, 8.2 ms for "family", 8.7 ms for "chest
+indrawing". A clinic phone several times slower than the machine that measured
+it still lands inside the 120 ms the box already waits before searching. Two
+things keep it there, and both matter: the WHERE filters before the score is
+computed, so 551 rows are scanned once and a dozen are scored; and nothing is
+`lower()`ed, because SQLite's LIKE is already case-insensitive for ASCII and
+lowering a 21,000-character `full_text` per row per token is the one change
+that would make this slow enough to feel.
+
+Four things the measurement made visible that reading never would:
+
+- **A section NUMBER must not be tokenised.** "19.2" became the tokens "19"
+  and "2", and "19" matched the heading "COVID-**19** Disease" at full heading
+  weight, which outranked Malnutrition. A number now goes straight to the
+  section that has it.
+- **The start of a word beats the middle of one.** "ORS" put "Refractive
+  Err**ors**" first. Every short name a clinician types has this problem.
+- **A chapter is an answer.** "Family planning" is a chapter, not a condition,
+  so the chapter is offered and opens the contents page there.
+- **A brand name is not in the book.** Coartem, Panadol, Septrin, Flagyl,
+  jiggers, piles — `SAY_ALSO` is consulted **only when the book's own words
+  return nothing**, and the screen says which word it substituted. It changes
+  what can be found and nothing else; no card ever shows an alias as the
+  book's wording.
+
+### Two ways a card could open with nothing on it
+Reported together as "no context", and they are different faults:
+
+- **53 sections are headings with no text of their own** — 19.2 Malnutrition,
+  19.1 Nutrition Guidelines in Special Populations, 15.2 Overview of Key
+  Contraceptive Methods. The book prints the heading and then its
+  sub-sections, and all the text is in those. The card said the content "is in
+  the sections listed under it" and then listed nothing, anywhere. It now
+  lists them, in the book's own numbering, tappable.
+- **12 more parsed only their SECONDARY fields** and rendered as a title with
+  two or three grey folded panels and not one readable word. "Clinical
+  Features of HIV" was one of them, and the parse had captured **8 of its 203
+  distinct words**. Measured for all twelve: `full_text` holds everything the
+  parsed fields hold and **2–195 words more**, so where the substance was not
+  found the book's own text is now shown in full.
+
+The rule underneath the second one: **ask whether the extraction found the
+substance, not whether it found anything.** `hasPrimary` is clinical features,
+investigations, management, treatment steps or medicines — a differential and
+a note are not a section.
+
+## Everything in the book, including the parts that are not conditions
+
+`tools/ucg_reference.py` · `tools/build_ucg_db.py` ·
+`tests/measure-book-coverage.js`
+
+A clinician opened **24.1 Surgery**, got an empty card, and said: *"when I
+check in the book, the context is there."* Two different things were true.
+
+**24.1 itself was right.** The body prints `24.1 SURGERY` and then goes
+straight to `24.1.1 Intestinal Obstruction` — it is a heading with no text of
+its own, which is why it now lists what is under it.
+
+**But the question deserved a number**, so `measure-book-coverage.js` walks
+the source the database is cut from and asks, line by line, whether a
+clinician can reach it.
+
+| | letters |
+|---|---|
+| in the book | 994,324 |
+| reachable before | 887,140 · **89.22%** |
+| reachable now | 960,067 · **96.55%** |
+| the book's printed index (replaced by the app's own contents page) | 34,257 |
+| **in the book and nowhere in the app** | **0** |
+
+### A wrong number I nearly shipped
+My first alignment said 9.2% of SECTION text was missing, Hypertension losing
+23,892 letters. It was wrong: my matcher located headings by searching the
+whole document and found "Hypertension" in the abbreviations list. Measured
+with the project's own `ucg_spine`, section spans are contiguous —
+`a['end'] = b['line']` — so no clinical text falls between two sections, and
+the 20,928-letter difference is the 551 heading lines, which the card shows
+as its title. **The alarming number was mine, not the book's.** Worth keeping
+because it was confident and it was wrong.
+
+### What was really missing: everything outside the numbered spine
+`ucg_spine` cuts on numbered headings and `back_matter_start` deliberately
+stops before the appendices, so two blocks had no section, no search entry and
+no way to be read:
+
+| | letters | what is in it |
+|---|---|---|
+| front matter | 64,670 | **PRESCRIPTION WRITING RULES**, **INJECTIONS**, controlled-medicine prescriptions, prescribing in children and the elderly, medicine interactions, patient counselling, **Antimicrobial Resistance**, Appropriate Medicines Use, the Seven Steps in a Primary Care Consultation, the abbreviations list |
+| back matter | 27,087 | the four appendices — infection control, pharmacovigilance, **Appendix 3: the National Laboratory Test Menu**, which tests an HC II, HC III, HC IV, district hospital or national referral hospital can actually run |
+
+"Front matter" badly undersells the first one. A clinician looking up how to
+write a legal prescription, or whether their level of care can run a test,
+found nothing — and it was in the book in their hand.
+
+Both are now **chapter 25**, cut at the book's own headings. The headings are
+named as **anchors, not line numbers**, because a line number is a fact about
+one conversion and a heading is a fact about the book; an anchor that cannot
+be placed **fails the build loudly**, since a reference section that silently
+came out empty would look answered.
+
+### The one line that could do harm
+```python
+if is_ref: continue      # before medicines and treatments are parsed
+```
+The prescribing chapter is full of drug names used as **examples of how to
+write a prescription**, and Appendix 3 is a list of tests. Parsed as medicines
+they would become rows the one-tap package could offer a patient, with a dose
+lifted from a worked example. Two things prove it stayed skipped: the build's
+own counts are **unchanged** at 2,753 treatment steps and 1,008 medicine rows,
+and `test-doses.js` asserts 0 medicines and 0 steps from chapter 25 — because
+that failure would be silent and would look like content.
+
+Chapter 25 is also **out of the suggestion engine**: 91,666 characters thick
+with drug and test vocabulary and not one condition would score against any
+query, and a clinician typing a fever would be offered "Prescription Writing"
+as an impression. UCG documents stay at 488 and the WHO benchmark at 239/241.
+
+It cites **no page**, because this part of the book is paginated in roman
+numerals the index does not carry, and an arabic page would be a number from
+somewhere else entirely.
+
+### 2,691 rows of dashes were being read as findings
+The conversion drew the book's ruled tables as rows of `-----`, and the
+guideline screen laid every one out as a bullet — 320 in "Recommended Second
+Line Regimens", 204 in the TB preventive dosing chart, 177 in the antenatal
+care protocol, 72 in severe malaria. The package screen had dropped them since
+it was written; the guideline screen now does too. The **whole line** must be
+rule characters, so a single `-` survives (in a table cell it means nil).
+Dropped in the rendering, never in the data.
+
+**And the measurement had to be corrected before it could be believed.**
+`measure-guidelines.js` reported *3,530 words lost* for a change that lost no
+word at all — it was counting dash-runs, and lone `|` column dividers, as
+words. Same shape as the hyphen-repair correction in `measure-panel-text.js`:
+the thing being counted has to be the thing a clinician would miss. After the
+fix, 0 words lost across 565 sections and 2,005 fields.
+
+### What is still not done
+The seven buried sections still have no rows of their own. They are reachable
+— on the contents page and by search — and the 28 misfiled medicines are kept
+out of the package and labelled on the reference screen. Giving them real rows
+would be cleaner but would renumber the book's own spine, which this work has
+been careful not to touch. Its own change, with its own measurement.
+
+## Which condition a dose belongs to
+
+`app/clinic/js/ucg-sections.js` · `tests/measure-doses.js` ·
+`tests/test-doses.js`
+
+The one-tap package reads `medicines WHERE condition_id = ?` and offers every
+row as that condition's drug — dose, tick box, price, onto the visit and onto
+the bill. So "is this drug printed under this heading?" is the question.
+
+| over all 1,008 medicine rows | |
+|---|---|
+| source line verbatim in its own section | 1008 of 1008 |
+| dose readable in that line | 980 of 980 |
+| route readable in that line | all |
+| **printed under a different heading** | **28** |
+
+**The first three rows are why this was invisible.** Every row is a real line
+of the real book, and every row is inside the `full_text` of the condition it
+is filed under — because that condition's text ran past its own end and
+swallowed the sections after it. Three rows of 551 do it:
+
+| the row | swallowed | rows |
+|---|---|---|
+| **9.2.4.1 Postnatal Psychosis** (21,058 chars where its neighbours are two or three thousand) | Anxiety, Depression, Postnatal Depression, Suicidal Behaviour, Bipolar Disorder, Psychosis | 26 |
+| **9.1.1.1 Postnatal Psychosis** — a *second* row with the same title | Alcohol Use Disorders | 1 |
+| **6.5.4.3 Hepatic Encephalopathy** | Oesophageal Varices | 1 |
+
+On screen that meant a woman who had just given birth, and is breastfeeding,
+was offered a package built from **lithium, carbamazepine, clozapine,
+alprazolam, fluoxetine and bupropion** — four sections' drugs, none of them
+hers, each with a dose and a tick.
+
+**How a boundary is found, and the two things that were nearly wrong.** A
+numbered heading part-way down the text that is a section of the book — either
+one with a row of its own, or one of the seven the import buried with no row
+(Oesophageal Varices, Alcohol Use Disorders, Adenoid Disease…), decided by the
+same test the contents page uses, so the two can never disagree about what a
+section is.
+
+- **The title must match the words on the page.** "Benzathine penicillin
+  **2.4** MU IM single dose" wrapping onto a new line is indistinguishable
+  from a heading numbered 2.4, and without the title check it condemned the
+  whole genital ulcer disease page and took congenital syphilis with it.
+- **…but the number alone is not enough either**, and that hid two of these.
+  The extraction mis-numbered part of the book: the row numbered `6.5.4.2` is
+  titled "Spontaneous Bacterial Peritonitis" while the heading printed at
+  6.5.4.2 reads "Oesophageal Varices". Looking the number up, finding a title
+  that did not match, and stopping there missed a boundary that was plainly in
+  the text. A mismatch has to fall through to the second question, not to
+  `null`.
+
+It fails by finding too **few** boundaries, which is the state we were already
+in.
+
+Nothing is deleted. The package takes them out of what it offers and names
+them, with the section they belong to, at the top of the guideline notes — a
+drug that silently disappears is its own kind of wrong. The guideline screen
+is reference rather than prescribing, so it keeps every row and labels the
+ones the book prints elsewhere.
+
+### The run-on text was in THREE places, and the table was the smallest
+Cutting the medicines table looked like the fix and was a third of one. Each
+of the other two was found by driving the screen and asking where a drug name
+could still be coming from:
+
+| where | what it did |
+|---|---|
+| `medicines` rows | 28 drugs offered for the wrong condition |
+| the section's **prose** | `findMissingDrugs()` re-reads management/prevention/notes against the national medicines list to recover drugs the extraction missed — a feature severe malaria depends on. Reading the uncut text put alprazolam, bupropion, carbamazepine and fluoxetine straight back after they had been removed. The same text also decides which drug is "first line". |
+| the **treatment steps** | the largest. "Treatment steps by level of care" for Postnatal Psychosis was 7,682 characters of four other sections' protocols, printed as the steps for this one. |
+
+**And the fields cannot be cut the way the table was.** `management` for that
+row is 7,709 characters holding all six drugs and **not one heading** — the
+extraction took the headings out when it split the fields. There is nothing in
+that string to cut at.
+
+So `full_text` is the arbiter, because it is the only field that still carries
+the book's structure. Everything before the first boundary is the section; a
+line of any other field, and any treatment step, is kept only if it is in
+there. Both screens cut once and everything downstream reads the cut text, and
+both say on the card that they did — the source panel still holds the whole
+stretch as printed, so nothing is hidden, only moved out of the place it was
+pretending to belong.
+
+### The change the measurement told me not to make
+The package lays out guideline text with its own rule; the guideline screen
+uses the `ranToMargin` rule that was measured at 0 words lost. Making the two
+the same is the obvious change, and `tests/measure-panel-text.js` says it is
+the wrong one:
+
+| | the panel's rule | the screen's rule |
+|---|---|---|
+| sentences cut in half | **0** | 1,723 |
+| sentences welded together | **110** | 180 |
+| letters lost | 0 | 0 |
+
+The screen is fed raw wrapped pages, where line length is evidence of a
+wrap. The panel is fed the already-split fields — short bullets and list
+items — where it is evidence of nothing. **Same job, different input, and the
+input decides.** Recorded because the next reader will propose it again.
+
+## Correcting what was already recorded
+
+`supabase/migrations/20260912_owner_corrections.sql` ·
+`app/clinic/js/clinic-corrections.js` · `tests/sql/test-owner-corrections.sql`
+· `tests/test-corrections.js`
+
+A clinic asked to be able to fix what they had already saved — a quick sale
+with the wrong quantity, a treatment where the lab test or the money was
+forgotten, a patient whose name was typed wrong — and to have all of it be
+"only done in the main account, not sub accounts".
+
+### The screen cannot enforce that, and nothing did
+Both tables were open to every member of staff:
+
+```
+qs_clinic_write               for all using (active portal_user, same clinic)
+clinic_patients_staff_manage  the same shape
+```
+
+`for all` is insert, update **and** delete, and the check is membership, not
+role. A receptionist or a visiting clinician could already delete a sale or a
+patient with one REST call. **Hiding a button changes nothing about that**, so
+the permission lives in the database: security-definer RPCs that check
+`is_clinic_main_account()`, and the direct UPDATE/DELETE closed behind
+owner-only policies. `clinicCan('corrections')` in the app is tidiness — not
+showing somebody a control they cannot use.
+
+### A hole found on the way
+`adjust_inventory`, `deduct_inventory` and `get_clinic_stock` are all
+`security definer` — they run as the function's owner and **RLS never applies
+to them** — and none checked that the *caller* belonged to `p_clinic_id`, only
+that the item did. Any authenticated Homatt user, including a patient account
+or a clinician attached to a different clinic, could read another clinic's
+shelves and adjust its quantities given the ids. Closed here, because the "put
+the stock back" path calls `adjust_inventory` and an owner-only feature built
+on a function anyone can call is not one.
+
+**The rule: RLS policies on a table say nothing about a `security definer`
+function that touches it.** Every such function needs its own caller check.
+
+### The rules a correction follows
+- **A sale deleted or reduced puts the stock back**, by the difference and in
+  the right direction. A sale removed without returning the stock makes the
+  shelf count drift silently — worse than the wrong sale, because nobody sees
+  it until a count.
+- **The amount decides the payment status, not a chip.** Same rule the
+  treatment screen already follows, so a correction cannot settle a debt by
+  mistyping.
+- **A patient with any history is archived, never destroyed**; one with none —
+  the duplicate a typo made, which is the common case — is deleted outright.
+  History is counted from `clinic_diagnoses`, **not `bookings`**: a walk-in
+  never gets a booking, so counting bookings would call most of a busy
+  clinic's patients history-free and delete them.
+- **Numbers and names only.** Not the diagnosis, not who recorded it, not the
+  date — changing what somebody was treated for, after the fact, is not a
+  correction, it is a different record.
+- **Every change writes an audit row** — who, when, from, to. There is
+  deliberately **no insert policy** on `clinic_record_edits`: an audit row a
+  client can forge is not an audit row.
+
+### No offline path, on purpose
+The outbox replays inserts. Replaying "set the quantity to 6" against a row
+somebody has since changed again would quietly undo their work. A correction
+with no connection is refused with *"Nothing has been changed"* rather than
+accepted and lost.
+
+### What was already there, and is left alone
+Emmanuel caught this: *"I think for adding money or drug, it was already
+there."* He was right, and the first version of this duplicated it.
+
+| already there, all staff, offline | what a correction adds |
+|---|---|
+| **Follow-up** on a visit — adds medications to `prescription_items`, adds an extra charge, records a payment, notes, reschedules | fixes a figure that is **wrong**, in either direction — Follow-up can only ADD |
+| **Record payment** (`record_payment`) — adds to `amount_paid` | **sets** `amount_paid` to a figure, for a payment entered twice |
+| **`openPatientEdit`** — fixes the name or phone **on one visit** | corrects the patient **record**, which reaches every visit that person has |
+| — | **lab tests**, which nothing else could touch |
+
+So the correction dialog says, in as many words, *"To ADD a medicine, a charge
+or a payment, use Follow-up instead — that is for what has happened since."*
+And it carries **no free-text medicines box**: `prescription_items` is a
+structured list Follow-up maintains, and a free-text field beside it would
+give one visit two different answers to "what was given" — with the free-text
+one being the one nobody measured. `test-corrections.js` asserts both: that
+the box is absent and that the dialog points at Follow-up.
+
+### Two faults that were in the TEST, not the code
+Both would have been easy to misread as the policy failing:
+
+- **The SQL test connects as postgres, which is a superuser and bypasses RLS
+  completely.** Every direct-row attempt now runs `set role authenticated`
+  first. Without it the nurse's delete succeeded and the policy looked broken.
+- **It asserted "the last audit row is the deletion" by `created_at`.** Every
+  row is written inside one transaction and `now()` is frozen per transaction,
+  so they all share a timestamp and the ordering was the planner's choice.
+
+```
+tests/sql/test-owner-corrections.sql   105 checks, real Postgres
+tests/test-corrections.js               27 checks, real screens
+```
+
+## One table that knows what a dose looks like
+
+`app/clinic/js/clinic-regimens.js` · `tests/test-followup-meds.js`
+
+The **follow-up visit** on the dashboard offered three empty boxes — drug
+name, strength, days — on the one screen where a clinician is adding a
+medicine to somebody already diagnosed. The treatment screen has known those
+regimens since it was written.
+
+The obvious fix is to copy the table onto the dashboard. **That is the mistake
+this project has already paid for once.** "Two separate implementations would
+drift, and the second one would be the one nobody measured" is written above
+about the microphone, and it is truer of a dose: the day somebody corrects
+amoxicillin in one file and not the other, two screens in the same app
+prescribe two different things and neither looks wrong. So the 39 regimens
+moved into `clinic-regimens.js` and **both screens read it**.
+
+If the module fails to load, `DRUG_REGIMENS` falls back to an **empty list**,
+not a second copy — auto-fill then does nothing and the clinician types the
+dose, which is what they did before any of this existed. A stale duplicate
+would be worse than none.
+
+### The band it used, not just the number
+`forBand(reg, band)` returns `usedBand` alongside the dose, and that is the
+point of it. Falling back to the adult figure for a child is often the only
+thing available and is safe **only if the screen says so**. Ciprofloxacin has
+an adult entry and nothing else, so a four-year-old's card reads *"This is the
+adult dose — the guide has none for this age. Check it before giving it."* in
+the warning colour, rather than quietly filling in 500mg.
+
+Everything filled stays editable, and the row says where the figure came from.
+It is a starting point, never a prescription.
+
+### The suggestion order is a clinical decision
+The clinic's **own shelf first**, with the quantity on it — a medicine in the
+building is one the patient can actually be given today, and it costs no
+request because Quick Sale has already loaded it. The common medicines follow.
+A shelf item still takes its dose from the shared table: the name on a box and
+the dose for it are two different questions.
+
+### `min-width:0`, or the select pushes itself off the card
+The frequency was **outside the medication card** on a real phone — "2×" cut
+off by the screen. The strength box and the select were `flex:1` with no
+`min-width:0`, and `.field-input` carries `font-size:16px !important`, so the
+select's own content set a floor wider than its share. A grid now, every cell
+`min-width:0` and `box-sizing:border-box`: a cell can never exceed its column.
+Two columns with the strength spanning both — three boxes across is not
+readable at 360px, which is the phone this is used on.
+
+**And a fixed-height flex sheet has no spare height**, which this round
+learned twice in one afternoon: a list of today's sales added to the quick
+sale sheet pushed the Sell button off the bottom (11px over at 412×420, 45px
+at 360×380), and a full-width correction button pushed the visit record to
+711px in the 661px it has. Both moved into a row that already existed — a
+header icon, and a 30px icon beside the severity chip. Put a new affordance in
+a row that already exists, or it comes out of the button at the bottom, on the
+phone of whoever has the smallest screen.
+
+## A photograph of a patient, which must not reach the gallery
+
+`app/clinic/js/clinic-photo.js` · `tests/test-clinical-photo.js` ·
+`tests/measure-photo.js`
+
+A wound, a rash, a swelling, a lab slip — these belong on the record. Taking
+one with the phone's own camera app does not put them there: it writes a
+full-resolution file into shared storage, registers it with MediaStore, and
+from that moment a patient's ulcer is in the gallery, in the photo backup, and
+in whatever gallery app the clinic's phone shipped with. Nothing in this app
+can reach in and take it back.
+
+So the picture is never handed to the operating system at all.
+
+| | how |
+|---|---|
+| the viewport | `getUserMedia` into a `<video>` **in the page**. No Intent, no file picker, no `ACTION_IMAGE_CAPTURE` — so no MediaStore row, because no other process ever sees the frame |
+| the metadata | the frame goes through a `<canvas>` and comes out a fresh JPEG |
+| the size | a size-then-quality ladder, hard ceiling 50 KB |
+| the storage | `Directory.Data` — the app's private internal files directory — with a `.nomedia` beside it; IndexedDB where the Filesystem plugin is absent |
+| leaving the phone | it doesn't. Nothing here uploads |
+
+### There is no "strip EXIF" step, and that is the point
+A canvas holds raster data and nothing else, so the encoder has no GPS tag, no
+timestamp, no device name and no orientation flag to write. Metadata is not
+filtered out — **it has no route in**. A filter can miss a tag it has never
+heard of; this cannot.
+
+Measured rather than assumed, by walking the JPEG's marker chain and naming
+each APPn block by the identifier written inside it. The file holds exactly
+two: `JFIF`, and a 472-byte generic sRGB `ICC_PROFILE`. No Exif, no XMP, no
+IPTC, no comment.
+
+**The colour profile is deliberately kept.** Judging how red a cellulitis is,
+or how yellow a sclera, is exactly what goes wrong when one phone's colours are
+read as another's, and it costs half a kilobyte of the fifty.
+
+The first version of that assertion read "APP0 and nothing else" and failed on
+the profile. Worth remembering: **a metadata check written as "no unexpected
+segments" will fail on something harmless**, and tempt whoever inherits it into
+loosening it to "no segment I have seen before" — which is how a real one gets
+through.
+
+### What 50 KB actually buys
+The camera Chromium fakes is a smooth synthetic pattern that compresses to
+nothing and flatters the ladder badly, so `measure-photo.js` spans the range
+instead. Sensor grain is the part that costs — a drawn image is far cleaner
+than anything a phone produces:
+
+| 1280×960 source | at q0.60 | kept as | size |
+|---|---|---|---|
+| flat lesion on even skin | 11.2 KB | 1280×960 q0.60 | 11.2 KB |
+| ordinary skin texture | 9.2 KB | 1280×960 q0.60 | 9.2 KB |
+| coarse wound / dressing | 16.4 KB | 1280×960 q0.60 | 16.4 KB |
+| **skin + daylight sensor grain** | 83.1 KB | 1024×768 q0.55 | 38.3 KB |
+| **skin + dim-room sensor grain** | 210.5 KB | 800×600 q0.45 | 39.6 KB |
+| pure noise — worse than any camera | 532.8 KB | 640×480 q0.35 | 45.8 KB |
+
+Size is stepped **before** quality is pushed low, because a 1024px picture at
+q0.45 is easier to read a wound margin off than a 1280px one at q0.25 — JPEG
+spends its worst artefacts on exactly the edges that matter here.
+
+### Small things that are not small
+- **`audio: false`, explicitly.** A clinical photograph must not also record
+  what was being said in the room.
+- **`ideal`, never `exact`**, on `facingMode` — a hard constraint a phone
+  cannot meet fails the whole call with `OverconstrainedError`, the same trap
+  the microphone fell into.
+- **The camera is released the moment the frame is taken.** A lit camera
+  behind a still picture is a battery drain and a privacy light nobody can
+  explain.
+- **`.nomedia` goes in BEFORE the first photograph**, not after. A marker that
+  arrives second leaves a window in which a scanner can index the folder, and
+  once indexed, adding the marker does not remove what it took.
+- **One copy, one place.** Where the bytes go to the filesystem they are *not*
+  also left in the database; the record keeps a path.
+- **Deleting a saved photograph is main-account only**, the same rule as a sale
+  or a patient. A blurry one can be retaken and both kept; letting any member
+  of staff erase what was recorded is a different thing.
+- A receptionist and a drug-shop salesperson are not offered a camera. A
+  photograph of a patient is clinical work.
+
+### "A row that already exists" is not enough — it needs the SLACK
+The camera button first went in the patient record's hero row, beside the "fix
+a wrong figure" icon, on the rule written further down this file: *put a new
+affordance in a row that already exists, or it comes out of the button at the
+bottom.* That rule is right and it was not sufficient.
+
+That row had **30px of slack and the button needed 36**. The diagnosis dropped
+from 200px to 154px, "Diagnosis pending" wrapped onto a second line, the hero
+went 57px → 81px, and the whole record went to **683px in the 661px** the modal
+has. `test-patient-record.js` caught it.
+
+It lives in the modal's **header** now, beside the close button — which already
+makes that row 34px tall, so a second 34px control costs nothing, and the name
+and meta beside it are `nowrap`/`ellipsis` so they cannot wrap the way the
+diagnosis did. **Adding to a full row can cost height without adding a row**:
+the squeeze lands on whatever text was sharing it. The test now asserts the
+hero stays one line and the record still fits, so the next person to reach for
+that row finds out immediately.
+
+### The proof that the upload check works
+"No image was uploaded" is also what a detector that inspects nothing reports.
+So the test posts the very bytes just taken and **requires the instrument to
+catch them**. Three URL-shaped versions of that check were wrong first: "any
+POST" counted the dashboard's own RPC polling (PostgREST calls a function with
+POST), "any storage call" counted a GET of the clinic's logo, and "any non-GET
+storage call" counted `/object/sign/…/portrait.jpg` — a POST that asks for a
+link to READ something. **The body knows; the URL guesses.**
+
+## Three things a sign-in screen said that were not true
+
+`app/clinic/index.html` · `app/clinic/js/clinic.js` ·
+`app/clinic/settings.html` · `tests/test-signin-clarity.js`
+
+A clinic sent one photograph of the sign-in page while trying to change their
+login email. It carried three wrong things, and all three were ours.
+
+### 1. A 228-minute-old explanation, printed over a fresh failure
+> *"You were asked to sign in again 228 minutes ago because the saved sign-in
+> on this device could not be read."* — above an unrelated *"Invalid login
+> credentials"* from a moment earlier.
+
+Two faults in one sentence:
+
+- **`clinicSignOut()` cleared the session and recorded no reason.** The next
+  guarded page found nothing and `requireClinic()` announced *"could not be
+  read"* — the same branch handled "there is nothing saved" and "what is saved
+  is damaged", and it chose the frightening wording. An ordinary sign-out was
+  reported to a clinic as a broken phone.
+- **A successful sign-in never cleared the reason.** It was dropped only after
+  24 hours, so it kept being printed on top of whatever went wrong next.
+
+Now: signing out records `deliberate: true` and is never announced back at
+anybody; absent and damaged say different things; signing in clears the reason;
+and anything older than 30 minutes is history rather than a description of the
+screen. **An explanation that outlives the thing it explains is worse than
+none** — this one cost the first hour of the investigation.
+
+### 2. "v151", in TWO places, neither of them true
+`app/clinic/index.html` and `app/clinic/js/clinic.js` each carried
+`= 'v151'` — written on 2026-07-05, never touched again, while
+`clinic-sw.js` beside them reached v184. The second one is printed in the side
+menu of **every screen**. Every clinic in the country, on every build, read
+"Version v151" and reported it to us.
+
+**A version nobody remembers to bump is worse than no version at all**: it does
+not merely fail to inform, it misinforms, with the confidence of a printed
+number. Both are now asked for, in one place (`homattRunningBuild()`), in order
+of authority: `__meta__appliedBuild` from IndexedDB (marked **`+`** — this
+phone has taken a build over the air, the most useful thing a screenshot can
+say), else the highest `homatt-clinic-vNNN` cache, else `v?` said plainly.
+
+**And `test-version.js` asserted the literal**, which is how it survived:
+clinic.js said v151, the test said v151, they agreed, and the worker drifted
+two months away. The test now compares the number on screen against the CACHE
+constant in the service worker, so neither can move without it failing. *A test
+that repeats the constant cannot see the constant going stale.*
+
+### 3. Supabase's words, for a situation only the app could explain
+Changing a sign-in email does **not** move the login. `auth.updateUser({email})`
+starts a confirmation; with "Secure email change" a link goes to the **old**
+address as well and **both** must be opened. Until then the old address is the
+account. The app said so — in Settings, behind the sign-in, hours before it
+mattered.
+
+Worse, it wrote the new address into `portal_users` the instant the link was
+**sent**, so every other screen advertised an address that could not sign in.
+That is how a clinic ends up typing it.
+
+So: the half-finished change is written down on the device
+(`homatt_email_change`), Settings shows it and names which address still works,
+the **sign-in page** warns before a word is typed, and `portal_users` is
+brought into step only once the login has actually moved — detected by
+comparing the session's email to the pending one, because the link is opened in
+a mail app where none of this code is running.
+
+`err.textContent = authError.message` is gone. "Invalid login credentials"
+covers a wrong password, an address with no account, and an unconfirmed
+change. Supabase deliberately gives the same answer to the first two so that
+somebody guessing cannot learn which addresses exist — **and the app must not
+undo that by saying "no such account"**. But it can tell the third apart,
+because the third happened on this phone and was written down.
+
+### 4. …and then the explanation itself became the dead end
+`supabase/functions/change-email/index.ts` · `tests/test-email-direct.js`
+
+The message above is accurate and it was still a failure. A clinic on
+`emmanuel@homatt-health.com` — a domain that takes no mail — was told, in as
+many words, that the change *"cannot be completed from here"* and that
+*"whoever runs the Supabase project"* would have to fix it. For a clinic in
+Uganda that means it never happens. The account is stuck on that address for
+ever, and the app's contribution is a paragraph naming a dashboard setting
+nobody there can reach.
+
+**Explaining a wall is not the same as getting over it.** So there is a second
+route, through an Edge Function with the admin API, which sends **no mail at
+all** — the old address never has to be reachable.
+
+What replaces the confirmation link matters, because something has to. The link
+proves two things: control of the new mailbox, and identity. **Only the second
+is a security property**; the first is a convenience and it is precisely what
+is broken here. So the second is proved directly — a valid session **and the
+current password, verified on the server** — and the first is dropped. That is
+the same bar as changing a password, and an attacker who can clear it already
+owns the account.
+
+The residual risk is a typo in the new address, and it is recoverable: the
+password is unchanged and the address is whatever they typed. The change is
+written into `homatt_email_change` with `direct: true`, so the **sign-in
+screen** reads it back — and typing the OLD address afterwards is answered with
+*"That is the OLD address… use \<new\> — your password did not change."*
+Being stuck on an address that takes no mail is not recoverable. That is the
+trade, and it is the right way round.
+
+It is offered **only after the ordinary route has actually failed** in that one
+unrecoverable way. Offering it up front would train clinics to skip a
+confirmation link that works perfectly well for everybody else.
+
+#### `error.status` does not exist on a FunctionsHttpError
+The client read `r.error.status` to decide what went wrong. supabase-js puts
+the Response on **`error.context`**, not `error.status` — so that lookup found
+`undefined` for *every* refusal, and a **wrong password came out as "the helper
+is not installed on your server yet"**. A clinic would have gone to their
+developer over a mistyped password. Nothing about the code looked wrong; the
+test caught it.
+
+The body is now read off `error.context.json()`, and the genuinely-missing case
+is told apart by there being nothing readable at all. **A 404 and "no reply"
+are the same fault wearing two faces** — the gateway answers 404 for a function
+that was never deployed and puts no CORS headers on it, so depending on where
+the request came from it arrives either as a readable 404 or as nothing. Both
+say the same sentence now; leaning on the CORS block alone left the readable
+case reporting a bare "error 404" to a clinic.
+
+### 5. And none of it deployed, for eleven days, in silence
+`.github/workflows/deploy-edge-functions-branch.yml`
+
+The clinic tapped the new button and got *"the helper is not installed on your
+server yet"*. That was true, and it was not about `change-email`. **Every Edge
+Function had failed to deploy on every run since 5 September** — `ai-proxy`,
+`create-staff`, `discharge-notify`, `payment-notify`, `relworx-payment`,
+`send-notification`, `structure`, `transcribe` and `change-email`. Dictation
+and push notifications were running whatever last deployed in **March**.
+
+The cause, once it could be read:
+
+```
+unexpected list functions status 401: {"message":"Unauthorized"}
+```
+
+The access token had been revoked. Three things conspired to hide that for a
+fortnight, and each is worth keeping:
+
+- **A check that only tests non-empty is not a check.** The first step said
+  `✓ SUPABASE_ACCESS_TOKEN is set`, which was true of a revoked token. It now
+  calls `GET /v1/projects` and fails at step one with the remedy in the
+  sentence — and confirms the token can actually see *this* project, since a
+  valid token for the wrong account fails differently and needs a different
+  answer.
+- **`continue-on-error: true` makes a green tick that cannot go red.** "Set
+  Supabase secrets" and "Configure Auth origins" both use the same token and
+  both *appeared to succeed* while failing. I read those ticks as proof the
+  token worked and told Emmanuel so — twice, and wrongly. A step allowed to
+  fail must still SAY that it failed.
+- **The error was written only to the log.** The step ran the CLI and reported
+  `::error::<fn> failed to deploy`, nine identical lines with no reason, while
+  the CLI's own message went to a log that a corporate egress proxy refuses to
+  serve (the download is Azure blob storage; 403). A run's **annotations** come
+  from the GitHub API and are always readable. Putting the CLI's last lines
+  into the annotation is what turned eleven days of "failed" into one
+  diagnosable sentence, in a single run.
+
+**The token is the fix and it is not a code change**: Supabase dashboard →
+Account → Access Tokens → generate, then GitHub → Settings → Secrets and
+variables → Actions → `SUPABASE_ACCESS_TOKEN`. Nothing deploys until then.
+
+### 6. Both addresses were dead ends, and that is the real fault
+Asked "can't the client just change it in the portal?", I checked the
+assumption I had been repeating instead of repeating it again:
+
+```
+homatt-health.com  ->  ENOTFOUND       the domain does not exist at all
+clinic.com         ->  MX: 0.0.0.0     a blackhole; accepts no mail
+gmail.com          ->  real MX         (so the resolver works — those answers are real)
+```
+
+The clinic was on an address that **does not exist**, moving to one whose mail
+goes to **0.0.0.0**. Out of the frying pan. It also explains, and now *proves*
+rather than assumes, why the ordinary route refused: Supabase validates the
+domain, and there is no domain.
+
+**This matters far more than the deploy.** The portal has no password reset, so
+an account on an unreachable address has no way back if the password is ever
+lost — not a nuisance, a locked door. And the direct route is the one that can
+create that situation, because it deliberately sends no mail.
+
+So `change-email` now checks the new domain before committing, by RFC
+5321/7505: usable MX → fine; MX present but `.` or `0.0.0.0` → explicitly
+refuses mail; no MX at all → an A record still takes mail (implicit MX), no A
+either → the domain is not real. It refuses only what it can **positively
+show** is undeliverable — a resolver having a bad minute, or an edge runtime
+without `Deno.resolveDns`, lands in "unknown" and is allowed through, because a
+check that blocks a real address when DNS hiccups is worse than the fault it
+guards against.
+
+**The lesson is older than this bug: I had asserted "the domain takes no mail"
+four times before measuring it.** It happened to be right, and the measurement
+turned up the second dead domain that nobody had noticed — which no amount of
+being right about the first one would have found.
+
+### Still open
+There is **no password reset** on the clinic sign-in page at all — no "forgot
+password", no route of any kind. A clinic that mistypes its way out has nothing
+to tap. That is a real hole and it is not fixed here.
+
+## "It does not load on some browsers"
+
+`tests/measure-browser-support.js` · `app/clinic/index.html` (the boot check)
+
+Desktop clinics reported the site simply not loading. That is the hardest
+report to act on, because a blank page looks identical to a bad connection, a
+wrong address and a dead laptop.
+
+**A missing METHOD and a missing SYNTAX FEATURE are not the same kind of
+fault, and only one of them does this.** `[].flatMap()` on an old engine
+throws where it is called and the rest of the page carries on. A `?.` is a
+**parse error**, and it takes the WHOLE FILE — every function in it, including
+the ones that never touch the new syntax. No `try/catch` can reach it, because
+nothing in the file ever runs.
+
+Measured across the 32 shipped files:
+
+| | |
+|---|---|
+| optional chaining `?.` in shipped code | **36 occurrences in 4 files** |
+| one of those files | `js/clinic.js` — which defines `requireClinic()` |
+
+So on any browser older than Chrome 80 / Firefox 74 / Safari 13.1, `clinic.js`
+did not parse, `requireClinic` did not exist, and **every guarded page in the
+portal was a blank screen**. The other three were `index.html` (the sign-in
+handler itself), `new-order-wizard.js` and `settings.html`.
+
+All 36 are gone, rewritten as `(EXPR || {}).prop` — which evaluates EXPR
+exactly once, yields `undefined` instead of throwing, and is understood by
+every engine ever shipped. No build step was added: this project deliberately
+ships plain files, and a bundler is a bigger change than the bug.
+
+| | before | after |
+|---|---|---|
+| hard syntax dependencies | 36 | **0** |
+| files that would not parse | 4 | **0** |
+
+`Promise.allSettled` in the service worker is shimmed (it was called during
+`install`, so an older browser got **no offline app at all**, silently), and
+the two `.flatMap()` calls are `reduce`. Everything that remains — four
+`globalThis` and three `navigator.clipboard` — is feature-detected or inside a
+`try/catch`, listed by name in the measurement with the guard quoted beside it.
+
+### And when it genuinely cannot run, it says so
+A first-in-the-page check, written in the oldest JavaScript there is — no
+arrow functions, no `const`, no template strings — because **a browser too old
+for the app is too old for anything clever in the message explaining that.**
+It names the missing capability, and tells a locked-down private window that
+it is blocking storage, which is a different fault needing a different
+sentence. Plus a `<noscript>`.
+
+### The instrument was wrong first, in both directions
+The first version of `measure-browser-support.js` blanked strings and comments
+with a hand-rolled scanner and matched with clever regexes. It reported **12**
+optional-chaining sites where there are **36** (its blanker lost track of
+quoting and silently blanked real code), and it reported "class private field
+`#x`" four times in dashboard.html — every one a **CSS hex colour** inside an
+inline style.
+
+**A rule that cannot tell `#private` from `#FFF8E1` is worse than no rule, and
+a scanner that under-reports is worse still — it is the one that says the
+problem is fixed.** It now uses a literal search, which has complete recall by
+construction, and prints every line so a reader can judge. It can over-report;
+it cannot under-report. That is the safe direction for a check whose job is to
+find something before a clinic does.
+
+## Switching tabs must never lose what was typed
+
+`app/clinic/js/new-order-wizard.js` · `tests/test-wizard-draft.js`
+
+> *"If you open a new tab, by the time you go back to the site it needs you to
+> re-enter the details."*
+
+It was not the browser. The wizard had:
+
+```js
+const untouched = state.step === 1 && !state.patient && !state.bookingId &&
+  !state.confirmedDx && !state.medications.length && … ;
+if (untouched && hidden > 2500ms) window.location.replace('dashboard.html');
+```
+
+Every one of those is something **picked**. On the intake screen almost all
+the work is something **typed** — name, phone, age, complaint, story,
+background, four vitals — and it lives in the DOM. `state.patient` is only set
+when an *existing* patient is chosen, so a brand-new patient, which is the
+common case, left `untouched` true with the screen full of their details.
+Three seconds in another tab and the page navigated away and threw the lot.
+
+On a phone that seldom fires. On a desktop it fires all day — which is exactly
+who reported it.
+
+**Ask the SCREEN whether anybody has done anything, not the model.** A model
+written only on "confirm" cannot answer a question about unconfirmed work.
+
+### Two ways to get "has anybody typed?" wrong, both found by probing
+- **`defaultValue` is not the default.** `followUpDays` is a number box the
+  wizard fills with **7** on load while its markup default is empty, so a
+  `defaultValue` comparison called every fresh form "already being typed in" —
+  which would have silently disabled the return-to-dashboard *and* suppressed
+  the draft offer, on a form where nothing looked wrong. A **baseline**
+  snapshot taken once the form settles cannot fall behind the form the way a
+  list of field names would.
+- **The app fires its own input events.** Counting them marked the form
+  touched the instant it opened. Before the baseline only `isTrusted` events
+  count — the browser sets that on a real key and never on `dispatchEvent`.
+  After it, both count, because by then a synthetic fill **is** work: that is
+  dictation and the one-tap handoff putting a patient on screen.
+
+### And a draft, because not navigating away is not the whole answer
+It does not cover the tab being discarded to reclaim memory, a stray Back, a
+crash, or the wrong window closed — and on each of those a clinician retypes a
+patient from memory, which is worse than a nuisance because the second telling
+is never quite the first.
+
+**Offered, never applied.** A shared clinic laptop can hold somebody else's
+half-typed patient, and writing that into a form unasked is how one record
+ends up describing two people — a fault this project has already had once.
+Kept 12 hours, per clinic, and cleared the moment a treatment is saved.
+
+### What is NOT claimed
+The wizard also returns home when a genuinely untouched New Treatment is
+resumed. That does not fire in the test harness — and **it does not fire on
+the original code either**, checked directly. So it is not a regression, and
+asserting it would be asserting something that was never true under those
+conditions. The test asserts the judgement the navigation depends on instead,
+which is the part that changed.
+
+## Printing a record, and printing a period
+
+`app/clinic/js/clinic-print.js` · `tests/test-print.js`
+
+One patient in full — the sheet that goes in a paper file or travels with a
+referral — and a register for a day, week, month or year with the money on it.
+
+**Not `window.open()`.** Pop-ups are blocked by default in several desktop
+browsers and behave badly inside the Android WebView, which is precisely the
+split of devices this clinic uses. The sheet is built into a div in the
+current page and a `@media print` rule hides everything else: no pop-up, no
+second document, no network. It prints offline, which matters because the
+power and the internet in a Ugandan clinic do not fail at the same times.
+
+It shows the sheet on screen first. Paper costs money, and nobody should find
+out the date range was wrong after forty pages.
+
+- **Black on white, always.** This is the one surface where the app's colour
+  tokens are wrong: a clinic on the dark skin would otherwise print white on
+  white and get blank paper, or lay down a full dark background. Asserted at
+  21:1 on two skins.
+- **Local midnight, not UTC.** Kampala is UTC+3, so a UTC "today" silently
+  drops the first three hours of the clinic's day.
+- **The "N/A" placeholder is dropped**, the same way the record screen drops
+  it — a medicine called "N/A" is not a prescription and must not print like
+  one.
+- The query lives in `dashboard.html`, not in the module: the module is handed
+  a loader and never learns what a Supabase is, which is what keeps the
+  single-patient sheet printable with no connection at all.
+
+### The preview was not a preview, and four words were invisible
+`tests/measure-print-fit.js` prints the sheet through Chromium's own print
+pipeline to a **real PDF**, counts the pages, and measures every element
+against the printable edge. A clinic sent three photographs and it answered all
+of them:
+
+| | before | after |
+|---|---|---|
+| "Today / This week / This month / This year" | **1.11:1, 1.16:1, 1.19:1** — invisible on all three dark themes | 21:1, every skin |
+| register preview on a 412px phone | needs 718px, **runs 320px off the side** | the real page at 51%, no sideways scroll |
+| on A4 | fits, 3 pages | fits, 3 pages (was never the problem) |
+
+**The paper was fine all along.** What was broken was the preview and the
+buttons, and the measurement is what separated the two — the first version of
+that measurement got it wrong too, and is worth keeping as a warning.
+
+#### I broke my own colour rule
+The period buttons were `.hm-pbtn.ghost` — `color: var(--text)` on a
+transparent background. That pair is **correct in the toolbar**, where the
+background is `var(--surface)` and the two move together. Inside the sheet the
+background is `#fff` and does **not** move, so on every dark theme those four
+words were near-white on white.
+
+This is exactly the rule written above — *a fill colour and the text on it must
+be defined as a PAIR, in the same place* — and I broke it by borrowing a word
+colour from a palette that changes underneath the surface it sits on. **The
+paper is white in every skin, so its ink is black in every skin**, stated in
+the sheet's own stylesheet and never inherited.
+
+#### The measurement measured the wrong width first
+The first version reported print overflow from the DOM at the **412px phone
+viewport** with print media switched on. Chromium lays a print out at 96dpi:
+A4 is 794px and 12mm margins leave **704px**. So it "found" a table overflowing
+the paper by 282px when that table fits an A4 perfectly well — and would have
+sent the fix off narrowing columns that were never too wide. Measured at 704px,
+nothing hangs off either sheet. *Print layout happens at the paper's width, not
+the screen's.*
+
+#### What you see must be what prints
+The preview was `max-width:820px` and otherwise whatever the phone gave it —
+384px. So a ten-column register was laid out at a width the printer will never
+use, and a clinic's preview was of a page that did not exist. The sheet is now
+a fixed **752px** (704 of content plus its padding) and the whole page is
+**scaled** to the room available.
+
+A transform does not change layout, so the wrapper is given the scaled size by
+hand. Without that the scroll area keeps the full 752px and the page floats in
+grey with scrollbars for space that is not there — the other half of what was
+photographed.
+
+Fitting A4 onto a phone is about **51%**, which turns 11px table text into 6px:
+fine for *"is this the right patient?"*, useless for reading a dose. **"Read
+it"** switches to full size and scrolls. It is not a nicety — the app's own
+viewport meta sets `user-scalable=no`, so pinching is unavailable and that
+button is the only way in.
+
+#### One page or six, but never a heading alone at the foot of one
+`page-break-inside: avoid` on rows was already there. The one usually forgotten
+is **`break-after: avoid` on the heading**, and it is the one that produces
+"MEDICINES GIVEN" stranded at the bottom of page 1 with its table overleaf.
+`thead`/`tfoot` repeat per page.
+
+#### "When this patient has been seen"
+The visits table was *"Previous visits"* and left the current one out — so the
+sheet listed four dates while the patient had been seen five times, and the one
+occasion the sheet was **about** was missing from its own list of occasions.
+Every visit is now in it, newest first, with today's marked *(this visit)* and
+a count underneath. Somebody at the hospital it was sent to has to be able to
+answer "when has this person been seen?" from the page in their hand.
+
+### "It costs no height" is a delta, not a threshold
+The print button went in the patient record's modal header. The first version
+of the test asserted `headH <= 62` and `heroH <= 60` — two numbers picked out
+of the air — and both failed for reasons that had nothing to do with the
+button: the header is 65px because the name and meta are two lines, and the
+hero is 81px because *"Uncomplicated Malaria"* is a long diagnosis that wraps.
+Measured with the button, without it, and without the camera too, **every
+figure was identical**.
+
+**A threshold tests the fixture.** The claim was "this control costs the
+record no height", and the only honest way to check it is to take the control
+away and measure again — the same discipline as putting a bug back to prove a
+fix.
+
+### A register, not a flat wall of ten columns
+
+Three photographs arrived together: the period buttons invisible, the table
+running off the side, and *"the prints for the period are not organised"*.
+
+**Two of the three were already fixed, and the clinic was on an old build.**
+Measured before touching anything: the period buttons are **21:1 black on
+white** in both themes, and the register **fits 704px of A4** with nothing
+hanging off, previewed at 51%. Saying so is worth more than fixing it twice —
+this is the stale-build problem the self-update mechanism exists for, and it
+still needs one more APK install to land.
+
+*(The first probe of that reported the buttons as white-on-green. An unscoped
+`querySelector('[data-period]')` had found one of the dashboard's own finance
+chips. **The instrument was reading the wrong element** — check what a probe
+selected before believing what it says.)*
+
+**The third was real, and it was the design rather than a bug.** Three things
+made it a wall:
+
+- **the date was on every row**, and at 11px in its share of the width it
+  wrapped to three lines — "6 / Apr / 2026" — so every row was three rows tall
+  for a fact that changes once a day;
+- **the clinician's name was on every row**, "DANIEL MUSINGUZI" over two lines,
+  thirty-four times, saying nothing;
+- **nothing could be read without reading all of it.**
+
+So it is grouped **by day** — by month over a year, where three hundred
+day-headings is its own kind of unusable — with the date in the group heading
+and that column gone. One clinician is named once under the title and that
+column goes too; two or more and it stays, shortened to "D. MUSINGUZI". Every
+group carries its own subtotal, which is the figure a clinic checks the cash
+box against. A summary band opens it: patients seen, charged, received, still
+owing and from how many, then the commonest diagnoses.
+
+**And it shows what the old one totalled past.** This clinic's real figures
+include 10,000 charged against 20,000 received, twice. Those rows are named at
+the top — either change is owed or a number was mis-keyed, and a register that
+quietly sums over it is how that stays true for months.
+
+#### The instrument reported a number that named nothing
+`measure-print-fit.js` said *"content needs 724px of 704"* and pointed at no
+element, and two rounds went into guessing at column arithmetic. The reason it
+could not point: **a cell in a `table-layout:fixed` table overflows its content
+box while its bounding rect stays inside the page**, so the per-element check —
+which reads `getBoundingClientRect` — sees nothing at all. Only `scrollWidth`
+does, and only per element does it point anywhere.
+
+Taught to name the culprit, it named two in one run:
+
+```
+TD.num needs 98 in 77   "(UGX 15,000 over)"   the over-payment wording
+TD.num needs 64 in 37   "UGX 25,000"          a money cell in the 38px Meds column
+```
+
+The second is the one that mattered: `cols` counted **7 base columns as 6**, so
+every group heading spanned one column too few and each subtotal's money cells
+landed one column to the left. Invisible on screen, invisible to a
+bounding-rect check, and it would have printed that way.
+
+**A measurement that reports a total without naming what produced it sends the
+next person guessing.** The number was right every time; it was useless until it
+could say which element.
+
+## The flowsheet, and which book decides what a number means
+
+`app/clinic/js/clinic-vitals.js` (the arithmetic) ·
+`app/clinic/js/clinic-flowsheet.js` (the screen) ·
+`supabase/migrations/20260916_vital_flowsheet.sql` ·
+`tests/test-vitals-engine.js`, `tests/test-flowsheet.js`,
+`tests/sql/test-vital-flowsheet.sql` · `tests/measure-vitals.js`
+
+"Monitor her BP every fifteen minutes" and "bring her back next month and we
+will check it again" are the same question over two timescales: is this person
+getting worse, holding, or responding? One reading cannot answer it. Until now
+the app only ever took one, at intake, and wrote it into `clinical_findings`
+as a sentence — which cannot be plotted, compared or counted.
+
+### One sheet, not two
+It reads its own readings and changes how it presents them: several inside six
+hours is a ward observation chart, one a day is somebody whose pressure is
+being followed. The clinician can override it, because a rule about time
+cannot know what is happening in the room. Two screens would be two things to
+keep correct and the second would be the one nobody measured — written in this
+file already about the microphone and about the follow-up dose table, and true
+a third time.
+
+### The bands are the UGANDA guideline's, and this is not a detail
+Every worked example on the internet uses the AHA's 2017 table. The app ships
+the UCG and a clinician can open it, one tap away, on the same phone. Measured
+over 8,130 plausible adult readings (`measure-vitals.js`) the two disagree
+about **what to do** in 2,890 of them — **35.5%**:
+
+| AHA says | the book says | readings |
+|---|---|---|
+| stage 2 | Hypertension, stage 1 | 1,445 |
+| stage 1 | Pre-hypertension | 800 |
+| stage 2 | Hypertensive emergency | 645 |
+
+135/85 is "stage 1 hypertension" under the AHA and **pre-hypertension** in UCG
+4.1.6, whose step 1 for that is three months of lifestyle measures before any
+medicine. Using the familiar table would have printed one answer on the
+flowsheet and the opposite one on the guideline screen beside it, with nothing
+to tell a clinician which the app meant.
+
+### A child is never given an adult stage
+Under 13 uses the book's own paediatric table (UCG 1.1.2.1, *Normal ranges for
+vital signs in children*) and reads *in range / below / above* for that age.
+Over 555 paediatric readings the adult table is wrong **245 times (44.1%)**:
+
+| | |
+|---|---|
+| a child **above** their range, called normal | **205** |
+| a child inside their range, called hypotensive | 40 |
+| a child **below** their range, called normal | **0** |
+
+That last row is stated rather than assumed: the paediatric floors (70, 80, 90)
+all sit at or under the adult 90, so the adult table cannot miss a low child —
+it over-warns instead. **I had written the opposite in two file headers; the
+measurement disproved it and both were corrected.** The harm is the 205, which
+is the direction that gets ignored.
+
+The book's table gives **systolic only**, so a child's diastolic is recorded
+and not judged, and the card says so. Inventing a paediatric diastolic
+threshold to make the display symmetrical is exactly the class of mistake this
+engine exists to avoid.
+
+Where no age is recorded the adult table is used and the result carries
+`assumedAdult`, which the card prints out loud. The age itself is read from
+what intake already wrote — `Patient: Female, 46 years` is the first line of
+`clinical_findings` — so it costs no column and no migration.
+
+### A fall in blood pressure is not always improvement
+This is the only real judgement in the engine. 200/120 → 170/100 is the
+hydralazine working. 95/60 → 80/50 is the same arithmetic and the opposite
+event. **A flowsheet that colours every fall green paints a haemorrhage as a
+cure.** So a reading is judged by whether it moved *toward* the window it
+belongs in, not by the sign of the change, and both directions read correctly
+with one rule. Anything under 5 mmHg is called stable — a cuff read by ear is
+routinely that far off between two honest readings, and labelling that noise
+"worsening" every few minutes trains people to ignore the sheet.
+
+A reading in the emergency band is `CRITICAL` whichever way it moved. 220/130
+down to 200/125 is improvement and is still an emergency; the direction is
+kept separately so the arrow can still say the medicine is working.
+
+MAP is `DBP + (SBP − DBP)/3`, written out because the fraction is what gets
+mangled in transit — `DBP + 31 × (SBP − DBP)` is a real thing people have
+typed. In the database it is a **generated column**: a derived number written
+by a client can disagree with the numbers it came from after a bad sync or an
+older build, and nothing on the far side notices.
+
+### A reading is never edited and never deleted
+The rest of this app can correct a sale, a fee or a patient's name, because
+those are facts about an agreement and an agreement can be wrong. A vital sign
+is not that — it is an observation of a person at an instant, and the instant
+is gone.
+
+Rewriting one in place would also destroy what the sheet is for: every delta,
+arrow and trend line is computed from the row **before**, so changing a reading
+changes the meaning of its neighbours, and a chart somebody has already acted
+on becomes a different chart with no trace.
+
+So there is **no update policy and no delete policy** on the readings — not for
+a nurse, not for a visiting clinician, not for the owner. A mistake is
+**voided**: struck through, with a reason and a name against it, kept visible
+and kept out of the arithmetic, and the corrected reading entered as its own
+row. That is how a paper observation chart has always worked. Who may strike
+one out: the person who recorded it, or the main account — striking out
+somebody else's observation is a statement about what they saw.
+
+`logged_at` is separate from `created_at`. A nurse writes four observations up
+at the end of a ward round and a phone with no signal writes them whenever it
+next has one; the clinical fact is when the reading was **taken**, and a
+back-dated row is marked as such rather than lying about the clock.
+
+The plausibility constraints are **deliberately loose** — they reject what
+cannot be a living human, not what is unlikely. A constraint tight enough to
+catch a typo is tight enough to reject a real reading from a patient in
+extremis, and a rejected insert loses the observation entirely. 60/30 with a
+pulse of 150 is accepted; a temperature of 385 is not.
+
+### Three seconds to enter one
+A split numpad that advances from systolic to diastolic **on its own** after
+three digits, so a blood pressure is six taps and nothing in between. Anything
+that makes a nurse choose a box between the two numbers is what makes the
+fourth observation of the morning the one that does not get written down.
+
+It says what the reading **means** while it is still being typed — the band,
+the MAP and the change on the last one — so the comparison arrives while the
+patient is still in the room rather than after the record is filed.
+
+### The chart is drawn, not fetched
+About a hundred lines of SVG. A charting library from a CDN works perfectly on
+the laptop it was chosen on and is an empty box in Gulu — the same reasoning
+that had the QR encoder written out. Notes appear as **pins** on the trend
+line, because a fall of 30 mmHg means one thing alone and another with a dose
+of hydralazine sitting under it, and nobody reading the chart later can tell
+the two apart unless the chart says so.
+
+Colours are tokens, never the `#0D0D0D` the design called for: four skins × two
+themes is eight combinations and a hex literal is readable in one of them.
+**`--success-ink` is added as the pair for `--success`**, which was a fill being
+asked to be a word — the same mistake `--info-ink` and `--warning-ink` were
+added to undo.
+
+### With no signal
+A reading gets its client-side id **before** it is queued, so the note written
+at the same moment has something to hang off; without that the note is lost, or
+reappears against the wrong reading when the outbox replays — and on this
+screen "which reading was the drug given at" is the whole question.
+
+Striking one out is deliberately **not** queued. Replaying "strike this out"
+against a chart somebody has since worked from would change what it meant hours
+later, with nobody watching. Same rule as the corrections feature.
+
+### Two faults the test found that reading would not have
+- **The note's KIND was dropped on the round trip.** The module works out that
+  "Gave hydralazine 10mg IV" is a medication; the page then posted it as a
+  plain observation, so it read "Noted" on every device except the one that
+  typed it. On a chart whose question is whether the drug or the disease moved
+  the pressure, that is the label that matters.
+- **The patient record has two doors, and only one of them cleaned up.**
+  `openHistModal` (the history search) shares `#histModal` with the
+  active-treatment list but does not wire its header controls. It already hid
+  the footer, with a comment saying it "would be stale here" — and left the
+  camera, the print button and the flowsheet on screen, **still pointing at the
+  patient looked at before**. A photograph of the person in front of you filed
+  against somebody else's record is a record about the wrong patient: the same
+  fault the handoff check was written to stop, arriving by another door. It
+  predates this work — the camera and print buttons have shipped with it — and
+  was found by driving the two entry points in sequence. Put back to prove it:
+  all three buttons reappear, and the test fails.
+
+## The tests
+
+`tests/` — 79 files, ~1500 checks (plus 18 `measure-*.js`, which print numbers
+rather than pass or fail). No framework: each file starts a web server
+over `app/`, opens a real page in Chromium with the network mocked, drives it,
+and prints `PASS`/`FAIL` with the evidence.
+
+```bash
+cd tests && npm install && node run-all.js     # all of them, ~25 min
+node run-all.js dictate                        # just the ones matching
+./tests/run-sql.sh                             # the SQL half, real Postgres
+node tests/measure-qr.js                       # the QR encoder vs a reference
+```
+
+**Give every test its own port.** They are separate processes run in sequence,
+so a duplicate looks harmless — and then one of them starts finding an empty
+page and failing only inside the suite, never on its own.
+`grep -ho "PORT = [0-9]*" test-*.js | sort | uniq -d` answers it.
+
+`tests/README.md` says what each file protects and how to write another. Two
+rules worth repeating here:
+
+- **Never assert on a colour by name.** Measure the contrast ratio against the
+  computed background, in all four skins and both themes. Four separate
+  unreadable-text bugs got past eyes and were caught by a number.
+- **Composite the background, do not take it at face value.** Dark-mode inputs
+  are a 6% white wash over a dark card; reading `rgba(255,255,255,.06)` as
+  opaque white reported a perfectly readable box as 1.16:1 — and would just as
+  easily hide a real failure behind a passing number.
+- **A rule that hides a clinical suggestion needs a test for what it must NOT
+  hide, not only for what it hides.** Every condition taken off the rigidity
+  guard's demotion list has its own assertion in `test-guards.js`, because the
+  next person to read that list will see three entries and reasonably wonder
+  why obstruction and ectopic are missing. The test answers them.
+- **Walk the journey, do not only read it.** Four faults in the treatment
+  process — an invisible charge, a bill that kept a discarded diagnosis's
+  tests, a record describing two patients, and a warning printed three times
+  mid-sentence — were all invisible in the code and obvious within one pass of
+  `probe-journey.js` driving the real screens.
+- **`measure-*.js` files are not tests** — they print a number (30/30
+  dictations placed correctly, 75% of doses read). Re-run them when changing
+  what they measure and put the number in the commit message.
+- **A measurement can corrupt its own input, and it reads exactly like a bug
+  in the thing measured.** Three times now: an HTML tag-stripper run over the
+  book's own "<6 … >12" deleted the span between them (137 phantom lost
+  words); counting a repaired hyphen as a lost word; counting a table rule as
+  a word (3,530 phantom losses). Before believing a bad number, check that the
+  instrument is not the thing that is broken.
+- **A metric that the current code satisfies by construction proves nothing.**
+  `measure-panel-text.js` counts "sentences cut in half" as exactly the pairs
+  the shipped rule joins, so the shipped rule scores 0 whatever it does. The
+  file says so in its own header. A comparison is only worth reading when the
+  thing being measured could have come out badly.
+- **Be willing to publish the measurement that says no.** The panel's layout
+  rule was going to be replaced with the guideline screen's, because two rules
+  for one job drift. The numbers said the screen's rule would cut 1,723
+  sentences in half here. The change was dropped and the number kept, so
+  nobody spends the afternoon rediscovering it.
+- **A `try/catch` around a query can hide a missing engine, not a missing
+  row.** Every FTS index in every book is FTS5 and the shipped WASM has none,
+  so `MATCH` threw on every search for the life of the app and the catch
+  quietly downgraded it to `title LIKE`. It passed every test, because the
+  tests searched for words that were in titles.
+- **Check the test is looking at the page it thinks it is.** Three clinician
+  screens all reported a confident pass at 36 elements each — the same 36,
+  because the session sent every one of them to the sign-up page. A count that
+  is suspiciously equal across different screens is the tell.
+- **Some of this cannot be tested from the browser at all.** RLS policies,
+  security-definer RPCs and triggers are never reached by a test that mocks the
+  network. `tests/run-sql.sh` applies the real migrations to a real Postgres and
+  drives them; it is also the only thing that checks the "idempotent" every
+  migration in this repo claims, by applying it twice.
+- **A SQL test connects as postgres, which is a SUPERUSER and bypasses RLS.**
+  Any check of the form "this role cannot touch that row" must run `set role
+  authenticated` first, or it proves nothing and reads as the policy failing.
+- **`now()` is frozen for a transaction.** A test that writes several rows in
+  one `do $$` block and then asserts on "the latest by created_at" is asking
+  the planner to pick, not the clock. Assert on existence instead.
+- **An element with no size satisfies every layout assertion.** `#histModal`
+  starts at `display:none`, so measuring the follow-up row before showing it
+  returned zeros and "no field is outside the card" passed because nothing had
+  a size at all — reporting the fault fixed. Make it visible first, and put a
+  width assertion beside every overflow assertion: the width check is what
+  caught this.
+- **A test that repeats a constant cannot see that constant going stale.**
+  `test-version.js` asserted `/^Version v151 ·/` while clinic.js said `v151` —
+  they agreed with each other for two months while the service worker drifted
+  to v184 and every clinic read the wrong number off their screen. Assert
+  against the thing that DEFINES the value (here, the worker's `CACHE`), never
+  against a copy of it.
+- **A metric can be right about the conclusion and wrong about the reason.**
+  The paediatric table IS needed — but not for the reason written in two file
+  headers, which said the adult table would read a shocked child as fine.
+  `measure-vitals.js` says that never happens (0 of 555): the paediatric floors
+  all sit at or under the adult 90. The real harm is the 205 readings where a
+  child ABOVE their range is called normal. The measurement was run to justify
+  a decision already taken, and it corrected the justification.
+- **A modal with two entry points needs both of them driven.** `#histModal` is
+  opened by the active-treatment list, which wires its header controls, and by
+  the history search, which does not — so the camera, print and flowsheet
+  buttons stayed on screen pointing at the previous patient. The footer had
+  already been dealt with, years earlier, with a comment explaining exactly
+  this. Reading either door alone shows nothing.
+- **A check that reports "nothing happened" needs proof it could have seen
+  something happen.** "No image was uploaded" is also what a detector that
+  inspects nothing returns. `test-clinical-photo.js` posts the bytes it just
+  took and requires the check to catch them, immediately after asserting it
+  caught nothing.
+- **A flaky test guarding a delivery mechanism is not flaky until proven so.**
+  `test-selfupdate.js` failed about half the time for weeks and was read as
+  noise. It was reporting a real race in the service worker that silently
+  walked back a completed update — the thing that decides whether any fix ever
+  reaches a clinic. Chase the flake in the mechanism before blaming the test.
+- **On an intermittent failure, a green run after the change proves nothing —
+  put the bug BACK.** Ten clean runs on a 50% flake is ~0.1% likely by chance,
+  which is suggestive and not proof. Restoring the old ordering brought the
+  failure straight back (4 of 6), and that is the half of the experiment that
+  turns correlation into cause.
+- **Assert a DELTA, not a threshold, for "this costs nothing".** `headH <= 62`
+  tests the fixture; removing the control and measuring again tests the claim.
+  Two such thresholds failed in `test-print.js` for reasons that had nothing
+  to do with the thing being added — a two-line name, and a long diagnosis
+  that wraps.
+- **Before asserting you PRESERVED a behaviour, check it happens at all.**
+  `test-wizard-draft.js` was going to assert that an untouched wizard still
+  returns to the dashboard. It does not fire in the harness — and it does not
+  fire on the original code either. Asserting it would have been asserting
+  something that was never true, and the "regression" would have been chased
+  for an afternoon.
+- **A scanner that under-reports is worse than no scanner**, because it is the
+  one that says the problem is fixed. `measure-browser-support.js` found 12 of
+  36 real sites with clever regexes and four imaginary ones (CSS hex colours
+  read as JS private fields). Prefer complete recall and let a reader judge.
+- **Explaining a wall is not getting over it.** The sign-in-email message was
+  accurate, well-worded, and left a clinic permanently stuck on an address that
+  takes no mail, pointing at a dashboard setting nobody there can reach. If the
+  honest message ends "ask somebody else", the work is not finished.
+- **`error.status` is not where supabase-js puts it.** A `FunctionsHttpError`
+  carries the Response on `error.context`; reading `.status` finds `undefined`
+  for every refusal. That turned a wrong password into "the helper is not
+  installed on your server" — a clinic sent to their developer over a typo.
+- **Print layout happens at the PAPER's width, not the screen's.** Chromium
+  lays a print out at 96dpi — A4 is 794px, less margins. `measure-print-fit.js`
+  first measured overflow at a 412px phone viewport with print media on, and
+  "found" a table 282px over the edge that fits an A4 perfectly. Resize the
+  viewport to the paper before believing any print measurement.
+- **A measurement that names no element is half a measurement.**
+  `measure-print-fit.js` reported "content needs 724px of 704" and pointed
+  nowhere, and two rounds went into guessing column arithmetic. A cell in a
+  `table-layout:fixed` table overflows while its bounding rect stays inside the
+  page, so the per-element rect check sees nothing — only per-element
+  `scrollWidth` does. Taught to name the culprit it found two faults in one
+  run, one of which was an off-by-one column count that would have printed
+  every subtotal's money in the wrong column.
+- **Check what the probe actually selected.** An unscoped
+  `querySelector('[data-period]')` found the dashboard's own finance chip
+  instead of the print dialog's button, and reported a green button that was
+  never on the screen in the photograph. The measurement was of the wrong
+  element, not of the wrong thing.
+- **A string test can match the thing that REPLACED what it was checking for.**
+  `/Seen by/i` was meant to detect the "Seen by" column; it also matched the
+  "all seen by DANIEL MUSINGUZI" line printed under the heading *because* the
+  column had been removed — so it reported the column present exactly when the
+  fix had worked. Assert on the element, not on words that appear elsewhere.
+- **A colour token is only safe on the surface it was paired with.**
+  `color: var(--text)` is right in the toolbar (`var(--surface)` behind it) and
+  wrong two elements away inside a sheet that is always `#fff` — where it was
+  1.11:1 on dark themes. If a surface does not follow the theme, nothing on it
+  may.
+- **`continue-on-error: true` is a green tick that cannot go red.** Two deploy
+  steps using a revoked token both "succeeded" for eleven days, and I read
+  those ticks as proof the token was fine — twice, out loud, wrongly. A step
+  allowed to fail must still emit a `::warning::` saying it did.
+- **Write the failure where it can be READ.** A GitHub log download is served
+  from Azure blob storage and a corporate proxy will refuse it (403);
+  annotations come from the GitHub API and always arrive. `::error::<fn>
+  failed` carried no reason for a fortnight; putting the tool's own last lines
+  into the annotation diagnosed it in one run.
+- **A check that tests non-empty is not a check.** `✓ SUPABASE_ACCESS_TOKEN is
+  set` was true of a revoked token. Call the API with it.
+- **A page that claims to need nothing must be tested with nothing allowed.**
+  `test-get-page.js` ABORTS every off-origin request rather than mocking it,
+  and asserts the count is zero. Mock them and a stylesheet, a font or an
+  analytics tag creeps back into the one page whose whole job is to open on a
+  bad connection — and the test goes on passing.
+- **"Does it exist" is not "can it be seen".** `clinic-open.js` checked
+  `if (!list) return false` and then scrolled to the element — but the element
+  was on a hidden slide, so the check passed, the retry loop stopped, and
+  `scrollIntoView` did nothing and said nothing. A readiness predicate that
+  tests presence rather than visibility declares success at an invisible
+  thing. `offsetParent !== null` is the question.
+- **Calling a function is not the same as it working.** `openSectionView`
+  returns silently on three different refusals, and the router did
+  `openSectionView('active'); return true;` — success announced without ever
+  looking. It is the same "does it exist vs can it be seen" fault documented
+  twenty lines above it in this file, reintroduced one branch higher, in the
+  same file, in the same round. **If a function can refuse without saying so,
+  the caller has to ask a second question**, and the test has to force the
+  refusal — here by moving the element away and stubbing the opener to do
+  nothing.
+- **A perfect test of a mechanism proves nothing about whether the mechanism
+  is switched ON.** `test-selfupdate.js` drives `clinic-sw.js` exhaustively and
+  passes — by constructing the worker itself, so it never asked who registers
+  it. Nobody did: `pwa-install.js` returned early on Capacitor and unregistered
+  what it found, so the entire self-update mechanism had never run on a phone,
+  for its whole life, while every round said the screens update themselves.
+  Test the wiring, not only the component — and test it in the state the
+  feature exists for.
+- **The version line failed only where nobody looks.** It read the real build
+  in a browser and `v?` in the installed app, so every check of a version
+  complaint was made on the copy that works. When a report and your own
+  observation disagree, ask which of the two of you is looking at the thing
+  being complained about.
+- **A symptom reported TWICE is evidence against your explanation.** The first
+  report of "Active takes me to the home page" was answered, correctly, with
+  "the code is right, your phone is on an older build". The second report was
+  the same sentence — and repeating the answer would have been comfortable and
+  wrong. Going back in found two real faults, both written in the round that
+  produced the reassurance.
+- **Drive the condition the feature actually lives in.** A widget tap ALWAYS
+  arrives on a page that was just backgrounded — the clinician was on the home
+  screen. Every deep-link assertion called `go()` on a wide-awake page, which
+  is the one situation that never happens in the field. Driving the real one
+  (hidden, wait, tap, wake) over nine combinations plus a cold start is what
+  proved the code was already correct and the phone was simply on an older
+  build. "Broken" and "has not arrived yet" look identical from a screenshot.
+- **A seed that runs on every page load can erase what it is measuring.**
+  `probe-widget-resume.js` cleared `sessionStorage` in its init script — and
+  `sessionStorage` is exactly where the router parks the tapped target across
+  a navigation. It reported the app broken on BOTH builds until the seed was
+  corrected. Anything installed with `addInitScript` runs again on every
+  navigation; think about what the page under test keeps there.
+- **An investigation running while you fix the thing verifies a moving
+  target.** A background review of the widget deep link was still going when
+  the router was added to the five pages that lacked it. Its verifier then
+  "refuted" the finding — correctly, against the tree in front of it, which
+  already had the fix. The finding was true when it was made and false when it
+  was checked, and nothing in either agent could see that. Read a concurrent
+  review's verdicts against the commit they were made on, not against HEAD.
+- **A probe can measure the wrong element after you fix the thing.**
+  `probe-widget-open.js` went on reporting `listVisible: false` for Active
+  after the fix, because it was still looking at the card on the hidden slide
+  while the feature now opens as a full-screen overlay. The number was
+  correct and about the wrong object — check what a probe selected before
+  reading its verdict as a failure.
+- **A bug that only fires in the installed app looks fixed in a browser.**
+  `native-bridge.js` repainted the status bar green on every load, inside the
+  APK only. Whoever checks a colour report is usually on the web version,
+  where that line never runs. `test-chrome.js` stubs the Capacitor bridge and
+  asserts on what the app ASKED the phone for, twice — once with the new
+  native plugin present and once without, because "without" is what almost
+  every phone in the field is.
+- **A generator that writes a broken manifest and exits 0 is the most
+  damaging thing in the build.** An apostrophe in a `SHELL` comment made
+  `make_version_json.py` list a sentence as a file; an installed app throws
+  away the entire staged update on the first bad entry and calls it a dropped
+  connection. Every listed file is now checked to exist, and the generator
+  refuses rather than writing. Strip comments before parsing code with a
+  regex — or better, check the OUTPUT is usable rather than the input pretty.
+- **"Different" is not "newer".** The service worker took any build whose name
+  differed from its own, so republishing an old branch would have downgraded
+  every clinic in the country and reported it as a successful update. Put the
+  old worker back and the test says *"still serving ANCIENT"* — which is how
+  you know the guard is guarding something.
+- **`display-mode: standalone` does not mean "installed app".** It is true of
+  any icon added to a home screen. Testing it as "they already have the app"
+  hid the Android app offer from every clinic that had added the portal to
+  their home screen, which was all of them. Only the Capacitor bridge answers
+  that question.
+- **Test what a role CANNOT do, not only what the owner can.** Every
+  correction in `test-owner-corrections.sql` is driven as a nurse, a
+  receptionist, a visiting clinician and a stranger — and separately by
+  deleting the row directly, which is exactly what a hidden button leaves
+  open.

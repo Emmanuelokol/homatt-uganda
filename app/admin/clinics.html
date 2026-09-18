@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Homatt Admin — Clinics</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -56,14 +56,16 @@
               <option value="pending">Pending</option>
               <option value="approved">Approved</option>
               <option value="active">Active</option>
+              <option value="suspended">Suspended</option>
               <option value="rejected">Rejected</option>
+              <option value="removed">Removed</option>
             </select>
             <input type="text" id="searchClinics" placeholder="Search by name..." style="width:180px">
           </div>
         </div>
         <table class="admin-table">
           <thead>
-            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>Consultation Fee</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+            <tr><th>Name</th><th>District / City</th><th>Phone</th><th>Consultation Fee</th><th>Plan</th><th>Verified</th><th>Status</th><th>Created</th><th>Actions</th></tr>
           </thead>
           <tbody id="clinicsBody">
             <tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">Loading...</td></tr>
@@ -72,6 +74,37 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- Delete facility confirmation (in-page: window.prompt is disabled in some
+     WebViews, which silently blocked the old typed-name confirmation) -->
+<div class="admin-modal-overlay" id="deleteClinicModal" style="display:none">
+  <div class="admin-modal" style="max-width:460px">
+    <div class="admin-modal-header">
+      <div class="admin-modal-title" style="color:#C62828">Delete facility permanently</div>
+      <button class="admin-modal-close" onclick="closeDeleteClinicModal()"><span class="material-icons-outlined">close</span></button>
+    </div>
+    <div style="padding:18px 20px">
+      <p style="font-size:14px;color:#333;margin-bottom:10px">
+        This permanently deletes <strong id="dcName">this clinic</strong>, all of its records
+        (consultations, stock, sales, referrals) and its staff logins. Patients keep their own
+        booking history.
+      </p>
+      <p style="font-size:13px;color:#C62828;font-weight:700;margin-bottom:14px">
+        This cannot be undone. To take a facility offline temporarily, use Suspend instead.
+      </p>
+      <label style="display:block;font-size:12px;font-weight:700;color:#5F6368;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">
+        Type the facility name to confirm
+      </label>
+      <input id="dcInput" type="text" autocomplete="off"
+        style="width:100%;padding:12px 14px;border:1.5px solid #E0E0E0;border-radius:12px;font-size:15px;font-family:inherit;outline:none;box-sizing:border-box">
+      <div id="dcError" style="display:none;background:#FFEBEE;color:#C62828;border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn-admin secondary" style="flex:1;justify-content:center" onclick="closeDeleteClinicModal()">Cancel</button>
+        <button id="dcConfirmBtn" class="btn-admin danger" style="flex:1;justify-content:center" disabled>Delete permanently</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Add/Edit Clinic Modal -->
@@ -136,24 +169,23 @@
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
             <div class="admin-form-group">
               <label>District *</label>
-              <input type="text" id="clinicDistrict" placeholder="e.g. Kampala">
+              <input type="text" id="clinicDistrict" placeholder="e.g. Mukono">
             </div>
             <div class="admin-form-group">
-              <label>City / Subcounty</label>
-              <input type="text" id="clinicCity" placeholder="e.g. Nakawa">
+              <label>County</label>
+              <input type="text" id="clinicCounty" placeholder="e.g. Mukono County">
+            </div>
+            <div class="admin-form-group">
+              <label>Subcounty / Town</label>
+              <input type="text" id="clinicCity" placeholder="e.g. Mukono Town">
+            </div>
+            <div class="admin-form-group">
+              <label>Parish / Village</label>
+              <input type="text" id="clinicParish" placeholder="e.g. Butto">
             </div>
             <div class="admin-form-group" style="grid-column:span 2">
               <label>Full Address</label>
               <input type="text" id="clinicAddress" placeholder="Plot number, street, area">
-            </div>
-            <div class="admin-form-group">
-              <label>Latitude (GPS)</label>
-              <input type="number" id="clinicLat" placeholder="e.g. 0.3476" step="0.0001">
-              <div style="font-size:11px;color:#9AA0A6;margin-top:3px">Use Google Maps to find exact coordinates</div>
-            </div>
-            <div class="admin-form-group">
-              <label>Longitude (GPS)</label>
-              <input type="number" id="clinicLng" placeholder="e.g. 32.5825" step="0.0001">
             </div>
           </div>
         </div>
@@ -227,6 +259,14 @@
                 <option value="rejected">Rejected</option>
               </select>
             </div>
+            <div class="admin-form-group">
+              <label>Subscription Plan</label>
+              <select id="clinicTier">
+                <option value="basic">Basic — stock, quick sale, alerts, consultations, bookings, payments</option>
+                <option value="premium">Premium — everything incl. reports, follow-up care, lab services</option>
+              </select>
+            </div>
+
             <div style="display:flex;align-items:center;gap:10px;padding:10px 0">
               <label class="toggle-label" style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
                 <input type="checkbox" id="clinicVerified" style="width:18px;height:18px;accent-color:#1B5E20"> Verified by Homatt
@@ -323,11 +363,19 @@
         </div>
         <div class="admin-form-group">
           <label>District *</label>
-          <input type="text" id="caClinicDistrict" placeholder="e.g. Kampala">
+          <input type="text" id="caClinicDistrict" placeholder="e.g. Mukono">
         </div>
         <div class="admin-form-group">
-          <label>City / Area</label>
-          <input type="text" id="caClinicCity" placeholder="e.g. Ntinda">
+          <label>County</label>
+          <input type="text" id="caClinicCounty" placeholder="e.g. Mukono County">
+        </div>
+        <div class="admin-form-group">
+          <label>Subcounty / Town</label>
+          <input type="text" id="caClinicCity" placeholder="e.g. Mukono Town">
+        </div>
+        <div class="admin-form-group">
+          <label>Parish / Village</label>
+          <input type="text" id="caClinicParish" placeholder="e.g. Butto">
         </div>
         <div class="admin-form-group" style="grid-column:span 2">
           <label>Full Address</label>
@@ -542,7 +590,10 @@ async function loadClinics() {
     return;
   }
   try {
-    var res = await supa.from('clinics').select('*').order('created_at', {ascending:false});
+    var res = await Promise.race([
+      supa.from('clinics').select('*').order('created_at', {ascending:false}),
+      new Promise(function(_, rej){ setTimeout(function(){ rej(new Error('timeout')); }, 10000); })
+    ]);
     if (res.error) {
       showAdminToast('Error loading clinics: ' + res.error.message, 'error');
       allClinics = [];
@@ -551,10 +602,21 @@ async function loadClinics() {
       allClinics = res.data || [];
     }
   } catch(e) {
-    showAdminToast('Network error loading clinics', 'error');
+    showAdminToast(e.message === 'timeout' ? 'Loading timed out — check your connection' : 'Network error loading clinics', 'error');
     allClinics = [];
   }
   renderClinics();
+}
+
+// Subscription plan badge: Premium (green), Basic (grey), plus trial
+// days remaining while the 30-day free onboarding is running.
+function planBadgeHtml(c) {
+  if (!('subscription_tier' in (c || {})) || !c.subscription_tier) return '—';
+  var tier = c.subscription_tier === 'premium' ? 'Premium' : 'Basic';
+  var color = c.subscription_tier === 'premium' ? '#1B5E20' : '#616161';
+  var bg    = c.subscription_tier === 'premium' ? '#E8F5E9' : '#F5F5F5';
+  var html = '<span style="background:' + bg + ';color:' + color + ';font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px">' + tier + '</span>';
+  return html;
 }
 
 function renderClinics() {
@@ -565,7 +627,7 @@ function renderClinics() {
   });
   var tbody = document.getElementById('clinicsBody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:#9AA0A6">No clinics found</td></tr>';
     return;
   }
   tbody.innerHTML = filtered.map(function(c) {
@@ -575,13 +637,17 @@ function renderClinics() {
       '<td>' + ([c.district,c.city].filter(Boolean).join(', ')||'—') + '</td>' +
       '<td style="font-size:12px">' + (c.phone||'—') + '</td>' +
       '<td style="font-size:12px;font-weight:600;color:#1B5E20">' + fee + '</td>' +
+      '<td>' + planBadgeHtml(c) + '</td>' +
       '<td>' + (c.verified ? '<span class="status-badge resolved">Verified</span>' : '<span class="status-badge open">Unverified</span>') + '</td>' +
       '<td><span class="status-badge ' + (c.status||'approved') + '">' + (c.status||'approved') + '</span></td>' +
       '<td style="font-size:12px;color:#9AA0A6">' + formatShortDate(c.created_at) + '</td>' +
-      '<td style="display:flex;gap:6px;flex-wrap:wrap">' +
-        '<button class="btn-admin secondary sm" onclick="openModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">edit</span></button>' +
-        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + c.id + '\')"><span class="material-icons-outlined" style="font-size:14px">person_add</span></button>' +
-        (!c.verified ? '<button class="btn-admin primary sm" onclick="toggleVerify(\'' + c.id + '\',true)">Verify</button>' : '') +
+      '<td style="display:flex;gap:4px;flex-wrap:wrap">' +
+        '<button class="btn-admin secondary sm" onclick="openModal(\'' + c.id + '\')" title="Edit"><span class="material-icons-outlined" style="font-size:13px">edit</span></button>' +
+        '<button class="btn-admin info sm" onclick="openStaffModal(\'' + c.id + '\')" title="Add staff"><span class="material-icons-outlined" style="font-size:13px">person_add</span></button>' +
+        (!c.verified ? '<button class="btn-admin primary sm" onclick="toggleVerify(\'' + c.id + '\',true)" title="Verify">✓</button>' : '') +
+        (c.status !== 'suspended' && c.status !== 'removed' ? '<button class="btn-admin warning sm" onclick="toggleClinicStatus(\'' + c.id + '\',\'suspended\')" title="Suspend"><span class="material-icons-outlined" style="font-size:13px">block</span></button>' : '') +
+        (c.status === 'suspended' ? '<button class="btn-admin success sm" onclick="toggleClinicStatus(\'' + c.id + '\',\'approved\')" title="Reactivate"><span class="material-icons-outlined" style="font-size:13px">check_circle</span></button>' : '') +
+        (c.status !== 'removed' ? '<button class="btn-admin danger sm" onclick="removeClinic(\'' + c.id + '\')" title="Remove"><span class="material-icons-outlined" style="font-size:13px">delete</span></button>' : '') +
       '</td>' +
     '</tr>';
   }).join('');
@@ -600,12 +666,14 @@ function openModal(id) {
   document.getElementById('clinicContact').value = c?.contact_person || '';
   document.getElementById('clinicLicense').value = c?.license_number || '';
   document.getElementById('clinicDistrict').value = c?.district || '';
+  document.getElementById('clinicCounty').value = c?.county || '';
   document.getElementById('clinicCity').value = c?.city || '';
+  document.getElementById('clinicParish').value = c?.parish || '';
   document.getElementById('clinicAddress').value = c?.address || '';
-  document.getElementById('clinicLat').value = c?.latitude || '';
-  document.getElementById('clinicLng').value = c?.longitude || '';
   document.getElementById('clinicCommission').value = c?.commission_rate ?? 15;
   document.getElementById('clinicStatus').value = c?.status || 'approved';
+  document.getElementById('clinicTier').value = c?.subscription_tier || 'basic';
+  window._origTier = c?.subscription_tier || 'basic';
   document.getElementById('clinicVerified').checked = c?.verified || false;
   document.getElementById('clinicActive').checked = c?.active !== false;
   document.getElementById('clinicNotes').value = c?.notes || '';
@@ -653,15 +721,15 @@ async function saveClinic() {
     name: name,
     description: document.getElementById('clinicDescription').value.trim() || null,
     district: document.getElementById('clinicDistrict').value.trim() || null,
-    city: document.getElementById('clinicCity').value.trim() || null,
+    county:   document.getElementById('clinicCounty').value.trim() || null,
+    city:     document.getElementById('clinicCity').value.trim() || null,
+    parish:   document.getElementById('clinicParish').value.trim() || null,
     address: document.getElementById('clinicAddress').value.trim() || null,
     phone: document.getElementById('clinicPhone').value.trim() || null,
     whatsapp: document.getElementById('clinicWhatsapp').value.trim() || null,
     email: document.getElementById('clinicEmail').value.trim() || null,
     contact_person: document.getElementById('clinicContact').value.trim() || null,
     license_number: document.getElementById('clinicLicense').value.trim() || null,
-    latitude: parseFloat(document.getElementById('clinicLat').value) || null,
-    longitude: parseFloat(document.getElementById('clinicLng').value) || null,
     commission_rate: Number(document.getElementById('clinicCommission').value) || 15,
     consultation_fee: Number(document.getElementById('clinicFeeGeneral').value) || null,
     status: document.getElementById('clinicStatus').value,
@@ -690,6 +758,24 @@ async function saveClinic() {
   btn.innerHTML = '<span class="material-icons-outlined" style="font-size:16px">save</span> Save Clinic';
 
   if (result.error) { showAdminToast('Save failed: ' + result.error.message, 'error'); return; }
+
+  // Subscription plan goes through an admin-only RPC (a DB trigger blocks
+  // direct tier edits). Only called when the plan or trial date changed.
+  var newTier = document.getElementById('clinicTier').value;
+  if (id && newTier !== window._origTier) {
+    var tierRes = await supa.rpc('admin_set_clinic_tier', {
+      p_clinic_id: id, p_tier: newTier, p_trial_ends: null,
+    });
+    var tierErr = tierRes.error ? tierRes.error.message
+      : (tierRes.data && tierRes.data.ok === false ? tierRes.data.error : null);
+    if (tierErr) {
+      showAdminToast('Clinic saved, but the plan was NOT changed: ' + tierErr
+        + (/could not find the function/i.test(tierErr) ? ' — run the subscription tier SQL first.' : ''), 'error');
+      await loadClinics();
+      return;
+    }
+  }
+
   closeModal();
   await loadClinics();
   showAdminToast(id ? 'Clinic updated!' : 'Clinic added!', 'success');
@@ -763,7 +849,7 @@ window.copyStaffCreds = function() {
 
 /* ── Create Clinic Account Modal ── */
 function openCreateClinicAccountModal() {
-  ['caClinicName','caClinicDistrict','caClinicCity','caClinicAddress','caClinicPhone','caClinicWhatsapp','caClinicContact','caClinicLicense','caClinicEmail','caClinicPassword'].forEach(function(id){
+  ['caClinicName','caClinicDistrict','caClinicCounty','caClinicCity','caClinicParish','caClinicAddress','caClinicPhone','caClinicWhatsapp','caClinicContact','caClinicLicense','caClinicEmail','caClinicPassword'].forEach(function(id){
     document.getElementById(id).value = '';
   });
   document.getElementById('caClinicFee').value = '';
@@ -784,7 +870,9 @@ var _lastClinicCredentials = '';
 async function submitCreateClinicAccount() {
   var name     = document.getElementById('caClinicName').value.trim();
   var district = document.getElementById('caClinicDistrict').value.trim();
+  var county   = document.getElementById('caClinicCounty').value.trim();
   var city     = document.getElementById('caClinicCity').value.trim();
+  var parish   = document.getElementById('caClinicParish').value.trim();
   var address  = document.getElementById('caClinicAddress').value.trim();
   var phone    = document.getElementById('caClinicPhone').value.trim();
   var whatsapp = document.getElementById('caClinicWhatsapp').value.trim();
@@ -836,7 +924,9 @@ async function submitCreateClinicAccount() {
     email: email, auth_user_id: authUserId,
     commission_rate: comm
   };
-  if (city) insertPayload.city = city;
+  if (county)  insertPayload.county  = county;
+  if (city)    insertPayload.city    = city;
+  if (parish)  insertPayload.parish  = parish;
   if (address) insertPayload.address = address;
   if (phone) insertPayload.phone = phone;
   if (whatsapp) insertPayload.whatsapp = whatsapp;
@@ -872,6 +962,107 @@ async function submitCreateClinicAccount() {
 
 function copyClinicCredentials() {
   navigator.clipboard.writeText(_lastClinicCredentials).then(function(){ showAdminToast('Copied!', 'success'); }).catch(function(){ showAdminToast('Copy failed', 'error'); });
+}
+
+/* ── Suspend / Remove clinic ── */
+async function toggleClinicStatus(id, newStatus) {
+  var supa = adminSupa();
+  if (!supa) { showAdminToast('Demo mode — cannot update', 'default'); return; }
+  var isActive = (newStatus === 'approved' || newStatus === 'active');
+  var { error } = await supa.from('clinics').update({ status: newStatus, active: isActive, updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) { showAdminToast('Failed: ' + error.message, 'error'); return; }
+  await loadClinics();
+  var msgs = { suspended: 'Clinic suspended', approved: 'Clinic reactivated!' };
+  showAdminToast(msgs[newStatus] || 'Status updated', isActive ? 'success' : 'default');
+}
+
+// PERMANENT delete of a facility. Uses an IN-PAGE confirmation dialog rather
+// than window.confirm/prompt: Android WebViews commonly disable prompt()
+// (it returns null instantly), which made the typed-name check always fail —
+// that is why "delete was not working". Falls back through three levels so the
+// admin can always remove a facility:
+//   1. admin_delete_clinic RPC  → full wipe incl. staff logins  (best)
+//   2. client-side cascade      → deletes the clinic's rows then the clinic
+//   3. soft delete              → marks it removed so it leaves the live list
+function removeClinic(id) {
+  var c = allClinics.find(function(x){ return x.id === id; });
+  var name = c ? c.name : 'this clinic';
+  var ov = document.getElementById('deleteClinicModal');
+  document.getElementById('dcName').textContent = name;
+  document.getElementById('dcInput').value = '';
+  document.getElementById('dcError').style.display = 'none';
+  var btn = document.getElementById('dcConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Delete permanently';
+  document.getElementById('dcInput').oninput = function() {
+    btn.disabled = this.value.trim().toLowerCase() !== String(name).trim().toLowerCase();
+  };
+  btn.onclick = function() { _doDeleteClinic(id, name); };
+  ov.style.display = 'flex';
+  setTimeout(function(){ document.getElementById('dcInput').focus(); }, 80);
+}
+function closeDeleteClinicModal() {
+  var ov = document.getElementById('deleteClinicModal');
+  if (ov) ov.style.display = 'none';
+}
+
+async function _doDeleteClinic(id, name) {
+  var supa = adminSupa();
+  var btn = document.getElementById('dcConfirmBtn');
+  var errBox = document.getElementById('dcError');
+  function fail(msg) {
+    errBox.textContent = msg;
+    errBox.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Delete permanently';
+  }
+  if (!supa) { fail('Demo mode — cannot delete.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+
+  // 1. Proper server-side wipe.
+  var r = await supa.rpc('admin_delete_clinic', { p_clinic_id: id });
+  var err = r.error ? r.error.message : (r.data && r.data.ok === false ? r.data.error : null);
+  if (!err) {
+    closeDeleteClinicModal();
+    await loadClinics();
+    showAdminToast('"' + name + '" permanently deleted' +
+      (r.data && r.data.staff_logins_removed ? ' (' + r.data.staff_logins_removed + ' staff login' + (r.data.staff_logins_removed !== 1 ? 's' : '') + ' removed)' : ''), 'default');
+    return;
+  }
+
+  // 2. RPC not installed on this database → delete what we can from the client.
+  var rpcMissing = /could not find the function|does not exist|schema cache/i.test(err);
+  if (rpcMissing) {
+    var tables = ['clinic_referrals','clinic_quick_sales','clinic_inventory_txns','clinic_inventory',
+                  'clinic_payments','clinic_followups','e_prescriptions','clinic_diagnoses',
+                  'clinic_patients','clinic_staff_invites','portal_users'];
+    var blocked = [];
+    for (var i = 0; i < tables.length; i++) {
+      try {
+        var d = await supa.from(tables[i]).delete().eq('clinic_id', id);
+        if (d.error && !/does not exist|schema cache/i.test(d.error.message || '')) blocked.push(tables[i]);
+      } catch (e) { blocked.push(tables[i]); }
+    }
+    var dc = await supa.from('clinics').delete().eq('id', id);
+    if (!dc.error) {
+      closeDeleteClinicModal();
+      await loadClinics();
+      showAdminToast('"' + name + '" deleted' + (blocked.length ? ' (some records were protected — run the delete-clinic SQL for a full wipe)' : ''), 'default');
+      return;
+    }
+    // 3. Even the clinic row is protected → soft delete so it leaves the list.
+    var sd = await supa.from('clinics').update({ status: 'removed' }).eq('id', id);
+    if (!sd.error) {
+      closeDeleteClinicModal();
+      await loadClinics();
+      showAdminToast('"' + name + '" removed from the live list. Run the delete-clinic SQL (20260726) in Supabase for a full permanent wipe.', 'default');
+      return;
+    }
+    fail('Could not delete: ' + (dc.error.message || sd.error.message) + ' — run the delete-clinic SQL (20260726) in Supabase, then retry.');
+    return;
+  }
+  fail('Delete failed: ' + err);
 }
 </script>
 </body>
