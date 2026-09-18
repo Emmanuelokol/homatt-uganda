@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v202';
+const CACHE = 'homatt-clinic-v203';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -942,9 +942,26 @@ self.addEventListener('fetch', (event) => {
                        (await idbAnyPage());
         if (idbHit) return idbHit;
 
-        // 3) Never cached yet (true first run) → wait for the network, then the
-        //    self-healing placeholder.
-        const net = await netUpdate;
+        /* 3) Never cached yet (true first run) → wait for the network, then the
+         *    self-healing placeholder.
+         *
+         * THE NETWORK IS TRIED EVEN WHEN NO REVALIDATION WAS DUE. `netUpdate`
+         * is `Promise.resolve(null)` unless a refresh happened to fall due, so
+         * a page with nothing cached and a recent revalidation stamp went
+         * straight to the placeholder with the real page one fetch away.
+         *
+         * That combination is exactly the risk that kept this worker out of
+         * the installed app for its whole life — "if its cache is empty it can
+         * serve the placeholder INSTEAD of the bundled page". Inside the APK
+         * the network IS the bundle and cannot fail, so trying it first means
+         * the placeholder can only ever appear when there is genuinely nothing
+         * to show. Answering the objection is what makes registering the
+         * worker in the app safe. */
+        let net = await netUpdate;
+        if (!net) {
+          net = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+            .catch(() => null);
+        }
         if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) return net;
         return offlineFallbackResponse();
       } catch (e) {

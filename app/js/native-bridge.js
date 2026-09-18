@@ -630,11 +630,26 @@
   // ─── SERVICE WORKER REGISTRATION ────────────────────────────────────────────
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
+      /* ONE WORKER PER AREA, and /clinic/ is not this one's.
+       *
+       * The clinic portal has its own worker — clinic-sw.js, scope './' —
+       * which is the whole self-update mechanism: it holds the build name,
+       * the shell list, the staged swap and the downgrade guard, and it is
+       * what Settings > App version reads. Registering the patient app's
+       * root-scoped worker from a clinic page put TWO workers on the same
+       * pages (measured: 2 registrations on the web version), and inside the
+       * APK it was the only one there at all — so the clinic pages were
+       * controlled by a worker that knows nothing about clinic builds, has no
+       * homatt-clinic cache, and can never fetch a newer one.
+       *
+       * That is the shape of the reported fault: an installed app that could
+       * not update itself and printed "Version v?" while the web version
+       * beside it printed the real build. */
+      if (location.pathname.includes('/clinic/')) return;
       // Determine the SW path relative to where we are in the URL tree
       const swPath = location.pathname.includes('/admin/') ||
                      location.pathname.includes('/pharmacy/') ||
-                     location.pathname.includes('/rider/') ||
-                     location.pathname.includes('/clinic/')
+                     location.pathname.includes('/rider/')
         ? '../sw.js' : './sw.js';
       navigator.serviceWorker.register(swPath, { scope: swPath.replace('sw.js', '') })
         .catch(() => {}); // silently fail on non-HTTPS or unsupported env

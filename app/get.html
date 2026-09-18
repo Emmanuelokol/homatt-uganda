@@ -151,6 +151,35 @@
         reached rather than starting again.
       </p>
     </details>
+
+    <!-- CHROME REFUSING THE FILE OUTRIGHT, which is a different fault from the
+         one above and needs a different answer.
+         Reported as "in the chrome, it wasn't downloading ... it was about the
+         security issue", and then the same file downloaded perfectly in
+         Firefox. Chrome treats every .apk as a dangerous file type and blocks
+         it by default; the button that lets it through is deliberately small
+         and easy to miss, and nothing on the page said it existed. Somebody
+         who does not know that reads it as "the app is broken" or, worse, as
+         "this file is a virus" — and stops. Naming the exact words Chrome
+         uses is what makes it findable. -->
+    <details class="stuck">
+      <summary>Chrome says it is blocked or dangerous?</summary>
+      <p>
+        That is normal and it is not about this file. Chrome refuses
+        <b>every</b> app file that does not come from the Play Store, however
+        safe it is. Nothing is wrong with the download.
+      </p>
+      <p>
+        Pull down the notification, or open Chrome's <b>Downloads</b>, find
+        the blocked line and tap <b>Download anyway</b> — it may be behind
+        the small <b>⋮</b> or an arrow beside the message.
+      </p>
+      <p>
+        If you cannot find it, use <b>Firefox</b>, <b>Samsung Internet</b> or
+        <b>Opera</b> instead — open this page there and tap the same button.
+        It is the identical file, and it installs the same way.
+      </p>
+    </details>
     <div class="url">https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk</div>
   </div>
 

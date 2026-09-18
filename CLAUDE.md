@@ -772,6 +772,83 @@ takes **one more APK install** to get it. After that one, the portal updates
 itself, and Settings → *App version* says which build it is running and lets
 somebody check on demand.
 
+### And the worker was never registered in the app at all
+`app/clinic/js/pwa-install.js` · `app/js/native-bridge.js` ·
+`tests/test-app-updates.js` · by hand: `tests/probe-selfupdate-reaches.js`
+
+> *"do I have to download the app for every update … it doesn't show me any
+> version"*
+
+Everything above is true of `clinic-sw.js` and every word of it was tested.
+None of it had ever run on a phone. `pwa-install.js` opened with:
+
+```js
+if (isNativeApp()) { …unregister every worker…; return; }
+```
+
+So inside the APK the clinic worker was never registered, and any worker found
+was actively removed — while `native-bridge.js` registered the **patient**
+app's root-scoped `../sw.js` from clinic pages, which then controlled them.
+A worker that knows nothing about clinic builds, has no `homatt-clinic` cache
+and cannot fetch a newer one.
+
+**A perfect test of a mechanism proves nothing about whether the mechanism is
+switched on.** `test-selfupdate.js` drives the worker directly — it constructs
+it, so it never asked who registers it.
+
+Measured, on the same commit, changing one thing:
+
+| | worker | `homatt-clinic` cache | the version line |
+|---|---|---|---|
+| the web version | registered (×2) | `homatt-clinic-v202` | **Version v202** |
+| the installed app | **none** | **none** | **Version v?** |
+
+That last cell is the report word for word, and it is why it survived: the web
+version answers correctly, and whoever checks a version complaint is on the web
+version. Put the early return back and the failure returns immediately — 0
+registrations, no cache, *"no offline cache"*.
+
+So **every assurance that one more install would make the screens update
+themselves was wrong**. As shipped, an installed clinic could only ever change
+by installing an APK. That is the honest answer to the question he actually
+asked, and it had been answered confidently in the other direction for rounds.
+
+**The old comment's objection was real and is answered rather than ignored:**
+*"a worker whose cache is empty can serve the placeholder INSTEAD of the
+bundled page."* The navigation path already falls through cache → IndexedDB →
+network before the placeholder, and inside the APK the network **is** the
+bundle, which cannot fail. But `netUpdate` was `Promise.resolve(null)` unless a
+revalidation happened to be due — so nothing cached *plus* a recent stamp went
+straight to "Setting up…" with the real page one fetch away. The network is now
+always tried when there is no cached copy. Answering the objection is what
+makes registering the worker safe, and the test asserts the placeholder never
+appears.
+
+**One worker per area.** A clinic page registered both `clinic-sw.js` and the
+patient `../sw.js`; the measurement showed **2 registrations** on the web
+version. `native-bridge.js` now leaves `/clinic/` to the worker that owns it.
+
+**And `v?` is the last answer, not the second.** Both of its sources came from
+the worker. `homattRunningBuild()` now falls back to `version.json` — which is
+generated *from* `clinic-sw.js` and ships beside it — so on a first launch,
+after a cleaner, or anywhere the worker has not started, the files can still
+say which build they are. A screen that cannot name its own version is a
+support conversation nobody can win.
+
+### Chrome refuses the file, and that is not a fault in the file
+> *"in the chrome, it wasn't downloading, think it was about the security
+> issue"* — and the same APK then downloaded perfectly in Firefox.
+
+Chrome blocks **every** `.apk`, however safe, because it did not come from the
+Play Store. *Download anyway* is deliberately small and often behind a `⋮`.
+Unexplained it reads as "the app is broken" or "this file is a virus", and a
+clinic stops there. `get.html` now names the exact words Chrome uses, says
+where the button hides, and names three browsers that simply do not ask.
+
+This is a **different fault from the one above it** on that page — a download
+that finished and looked busy — and they need different answers. Both are
+`<details>`, so they work on a page with no script at all.
+
 ## Nobody had the app, including the person who wrote it
 
 `app/get.html` · `app/clinic/index.html` (who is offered the APK) ·
@@ -2870,7 +2947,7 @@ later, with nobody watching. Same rule as the corrections feature.
 
 ## The tests
 
-`tests/` — 77 files, ~1500 checks (plus 16 `measure-*.js`, which print numbers
+`tests/` — 79 files, ~1500 checks (plus 18 `measure-*.js`, which print numbers
 rather than pass or fail). No framework: each file starts a web server
 over `app/`, opens a real page in Chromium with the network mocked, drives it,
 and prints `PASS`/`FAIL` with the evidence.
@@ -3068,6 +3145,19 @@ rules worth repeating here:
   the caller has to ask a second question**, and the test has to force the
   refusal — here by moving the element away and stubbing the opener to do
   nothing.
+- **A perfect test of a mechanism proves nothing about whether the mechanism
+  is switched ON.** `test-selfupdate.js` drives `clinic-sw.js` exhaustively and
+  passes — by constructing the worker itself, so it never asked who registers
+  it. Nobody did: `pwa-install.js` returned early on Capacitor and unregistered
+  what it found, so the entire self-update mechanism had never run on a phone,
+  for its whole life, while every round said the screens update themselves.
+  Test the wiring, not only the component — and test it in the state the
+  feature exists for.
+- **The version line failed only where nobody looks.** It read the real build
+  in a browser and `v?` in the installed app, so every check of a version
+  complaint was made on the copy that works. When a report and your own
+  observation disagree, ask which of the two of you is looking at the thing
+  being complained about.
 - **A symptom reported TWICE is evidence against your explanation.** The first
   report of "Active takes me to the home page" was answered, correctly, with
   "the code is right, your phone is on an older build". The second report was

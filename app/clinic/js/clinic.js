@@ -853,16 +853,45 @@ window.HOMATT_BUILD = HOMATT_BUILD;
 
 function homattRunningBuild() {
   return new Promise(function (done) {
-    var applied = '', cacheName = '';
+    var applied = '', cacheName = '', shipped = '';
     function finish() {
+      /* 'v?' IS THE LAST ANSWER, NOT THE SECOND.
+       *
+       * The first two sources both come from the service worker — the build it
+       * applied, and the cache it named. Inside the installed app that worker
+       * had never been registered at all (pwa-install.js returned early on
+       * Capacitor and unregistered whatever it found), so both were empty and
+       * every clinic holding the APK read "Version v?" — reported, exactly, as
+       * "it doesn't show me any version". The web version beside it read v202,
+       * which is why it survived: whoever checks a version report is on the
+       * wrong one of the two.
+       *
+       * The worker is registered now. This third source is the belt to that
+       * brace, and it is the honest one: version.json is generated FROM
+       * clinic-sw.js and ships beside it, so on a first launch, on a phone
+       * whose cache was cleaned, or anywhere the worker has not started yet,
+       * the files can still say which build they are. A screen that cannot
+       * name its own version is a support conversation nobody can win. */
       var b = applied ? applied.replace(/^homatt-clinic-/, '') + '+'
             : cacheName ? cacheName.replace(/^homatt-clinic-/, '')
+            : shipped ? shipped.replace(/^homatt-clinic-/, '')
             : 'v?';
       HOMATT_BUILD = b; window.HOMATT_BUILD = b;
       done(b);
     }
-    var left = 2;
+    var left = 3;
     function step() { if (--left <= 0) finish(); }
+
+    /* The build baked into these very files. Same-origin, a few hundred bytes,
+     * and served from the cache once the worker has it — so it costs a clinic
+     * nothing after the first open. */
+    try {
+      var vurl = new URL('version.json', location.href.replace(/[^/]*$/, '')).href;
+      fetch(vurl, { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (j) { shipped = (j && j.cache) ? String(j.cache) : ''; step(); })
+        .catch(step);
+    } catch (e) { step(); }
 
     try {
       var q = indexedDB.open('homatt-shell', 1);

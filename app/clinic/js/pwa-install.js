@@ -25,22 +25,37 @@
     ));
   }
 
-  // NATIVE ANDROID APP: pages are served directly from the APK bundle (always
-  // present, offline by construction). A service worker here is not just
-  // unnecessary — it INTERCEPTS navigation and, if its cache is empty, can serve
-  // the "Setting up/offline" placeholder INSTEAD of the bundled page. So in the
-  // native app we register no SW and actively unregister any stale one, letting
-  // the bundle serve every page. (No install UI either — it's already an app.)
-  if (isNativeApp()) {
-    try {
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function (regs) {
-          regs.forEach(function (r) { try { r.unregister(); } catch (e) {} });
-        }).catch(function () {});
-      }
-    } catch (e) {}
-    return;
-  }
+  /* THE WORKER RUNS IN THE INSTALLED APP TOO, AND THAT IS THE WHOLE POINT.
+   *
+   * This block used to read:
+   *
+   *     if (isNativeApp()) { ...unregister every worker...; return; }
+   *
+   * so inside the APK `clinic-sw.js` was never registered — and any that
+   * existed was actively removed. `clinic-sw.js` IS the self-update mechanism:
+   * the CACHE name, the SHELL list, UPDATE_SOURCES, the staged swap, the
+   * downgrade guard, `checkForUpdate`. None of it has ever run on a phone.
+   *
+   * So an installed clinic could only ever change by installing an APK, which
+   * is exactly what was reported — "do I have to download the app for every
+   * update" — and every reassurance that one more install would fix it was
+   * wrong. It also explains "it doesn't show me any version": the version line
+   * names the `homatt-clinic-vNNN` cache, and with no worker there is no cache
+   * to name, so the installed app read `Version v?` while the web version
+   * beside it read `v202`. Whoever checks a version report is usually on the
+   * web one.
+   *
+   * The old comment's worry was real and is answered rather than ignored: a
+   * worker whose cache is empty must never serve the "Setting up…" placeholder
+   * over a page that is sitting right there inside the APK. The navigation
+   * handler falls through cache -> IndexedDB -> NETWORK before the placeholder,
+   * and inside the app "the network" is the bundled file, which cannot fail.
+   * clinic-sw.js now also forces that network attempt whenever nothing is
+   * cached, instead of only when a revalidation happened to be due.
+   *
+   * What stays true of the native app: no install UI. It is already installed.
+   */
+  var native = isNativeApp();
 
   // Register the clinic service worker IMMEDIATELY (not on window 'load'). It
   // must be active and controlling before Chrome decides whether to mint a real
@@ -55,14 +70,30 @@
         var check = function () { try { reg.update(); } catch (e) {} };
         check();
         setInterval(check, 30 * 60 * 1000);
+        /* Inside the APK `reg.update()` can only ever re-find the worker baked
+         * into the installed file, so it is not what carries an update there.
+         * Asking the worker directly is. It is cheap — one version.json — and
+         * it is the only thing that can move an installed clinic forward. */
+        if (native) {
+          var ask = function () {
+            try {
+              var c = navigator.serviceWorker.controller;
+              if (c) c.postMessage({ type: 'checkForUpdate' });
+            } catch (e) {}
+          };
+          setTimeout(ask, 4000);
+          setInterval(ask, 6 * 60 * 60 * 1000);
+        }
       }).catch(function () {});
     })();
-
-    // NOTE: no auto-reload on controllerchange. Reloading on every update was
-    // what made the app "keep loading to update" on each open. A new version
-    // now takes over silently and is shown the next time the app is opened —
-    // instant, native-feeling launches every time (online AND offline).
   }
+
+  // NOTE: no auto-reload on controllerchange. Reloading on every update was
+  // what made the app "keep loading to update" on each open. A new version
+  // now takes over silently and is shown the next time the app is opened —
+  // instant, native-feeling launches every time (online AND offline).
+
+  if (native) return;   // everything below is the "add to home screen" offer
 
   function isStandalone() {
     return window.matchMedia('(display-mode: standalone)').matches ||
