@@ -935,6 +935,41 @@ the overlay's markup and comparing it to the card's, character for character.
 Measured: the overlay fills **412×915 of 412×915** — the feature, not a scroll
 position on a dashboard.
 
+### The condition every earlier test missed, and what it settled
+`tests/probe-widget-resume.js`
+
+The next report was **"quick sale is the only one that does right… active and
+new treatment take me to the home page"** — after the fix above had shipped.
+
+Quick sale working is the clue, because all three go through the same router:
+the link IS arriving and IS being parsed. So the difference is later, and the
+condition nothing had tested is the one that is always true of a widget tap —
+**the page was backgrounded**. A clinician on the home screen has, by
+definition, left the app; the WebView was hidden and it wakes in the same
+instant the intent is delivered. Every assertion up to here called `go()` on a
+page that was wide awake.
+
+Driven properly — hidden, wait past the wizard's 2,500 ms, fire `appUrlOpen`,
+wake — over three targets × three starting pages, **plus a cold start** through
+the real `app/index.html → clinic/index.html → dashboard.html` chain where only
+`getLaunchUrl` can recover the tap:
+
+| against | result |
+|---|---|
+| the build **inside his APK** | **14 failures**, matching the report line by line: Active lands on the dashboard and does not open, Settings loses all three, quick sale works everywhere else |
+| the build **on this branch** | **12 of 12 pass** |
+
+So the code was already right and the phone was on the older build. That is
+worth more than another fix: it is the difference between "this is broken" and
+"this has not arrived yet", and only driving the real condition could tell them
+apart.
+
+**The probe broke it itself first.** Its seed ran on every page load and called
+`sessionStorage.clear()` — which is exactly where the router parks the target
+across a navigation. The first run reported the cross-page cases failing on
+*both* builds. The instrument was wiping the thing it was measuring, on the
+very page that was supposed to act on it.
+
 ### Tapped while signed out
 `go()` no longer navigates away from the sign-in page. Sending a signed-out
 clinician to `dashboard.html` only has the guard send them back, **consuming
@@ -2976,6 +3011,19 @@ rules worth repeating here:
   `scrollIntoView` did nothing and said nothing. A readiness predicate that
   tests presence rather than visibility declares success at an invisible
   thing. `offsetParent !== null` is the question.
+- **Drive the condition the feature actually lives in.** A widget tap ALWAYS
+  arrives on a page that was just backgrounded — the clinician was on the home
+  screen. Every deep-link assertion called `go()` on a wide-awake page, which
+  is the one situation that never happens in the field. Driving the real one
+  (hidden, wait, tap, wake) over nine combinations plus a cold start is what
+  proved the code was already correct and the phone was simply on an older
+  build. "Broken" and "has not arrived yet" look identical from a screenshot.
+- **A seed that runs on every page load can erase what it is measuring.**
+  `probe-widget-resume.js` cleared `sessionStorage` in its init script — and
+  `sessionStorage` is exactly where the router parks the tapped target across
+  a navigation. It reported the app broken on BOTH builds until the seed was
+  corrected. Anything installed with `addInitScript` runs again on every
+  navigation; think about what the page under test keeps there.
 - **An investigation running while you fix the thing verifies a moving
   target.** A background review of the widget deep link was still going when
   the router was added to the five pages that lacked it. Its verifier then

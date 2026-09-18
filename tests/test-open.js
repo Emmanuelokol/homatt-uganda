@@ -571,6 +571,152 @@ async function signIn(page) {
     await ctx4.close();
   }
 
+  /* ── 10. THE CONDITION EVERY EARLIER TEST MISSED ──────────────────────
+   *
+   * A widget tap ALWAYS arrives on a page that was just backgrounded. The
+   * clinician was on the home screen — by definition the WebView was hidden,
+   * and it wakes in the same instant the intent is delivered.
+   *
+   * Every assertion above calls HomattOpen.go() on a page that is wide awake.
+   * That is not the situation the feature exists for, and driving the real one
+   * is what separated "the code is wrong" from "the phone is on an old build":
+   * against the previous build these fail exactly as reported, and against
+   * this one all nine pass.
+   *
+   * Nine combinations: three targets, from each of the three pages a clinician
+   * is realistically left on.
+   */
+  {
+    const PHONE = () => {
+      window.__listeners = [];
+      window.Capacitor = {
+        isNative: true, platform: 'android', isNativePlatform: () => true,
+        Plugins: {
+          App: {
+            addListener: (ev, fn) => { if (ev === 'appUrlOpen') window.__listeners.push(fn); return { remove() {} }; },
+            getLaunchUrl: () => Promise.resolve(null),
+          },
+          StatusBar: { setStyle: () => Promise.resolve(), setBackgroundColor: () => Promise.resolve() },
+        },
+      };
+      window.__setHidden = (v) => {
+        Object.defineProperty(document, 'hidden', { configurable: true, get: () => v });
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => (v ? 'hidden' : 'visible') });
+        document.dispatchEvent(new Event('visibilitychange'));
+      };
+      window.__tapWidget = (t) => {
+        window.__listeners.forEach(fn => { try { fn({ url: 'homatt://app/' + t }); } catch (e) {} });
+        return window.__listeners.length;
+      };
+    };
+    // NOT sessionStorage.clear() — the router carries the target across the
+    // navigation in sessionStorage, and wiping it on every page load would
+    // destroy the thing being measured and report the app broken. It did
+    // exactly that on the first run of the probe this came from.
+    const SEED_KEEP = ([cid, uid]) => {
+      localStorage.clear();
+      localStorage.setItem('clinic_session', JSON.stringify({ userId: uid, staffName: 'D. Musinguzi',
+        clinicName: 'family clinic', clinicId: cid, staffRole: 'owner', level: 'HC III' }));
+      localStorage.setItem('sb-homatt-clinic-auth', JSON.stringify({ access_token: 't', refresh_token: 'r',
+        token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, user: { id: uid } }));
+    };
+
+    async function tapFrom(startPage, target) {
+      const c = await b.newContext({ viewport: { width: 412, height: 915 }, serviceWorkers: 'block' });
+      await c.addInitScript(PHONE);
+      await c.addInitScript(SEED_KEEP, [CID, UID]);
+      const p = await c.newPage();
+      await p.route('**/*', r => {
+        const u = r.request().url();
+        if (u.startsWith(ORIGIN)) return r.continue();
+        if (u.startsWith(SB)) return r.fulfill({ status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+        return r.abort();
+      });
+      await p.goto(ORIGIN + '/clinic/' + startPage, { waitUntil: 'load' });
+      await p.waitForTimeout(2400);
+      await p.evaluate(() => window.__setHidden(true));     // they press home
+      await p.waitForTimeout(3100);                          // > the wizard's 2500ms
+      // The tap and the wake are the same instant. Either can navigate the
+      // page out from under us, which is the behaviour, not an error.
+      try { await p.evaluate((t) => window.__tapWidget(t), target); } catch (e) {}
+      await p.waitForTimeout(350);
+      try { await p.evaluate(() => window.__setHidden(false)); } catch (e) {}
+      await p.waitForTimeout(3000);
+      const out = await p.evaluate(() => {
+        const ov = document.getElementById('svOverlay');
+        const qs = document.getElementById('qsSheet');
+        return {
+          page: location.pathname.split('/').pop(),
+          active: !!(ov && getComputedStyle(ov).display !== 'none'),
+          sale: !!(qs && qs.offsetParent !== null),
+        };
+      }).catch(() => ({ page: '(context gone)' }));
+      await c.close();
+      return out;
+    }
+
+    for (const from of ['dashboard.html', 'new-order.html', 'settings.html']) {
+      const nt = await tapFrom(from, 'new-treatment');
+      ok('waking from ' + from + ', New treatment opens the intake screen',
+        nt.page === 'new-order.html', JSON.stringify(nt));
+      const ac = await tapFrom(from, 'active');
+      ok('waking from ' + from + ', Active opens its own screen',
+        ac.active === true, JSON.stringify(ac));
+      const qs = await tapFrom(from, 'quick-sale');
+      ok('waking from ' + from + ', Quick sale opens',
+        qs.sale === true, JSON.stringify(qs));
+    }
+
+    /* COLD START — the app is not running at all, and Android launches it WITH
+     * the intent. The app begins at app/index.html, which replaces itself with
+     * clinic/index.html, which sends a signed-in clinic to dashboard.html:
+     * three navigations before anything can act on the target. Only
+     * getLaunchUrl can recover it, because appUrlOpen fired before any of this
+     * code existed. Landing on the dashboard here IS "it takes me to the home
+     * page". */
+    async function coldStart(target) {
+      const c = await b.newContext({ viewport: { width: 412, height: 915 }, serviceWorkers: 'block' });
+      await c.addInitScript((t) => {
+        window.Capacitor = {
+          isNative: true, platform: 'android', isNativePlatform: () => true,
+          Plugins: {
+            App: { addListener: () => ({ remove() {} }),
+                   getLaunchUrl: () => Promise.resolve({ url: 'homatt://app/' + t }) },
+            StatusBar: { setStyle: () => Promise.resolve(), setBackgroundColor: () => Promise.resolve() },
+          },
+        };
+      }, target);
+      await c.addInitScript(SEED_KEEP, [CID, UID]);
+      const p = await c.newPage();
+      await p.route('**/*', r => {
+        const u = r.request().url();
+        if (u.startsWith(ORIGIN)) return r.continue();
+        if (u.startsWith(SB)) return r.fulfill({ status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+        return r.abort();
+      });
+      await p.goto(ORIGIN + '/index.html', { waitUntil: 'load' });   // the REAL entry point
+      await p.waitForTimeout(6000);
+      const out = await p.evaluate(() => {
+        const ov = document.getElementById('svOverlay');
+        const qs = document.getElementById('qsSheet');
+        return { page: location.pathname.split('/').pop(),
+                 active: !!(ov && getComputedStyle(ov).display !== 'none'),
+                 sale: !!(qs && qs.offsetParent !== null) };
+      }).catch(() => ({ page: '(context gone)' }));
+      await c.close();
+      return out;
+    }
+    const cNew = await coldStart('new-treatment');
+    ok('COLD START, launched by the widget: New treatment opens the intake screen',
+      cNew.page === 'new-order.html', JSON.stringify(cNew));
+    const cAct = await coldStart('active');
+    ok('COLD START: Active opens its own screen', cAct.active === true, JSON.stringify(cAct));
+    const cSale = await coldStart('quick-sale');
+    ok('COLD START: Quick sale opens', cSale.sale === true, JSON.stringify(cSale));
+  }
+
   ok('no page error anywhere in that journey', errors.length === 0, errors.slice(0, 2).join(' | '));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
