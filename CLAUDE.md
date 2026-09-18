@@ -970,6 +970,54 @@ across a navigation. The first run reported the cross-page cases failing on
 *both* builds. The instrument was wiping the thing it was measuring, on the
 very page that was supposed to act on it.
 
+### And then he said it again, so "you are on an old build" stopped being an answer
+
+> *"Active button only takes me to the home page, it should take me straight to
+> the active treatment section"*
+
+The same symptom, reported a second time, after the section above had concluded
+the code was already right. **A second report of a symptom you have explained
+away is evidence against the explanation**, so this time I went looking for a
+cause the harness could not see — and found two, both mine, both in the branch
+written in the round above.
+
+**1. Calling a function is not the same as it working.** I had written:
+
+```js
+root.openSectionView('active');
+return true;                      // ← success, reported without looking
+```
+
+`openSectionView` returns **silently** on three separate refusals — the role
+gate (`SV_CAPS`), a renderer it does not recognise, and a missing `#svOverlay`.
+On any of them the router announced success, the retry loop stopped, and the
+clinician was left on whatever screen they were already on with nothing said.
+
+That is the **identical** mistake to the one described twenty lines above —
+*"does the element exist"* instead of *"can it be seen"* — reintroduced one
+branch higher, in the same file, in the same round, by the person who had just
+fixed it. It now calls, then asks `sectionViewOpen()`, and falls through to the
+slide rather than claiming anything.
+
+**2. `show()` reroutes an empty slide to HOME, which is the report word for
+word.** The fallback path for a build whose dashboard has no full view is
+`showSlide('patients')`. A slide is marked `dataset.empty` when every card on
+it was hidden *at the moment the tabs were built*, and `show()` quietly sends a
+request for an empty slide to `visibleKeys()[0] || 'home'`. Ask for patients
+before the active list has loaded and you are not refused — **you are taken to
+the home slide**. `_refreshSlideTabs()` is now called first, so emptiness is
+re-judged against the DOM as it stands rather than as it was on page load.
+
+The test forces the first fault by moving the card out of the way and stubbing
+`openSectionView` to do nothing. Put the bug back and it reports exactly what
+the clinic did:
+
+```
+FAIL  a refused full view is not reported as success   {"called":1,"overlayOpen":false}
+FAIL  ...it keeps trying rather than stopping at the first call
+FAIL  ...and it finally says which thing it could not open   — null
+```
+
 ### Tapped while signed out
 `go()` no longer navigates away from the sign-in page. Sending a signed-out
 clinician to `dashboard.html` only has the guard send them back, **consuming
@@ -3011,6 +3059,21 @@ rules worth repeating here:
   `scrollIntoView` did nothing and said nothing. A readiness predicate that
   tests presence rather than visibility declares success at an invisible
   thing. `offsetParent !== null` is the question.
+- **Calling a function is not the same as it working.** `openSectionView`
+  returns silently on three different refusals, and the router did
+  `openSectionView('active'); return true;` — success announced without ever
+  looking. It is the same "does it exist vs can it be seen" fault documented
+  twenty lines above it in this file, reintroduced one branch higher, in the
+  same file, in the same round. **If a function can refuse without saying so,
+  the caller has to ask a second question**, and the test has to force the
+  refusal — here by moving the element away and stubbing the opener to do
+  nothing.
+- **A symptom reported TWICE is evidence against your explanation.** The first
+  report of "Active takes me to the home page" was answered, correctly, with
+  "the code is right, your phone is on an older build". The second report was
+  the same sentence — and repeating the answer would have been comfortable and
+  wrong. Going back in found two real faults, both written in the round that
+  produced the reassurance.
 - **Drive the condition the feature actually lives in.** A widget tap ALWAYS
   arrives on a page that was just backgrounded — the clinician was on the home
   screen. Every deep-link assertion called `go()` on a wide-awake page, which

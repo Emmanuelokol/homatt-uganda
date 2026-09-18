@@ -717,6 +717,64 @@ async function signIn(page) {
     ok('COLD START: Quick sale opens', cSale.sale === true, JSON.stringify(cSale));
   }
 
+  /* ── 11. WHEN THE FULL VIEW REFUSES ───────────────────────────────────
+   *
+   * "Active button only takes me to the home page" — reported again AFTER the
+   * full-screen view shipped. `openSectionView` returns SILENTLY on three
+   * different refusals: the role gate, a renderer it does not know, and a
+   * missing overlay element. The router called it and returned `true` — so
+   * the retry loop stopped, nothing opened, and nothing was said.
+   *
+   * That is the identical mistake to "does the element exist" vs "can it be
+   * seen", reintroduced one branch above the place it was fixed. Calling a
+   * function is not the same as it working, and the only way to know is to
+   * look at the screen afterwards.
+   *
+   * Forced here by making openSectionView refuse, which is what the role gate
+   * does. The requirement is NOT that it opens — it cannot — but that the app
+   * does not pretend, and says so.
+   */
+  {
+    const ctx5 = await b.newContext({ viewport: { width: 412, height: 915 },
+      serviceWorkers: 'block' });
+    const p5 = await ctx5.newPage();
+    await p5.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith(ORIGIN)) return r.continue();
+      if (u.startsWith(SB)) return r.fulfill({ status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+      return r.abort();
+    });
+    await p5.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'domcontentloaded' });
+    await signIn(p5);
+    await p5.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'load' });
+    await p5.waitForTimeout(2400);
+
+    const refused = await p5.evaluate(async () => {
+      let toast = null, called = 0;
+      window.showToast = (m) => { toast = m; };
+      // Exactly what the role gate does: return, having opened nothing.
+      window.openSectionView = () => { called++; };
+      // And take the card away too, so the slide fallback cannot rescue it —
+      // this is the state where the honest answer is "I could not".
+      const card = document.getElementById('activeTreatmentsList');
+      if (card) card.id = '_movedForTest';
+      window.HomattOpen.go('active');
+      await new Promise(r => setTimeout(r, 9800));
+      const ov = document.getElementById('svOverlay');
+      return { toast, called,
+               overlayOpen: !!(ov && getComputedStyle(ov).display !== 'none') };
+    });
+
+    ok('a refused full view is not reported as success',
+      refused.overlayOpen === false && !!refused.toast, JSON.stringify(refused));
+    ok('...it keeps trying rather than stopping at the first call',
+      refused.called > 1, 'openSectionView called ' + refused.called + ' time(s)');
+    ok('...and it finally says which thing it could not open',
+      /active treatments/i.test(refused.toast || ''), String(refused.toast));
+    await ctx5.close();
+  }
+
   ok('no page error anywhere in that journey', errors.length === 0, errors.slice(0, 2).join(' | '));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

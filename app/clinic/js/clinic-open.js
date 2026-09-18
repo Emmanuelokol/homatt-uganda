@@ -156,20 +156,44 @@
        * no-op that reports nothing. Existence is not the question; being
        * lookable-at is. */
       whenReady(function () {
-        // The dashboard's own full-screen list, where this build has one. It
-        // is the same rows as the card, rendered by the same function, with a
-        // search box and nothing else on the screen — which is what somebody
-        // who tapped "Active" on their home screen actually asked for.
+        /* The dashboard's own full-screen list, where this build has one. It
+         * is the same rows as the card, rendered by the same function, with a
+         * search box and nothing else on the screen — which is what somebody
+         * who tapped "Active" on their home screen actually asked for.
+         *
+         * ASK WHETHER IT OPENED. `openSectionView` returns SILENTLY on three
+         * different refusals — the role gate, a renderer it does not know, and
+         * a missing overlay element — so calling it is not the same as it
+         * working. The first version of this branch did
+         *
+         *     root.openSectionView('active'); return true;
+         *
+         * which reports success without ever looking, and a refusal then
+         * leaves the clinician on the dashboard with nothing said. That is
+         * the identical mistake to the one fixed twenty lines below — "does
+         * the element exist" instead of "can it be seen" — reintroduced one
+         * branch above it, in the same file, in the same round. */
         if (typeof root.openSectionView === 'function' &&
             root._svRenderers && root._svRenderers.active) {
-          root.openSectionView('active');
-          return true;
+          try { root.openSectionView('active'); } catch (e) {}
+          if (sectionViewOpen()) return true;
+          // It refused. Fall through to the slide rather than claim success.
         }
 
         // Older build, arriving over the air before the dashboard has caught
         // up: put the right slide up and scroll to the card.
         var list = document.getElementById('activeTreatmentsList');
         if (!list) return false;
+        /* A slide is marked EMPTY when every card on it was hidden at the
+         * moment the tabs were built, and `show()` quietly redirects a request
+         * for an empty slide to the first visible one — which is HOME. So
+         * asking for "patients" too early does not fail, it takes the
+         * clinician to the home slide, which is precisely what was reported.
+         * Re-evaluating emptiness against the DOM as it stands now is what
+         * makes the request answerable rather than silently rerouted. */
+        if (typeof root._refreshSlideTabs === 'function') {
+          try { root._refreshSlideTabs(); } catch (e) {}
+        }
         if (typeof root.showSlide === 'function') {
           try { root.showSlide('patients'); } catch (e) {}
         }
@@ -184,6 +208,22 @@
         return true;
       }, 40, 'active treatments');
     }
+  }
+
+  /* Is the dashboard's full-screen section view actually on the screen?
+   *
+   * The one question worth asking after calling openSectionView, and the one
+   * the first version of this file did not ask. `display` is what that
+   * function sets ('flex' to open, 'none' to close), so it is what answers. */
+  function sectionViewOpen() {
+    try {
+      var ov = document.getElementById('svOverlay');
+      if (!ov) return false;
+      var d = (ov.style && ov.style.display) || '';
+      if (d && d !== 'none') return true;
+      // A stylesheet could be deciding it instead of the inline style.
+      return getComputedStyle(ov).display !== 'none';
+    } catch (e) { return false; }
   }
 
   /* The dashboard builds itself over several hundred milliseconds — the
