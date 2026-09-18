@@ -388,6 +388,189 @@ async function signIn(page) {
 
   if (pinCtx) await pinCtx.close();
 
+  /* ── 9. THE TAP THAT LANDED NOWHERE ───────────────────────────────────
+   *
+   * "when I tap on the icon on the widget, instead of taking me to the exact
+   * feature, they just take me to the app itself, where I left off."
+   *
+   * Two separate causes, and both are asserted here because either one alone
+   * reproduces the report exactly.
+   */
+
+  // ── 9a. EVERY page a clinician can be sitting on must answer ──────────
+  //
+  // The router was loaded by dashboard.html and new-order.html and by nothing
+  // else. Land on Settings — which is where somebody checking their app
+  // version has just been — tap the widget, and the appUrlOpen listener does
+  // not exist on that page, so the intent arrives and is dropped. The app
+  // comes to the front showing what it was showing. Precisely the report.
+  {
+    const TAG = '<script src="js/clinic-open.js';
+    const pages = fs.readdirSync(path.join(APP, 'clinic')).filter(f => f.endsWith('.html'));
+    const missing = [];
+    for (const f of pages) {
+      const src = fs.readFileSync(path.join(APP, 'clinic', f), 'utf8');
+      if (src.indexOf(TAG) >= 0) continue;
+      // A page that only redirects is never the page somebody is left on, so
+      // it needs no router. Asserted rather than assumed — an exemption
+      // nobody checks is how the next page quietly opts itself out.
+      const redirects = /location\.replace\(/.test(src) && src.split('\n').length < 40;
+      if (!redirects) missing.push(f);
+    }
+    ok('every clinic page a tap can land on carries the router',
+      missing.length === 0, missing.join(', '));
+    ok('...and the one that does not is a redirect stub, not an oversight',
+      fs.readFileSync(path.join(APP, 'clinic', 'patients.html'), 'utf8')
+        .indexOf("location.replace('dashboard.html')") >= 0);
+  }
+
+  // ── 9b. "Active" returned true and did nothing ────────────────────────
+  {
+    const ctx2 = await b.newContext({ viewport: { width: 412, height: 915 },
+      serviceWorkers: 'block' });
+    const p2 = await ctx2.newPage();
+    const errs2 = []; p2.on('pageerror', e => errs2.push(String(e.message)));
+    await p2.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith(ORIGIN)) return r.continue();
+      if (u.startsWith(SB)) return r.fulfill({ status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+      return r.abort();
+    });
+    await p2.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'domcontentloaded' });
+    await signIn(p2);
+    await p2.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'load' });
+    await p2.waitForTimeout(2600);
+
+    /* The state the bug lived in, asserted first so the rest means something:
+     * the list IS in the document and is NOT on the screen, because the
+     * dashboard opens on the "home" slide and the list is on "patients".
+     * The old check was `if (!list) return false` — existence — which passes
+     * here, so it stopped retrying and scrolled a hidden element. */
+    const before = await p2.evaluate(() => {
+      const l = document.getElementById('activeTreatmentsList');
+      return { inDocument: !!l, onScreen: !!(l && l.offsetParent !== null) };
+    });
+    ok('the active list is in the document on arrival', before.inDocument);
+    ok('...and NOT on the screen, which is what made "it exists" the wrong test',
+      before.onScreen === false);
+
+    const opened = await p2.evaluate(async () => {
+      window.HomattOpen.go('active');
+      await new Promise(r => setTimeout(r, 1800));
+      const ov = document.getElementById('svOverlay');
+      const box = ov ? ov.getBoundingClientRect() : null;
+      return {
+        open: !!(ov && getComputedStyle(ov).display !== 'none'),
+        title: (document.getElementById('svTitle') || {}).textContent || '',
+        hasSearch: !!document.getElementById('svSearch'),
+        coversW: box ? Math.round(box.width) === Math.round(innerWidth) : false,
+        coversH: box ? Math.round(box.height) === Math.round(innerHeight) : false,
+      };
+    });
+    ok('tapping Active opens a screen of its own', opened.open,
+      JSON.stringify(opened));
+    ok('...titled for what it is', /active treatments/i.test(opened.title), opened.title);
+    ok('...filling the screen, not a scroll position on a dashboard',
+      opened.coversW && opened.coversH, JSON.stringify(opened));
+    ok('...with a search box, because finding somebody is why you opened it',
+      opened.hasSearch);
+
+    /* ONE renderer, not two. The overlay must be drawn by the same function as
+     * the card — copying it is the mistake this project has paid for three
+     * times. Proved by making the card's own renderer produce the overlay's
+     * markup: if they were separate implementations this could not hold. */
+    const shared = await p2.evaluate(() => {
+      const cfg = window._svRenderers && window._svRenderers.active;
+      if (!cfg) return { registered: false };
+      const probe = document.createElement('div');
+      cfg.render(probe, '');
+      const card = document.getElementById('activeTreatmentsList');
+      return {
+        registered: true,
+        sameMarkup: probe.innerHTML === card.innerHTML,
+        len: probe.innerHTML.length,
+      };
+    });
+    ok('the full view is registered as a section of the dashboard', shared.registered);
+    ok('...and renders identically to the card, so there is ONE implementation',
+      shared.sameMarkup === true, JSON.stringify(shared));
+
+    ok('no page error while opening it', errs2.length === 0, errs2[0]);
+    await ctx2.close();
+  }
+
+  // ── 9c. A target that cannot be satisfied must SAY so ─────────────────
+  //
+  // Eight seconds of retries ending in a silent `return` is indistinguishable
+  // from a widget that was never wired up — which is how this went unreported
+  // for a round. Driven with the handler removed so the wait really expires.
+  {
+    const ctx3 = await b.newContext({ viewport: { width: 412, height: 915 },
+      serviceWorkers: 'block' });
+    const p3 = await ctx3.newPage();
+    await p3.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith(ORIGIN)) return r.continue();
+      if (u.startsWith(SB)) return r.fulfill({ status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+      return r.abort();
+    });
+    await p3.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'domcontentloaded' });
+    await signIn(p3);
+    await p3.goto(ORIGIN + '/clinic/dashboard.html', { waitUntil: 'load' });
+    await p3.waitForTimeout(2200);
+
+    const said = await p3.evaluate(async () => {
+      // Take quick sale away so the wait genuinely runs out, and catch what
+      // the app says rather than what it was supposed to do.
+      let toast = null;
+      window.openQuickSale = undefined;
+      window.showToast = (m) => { toast = m; };
+      window.HomattOpen.go('quick-sale');
+      await new Promise(r => setTimeout(r, 9500));
+      return { toast };
+    });
+    ok('a target that never becomes ready says so instead of failing silently',
+      !!said.toast, JSON.stringify(said));
+    ok('...and names the thing it could not open',
+      /quick sale/i.test(said.toast || ''), said.toast);
+    await ctx3.close();
+  }
+
+  // ── 9d. Tapped while signed out: remembered, not thrown away ───────────
+  {
+    const ctx4 = await b.newContext({ viewport: { width: 412, height: 915 },
+      serviceWorkers: 'block' });
+    const p4 = await ctx4.newPage();
+    await p4.route('**/*', r => {
+      const u = r.request().url();
+      if (u.startsWith(ORIGIN)) return r.continue();
+      if (u.startsWith(SB)) return r.fulfill({ status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: '[]' });
+      return r.abort();
+    });
+    await p4.goto(ORIGIN + '/clinic/index.html', { waitUntil: 'load' });
+    await p4.waitForTimeout(700);
+    const signedOut = await p4.evaluate(() => {
+      sessionStorage.clear();
+      const moved = window.HomattOpen.go('quick-sale');
+      return {
+        returned: moved,
+        stillHere: location.pathname.split('/').pop(),
+        kept: sessionStorage.getItem('homatt_open_target'),
+      };
+    });
+    /* Sending a signed-out clinician to the dashboard only has the guard send
+     * them back, consuming the target on the way — the tap is lost and the
+     * round trip is invisible. */
+    ok('a tap arriving on the sign-in page does not navigate away',
+      signedOut.stillHere === 'index.html', signedOut.stillHere);
+    ok('...and the target is kept, so signing in finishes the job',
+      signedOut.kept === 'quick-sale', String(signedOut.kept));
+    await ctx4.close();
+  }
+
   ok('no page error anywhere in that journey', errors.length === 0, errors.slice(0, 2).join(' | '));
 
   console.log('\n' + pass + ' passed, ' + fail + ' failed');

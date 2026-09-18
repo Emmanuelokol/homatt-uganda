@@ -3647,6 +3647,11 @@
     _activeRows = _applyLocalNames(rows);
     renderActiveTreatments();
     renderOverdueFollowups();
+    /* The full-screen list, if it is open. A widget tap opens it within a
+     * moment of the page starting — well before this request comes back — so
+     * without this it would sit on "Loading…" for ever while the card behind
+     * it quietly filled up. */
+    refreshSectionView();
   }
 
   // Names and numbers typed on this phone, held until the server agrees.
@@ -3671,13 +3676,31 @@
   }
 
 
-  function renderActiveTreatments() {
-    var el = document.getElementById('activeTreatmentsList');
-    var ct = document.getElementById('activeCount');
+  /* ONE renderer, two places it can be shown.
+   *
+   * A clinician tapping "Active" on the home-screen widget asked for the list,
+   * not for the dashboard with the list somewhere on it — and the list lives on
+   * the "patients" slide, which is not the one the dashboard opens on, so it
+   * was off the screen when they arrived. The answer is the full-screen section
+   * view this page already has (svOverlay, used by Stock, Pending Payments and
+   * Conditions): the same rows, a search box, and nothing else competing.
+   *
+   * The overrides exist so that view can mount these rows somewhere else
+   * WITHOUT a second copy of them. Copying it is the mistake this project has
+   * paid for three times — the microphone, the dose table, the treatment
+   * screen — and it is always the second copy that nobody measures. Called with
+   * no arguments it behaves exactly as it always did, so every existing caller
+   * is untouched. */
+  function renderActiveTreatments(elOverride, ctOverride, qOverride) {
+    var el = elOverride || document.getElementById('activeTreatmentsList');
+    // `undefined` means "find it yourself"; an explicit null means "there is no
+    // count to write", which the overlay's header needs to be able to say.
+    var ct = ctOverride !== undefined ? ctOverride : document.getElementById('activeCount');
     if (!el) return;
 
-    var q = (document.getElementById('activeSearch')||{}).value || '';
-    q = q.trim().toLowerCase();
+    var q = qOverride !== undefined ? qOverride
+          : ((document.getElementById('activeSearch')||{}).value || '');
+    q = String(q || '').trim().toLowerCase();
     var rows = q
       ? _activeRows.filter(function(c) {
           var name = (c.patient_name || '').toLowerCase();
@@ -3760,6 +3783,33 @@
       card.onclick = function() { openActivePatientDetail(card.dataset.diagnosisId); };
     });
   }
+
+  /* Active treatments as a screen of its own — the same rows, rendered by the
+   * function directly above, in the full-screen view this page already has.
+   *
+   * This is what the home-screen widget's "Active" opens, and it is the whole
+   * of the redesign asked for: "when they tap on the treatment that feature can
+   * just show itself, and they work on that without leaving to the app". The
+   * overlay has its own search, so the card's own box is not consulted — the
+   * query is handed in.
+   *
+   * `null` for the count element: the overlay writes its own figure into
+   * #svCount through _svSetCount, and letting the renderer also write into the
+   * card's #activeCount while the card is off-screen would leave a number
+   * behind that nobody updated. */
+  (window._svRenderers = window._svRenderers || {}).active = {
+    title: 'Active Treatments',
+    render: function (body, q) {
+      renderActiveTreatments(body, null, q || '');
+      _svSetCount(_activeRows.length
+        ? (q ? body.querySelectorAll('.pt-row').length + ' / ' + _activeRows.length + ' open'
+             : _activeRows.length + ' open')
+        : '');
+    }
+  };
+  // Same capability as the card it mirrors. openSectionView is reachable from
+  // the sidebar, a deep link and the console, so the check has to be here.
+  SV_CAPS.active = 'consultations';
 
   // ── Overdue Follow-up Tracker ────────────────────────────────────
   function renderOverdueFollowups() {

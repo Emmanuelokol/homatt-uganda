@@ -105,6 +105,20 @@
     var spec = TARGETS[t];
     if (!spec) return false;
     var page = here();
+
+    /* THE SIGN-IN PAGE IS NOT SOMEWHERE TO NAVIGATE AWAY FROM.
+     *
+     * Sending a signed-out clinician to dashboard.html only has the guard send
+     * them straight back here — and the target is consumed on the way, so the
+     * tap is lost and the round trip is invisible. Remember it instead: the
+     * dashboard picks it up from sessionStorage the moment they are in, so
+     * tapping "Quick sale" while signed out now ends at quick sale rather than
+     * at a dashboard they did not ask for. */
+    if (page === 'index.html' || page === '') {
+      remember(t);
+      return true;
+    }
+
     if (page !== spec.page) {
       remember(t);
       location.replace(spec.page);
@@ -123,13 +137,43 @@
       whenReady(function () {
         if (typeof root.openQuickSale === 'function') { root.openQuickSale(); return true; }
         return false;
-      });
+      }, 40, 'quick sale');
       return;
     }
     if (what === 'active') {
+      /* THIS ONE RETURNED TRUE AND DID NOTHING, AND THAT IS WHY IT WAS
+       * REPORTED AS "it just takes me to the app".
+       *
+       * Driven on the real dashboard: go('active') returned true, scrollY went
+       * 0 -> 0, and the list's offsetParent was null. The dashboard lays its
+       * cards out on four SLIDES — home, patients, money, stock — and opens on
+       * "home". #activeTreatmentsList is on "patients", so on arrival it is in
+       * the document and off the screen.
+       *
+       * The old check was `if (!list) return false`, which asks whether the
+       * element EXISTS. It does. So whenReady succeeded on the first try, never
+       * retried, and called scrollIntoView on a hidden element — which is a
+       * no-op that reports nothing. Existence is not the question; being
+       * lookable-at is. */
       whenReady(function () {
+        // The dashboard's own full-screen list, where this build has one. It
+        // is the same rows as the card, rendered by the same function, with a
+        // search box and nothing else on the screen — which is what somebody
+        // who tapped "Active" on their home screen actually asked for.
+        if (typeof root.openSectionView === 'function' &&
+            root._svRenderers && root._svRenderers.active) {
+          root.openSectionView('active');
+          return true;
+        }
+
+        // Older build, arriving over the air before the dashboard has caught
+        // up: put the right slide up and scroll to the card.
         var list = document.getElementById('activeTreatmentsList');
         if (!list) return false;
+        if (typeof root.showSlide === 'function') {
+          try { root.showSlide('patients'); } catch (e) {}
+        }
+        if (list.offsetParent === null) return false;   // still hidden: wait
         var card = list.closest ? (list.closest('.admin-card') || list.parentElement) : list.parentElement;
         try { (card || list).scrollIntoView({ behavior: 'smooth', block: 'start' }); }
         catch (e) { try { (card || list).scrollIntoView(); } catch (e2) {} }
@@ -138,7 +182,7 @@
         // list somebody just asked to look at is the opposite of helping.
         if (s && !('ontouchstart' in root)) { try { s.focus(); } catch (e) {} }
         return true;
-      });
+      }, 40, 'active treatments');
     }
   }
 
@@ -147,11 +191,39 @@
    * finds nothing and silently does nothing, which reads to a clinician as a
    * widget that does not work. So it retries, briefly, and gives up quietly
    * rather than hanging on. */
-  function whenReady(fn, tries) {
+  function whenReady(fn, tries, what) {
     tries = tries === undefined ? 40 : tries;      // ~8 seconds, then stop
     if (fn()) return;
-    if (tries <= 0) return;
-    setTimeout(function () { whenReady(fn, tries - 1); }, 200);
+    if (tries <= 0) { giveUp(what); return; }
+    setTimeout(function () { whenReady(fn, tries - 1, what); }, 200);
+  }
+
+  /* GIVING UP QUIETLY IS THE WORST THING THIS FILE CAN DO.
+   *
+   * "Nothing happened" is exactly what was reported, and a silent return is
+   * indistinguishable from a widget that was never wired up — so a clinician
+   * stops using it and never says why. Eight seconds is already a long time to
+   * stare at a screen; at the end of it the app owes them a sentence.
+   *
+   * The dashboard's own toast where there is one, because it is the thing they
+   * already recognise; a plain banner otherwise, so a page without a toast is
+   * not silently exempt from the rule. */
+  function giveUp(what) {
+    var msg = 'Could not open ' + (what || 'that') + '. Open it from this screen instead.';
+    try {
+      if (typeof root.showToast === 'function') { root.showToast(msg, 'error'); return; }
+    } catch (e) {}
+    try {
+      var d = document.createElement('div');
+      d.setAttribute('role', 'status');
+      d.style.cssText = 'position:fixed;left:16px;right:16px;bottom:22px;z-index:99998;' +
+        'background:var(--danger, #D32F2F);color:#fff;padding:12px 14px;border-radius:12px;' +
+        'font-size:13.5px;line-height:1.5;box-shadow:0 8px 24px rgba(0,0,0,.28);' +
+        'font-family:inherit';
+      d.textContent = msg;
+      (document.body || document.documentElement).appendChild(d);
+      setTimeout(function () { try { d.remove(); } catch (e) {} }, 6000);
+    } catch (e) {}
   }
 
   // ── Where a target can arrive from ───────────────────────────────────────

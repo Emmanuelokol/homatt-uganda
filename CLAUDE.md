@@ -865,6 +865,82 @@ stale. It is `<details>`, so it opens on a page that has no script at all.
 `build-info.json` beside the APK now also carries `apkBytes` and `apkSha256`,
 so "is this file intact?" has an answer for whoever wants one.
 
+## The widget tap that landed on the last screen you were reading
+
+`app/clinic/js/clinic-open.js` · `tests/test-open.js` ·
+by hand: `tests/probe-widget-open.js`
+
+> *"when I tap on the icon on the widget, instead of taking me to the exact
+> feature, they just take me to the app itself, where I left off"*
+
+Reading the code offered four candidate causes and no way to choose between
+them. Driving the real dashboard picked two, and they are **different faults
+that produce the identical symptom** — either one alone reproduces the report:
+
+### 1. Five pages of seven could not answer at all
+`clinic-open.js` was loaded by `dashboard.html` and `new-order.html`. It is the
+file that registers the `appUrlOpen` listener — so on `settings.html`,
+`messages.html`, `guidelines.html` or the sign-in page, the intent arrived and
+there was nothing listening. The app came to the front showing what it was
+showing.
+
+Which is exactly where this clinic had been: checking *App version* and
+*Dictation* in Settings, going to the home screen, tapping the widget.
+
+`patients.html` still has no router, and the test asserts **why**: it is a
+21-line redirect stub, so it is never the page anybody is left on. An exemption
+nobody checks is how the next page quietly opts itself out.
+
+### 2. "Active" returned true and did nothing — on the dashboard too
+```
+go("active")  returned  {"returned":true}
+scrollY       0 -> 0
+listVisible   false
+```
+The dashboard lays its cards out on four **slides** — home, patients, money,
+stock — and opens on *home*. `#activeTreatmentsList` is on *patients*, so on
+arrival it is in the document and off the screen.
+
+The check was `if (!list) return false` — **does the element exist**. It does.
+So the retry loop succeeded on its first attempt, never ran again, and called
+`scrollIntoView` on a hidden element, which is a no-op that reports nothing.
+
+**Existence is not the question; being lookable-at is.** The predicate now
+requires `offsetParent !== null`, so it keeps waiting instead of declaring
+success at something invisible.
+
+### And giving up quietly was the third fault
+`whenReady` retried for eight seconds and then `return`ed. Silence is
+indistinguishable from a widget that was never wired up — a clinician stops
+using it and never says why. It now names what it could not open.
+
+### The feature shows itself
+> *"make at least the accessibility insanely simple, by when they tap on the
+> treatment that feature can just show itself, and they work on that without
+> leaving to the app"*
+
+The dashboard already had the answer: a full-screen section view
+(`svOverlay` + `_svRenderers`, used by Stock, Pending Payments and Conditions)
+with its own title, count and search. Active Treatments was simply never
+registered in it.
+
+`renderActiveTreatments()` gained three optional arguments — where to render,
+where to write the count, what to search for — so **one function** now serves
+the card and the overlay. Called with no arguments it behaves exactly as it
+always did, so every existing caller is untouched. Copying it is the mistake
+this project has paid for three times (the microphone, the dose table, the
+treatment screen), and the test proves there is one implementation by rendering
+the overlay's markup and comparing it to the card's, character for character.
+
+Measured: the overlay fills **412×915 of 412×915** — the feature, not a scroll
+position on a dashboard.
+
+### Tapped while signed out
+`go()` no longer navigates away from the sign-in page. Sending a signed-out
+clinician to `dashboard.html` only has the guard send them back, **consuming
+the target on the way** — the tap is lost and the round trip is invisible. It
+is remembered instead, so signing in lands on the thing they asked for.
+
 ## The green at the top and the green at the bottom
 
 `app/clinic/js/clinic-chrome.js` · `--chrome` in `app/clinic/css/clinic.css` ·
@@ -2894,6 +2970,25 @@ rules worth repeating here:
   and asserts the count is zero. Mock them and a stylesheet, a font or an
   analytics tag creeps back into the one page whose whole job is to open on a
   bad connection — and the test goes on passing.
+- **"Does it exist" is not "can it be seen".** `clinic-open.js` checked
+  `if (!list) return false` and then scrolled to the element — but the element
+  was on a hidden slide, so the check passed, the retry loop stopped, and
+  `scrollIntoView` did nothing and said nothing. A readiness predicate that
+  tests presence rather than visibility declares success at an invisible
+  thing. `offsetParent !== null` is the question.
+- **An investigation running while you fix the thing verifies a moving
+  target.** A background review of the widget deep link was still going when
+  the router was added to the five pages that lacked it. Its verifier then
+  "refuted" the finding — correctly, against the tree in front of it, which
+  already had the fix. The finding was true when it was made and false when it
+  was checked, and nothing in either agent could see that. Read a concurrent
+  review's verdicts against the commit they were made on, not against HEAD.
+- **A probe can measure the wrong element after you fix the thing.**
+  `probe-widget-open.js` went on reporting `listVisible: false` for Active
+  after the fix, because it was still looking at the card on the hidden slide
+  while the feature now opens as a full-screen overlay. The number was
+  correct and about the wrong object — check what a probe selected before
+  reading its verdict as a failure.
 - **A bug that only fires in the installed app looks fixed in a browser.**
   `native-bridge.js` repainted the status bar green on every load, inside the
   APK only. Whoever checks a colour report is usually on the web version,
