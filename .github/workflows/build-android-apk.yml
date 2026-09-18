@@ -176,9 +176,21 @@ jobs:
           # The stamp itself. "Build 578" on a clinic's Settings screen is the
           # versionCode, which is this run number — so this file is what turns
           # a photograph of a phone into a commit anybody can look up.
+          # The SIZE and the CHECKSUM, because "did my download finish?" is a
+          # real question with a real answer and nobody could reach it.
+          #
+          # A clinic photographed a download sitting at 12.75 MB of 12.75 MB
+          # with the browser still showing it as in progress. Every byte was
+          # there; Chrome simply never flipped it to done. With nothing
+          # published to compare against, "is this file complete?" could only
+          # be guessed at — so the file sat in Downloads, untapped, while the
+          # app it contained was the thing being waited for.
           export MINE="$mine"
+          export APK_BYTES="$(wc -c < HomattHealth.apk)"
+          export APK_SHA256="$(sha256sum HomattHealth.apk | cut -d' ' -f1)"
           python3 - <<'PY' > build-info.json
           import json, os
+          b = int(os.environ['APK_BYTES'])
           print(json.dumps({
             'build': int(os.environ['MINE']),
             'versionCode': os.environ['GITHUB_RUN_NUMBER'],
@@ -187,6 +199,9 @@ jobs:
             'sha': os.environ['GITHUB_SHA'],
             'run': os.environ['GITHUB_RUN_ID'],
             'built': os.environ.get('BUILT', ''),
+            'apkBytes': b,
+            'apkSize': '%.2f MB' % (b / 1000000.0),   # what a phone shows
+            'apkSha256': os.environ['APK_SHA256'],
           }, indent=2))
           PY
           cat build-info.json
@@ -216,8 +231,14 @@ jobs:
 
             Download **HomattHealth.apk** below and open it on your phone to
             install or update. It installs over the previous version and keeps
-            everything already recorded. `build-info.json` beside it is the same
-            information in a form a program can read.
+            everything already recorded. `build-info.json` beside it carries the
+            same information plus the APK's exact byte count and SHA-256, so
+            "did my download finish, and is it intact?" can be answered instead
+            of guessed at.
+
+            **If the download appears to stop at 100%** — the same number on
+            both sides of the slash, still showing as busy — it has finished.
+            Open the file from My Files → Downloads and install it.
 
             The screens inside the app update themselves over the internet
             afterwards. The app itself — the home-screen widget, the colour of

@@ -835,6 +835,36 @@ its `tag_name` and the filename it renames the APK to — and the three places
 that carry it are compared against that. A test that repeats the constant
 cannot see the constant go stale, which is how `v151` survived two months.
 
+### "The download doesn't finish" — over a download that had finished
+
+A clinic photographed the Downloads screen: **12.75 MB / 12.75 MB**, with the
+browser still showing it as busy, and the file untapped. Measured against the
+published asset, that is **12,750,356 bytes — every byte of it**. Chrome does
+this with APKs: the transfer completes and the entry never flips to done.
+
+So the finished app sat in Downloads while the thing inside it was what they
+were waiting for. **Nothing was broken and nothing could have told them that.**
+
+What the measurement did and did not establish, because the difference matters:
+
+| established | not established |
+|---|---|
+| the asset is 12,750,356 bytes, and the phone had all of them | *why* Chrome did not finalise |
+| the link is a signed URL, valid ~1 hour | that the expiry had anything to do with it |
+| `Accept-Ranges: bytes` — a real stop resumes rather than restarting | — |
+
+I tried to reproduce an expired-signature failure by corrupting the signature
+and still got a `206`, so that theory is **unproven and not claimed**.
+
+The fix is therefore guidance, not code: `get.html` carries a folded panel
+saying that **the same number on both sides means finished**, where to go and
+tap it, and how that differs from a download that really did stop. The test is
+a fact anybody can read off their own screen — no published constant to go
+stale. It is `<details>`, so it opens on a page that has no script at all.
+
+`build-info.json` beside the APK now also carries `apkBytes` and `apkSha256`,
+so "is this file intact?" has an answer for whoever wants one.
+
 ## The green at the top and the green at the bottom
 
 `app/clinic/js/clinic-chrome.js` · `--chrome` in `app/clinic/css/clinic.css` ·

@@ -78,6 +78,12 @@
   }
   @media (prefers-color-scheme: dark){ .tag{color:var(--ink)} }
   .note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:12px}
+  /* Folded, because it is only wanted by somebody it is happening to — and
+     open-able with no script, which this page has none of. */
+  .stuck{margin-top:12px;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;background:var(--brand-soft)}
+  .stuck summary{font-size:13px;font-weight:700;cursor:pointer;color:var(--ink)}
+  .stuck p{margin:10px 0 0;font-size:12.5px;color:var(--ink-soft);line-height:1.6}
   .url{
     font-size:11.5px;word-break:break-all;user-select:all;-webkit-user-select:all;
     color:var(--ink-soft);margin-top:10px;
@@ -118,6 +124,33 @@
       <br><br>
       This address always gives the newest version, so it never needs replacing.
     </p>
+
+    <!-- THE COMMONEST WAY THIS GOES WRONG, AND IT IS NOT A FAILURE.
+         A clinic photographed a download reading 12.75 MB of 12.75 MB with
+         the browser still showing it as busy, and reported "the download
+         doesn't finish". Every byte was already on the phone — Chrome simply
+         never flipped it to done, which it does with APKs.
+         Left unexplained, the finished file sits in Downloads untapped while
+         the thing inside it is what somebody is waiting for. The test is not
+         a number anybody has to be told: it is whether the two numbers either
+         side of the slash are the same. -->
+    <details class="stuck">
+      <summary>The download looks stuck?</summary>
+      <p>
+        If it shows <b>the same number on both sides</b> — like
+        <b>12.75 MB / 12.75 MB</b> — then it <b>has finished</b>, even though
+        it still looks busy. Android does this with app files.
+      </p>
+      <p>
+        Open <b>My Files</b> (or <b>Files</b>) → <b>Downloads</b>, and tap
+        <b>HomattHealth.apk</b>. It will install normally.
+      </p>
+      <p>
+        If the two numbers are <b>different</b>, it really did stop. Tap it in
+        your browser's Downloads list to resume — it carries on from where it
+        reached rather than starting again.
+      </p>
+    </details>
     <div class="url">https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk</div>
   </div>
 

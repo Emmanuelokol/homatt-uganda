@@ -176,6 +176,37 @@ const MEASURE = () => {
     ok('it says installing over an older copy keeps what is recorded',
       /keeps everything already recorded/i.test(seen.text));
 
+    /* A clinic reported "the download doesn't finish" over a download that
+     * had finished — 12.75 MB of 12.75 MB, with Chrome still showing it as
+     * busy, which is what Android does with APKs. The finished file sat in
+     * Downloads untapped. The guidance has to be ON THIS PAGE, because this
+     * is the page they are looking at when it happens.
+     *
+     * Asserted on the <details> element rather than on the words, so it
+     * cannot pass on the phrase appearing somewhere else in the prose. */
+    const stuck = await page.evaluate(() => {
+      const d = document.querySelector('details.stuck');
+      if (!d) return null;
+      const s = d.querySelector('summary');
+      d.open = true;                 // it must be openable with no script
+      return {
+        summary: (s && s.textContent || '').trim(),
+        body: (d.textContent || '').replace(/\s+/g, ' '),
+        openedH: Math.round(d.getBoundingClientRect().height),
+      };
+    });
+    ok('a download that looks stuck is explained, where it happens',
+      !!stuck, 'no details.stuck on the page');
+    ok('...and it says the same number both sides means finished',
+      !!stuck && /same number on both sides/i.test(stuck.body),
+      (stuck || {}).body);
+    ok('...and names where to go and tap it',
+      !!stuck && /downloads/i.test(stuck.body) && /\.apk/i.test(stuck.body));
+    ok('...and tells apart a download that really DID stop',
+      !!stuck && /resume/i.test(stuck.body));
+    ok('...and it opens, on a page with no script at all',
+      !!stuck && stuck.openedH > 60, String((stuck || {}).openedH));
+
     ok('nothing runs off the side at 360px',
       seen.scrollW <= seen.clientW + 1, seen.scrollW + ' in ' + seen.clientW);
 
