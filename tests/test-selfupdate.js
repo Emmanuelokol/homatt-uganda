@@ -43,7 +43,8 @@ function serve(port, { rewrite, cors }) {
   }).listen(port);
 }
 
-const NEWV = 'homatt-clinic-v999';
+let NEWV = 'homatt-clinic-v999';   // what the stand-in web host advertises
+let MARK = 'NEW';                  // what its dashboard.html is stamped with
 
 (async () => {
   const installed = serve(INSTALLED_PORT, {});
@@ -60,7 +61,7 @@ const NEWV = 'homatt-clinic-v999';
       // is answered by the page itself and not by a cache name.
       if (p.endsWith('/clinic/dashboard.html')) {
         return Buffer.from(d.toString('utf8')
-          .replace('</title>', '</title><meta name="homatt-build" content="NEW">'));
+          .replace('</title>', '</title><meta name="homatt-build" content="' + MARK + '">'));
       }
       return null;
     },
@@ -81,7 +82,7 @@ const NEWV = 'homatt-clinic-v999';
       }
       if (p.endsWith('/clinic/dashboard.html')) {
         return Buffer.from(d.toString('utf8')
-          .replace('</title>', '</title><meta name="homatt-build" content="NEW">'));
+          .replace('</title>', '</title><meta name="homatt-build" content="' + MARK + '">'));
       }
       return null;
     },
@@ -192,6 +193,55 @@ const NEWV = 'homatt-clinic-v999';
     }));
     result('asking again does not download it a second time',
       !!again && again.updated !== true, JSON.stringify(again).slice(0, 120));
+
+    /* ── A BUILD THAT GOES BACKWARDS IS NOT AN UPDATE ──────────────────
+     *
+     * The worker used to ask only "is the remote build DIFFERENT from mine?",
+     * and different is not the same question. gh-pages is published with
+     * force_orphan from whichever branch pushed last, and this repository has
+     * a `main` hundreds of commits behind that points the app at another
+     * server entirely. One push to it republishes that folder — and every
+     * installed app would read the lower version.json, find it different, and
+     * swap a working clinic for a build from months ago. No flowsheet, no
+     * widget, no corrections. Reported as a SUCCESSFUL update, which is the
+     * part that makes it dangerous: nothing on any screen would say what had
+     * happened, and the phone would keep doing it every six hours.
+     *
+     * So: the host now offers something OLDER than what the app is running,
+     * and the app has to refuse it and keep working. */
+    NEWV = 'homatt-clinic-v151';
+    MARK = 'ANCIENT';
+    const back = await page.evaluate(() => new Promise((resolve) => {
+      const ch = new MessageChannel();
+      let done = false;
+      ch.port1.onmessage = (ev) => { done = true; resolve(ev.data || {}); };
+      navigator.serviceWorker.controller.postMessage({ type: 'checkForUpdate', force: true }, [ch.port2]);
+      setTimeout(() => { if (!done) resolve({ reason: 'timed out' }); }, 60000);
+    }));
+    result('an OLDER build offered by the update server is refused',
+      !!back && back.updated !== true, JSON.stringify(back).slice(0, 200));
+    result('...and it says so, rather than failing silently',
+      !!back && /older/i.test(String((back && back.reason) || '')),
+      JSON.stringify(back).slice(0, 200));
+
+    // The assertion that actually matters: not what it REPORTED, but what it
+    // still SERVES. A refusal that had already overwritten the cache would
+    // report the same thing.
+    await page.goto(INSTALLED + '/clinic/dashboard.html', { waitUntil: 'load' });
+    await page.waitForTimeout(1500);
+    const stillNew = await page.evaluate(() => ({
+      build: (document.querySelector('meta[name="homatt-build"]') || {}).content || '(old)',
+      session: localStorage.getItem('clinic_session'),
+      outbox: localStorage.getItem('homatt_outbox_probe'),
+    }));
+    result('the clinic is STILL on the newer build afterwards',
+      stillNew.build === 'NEW', stillNew.build);
+    result('and nothing local was touched by the refusal',
+      stillNew.outbox === 'one unsynced consultation', String(stillNew.outbox));
+
+    // Put the host back where it was, so anything after this behaves as before.
+    NEWV = 'homatt-clinic-v999';
+    MARK = 'NEW';
 
     // A dead update server must leave the working app alone.
     await new Promise(r => web.close(r));

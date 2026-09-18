@@ -93,6 +93,7 @@
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
   <link rel="stylesheet" href="css/clinic.css?v=20261007">
+  <script src="js/clinic-chrome.js?v=20261007"></script>
   <meta name="color-scheme" content="light dark">
   <script>
     // Apply the saved (or system) theme BEFORE first paint — no flash.
@@ -107,11 +108,19 @@
         if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
         document.documentElement.setAttribute('data-theme', t);
         document.documentElement.setAttribute('data-skin', s);
-        // The Android status bar reads this tag, so it has to follow the look.
-        var C = { forest:'#0B3D2E', midnight:'#0C2340', dark:'#000000', clay:'#3B2F27' };
+        /* The phone's own bar reads this tag, so it has to follow the look.
+           The colour is ONE fact, kept in clinic.css as --chrome beside the
+           skin that owns it — it used to be a map copied into five files.
+           js/clinic-chrome.js does this read as well, and additionally hands
+           the colour to the native bars of the installed app; this is the
+           fallback for a page whose copy of that file has not arrived. */
         document.addEventListener('DOMContentLoaded', function () {
-          var m = document.querySelector('meta[name="theme-color"]');
-          if (m) m.setAttribute('content', C[s] || C.forest);
+          try {
+            var m = document.querySelector('meta[name="theme-color"]');
+            var v = getComputedStyle(document.documentElement)
+              .getPropertyValue('--chrome').trim();
+            if (m && v) m.setAttribute('content', v);
+          } catch (e) {}
         });
       } catch (e) {}
     })();

@@ -27,6 +27,22 @@
   --grad-1:    #0B3D2E;   /* the hero gradient, dark -> light */
   --grad-2:    #10855F;
   --grad-3:    #17A46F;
+  /* THE PHONE'S OWN BARS — the strip with the clock in it, and the strip with
+     the back gesture. They are not part of the page: Android draws them, from
+     a colour the app has to hand over. So this token is not decoration, it is
+     the one value the operating system is told.
+
+     It has its own name rather than borrowing --grad-1, which happens to have
+     the same value today. --grad-1 is "the dark end of the hero gradient", and
+     the day somebody lightens that gradient the status bar would follow it
+     without anybody asking — which is exactly the class of mistake this file
+     has been caught by four times. A fill that is handed to something else
+     gets its own name.
+
+     The ICON colour is NOT a token beside it. Android takes a boolean, not a
+     colour, and working it out from this value's luminance means the two can
+     never disagree — a pair that computes itself cannot drift. */
+  --chrome:    #0B3D2E;
   --brand-tint:#DBF4EA;   /* soft brand background behind chips and panels */
   --brand-ink: #0A5C43;   /* text that sits on --brand-tint */
   --side-accent:      #42A5F5;               /* sidebar highlight */
@@ -387,6 +403,7 @@ html[data-skin="midnight"]{
   --deep:#123E6B; --deep-ink:#123E6B; --deep-2:#1B5FA8;
   --tint-2:#E8F0FA; --tint-3:#90BFEA;
   --grad-1:#0C2340; --grad-2:#164A82; --grad-3:#2E7DC4;
+  --chrome:#0C2340;
   --brand-tint:#DCEAF9; --brand-ink:#16457B;
   --side-accent:#64B5F6; --side-accent-soft:rgba(100,181,246,.16);
   --surface:#FFFFFF; --bg:#EEF3FA;
@@ -412,6 +429,7 @@ html[data-skin="dark"]{
   --deep:#1A1D20; --deep-ink:#1A1D20; --deep-2:#33383D;
   --tint-2:#F0F1F2; --tint-3:#B9BEC4;
   --grad-1:#000000; --grad-2:#1C1F22; --grad-3:#33383D;
+  --chrome:#000000;
   --brand-tint:#ECEDEF; --brand-ink:#1C1F22;
   --side-accent:#B9BEC4; --side-accent-soft:rgba(185,190,196,.16);
   --surface:#FFFFFF; --bg:#F4F5F6;
@@ -437,6 +455,7 @@ html[data-skin="clay"]{
   --deep:#4A3B31; --deep-ink:#4A3B31; --deep-2:#6D5B4E;
   --tint-2:#F5EFE8; --tint-3:#C9B49F;
   --grad-1:#3B2F27; --grad-2:#6D5B4E; --grad-3:#8D7864;
+  --chrome:#3B2F27;
   --brand-tint:#EFE7DF; --brand-ink:#514239;
   --side-accent:#D7B899; --side-accent-soft:rgba(215,184,153,.18);
   --surface:#FFFDFB; --bg:#F3EFEA;

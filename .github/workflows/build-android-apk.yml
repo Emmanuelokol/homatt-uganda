@@ -58,6 +58,23 @@ jobs:
             echo "::warning::Then base64-encode it and add as GOOGLE_SERVICES_JSON secret in GitHub."
           fi
 
+      # The APK bakes app/ in whole, including app/clinic/version.json — which
+      # is what a freshly installed app compares itself against. The web deploy
+      # regenerates it from clinic-sw.js; this build did not, so it shipped
+      # whatever happened to be committed.
+      #
+      # That is the exact failure make_version_json.py exists to prevent, as
+      # its own header says: a version.json that disagrees with the worker
+      # beside it is worse than none, because it tells a phone to fetch files
+      # that are not there. Bump CACHE, forget to regenerate, and every new
+      # install is born unable to update.
+      #
+      # It also refuses to write when a listed file does not exist, so this
+      # step fails the build rather than shipping a manifest that breaks
+      # updates silently.
+      - name: Write version.json (same generator the web deploy uses)
+        run: python3 tools/make_version_json.py
+
       - name: Install npm dependencies
         run: npm install
 
@@ -105,18 +122,113 @@ jobs:
       - name: Rename APK for release
         run: cp android/app/build/outputs/apk/release/app-release.apk HomattHealth.apk
 
+      # ── THE PUBLISHED APK MUST NEVER GO BACKWARDS ────────────────────────
+      #
+      # This workflow runs on `main` AND on every `claude/**` branch, and every
+      # one of them writes the SAME `android-latest` release. `main` is
+      # hundreds of commits behind and its capacitor.config.json points the app
+      # at a different server entirely — so one push to it would replace, at a
+      # permanent public download link that clinics have already been sent, the
+      # app they are running with one from months ago. Nothing would say so.
+      # The download would work. The APK would install. It would simply be the
+      # wrong app.
+      #
+      # The rule is the same one the service worker now enforces for the web
+      # build, deliberately: a number that goes down is not an update. The
+      # number is the one in clinic-sw.js, which is the build a clinic sees on
+      # its own Settings screen, so refusing here and refusing there mean the
+      # same thing to the same person.
+      #
+      # Equal is allowed — a Java-only change (the widget, the bar colours)
+      # ships without touching the web build, and blocking that would be
+      # blocking exactly the kind of fix this guard exists to deliver.
+      - name: Check this build is not older than the published one
+        id: forward
+        run: |
+          set -u
+          mine=$(grep -o "homatt-clinic-v[0-9]\+" app/clinic/clinic-sw.js | head -1 | grep -o "[0-9]\+")
+          if [ -z "$mine" ]; then
+            echo "::error::Could not read the build number out of app/clinic/clinic-sw.js."
+            exit 1
+          fi
+          echo "this build: v$mine (branch ${GITHUB_REF_NAME}, commit ${GITHUB_SHA})"
+
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/android-latest/build-info.json"
+          theirs=""
+          if curl -fsSL --retry 3 --max-time 30 -o published.json "$url" 2>/dev/null; then
+            theirs=$(python3 -c "import json;print(json.load(open('published.json')).get('build',''))" 2>/dev/null || true)
+            echo "published:  v${theirs:-unknown}  $(python3 -c "import json;d=json.load(open('published.json'));print(d.get('branch',''), d.get('sha','')[:8])" 2>/dev/null || true)"
+          else
+            # No stamp yet: either the first run of this guard, or a release
+            # published before it existed. Publishing is right in both cases —
+            # this is the run that starts recording, and refusing would leave
+            # the link stuck on an APK nobody can identify.
+            echo "published:  nothing recorded yet"
+          fi
+
+          publish=yes
+          if [ -n "$theirs" ] && [ "$mine" -lt "$theirs" ] 2>/dev/null; then
+            publish=no
+            echo "::warning::NOT publishing. This build is v$mine and the published APK is v$theirs — publishing would hand clinics an older app at a link they have already been sent. Branch ${GITHUB_REF_NAME} is behind; merge the newer work into it first. The APK is still attached to this run as an artifact."
+          fi
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+          # The stamp itself. "Build 578" on a clinic's Settings screen is the
+          # versionCode, which is this run number — so this file is what turns
+          # a photograph of a phone into a commit anybody can look up.
+          export MINE="$mine"
+          python3 - <<'PY' > build-info.json
+          import json, os
+          print(json.dumps({
+            'build': int(os.environ['MINE']),
+            'versionCode': os.environ['GITHUB_RUN_NUMBER'],
+            'versionName': '1.1.' + os.environ['GITHUB_RUN_NUMBER'],
+            'branch': os.environ['GITHUB_REF_NAME'],
+            'sha': os.environ['GITHUB_SHA'],
+            'run': os.environ['GITHUB_RUN_ID'],
+            'built': os.environ.get('BUILT', ''),
+          }, indent=2))
+          PY
+          cat build-info.json
+        env:
+          BUILT: ${{ github.event.head_commit.timestamp }}
+
       # Publish the APK at a PERMANENT public link so the portal can offer a
       # one-tap "Download Android app" — no GitHub account or Actions digging:
       #   https://github.com/<owner>/<repo>/releases/download/android-latest/HomattHealth.apk
       - name: Publish APK to the android-latest release
+        if: steps.forward.outputs.publish == 'yes'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: android-latest
           name: Homatt Clinic — Android app (latest)
+          # Named, not just "the latest". A clinic reads "build 578" off its own
+          # Settings screen; this is where that number is looked up.
           body: |
-            Latest Homatt Clinic Android app (build ${{ github.run_number }}).
-            Download HomattHealth.apk below and open it on your phone to
-            install/update. Updates install over the previous version and keep
-            all offline data. Built automatically from the most recent code.
-          files: HomattHealth.apk
+            Latest Homatt Clinic Android app.
+
+            | | |
+            |---|---|
+            | Build (shown in Settings → App version) | `${{ github.run_number }}` |
+            | Version | `1.1.${{ github.run_number }}` |
+            | Built from | `${{ github.ref_name }}` |
+            | Commit | `${{ github.sha }}` |
+
+            Download **HomattHealth.apk** below and open it on your phone to
+            install or update. It installs over the previous version and keeps
+            everything already recorded. `build-info.json` beside it is the same
+            information in a form a program can read.
+
+            The screens inside the app update themselves over the internet
+            afterwards. The app itself — the home-screen widget, the colour of
+            the phone's own top and bottom bars, the camera — only changes when
+            a new file like this one is installed.
+          files: |
+            HomattHealth.apk
+            build-info.json
           make_latest: true
+
+      - name: Say plainly that nothing was published
+        if: steps.forward.outputs.publish != 'yes'
+        run: |
+          echo "::warning::The APK built successfully and was NOT published, because it is older than the one clinics can already download. It is attached to this run as an artifact if you need it."

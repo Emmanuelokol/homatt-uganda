@@ -30,12 +30,57 @@
   }
 
   // ─── STATUS BAR ─────────────────────────────────────────────────────────────
+  /**
+   * THIS FUNCTION USED TO PAINT THE BAR GREEN AND KEEP IT GREEN.
+   *
+   * It read `StatusBar.setBackgroundColor({ color: '#1B5E20' })` — a literal,
+   * run on every load, in the INSTALLED APP ONLY. A clinic switched the app to
+   * Midnight blue, the page worked out the right colour and wrote it into
+   * <meta name="theme-color">, and then this line ran a moment later and put
+   * the green back. In a browser it never ran at all, so the browser looked
+   * correct and the app did not, which is exactly how a bug survives being
+   * reported: whoever checks it is usually on the wrong one of the two.
+   *
+   * The colour is now the page's own. Clinic pages carry HomattChrome, which
+   * reads --chrome from the stylesheet, handles the skin changing under it and
+   * also does the navigation bar — so where it exists it is left to do the job
+   * rather than being raced. Everywhere else (the patient app, which has its
+   * own look and no --chrome) the page's declared theme-color is the answer,
+   * because that is the value the page already gives every other platform.
+   *
+   * The icon style is derived rather than fixed. Capacitor's Style.Dark means
+   * "content for a dark background", i.e. LIGHT icons — so the old
+   * `style: 'LIGHT'` was asking for dark icons on a near-black bar. It looked
+   * fine only because Android ignored it.
+   */
   function initStatusBar() {
     if (!isNative()) return;
+
+    // The clinic portal owns its chrome. Do not fight it.
+    if (window.HomattChrome && typeof window.HomattChrome.apply === 'function') {
+      window.HomattChrome.apply(true);
+      return;
+    }
+
     const { StatusBar } = window.Capacitor.Plugins;
     if (!StatusBar) return;
-    StatusBar.setStyle({ style: 'LIGHT' }).catch(() => {});
-    StatusBar.setBackgroundColor({ color: '#1B5E20' }).catch(() => {});
+
+    let colour = '';
+    try {
+      const m = document.querySelector('meta[name="theme-color"]');
+      colour = ((m && m.getAttribute('content')) || '').trim();
+    } catch (e) {}
+    if (!/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(colour)) return;  // say nothing rather than guess
+
+    // Luminance decides the icons, so the bar and what is drawn on it can
+    // never disagree — a stored pair can be half-updated; a computed one cannot.
+    let h = colour.slice(1);
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    const lin = (v) => { v = parseInt(v, 16) / 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    const L = 0.2126 * lin(h.slice(0, 2)) + 0.7152 * lin(h.slice(2, 4)) + 0.0722 * lin(h.slice(4, 6));
+
+    StatusBar.setStyle({ style: L < 0.5 ? 'DARK' : 'LIGHT' }).catch(() => {});
+    StatusBar.setBackgroundColor({ color: colour }).catch(() => {});
   }
 
   // ─── SPLASH SCREEN ──────────────────────────────────────────────────────────

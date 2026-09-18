@@ -34,11 +34,65 @@ jobs:
       - name: Write version.json for self-updating installs
         run: python3 tools/make_version_json.py
 
+      # ── THIS FOLDER IS WHAT INSTALLED APPS UPDATE THEMSELVES FROM ────────
+      #
+      # Which makes it more dangerous than the APK, not less. Every installed
+      # Homatt Clinic asks this host "is there a newer build?" and takes what
+      # it is offered. The workflow runs on `main` AND every `claude/**`
+      # branch, and `force_orphan: true` means whichever pushed last REPLACES
+      # the folder outright — there is no merge and no history to fall back on.
+      #
+      # `main` is hundreds of commits behind. One push to it would publish that
+      # build here, and every phone in the field would fetch it and swap it in.
+      # Not a failed update — a successful one, to a build from months ago,
+      # with nothing on any screen to say what had happened.
+      #
+      # The service worker now refuses a build whose number is lower than the
+      # one it is running, so a clinic is protected even if this step is wrong.
+      # This is the other half: do not put it there in the first place. Two
+      # independent guards, because the first one only reaches phones that
+      # have already taken the build that contains it.
+      - name: Check this build is not older than the one already published
+        id: forward
+        run: |
+          set -u
+          mine=$(grep -o "homatt-clinic-v[0-9]\+" app/clinic/clinic-sw.js | head -1 | grep -o "[0-9]\+")
+          if [ -z "$mine" ]; then
+            echo "::error::Could not read the build number out of app/clinic/clinic-sw.js."
+            exit 1
+          fi
+          echo "this build: v$mine (branch ${GITHUB_REF_NAME})"
+
+          # raw.githubusercontent, not the Pages URL: Pages is a CDN and can
+          # serve a cached copy for minutes after a deploy, which would make
+          # this guard compare against something that is no longer there.
+          url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/gh-pages/clinic/version.json"
+          theirs=""
+          if curl -fsSL --retry 3 --max-time 30 -o live.json "$url" 2>/dev/null; then
+            theirs=$(grep -o "homatt-clinic-v[0-9]\+" live.json | head -1 | grep -o "[0-9]\+" || true)
+            echo "published:  v${theirs:-unreadable}"
+          else
+            echo "published:  nothing there yet"
+          fi
+
+          deploy=yes
+          if [ -n "$theirs" ] && [ "$mine" -lt "$theirs" ] 2>/dev/null; then
+            deploy=no
+            echo "::warning::NOT deploying. This build is v$mine and the live site is v$theirs — publishing it would hand every installed app an older build than the one it is running. Branch ${GITHUB_REF_NAME} is behind; merge the newer work into it first."
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
       - name: Deploy app/ to GitHub Pages (gh-pages branch)
+        if: steps.forward.outputs.deploy == 'yes'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./app
           publish_branch: gh-pages
           force_orphan: true
-          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }}'
+          commit_message: 'deploy: update GitHub Pages from ${{ github.ref_name }} ${{ github.sha }}'
+
+      - name: Say plainly that nothing was deployed
+        if: steps.forward.outputs.deploy != 'yes'
+        run: |
+          echo "::warning::The site was NOT deployed, because this branch's build is older than the one already live. Nothing was changed for any clinic."

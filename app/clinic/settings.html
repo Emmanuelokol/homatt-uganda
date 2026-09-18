@@ -17,10 +17,17 @@
     if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
     var d=document.documentElement;
     d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
-    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
-    document.addEventListener('DOMContentLoaded',function(){
+    /* The bar colour is ONE fact and it lives in clinic.css as --chrome,
+       beside the skin that owns it. It used to be this four-entry map, copied
+       into five separate files — five chances for the next skin to reach four
+       of them. js/clinic-chrome.js does the same read AND hands the colour to
+       the phone's own bars; this is only the fallback for a page whose copy of
+       that file has not arrived yet. Both read the same token, so the fallback
+       cannot disagree with the real thing. */
+    document.addEventListener('DOMContentLoaded',function(){try{
       var m=document.querySelector('meta[name="theme-color"]');
-      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
+      var v=getComputedStyle(d).getPropertyValue('--chrome').trim();
+      if(m&&v)m.setAttribute('content',v);}catch(e){}});}catch(e){}})();
   </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -34,6 +41,7 @@
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
   <link rel="stylesheet" href="css/clinic.css?v=20261007">
+  <script src="js/clinic-chrome.js?v=20261007"></script>
   <style>
     .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
     @media(max-width:700px) { .settings-grid { grid-template-columns:1fr; } }
@@ -744,6 +752,34 @@
           swapped in until the whole thing has arrived, so a connection that
           drops leaves the working app exactly as it was.
         </p>
+        <!-- ASKED IN AS MANY WORDS: "I need to see everything update if the
+             icon of the app is change". The honest answer is no, and it is
+             better said here than discovered. Two halves update by two
+             different roads, and which half a thing belongs to is not
+             guessable from outside — the widget and the bar colours look like
+             settings and are actually compiled code. -->
+        <div class="dict-detail" style="margin-bottom:10px">
+          <div class="dict-row"><b>Updates on its own, over the internet:</b>
+            every screen — treatments, the patient record, the guidelines,
+            printing, the readings chart, the wording, the layout.</div>
+          <div class="dict-row"><b>Only with a new install:</b> the app's icon
+            and name, the home-screen widget, the colour of your phone's own
+            top and bottom bars, the camera, and anything the phone itself
+            has to be asked for.</div>
+          <div class="dict-row" style="opacity:.85">The second list is built
+            into the app file rather than served to it, so nothing sent over
+            the internet can reach it. When something there changes, this
+            screen says so and <b>Get the newest app</b> below is the way.</div>
+        </div>
+        <!-- WHAT THIS PHONE IS ACTUALLY RUNNING.
+             A clinic installed the newest APK and said "you have given me an
+             old apk". Nothing on any screen could settle that either way: the
+             only number shown was the WEB build, which updates itself over the
+             air and therefore says almost nothing about which APK somebody is
+             holding — and the APK is what carries the widget, the phone's bar
+             colours and everything else that is compiled rather than served.
+             Three facts, named separately, so one photograph answers it. -->
+        <div class="dict-detail" id="verWho" style="margin-bottom:10px"></div>
         <div class="dict-state" id="verState">
           <span class="dict-dot" id="verDot"></span>
           <span class="dict-msg" id="verMsg">Checking…</span>
@@ -3182,6 +3218,12 @@ document.addEventListener('DOMContentLoaded', function () {
   var vbtn = document.getElementById('verCheckBtn');
   if (vbtn) vbtn.addEventListener('click', function () { verCheck(true); });
   verCheck(false);
+  /* Separate from verCheck, and NOT awaited by it. "What am I running?" is
+   * answerable from this device alone and must appear straight away; "is
+   * there a newer one?" needs the network and can take ninety seconds. Tying
+   * them together is how the most useful line on the screen ends up waiting
+   * on the least reliable one. */
+  verWho();
   pinInit();
   // Show what this device already knows without waiting to be asked; the live
   // check costs a request, so it stays on the button.
@@ -3214,6 +3256,57 @@ function verShow(state, msg, detail) {
   if (m)   m.textContent = msg || '';
   if (d)   d.innerHTML = detail || '';
 }
+/* The three facts, written out as sentences a clinic owner can read back down
+ * a phone line. Deliberately NOT one clever version string: the last one was
+ * `homatt-clinic-v199` and it was read as "the app", which it is not.
+ *
+ * The APK's build number is the useful one. CI sets versionCode to the GitHub
+ * Actions run number, so "Build 578" names one run, one commit, one moment —
+ * and "is that the newest?" becomes a question with an answer instead of an
+ * argument. */
+async function verWho() {
+  var el = document.getElementById('verWho');
+  if (!el) return;
+  var i = null;
+  try { i = await window.homattAppInfo(); } catch (e) { i = null; }
+  if (!i) { el.innerHTML = ''; return; }
+
+  var rows = [];
+  if (i.installed) {
+    rows.push('<div class="dict-row"><b>The Android app</b> — version ' +
+      escHtml(i.appVersion || 'unknown') +
+      (i.appBuild ? ', build <b>' + escHtml(i.appBuild) + '</b>' : '') + '</div>');
+    if (!i.appBuild) {
+      rows.push('<div class="dict-row">This build is too old to say which one ' +
+        'it is. Installing the newest app once fixes that for good.</div>');
+    }
+  } else if (i.mode === 'home-screen') {
+    /* The distinction the whole of last round was about. An icon on a home
+     * screen is not an install, and somebody who believes it is will keep
+     * waiting for things that only ever arrive in an APK. */
+    rows.push('<div class="dict-row"><b>Not the Android app.</b> This is the ' +
+      'web version, added to your home screen — which looks the same from the ' +
+      'outside but cannot carry the home-screen widget or set the colour of ' +
+      'your phone’s top and bottom bars.</div>');
+  } else {
+    rows.push('<div class="dict-row"><b>A browser</b>, not the installed app.</div>');
+  }
+
+  rows.push('<div class="dict-row"><b>The screens</b> — ' + escHtml(i.screens) +
+    (i.installed
+      ? (i.overTheAir
+          ? ', fetched over the internet since you installed'
+          : ', exactly as it came in the app')
+      : '') + '</div>');
+
+  if (i.installed) {
+    rows.push('<div class="dict-row" style="opacity:.85">These two move ' +
+      'separately, and that is the thing worth knowing: the screens update ' +
+      'themselves, the app itself only changes when you install it again.</div>');
+  }
+  el.innerHTML = rows.join('');
+}
+
 async function verCheck(force) {
   var here = 'unknown';
   try {

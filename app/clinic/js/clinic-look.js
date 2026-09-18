@@ -71,13 +71,34 @@
     paintThemeColor();
     paintPicker();
   }
-  // The Android status bar takes its colour from this tag, so it has to follow
-  // the look too — otherwise the top of the screen stays green in a blue app.
+  /* The phone's own bars have to follow the look too — otherwise the top of
+   * the screen stays green in a blue app, which is exactly what a clinic
+   * photographed.
+   *
+   * This function already knew that and did half of it: it set the meta tag,
+   * which is all a BROWSER reads. Inside the installed app the meta tag is
+   * decoration — the bars are set through the native bridge, and the bottom
+   * one has no web API at all. So the work belongs in one place and this is
+   * not it; HomattChrome does the whole job, including watching data-skin, and
+   * calling it here just makes the change immediate rather than a frame later.
+   *
+   * It also read `--grad-1` while everything else now reads `--chrome`. They
+   * hold the same value today, which is precisely why it would have gone
+   * unnoticed: the day the hero gradient is lightened, two places would set
+   * two different colours and which one won would depend on load order. */
   function paintThemeColor() {
+    if (window.HomattChrome && typeof window.HomattChrome.apply === 'function') {
+      window.HomattChrome.apply(true);
+      return;
+    }
     var m = document.querySelector('meta[name="theme-color"]');
     if (!m) return;
     try {
-      var c = getComputedStyle(document.documentElement).getPropertyValue('--grad-1').trim();
+      var cs = getComputedStyle(document.documentElement);
+      // --grad-1 stays as the fallback, not as a second opinion: a page that
+      // somehow loaded without the module keeps working exactly as it did.
+      var c = (cs.getPropertyValue('--chrome').trim() ||
+               cs.getPropertyValue('--grad-1').trim());
       if (c) m.setAttribute('content', c);
     } catch (e) {}
   }

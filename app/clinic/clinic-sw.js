@@ -11,7 +11,7 @@
  *   • Supabase API (supabase.co): never touched here — the pages read/write it
  *     directly and fall back to their own localStorage data cache when offline.
  */
-const CACHE = 'homatt-clinic-v199';
+const CACHE = 'homatt-clinic-v200';
 
 // Bumped only when a bundled .db is rebuilt. The databases are cached
 // cache-first and never re-downloaded, so this is what tells an existing
@@ -91,6 +91,11 @@ const SHELL = [
   'js/clinic-speak.js?v=20261007',
   'js/clinic-whois.js?v=20261007',
   'js/clinic-open.js?v=20261007',
+  /* The phone's own status and navigation bars. In SHELL because a page that
+   * loads without it falls back to its inline copy, which handles the browser
+   * but cannot reach the native bars — so a phone that missed this file is a
+   * phone whose bars stay the colour they were, which is the bug. */
+  'js/clinic-chrome.js?v=20261007',
   'js/clinic-intake.js?v=20261007',
   'js/clinic-look.js?v=20261007',
   'manifest.json',
@@ -221,6 +226,37 @@ async function fetchNewBuild(force) {
     if (manifest.cache === running) {
       return { checked: true, current: running, latest: manifest.cache, updated: false,
                reason: 'already the newest' };
+    }
+
+    /* ONLY EVER FORWARDS.
+     *
+     * This used to be "different, therefore take it", and different is not the
+     * same question. The web host is one branch of gh-pages, published with
+     * force_orphan from whichever branch pushed last — and the repository has
+     * a `main` that is hundreds of commits behind and points the app at a
+     * different server entirely. One push to it republishes that folder, and
+     * every installed app in the country would read a LOWER version.json,
+     * conclude "this differs from what I am running", and quietly replace a
+     * working clinic with a build from months ago: no flowsheet, no widget, no
+     * corrections. The mechanism would report it as a successful update, which
+     * is the worst part — there would be nothing to see and nothing to blame.
+     *
+     * A number that goes down is never an update. Refuse it and say so.
+     *
+     * If either side cannot be read as a number, fall through to the old
+     * behaviour rather than freezing: a naming change that nobody could parse
+     * would otherwise stop every clinic updating for ever, and being unable to
+     * tell is not the same as knowing it is older. */
+    const num = (s) => {
+      const m = /v(\d+)/.exec(String(s || ''));
+      return m ? parseInt(m[1], 10) : NaN;
+    };
+    const there = num(manifest.cache), here = num(running);
+    if (!isNaN(there) && !isNaN(here) && there < here) {
+      return { checked: true, current: running, latest: manifest.cache, updated: false,
+               reason: 'the update server is offering an OLDER build (' +
+                       manifest.cache + ') than this app is running (' + running +
+                       ') — refused' };
     }
 
     // The books are 4 MB and cache-first; they are only worth sending when the

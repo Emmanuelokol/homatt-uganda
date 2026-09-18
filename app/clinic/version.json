@@ -1,5 +1,5 @@
 {
-  "cache": "homatt-clinic-v199",
+  "cache": "homatt-clinic-v200",
   "dataVersion": "145",
   "files": [
     "./",
@@ -9,7 +9,6 @@
     "settings.html",
     "messages.html",
     "guidelines.html",
-    "./",
     "clinician/index.html",
     "clinician/home.html",
     "clinician/join.html",
@@ -32,6 +31,7 @@
     "js/clinic-speak.js?v=20261007",
     "js/clinic-whois.js?v=20261007",
     "js/clinic-open.js?v=20261007",
+    "js/clinic-chrome.js?v=20261007",
     "js/clinic-intake.js?v=20261007",
     "js/clinic-look.js?v=20261007",
     "manifest.json",

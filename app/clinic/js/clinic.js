@@ -899,6 +899,90 @@ function homattRunningBuild() {
 }
 window.homattRunningBuild = homattRunningBuild;
 
+/**
+ * WHICH BUILD IS THIS, EXACTLY — as three separate facts, because they are
+ * three separate things and merging them is what made the last round
+ * unanswerable.
+ *
+ * A clinic installed the newest APK and reported "you have given me an old
+ * apk, it doesn't have the updates". Nothing on any screen could settle that,
+ * in either direction: the version line said `homatt-clinic-v199`, which is
+ * the WEB build. The web build updates itself over the air, so it says almost
+ * nothing about which APK somebody is holding — and the APK is what carries
+ * the widget, the native bars and everything else that is compiled.
+ *
+ * So there are three questions and they need three answers:
+ *
+ *   installed   Is this the Android app at all? Only the Capacitor bridge can
+ *               say. An icon on a home screen is NOT an install — that is the
+ *               mistake that hid the download button from everybody who had
+ *               added the portal to their home screen.
+ *   appBuild    The APK's own versionCode, which CI sets to the GitHub Actions
+ *               run number. That is the single most useful fact a screenshot
+ *               can carry: it names one run, one commit, one moment. "Build
+ *               578" is checkable; "the latest one" is not.
+ *   screens     The web build actually being served, and whether it arrived
+ *               over the air or came baked into the APK.
+ *
+ * Every lookup is bounded. `App.getInfo()` is a bridge call, and a bridge call
+ * that never answers would leave the version card saying "Checking…" for ever
+ * — which is indistinguishable from a broken app and is precisely the kind of
+ * thing this function exists to stop.
+ */
+function homattAppInfo() {
+  return new Promise(function (done) {
+    var out = {
+      installed: false,      // the real Android app
+      mode: 'browser',       // 'android' | 'home-screen' | 'browser'
+      appVersion: '',        // e.g. "1.1.578"
+      appBuild: '',          // versionCode == the CI run number
+      screens: 'v?',         // the web build being served
+      overTheAir: false,     // did that build arrive over the air?
+    };
+
+    var C = window.Capacitor, native = false;
+    try {
+      native = !!(C && (C.isNative ||
+        (typeof C.isNativePlatform === 'function' && C.isNativePlatform())));
+    } catch (e) {}
+    out.installed = native;
+
+    var standalone = false;
+    try {
+      standalone = !!(window.matchMedia &&
+        window.matchMedia('(display-mode: standalone)').matches);
+    } catch (e) {}
+    // Deliberately three values, not two. "installed" for a home-screen web
+    // app is the conflation that started all of this.
+    out.mode = native ? 'android' : (standalone ? 'home-screen' : 'browser');
+
+    function thenScreens() {
+      homattRunningBuild().catch(function () { return 'v?'; }).then(function (b) {
+        // homattRunningBuild marks an over-the-air build with a trailing '+'.
+        out.overTheAir = /\+$/.test(b);
+        out.screens = b.replace(/\+$/, '');
+        done(out);
+      });
+    }
+
+    if (!native) { thenScreens(); return; }
+
+    var settled = false;
+    function next() { if (!settled) { settled = true; thenScreens(); } }
+    try {
+      var A = C.Plugins && C.Plugins.App;
+      if (!A || !A.getInfo) { next(); return; }
+      A.getInfo().then(function (i) {
+        out.appVersion = (i && i.version) ? String(i.version) : '';
+        out.appBuild = (i && (i.build || i.build === 0)) ? String(i.build) : '';
+        next();
+      }, next);
+    } catch (e) { next(); return; }
+    setTimeout(next, 2500);   // a bridge that never answers must not hang the card
+  });
+}
+window.homattAppInfo = homattAppInfo;
+
 function homattBuildLine() {
   var foot = document.querySelector('.sidebar-footer');
   if (!foot) return;
@@ -913,7 +997,12 @@ function homattBuildLine() {
   var native = !!(window.Capacitor && window.Capacitor.isNativePlatform &&
                   window.Capacitor.isNativePlatform());
   var standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
-  var mode = native ? 'android app' : (standalone ? 'installed' : 'browser');
+  /* "home screen", not "installed". A page added to a home screen looks
+   * exactly like an installed app from the outside — an icon, a splash, no
+   * address bar — and calling it "installed" here is the same claim that hid
+   * the Android download from every clinic that had done it. The word has to
+   * tell them apart, because this line exists to be photographed and sent. */
+  var mode = native ? 'android app' : (standalone ? 'home screen' : 'browser');
 
   /* ONE painter, and everything it needs is gathered before it runs.
    *

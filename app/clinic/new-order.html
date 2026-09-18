@@ -17,10 +17,17 @@
     if(['forest','midnight','dark','clay'].indexOf(s)<0)s='forest';
     var d=document.documentElement;
     d.setAttribute('data-theme',t);d.setAttribute('data-skin',s);
-    var C={forest:'#0B3D2E',midnight:'#0C2340',dark:'#000000',clay:'#3B2F27'};
-    document.addEventListener('DOMContentLoaded',function(){
+    /* The bar colour is ONE fact and it lives in clinic.css as --chrome,
+       beside the skin that owns it. It used to be this four-entry map, copied
+       into five separate files — five chances for the next skin to reach four
+       of them. js/clinic-chrome.js does the same read AND hands the colour to
+       the phone's own bars; this is only the fallback for a page whose copy of
+       that file has not arrived yet. Both read the same token, so the fallback
+       cannot disagree with the real thing. */
+    document.addEventListener('DOMContentLoaded',function(){try{
       var m=document.querySelector('meta[name="theme-color"]');
-      if(m)m.setAttribute('content',C[s]||C.forest);});}catch(e){}})();
+      var v=getComputedStyle(d).getPropertyValue('--chrome').trim();
+      if(m&&v)m.setAttribute('content',v);}catch(e){}});}catch(e){}})();
   </script>
   <link href="fonts/inter.css?v=1" rel="stylesheet">
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -34,6 +41,7 @@
   <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
   <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
   <link rel="stylesheet" href="css/clinic.css?v=20261007">
+  <script src="js/clinic-chrome.js?v=20261007"></script>
   <style>
     /* ── Wizard shell ───────────────────────────────────────────── */
     .wiz { max-width: 680px; margin: 0 auto; padding-bottom: 40px; }
