@@ -1,0 +1,713 @@
+/* ============================
+   Homatt Health - Dashboard Styles
+   ============================ */
+
+/* Dashboard Header */
+.dash-header {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  padding: 16px 20px 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.dash-header::before {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+}
+
+.dash-header::after {
+  content: '';
+  position: absolute;
+  bottom: -20px;
+  left: -30px;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+}
+
+.dash-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.dash-welcome {
+  font-size: 13px;
+  color: rgba(255,255,255,0.8);
+  font-weight: 400;
+  margin-bottom: 2px;
+}
+
+.dash-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: -0.3px;
+}
+
+.dash-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dash-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.2s ease;
+}
+
+.dash-icon-btn:active {
+  background: rgba(255,255,255,0.25);
+}
+
+.notif-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dash-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Health Score Card */
+.health-score-card {
+  background: rgba(255,255,255,0.12);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+  backdrop-filter: blur(10px);
+}
+
+.health-score-label {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.health-score-value {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.score-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: white;
+  line-height: 1;
+}
+
+.score-suffix {
+  font-size: 16px;
+  color: rgba(255,255,255,0.6);
+  font-weight: 500;
+}
+
+.health-score-status {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.health-score-ring {
+  position: relative;
+  width: 70px;
+  height: 70px;
+}
+
+.score-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.score-ring-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+}
+
+/* Dashboard Content */
+.dash-content {
+  padding: 16px 20px;
+}
+
+/* Hero Card - Symptom Checker */
+.dash-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 14px;
+  border: 1.5px solid transparent;
+}
+
+.dash-hero-card:active {
+  transform: scale(0.98);
+  border-color: var(--primary);
+}
+
+.hero-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.hero-card-icon .material-icons-outlined {
+  color: white;
+  font-size: 26px;
+}
+
+.hero-card-text h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.hero-card-text p {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.hero-arrow {
+  color: var(--text-hint);
+  margin-left: auto;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* Daily Tip Card */
+.dash-tip-card {
+  background: var(--primary-surface);
+  border-radius: var(--radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+  border: 1px solid #C8E6C9;
+}
+
+.tip-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tip-icon {
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.tip-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tip-text {
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin-bottom: 10px;
+  transition: opacity 0.2s ease;
+}
+
+.tip-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.tip-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  transition: background 0.2s ease;
+}
+
+.tip-btn:active {
+  background: rgba(27, 94, 32, 0.1);
+}
+
+/* Quiz Card */
+.dash-quiz-card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
+}
+
+.quiz-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.quiz-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quiz-icon {
+  font-size: 28px;
+  color: var(--accent);
+}
+
+.quiz-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.quiz-subtitle {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.quiz-streak {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFF3E0;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.streak-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.quiz-start-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 14px;
+}
+
+/* Section */
+.dash-section {
+  margin-bottom: 20px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
+.section-link {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Feature Grid */
+.feature-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.feature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 10px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feature-card:active {
+  transform: scale(0.96);
+  border-color: var(--primary);
+  background: var(--primary-surface);
+}
+
+.feature-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.feature-icon-wrap .material-icons-outlined {
+  font-size: 24px;
+  color: white;
+}
+
+.feature-icon-wrap.cycle-tracker {
+  background: linear-gradient(135deg, #AD1457, #E91E63);
+}
+
+.feature-icon-wrap.mood-tracker {
+  background: linear-gradient(135deg, #4527A0, #7B1FA2);
+}
+
+.feature-icon-wrap.pain-tracker {
+  background: linear-gradient(135deg, #BF360C, #D32F2F);
+}
+
+.feature-icon-wrap.digestive-tracker {
+  background: linear-gradient(135deg, #004D40, #00695C);
+}
+
+.feature-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: center;
+}
+
+/* Malaria Alert Card */
+.dash-alert-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #FFF8E1;
+  border-radius: var(--radius-lg);
+  margin-bottom: 20px;
+  cursor: pointer;
+  border: 1px solid #FFE082;
+  transition: all 0.2s ease;
+}
+
+.dash-alert-card:active {
+  transform: scale(0.98);
+}
+
+.alert-icon-wrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #FFF3E0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.alert-icon-wrap .material-icons-outlined {
+  font-size: 22px;
+  color: #F57C00;
+}
+
+.alert-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.alert-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+
+.alert-level {
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+}
+
+.alert-level.low {
+  background: #E8F5E9;
+  color: #2E7D32;
+}
+
+.alert-level.medium {
+  background: #FFF3E0;
+  color: #E65100;
+}
+
+.alert-level.high {
+  background: #FFEBEE;
+  color: #C62828;
+}
+
+.alert-detail {
+  font-size: 11px;
+  color: var(--text-hint);
+}
+
+.alert-arrow {
+  color: var(--text-hint);
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+/* Reminders */
+.reminder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reminder-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.reminder-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.reminder-icon .material-icons-outlined {
+  font-size: 20px;
+  color: white;
+}
+
+.reminder-icon.water {
+  background: #0288D1;
+}
+
+.reminder-icon.medication {
+  background: #7B1FA2;
+}
+
+.reminder-icon.checkup {
+  background: var(--primary);
+}
+
+.reminder-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.reminder-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.reminder-time {
+  font-size: 12px;
+  color: var(--text-hint);
+}
+
+.reminder-dismiss {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: var(--background);
+  color: var(--text-hint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.reminder-dismiss .material-icons-outlined {
+  font-size: 16px;
+}
+
+.reminder-dismiss:active {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+/* Wallet Cards */
+.wallet-cards {
+  display: flex;
+  gap: 10px;
+}
+
+.wallet-card {
+  flex: 1;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  color: white;
+  position: relative;
+  overflow: hidden;
+}
+
+.wallet-card::before {
+  content: '';
+  position: absolute;
+  top: -20px;
+  right: -20px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+}
+
+.family-wallet {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+}
+
+.care-wallet {
+  background: linear-gradient(135deg, #E65100 0%, var(--accent) 100%);
+}
+
+.wallet-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.wallet-header .material-icons-outlined {
+  font-size: 18px;
+  opacity: 0.8;
+}
+
+.wallet-name {
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+.wallet-balance {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
+}
+
+.wallet-actions {
+  position: relative;
+  z-index: 1;
+}
+
+.wallet-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.2s ease;
+}
+
+.wallet-btn:active {
+  background: rgba(255,255,255,0.35);
+}

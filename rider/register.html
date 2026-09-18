@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homatt Health — Rider Registration</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link rel="stylesheet" href="css/rider.css">
+  <style>
+    .reg-card { background:#fff; border-radius:16px; padding:36px 40px; width:520px; max-width:95vw; box-shadow:0 20px 60px rgba(0,0,0,0.35); }
+    .reg-steps { display:flex; gap:0; margin-bottom:28px; }
+    .reg-step { flex:1; text-align:center; position:relative; }
+    .reg-step::after { content:''; position:absolute; top:14px; left:50%; width:100%; height:2px; background:#E0E0E0; z-index:0; }
+    .reg-step:last-child::after { display:none; }
+    .step-dot { width:28px; height:28px; border-radius:50%; background:#E0E0E0; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:700; margin:0 auto 6px; position:relative; z-index:1; }
+    .step-dot.active { background:#BF360C; color:#fff; }
+    .step-dot.done { background:#2E7D32; color:#fff; }
+    .step-label { font-size:11px; color:#9AA0A6; }
+    .step-label.active { color:#BF360C; font-weight:600; }
+    .form-section { display:none; }
+    .form-section.active { display:block; }
+    .success-card { text-align:center; padding:20px 0; }
+    .success-icon { width:72px; height:72px; border-radius:50%; background:#E8F5E9; display:flex; align-items:center; justify-content:center; margin:0 auto 16px; }
+  </style>
+</head>
+<body>
+<div class="admin-login-page">
+  <div class="reg-card">
+    <div class="admin-login-logo" style="margin-bottom:20px">
+      <div class="admin-login-logo-mark">
+        <span class="material-icons-outlined" style="font-size:28px">electric_moped</span>
+      </div>
+      <div class="admin-login-title">Join as a Homatt Rider</div>
+      <div class="admin-login-sub">Deliver medicines across Kampala &amp; beyond</div>
+    </div>
+
+    <!-- Steps indicator -->
+    <div class="reg-steps">
+      <div class="reg-step" id="stepDot1">
+        <div class="step-dot active" id="dot1">1</div>
+        <div class="step-label active" id="lbl1">Personal</div>
+      </div>
+      <div class="reg-step" id="stepDot2">
+        <div class="step-dot" id="dot2">2</div>
+        <div class="step-label" id="lbl2">Vehicle</div>
+      </div>
+      <div class="reg-step" id="stepDot3">
+        <div class="step-dot" id="dot3">3</div>
+        <div class="step-label" id="lbl3">Account</div>
+      </div>
+    </div>
+
+    <!-- Step 1: Personal details -->
+    <div class="form-section active" id="section1">
+      <div class="login-field">
+        <label>Full Name <span style="color:#D32F2F">*</span></label>
+        <input type="text" id="fullName" placeholder="e.g. Ssali Moses Kagwa" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-field">
+          <label>Phone Number <span style="color:#D32F2F">*</span></label>
+          <input type="tel" id="phone" placeholder="+256 7XX XXX XXX" required>
+        </div>
+        <div class="login-field">
+          <label>District / Area</label>
+          <input type="text" id="area" placeholder="e.g. Kampala Central">
+        </div>
+      </div>
+      <div class="login-field">
+        <label>National ID Number <span style="color:#D32F2F">*</span></label>
+        <input type="text" id="nationalId" placeholder="e.g. CM9000XXXXXXXX" required>
+      </div>
+      <button class="login-btn" onclick="nextStep(2)">
+        Continue <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle">arrow_forward</span>
+      </button>
+      <div style="text-align:center;margin-top:14px;font-size:13px;color:#5F6368">
+        Already registered? <a href="index.html" style="color:#FF7043;font-weight:600;text-decoration:none">Sign in →</a>
+      </div>
+    </div>
+
+    <!-- Step 2: Vehicle details -->
+    <div class="form-section" id="section2">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-field">
+          <label>Vehicle Type <span style="color:#D32F2F">*</span></label>
+          <select id="vehicleType" style="width:100%;padding:10px 14px;border:1.5px solid #E0E0E0;border-radius:8px;font-size:14px;outline:none;background:#fff">
+            <option value="">Select…</option>
+            <option value="boda_boda">Boda Boda (Motorcycle)</option>
+            <option value="bicycle">Bicycle</option>
+            <option value="car">Car</option>
+            <option value="tricycle">Tricycle / Tuk-tuk</option>
+          </select>
+        </div>
+        <div class="login-field">
+          <label>Plate Number <span style="color:#D32F2F">*</span></label>
+          <input type="text" id="plateNumber" placeholder="e.g. UAA 123A" required>
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Vehicle Model / Description</label>
+        <input type="text" id="vehicleDesc" placeholder="e.g. Bajaj Boxer 150cc — Red">
+      </div>
+      <div style="background:#FFF3E0;border-radius:8px;padding:12px 14px;font-size:12px;color:#E65100;margin-bottom:16px">
+        <strong>Requirements:</strong> Valid driving permit, road-worthy vehicle, and ability to operate in Kampala metropolitan area.
+      </div>
+      <div style="display:flex;gap:10px">
+        <button class="demo-btn" style="flex:1" onclick="prevStep(1)">← Back</button>
+        <button class="login-btn" style="flex:2" onclick="nextStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Account setup -->
+    <div class="form-section" id="section3">
+      <div class="login-field">
+        <label>Email Address <span style="color:#D32F2F">*</span></label>
+        <input type="email" id="regEmail" placeholder="yourname@email.com" required>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="login-field">
+          <label>Password <span style="color:#D32F2F">*</span></label>
+          <input type="password" id="regPassword" placeholder="Min. 8 characters" required>
+        </div>
+        <div class="login-field">
+          <label>Confirm Password</label>
+          <input type="password" id="regPasswordConfirm" placeholder="Repeat password">
+        </div>
+      </div>
+      <div class="login-field">
+        <label>Mobile Money Number (for earnings)</label>
+        <input type="tel" id="momoNumber" placeholder="Same as phone or different">
+      </div>
+      <div class="login-error" id="regError"></div>
+      <div style="display:flex;gap:10px">
+        <button class="demo-btn" style="flex:1" onclick="prevStep(2)">← Back</button>
+        <button class="login-btn" style="flex:2" id="submitBtn" onclick="submitRegistration()">
+          Submit Application
+        </button>
+      </div>
+    </div>
+
+    <!-- Success state -->
+    <div class="form-section" id="sectionSuccess">
+      <div class="success-card">
+        <div class="success-icon">
+          <span class="material-icons-outlined" style="font-size:36px;color:#2E7D32">check_circle</span>
+        </div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:8px">Application Submitted!</div>
+        <div style="font-size:13px;color:#5F6368;margin-bottom:24px;line-height:1.6">
+          Thank you for applying to be a Homatt rider. Our team will review your application
+          and contact you within <strong>1–2 business days</strong> via phone or email.
+        </div>
+        <div style="background:#F0FAF8;border-radius:10px;padding:16px;font-size:13px;margin-bottom:20px;text-align:left">
+          <strong>What happens next:</strong>
+          <div style="margin-top:8px;line-height:1.8">
+            1. Admin reviews your application<br>
+            2. Brief phone verification call<br>
+            3. Account activated — you receive a confirmation SMS<br>
+            4. Log in and start earning!
+          </div>
+        </div>
+        <a href="index.html" class="login-btn" style="display:inline-flex;align-items:center;gap:8px;justify-content:center;text-decoration:none;width:100%">
+          <span class="material-icons-outlined" style="font-size:18px">login</span> Go to Sign In
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../js/config.js"></script>
+<script>
+  const cfg = window.HOMATT_CONFIG || {};
+  const _supa = (cfg.SUPABASE_URL && window.supabase)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY) : null;
+
+  let currentStep = 1;
+
+  function nextStep(step) {
+    if (!validateStep(currentStep)) return;
+    showStep(step);
+  }
+
+  function prevStep(step) { showStep(step); }
+
+  function showStep(step) {
+    for (let i = 1; i <= 3; i++) {
+      document.getElementById('section' + i).classList.toggle('active', i === step);
+      const dot = document.getElementById('dot' + i);
+      const lbl = document.getElementById('lbl' + i);
+      if (i < step) { dot.className = 'step-dot done'; dot.innerHTML = '<span class="material-icons-outlined" style="font-size:14px">check</span>'; lbl.className = 'step-label'; }
+      else if (i === step) { dot.className = 'step-dot active'; dot.textContent = i; lbl.className = 'step-label active'; }
+      else { dot.className = 'step-dot'; dot.textContent = i; lbl.className = 'step-label'; }
+    }
+    currentStep = step;
+  }
+
+  function validateStep(step) {
+    if (step === 1) {
+      if (!document.getElementById('fullName').value.trim()) { alert('Please enter your full name'); return false; }
+      if (!document.getElementById('phone').value.trim()) { alert('Please enter your phone number'); return false; }
+      if (!document.getElementById('nationalId').value.trim()) { alert('Please enter your National ID number'); return false; }
+    }
+    if (step === 2) {
+      if (!document.getElementById('vehicleType').value) { alert('Please select your vehicle type'); return false; }
+      if (!document.getElementById('plateNumber').value.trim()) { alert('Please enter your plate number'); return false; }
+    }
+    return true;
+  }
+
+  async function submitRegistration() {
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    const confirm = document.getElementById('regPasswordConfirm').value;
+    const err = document.getElementById('regError');
+    err.style.display = 'none';
+
+    if (!email) { err.textContent = 'Email is required'; err.style.display = 'block'; return; }
+    if (password.length < 8) { err.textContent = 'Password must be at least 8 characters'; err.style.display = 'block'; return; }
+    if (password !== confirm) { err.textContent = 'Passwords do not match'; err.style.display = 'block'; return; }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+
+    const fullName = document.getElementById('fullName').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    const nationalId = document.getElementById('nationalId').value.trim();
+    const vehicleType = document.getElementById('vehicleType').value;
+    const plateNumber = document.getElementById('plateNumber').value.trim().toUpperCase();
+    const notes = document.getElementById('vehicleDesc').value.trim();
+
+    if (!_supa) {
+      // No backend — show success anyway (demo mode)
+      document.getElementById('section3').classList.remove('active');
+      document.getElementById('sectionSuccess').classList.add('active');
+      return;
+    }
+
+    // Create auth user
+    const { data: authData, error: authError } = await _supa.auth.signUp({ email, password, options: { data: { full_name: fullName } } });
+    if (authError) {
+      err.textContent = authError.message;
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit Application';
+      return;
+    }
+
+    // Create rider record (status = pending, awaiting admin approval)
+    const { data: riderData, error: riderError } = await _supa.from('riders').insert({
+      user_id: authData.user.id,
+      full_name: fullName,
+      phone,
+      email,
+      national_id: nationalId,
+      vehicle_type: vehicleType,
+      plate_number: plateNumber,
+      notes,
+      status: 'pending',
+      active: false,
+      available: false,
+      total_deliveries: 0,
+      rating: 5.0
+    }).select().single();
+
+    if (riderError) {
+      err.textContent = 'Failed to create rider profile: ' + riderError.message;
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit Application';
+      return;
+    }
+
+    // Create portal_users record
+    await _supa.from('portal_users').insert({
+      auth_user_id: authData.user.id,
+      full_name: fullName,
+      email,
+      phone,
+      role: 'rider',
+      rider_id: riderData.id,
+      is_active: false   // activated by admin on approval
+    });
+
+    // Sign out immediately (can't log in until approved)
+    await _supa.auth.signOut();
+
+    document.getElementById('section3').classList.remove('active');
+    document.getElementById('sectionSuccess').classList.add('active');
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homatt Clinic — get the app</title>
+<meta name="description" content="Install Homatt Clinic on an Android phone, or open it in a browser.">
+<meta name="theme-color" content="#1B5E20">
+<link rel="icon" href="clinic/icons/clinic-192.png?v=3">
+<!--
+  ONE LINK TO SEND A CLINIC.
+
+  This page exists because of a real confusion that cost several rounds. The
+  link being shared was `/clinic/` — the portal itself — so every clinic that
+  "installed" Homatt had actually added a web page to their home screen. It
+  works, and it is a perfectly good way to use the portal; but it is not the
+  Android app, it cannot carry a home-screen widget, and nothing on the screen
+  said which of the two somebody was holding.
+
+  So there is now one address to send, and it offers both with the difference
+  stated in plain words rather than left to be discovered.
+
+  WHY THE APK LINK NEVER CHANGES. Every push builds a new APK and replaces the
+  file behind `releases/download/android-latest/HomattHealth.apk`. The address
+  is permanent and the file behind it is always the newest, so this page never
+  needs editing and neither does anything anybody has already sent.
+
+  Self-contained on purpose: no stylesheet, no script from anywhere else, no
+  font to fetch. It is the page somebody opens on a bad connection in order to
+  get the thing that works without one.
+-->
+<style>
+  /* Every colour is a fill and the ink that goes on it, declared together and
+     redeclared together for dark — the rule the rest of this project follows,
+     and the one it has been caught by four times. Measured: 15.3:1 for the
+     body text, 8.9:1 for white on the green. */
+  :root{
+    --bg:#F4F8F5; --surface:#FFFFFF; --ink:#12261A; --ink-soft:#4A5B50;
+    --line:#D6E2DA; --brand:#1B5E20; --on-brand:#FFFFFF; --brand-soft:#E6F1E8;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0B110D; --surface:#151E18; --ink:#E8F0EA; --ink-soft:#9FB4A4;
+      --line:#293630; --brand:#43A047; --on-brand:#04150A; --brand-soft:#123326;
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink); min-height:100vh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;
+    font-size:16px; line-height:1.55;
+    padding:28px 16px 48px;   /* 16px gutter, so nothing touches the edge */
+  }
+  .wrap{max-width:520px;margin:0 auto}
+  header{text-align:center;margin-bottom:26px}
+  .logo{width:72px;height:72px;border-radius:18px;display:block;margin:0 auto 12px}
+  h1{font-size:23px;line-height:1.25;margin:0 0 6px;letter-spacing:-.2px}
+  .sub{color:var(--ink-soft);font-size:14px;margin:0}
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:20px; margin-bottom:16px;
+  }
+  .card h2{font-size:16px;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+  .card p{margin:0 0 14px;font-size:14px;color:var(--ink-soft)}
+  .card ul{margin:0 0 14px;padding-left:18px;font-size:13.5px;color:var(--ink-soft)}
+  .card li{margin-bottom:4px}
+  a.btn{
+    display:block; text-align:center; text-decoration:none; font-weight:700;
+    padding:15px 16px; border-radius:12px; font-size:15.5px; min-height:48px;
+  }
+  a.primary{background:var(--brand);color:var(--on-brand)}
+  a.ghost{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+  .tag{
+    display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.5px;
+    text-transform:uppercase;padding:3px 8px;border-radius:20px;
+    background:var(--brand-soft);color:var(--brand);
+  }
+  @media (prefers-color-scheme: dark){ .tag{color:var(--ink)} }
+  .note{font-size:12.5px;color:var(--ink-soft);line-height:1.6;margin-top:12px}
+  /* Folded, because it is only wanted by somebody it is happening to — and
+     open-able with no script, which this page has none of. */
+  .stuck{margin-top:12px;border:1px solid var(--line);border-radius:10px;
+    padding:10px 12px;background:var(--brand-soft)}
+  .stuck summary{font-size:13px;font-weight:700;cursor:pointer;color:var(--ink)}
+  .stuck p{margin:10px 0 0;font-size:12.5px;color:var(--ink-soft);line-height:1.6}
+  .url{
+    font-size:11.5px;word-break:break-all;user-select:all;-webkit-user-select:all;
+    color:var(--ink-soft);margin-top:10px;
+  }
+  footer{text-align:center;color:var(--ink-soft);font-size:12px;margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <img class="logo" src="clinic/icons/clinic-192.png?v=3" alt="">
+    <h1>Homatt Clinic</h1>
+    <p class="sub">Treatments, prescriptions, stock and patient history —
+      built to keep working when the internet does not.</p>
+  </header>
+
+  <!-- THE ANDROID APP FIRST, because it is the one that survives a day with no
+       signal and the one that can put the widget on a home screen. -->
+  <div class="card">
+    <h2>📱 Android app <span class="tag">recommended</span></h2>
+    <p>For the phone a clinic actually works on.</p>
+    <ul>
+      <li>Works with <b>no internet at all</b> — treatments are recorded and sent later</li>
+      <li>A <b>home-screen widget</b>: New treatment, Active, Quick sale, one tap each</li>
+      <li>The clinical guidelines are stored on the phone, not fetched</li>
+      <li>Updates its own screens afterwards, on its own</li>
+    </ul>
+    <a class="btn primary" id="apk"
+       href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk">
+      Install on Android
+    </a>
+    <p class="note">
+      Android will ask you to allow installing this file — it is not from the
+      Play Store. Tap <b>Settings</b> → <b>Allow from this source</b>, then
+      <b>Install</b>. Installing over an older Homatt Clinic keeps everything
+      already recorded.
+      <br><br>
+      This address always gives the newest version, so it never needs replacing.
+    </p>
+
+    <!-- THE COMMONEST WAY THIS GOES WRONG, AND IT IS NOT A FAILURE.
+         A clinic photographed a download reading 12.75 MB of 12.75 MB with
+         the browser still showing it as busy, and reported "the download
+         doesn't finish". Every byte was already on the phone — Chrome simply
+         never flipped it to done, which it does with APKs.
+         Left unexplained, the finished file sits in Downloads untapped while
+         the thing inside it is what somebody is waiting for. The test is not
+         a number anybody has to be told: it is whether the two numbers either
+         side of the slash are the same. -->
+    <details class="stuck">
+      <summary>The download looks stuck?</summary>
+      <p>
+        If it shows <b>the same number on both sides</b> — like
+        <b>12.75 MB / 12.75 MB</b> — then it <b>has finished</b>, even though
+        it still looks busy. Android does this with app files.
+      </p>
+      <p>
+        Open <b>My Files</b> (or <b>Files</b>) → <b>Downloads</b>, and tap
+        <b>HomattHealth.apk</b>. It will install normally.
+      </p>
+      <p>
+        If the two numbers are <b>different</b>, it really did stop. Tap it in
+        your browser's Downloads list to resume — it carries on from where it
+        reached rather than starting again.
+      </p>
+    </details>
+
+    <!-- CHROME REFUSING THE FILE OUTRIGHT, which is a different fault from the
+         one above and needs a different answer.
+         Reported as "in the chrome, it wasn't downloading ... it was about the
+         security issue", and then the same file downloaded perfectly in
+         Firefox. Chrome treats every .apk as a dangerous file type and blocks
+         it by default; the button that lets it through is deliberately small
+         and easy to miss, and nothing on the page said it existed. Somebody
+         who does not know that reads it as "the app is broken" or, worse, as
+         "this file is a virus" — and stops. Naming the exact words Chrome
+         uses is what makes it findable. -->
+    <details class="stuck">
+      <summary>Chrome says it is blocked or dangerous?</summary>
+      <p>
+        That is normal and it is not about this file. Chrome refuses
+        <b>every</b> app file that does not come from the Play Store, however
+        safe it is. Nothing is wrong with the download.
+      </p>
+      <p>
+        Pull down the notification, or open Chrome's <b>Downloads</b>, find
+        the blocked line and tap <b>Download anyway</b> — it may be behind
+        the small <b>⋮</b> or an arrow beside the message.
+      </p>
+      <p>
+        If you cannot find it, use <b>Firefox</b>, <b>Samsung Internet</b> or
+        <b>Opera</b> instead — open this page there and tap the same button.
+        It is the identical file, and it installs the same way.
+      </p>
+    </details>
+    <div class="url">https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk</div>
+  </div>
+
+  <!-- AND THE BROWSER, which is a real answer rather than a consolation: it is
+       how somebody tries the portal in thirty seconds, and how it is used on a
+       laptop, where there is no APK to install. -->
+  <div class="card">
+    <h2>🌐 Use it in a browser</h2>
+    <p>Nothing to install. Right for a laptop, or for trying it now.</p>
+    <ul>
+      <li>Everything on the screens works the same</li>
+      <li>Add it to a home screen and it opens like an app</li>
+      <li><b>No home-screen widget</b> — that belongs to the Android app</li>
+    </ul>
+    <a class="btn ghost" href="clinic/">Open the clinic portal</a>
+    <div class="url">https://emmanuelokol.github.io/homatt-uganda/clinic/</div>
+  </div>
+
+  <footer>Homatt Health · Uganda</footer>
+</div>
+</body>
+</html>

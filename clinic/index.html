@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Homatt Clinic</title>
+  <script>
+  /* A blank page is the worst thing a browser can show a clinic, because it
+   * looks identical to a broken connection, a wrong address and a dead phone.
+   * Clinics reported "the site does not load" and there was nothing on screen
+   * for anybody to act on.
+   *
+   * This runs FIRST and is written in the oldest JavaScript there is — no
+   * arrow functions, no const, no template strings, no optional chaining —
+   * because a browser too old for the app is by definition too old for
+   * anything clever in the message that explains it. It must parse in the
+   * engine it is warning about, or it is another blank page.
+   *
+   * It checks the things the portal genuinely cannot work without, and names
+   * the missing one. It does NOT check for a service worker: the app runs
+   * perfectly well without offline caching, and refusing to load over that
+   * would lock out the browsers this is meant to help. */
+  (function () {
+    var missing = [];
+    try {
+      if (typeof JSON === 'undefined' || !JSON.parse) missing.push('reading saved data (JSON)');
+      if (typeof Promise === 'undefined') missing.push('Promises');
+      if (typeof fetch === 'undefined') missing.push('fetch');
+      if (!document.querySelector) missing.push('querySelector');
+      if (!window.addEventListener) missing.push('addEventListener');
+      if (!Array.prototype.forEach || !Array.prototype.indexOf) missing.push('modern arrays');
+      try {
+        // Not just "is there a localStorage" — a browser in a locked-down
+        // private mode HAS the object and THROWS on write, which is a
+        // different fault and needs a different sentence.
+        window.localStorage.setItem('__homatt_probe__', '1');
+        window.localStorage.removeItem('__homatt_probe__');
+      } catch (e) { missing.push('STORAGE_BLOCKED'); }
+    } catch (e) { missing.push('something basic'); }
+    if (!missing.length) return;
+
+    var blocked = false, i;
+    for (i = 0; i < missing.length; i++) if (missing[i] === 'STORAGE_BLOCKED') blocked = true;
+
+    var msg = blocked
+      ? '<b>This browser is blocking storage.</b><p>Homatt Clinic keeps your sign-in and '
+        + 'any work you record without a connection on this device, so it cannot run with '
+        + 'storage switched off.</p><p>If you are in a private or incognito window, open the '
+        + 'site in a normal window. Otherwise allow cookies and site data for this site, '
+        + 'then reload.</p>'
+      : '<b>This browser is too old for Homatt Clinic.</b><p>It is missing: '
+        + missing.join(', ') + '.</p><p>Please open the site in an up-to-date Chrome, Edge, '
+        + 'Firefox or Safari, or install the Android app. Nothing you have recorded is '
+        + 'lost — it is on the server, and it will be there when you sign in.</p>';
+
+    var show = function () {
+      var d = document.createElement('div');
+      d.setAttribute('style',
+        'position:fixed;inset:0;left:0;top:0;right:0;bottom:0;z-index:99999;background:#F3FAF4;'
+        + 'color:#17251A;font-family:Arial,Helvetica,sans-serif;padding:26px;overflow:auto;'
+        + 'font-size:15px;line-height:1.55');
+      d.innerHTML = '<div style="max-width:430px;margin:8vh auto;background:#fff;border:1px solid #D7E4D9;'
+        + 'border-radius:16px;padding:22px 20px">'
+        + '<div style="font-size:19px;font-weight:700;margin-bottom:10px">Homatt Clinic</div>'
+        + msg
+        + '<p style="color:#5B6B5E;font-size:13px">If you are not sure what to do, show this '
+        + 'screen to whoever set up the clinic’s phones.</p></div>';
+      if (document.body) document.body.appendChild(d);
+    };
+    if (document.body) show();
+    else if (window.addEventListener) window.addEventListener('DOMContentLoaded', show);
+    else if (window.attachEvent) window.attachEvent('onload', show);
+  })();
+  </script>
+  <noscript>
+    <div style="font-family:Arial,Helvetica,sans-serif;padding:26px;font-size:15px;line-height:1.6">
+      <b>Homatt Clinic needs JavaScript.</b>
+      <p>Turn it on in your browser settings and reload this page.</p>
+    </div>
+  </noscript>
+  <link href="fonts/inter.css?v=1" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
+  <link href="fonts/material-icons.css?v=1" rel="stylesheet">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1B5E20">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Homatt Clinic">
+  <link rel="apple-touch-icon" href="icons/clinic-192.png?v=3">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/clinic-512.png?v=3">
+  <link rel="stylesheet" href="css/clinic.css?v=20261007">
+  <script src="js/clinic-chrome.js?v=20261007"></script>
+  <meta name="color-scheme" content="light dark">
+  <script>
+    // Apply the saved (or system) theme BEFORE first paint — no flash.
+    (function () {
+      try {
+        var t = localStorage.getItem('homatt_theme');
+        if (t !== 'dark' && t !== 'light') {
+          t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+        }
+        // The colour family, set before the first paint for the same reason.
+        var s = localStorage.getItem('homatt_skin');
+        if (['forest', 'midnight', 'dark', 'clay'].indexOf(s) < 0) s = 'forest';
+        document.documentElement.setAttribute('data-theme', t);
+        document.documentElement.setAttribute('data-skin', s);
+        /* The phone's own bar reads this tag, so it has to follow the look.
+           The colour is ONE fact, kept in clinic.css as --chrome beside the
+           skin that owns it — it used to be a map copied into five files.
+           js/clinic-chrome.js does this read as well, and additionally hands
+           the colour to the native bars of the installed app; this is the
+           fallback for a page whose copy of that file has not arrived. */
+        document.addEventListener('DOMContentLoaded', function () {
+          try {
+            var m = document.querySelector('meta[name="theme-color"]');
+            var v = getComputedStyle(document.documentElement)
+              .getPropertyValue('--chrome').trim();
+            if (m && v) m.setAttribute('content', v);
+          } catch (e) {}
+        });
+      } catch (e) {}
+    })();
+  </script>
+  <style>
+    /* ── Homatt login design system (scoped to this page) ─────────────── */
+    :root{
+      --lg-bg1:#F3FAF4; --lg-bg2:#DFEFE3; --lg-glow:rgba(46,125,50,.14);
+      --lg-mark:rgba(27,94,32,.07);
+      --lg-card:rgba(255,255,255,.86); --lg-card-border:rgba(27,94,32,.10);
+      --lg-shadow:0 24px 70px rgba(21,64,28,.18);
+      --lg-text:#17251A; --lg-text-sub:#5B6B5E; --lg-label:#33473A;
+      --lg-input-bg:#FFFFFF; --lg-input-border:#D7E4D9; --lg-input-text:#17251A;
+      --lg-focus:var(--deep-2); --lg-focus-ring:rgba(46,125,50,.18);
+      --lg-btn1:var(--deep); --lg-btn2:var(--deep-2);
+      --lg-ghost-bg:rgba(27,94,32,.06); --lg-ghost-border:rgba(27,94,32,.16); --lg-ghost-text:var(--deep);
+      --lg-divider:#C9DACB; --lg-marker:#93A697;
+    }
+    html[data-theme="dark"]{
+      --lg-bg1:#07130B; --lg-bg2:#0C2415; --lg-glow:rgba(67,160,71,.13);
+      --lg-mark:rgba(255,255,255,.055);
+      --lg-card:rgba(17,29,20,.78); --lg-card-border:rgba(255,255,255,.09);
+      --lg-shadow:0 24px 70px rgba(0,0,0,.55);
+      --lg-text:#EAF3EC; --lg-text-sub:#9FB4A4; --lg-label:#C2D3C6;
+      --lg-input-bg:rgba(255,255,255,.06); --lg-input-border:rgba(255,255,255,.14); --lg-input-text:#EAF3EC;
+      --lg-focus:#66BB6A; --lg-focus-ring:rgba(102,187,106,.22);
+      --lg-btn1:var(--deep-2); --lg-btn2:#43A047;
+      --lg-ghost-bg:rgba(255,255,255,.05); --lg-ghost-border:rgba(255,255,255,.16); --lg-ghost-text:var(--tint-3);
+      --lg-divider:rgba(255,255,255,.14); --lg-marker:#5F7263;
+    }
+    .admin-login-page{
+      position:relative; overflow:hidden;
+      background:
+        radial-gradient(120vmin 120vmin at 82% -10%, var(--lg-glow), transparent 60%),
+        linear-gradient(160deg, var(--lg-bg1) 0%, var(--lg-bg2) 100%) !important;
+      transition:background .35s ease;
+    }
+    /* GIANT brand watermark — the helping-figures mark, quietly everywhere */
+    .login-watermark{
+      position:absolute; width:125vmin; height:125vmin;
+      right:-32vmin; bottom:-34vmin; transform:rotate(-9deg);
+      color:var(--lg-mark); pointer-events:none; user-select:none; z-index:0;
+    }
+    .login-watermark svg{width:100%;height:100%}
+    .admin-login-card{
+      position:relative; z-index:1;
+      background:var(--lg-card) !important;
+      -webkit-backdrop-filter:blur(18px); backdrop-filter:blur(18px);
+      border:1px solid var(--lg-card-border);
+      border-radius:24px !important;
+      box-shadow:var(--lg-shadow) !important;
+      color:var(--lg-text);
+      animation:lg-rise .5s cubic-bezier(.2,.8,.3,1) both;
+    }
+    @keyframes lg-rise{from{opacity:0;transform:translateY(16px) scale(.985)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion: reduce){.admin-login-card{animation:none}}
+    .admin-login-title{color:var(--lg-text);font-size:21px;letter-spacing:-.2px}
+    .admin-login-sub{color:var(--lg-text-sub) !important}
+    .admin-login-logo-mark{box-shadow:0 10px 26px rgba(27,94,32,.35);border-radius:18px}
+    .login-field label{color:var(--lg-label) !important}
+    .login-field input{
+      background:var(--lg-input-bg) !important; color:var(--lg-input-text) !important;
+      border:1.5px solid var(--lg-input-border) !important; border-radius:12px !important;
+      transition:border-color .18s, box-shadow .18s;
+    }
+    .login-field input::placeholder{color:var(--lg-text-sub);opacity:.75}
+    .login-field input:focus{border-color:var(--lg-focus) !important;box-shadow:0 0 0 4px var(--lg-focus-ring)}
+    .login-btn{
+      background:linear-gradient(135deg, var(--lg-btn1), var(--lg-btn2)) !important;
+      border-radius:14px !important; letter-spacing:.2px;
+      box-shadow:0 10px 24px rgba(27,94,32,.30);
+      transition:transform .12s ease, box-shadow .2s ease, filter .2s ease;
+    }
+    .login-btn:active{transform:translateY(1px) scale(.995);box-shadow:0 5px 14px rgba(27,94,32,.28)}
+    .demo-btn{
+      background:var(--lg-ghost-bg) !important; color:var(--lg-ghost-text) !important;
+      border:1.5px solid var(--lg-ghost-border) !important; border-radius:14px !important;
+    }
+    .login-divider{color:var(--lg-text-sub)}
+    .login-divider::before,.login-divider::after{background:var(--lg-divider)}
+    #buildMarker{color:var(--lg-marker) !important}
+    #apkHint{color:var(--lg-text-sub) !important}
+    /* Theme toggle — top-right of the card */
+    .theme-toggle{
+      position:absolute; top:14px; right:14px; z-index:2;
+      width:40px; height:40px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      background:var(--lg-ghost-bg); border:1px solid var(--lg-ghost-border);
+      color:var(--lg-ghost-text); cursor:pointer;
+      transition:transform .15s ease, background .2s ease;
+      -webkit-tap-highlight-color:transparent;
+    }
+    .theme-toggle:active{transform:scale(.92)}
+    .theme-toggle .material-icons-outlined{font-size:20px}
+  </style>
+</head>
+<body>
+<div class="admin-login-page">
+  <div class="login-watermark" aria-hidden="true">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+      <g stroke="currentColor" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 206 168 C 172 212, 148 264, 140 318"/>
+        <path d="M 140 318 L 94 438"/>
+        <path d="M 140 318 L 228 386 L 212 462"/>
+        <path d="M 216 184 L 332 294"/>
+        <path d="M 416 270 C 438 314, 452 372, 456 430"/>
+        <path d="M 408 286 L 332 294"/>
+        <path d="M 456 430 L 350 378 L 302 458"/>
+      </g>
+      <circle cx="196" cy="102" r="49" fill="currentColor"/>
+      <circle cx="404" cy="214" r="45" fill="currentColor"/>
+    </svg>
+  </div>
+  <div class="admin-login-card">
+    <button type="button" class="theme-toggle" id="themeToggle" aria-label="Switch between light and dark mode">
+      <span class="material-icons-outlined" id="themeIcon">dark_mode</span>
+    </button>
+    <div class="admin-login-logo">
+      <div class="admin-login-logo-mark">
+        <img src="icons/logo-mark.svg?v=1" alt="Homatt Health" style="width:40px;height:40px" draggable="false">
+      </div>
+      <div class="admin-login-title">Clinic Portal</div>
+      <div class="admin-login-sub">Homatt Health — Uganda</div>
+    </div>
+
+    <!-- Why the app asked again. "It logs me out sometimes" is not something
+         anybody can chase; a reason and a time are. -->
+    <div id="whySignedOut" style="display:none;margin-bottom:14px;padding:10px 12px;
+         border-radius:11px;font-size:12.5px;line-height:1.45;
+         background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
+         border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
+
+    <!-- A sign-in email that was changed and never confirmed. This is the
+         screen where that matters and the only screen where nobody could see
+         it: the explanation lived in Settings, behind the sign-in. -->
+    <div id="pendingEmail" style="display:none;margin-bottom:14px;padding:10px 12px;
+         border-radius:11px;font-size:12.5px;line-height:1.45;
+         background:var(--pr-owe-bg, #FFF4E5);color:var(--pr-owe-fg, #7A4F01);
+         border:1px solid var(--pr-owe-bd, #F5D9A8)"></div>
+
+    <form id="loginForm">
+      <div class="login-field">
+        <label for="email">Staff Email</label>
+        <input type="text" id="email" name="clinic-login-id" placeholder="doctor@yourclinic.ug" required
+               inputmode="email" autocomplete="off" autocapitalize="none"
+               autocorrect="off" spellcheck="false" aria-autocomplete="none">
+      </div>
+      <div class="login-field">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required
+               autocomplete="current-password" autocapitalize="none"
+               autocorrect="off" spellcheck="false">
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">
+        Sign In to Clinic Portal
+      </button>
+    </form>
+
+    <div class="login-divider">or</div>
+
+    <!-- A clinician who moves between clinics has their own account, not one
+         of this clinic's logins. Without this line the only way to find that
+         portal is to be told the address, which nobody would be. -->
+    <a href="clinician/index.html" id="clinicianPortalLink"
+       style="display:flex;align-items:center;justify-content:center;gap:7px;margin-bottom:12px;padding:12px;
+              border:1.5px solid var(--lg-ghost-border);border-radius:10px;background:var(--lg-ghost-bg);
+              color:var(--lg-ghost-text);font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">badge</span>
+      I am a clinician — my own account
+    </a>
+    <div style="font-size:11px;color:var(--lg-text-sub);text-align:center;margin:-6px 0 14px;line-height:1.5">
+      For doctors, clinical officers and nurses who work at more than one clinic.
+      Your record goes with you.
+    </div>
+
+    <button class="demo-btn" id="demoBtn">
+      <span class="material-icons-outlined" style="font-size:16px;vertical-align:middle;margin-right:6px">play_circle</span>
+      Open Demo Dashboard
+    </button>
+
+    <a id="apkDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/android-latest/HomattHealth.apk"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:var(--on-deep, #fff);font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">android</span>
+      Get the Android app (best offline — installs from a file)
+    </a>
+    <div id="apkHint" style="display:none;font-size:11px;color:var(--text-lt, #5F6368);text-align:center;margin-top:6px;line-height:1.5">
+      Opens fully offline on any phone. After downloading, tap the file and allow install.
+    </div>
+
+    <a id="pcDownload" href="https://github.com/Emmanuelokol/homatt-uganda/releases/download/desktop-latest/HomattClinic-Setup.exe"
+       style="display:none;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:12px;border:none;border-radius:10px;background:var(--deep);color:var(--on-deep, #fff);font-size:13.5px;font-weight:700;text-decoration:none">
+      <span class="material-icons-outlined" style="font-size:18px">computer</span>
+      Get the Windows app (works fully offline)
+    </a>
+    <div id="pcHint" style="display:none;font-size:11px;color:var(--text-lt, #5F6368);text-align:center;margin-top:6px;line-height:1.5">
+      Or install from the browser: Chrome / Edge menu → "Install Homatt Clinic".
+    </div>
+
+    <div class="login-error" id="loginError"></div>
+    <div id="buildMarker" style="text-align:center;margin-top:14px;font-size:10px;color:#B0BEC5;letter-spacing:.3px"></div>
+  </div>
+</div>
+<script>
+  // Visible build + LIVE DIAGNOSTICS marker. Tells us, from one screenshot,
+  // exactly why offline is or isn't working: the version, the launch mode, and
+  // — critically — whether the offline service worker is active and how many
+  // files it has actually cached. "SW:active cache:20" = offline will work;
+  // "SW:none" or "cache:0" pinpoints the real failure.
+  (function () {
+    /* The build is ASKED FOR, never typed here.
+     *
+     * This line existed to be photographed and sent to us, and for two months
+     * its most important field was the string 'v151' — written once on
+     * 2026-07-05 and never touched again, while the worker beside it went to
+     * v184. Every clinic on every build reported v151, and a screenshot that
+     * was meant to answer "what are they running?" answered it wrongly, with
+     * total confidence, for every phone in the country.
+     *
+     * The honest answers, in order of authority:
+     *   1. __meta__appliedBuild in IndexedDB — what the self-update actually
+     *      put in place. This is the only field that knows a phone has taken a
+     *      newer build over the air, and it is marked with a '+'.
+     *   2. otherwise the newest homatt-clinic-vNNN cache, which is the name
+     *      the running worker gave its own cache.
+     *   3. otherwise 'v?' — said plainly, rather than guessed at. */
+    var BUILD = 'v…';
+    var el = document.getElementById('buildMarker');
+    function set(t) { if (el) el.textContent = t; }
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    var standalone = window.matchMedia('(display-mode: standalone)').matches;
+    var mode = native ? 'app' : (standalone ? 'installed' : 'browser');
+    set('Homatt Clinic • ' + BUILD + ' • ' + mode);
+    (async function () {
+      var sw = 'no-SW-support', pages = 0;
+      try {
+        if ('serviceWorker' in navigator) {
+          var reg = await navigator.serviceWorker.getRegistration();
+          sw = !reg ? 'none' : (reg.active ? 'active' : (reg.installing ? 'installing' : (reg.waiting ? 'waiting' : 'reg')));
+        }
+      } catch (e) { sw = 'err'; }
+      var cacheBuild = '';
+      try {
+        if (window.caches) {
+          var keys = await caches.keys();
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i].indexOf('homatt-clinic-') !== 0) continue;
+            var c = await caches.open(keys[i]);
+            pages += (await c.keys()).length;
+            // Highest version number wins: an old cache can still be lying
+            // around next to the one in use.
+            var nThis = parseInt((keys[i].match(/v(\d+)/) || [])[1] || '0', 10);
+            var nBest = parseInt((cacheBuild.match(/v(\d+)/) || [])[1] || '-1', 10);
+            if (nThis > nBest) cacheBuild = keys[i];
+          }
+        }
+      } catch (e) {}
+      // The IndexedDB SECOND copy of the shell (survives cache wipes) and
+      // whether the OS granted persistent storage (protects against cleaners).
+      var idbN = 0, keep = '?', applied = '';
+      try {
+        var shelf = await new Promise(function (res) {
+          var q = indexedDB.open('homatt-shell', 1);
+          q.onupgradeneeded = function () { try { q.result.createObjectStore('files'); } catch (e) {} };
+          q.onsuccess = function () {
+            try {
+              var st = q.result.transaction('files', 'readonly').objectStore('files');
+              var out = { n: 0, build: '' }, left = 2;
+              function done() { if (--left <= 0) res(out); }
+              var rq = st.getAllKeys();
+              rq.onsuccess = function () { out.n = (rq.result || []).length; done(); };
+              rq.onerror = done;
+              // What the self-update actually put in place, written by
+              // clinic-sw.js as __meta__appliedBuild. Absent on a phone that
+              // has never taken an over-the-air build.
+              var rb = st.get('__meta__appliedBuild');
+              rb.onsuccess = function () {
+                out.build = (rb.result && rb.result.body) ? String(rb.result.body) : ''; done();
+              };
+              rb.onerror = done;
+            } catch (e) { res({ n: 0, build: '' }); }
+          };
+          q.onerror = function () { res({ n: 0, build: '' }); };
+        });
+        idbN = shelf.n; applied = shelf.build;
+      } catch (e) {}
+      /* The answer comes from clinic.js, which is the one place that works it
+       * out — the same number the side menu shows on every other screen, so
+       * the two can never disagree about what this phone is running.
+       *
+       * It is loaded further down this page, but every `await` above has
+       * yielded to the parser by now, so it is there. If it somehow is not —
+       * and this is the one screen that has to keep working when things are
+       * broken — fall back to the cache name, which was already read for the
+       * "cache:" counter beside it.
+       *
+       * '+' means this phone has taken a newer build over the air, which is
+       * the single most useful thing a support screenshot can tell us. */
+      if (typeof window.homattRunningBuild === 'function') {
+        try { BUILD = await window.homattRunningBuild(); } catch (e) { BUILD = 'v?'; }
+      } else {
+        BUILD = applied ? (applied.replace(/^homatt-clinic-/, '') + '+')
+              : cacheBuild ? cacheBuild.replace(/^homatt-clinic-/, '')
+              : 'v?';
+      }
+      try {
+        if (navigator.storage && navigator.storage.persisted) {
+          keep = (await navigator.storage.persisted()) ? 'yes' : 'no';
+        }
+      } catch (e) {}
+      set('Homatt Clinic • ' + BUILD + ' • ' + mode + ' • SW:' + sw + ' • cache:' + pages + ' • idb:' + idbN + ' • keep:' + keep);
+    })();
+  })();
+</script>
+
+<script>
+  // Light/dark toggle — remembered on this device, defaults to the phone's own
+  // setting. The whole page re-themes through CSS variables instantly.
+  (function () {
+    var btn = document.getElementById('themeToggle');
+    var icon = document.getElementById('themeIcon');
+    function paint() {
+      var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      if (icon) icon.textContent = dark ? 'light_mode' : 'dark_mode';
+    }
+    if (btn) btn.addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('homatt_theme', next); } catch (e) {}
+      paint();
+    });
+    paint();
+  })();
+</script>
+
+<script src="js/vendor/supabase.min.js?v=2110"></script>
+<script src="../js/config.js"></script>
+<script src="js/clinic-offline.js?v=20261007a"></script>
+<!-- clinic.js registers the offline-sync handlers. Loading it here (not just on
+     the dashboard) lets the outbox process + self-heal from the LOGIN page too,
+     so a queued write that can never succeed no longer shows "Syncing…" forever
+     while you're signed out. It only defines functions + registers handlers —
+     no side effects that touch the login flow. -->
+<script src="js/clinic.js?v=20261007"></script>
+  <script src="js/clinic-open.js?v=20261007"></script>
+<script src="js/pwa-install.js?v=20261007"></script>
+<script>
+  (function() {
+    try {
+      const s = JSON.parse(localStorage.getItem('clinic_session') || 'null');
+      if (s && typeof s === 'object' && !Array.isArray(s)) {
+        window.location.href = 'dashboard.html';
+        return;
+      }
+    } catch(e) {}
+    localStorage.removeItem('clinic_session');
+  })();
+
+  // If the app put somebody out, say so here rather than presenting a blank
+  // sign-in screen as though they had chosen it.
+  (function () {
+    try {
+      var raw = localStorage.getItem('homatt_last_signout');
+      if (!raw) return;
+      var r = JSON.parse(raw);
+      if (!r || !r.at) return;
+      // Nobody needs telling they signed out. It is recorded so the next page
+      // does not mistake the empty storage for a damaged one, not so it can be
+      // announced back at them.
+      if (r.deliberate) return;
+      var mins = Math.max(0, Math.round((Date.now() - new Date(r.at).getTime()) / 60000));
+      /* An explanation must not outlive the thing it explains.
+       *
+       * This used to keep for a full DAY, and a successful sign-in never
+       * cleared it — so one clinic's screenshot carried a 228-minute-old
+       * "could not be read" printed directly above a fresh and completely
+       * unrelated "Invalid login credentials", as though they were one fault.
+       * Signing in now clears it (see the submit handler), and anything older
+       * than half an hour is history rather than an explanation of what is on
+       * the screen right now. */
+      if (mins > 30) { localStorage.removeItem('homatt_last_signout'); return; }
+      var el = document.getElementById('whySignedOut');
+      if (!el) return;
+      el.textContent = 'You were asked to sign in again ' +
+        (mins < 1 ? 'just now' : mins + ' minute' + (mins === 1 ? '' : 's') + ' ago') +
+        ' because ' + r.why + '.' +
+        (r.online ? '' : ' The phone had no connection at the time.');
+      el.style.display = '';
+    } catch (e) {}
+  })();
+
+  /* An email change that was started and never finished.
+   *
+   * Changing a sign-in email in Supabase does not move the login — it sends a
+   * confirmation link, and with "Secure email change" it sends one to the OLD
+   * address as well, and BOTH have to be opened. Until then the old address is
+   * still the account.
+   *
+   * A clinic changed theirs, came back later, typed the NEW address here
+   * because that is the one they had decided on, and was told "Invalid login
+   * credentials" — which is true, unhelpful, and identical to what a wrong
+   * password says. Settings knew the change was pending; this screen, the one
+   * they were actually looking at, did not. Now it does. */
+  function _pendingEmailChange() {
+    try {
+      var p = JSON.parse(localStorage.getItem('homatt_email_change') || 'null');
+      return (p && p.to) ? p : null;
+    } catch (e) { return null; }
+  }
+  (function () {
+    var p = _pendingEmailChange();
+    var el = document.getElementById('pendingEmail');
+    if (!p || !el) return;
+    /* A change made DIRECTLY has already moved the login — there is no link to
+     * open and the old address is finished. Saying "it has not been confirmed,
+     * keep using the old one" would be exactly backwards, and would send
+     * somebody to an address that no longer works. */
+    el.textContent = p.direct
+      ? 'The sign-in email for this account was changed to ' + p.to + ' on this phone. ' +
+        'Use that from now on — ' + (p.from ? p.from + ' no longer works.' : 'the old one no longer works.')
+      : 'A change of sign-in email to ' + p.to + ' was started on this ' +
+        'phone and has not been confirmed. Until the link sent to ' + p.to + ' is opened, ' +
+        'sign in with ' + (p.from || 'your old address') + ' — it still works.';
+    el.style.display = '';
+  })();
+
+  /* Offer the native Android app — and the whole point of this block is WHO it
+   * is offered to.
+   *
+   * IT USED TO BE HIDDEN FROM THE ONE PERSON WHO NEEDED IT. The old test was
+   *
+   *     standalone || Capacitor  ->  "already installed, say nothing"
+   *
+   * and `display-mode: standalone` is true of ANY page added to a home screen.
+   * So a clinic that tapped "Add to Home screen" on this very page — which is
+   * what everybody given the /clinic/ link does, and what the owner himself
+   * had done — was thereafter treated as though they were holding the Android
+   * app. They were holding a browser tab with no address bar. It offered them
+   * nothing, told them nothing, and they reasonably concluded there was
+   * nothing else to get.
+   *
+   * That is the same conflation the widget card was caught by: an icon on a
+   * home screen is not an installed app. Only the Capacitor bridge answers
+   * that question, because only the real app has one.
+   *
+   * Standalone is still worth knowing — somebody who has already "installed"
+   * something needs to be told plainly that this is not it, rather than
+   * offered an install they think they already did. */
+  (function() {
+    try {
+      var isAndroid = /Android/i.test(navigator.userAgent || '');
+      var native = !!(window.Capacitor && (window.Capacitor.isNative ||
+                   (typeof window.Capacitor.isNativePlatform === 'function' &&
+                    window.Capacitor.isNativePlatform())));
+      var standalone = false;
+      try { standalone = window.matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+      var inApp = standalone || native;   // desktop's rule, unchanged
+      if (isAndroid && !native) {
+        var a = document.getElementById('apkDownload');
+        var h = document.getElementById('apkHint');
+        if (a) a.style.display = 'flex';
+        if (h) {
+          if (standalone) {
+            h.innerHTML = 'What you have on your home screen is this web page, ' +
+              'not the Android app. The app works with no internet at all and ' +
+              'can put New treatment, Active and Quick sale on your home screen. ' +
+              'Installing it keeps everything already recorded.';
+          }
+          h.style.display = 'block';
+        }
+      }
+      // Desktop browser (not a phone, not already installed/native, not the
+      // desktop app itself which runs from file:) → offer the Windows app.
+      var isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      var isFile = location.protocol === 'file:';
+      if (!isMobile && !inApp && !isFile) {
+        var p = document.getElementById('pcDownload');
+        var ph = document.getElementById('pcHint');
+        if (p) p.style.display = 'flex';
+        if (ph) ph.style.display = 'block';
+      }
+    } catch(e) {}
+  })();
+
+  const cfg = window.HOMATT_CONFIG || {};
+  const _supa = (cfg.SUPABASE_URL && window.supabase)
+    ? window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY, {
+        auth: { storageKey: 'sb-homatt-clinic-auth' }
+      }) : null;
+
+  // IMPORTANT: never rewrite the field's value while the user is typing.
+  // Samsung/Gboard keyboards hold the current word in an IME composition
+  // buffer; changing input.value mid-composition makes the keyboard re-commit
+  // its whole buffer, which DUPLICATES the text (emmanuel@emmanuel@…).
+  // So we only sanitize when it's safe: after composition ends, on blur,
+  // and right before submitting.
+  const emailInput = document.getElementById('email');
+  let _composing = false;
+
+  function sanitizeEmail() {
+    if (_composing) return; // never touch the value mid-composition
+    const cleaned = emailInput.value.replace(/[^a-zA-Z0-9._%+@\-]/g, '');
+    if (cleaned !== emailInput.value) emailInput.value = cleaned;
+  }
+
+  emailInput.addEventListener('compositionstart', () => { _composing = true; });
+  emailInput.addEventListener('compositionend',   () => { _composing = false; sanitizeEmail(); });
+  emailInput.addEventListener('blur', sanitizeEmail);
+
+  /* What the sign-in error actually means, in words a clinic can act on.
+   *
+   * It used to print Supabase's own sentence, unedited. "Invalid login
+   * credentials" is that sentence, and it covers three different situations
+   * that need three different actions:
+   *
+   *   - the password is wrong
+   *   - there is no account with this address
+   *   - the address is a NEW one whose change was never confirmed
+   *
+   * Supabase deliberately gives the same answer to the first two, so that
+   * somebody guessing cannot learn which addresses exist, and that is right —
+   * the app must not undo it by saying "no such account". But it CAN tell the
+   * third apart, because the third happened on this phone and was written
+   * down, and that is the one a clinic cannot possibly work out alone. */
+  function _signinFault(e, typed) {
+    var m = String((e && e.message) || '');
+    var status = Number((e && e.status) || 0);
+
+    if (/failed to fetch|networkerror|network request failed|load failed|timeout/i.test(m)) {
+      return 'Could not reach the server. Check the connection and try again — ' +
+             'everything already on this phone still works offline once you are in.';
+    }
+    if (/rate|too many|429/i.test(m) || status === 429) {
+      return 'Too many attempts. Wait a few minutes, then try again.';
+    }
+    if (/email not confirmed|not confirmed/i.test(m)) {
+      return 'This account’s address has not been confirmed yet. Open the link ' +
+             'that was sent to ' + typed + ', then sign in.';
+    }
+    if (/invalid login credentials|invalid.*credential/i.test(m)) {
+      var p = _pendingEmailChange();
+      // Only an UNCONFIRMED change explains this. A direct change already
+      // moved the login, so the address is right and the password is not —
+      // blaming the change there would send them to an address that is gone.
+      if (p && !p.direct && String(p.to).toLowerCase() === String(typed).toLowerCase()) {
+        return 'That address is not your sign-in yet. The change to ' + p.to +
+               ' was never confirmed, so the account is still ' +
+               (p.from || 'your old address') + ' — sign in with that one. ' +
+               'The link sent to ' + p.to + ' has to be opened first.';
+      }
+      if (p && p.direct && String(p.from || '').toLowerCase() === String(typed).toLowerCase()) {
+        return 'That is the OLD address. The sign-in for this account was changed to ' +
+               p.to + ' — use that one. Your password did not change.';
+      }
+      return 'That email and password did not sign in. Check the address letter ' +
+             'by letter — ' + typed + ' is what was sent. If you recently changed ' +
+             'your sign-in email, the OLD one still works until the confirmation ' +
+             'link is opened.';
+    }
+    return m || 'Could not sign in. Try again.';
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    _composing = false;
+    sanitizeEmail();
+    const email = document.getElementById('email').value.trim().toLowerCase();
+    const password = document.getElementById('password').value;
+    const btn = document.getElementById('loginBtn');
+    const err = document.getElementById('loginError');
+    err.style.display = 'none';
+
+    if (!_supa) {
+      localStorage.setItem('clinic_session', JSON.stringify({ email, staffName: email.split('@')[0], clinicName: 'Clinic Portal' }));
+      window.location.href = 'dashboard.html';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+
+    const { data: authData, error: authError } = await _supa.auth.signInWithPassword({ email, password });
+    if (authError) {
+      err.textContent = _signinFault(authError, email);
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Clinic Portal';
+      return;
+    }
+
+    const { data: pu } = await _supa
+      .from('portal_users')
+      .select('*, clinics(name)')
+      .eq('auth_user_id', authData.user.id)
+      .eq('role', 'clinic_staff')
+      .eq('is_active', true)
+      .single();
+
+    if (!pu) {
+      await _supa.auth.signOut();
+      err.textContent = 'No clinic staff account found for this email.';
+      err.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Sign In to Clinic Portal';
+      return;
+    }
+
+    localStorage.setItem('clinic_session', JSON.stringify({
+      userId: authData.user.id,
+      staffName: pu.full_name || email,
+      clinicId: pu.clinic_id,
+      clinicName: (pu.clinics || {}).name || 'Clinic',
+      staffRole: pu.staff_role || 'owner',
+      email
+    }));
+    // Signed in: whatever put them out is over, and must not be printed over
+    // the top of the next thing that goes wrong.
+    try { localStorage.removeItem('homatt_last_signout'); } catch (e) {}
+    // This address IS the login — it just worked. So a pending change to some
+    // other address is either finished or was never confirmed; either way the
+    // warning has served its purpose once the right one is in use.
+    try {
+      var pend = JSON.parse(localStorage.getItem('homatt_email_change') || 'null');
+      if (pend && String(pend.to || '').toLowerCase() === email) {
+        localStorage.removeItem('homatt_email_change');
+      }
+    } catch (e) {}
+    window.location.href = 'dashboard.html';
+  });
+
+  document.getElementById('demoBtn').addEventListener('click', async () => {
+    // The demo is for showing OTHER people — it must never carry the real
+    // account's access with it. Sign the real login out first so nothing in
+    // demo mode can reach the clinic's actual data.
+    try { if (_supa) await Promise.race([_supa.auth.signOut(), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
+    localStorage.setItem('clinic_session', JSON.stringify({
+      staffName: 'Dr. Demo',
+      clinicName: 'Kampala Medical Centre',
+      clinicId: null,
+      demo: true
+    }));
+    window.location.href = 'dashboard.html';
+  });
+</script>
+</body>
+</html>
