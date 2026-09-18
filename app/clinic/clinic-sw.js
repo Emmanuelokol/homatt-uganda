@@ -962,7 +962,21 @@ self.addEventListener('fetch', (event) => {
           net = await fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
             .catch(() => null);
         }
-        if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) return net;
+        /* THROUGH navSafe, like the cached hit above it.
+         *
+         * This line returned the network response straight to the navigation.
+         * A REDIRECTED response reaching a navigation is one of the two things
+         * this whole handler exists to prevent — it makes Chrome show its own
+         * dark "You're offline" screen — and navSafe() is the function written
+         * to strip exactly that. The cached branch used it; this one did not.
+         *
+         * It mattered little while this path was rarely reached. Forcing the
+         * network attempt above (so the placeholder can never beat a page
+         * sitting in the APK) makes it the ordinary path on a first launch, so
+         * it gets the same guard. */
+        if (net && (net.ok || net.type === 'opaqueredirect' || net.type === 'opaque')) {
+          return await navSafe(net);
+        }
         return offlineFallbackResponse();
       } catch (e) {
         // Whatever broke above, the user still gets OUR page, never Chrome's.
