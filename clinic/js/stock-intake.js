@@ -348,6 +348,14 @@
       for (var i = 0; i < arguments.length; i++) if (num(arguments[i]) > 0) return num(arguments[i]);
       return '';
     }
+    // Genuinely guessing, as opposed to knowing: nothing on the shelf already,
+    // nothing remembered for this clinic, and the blueprint itself is only
+    // offering the standard shape for that kind of thing, not a confident
+    // match. This is exactly the freehand-brand-name case — the national list
+    // never heard of it, so there was no dosage form to go on, and the
+    // fallback for an unknown medicine is a tablet. True most of the time;
+    // wrong for every syrup, vial or sachet added this way.
+    var unsure = !(ex && ex.unit) && !tmpl.unit && !plan.sure;
     st = {
       name: hit.name,
       // The national list files condoms under contraceptives — a medicine. To
@@ -360,6 +368,7 @@
       unit:   (ex && ex.unit) || tmpl.unit || plan.unit || 'tabs',
       outer:  tmpl.outer || plan.outer || 'boxes',
       inner:  (tmpl.inner != null ? tmpl.inner : plan.inner) || '',
+      unsure: unsure,
       existing: ex || null,
       boxes:  firstNum(ex && ex.last_boxes, tmpl.last_boxes),
       strips: firstNum(ex && ex.strips_per_box, ex && ex.packs_per_box, tmpl.strips_per_box),
@@ -412,6 +421,22 @@
       // The batches already on the shelf, soonest-expiring first, so the owner
       // can see exactly which stock leaves next. Filled in once loaded.
       h += '<div id="stkBatches"></div>';
+    }
+
+    // Only shown when we are genuinely guessing (see `unsure` above) — every
+    // item the national list or this clinic's own history already knows
+    // skips this entirely, so nothing about the existing flow changes.
+    if (st.unsure) {
+      h += '<div class="stk-known">We\'re guessing this comes in <b>' + esc(st.unit) +
+           '</b>. If that is wrong, say what it actually is:<br>' +
+           [['tabs', 'Tabs / caps'], ['bottles', 'Bottle'], ['vials', 'Vial'],
+            ['sachets', 'Sachet'], ['tubes', 'Tube'], ['pieces', 'Piece']]
+             .map(function (p) {
+               return '<button type="button" class="stk-edit stk-unit-btn" data-u="' + p[0] + '"' +
+                      (st.unit === p[0] ? ' disabled style="opacity:.45"' : '') +
+                      ' style="margin-right:14px">' + p[1] + '</button>';
+             }).join('') +
+           '</div>';
     }
 
     // Q1 — always asked. When there is no pack at all, this IS the count.
@@ -498,6 +523,18 @@
     if (xp) xp.onchange = function () { st.expiry = xp.value || ''; };
     var ch = document.getElementById('stkChange');
     if (ch) ch.onclick = function () { st.forceAsk = true; renderCount(); };
+    document.querySelectorAll('.stk-unit-btn').forEach(function (btn) {
+      btn.onclick = function () {
+        var shp = bp() && bp().shapeForUnit(btn.getAttribute('data-u'));
+        if (!shp) return;
+        st.unit = shp.unit; st.outer = shp.outer; st.inner = shp.inner;
+        st.strips = ''; st.units = '';           // the old numbers belonged to the wrong shape
+        st.suggest = { strips: shp.strips, units: shp.units, sure: false, note: '' };
+        st.unsure = false;                        // they just told us — no need to ask again this time
+        st.forceAsk = true;
+        renderCount();
+      };
+    });
     recalc();
     setTimeout(function () { try { document.getElementById('stkBoxes').focus(); } catch (e) {} }, 120);
     loadBatches();
