@@ -42,7 +42,7 @@
   'use strict';
 
   // ?v= must match DATA_VERSION in clinic-sw.js — see guidelines.js.
-  var IDX_URL = 'data/impression_index.db?v=144';
+  var IDX_URL = 'data/impression_index.db?v=145';
   var idx = null, idxLoading = null;
 
   // ── Lay speech → the words the books use ────────────────────────────────
